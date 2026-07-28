@@ -49,11 +49,48 @@ export default defineConfig({
         },
       },
     ],
+    /**
+     * `pnpm coverage` exécute **les deux projets en une passe**, et c'est la seule mesure qui
+     * reflète la réalité : le code du BFF qui touche la base est exercé par le projet `db`, et une
+     * couverture mesurée sur `unit` seul le déclarerait mort. Deux îlots séparés auraient poussé
+     * soit à exclure ce qui manque, soit à écrire des tests unitaires redondants pour regagner des
+     * points — deux façons de dégrader la suite pour flatter un chiffre.
+     */
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/routeTree.gen.ts', 'src/test/**', 'src/**/*.{test,spec}.{ts,tsx}'],
+      exclude: [
+        'src/routeTree.gen.ts', // généré par le build, vérifié par la CI
+        'src/test/**', // le harnais lui-même
+        'src/**/*.{test,spec}.{ts,tsx}',
+        // Déclarations Drizzle pures : des appels `pgTable(...)`, aucune branche. Les couvrir ne
+        // dirait rien de ce qui compte — qu'une cascade `onDelete` fasse ce qu'elle annonce se
+        // prouve par un test de comportement dans le projet `db`, jamais par un pourcentage.
+        // Corollaire à tenir : **aucune fonction dans ce répertoire**. Le jour où une valeur par
+        // défaut calculée ou un type de colonne sur mesure y apparaît, cette logique sort de la
+        // mesure sans que personne ne le voie — elle doit vivre à côté, pas dans le schéma.
+        'src/server/db/schema/**',
+      ],
+      thresholds: {
+        /**
+         * **`perFile`, et c'est tout l'intérêt.** Un seuil agrégé est une moyenne, et une moyenne
+         * masque exactement ce qu'on veut voir : un nouveau module de permissions à 40 % passerait
+         * derrière un client Admin à 96 %, alors que ses lignes non couvertes seraient les chemins
+         * de refus et les échecs d'écriture d'audit — ce que les invariants (a) et (c) exigent de
+         * garder. Vérifié : un seuil par glob (`'src/server/**': …`) reste agrégé lui aussi, et
+         * n'aurait donc rien réglé.
+         *
+         * Les valeurs sont le plancher de **chaque** fichier mesuré. Elles montent avec les steps ;
+         * elles ne redescendent pas. Un fichier qui ne peut honnêtement pas les tenir se justifie
+         * par un `v8 ignore` commenté, jamais en abaissant le seuil pour tout le monde.
+         */
+        perFile: true,
+        lines: 85,
+        branches: 75,
+        functions: 70,
+        statements: 85,
+      },
     },
   },
 })

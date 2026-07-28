@@ -62,7 +62,13 @@ export function getDatabase(): Database {
 export function closeDatabase(): Promise<void> {
   const current = instance
   instance = undefined
-  closing ??= current ? current.client.end({ timeout: 5 }) : Promise.resolve()
+  closing ??= (current ? current.client.end({ timeout: 5 }) : Promise.resolve()).finally(() => {
+    // Relâché une fois le drain **terminé**. La garde de `getDatabase` protège la fenêtre pendant
+    // laquelle les connexions se vident, pas la vie entière du processus : sans cette remise à
+    // zéro, un arrêt suivi d'un redémarrage à chaud — ce que fait un test, et ce que fera un jour
+    // un rechargement de configuration — laisserait le module définitivement muet.
+    closing = undefined
+  })
   return closing
 }
 

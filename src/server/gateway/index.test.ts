@@ -1,8 +1,13 @@
 // @vitest-environment node
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { readGatewayConfig } from './config'
-import { build } from './index'
+import { build, closeGatewayClient, getGatewayClient } from './index'
+
+const MOCK_ENV = {
+  GATEWAY_MODE: 'mock',
+  GATEWAY_ADMIN_BASE_URL: 'http://127.0.0.1:4010',
+} as const
 
 describe('assemblage du client', () => {
   it('ne monte ni certificat ni fournisseur de jeton en mode mock', async () => {
@@ -38,5 +43,41 @@ describe('assemblage du client', () => {
         }),
       ),
     ).toThrow(/GATEWAY_MTLS_CERT_PATH/)
+  })
+})
+
+describe('getGatewayClient', () => {
+  afterEach(async () => {
+    await closeGatewayClient()
+    for (const key of Object.keys(MOCK_ENV)) process.env[key] = undefined
+  })
+
+  it('construit le client une fois et le partage ensuite', () => {
+    // Le partage n'est pas un détail de performance : c'est ce qui garantit qu'une seule et même
+    // instance porte le certificat client et le jeton mis en cache. Deux clients, ce serait deux
+    // demandes de jeton et deux pools de connexions.
+    Object.assign(process.env, MOCK_ENV)
+
+    expect(getGatewayClient()).toBe(getGatewayClient())
+  })
+
+  it('refuse de se construire sur un environnement incomplet', async () => {
+    await closeGatewayClient()
+    process.env.GATEWAY_MODE = undefined
+
+    expect(() => getGatewayClient()).toThrow(/GATEWAY_MODE/)
+  })
+
+  it('reconstruit un client après fermeture', async () => {
+    Object.assign(process.env, MOCK_ENV)
+
+    const first = getGatewayClient()
+    await closeGatewayClient()
+
+    expect(getGatewayClient()).not.toBe(first)
+  })
+
+  it('ne fait rien quand aucun client n’a été construit', async () => {
+    await expect(closeGatewayClient()).resolves.toBeUndefined()
   })
 })
