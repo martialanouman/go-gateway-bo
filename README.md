@@ -7,12 +7,23 @@ Node auto-hébergé qui joue aussi le rôle de **BFF** vers l'API Admin de la pa
 ## Démarrer
 
 ```bash
+# Une fois par poste. Les contrats viennent de GitHub Packages, qui exige une authentification même
+# en lecture. Le jeton du CLI `gh` suffit ; le credential va dans la config utilisateur et non dans
+# le dépôt — pnpm refuse d'expanser une variable dans un `.npmrc` commité, voir `.npmrc`.
+gh auth refresh --hostname github.com -s read:packages
+pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"
+
 pnpm install
-cp .env.example .env     # renseigner au minimum GATEWAY_* si l'on vise la vraie passerelle
-pnpm dev                 # http://localhost:3000
+cp .env.example .env      # GATEWAY_MODE=mock suffit pour développer
+pnpm mock                 # Prism sert le contrat sur :4010 — dans un autre terminal
+pnpm dev                  # http://localhost:3000
 ```
 
 Node ≥ 24 (`.nvmrc` fait foi — la CI y lit sa version), pnpm 11.
+
+Un `pnpm install` qui échoue en **401 ou 403 sur `npm.pkg.github.com`** a toujours l'une de ces deux
+causes : le jeton local n'a pas le scope `read:packages`, ou le package n'accorde pas la lecture à ce
+dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat d'API ».
 
 ## Commandes
 
@@ -51,7 +62,28 @@ Le dépôt ne copie aucun schéma : il consomme le package versionné
 par une PR **là-bas**, jamais par un contournement ici.
 
 En développement, le mock Prism sert le contrat sans dépendre de la passerelle — ce qui est
-nécessaire, une partie des opérations n'étant pas encore implémentée en amont.
+nécessaire, une partie des opérations n'étant pas encore implémentée en amont. `GATEWAY_MODE`
+tranche : `mock` parle à Prism (`pnpm mock`), `live` à la vraie passerelle, avec OAuth2
+`client_credentials` et mTLS. Le réglage n'a pas de valeur par défaut, dans un sens comme dans
+l'autre : servir des données inventées en les croyant vraies est aussi grave que l'inverse.
+
+Le client typé vit sous `src/server/gateway/` et **nulle part ailleurs** — une règle Biome refuse son
+import depuis `src/routes/` et `src/components/` (invariant d). Le jeton obtenu est un jeton
+**machine** à scopes fixes, qui porte `content:read` en permanence : il ne représente pas l'opérateur
+connecté, et aucune restriction par opérateur ne peut donc être déléguée à la passerelle
+(invariant c).
+
+### Accès au registre
+
+Le package est publié sur GitHub Packages, qui exige une authentification même en lecture.
+
+- **En local**, le jeton du CLI `gh` avec le scope `read:packages`, posé dans la config *utilisateur*
+  (voir « Démarrer »). Le `.npmrc` du dépôt ne contient que la redirection de scope : pnpm refuse —
+  à raison — d'expanser une variable d'environnement dans un credential venant d'un fichier commité,
+  puisque ce fichier suit le dépôt jusque dans ses forks.
+- **En CI**, le `GITHUB_TOKEN` du run, auquel le package accorde la lecture (*Package settings →
+  Manage Actions access → `go-gateway-bo`*). Aucun PAT stocké en secret : un secret long-vécu expire
+  un matin sans prévenir et se révoque mal. Le workflow accorde `packages: read`.
 
 ## Dépendances
 
@@ -72,7 +104,10 @@ Deux protections sont actives et **ne doivent pas être désarmées par confort*
 ### Avis `pnpm audit` triés
 
 `pnpm vuln` échoue sur tout avis non listé dans `auditConfig.ignoreGhsas`. Un avis n'y entre qu'avec
-son raisonnement d'exposition écrit.
+son raisonnement d'exposition écrit — **et seulement après avoir vérifié qu'il n'est pas corrigeable**.
+Un avis qu'un `overrides` résout n'a rien à faire dans cette liste : c'est ce qui a été fait pour les
+quatre avis apportés par Prism (`lodash` et `uuid`, tous deux sous `postman-collection`), corrigés
+par deux entrées ciblées de `overrides` dans `pnpm-workspace.yaml` plutôt qu'ignorés.
 
 | Avis | Verdict |
 |---|---|

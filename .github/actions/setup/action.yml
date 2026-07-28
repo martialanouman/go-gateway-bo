@@ -17,6 +17,26 @@ runs:
         node-version-file: .nvmrc
         cache: pnpm
 
+    # Les contrats de la passerelle viennent de GitHub Packages, qui exige une authentification même
+    # en lecture. Le credential va dans la config *utilisateur* du runner et pas dans le `.npmrc` du
+    # dépôt : pnpm refuse d'expanser une variable d'environnement dans un credential venant d'un
+    # fichier commité — à raison, puisque ce fichier suit le dépôt jusque dans ses forks.
+    #
+    # `github.token` suffit : le package accorde la lecture à ce dépôt (Package settings → Manage
+    # Actions access). Aucun PAT en secret, donc rien qui expire un matin sans prévenir. Le workflow
+    # doit accorder `packages: read`.
+    #
+    # Le jeton passe par l'environnement et non par la ligne de commande : un argument de commande
+    # est lisible par tout autre processus du runner via `ps`. Le fichier est réécrit et non
+    # complété, pour qu'un runner réutilisé n'accumule pas de jetons périmés dont le premier lu
+    # gagnerait, et il est créé sans permission pour les autres utilisateurs.
+    - run: |
+        umask 077
+        printf '//npm.pkg.github.com/:_authToken=%s\n' "$NODE_AUTH_TOKEN" > "$HOME/.npmrc"
+      shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ github.token }}
+
     # --frozen-lockfile : une PR qui modifie package.json sans commiter le lockfile échoue ici plutôt
     # que d'installer silencieusement autre chose que ce qui a été testé en local.
     - run: pnpm install --frozen-lockfile

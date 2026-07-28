@@ -17,17 +17,25 @@
     "format": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "mock": "prism mock node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml --port 4010 --errors",
     "vuln": "pnpm audit --audit-level=low",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm vuln && pnpm build"
   },
   "dependencies": {
+    "@martialanouman/gateway-api-contracts": "1.0.0",
     "@tanstack/react-router": "1.170.18",
     "@tanstack/react-start": "1.168.32",
+    "openapi-fetch": "0.17.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "undici": "8.9.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.5",
+    "@stoplight/prism-cli": "5.16.0",
+    "@stoplight/prism-core": "5.16.0",
+    "@stoplight/prism-http": "5.16.0",
+    "@stoplight/prism-http-server": "5.16.0",
     "@tanstack/nitro-v2-vite-plugin": "1.155.0",
     "@testing-library/jest-dom": "7.0.0",
     "@testing-library/react": "16.3.2",
