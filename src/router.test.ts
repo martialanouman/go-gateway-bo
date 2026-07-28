@@ -6,8 +6,11 @@ import { getRouter } from './router'
 /**
  * Le câblage du routeur.
  *
- * Trois lignes de configuration, mais chacune est une décision de produit qu'aucun autre test ne
- * regarde — et que le build ne vérifie pas, puisqu'il se contente de les transmettre.
+ * Un seul test, délibérément. Asserter que `defaultPreload` vaut `'intent'` ou que
+ * `scrollRestoration` est vrai ne ferait que recopier `router.tsx` : ces assertions ne peuvent
+ * échouer que si quelqu'un change le réglage exprès, et elles échoueraient alors sans dire si le
+ * changement est bon. Ce qui mérite un test, c'est que la fabrique produise un routeur monté sur
+ * l'arbre généré — le reste se vérifie en lisant le fichier.
  */
 describe('getRouter', () => {
   it('construit un routeur sur l’arbre de routes généré', () => {
@@ -17,17 +20,5 @@ describe('getRouter', () => {
     // `/` et `/_design` existent aujourd'hui ; le test ne les énumère pas, ce serait redire
     // `routeTree.gen.ts`. Il vérifie que l'arbre est bien celui qui a été généré.
     expect(Object.keys(router.routesById)).toContain('/')
-  })
-
-  it('précharge à l’intention de navigation', () => {
-    // L'outil est dense et desktop-first : précharger au survol supprime l'attente perçue, et le
-    // réseau interne rend le coût négligeable. Un changement de ce réglage se verrait ici.
-    expect(getRouter().options.defaultPreload).toBe('intent')
-  })
-
-  it('restaure la position de défilement', () => {
-    // Un opérateur qui revient d'une fiche vers une table de mille lignes doit retrouver sa place ;
-    // sans cela, il perd le contexte de ce qu'il était en train d'examiner.
-    expect(getRouter().options.scrollRestoration).toBe(true)
   })
 })

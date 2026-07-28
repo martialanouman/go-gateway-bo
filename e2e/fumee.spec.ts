@@ -13,20 +13,25 @@ import { expect, test } from '@playwright/test'
  */
 
 test("l'application démarre et rend sa page d'accueil", async ({ page }) => {
-  const erreursConsole: string[] = []
-  page.on('console', (message) => {
-    if (message.type() === 'error') erreursConsole.push(message.text())
-  })
-  page.on('pageerror', (error) => erreursConsole.push(error.message))
+  // Deux signaux, et un seul est strict. `pageerror` ne se déclenche que sur une exception non
+  // rattrapée — typiquement un échec d'hydratation, qui ne casse pas l'affichage mais rend
+  // l'application inerte : les gestionnaires ne s'attachent jamais et l'écran devient une image.
+  // `console.error`, lui, remonte aussi ce qui ne nous appartient pas (une ressource absente, un
+  // avertissement d'extension) ; l'exiger vide rendrait la suite instable pour rien.
+  const exceptions: string[] = []
+  page.on('pageerror', (error) => exceptions.push(error.message))
 
   const response = await page.goto('/')
 
   expect(response?.status()).toBe(200)
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Tableau de bord')
 
-  // Une exception d'hydratation ne casse pas l'affichage mais rend l'application inerte : les
-  // gestionnaires d'événements ne s'attachent jamais, et l'écran devient une image.
-  expect(erreursConsole).toEqual([])
+  // L'hydratation n'est pas terminée au rendu du titre — il vient du serveur. On attend que React
+  // ait pris la main avant de conclure qu'aucune exception n'est survenue.
+  await page.waitForFunction(() => document.readyState === 'complete')
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+
+  expect(exceptions).toEqual([])
 })
 
 test('la page est servie en français et applique la charte', async ({ page }) => {
@@ -38,10 +43,27 @@ test('la page est servie en français et applique la charte', async ({ page }) =
 
   // Le thème sombre de la charte est appliqué par les tokens, pas par une préférence système : la
   // charte est sombre, sans bascule.
-  const fond = await page.evaluate(() =>
-    getComputedStyle(document.body).getPropertyValue('background-color'),
-  )
-  expect(fond).toBe('rgb(12, 15, 20)')
+  //
+  // On asserte la **liaison**, pas la constante : recopier `rgb(12, 15, 20)` ici ferait échouer ce
+  // test au premier ajustement de la charte, avec un message qui ne dirait pas lequel des deux a
+  // raison. Ce que le bout en bout peut prouver — et que l'unitaire ne peut pas — c'est que le
+  // `body` est réellement câblé sur le token, une fois la feuille chargée et la cascade résolue.
+  const { fond, token } = await page.evaluate(() => {
+    const styles = getComputedStyle(document.body)
+    const brut = styles.getPropertyValue('--surface-page').trim()
+
+    // La valeur du token est un hexadécimal ; le fond calculé est en `rgb()`. On les compare dans
+    // le même espace en laissant le navigateur faire la conversion.
+    const sonde = document.createElement('div')
+    sonde.style.color = brut
+    document.body.append(sonde)
+    const token = getComputedStyle(sonde).color
+    sonde.remove()
+
+    return { fond: styles.backgroundColor, token }
+  })
+
+  expect(fond).toBe(token)
 })
 
 test('la référence visuelle rend la charte', async ({ page }) => {

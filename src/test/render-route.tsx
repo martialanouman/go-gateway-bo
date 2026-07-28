@@ -11,26 +11,29 @@
  * refusant un diff sur ce fichier.
  */
 
-import { QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { render as renderWithTestingLibrary } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { routeTree } from '~/routeTree.gen'
-import { createTestQueryClient, type RenderResult } from './render'
+import { type RenderResult, renderComponent } from './render'
 
-/** Monte le produit à l'URL demandée. */
-export function renderRoute(path: string): RenderResult {
-  const queryClient = createTestQueryClient()
+/**
+ * Monte le produit à l'URL demandée.
+ *
+ * **Asynchrone**, et ce n'est pas un détail : `RouterProvider` ne rend le composant d'une route
+ * qu'après avoir résolu cette route. Un helper synchrone obligerait chaque test à commencer par un
+ * `findBy…` — c'est-à-dire à connaître ce détail — alors que c'est précisément ce qu'un helper doit
+ * absorber. `router.load()` attend la résolution ; le test peut ensuite interroger le DOM avec
+ * `getBy…` comme sur n'importe quel rendu.
+ *
+ * Les contextes viennent de `renderComponent` plutôt que d'être remontés ici : un seul endroit
+ * décide ce qui enveloppe un composant du produit.
+ */
+export async function renderRoute(path: string): Promise<RenderResult> {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [path] }),
   })
 
-  const result = renderWithTestingLibrary(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  )
+  await router.load()
 
-  return { ...result, user: userEvent.setup(), queryClient }
+  return renderComponent(<RouterProvider router={router} />)
 }

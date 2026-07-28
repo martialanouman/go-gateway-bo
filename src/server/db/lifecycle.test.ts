@@ -13,7 +13,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { closeDatabase, connect, getDatabase } from './index'
+import { closeDatabase, connect, getDatabase, resetDatabaseForTests } from './index'
 
 const URL = 'postgres://dashboard:dashboard@127.0.0.1:5432/dashboard'
 
@@ -23,7 +23,9 @@ beforeEach(() => {
 
 afterEach(async () => {
   await closeDatabase()
-  process.env.DATABASE_URL = undefined
+  // L'arrêt est terminal en production ; seuls les tests rouvrent, et par cette porte nommée.
+  resetDatabaseForTests()
+  delete process.env.DATABASE_URL
 })
 
 describe('getDatabase', () => {
@@ -33,7 +35,10 @@ describe('getDatabase', () => {
 
   it('refuse de démarrer sans DATABASE_URL', async () => {
     await closeDatabase()
-    process.env.DATABASE_URL = ''
+    resetDatabaseForTests()
+    // `delete`, et non `= undefined` : une affectation écrirait la chaîne « undefined », qui est
+    // truthy — le test passerait alors par la branche « valeur invalide » et non par « absente ».
+    delete process.env.DATABASE_URL
 
     // Pas de repli silencieux vers une base locale : une instance qui démarre en écrivant son
     // audit dans le vide est pire qu'une instance qui refuse de démarrer.
@@ -51,6 +56,15 @@ describe('closeDatabase', () => {
     // processus ne s'arrêterait jamais.
     expect(() => getDatabase()).toThrow(/fermeture/)
     await closing
+  })
+
+  it('reste fermé une fois éteint — l’arrêt est terminal', async () => {
+    // Un pool qui se rouvrirait après extinction empêcherait le processus de se terminer : une
+    // écriture d'audit tardive suffirait à ressusciter des connexions que plus personne n'attend.
+    getDatabase()
+    await closeDatabase()
+
+    expect(() => getDatabase()).toThrow(/fermeture/)
   })
 
   it('rend la même promesse quand on l’appelle deux fois', async () => {

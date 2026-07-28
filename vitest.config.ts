@@ -78,18 +78,21 @@ export default defineConfig({
          * masque exactement ce qu'on veut voir : un nouveau module de permissions à 40 % passerait
          * derrière un client Admin à 96 %, alors que ses lignes non couvertes seraient les chemins
          * de refus et les échecs d'écriture d'audit — ce que les invariants (a) et (c) exigent de
-         * garder. Vérifié : un seuil par glob (`'src/server/**': …`) reste agrégé lui aussi, et
-         * n'aurait donc rien réglé.
+         * garder. Un seuil par glob n'aurait pas suffi : il est agrégé par défaut, et la doc de
+         * Vitest annonce bien un `perFile` déclarable à l'intérieur d'un glob — mais le typage de
+         * la version installée (4.1.10) le refuse. `perFile` global est donc le seul chemin
+         * praticable aujourd'hui ; à revoir si une version ultérieure aligne le typage sur la doc,
+         * car un plancher différencié sous `src/server/**` serait plus juste.
          *
          * Les valeurs sont le plancher de **chaque** fichier mesuré. Elles montent avec les steps ;
          * elles ne redescendent pas. Un fichier qui ne peut honnêtement pas les tenir se justifie
          * par un `v8 ignore` commenté, jamais en abaissant le seuil pour tout le monde.
          */
         perFile: true,
-        lines: 85,
-        branches: 75,
-        functions: 70,
-        statements: 85,
+        lines: 88,
+        branches: 78,
+        functions: 85,
+        statements: 88,
       },
     },
   },

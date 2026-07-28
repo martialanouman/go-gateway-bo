@@ -1,7 +1,6 @@
-import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
-import { routeTree } from '~/routeTree.gen'
+import { renderRoute } from '~/test/render-route'
 
 /**
  * Test de fumée : l'arbre de routes généré se monte et la route racine rend son contenu.
@@ -11,14 +10,9 @@ import { routeTree } from '~/routeTree.gen'
  * périmé. C'est la porte `build` de la CI qui le régénère et refuse un diff.
  */
 test('la route racine se monte et rend son contenu', async () => {
-  const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({ initialEntries: ['/'] }),
-  })
+  await renderRoute('/')
 
-  render(<RouterProvider router={router} />)
-
-  expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
     'Tableau de bord — Passerelle SMS',
   )
 })

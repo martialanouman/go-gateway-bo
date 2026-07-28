@@ -26,7 +26,7 @@ export default defineConfig({
   reporter: process.env.CI ? [['html', { open: 'never' }], ['github']] : 'list',
 
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: 'http://127.0.0.1:3100',
     // La trace n'est enregistrée qu'à la reprise : un échec en CI livre alors le film complet
     // (réseau, DOM, console) sans ralentir les exécutions vertes.
     trace: 'on-first-retry',
@@ -45,13 +45,21 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'pnpm build && pnpm start',
-    url: 'http://127.0.0.1:3000',
-    // En local, réutiliser un serveur déjà lancé évite un build de trois minutes à chaque essai.
-    // En CI, jamais : le serveur doit venir du commit en cours de test.
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
+    // Le build n'est PAS lancé ici : en CI il est une étape à part, et en local `pnpm build`
+    // précède l'appel. Un build dans cette commande ferait passer un échec de compilation pour un
+    // serveur qui n'a pas répondu à temps.
+    command: 'pnpm start',
+    // Port dédié, distinct du 3000 de `pnpm dev` : un serveur de développement qui traîne serait
+    // sinon capté, et on croirait tester le build de production — la seule raison d'être de cette
+    // suite — en testant Vite en mode développement.
+    url: 'http://127.0.0.1:3100',
+    // **Jamais de réutilisation, même en local.** Un serveur resté en vie sert le build précédent :
+    // le symptôme est un test vert sur du code qui n'existe plus, et il est arrivé pendant l'écriture
+    // de ce fichier. Redémarrer coûte une seconde depuis que le build n'est plus dans cette commande.
+    reuseExistingServer: false,
+    timeout: 60_000,
     env: {
+      PORT: '3100',
       // Le bout en bout ne parle pas à la vraie passerelle : il n'a pas à en connaître l'adresse,
       // et une suite qui en dépendrait échouerait pour des raisons étrangères au code testé.
       GATEWAY_MODE: 'mock',
