@@ -66,6 +66,20 @@ export function closeDatabase(): Promise<void> {
   return closing
 }
 
+/**
+ * Rouvre la possibilité d'obtenir un pool après une fermeture. **Réservé aux tests.**
+ *
+ * L'arrêt est délibérément terminal en production : une instance qui a commencé à s'éteindre ne
+ * doit jamais rouvrir de connexion, sinon le processus ne se termine pas. Les tests, eux, ferment
+ * et rouvrent à chaque cas — leur donner cette porte nommée vaut mieux que d'affaiblir la
+ * sémantique d'arrêt pour tout le monde, ce qui laisserait une écriture d'audit tardive ressusciter
+ * un pool que plus personne n'attend.
+ */
+export function resetDatabaseForTests(): void {
+  instance = undefined
+  closing = undefined
+}
+
 export function connect(url: string, options?: { poolSize?: number }) {
   const client = postgres(url, {
     max: options?.poolSize ?? DEFAULT_POOL_SIZE,

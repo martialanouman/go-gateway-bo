@@ -1,7 +1,6 @@
-import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { render, screen, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { describe, expect, test } from 'vitest'
-import { routeTree } from '~/routeTree.gen'
+import { renderRoute } from '~/test/render-route'
 
 /**
  * La page de référence visuelle se monte, et sa structure reste navigable.
@@ -12,13 +11,8 @@ import { routeTree } from '~/routeTree.gen'
  * lecteur d'écran comme n'importe quel écran du produit.
  */
 async function renderDesignPage() {
-  const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({ initialEntries: ['/_design'] }),
-  })
-
-  render(<RouterProvider router={router} />)
-  return await screen.findByRole('heading', { level: 1 })
+  await renderRoute('/_design')
+  return screen.getByRole('heading', { level: 1 })
 }
 
 describe('/_design', () => {

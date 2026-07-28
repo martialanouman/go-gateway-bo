@@ -22,13 +22,17 @@
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "test:db": "vitest run --project db",
+    "coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "vuln": "pnpm audit --audit-level=low",
-    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:db && pnpm vuln && pnpm build"
+    "check": "pnpm typecheck && pnpm lint && pnpm coverage && pnpm vuln && pnpm build"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/ibm-plex-sans": "5.3.0",
     "@martialanouman/gateway-api-contracts": "1.0.0",
+    "@tanstack/react-query": "5.101.4",
     "@tanstack/react-router": "1.170.18",
     "@tanstack/react-start": "1.168.32",
     "drizzle-orm": "0.45.2",
@@ -40,6 +44,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.5",
+    "@playwright/test": "1.62.0",
     "@stoplight/prism-cli": "5.16.0",
     "@stoplight/prism-core": "5.16.0",
     "@stoplight/prism-http": "5.16.0",

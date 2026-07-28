@@ -60,6 +60,28 @@ describe('readGatewayConfig', () => {
     )
   })
 
+  describe('GATEWAY_TIMEOUT_MS', () => {
+    it('est optionnelle', () => {
+      expect(readGatewayConfig(live).timeoutMs).toBeUndefined()
+    })
+
+    it('accepte un entier de millisecondes', () => {
+      expect(readGatewayConfig({ ...live, GATEWAY_TIMEOUT_MS: '5000' }).timeoutMs).toBe(5000)
+    })
+
+    it('traite une valeur vide comme absente', () => {
+      expect(readGatewayConfig({ ...live, GATEWAY_TIMEOUT_MS: '' }).timeoutMs).toBeUndefined()
+    })
+
+    it.each(['0', '-1', '1.5', 'bientôt'])('refuse %s', (valeur) => {
+      // Un délai nul ou négatif couperait chaque requête avant qu'elle parte ; un délai
+      // fractionnaire trahit une unité mal comprise. Mieux vaut refuser de démarrer.
+      expect(() => readGatewayConfig({ ...live, GATEWAY_TIMEOUT_MS: valeur })).toThrow(
+        /GATEWAY_TIMEOUT_MS/,
+      )
+    })
+  })
+
   it('ne laisse jamais un secret transparaître dans le message levé', () => {
     const { GATEWAY_MTLS_CERT_PATH: _, ...incomplete } = live
 

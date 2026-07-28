@@ -43,7 +43,9 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 | `pnpm db:studio` | explorateur de schéma Drizzle |
 | `pnpm mock` | Prism sert le contrat sur `:4010` |
 | `pnpm vuln` | `pnpm audit` — échoue sur tout avis non trié |
-| `pnpm check` | typecheck + lint + test + test:db + vuln + build |
+| `pnpm coverage` | les deux projets Vitest en une passe, avec les seuils de couverture |
+| `pnpm e2e` | Playwright contre le build de production — **Docker non requis, navigateur oui** |
+| `pnpm check` | typecheck + lint + coverage + vuln + build |
 
 `pnpm check` vert signifie une CI verte, à une garde près : la CI vérifie en plus que
 `src/routeTree.gen.ts` est à jour après build.
@@ -89,6 +91,37 @@ parallèle et échoueraient sur un type déjà existant.
 Il n'y a **volontairement pas** de script `drizzle-kit push` : il applique un diff sans laisser de
 trace, ce qui rendrait l'état de la production indéductible de l'historique — et détruirait le
 partitionnement d'`audit_log`.
+
+## Tests
+
+Une pyramide, et l'ordre des étages est délibéré :
+
+- **Unitaires** (`pnpm test`) — la boucle de travail. Quelques centaines de millisecondes, aucune
+  dépendance externe. C'est là que vivent la logique du BFF, les permissions et les mappings.
+- **Base de données** (`pnpm test:db`) — un PostgreSQL 18 éphémère par Testcontainers, pour ce
+  qu'aucun mock ne peut prouver : que le SQL écrit à la main fait ce qu'il annonce.
+- **Bout en bout** (`pnpm e2e`) — Playwright contre `pnpm build && pnpm start`, donc contre ce qui
+  sera réellement servi. Il couvre des **parcours**, jamais des cas limites : une suite e2e qu'on
+  n'ose plus croire est pire qu'une suite absente.
+
+`pnpm coverage` exécute les projets `unit` et `db` **en une passe**. C'est la seule mesure qui
+reflète la réalité : le code qui touche la base est exercé par le second, et le mesurer sur le
+premier seul le déclarerait mort. Les seuils sont dans `vitest.config.ts` — 85 % de lignes sur le
+dépôt, et **par fichier** sous `src/server/`, là où vivent les gardes et l'audit. Un seuil agrégé y
+serait décoratif : un nouveau module de permissions à 40 % passerait derrière un client à 95 %.
+
+### L'invariant (a), outillé
+
+`src/test/invariants.ts` fournit l'oracle qui vérifie qu'un corps de message ne sort jamais de
+l'onglet qui l'affiche — ni log, ni URL, ni erreur, ni trace. Il est **branché sur les chemins déjà
+livrés** (traduction d'erreur, client Admin, URL sortantes), pas seulement sur des cas fabriqués :
+un oracle qui ne testerait que lui-même donnerait l'illusion d'une garde pendant les jalons où il
+n'y en aurait aucune.
+
+Sa limite est écrite dans le module : il reconnaît une chaîne, donc il voit la troncature, le
+découpage en segments et les encodages (base64, hexadécimal, pourcentage, `\uXXXX`), mais **il est
+aveugle à un corps haché ou chiffré**. La garde réelle n'est pas ce scan : c'est que rien ne recopie
+de texte libre venu de la passerelle.
 
 ## Contrat d'API
 
