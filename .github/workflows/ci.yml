@@ -7,7 +7,7 @@
 # échoue n'empêche plus les autres de rendre leur verdict. On voit une erreur de type ET un test
 # rouge dans le même run, au lieu de les découvrir l'une après l'autre.
 #
-# Le coût est réel et assumé : six runners au lieu d'un, donc six installations de dépendances
+# Le coût est réel et assumé : sept runners au lieu d'un, donc sept installations de dépendances
 # (~10 s chacune, cache chaud). Aujourd'hui le gain est le diagnostic complet, pas la vitesse — les
 # portes durent quelques secondes. Il deviendra un gain de temps mural quand les tests d'intégration
 # (step-002) et le bout en bout (step-004) arriveront, car eux seuls porteront leurs services et
@@ -49,10 +49,9 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm lint
 
-  # `pnpm coverage` exécute les DEUX projets Vitest en une passe et applique les seuils. C'est
-  # délibérément une seule porte plutôt que `test` et `test:db` séparés : les seuils ne veulent rien
-  # dire mesurés sur la moitié du code, et deux jobs distincts les auraient rendus inapplicables —
-  # ce qui était le cas jusqu'ici, la CI ne mesurant la couverture nulle part.
+  # `pnpm coverage` exécute les DEUX projets Vitest en une passe et applique les seuils. C'est la
+  # seule mesure qui veuille dire quelque chose : le code qui touche la base est exercé par le projet
+  # `db`, et des seuils calculés sur `unit` seul le déclareraient mort.
   #
   # Docker est présent sur les runners GitHub et son socket est à l'emplacement attendu ; la
   # résolution du démon (`src/test/docker-host.ts`) ne sert que sur les postes de développement.
@@ -63,6 +62,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - run: pnpm coverage
+
+  # Redondant avec la porte ci-dessus, et délibérément : elle rejoue les seuls tests de base de
+  # données. Quand une migration casse, ce job le dit en trente secondes et sous son propre nom,
+  # sans qu'il faille lire un rapport de couverture pour comprendre ce qui a échoué — c'est la même
+  # raison qui fait de chaque porte un job séparé plutôt qu'une étape.
+  test-db:
+    name: Test (base de données)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm test:db
 
   # Le sommet de la pyramide, et le job le plus lent : il construit l'application puis la sert avant
   # d'ouvrir un navigateur. Isolé pour que sa durée ne retarde le verdict d'aucune autre porte.
@@ -124,13 +135,13 @@ jobs:
             exit 1
           fi
 
-  # Porte unique à déclarer dans la protection de branche. Sans elle, il faudrait y lister les six
+  # Porte unique à déclarer dans la protection de branche. Sans elle, il faudrait y lister les sept
   # jobs nommément et penser à mettre la règle à jour à chaque ajout de porte — un oubli qui laisse
   # passer silencieusement une porte non requise.
   ci:
     name: CI
     if: always()
-    needs: [typecheck, lint, test, e2e, vuln, build]
+    needs: [typecheck, lint, test, test-db, e2e, vuln, build]
     runs-on: ubuntu-latest
     steps:
       - name: Vérifier le verdict des portes
