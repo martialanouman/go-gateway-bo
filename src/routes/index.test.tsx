@@ -6,8 +6,9 @@ import { routeTree } from '~/routeTree.gen'
 /**
  * Test de fumée : l'arbre de routes généré se monte et la route racine rend son contenu.
  *
- * Il vaut plus que son apparence — il échoue dès que `routeTree.gen.ts` est périmé par rapport aux
- * fichiers de `src/routes/`, ce qui est le mode de panne le plus courant du routage par fichiers.
+ * Il couvre le câblage — arbre de routes, `RouterProvider`, rendu du composant — mais pas la
+ * fraîcheur de `routeTree.gen.ts` : Vitest lit le fichier commité tel quel et passerait sur un arbre
+ * périmé. C'est la porte `build` de la CI qui le régénère et refuse un diff.
  */
 test('la route racine se monte et rend son contenu', async () => {
   const router = createRouter({

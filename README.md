@@ -12,7 +12,7 @@ cp .env.example .env     # renseigner au minimum GATEWAY_* si l'on vise la vraie
 pnpm dev                 # http://localhost:3000
 ```
 
-Node ≥ 22 (voir `.nvmrc`), pnpm 11.
+Node ≥ 24 (`.nvmrc` fait foi — la CI y lit sa version), pnpm 11.
 
 ## Commandes
 
@@ -62,8 +62,12 @@ Deux protections sont actives et **ne doivent pas être désarmées par confort*
 
 - **Scripts d'installation refusés par défaut.** Un paquet qui en a besoin s'autorise nommément dans
   `allowBuilds` (`pnpm-workspace.yaml`), avec sa justification.
-- **Quarantaine des versions fraîchement publiées.** Ne pas exempter un paquet pour installer une
-  version sortie il y a quelques heures — c'est le scénario que la quarantaine couvre.
+- **Quarantaine des versions fraîchement publiées.** `minimumReleaseAge: 1440` : une version publiée
+  il y a moins de 24 h ne s'installe pas, et `minimumReleaseAgeStrict` fait échouer la résolution
+  plutôt que de la contourner en silence. Ce n'est pas un défaut de pnpm — retirer ces deux lignes
+  supprime la protection entièrement. Ne pas exempter un paquet dans `minimumReleaseAgeExclude` pour
+  installer une version sortie il y a quelques heures : c'est le scénario même que la quarantaine
+  couvre. Seule exception, un correctif de sécurité qui ne peut pas attendre.
 
 ### Avis `pnpm audit` triés
 

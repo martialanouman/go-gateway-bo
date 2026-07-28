@@ -1,6 +1,6 @@
 # step-000 — Scaffold TanStack Start (pnpm, TS strict, lint/format, CI)
 
-> **Jalon :** M0 (§1.3, §4.2 `docs/specification-technique-tableau-de-bord.md`) · **Statut :** À FAIRE
+> **Jalon :** M0 (§1.3, §4.2 `docs/specification-technique-tableau-de-bord.md`) · **Statut :** LIVRÉE
 > **Dépend de :** — · **Bloque :** toutes les steps suivantes
 
 ## But
@@ -31,9 +31,9 @@ n'ait plus qu'à ajouter du produit.
 - La CI échoue si `typecheck` ou `lint` échoue (vérifié par une PR de démonstration ou un run local).
 
 ## Definition of Done
-- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
-- [ ] `pnpm dev` sert l'application ; `pnpm build && pnpm start` la sert en Node
-- [ ] CI verte sur la PR · `.env` jamais commité
+- [x] `pnpm check` vert (typecheck · lint · test · vuln · build)
+- [x] `pnpm dev` sert l'application ; `pnpm build && pnpm start` la sert en Node
+- [x] CI verte sur la PR · `.env` jamais commité
 
 ## Hors périmètre
 Contrat API et mock → step-001. Base de données → step-002. Tokens visuels → step-003.

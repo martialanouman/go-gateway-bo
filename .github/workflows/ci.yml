@@ -19,9 +19,11 @@ on:
   pull_request:
 
 # Un nouveau push sur une PR rend le run précédent obsolète : l'annuler plutôt que payer les deux.
+# Sur `main`, jamais : deux fusions rapprochées laisseraient le commit intermédiaire annulé, donc sans
+# verdict — et c'est précisément l'historique dont on veut pouvoir dire qu'il est vert.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

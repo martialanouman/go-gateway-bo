@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Tableau de bord Admin / Exploitation de la passerelle SMS — TanStack Start (BFF + React)",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "packageManager": "pnpm@11.13.0",
   "scripts": {

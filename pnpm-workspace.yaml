@@ -18,6 +18,18 @@ auditConfig:
     # l'atteint. Le correctif amont (2.x -> 5.x sous un minimatch v3) est plus risqué que la faille.
     - GHSA-mh99-v99m-4gvg
 
-# `minimumReleaseAgeExclude` (quarantaine des versions fraîchement publiées) est volontairement
-# absent. Y ajouter une entrée revient à installer un paquet publié il y a quelques heures — le
-# scénario même que la quarantaine couvre. Si le besoin survient, le justifier ici, avec la version.
+# Quarantaine des versions fraîchement publiées. Les compromissions de paquets npm sont détectées et
+# dépubliées en quelques heures ; attendre 24 h avant d'installer une version fait porter le risque
+# par l'écosystème plutôt que par ce dépôt. Le réglage n'a aucun défaut — sans cette ligne, il n'y a
+# pas de quarantaine du tout.
+minimumReleaseAge: 1440
+
+# En mode strict, une résolution qui ne trouve aucune version assez ancienne échoue au lieu
+# d'installer quand même la version fraîche. Une protection qui se contourne en silence n'en est pas
+# une : mieux vaut un `pnpm install` rouge et une décision consciente.
+minimumReleaseAgeStrict: true
+
+# `minimumReleaseAgeExclude` est volontairement absent. Y ajouter une entrée revient à installer un
+# paquet publié il y a quelques heures — le scénario même que la quarantaine couvre. La seule raison
+# valable est un correctif de sécurité qui ne peut pas attendre (`pnpm audit --fix` l'ajoute alors
+# lui-même) ; le justifier ici, avec la version.
