@@ -44,6 +44,11 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Vulnérabilités
+        # Échoue sur tout avis non trié dans `auditConfig.ignoreGhsas` (pnpm-workspace.yaml). Un
+        # nouvel avis doit être lu et justifié, pas absorbé par un seuil de sévérité relevé.
+        run: pnpm vuln
+
       - name: Build
         run: pnpm build
 

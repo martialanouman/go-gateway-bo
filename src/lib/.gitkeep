@@ -1,0 +1,2 @@
+# Utilitaires partagés client et serveur — donc sans aucun secret ni accès réseau privilégié :
+# ce qui touche à l'API Admin ou à la base vit sous src/server/ (invariant d).

@@ -1,0 +1,19 @@
+# `src/server/` — le BFF
+
+Cette moitié du dépôt ne s'exécute **jamais** dans le navigateur. Elle est la seule à connaître :
+
+- le jeton OAuth2 et les certificats mTLS de l'API Admin de la passerelle,
+- la connexion PostgreSQL et Redis,
+- le secret de signature de session et celui du webhook Alertmanager.
+
+C'est l'**invariant (d)** : le navigateur ne parle jamais directement à l'API Admin. Une règle de
+lint interdit d'importer `src/server/gateway/**` ou `src/server/db/**` depuis un composant client
+(posée en step-001) — ne la désactive pas localement, elle est la frontière.
+
+C'est aussi ici que vit l'**invariant (c)** : l'autorisation s'applique côté serveur, via
+`requirePermission()`. Le rendu conditionnel de l'UI est un confort ; un contrôle masqué dont la
+route n'est pas gardée reste une faille.
+
+Contenu à venir : client Admin typé (step-001), accès Drizzle (step-002), session et MFA (M1),
+moteur de permissions et journal d'audit (step-025), hub WebSocket (step-043), évaluateur d'alertes
+métier (step-182).

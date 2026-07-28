@@ -22,8 +22,12 @@ pnpm typecheck    # tsc --noEmit
 pnpm lint         # biome check
 pnpm format       # biome check --write
 pnpm test         # vitest run       (OBLIGATOIRE avant toute PR)
-pnpm check        # typecheck + lint + test — ce que vérifie la CI
+pnpm vuln         # pnpm audit — échoue sur tout avis non trié
+pnpm check        # typecheck + lint + test + vuln + build
 ```
+
+`pnpm check` vert signifie une CI verte, à une garde près : la CI vérifie en plus que
+`src/routeTree.gen.ts` est bien à jour après build.
 
 ## Architecture (carte mentale)
 
@@ -119,7 +123,7 @@ périmètre » et appartient à une autre PR.
 
 ## Definition of Done (chaque PR)
 
-`pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts • critères d'acceptation couverts
+`pnpm check` vert (typecheck · lint · test · vuln · build) • critères d'acceptation couverts
 par des tests • aucun invariant (a…e) violé • copie française conforme • clavier et libellés
 accessibles (WCAG 2.1 AA) sur tout écran touché • PR petite et focalisée (une step).
 

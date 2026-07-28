@@ -5,6 +5,19 @@ allowBuilds:
   # esbuild place son binaire natif à l'installation ; sans ce script, aucun build ne fonctionne.
   esbuild: true
 
-# Paquets exemptés du délai de quarantaine que pnpm applique aux versions fraîchement publiées.
-minimumReleaseAgeExclude:
-  - jsdom@30.0.0
+# Avis `pnpm audit` triés explicitement. Un avis n'entre ici qu'avec sa justification écrite, et
+# `pnpm vuln` échoue sur tout ce qui n'y figure pas — c'est ce qui rend le triage conscient plutôt
+# qu'un seuil de sévérité relevé en silence. Détail du raisonnement : section « Dépendances » du
+# README.
+auditConfig:
+  ignoreGhsas:
+    # brace-expansion <=5.0.7 — DoS par expansion non bornée. Chaîne :
+    # @tanstack/nitro-v2-vite-plugin > nitropack > archiver > minimatch. `archiver` empaquette les
+    # artefacts des presets qui zippent (lambda, azure) ; notre preset est `node-server`, et
+    # brace-expansion n'y traite que nos propres globs, au build. Aucune entrée non fiable ne
+    # l'atteint. Le correctif amont (2.x -> 5.x sous un minimatch v3) est plus risqué que la faille.
+    - GHSA-mh99-v99m-4gvg
+
+# `minimumReleaseAgeExclude` (quarantaine des versions fraîchement publiées) est volontairement
+# absent. Y ajouter une entrée revient à installer un paquet publié il y a quelques heures — le
+# scénario même que la quarantaine couvre. Si le besoin survient, le justifier ici, avec la version.

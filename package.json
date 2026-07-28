@@ -17,7 +17,8 @@
     "format": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "pnpm typecheck && pnpm lint && pnpm test"
+    "vuln": "pnpm audit --audit-level=low",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm vuln && pnpm build"
   },
   "dependencies": {
     "@tanstack/react-router": "1.170.18",
@@ -35,7 +36,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.4",
     "@vitest/coverage-v8": "4.1.10",
-    "jsdom": "30.0.0",
+    "jsdom": "29.1.1",
     "typescript": "7.0.2",
     "vite": "8.1.5",
     "vitest": "4.1.10"

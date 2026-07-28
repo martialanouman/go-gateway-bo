@@ -43,7 +43,7 @@ part.
 
 ### 0.4 Definition of Done (chaque PR)
 
-`pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts • critères d'acceptation couverts
+`pnpm check` vert (typecheck · lint · test · vuln · build) • critères d'acceptation couverts
 par des tests • aucun invariant (a…e) violé • copie française conforme aux fondamentaux de contenu du
 design system • clavier et libellés accessibles (WCAG 2.1 AA) sur tout écran touché • PR focalisée
 sur une step.
@@ -100,8 +100,21 @@ avant tout ajout ou toute mise à jour** — ne jamais recopier une signature de
 | Éditeur | `monaco-editor` | 0.56.x |
 | WebAuthn | `@simplewebauthn/server` + `/browser` | 13.3.x |
 | Tests | `vitest` + `@playwright/test` | 4.1.x / 1.62.x |
+| Langage | `typescript` — 7.0, le compilateur natif | 7.0.x |
+| Lint + format | `@biomejs/biome` — un seul outil, pas d'ESLint en plus | 2.5.x |
+| Hébergement | `@tanstack/nitro-v2-vite-plugin` (preset `node-server`) | 1.155.x |
 
 Pas de framework CSS utilitaire : les tokens de la charte et le CSS de composant suffisent.
+
+Deux de ces lignes méritent leur justification, décidée en step-000 :
+
+- **Hébergement.** Sans plugin dédié, `vite build` ne produit qu'un handler *fetch* : rien n'écoute.
+  Nitro l'emballe en serveur Node autonome. **v2 et non v3** — `nitro@3` n'existe qu'en beta, et
+  §1.3 impose une cible Node auto-hébergée tenant des WebSockets longue durée sous 99,9 % (§1.2).
+  On ne fonde pas ce socle sur une préversion. À revoir quand `nitro@3` sera stable.
+- **TypeScript 7** est un changement de compilateur, pas un bump de version. Il est en `latest`
+  stable et passe sur React 19 + TanStack ; s'il fait défaut sur une bibliothèque, le repli est
+  `5.9.x` et se décide en équipe.
 
 ### 1.3 La frontière BFF ⟷ client
 
