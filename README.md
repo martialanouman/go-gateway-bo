@@ -15,6 +15,8 @@ pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"
 
 pnpm install
 cp .env.example .env      # GATEWAY_MODE=mock suffit pour développer
+docker compose up -d      # PostgreSQL 18 + Redis
+pnpm db:migrate           # applique les migrations
 pnpm mock                 # Prism sert le contrat sur :4010 — dans un autre terminal
 pnpm dev                  # http://localhost:3000
 ```
@@ -34,9 +36,14 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 | `pnpm start` | sert le build en Node |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm lint` / `pnpm format` | Biome (lint + format en un seul outil) |
-| `pnpm test` | Vitest |
+| `pnpm test` | Vitest — la boucle rapide, sans dépendance externe |
+| `pnpm test:db` | Vitest sur un PostgreSQL 18 éphémère (Testcontainers) — **Docker requis** |
+| `pnpm db:migrate` | applique les migrations |
+| `pnpm db:generate` | génère une migration depuis le schéma Drizzle |
+| `pnpm db:studio` | explorateur de schéma Drizzle |
+| `pnpm mock` | Prism sert le contrat sur `:4010` |
 | `pnpm vuln` | `pnpm audit` — échoue sur tout avis non trié |
-| `pnpm check` | typecheck + lint + test + vuln + build |
+| `pnpm check` | typecheck + lint + test + test:db + vuln + build |
 
 `pnpm check` vert signifie une CI verte, à une garde près : la CI vérifie en plus que
 `src/routeTree.gen.ts` est à jour après build.
@@ -53,7 +60,30 @@ tasks-todo/      steps à faire · tasks-done/ steps livrées
 ```
 
 `src/server/` est la seule moitié du dépôt qui connaît le jeton de l'API Admin, les certificats mTLS
-et la base : le navigateur ne parle jamais directement à la passerelle.
+et la base : le navigateur ne parle jamais directement à la passerelle. Une règle Biome **et** un
+test (`src/test/frontiere-serveur.test.ts`, qui suit les imports de proche en proche) refusent qu'un
+fichier client l'atteigne, même par un intermédiaire.
+
+## Base de données
+
+Le BFF possède **neuf tables et rien d'autre** : opérateurs, catalogue de permissions, rôles et leurs
+liaisons, journal d'audit, règles d'alerte, notifications, vues sauvegardées. Clients, comptes SMPP,
+connecteurs, CDR et soldes appartiennent à la passerelle et se lisent à travers l'API Admin **à chaque
+affichage** — les recopier ici créerait une seconde vérité qui divergerait en silence, et un cockpit
+qui montre un état périmé est pire qu'un cockpit en panne : il inspire confiance.
+
+Les identifiants sont des **UUIDv7 générés par PostgreSQL 18**, qui expose `uuidv7()` en fonction
+native — un seul mécanisme, côté base, sans extension.
+
+`audit_log` est **partitionnée par mois** : détacher un mois pour l'archivage est instantané, là où un
+`DELETE` massif réécrirait la table. Drizzle ne sait pas déclarer cela, donc la mécanique
+(partitions, partition par défaut, fonction de maintenance sous verrou consultatif) vit dans
+`drizzle/0001_audit_log_partitions.sql`, écrite à la main. `pnpm db:migrate` repousse l'horizon de
+trois mois à chaque déploiement.
+
+Il n'y a **volontairement pas** de script `drizzle-kit push` : il applique un diff sans laisser de
+trace, ce qui rendrait l'état de la production indéductible de l'historique — et détruirait le
+partitionnement d'`audit_log`.
 
 ## Contrat d'API
 
@@ -67,8 +97,8 @@ tranche : `mock` parle à Prism (`pnpm mock`), `live` à la vraie passerelle, av
 `client_credentials` et mTLS. Le réglage n'a pas de valeur par défaut, dans un sens comme dans
 l'autre : servir des données inventées en les croyant vraies est aussi grave que l'inverse.
 
-Le client typé vit sous `src/server/gateway/` et **nulle part ailleurs** — une règle Biome refuse son
-import depuis `src/routes/` et `src/components/` (invariant d). Le jeton obtenu est un jeton
+Le client typé vit sous `src/server/gateway/` et **nulle part ailleurs** — voir « Où sont les choses »
+pour la façon dont l'invariant (d) est tenu. Le jeton obtenu est un jeton
 **machine** à scopes fixes, qui porte `content:read` en permanence : il ne représente pas l'opérateur
 connecté, et aucune restriction par opérateur ne peut donc être déléguée à la passerelle
 (invariant c).
@@ -106,8 +136,9 @@ Deux protections sont actives et **ne doivent pas être désarmées par confort*
 `pnpm vuln` échoue sur tout avis non listé dans `auditConfig.ignoreGhsas`. Un avis n'y entre qu'avec
 son raisonnement d'exposition écrit — **et seulement après avoir vérifié qu'il n'est pas corrigeable**.
 Un avis qu'un `overrides` résout n'a rien à faire dans cette liste : c'est ce qui a été fait pour les
-quatre avis apportés par Prism (`lodash` et `uuid`, tous deux sous `postman-collection`), corrigés
-par deux entrées ciblées de `overrides` dans `pnpm-workspace.yaml` plutôt qu'ignorés.
+cinq avis apportés par Prism et drizzle-kit (`lodash` et `uuid` sous `postman-collection`, `esbuild`
+sous `@esbuild-kit/core-utils`), corrigés par trois entrées ciblées de `overrides` dans
+`pnpm-workspace.yaml` plutôt qu'ignorés.
 
 | Avis | Verdict |
 |---|---|

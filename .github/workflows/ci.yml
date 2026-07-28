@@ -6,7 +6,7 @@
 # échoue n'empêche plus les autres de rendre leur verdict. On voit une erreur de type ET un test
 # rouge dans le même run, au lieu de les découvrir l'une après l'autre.
 #
-# Le coût est réel et assumé : cinq runners au lieu d'un, donc cinq installations de dépendances
+# Le coût est réel et assumé : six runners au lieu d'un, donc six installations de dépendances
 # (~10 s chacune, cache chaud). Aujourd'hui le gain est le diagnostic complet, pas la vitesse — les
 # portes durent quelques secondes. Il deviendra un gain de temps mural quand les tests d'intégration
 # (step-002) et le bout en bout (step-004) arriveront, car eux seuls porteront leurs services et
@@ -56,6 +56,19 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm test
 
+  # Séparé de `test` parce qu'il ne coûte pas la même chose : celui-ci démarre un PostgreSQL 18 par
+  # Testcontainers et applique les migrations pour de vrai. Le garder à part laisse la porte `Test`
+  # rendre son verdict en vingt secondes, sans attendre le téléchargement d'une image.
+  test-db:
+    name: Test (base de données)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # Docker est présent sur les runners GitHub et son socket est à l'emplacement attendu ; la
+      # résolution du démon (`src/test/docker-host.ts`) ne sert que sur les postes de développement.
+      - run: pnpm test:db
+
   vuln:
     name: Vulnérabilités
     runs-on: ubuntu-latest
@@ -84,13 +97,13 @@ jobs:
             exit 1
           fi
 
-  # Porte unique à déclarer dans la protection de branche. Sans elle, il faudrait y lister les cinq
+  # Porte unique à déclarer dans la protection de branche. Sans elle, il faudrait y lister les six
   # jobs nommément et penser à mettre la règle à jour à chaque ajout de porte — un oubli qui laisse
   # passer silencieusement une porte non requise.
   ci:
     name: CI
     if: always()
-    needs: [typecheck, lint, test, vuln, build]
+    needs: [typecheck, lint, test, test-db, vuln, build]
     runs-on: ubuntu-latest
     steps:
       - name: Vérifier le verdict des portes

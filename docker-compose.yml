@@ -1,0 +1,44 @@
+# Environnement local du BFF. Ces deux services ne portent QUE les données que le tableau de bord
+# possède : opérateurs, rôles, audit, alertes, notifications, vues sauvegardées. Rien de la
+# passerelle — clients, comptes SMPP, connecteurs, CDR et soldes se lisent à travers l'API Admin, à
+# chaque requête, et ne sont jamais recopiés ici (§3.2).
+#
+# Un poste neuf : `docker compose up -d` puis `pnpm db:migrate`.
+
+services:
+  postgres:
+    # PostgreSQL 18 et pas moins : `uuidv7()` y est une fonction native, ce qui permet de générer
+    # les identifiants côté base sans extension ni code applicatif. Les images `alpine` gardent le
+    # téléchargement raisonnable sur un poste de développement.
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: dashboard
+      POSTGRES_PASSWORD: dashboard
+      POSTGRES_DB: dashboard
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` répond avant que la base accepte réellement les connexions applicatives ;
+      # préciser l'utilisateur et la base évite un `pnpm db:migrate` lancé une seconde trop tôt.
+      test: ['CMD-SHELL', 'pg_isready -U dashboard -d dashboard']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    # Ne sert à rien avant step-044, où il portera le Pub/Sub qui coordonne les instances du BFF.
+    # Il est déclaré ici pour qu'un poste neuf n'ait à lancer qu'une seule commande, aujourd'hui
+    # comme dans trois steps.
+    image: redis:8-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  postgres-data:
