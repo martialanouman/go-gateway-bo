@@ -89,7 +89,7 @@ sur tout écran touché • PR petite et focalisée (une step).
 ## M0 — Fondations & outillage
 - [x] step-000 — Scaffold TanStack Start (pnpm, TS strict, lint/format, CI)
 - [x] step-001 — Contrat API : package, client Admin typé, mock Prism
-- [ ] step-002 — PostgreSQL 18 + Drizzle : schéma propre au BFF, migrations, docker-compose
+- [x] step-002 — PostgreSQL 18 + Drizzle : schéma propre au BFF, migrations, docker-compose
 - [ ] step-003 — Design system : tokens de la charte + fondations de thème
 - [ ] step-004 — Harnais de test : Vitest, Testing Library, Playwright
 
