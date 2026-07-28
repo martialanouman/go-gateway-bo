@@ -46,5 +46,31 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/routes/**", "src/components/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["~/server/**", "**/server/**"],
+                    "message": "Invariant (d) : le navigateur ne parle jamais directement à l'API Admin. Le jeton machine, le mTLS et la connexion PostgreSQL restent sous src/server/. Passer par une fonction serveur, qui applique la permission (requirePermission) et écrit l'audit."
+                  },
+                  {
+                    "group": ["undici", "openapi-fetch", "node:fs", "node:crypto"],
+                    "message": "Invariant (d) : ce module est réservé au BFF. Un composant client qui l'importe fait entrer du code serveur — et parfois un secret — dans le bundle navigateur."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

@@ -27,6 +27,9 @@ concurrency:
 
 permissions:
   contents: read
+  # `pnpm install` récupère `@martialanouman/gateway-api-contracts` sur GitHub Packages, publié par
+  # le dépôt `go-gateway`. Lecture seule : rien ici ne publie de package.
+  packages: read
 
 jobs:
   typecheck:
