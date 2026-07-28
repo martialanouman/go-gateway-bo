@@ -9,6 +9,14 @@ allowBuilds:
   # fonctionnalité n'en dépend. Le laisser à `false` plutôt que de le taire : une entrée absente
   # redevient une question à chaque `pnpm install`, et fait échouer la commande.
   '@scarf/scarf': false
+  # Les trois arrivent en transitif de `@testcontainers/postgresql`, par `dockerode`. Refusés, et la
+  # suite `pnpm test:db` prouve que rien n'en dépend : Testcontainers parle au socket Docker local,
+  # jamais à un démon distant par SSH (`ssh2`, et `cpu-features` qui n'accélère que son chiffrement),
+  # et aucun de nos échanges n'est en protobuf. Ce sont trois compilations natives en moins à chaque
+  # installation, sur toutes les machines qui n'en tireront jamais rien.
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
 
 # Corrections de versions transitives. Un avis qu'on peut réellement résoudre ne s'ignore pas : ces
 # deux entrées suppriment quatre avis de l'arbre au lieu de les inscrire dans `ignoreGhsas`.
@@ -24,6 +32,10 @@ overrides:
   # uuid <11.1.1 : lecture hors bornes quand un buffer est fourni à v3/v5/v6
   # (GHSA-w5hq-g745-h8pq). `postman-collection` épingle 8.3.2, dépréciée par ailleurs.
   'postman-collection>uuid': '^11.1.1'
+  # esbuild <=0.24.2 : le serveur de développement d'esbuild répond à n'importe quelle origine
+  # (GHSA-67mh-4wv8-2f99). `drizzle-kit` traîne cet esbuild 0.18 par `@esbuild-kit/core-utils`, un
+  # paquet déprécié depuis sa fusion dans `tsx`. Le reste du dépôt est déjà sur esbuild 0.25.
+  '@esbuild-kit/core-utils>esbuild': '^0.25.12'
 
 # Avis `pnpm audit` triés explicitement. Un avis n'entre ici qu'avec sa justification écrite, et
 # `pnpm vuln` échoue sur tout ce qui n'y figure pas — c'est ce qui rend le triage conscient plutôt
