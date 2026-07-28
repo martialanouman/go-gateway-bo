@@ -29,6 +29,11 @@
   gap: var(--sp-7);
 }
 
+.design-page > header > h1 {
+  font: var(--text-page-title);
+  margin: 0;
+}
+
 .design-section > h2 {
   font: var(--text-section-title);
   margin: 0;
@@ -106,7 +111,7 @@
 .design-space__bar {
   height: var(--sp-6);
   background: var(--teal-500);
-  border-radius: var(--r-1);
+  border-radius: var(--r-field);
 }
 
 .design-space__name {

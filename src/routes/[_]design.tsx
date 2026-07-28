@@ -59,27 +59,40 @@ const SEMANTIC_COLORS = [
 ] as const
 
 /**
+ * `link_status` — l'état du bind lui-même. Rendu en **point coloré + libellé mono**, jamais en
+ * pilule : la charte l'appelle la règle la plus stricte du système, et la raison est
+ * opérationnelle. Un disjoncteur ouvert sur un lien vivant (attendre la reprise) et un bind mort
+ * (rebind manuel) demandent des actions opposées ; les rendre pareil, c'est inviter à la
+ * confusion au pire moment.
+ *
  * Les libellés restent en `snake_case` anglais, verbatim de l'API : ce sont eux qu'un opérateur
- * cherche dans les logs. Le point coloré double le texte, il ne le remplace pas — la couleur seule
- * ne porte jamais l'information (WCAG 1.4.1).
+ * cherche dans les logs. Le point double le texte, il ne le remplace pas — la couleur seule ne
+ * porte jamais l'information (WCAG 1.4.1).
  */
-const STATUS_PILLS = [
+const LINK_STATUS = [
   { label: 'bound', color: 'var(--status-up)' },
   { label: 'reconnecting', color: 'var(--status-degraded)' },
   { label: 'unbound', color: 'var(--status-down)' },
-  { label: 'half_open', color: 'var(--breaker-half-open)' },
-  { label: 'closed', color: 'var(--breaker-closed)' },
-  { label: 'suspended', color: 'var(--status-restricted)' },
 ] as const
 
-const SPACING = [
-  { token: '--sp-2', value: '4px' },
-  { token: '--sp-4', value: '8px' },
-  { token: '--sp-6', value: '12px' },
-  { token: '--sp-7', value: '16px' },
-  { token: '--sp-9', value: '24px' },
-  { token: '--sp-11', value: '40px' },
+/**
+ * `breaker_state` — l'état du disjoncteur. Rendu en **pilule teintée**, jamais en point, et jamais
+ * dérivé du champ précédent.
+ *
+ * Le texte posé sur un fond teinté rouge prend `--text-danger-on-tint` : le rouge de pleine surface
+ * n'atteint que 4,05 sur sa propre teinte, sous le seuil AA.
+ */
+const BREAKER_STATE = [
+  { label: 'closed', color: 'var(--breaker-closed)', tint: 'var(--tint-green)' },
+  { label: 'half_open', color: 'var(--breaker-half-open)', tint: 'var(--tint-amber)' },
+  { label: 'open', color: 'var(--text-danger-on-tint)', tint: 'var(--tint-red)' },
 ] as const
+
+/**
+ * Les pas canoniques. Aucune valeur en pixels n'est répétée ici : la barre tire sa largeur du token
+ * lui-même, de sorte que la page ne puisse pas mentir si `spacing.css` change.
+ */
+const SPACING = ['--sp-2', '--sp-4', '--sp-6', '--sp-7', '--sp-9', '--sp-11'] as const
 
 const RADII = [
   { token: '--r-field', usage: 'Champs, boutons, petits contrôles' },
@@ -91,7 +104,7 @@ function DesignReference() {
   return (
     <main className="design-page">
       <header className="design-section">
-        <h1 style={{ font: 'var(--text-page-title)', margin: 0 }}>Référence visuelle</h1>
+        <h1>Référence visuelle</h1>
         <p className="design-page__intro">
           La charte graphique v1.0 telle qu’elle est installée dans ce dépôt. Cette page n’est liée
           depuis aucun écran : elle sert à vérifier un token avant de l’utiliser. Un écran qui a
@@ -158,20 +171,24 @@ function DesignReference() {
       <section className="design-section" aria-labelledby="statuts">
         <h2 id="statuts">États</h2>
         <p className="design-section__note">
-          Une couleur et un libellé par état critique. Le libellé reste celui de l’API, en mono et
-          non traduit : c’est ce qu’un opérateur cherche dans les logs.
+          Deux familles, deux rendus, jamais fusionnés et jamais dérivés l’un de l’autre. Un
+          disjoncteur ouvert sur un lien vivant et un bind mort appellent des gestes opposés : les
+          confondre visuellement coûterait cher au pire moment.
         </p>
+
+        <span className="design-item__label">link_status — point et libellé</span>
         <div className="design-pills">
-          {STATUS_PILLS.map(({ label, color }) => (
-            <span
-              className="design-pill"
-              key={label}
-              style={{
-                color,
-                background: `color-mix(in srgb, ${color} 14%, transparent)`,
-                borderColor: `color-mix(in srgb, ${color} 40%, transparent)`,
-              }}
-            >
+          {LINK_STATUS.map(({ label, color }) => (
+            <span className="design-link-status" key={label} style={{ color }}>
+              {label}
+            </span>
+          ))}
+        </div>
+
+        <span className="design-item__label">breaker_state — pilule teintée</span>
+        <div className="design-pills">
+          {BREAKER_STATE.map(({ label, color, tint }) => (
+            <span className="design-pill" key={label} style={{ color, background: tint }}>
               {label}
             </span>
           ))}
@@ -184,11 +201,10 @@ function DesignReference() {
           Base de 4 px, pas canoniques 4 · 8 · 12 · 16 · 24 · 40. Cellules 8×12, cartes 16, panneaux
           24, intervalles de section 40.
         </p>
-        {SPACING.map(({ token, value }) => (
+        {SPACING.map((token) => (
           <div className="design-space" key={token}>
             <span className="design-space__name">{token}</span>
             <span className="design-space__bar" style={{ width: `var(${token})` }} />
-            <span className="design-swatch__value">{value}</span>
           </div>
         ))}
       </section>

@@ -37,7 +37,9 @@ export function readTokens(): Map<string, string> {
   const tokens = new Map<string, string>()
 
   for (const file of TOKEN_FILES) {
-    const css = readFileSync(join(TOKENS_DIRECTORY, file), 'utf8')
+    // Les commentaires sont retirés avant l'extraction : un commentaire qui citerait une
+    // déclaration (« remplace --foo: bar; ») entrerait sinon dans la table comme si elle existait.
+    const css = readFileSync(join(TOKENS_DIRECTORY, file), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
     for (const [, name, value] of css.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
       if (name && value) tokens.set(name, value.trim())
     }
@@ -46,18 +48,91 @@ export function readTokens(): Map<string, string> {
   return tokens
 }
 
-/** Suit les `var(--x)` jusqu'à la valeur littérale. Rend `undefined` si la chaîne ne mène nulle part. */
+/**
+ * Suit les `var(--x)` jusqu'à la valeur littérale. Rend `undefined` si la chaîne ne mène nulle part,
+ * **y compris lorsqu'elle boucle** : un alias circulaire ne doit pas ressortir comme une valeur
+ * définie, sinon `toBeDefined()` passerait dessus sans rien voir.
+ */
 export function resolveToken(tokens: Map<string, string>, name: string): string | undefined {
-  let value = tokens.get(name)
+  const visited = new Set<string>()
+  let current = name
 
-  // Une profondeur bornée : un alias circulaire ne doit pas suspendre la suite de tests.
-  for (let depth = 0; depth < 10 && value !== undefined; depth++) {
+  while (!visited.has(current)) {
+    visited.add(current)
+    const value = tokens.get(current)
+    if (value === undefined) return undefined
+
     const reference = /^var\((--[\w-]+)\)$/.exec(value)
     if (!reference?.[1]) return value
-    value = tokens.get(reference[1])
+    current = reference[1]
   }
 
-  return value
+  return undefined
+}
+
+/**
+ * Résout une couleur en un hexadécimal opaque, en évaluant les `color-mix()` de la charte.
+ *
+ * Sans cette évaluation, les tests de contraste ne couvriraient que les quatre fonds **littéraux**
+ * de la palette — alors que le produit compose : une pilule pose son texte sur sa propre teinte à
+ * 14 %, une ligne survolée ou sélectionnée change de fond. Ce sont exactement les endroits où le
+ * contraste se perd, et ils resteraient hors de portée du test.
+ *
+ * `over` est le fond sur lequel la couleur est peinte : `transparent` dans un `color-mix` signifie
+ * « laisse voir ce qu'il y a dessous », donc le mélange doit être composé sur ce fond pour donner
+ * la couleur réellement perçue.
+ */
+export function resolveColor(
+  tokens: Map<string, string>,
+  name: string,
+  over = '#000000',
+): string | undefined {
+  const value = resolveToken(tokens, name)
+  if (value === undefined) return undefined
+  return evaluateColor(tokens, value, over)
+}
+
+function evaluateColor(
+  tokens: Map<string, string>,
+  value: string,
+  over: string,
+): string | undefined {
+  const literal = /^#[0-9a-f]{6}$/i.exec(value.trim())
+  if (literal) return value.trim().toLowerCase()
+
+  // `color-mix(in srgb, <couleur> <p>%, <couleur|transparent>)` — la seule forme que la charte
+  // emploie. Toute autre syntaxe rend `undefined` plutôt qu'une approximation silencieuse.
+  const mix = /^color-mix\(\s*in\s+srgb\s*,\s*(.+?)\s+([\d.]+)%\s*,\s*(.+?)\s*\)$/i.exec(
+    value.trim(),
+  )
+  if (!mix?.[1] || !mix[2] || !mix[3]) return undefined
+
+  const foreground = evaluateColor(tokens, dereference(tokens, mix[1]), over)
+  const proportion = Number(mix[2]) / 100
+  const background =
+    mix[3].trim().toLowerCase() === 'transparent'
+      ? over
+      : evaluateColor(tokens, dereference(tokens, mix[3]), over)
+
+  if (!foreground || !background) return undefined
+  return blend(foreground, background, proportion)
+}
+
+function dereference(tokens: Map<string, string>, value: string): string {
+  const reference = /^var\((--[\w-]+)\)$/.exec(value.trim())
+  if (!reference?.[1]) return value.trim()
+  return resolveToken(tokens, reference[1]) ?? value.trim()
+}
+
+/** Mélange deux couleurs opaques en sRGB, sans correction gamma — comme le fait `color-mix(in srgb)`. */
+function blend(foreground: string, background: string, proportion: number): string {
+  const channels = [0, 2, 4].map((offset) => {
+    const fg = Number.parseInt(foreground.slice(1 + offset, 3 + offset), 16)
+    const bg = Number.parseInt(background.slice(1 + offset, 3 + offset), 16)
+    return Math.round(fg * proportion + bg * (1 - proportion))
+  })
+
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`
 }
 
 /**

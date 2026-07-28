@@ -10,9 +10,11 @@
   /* Éclairci depuis le #6b7684 de la charte v1.0 : cette valeur porte `--text-faint`, donc
      `--text-data-sm` en 11 px, et n'atteignait que 4,16 sur le canvas et 3,93 sur les cartes —
      sous le seuil WCAG 2.1 AA de 4,5 pour du texte normal. À 9 % plus clair, à teinte constante,
-     elle passe à 5,19 et 4,91 : conforme avec une marge, et la hiérarchie à trois niveaux reste
-     lisible. C'est le seul écart assumé par rapport à la charte, et il est gardé par un test. */
-  --n-300: #7b8694;
+     elle atteint 4,5 sur toutes les surfaces du système — y compris les surfaces **composées**,
+     qui sont le vrai point bas : sur une ligne sélectionnée (`--surface-selected`, teinte teal à
+     14 %), la première valeur essayée retombait à 4,04. La hiérarchie à trois niveaux reste
+     lisible. C'est l'un des deux écarts assumés avec la charte, et un test le garde. */
+  --n-300: #848f9e;
   --n-400: #4a5563;
   --n-500: #2f3945;
   --n-600: #232b36; /* bordure de carte */
@@ -33,6 +35,12 @@
   --green-500: #2fd18a; /* sain, up, closed, delivered, connecté */
   --amber-500: #f0b84a; /* dégradé, reconnecting, breaker open, expired */
   --red-500: #e5484d; /* panne, failed, suspended, action destructive */
+  /* Variante claire, absente de la charte. Le rouge à 500 posé sur sa propre teinte à 14 % ne donne
+     que 4,33 sur le canvas et 4,05 sur une carte — sous le seuil AA de 4,5, et c'est exactement la
+     combinaison des pilules `failed`, `suspended` et `sev-critical`, l'état qu'un opérateur doit
+     lire en premier. Le rouge pleine surface reste `--red-500` ; seul le TEXTE posé sur un fond
+     teinté rouge prend cette variante (4,69 sur carte). Second et dernier écart assumé. */
+  --red-400: #e85e62;
   --blue-500: #7fb2ff; /* métrique secondaire, types techniques, alertmanager */
   --violet-500: #c586c0; /* domaine métier : réputation, facturation, évaluation BFF */
 
@@ -55,6 +63,9 @@
   --text-link-hover: var(--teal-300);
   --text-accent: var(--teal-500);
   --text-danger: var(--red-500);
+  /* À employer partout où du texte rouge repose sur `--tint-red` — jamais sur une surface plate,
+     où `--text-danger` reste le bon token. */
+  --text-danger-on-tint: var(--red-400);
   --text-success: var(--green-500);
   --text-warning: var(--amber-500);
   --text-info: var(--blue-500);

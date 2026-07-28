@@ -37,6 +37,7 @@ describe('/_design', () => {
       'Accent et sémantique',
       'États',
       'Espacements',
+      'Rayons',
     ]) {
       expect(screen.getByRole('heading', { level: 2, name: titre })).toBeInTheDocument()
     }
@@ -50,9 +51,24 @@ describe('/_design', () => {
     const etats = screen.getByRole('heading', { level: 2, name: 'États' }).closest('section')
     expect(etats).not.toBeNull()
 
-    for (const label of ['bound', 'reconnecting', 'unbound', 'half_open']) {
+    for (const label of ['bound', 'reconnecting', 'unbound', 'half_open', 'closed', 'open']) {
       expect(within(etats as HTMLElement).getByText(label)).toBeInTheDocument()
     }
+  })
+
+  test('ne fusionne pas link_status et breaker_state', async () => {
+    // La charte appelle cette séparation la règle la plus stricte du système : un disjoncteur
+    // ouvert sur un lien vivant et un bind mort demandent des gestes opposés. Les rendre
+    // identiques serait une faute d'exploitation, pas une approximation esthétique.
+    await renderDesignPage()
+
+    const etats = screen.getByRole('heading', { level: 2, name: 'États' }).closest('section')
+    const dansEtats = within(etats as HTMLElement)
+
+    // Un `link_status` est un point et un libellé — jamais une pilule.
+    expect(dansEtats.getByText('bound')).toHaveClass('design-link-status')
+    // Un `breaker_state` est une pilule teintée — jamais un point.
+    expect(dansEtats.getByText('half_open')).toHaveClass('design-pill')
   })
 
   test('ne saute aucun niveau de titre', async () => {

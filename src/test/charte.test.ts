@@ -8,12 +8,16 @@
  * 1. **Les tokens que les écrans consomment existent.** Un `var(--surface-card)` qui ne résout rien
  *    ne casse pas : le navigateur applique la valeur héritée, et l'écran s'affiche presque juste.
  *    Un token renommé se remarquerait donc des semaines plus tard, sur une capture d'écran.
- * 2. **Le contraste est conforme dès les tokens**, pas rattrapé écran par écran. C'est la seule
- *    façon d'obtenir WCAG 2.1 AA partout : un token conforme rend conforme tout ce qui l'emploie.
+ * 2. **Le contraste est conforme dès les tokens**, pas rattrapé écran par écran — sur les surfaces
+ *    plates *et* sur les surfaces composées. Ces dernières sont le vrai point bas : une pilule pose
+ *    son texte sur sa propre teinte, une ligne se survole et se sélectionne. Un test qui ne
+ *    regarderait que les quatre fonds littéraux de la palette laisserait passer les combinaisons
+ *    que le produit rend réellement — c'est ce qui est arrivé à la première version de ce fichier,
+ *    et deux paires étaient sous le seuil.
  */
 
 import { describe, expect, it } from 'vitest'
-import { contrastRatio, readTokens, resolveToken } from './tokens'
+import { contrastRatio, readTokens, resolveColor, resolveToken } from './tokens'
 
 const tokens = readTokens()
 
@@ -121,12 +125,62 @@ describe('contraste WCAG 2.1 AA', () => {
     expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
   })
 
+  describe('surfaces composées', () => {
+    // Une teinte est peinte sur la surface qui la porte : le contraste réel dépend donc des deux.
+    const surfaces = ['--surface-page', '--surface-card'] as const
+
+    /** Chaque pilule pose son libellé sur sa propre teinte — la combinaison la plus fréquente. */
+    const tinted = [
+      { text: '--teal-500', background: '--tint-teal' },
+      { text: '--green-500', background: '--tint-green' },
+      { text: '--amber-500', background: '--tint-amber' },
+      { text: '--blue-500', background: '--tint-blue' },
+      { text: '--violet-500', background: '--tint-violet' },
+      // Le rouge de pleine surface ne tient pas sur sa propre teinte (4,05 sur carte) : c'est la
+      // variante claire qui porte le texte, et c'est tout l'intérêt de la tester ici.
+      { text: '--text-danger-on-tint', background: '--tint-red' },
+    ] as const
+
+    const pairs = surfaces.flatMap((surface) => tinted.map((pair) => ({ ...pair, surface })))
+
+    it.each(pairs)('$text sur $background posé sur $surface', ({ text, background, surface }) => {
+      const base = resolveColor(tokens, surface)
+      expect(base, `${surface} non résoluble`).toBeDefined()
+
+      const fg = resolveColor(tokens, text, base as string)
+      const bg = resolveColor(tokens, background, base as string)
+      expect(fg, `${text} non résoluble`).toBeDefined()
+      expect(bg, `${background} non résoluble`).toBeDefined()
+
+      expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+    })
+
+    /** Survol et sélection changent le fond sous un texte qui, lui, ne change pas. */
+    const interactive = ['--surface-hover', '--surface-active', '--surface-selected'] as const
+    const readable = ['--text-primary', '--text-muted', '--text-faint'] as const
+
+    const interactivePairs = interactive.flatMap((surface) =>
+      readable.map((text) => ({ text, surface })),
+    )
+
+    it.each(interactivePairs)('$text reste lisible sur $surface', ({ text, surface }) => {
+      // Ces surfaces se composent sur le canvas ; c'est lui qu'on passe comme fond de composition.
+      const page = resolveColor(tokens, '--surface-page') as string
+      const bg = resolveColor(tokens, surface, page)
+      const fg = resolveColor(tokens, text, page)
+      expect(bg, `${surface} non résoluble`).toBeDefined()
+      expect(fg, `${text} non résoluble`).toBeDefined()
+
+      expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+    })
+  })
+
   it('la bordure de carte se distingue de la surface qu’elle délimite', () => {
     // Sur un fond quasi-noir, c'est la bordure qui porte la profondeur. Si elle disparaît, les
     // cartes fusionnent avec le canvas. WCAG 1.4.11 demande 3:1 pour un élément d'interface, mais
     // cette séparation-là est décorative — on vérifie seulement qu'elle est perceptible.
-    const border = resolveToken(tokens, '--border-default')
-    const surface = resolveToken(tokens, '--surface-card')
+    const border = resolveColor(tokens, '--border-default')
+    const surface = resolveColor(tokens, '--surface-card')
 
     expect(contrastRatio(border as string, surface as string)).toBeGreaterThan(1.2)
   })
@@ -134,8 +188,8 @@ describe('contraste WCAG 2.1 AA', () => {
   it('l’anneau de focus tranche sur le canvas', () => {
     // Un focus invisible rend la navigation au clavier impraticable (WCAG 2.4.7). L'anneau est en
     // teal ; on vérifie la couleur qui le compose, pas l'ombre portée qui l'assemble.
-    const ring = resolveToken(tokens, '--teal-500')
-    const page = resolveToken(tokens, '--surface-page')
+    const ring = resolveColor(tokens, '--teal-500')
+    const page = resolveColor(tokens, '--surface-page')
 
     expect(contrastRatio(ring as string, page as string)).toBeGreaterThanOrEqual(
       AA_LARGE_TEXT_OR_UI,

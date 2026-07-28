@@ -35,4 +35,8 @@
   --font-ui: var(--font-sans);
   --font-data: var(--font-mono);
   --font-display: var(--font-sans);
+  /* La charte le définit comme un alias de la famille sans : elle n'emploie pas de condensé, et ce
+     token existe pour qu'un futur besoin ait un point d'accroche plutôt qu'une police improvisée.
+     Conservé tel quel — le supprimer parce qu'il est inutilisé reviendrait à décider à sa place. */
+  --font-condensed: var(--font-sans);
 }
