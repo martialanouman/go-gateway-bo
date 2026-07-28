@@ -34,7 +34,7 @@ typé vers l'API Admin, plus un mock local — pour que les écrans se développ
 - Le renouvellement de jeton se déclenche avant expiration et n'est pas concurrent (une seule requête).
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] `pnpm mock` sert les 134 opérations · aucun secret dans le dépôt
 - [ ] lint interdisant l'import du client depuis un composant client (invariant d)
 

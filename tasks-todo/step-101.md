@@ -31,7 +31,7 @@ BFF compose la fiche à partir de ce qui existe.
 - Aucun corps de message dans la réponse composée (invariant a).
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] composition documentée · rendu partiel testé
 
 ## Hors périmètre

@@ -28,7 +28,7 @@ tout ce qu'une action destructrice exige.
 - Après déconnexion, l'écart se réduit et le badge disparaît quand la convergence est atteinte.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] confirmation nommée · action auditée
 
 ## Hors périmètre

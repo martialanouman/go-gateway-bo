@@ -30,7 +30,7 @@ connexion fonctionne avant d'en dépendre.
 - Suppression d'un plan utilisé : avertissement listant les clients.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] invariant (b) tenu sur les identifiants fournisseur
 
 ## Hors périmètre

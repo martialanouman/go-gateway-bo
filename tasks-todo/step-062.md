@@ -29,7 +29,7 @@ et à quel groupe il appartient.
 - Changement de groupe reflété dans la liste des clients et dans le filtre.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] conséquence de la cascade affichée avant confirmation · actions auditées
 
 ## Hors périmètre

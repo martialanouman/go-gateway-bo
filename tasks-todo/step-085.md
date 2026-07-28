@@ -29,7 +29,7 @@ tenir à jour par deltas plutôt qu'en rechargeant tout.
 - La réconciliation corrige un delta manqué (simulé).
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] aucun refetch global sur événement · virtualisation effective
 
 ## Hors périmètre

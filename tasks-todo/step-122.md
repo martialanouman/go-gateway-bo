@@ -30,7 +30,7 @@ produit : croire qu'une route directe contourne la conformité.
 - Le contenu d'exemple n'apparaît dans aucun log.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] bandeau de précédence présent et testé dans les trois cas
 
 ## Hors périmètre

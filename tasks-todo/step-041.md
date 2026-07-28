@@ -30,7 +30,7 @@ accessible, tokens de la charte pour la forme.
 - Un champ invalide expose son message aux technologies d'assistance.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] toutes les primitives visibles sur `/_design` avec leurs états
 
 ## Hors périmètre

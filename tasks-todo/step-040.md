@@ -28,7 +28,7 @@ contenu, et l'arborescence de routes qui les accueillera.
 - Chaque route déclarée rend un état vide explicite, aucune page blanche.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] navigation clavier complète · repères ARIA corrects
 
 ## Hors périmètre

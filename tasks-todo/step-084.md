@@ -31,7 +31,7 @@ deux choses différentes, et un pool peut être à moitié debout.
 - Le badge « disjoncteur sans auto-reconnexion » apparaît dans le bon cas.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] rendu par bind testé · deux indicateurs distincts
 
 ## Hors périmètre

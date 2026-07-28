@@ -31,7 +31,7 @@ sans casser la pagination ni le magasin CDR.
 - Une vue sauvegardée restaure exactement ses filtres, et reste privée à son opérateur.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] aucune pagination par numéro de page · aucun corps dans l'URL (invariant a)
 
 ## Hors périmètre

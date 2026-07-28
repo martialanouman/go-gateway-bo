@@ -43,7 +43,7 @@ accès à Alertmanager lui-même et interdit au tableau de bord de parler à la 
 
 ## Definition of Done
 - [ ] blocage levé : opérations présentes au contrat et version bumpée
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] dérive visible sur la règle · aucun accès direct à Alertmanager depuis le BFF
 
 ## Hors périmètre

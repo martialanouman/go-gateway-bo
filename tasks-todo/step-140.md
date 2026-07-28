@@ -28,7 +28,7 @@ ni la plateforme.
 - Sans `suppressions:read`, l'écran est inaccessible.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] canal et origine visibles sur chaque ligne
 
 ## Hors périmètre

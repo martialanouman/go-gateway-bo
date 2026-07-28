@@ -29,7 +29,7 @@ Alertmanager ou le BFF — parce que ça change ce qu'on peut en conclure.
 - La source est rendue distinctement.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] persistance vérifiée hors WS · rétention définie
 
 ## Hors périmètre

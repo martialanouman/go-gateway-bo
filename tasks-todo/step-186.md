@@ -33,7 +33,7 @@ Livrer la topologie qui rend la cible de 99,9 % atteignable, et fermer les porte
 - CSP active et Monaco fonctionnel ; en-têtes de sécurité vérifiés par test.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm e2e` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build) · `pnpm e2e` vert
 - [ ] déploiement sans coupure vérifié · runbook complet · aucun secret dans l'image
 
 ## Hors périmètre

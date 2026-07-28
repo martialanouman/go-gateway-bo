@@ -31,7 +31,7 @@ avant/après.
 - Un opérateur `auditor` accède à l'écran complet ; un opérateur sans `audit:read` est refusé.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] utilisable avec `audit:read` seul · invariants (a)(b) revérifiés au rendu
 
 ## Hors périmètre

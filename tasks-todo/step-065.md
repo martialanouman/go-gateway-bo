@@ -29,7 +29,7 @@ croire qu'une baisse de quota coupe les binds déjà ouverts.
 - Refusé sans `accounts:write`.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] copie « ne coupe pas les binds vivants » présente et testée
 
 ## Hors périmètre

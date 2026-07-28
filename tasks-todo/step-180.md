@@ -34,7 +34,7 @@ ce qui détermine si elle survit à une panne du tableau de bord.
 - CRUD sous permission ; actions auditées.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] `evaluation_owner` dérivé, affiché, expliqué · limitation du write-through documentée
 
 ## Hors périmètre

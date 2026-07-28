@@ -30,7 +30,7 @@ Rendre lisible le chemin complet d'un message dans le pipeline, étape par étap
 - Étape non applicable distincte d'une étape en échec.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] **invariant (a)** couvert par un test sur un payload piégé
 
 ## Hors périmètre

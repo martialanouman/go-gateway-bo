@@ -29,7 +29,7 @@ de cibles adapté à la stratégie choisie.
 - Cycle de repli refusé ; création et mise à jour auditées.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] éditeur de cibles conditionné par la stratégie · aucun corps réel dans le testeur
 
 ## Hors périmètre

@@ -34,7 +34,7 @@ accessibles et fonctionnent de bout en bout.
 - Parcours clavier complet sur la table de routes et sur une liste virtualisée.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm e2e` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build) · `pnpm e2e` vert
 - [ ] aucune violation AA bloquante sur les parcours principaux
 
 ## Hors périmètre

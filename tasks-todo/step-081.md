@@ -27,7 +27,7 @@ d'un instantané pré-agrégé.
 - Le point pulsant n'apparaît qu'en direct.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] désabonnement effectif hors plage WS · fraîcheur affichée
 
 ## Hors périmètre

@@ -34,7 +34,7 @@ unique et trompeur.
 - Refusé sans `gdpr:erase`.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] conservation de l'opt-out testée · attestation liée à l'achèvement réel
 
 ## Hors périmètre

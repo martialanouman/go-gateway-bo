@@ -34,7 +34,7 @@ compteur qui monte et ne bloque rien.
 - Le grand livre filtre par direction et par compte.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] deux cartes distinctes testées · `balance_scope` toujours visible
 
 ## Hors périmètre

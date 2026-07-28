@@ -33,7 +33,7 @@ serveur protégée ne s'exécute sans permission vérifiée ni trace écrite.
 - Un secret ou un corps placé dans un payload muté n'apparaît pas dans `audit_log`.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] test d'énumération des routes en place et bloquant · invariants (a)(b)(c) tenus
 
 ## Hors périmètre

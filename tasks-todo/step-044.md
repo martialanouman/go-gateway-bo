@@ -28,7 +28,7 @@ le nombre d'abonnés WS ne croît pas avec le nombre d'instances.
 - Aucun doublon durable de consommation pendant la bascule.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] scénario deux instances vérifié en test d'intégration
 
 ## Hors périmètre

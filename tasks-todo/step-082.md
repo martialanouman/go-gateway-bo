@@ -27,7 +27,7 @@ domaine et pouvoir descendre au CDR d'un clic.
 - Le drill-down ouvre le CDR Explorer avec les filtres attendus dans l'URL.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] sommation par groupe testée · URL de drill-down partageable
 
 ## Hors périmètre

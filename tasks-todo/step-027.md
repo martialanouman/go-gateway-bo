@@ -29,7 +29,7 @@ toucher au code.
 - Désactiver un opérateur connecté met fin à sa session.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] garde-fous d'auto-verrouillage testés · actions auditées
 
 ## Hors périmètre

@@ -32,7 +32,7 @@ quelle règle a gagné.
 - La précédence affichée correspond à la règle qui gagnerait réellement.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] précédence explicite testée · raison obligatoire
 
 ## Hors périmètre

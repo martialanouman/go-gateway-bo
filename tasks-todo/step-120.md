@@ -29,7 +29,7 @@ qu'un opérateur doit comprendre.
 - Sans `routes:write`, la table est en lecture seule et l'explique.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] alternative clavier au glisser-déposer testée
 
 ## Hors périmètre

@@ -33,7 +33,7 @@ des numéros.
 - Import : compte-rendu des rejets, volume et date mis à jour ; refusé sans `routes:import`.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] clé MSISDN respectée · permission d'import distincte testée
 
 ## Hors périmètre

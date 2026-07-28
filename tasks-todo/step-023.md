@@ -29,7 +29,7 @@ authenticator.
 - Un code de récupération fonctionne une fois et une seule.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] secret chiffré au repos · anti-rejeu vérifié · codes de récupération jamais réaffichés
 
 ## Hors périmètre

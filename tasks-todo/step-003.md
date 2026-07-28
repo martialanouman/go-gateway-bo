@@ -29,7 +29,7 @@ plus jamais une couleur, un rayon ou une graisse.
 - Vérification automatisée du contraste des paires texte/fond principales.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] `/_design` rend la charte complète · aucune valeur codée en dur hors tokens
 
 ## Hors périmètre

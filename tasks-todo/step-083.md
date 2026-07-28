@@ -30,7 +30,7 @@ replié — un formulaire plat serait accablant pour le cas courant.
 - Suppression d'un connecteur référencé : avertissement listant les routes concernées.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] aucun secret de bind affiché · valeurs par défaut visibles
 
 ## Hors périmètre

@@ -29,7 +29,7 @@ socket, et un comportement honnête quand la connexion tombe.
 - Un message WS met à jour le cache Query sans re-render superflu.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] fraîcheur et état de connexion exposés et affichables
 
 ## Hors périmètre

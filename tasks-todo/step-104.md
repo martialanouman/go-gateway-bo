@@ -31,7 +31,7 @@ qui échappe le plus vite à ses règles.
 - Le lien expire après le TTL.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] export audité · masquage et plafond testés · aucun corps exporté
 
 ## Hors périmètre

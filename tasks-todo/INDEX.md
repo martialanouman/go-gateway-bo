@@ -43,6 +43,9 @@ petit schéma PostgreSQL propre (opérateurs, rôles, audit, alertes, notificati
 | Éditeur de script | Monaco | 0.56.x |
 | MFA | `@simplewebauthn/server` + `/browser` (passkey), TOTP | 13.3.x |
 | Tests | Vitest + Testing Library ; Playwright pour le bout en bout | 4.1.x / 1.62.x |
+| Langage | TypeScript 7 (compilateur natif), `strict` | 7.0.x |
+| Lint + format | Biome — un seul outil | 2.5.x |
+| Hébergement | Nitro v2 via `@tanstack/nitro-v2-vite-plugin`, preset `node-server` | 1.155.x |
 | Gestionnaire | **pnpm** | — |
 
 > **Règle d'or outillage :** avant d'ajouter ou de mettre à jour une dépendance, ou d'utiliser une API
@@ -64,7 +67,7 @@ petit schéma PostgreSQL propre (opérateurs, rôles, audit, alertes, notificati
 
 ## Definition of Done (chaque PR)
 
-`pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts • critères d'acceptation couverts
+`pnpm check` vert (typecheck · lint · test · vuln · build) • critères d'acceptation couverts
 par des tests • aucun invariant (a…e) violé • copie FR conforme aux fondamentaux de contenu de la
 charte (`.claude/skills/sms-gateway-design/README.md`) • clavier + libellés accessibles (WCAG 2.1 AA)
 sur tout écran touché • PR petite et focalisée (une step).

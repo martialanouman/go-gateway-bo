@@ -30,7 +30,7 @@ Répondre en une requête à la question de support la plus fréquente sur l'opt
 - L'avertissement structurel apparaît exactement pour un compte alphanumérique sans numéro entrant.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] portée décideuse toujours affichée · aucun raccourci vers la levée
 
 ## Hors périmètre

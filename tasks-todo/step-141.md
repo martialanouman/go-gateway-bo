@@ -29,7 +29,7 @@ automatiquement.
 - CRUD des mots-clés par pays.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] compte-rendu d'import complet · actions auditées
 
 ## Hors périmètre

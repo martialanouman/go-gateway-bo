@@ -30,7 +30,7 @@ tant que ses conditions ne sont pas réunies.
 - `account_manager` ne peut pas recharger.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] bouton inerte plutôt que masqué · mouvements audités
 
 ## Hors périmètre

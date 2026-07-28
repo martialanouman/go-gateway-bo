@@ -31,7 +31,7 @@ message entrant.
 - Collision avec un mot-clé d'opt-out signalée.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] bascule dédié/partagé testée · collisions signalées
 
 ## Hors périmètre

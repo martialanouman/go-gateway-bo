@@ -31,7 +31,7 @@ d'attaque par force brute qui monte vite.
 - Après N échecs, le compte est verrouillé pour la durée prévue, y compris depuis une autre instance.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] aucun secret journalisé · verrouillage effectif en multi-instance
 
 ## Hors périmètre

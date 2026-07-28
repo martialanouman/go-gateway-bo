@@ -30,7 +30,7 @@ n'improvise un vide, une erreur ou une dégradation.
 - `ConfirmDialog` : l'action ne part pas sans confirmation explicite.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] les cinq états sont sur `/_design` avec leur copie française définitive
 
 ## Hors périmètre

@@ -31,7 +31,7 @@ est la source de la détection.
 - Rappel périodique déclenché pour `critical`, pas pour `info`.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] endpoint isolé et authentifié · idempotence testée
 
 ## Hors périmètre

@@ -28,7 +28,7 @@ parcours de bout en bout, tous branchés en CI.
 - Le test d'invariant (a) échoue volontairement sur un cas fabriqué, puis passe une fois retiré.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm e2e` verts en CI
+- [ ] `pnpm check` + `pnpm e2e` verts en CI
 - [ ] seuil de couverture posé (pas symbolique) et respecté
 
 ## Hors périmètre

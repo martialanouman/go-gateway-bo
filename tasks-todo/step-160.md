@@ -30,7 +30,7 @@ passerelle comme une dégradation propre, jamais comme une panne.
 - Aucun état de solde persisté côté BFF (test de non-régression).
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] dégradation propre testée · aucune donnée financière stockée
 
 ## Hors périmètre

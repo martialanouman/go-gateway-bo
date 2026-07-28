@@ -30,7 +30,7 @@ manquante sans changer d'écran.
 - Aucun corps de MO n'est présent dans la réponse ni dans le DOM (invariant a).
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] **invariant (a)** testé sur un payload piégé · copie « pas de rejeu » présente
 
 ## Hors périmètre

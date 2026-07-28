@@ -28,7 +28,7 @@ plusieurs comptes SMPP.
 - Sans `customers:write`, le bouton de création est désactivé et expliqué.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] validation alignée sur le contrat · création auditée
 
 ## Hors périmètre

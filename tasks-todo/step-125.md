@@ -29,7 +29,7 @@ révocable, et observable une fois en production.
 - Retour arrière restaure la version choisie ; la santé affiche les métriques de la version active.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] séparation écriture/publication testée · unicité par portée testée
 
 ## Hors périmètre

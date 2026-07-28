@@ -28,7 +28,7 @@ Ouvrir le second niveau du domaine : le compte SMPP, l'objet technique qui se co
 - Suspension effectuée via `update-smpp-account`, pas via l'opération non implémentée.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] écart `suspend-smpp-account` documenté dans le code
 
 ## Hors périmètre

@@ -28,7 +28,7 @@ option par sa conséquence, pas par son nom.
 - Refusé sans permission ; changement audité.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] copie d'honnêteté présente · valeur effective toujours affichée
 
 ## Hors périmètre

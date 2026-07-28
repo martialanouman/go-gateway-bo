@@ -35,7 +35,7 @@ produit, de bout en bout.
 - Le filtre par groupe renvoie les membres courants.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] copie explicite « un groupe ne porte aucune configuration » · actions auditées
 
 ## Hors périmètre

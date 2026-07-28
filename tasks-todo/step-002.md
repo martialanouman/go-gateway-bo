@@ -30,7 +30,7 @@ reproductibles et un environnement local d'une commande.
 - Une insertion dans `audit_log` atterrit dans la bonne partition mensuelle.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] `docker compose up` + `pnpm db:migrate` suffisent à un poste neuf
 - [ ] aucune donnée du plan de contrôle de la passerelle dupliquée ici
 

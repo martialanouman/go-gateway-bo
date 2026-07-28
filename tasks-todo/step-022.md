@@ -31,7 +31,7 @@ front sur qui est connecté et ce qu'il a le droit de faire.
 - Une route protégée redirige un anonyme et un opérateur dont le MFA n'est pas passé.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] cookie `HttpOnly`/`Secure`/`SameSite` · aucune permission portée par le jeton
 
 ## Hors périmètre

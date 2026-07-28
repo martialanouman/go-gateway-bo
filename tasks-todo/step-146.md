@@ -28,7 +28,7 @@ réputation qui en découle.
 - Aucun contenu de test journalisé (invariant a).
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] file de revue auditée · tendance historisée
 
 ## Hors périmètre

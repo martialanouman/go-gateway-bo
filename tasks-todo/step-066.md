@@ -35,7 +35,7 @@ Gérer les secrets d'un compte sans jamais les exposer — l'écran où l'invari
 - Aucune action « révéler » n'existe dans l'écran (test de non-régression explicite).
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] **invariant (b)** couvert par un test bloquant · actions auditées
 
 ## Hors périmètre

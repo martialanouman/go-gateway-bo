@@ -29,7 +29,7 @@ désabonné.
 - Origine `regulator` → avertissement renforcé.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] permission dédiée testée (y compris le refus pour `ops`) · audit vérifié
 
 ## Hors périmètre

@@ -32,7 +32,7 @@ redémarrage.
 - Une transition franchissant un seuil crée exactement une notification.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] rejeu après redémarrage testé · lag exposé
 
 ## Hors périmètre

@@ -29,7 +29,7 @@ Rassembler sur une page tout ce qui définit le comportement d'un compte, hors q
 - Couper un canal avec binds vivants demande confirmation et affiche l'impact.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] invariant (b) tenu sur les webhooks · conséquences énoncées
 
 ## Hors périmètre

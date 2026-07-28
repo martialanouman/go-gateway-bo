@@ -35,7 +35,7 @@ C'est l'écran où l'invariant (a) se gagne.
   cache persisté.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] **invariant (a)** couvert par un test bloquant · audit systématique vérifié
 
 ## Hors périmètre

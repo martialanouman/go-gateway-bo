@@ -27,7 +27,7 @@ Offrir la destruction ciblée du contenu — irréversible, limitée au corps, e
 - Rotation de clé effectuée et auditée.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] cohérence avec l'état « effacé » de step-103 testée
 
 ## Hors périmètre

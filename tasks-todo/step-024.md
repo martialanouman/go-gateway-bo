@@ -28,7 +28,7 @@ sans code à recopier.
 - Supprimer le dernier facteur d'un rôle privilégié est refusé avec un message explicite.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm e2e` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build) · `pnpm e2e` vert
 - [ ] `rpID`/`origin` vérifiés côté serveur · challenge à usage unique
 
 ## Hors périmètre

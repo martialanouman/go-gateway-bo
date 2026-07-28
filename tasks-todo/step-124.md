@@ -35,7 +35,7 @@ d'exemple, sans quitter le tableau de bord.
 - Monaco n'est pas chargé sur les autres écrans (test de bundle ou de chargement).
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] chargement paresseux vérifié · garde-fous affichés
 
 ## Hors périmètre

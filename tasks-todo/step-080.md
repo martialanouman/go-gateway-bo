@@ -29,7 +29,7 @@ par un instantané REST — le direct viendra en step-081.
 - Aucun indicateur de direct tant que le flux WS n'est pas branché.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] graphiques conformes à la charte §07 · contraste AA vérifié
 
 ## Hors périmètre

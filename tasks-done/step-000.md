@@ -31,7 +31,7 @@ n'ait plus qu'à ajouter du produit.
 - La CI échoue si `typecheck` ou `lint` échoue (vérifié par une PR de démonstration ou un run local).
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] `pnpm dev` sert l'application ; `pnpm build && pnpm start` la sert en Node
 - [ ] CI verte sur la PR · `.env` jamais commité
 

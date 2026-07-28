@@ -32,7 +32,7 @@ multiplexée par sujet — le sens du travail est l'inverse d'un fan-out.
 - Un client lent voit ses messages jetés, la mémoire du serveur reste bornée.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
 - [ ] enveloppe conforme au §5.2 · filtrage par permission testé
 
 ## Hors périmètre

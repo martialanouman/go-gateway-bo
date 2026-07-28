@@ -30,7 +30,7 @@ produit conformément à la charte.
 - Compte verrouillé : message avec durée, aucune fuite d'existence de compte.
 
 ## Definition of Done
-- [ ] `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm e2e` verts
+- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build) · `pnpm e2e` vert
 - [ ] aucun contrôle silencieusement masqué · clavier et libellés conformes (WCAG 2.1 AA)
 
 ## Hors périmètre
