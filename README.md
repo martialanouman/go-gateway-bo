@@ -78,5 +78,9 @@ son raisonnement d'exposition écrit.
 
 Une **step = une PR**. Prendre le prochain fichier de `tasks-todo/` (l'ordre de `INDEX.md` fait foi),
 l'implémenter avec ses tests, puis déplacer le fichier dans `tasks-done/` en dernier commit.
+
+Les portes de qualité tournent en jobs parallèles (`typecheck`, `lint`, `test`, `vuln`, `build`).
+La protection de branche doit exiger le seul check **`CI`** : il agrège les cinq et reste valable
+quand une porte s'ajoute — lister les jobs nommément se périmerait au premier ajout.
 Les conventions, invariants et la Definition of Done sont dans [`CLAUDE.md`](./CLAUDE.md) ; le cadre
 et l'ordre dans [`docs/plan-execution-tableau-de-bord.md`](./docs/plan-execution-tableau-de-bord.md).

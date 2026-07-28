@@ -1,0 +1,23 @@
+# Setup partagé par tous les jobs de CI. Les portes tournent en parallèle et chacune part d'un runner
+# vierge : sans cette action, les mêmes quatre étapes seraient recopiées dans chaque job, et une
+# divergence entre deux copies (version de Node, options de cache) produirait des échecs qui ne
+# reproduisent pas en local.
+name: Setup Node & pnpm
+description: Installe pnpm, Node à la version de .nvmrc, et les dépendances du lockfile.
+
+runs:
+  using: composite
+  steps:
+    # Doit précéder setup-node : c'est ce qui rend `cache: pnpm` résoluble.
+    - uses: pnpm/action-setup@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        # .nvmrc est la source unique de la version de Node ; ne jamais la répéter ici.
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    # --frozen-lockfile : une PR qui modifie package.json sans commiter le lockfile échoue ici plutôt
+    # que d'installer silencieusement autre chose que ce qui a été testé en local.
+    - run: pnpm install --frozen-lockfile
+      shell: bash

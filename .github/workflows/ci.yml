@@ -1,5 +1,16 @@
 # Portes de qualité CI (plan d'exécution §0.4, M0). Chaque job reflète un script pnpm, de sorte
-# qu'un `pnpm check` local vert signifie une pipeline verte.
+# qu'un `pnpm check` local vert signifie une pipeline verte — à une garde près, la fraîcheur de
+# `src/routeTree.gen.ts`, qui n'a de sens qu'en CI.
+#
+# Les portes sont des jobs **indépendants** plutôt que des étapes d'un job unique : une porte qui
+# échoue n'empêche plus les autres de rendre leur verdict. On voit une erreur de type ET un test
+# rouge dans le même run, au lieu de les découvrir l'une après l'autre.
+#
+# Le coût est réel et assumé : cinq runners au lieu d'un, donc cinq installations de dépendances
+# (~10 s chacune, cache chaud). Aujourd'hui le gain est le diagnostic complet, pas la vitesse — les
+# portes durent quelques secondes. Il deviendra un gain de temps mural quand les tests d'intégration
+# (step-002) et le bout en bout (step-004) arriveront, car eux seuls porteront leurs services et
+# leurs navigateurs sans ralentir les autres portes.
 name: CI
 
 on:
@@ -16,41 +27,47 @@ permissions:
   contents: read
 
 jobs:
-  quality:
-    name: Typecheck · Lint · Test · Build
+  typecheck:
+    name: Typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm typecheck
 
-      - uses: pnpm/action-setup@v4
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm lint
 
-      - uses: actions/setup-node@v4
-        with:
-          # .nvmrc est la source unique de la version de Node ; ne jamais la répéter ici.
-          node-version-file: .nvmrc
-          cache: pnpm
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm test
 
-      - name: Install
-        # --frozen-lockfile : une PR qui modifie package.json sans commiter le lockfile échoue ici
-        # plutôt que d'installer silencieusement autre chose que ce qui a été testé en local.
-        run: pnpm install --frozen-lockfile
+  vuln:
+    name: Vulnérabilités
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # Échoue sur tout avis non trié dans `auditConfig.ignoreGhsas` (pnpm-workspace.yaml). Un
+      # nouvel avis doit être lu et justifié, pas absorbé par un seuil de sévérité relevé.
+      - run: pnpm vuln
 
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint & format
-        run: pnpm lint
-
-      - name: Test
-        run: pnpm test
-
-      - name: Vulnérabilités
-        # Échoue sur tout avis non trié dans `auditConfig.ignoreGhsas` (pnpm-workspace.yaml). Un
-        # nouvel avis doit être lu et justifié, pas absorbé par un seuil de sévérité relevé.
-        run: pnpm vuln
-
-      - name: Build
-        run: pnpm build
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm build
 
       - name: Vérifier que routeTree.gen.ts est à jour
         # Le build régénère l'arbre de routes. S'il diffère de ce qui est commité, c'est qu'une route
@@ -61,3 +78,26 @@ jobs:
             echo "::error::src/routeTree.gen.ts est périmé — relancer 'pnpm build' et commiter le résultat."
             exit 1
           fi
+
+  # Porte unique à déclarer dans la protection de branche. Sans elle, il faudrait y lister les cinq
+  # jobs nommément et penser à mettre la règle à jour à chaque ajout de porte — un oubli qui laisse
+  # passer silencieusement une porte non requise.
+  ci:
+    name: CI
+    if: always()
+    needs: [typecheck, lint, test, vuln, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vérifier le verdict des portes
+        # `if: always()` fait tourner ce job même quand une porte échoue — sans le test ci-dessous,
+        # il réussirait alors et rendrait la protection de branche inopérante.
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ]; then
+            echo "::error::Au moins une porte de qualité a échoué."
+            exit 1
+          fi
+          if [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "::error::Au moins une porte de qualité a été annulée."
+            exit 1
+          fi
+          echo "Toutes les portes sont vertes."
