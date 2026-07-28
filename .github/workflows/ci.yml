@@ -1,0 +1,58 @@
+# Portes de qualité CI (plan d'exécution §0.4, M0). Chaque job reflète un script pnpm, de sorte
+# qu'un `pnpm check` local vert signifie une pipeline verte.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un nouveau push sur une PR rend le run précédent obsolète : l'annuler plutôt que payer les deux.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Typecheck · Lint · Test · Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # .nvmrc est la source unique de la version de Node ; ne jamais la répéter ici.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        # --frozen-lockfile : une PR qui modifie package.json sans commiter le lockfile échoue ici
+        # plutôt que d'installer silencieusement autre chose que ce qui a été testé en local.
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint & format
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Vérifier que routeTree.gen.ts est à jour
+        # Le build régénère l'arbre de routes. S'il diffère de ce qui est commité, c'est qu'une route
+        # a été ajoutée sans commiter le fichier généré — la branche compilerait en local et pas
+        # ailleurs.
+        run: |
+          if ! git diff --exit-code -- src/routeTree.gen.ts; then
+            echo "::error::src/routeTree.gen.ts est périmé — relancer 'pnpm build' et commiter le résultat."
+            exit 1
+          fi

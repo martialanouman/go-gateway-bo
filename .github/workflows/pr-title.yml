@@ -1,0 +1,19 @@
+# Le dépôt fusionne en squash : le titre de la PR devient le commit sur `main`. Le valider ici est
+# ce qui garde l'historique lisible et exploitable (`type(scope): description (step-NNN)`).
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint-title:
+    name: Conventional commit title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

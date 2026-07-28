@@ -1,0 +1,10 @@
+# pnpm refuse par défaut d'exécuter les scripts d'installation d'une dépendance : un postinstall est
+# l'un des vecteurs d'attaque les plus courts de l'écosystème npm. Chaque entrée ci-dessous est une
+# autorisation explicite, à justifier.
+allowBuilds:
+  # esbuild place son binaire natif à l'installation ; sans ce script, aucun build ne fonctionne.
+  esbuild: true
+
+# Paquets exemptés du délai de quarantaine que pnpm applique aux versions fraîchement publiées.
+minimumReleaseAgeExclude:
+  - jsdom@30.0.0

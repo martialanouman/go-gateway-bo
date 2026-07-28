@@ -1,0 +1,22 @@
+# Sorties de build : `dist/` (Vite) et `.output/` (Nitro, le serveur Node déployé).
+/dist/
+/.output/
+/.nitro/
+/.tanstack/
+
+# Dépendances et caches d'outillage.
+node_modules/
+/coverage/
+/test-results/
+/playwright-report/
+
+# Variables d'environnement locales. `.env.example` est commité, jamais un `.env` réel :
+# il porte le jeton OAuth2 de l'API Admin, le secret de session et le DSN PostgreSQL (§1.8).
+.env
+.env.*
+!.env.example
+
+# Cruft OS / éditeur.
+.DS_Store
+*.swp
+.idea/

@@ -1,0 +1,18 @@
+/*
+ * Feuille racine provisoire. Les tokens de la charte v1.0 (couleurs, typographie, espacements,
+ * rayons, élévation, motion) arrivent en step-003 et remplacent tout ce qui suit — aucune valeur
+ * définie ici ne doit survivre à ce jalon.
+ */
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 2rem;
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
