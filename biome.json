@@ -49,7 +49,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/routes/**", "src/components/**"],
+      "includes": ["src/**", "!src/server/**", "!src/test/**"],
       "linter": {
         "rules": {
           "style": {
@@ -58,11 +58,18 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["~/server/**", "**/server/**"],
+                    "group": [
+                      "~/server",
+                      "~/server/**",
+                      "**/server/**",
+                      "../server",
+                      "../../server",
+                      "../../../server"
+                    ],
                     "message": "Invariant (d) : le navigateur ne parle jamais directement à l'API Admin. Le jeton machine, le mTLS et la connexion PostgreSQL restent sous src/server/. Passer par une fonction serveur, qui applique la permission (requirePermission) et écrit l'audit."
                   },
                   {
-                    "group": ["undici", "openapi-fetch", "node:fs", "node:crypto"],
+                    "group": ["undici", "openapi-fetch", "node:*", "node:*/*"],
                     "message": "Invariant (d) : ce module est réservé au BFF. Un composant client qui l'importe fait entrer du code serveur — et parfois un secret — dans le bundle navigateur."
                   }
                 ]

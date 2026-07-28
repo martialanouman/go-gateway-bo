@@ -25,8 +25,17 @@ runs:
     # `github.token` suffit : le package accorde la lecture à ce dépôt (Package settings → Manage
     # Actions access). Aucun PAT en secret, donc rien qui expire un matin sans prévenir. Le workflow
     # doit accorder `packages: read`.
-    - run: printf '//npm.pkg.github.com/:_authToken=%s\n' "${{ github.token }}" >> "$HOME/.npmrc"
+    #
+    # Le jeton passe par l'environnement et non par la ligne de commande : un argument de commande
+    # est lisible par tout autre processus du runner via `ps`. Le fichier est réécrit et non
+    # complété, pour qu'un runner réutilisé n'accumule pas de jetons périmés dont le premier lu
+    # gagnerait, et il est créé sans permission pour les autres utilisateurs.
+    - run: |
+        umask 077
+        printf '//npm.pkg.github.com/:_authToken=%s\n' "$NODE_AUTH_TOKEN" > "$HOME/.npmrc"
       shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ github.token }}
 
     # --frozen-lockfile : une PR qui modifie package.json sans commiter le lockfile échoue ici plutôt
     # que d'installer silencieusement autre chose que ce qui a été testé en local.

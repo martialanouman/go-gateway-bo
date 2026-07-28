@@ -52,6 +52,99 @@ describe('createGatewayClient', () => {
     expect((error as GatewayError).code).toBe('timeout')
   })
 
+  it('traduit aussi un délai dépassé PENDANT la lecture du corps', async () => {
+    // Les en-têtes arrivent vite, le corps traîne — une grande page de CDR, par exemple. La lecture
+    // du corps a lieu hors du périmètre du client si on n'y prend pas garde : l'appelant reçoit
+    // alors un `DOMException` brut, sans `code`, et l'état « erreur » de la copie française n'est
+    // plus produisible.
+    const fetch = vi.fn<FetchSignature>(async (_request, init) => {
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"data":['))
+          init?.signal?.addEventListener('abort', () => {
+            controller.error(init.signal?.reason)
+          })
+          // ... et le corps ne se termine jamais.
+        },
+      })
+      return new Response(body, { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    const client = createGatewayClient({ ...options(fetch), timeoutMs: 20 })
+
+    const error = await client.GET('/admin/customers').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(GatewayError)
+    expect((error as GatewayError).code).toBe('timeout')
+  })
+
+  describe('renouvellement sur 401', () => {
+    it('jette le jeton refusé et rejoue une fois avec le nouveau', async () => {
+      const invalidateToken = vi.fn()
+      let token = 'jeton-périmé'
+      const fetch = vi
+        .fn<FetchSignature>()
+        .mockResolvedValueOnce(json(401, { code: 'unauthorized', message: 'Jeton refusé.' }))
+        .mockResolvedValueOnce(json(200, { data: [], has_more: false }))
+
+      const client = createGatewayClient({
+        ...options(fetch),
+        getAccessToken: async () => token,
+        invalidateToken: (presented: string) => {
+          invalidateToken(presented)
+          token = 'jeton-neuf'
+        },
+      })
+
+      const { data } = await client.GET('/admin/customers')
+
+      expect(data).toEqual({ data: [], has_more: false })
+      expect(invalidateToken).toHaveBeenCalledWith('jeton-périmé')
+      expect(fetch.mock.calls[1]?.[0]?.headers.get('authorization')).toBe('Bearer jeton-neuf')
+    })
+
+    it('rejoue aussi une écriture — un 401 prouve que rien n’a été exécuté', async () => {
+      let token = 'jeton-périmé'
+      const fetch = vi
+        .fn<FetchSignature>()
+        .mockResolvedValueOnce(json(401, { code: 'unauthorized', message: 'Jeton refusé.' }))
+        .mockResolvedValueOnce(json(201, { id: 'c-1', name: 'ACME' }))
+
+      const client = createGatewayClient({
+        ...options(fetch),
+        getAccessToken: async () => token,
+        invalidateToken: () => {
+          token = 'jeton-neuf'
+        },
+      })
+
+      const { response } = await client.POST('/admin/customers', {
+        body: { name: 'ACME', billing_enabled: false, overdraft_enabled: false },
+      })
+
+      expect(response.status).toBe(201)
+      expect(fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('ne rejoue pas quand le renouvellement rend le même jeton', async () => {
+      // La passerelle refuse pour une autre raison que la fraîcheur du jeton. Rejouer produirait le
+      // même 401 et une requête de plus vers une passerelle qui refuse déjà (invariant e).
+      const fetch = vi
+        .fn<FetchSignature>()
+        .mockResolvedValue(json(401, { code: 'forbidden_scope', message: 'Scope manquant.' }))
+
+      const client = createGatewayClient({
+        ...options(fetch),
+        getAccessToken: async () => 'jeton-inchangé',
+        invalidateToken: () => {},
+      })
+
+      const { response } = await client.GET('/admin/customers')
+
+      expect(response.status).toBe(401)
+      expect(fetch).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('retry', () => {
     it('rejoue une lecture interrompue, une seule fois', async () => {
       const fetch = vi

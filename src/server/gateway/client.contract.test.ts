@@ -12,6 +12,7 @@
 // `false`, auquel cas le test négatif ci-dessous reçoit un 200 et rougit. Sans lui, Prism servirait
 // un exemple quoi qu'on lui envoie, et « le client parle au contrat » ne voudrait plus rien dire.
 
+import { fileURLToPath } from 'node:url'
 import { createLogger } from '@stoplight/prism-core'
 import { getHttpOperationsFromSpec } from '@stoplight/prism-http'
 import { createServer } from '@stoplight/prism-http-server'
@@ -94,10 +95,12 @@ function client() {
 }
 
 async function startPrism() {
-  const spec = new URL(
+  // `fileURLToPath` et non `.pathname` : ce dernier conserve le percent-encodage, et un dépôt cloné
+  // dans un chemin contenant une espace donnerait « %20 » à un lecteur de fichiers.
+  const spec = fileURLToPath(
     import.meta.resolve('@martialanouman/gateway-api-contracts/openapi-admin.yaml'),
   )
-  const operations = await getHttpOperationsFromSpec(spec.pathname)
+  const operations = await getHttpOperationsFromSpec(spec)
 
   const server = createServer(operations, {
     components: { logger: createLogger('contract-test', { level: 'silent' }) },

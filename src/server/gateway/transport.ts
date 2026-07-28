@@ -7,11 +7,12 @@
  * s'envoie qu'à l'interlocuteur pour lequel il a été émis ; la portée est donc attachée au client,
  * pas au processus.
  *
- * **Pourquoi `fetch` vient d'undici et non du global.** Node embarque sa propre copie d'undici, mais
- * n'expose pas `Agent`. Mélanger l'`Agent` du paquet npm avec le `fetch` global reviendrait à faire
- * dialoguer deux copies distinctes de la même bibliothèque par leurs interfaces internes : ça marche
- * tant que leurs versions restent alignées, et casse silencieusement le jour où elles divergent.
- * Une seule source, donc.
+ * **Pourquoi la requête est reconstruite à partir de primitives.** Node embarque sa propre copie
+ * d'undici mais n'expose pas `Agent` : il faut le paquet npm, et les deux copies ne se reconnaissent
+ * pas. Passer directement la `Request` construite par `openapi-fetch` au `fetch` du paquet échoue
+ * sur « Failed to parse URL from [object Request] » — le converter la prend pour une chaîne. URL,
+ * méthode, en-têtes et corps traversent donc la frontière sous forme de primitives, seules choses
+ * que les deux copies interprètent de la même façon.
  *
  * **Rotation des certificats.** Les options TLS d'un `Agent` sont figées à sa construction : ce
  * transport ne recharge pas les fichiers. Une rotation exige donc un redémarrage du processus —
@@ -21,12 +22,7 @@
  */
 
 import { readFileSync } from 'node:fs'
-import {
-  Agent,
-  type RequestInfo as UndiciRequestInfo,
-  type RequestInit as UndiciRequestInit,
-  fetch as undiciFetch,
-} from 'undici'
+import { Agent, fetch as undiciFetch } from 'undici'
 import { ConfigurationError, type MtlsPaths } from './config'
 
 export type Transport = {
@@ -42,29 +38,44 @@ export type Transport = {
 const HEADERS_TIMEOUT_MS = 15_000
 const BODY_TIMEOUT_MS = 30_000
 
-export function createMtlsTransport(mtls: MtlsPaths): Transport {
+/**
+ * Sans `mtls`, le transport reste en clair : c'est le mode `mock`, où Prism écoute en local et où
+ * exiger un certificat pousserait chacun à s'en fabriquer un.
+ */
+export function createTransport(mtls?: MtlsPaths): Transport {
   const agent = new Agent({
-    connect: {
-      cert: readCertificate(mtls.certPath, 'GATEWAY_MTLS_CERT_PATH'),
-      key: readCertificate(mtls.keyPath, 'GATEWAY_MTLS_KEY_PATH'),
-      ca: readCertificate(mtls.caPath, 'GATEWAY_MTLS_CA_PATH'),
-    },
+    ...(mtls
+      ? {
+          connect: {
+            cert: readCertificate(mtls.certPath, 'GATEWAY_MTLS_CERT_PATH'),
+            key: readCertificate(mtls.keyPath, 'GATEWAY_MTLS_KEY_PATH'),
+            ca: readCertificate(mtls.caPath, 'GATEWAY_MTLS_CA_PATH'),
+          },
+        }
+      : {}),
     headersTimeout: HEADERS_TIMEOUT_MS,
     bodyTimeout: BODY_TIMEOUT_MS,
   })
 
+  const fetch = async (input: Request, init?: RequestInit): Promise<Response> => {
+    // Le corps est matérialisé avant la traversée : un `ReadableStream` de la copie d'undici de Node
+    // n'est pas lisible par celle du paquet npm. Les réponses de l'Admin API sont des documents
+    // JSON, jamais des flux — la mise en mémoire n'a pas de coût caché ici.
+    const body = input.body ? await input.arrayBuffer() : undefined
+
+    const response = await undiciFetch(input.url, {
+      method: input.method,
+      headers: [...input.headers],
+      ...(body ? { body } : {}),
+      signal: init?.signal ?? input.signal,
+      dispatcher: agent,
+    })
+
+    return response as unknown as Response
+  }
+
   return {
-    // Les casts tiennent à une différence de déclarations entre le `fetch` d'undici et celui du
-    // DOM ; les deux implémentent la même spécification, et c'est le seul endroit du dépôt qui les
-    // rapproche.
-    fetch: ((input: Request, init?: RequestInit) =>
-      undiciFetch(
-        input as unknown as UndiciRequestInfo,
-        {
-          ...init,
-          dispatcher: agent,
-        } as unknown as UndiciRequestInit,
-      )) as unknown as typeof globalThis.fetch,
+    fetch: fetch as unknown as typeof globalThis.fetch,
     close: () => agent.close(),
   }
 }

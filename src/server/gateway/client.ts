@@ -3,7 +3,7 @@
  *
  * **Ce module ne s'importe que depuis `src/server/`.** Le jeton machine, le mTLS et l'adresse
  * interne de la passerelle n'ont rien à faire dans un bundle navigateur ; une règle de lint le
- * refuse depuis `src/routes/` et `src/components/` (invariant d).
+ * refuse depuis le code client, et un test d'invariant vérifie la chaîne complète des imports.
  *
  * Les types viennent du contrat publié, jamais d'une copie locale : `paths` est généré depuis
  * `openapi-admin.yaml` par le dépôt `go-gateway`. Un endpoint qui manque se corrige par une PR
@@ -18,6 +18,11 @@ export type GatewayClientOptions = {
   baseUrl: string
   /** Fournit le jeton machine. Une chaîne vide n'envoie aucun en-tête d'autorisation. */
   getAccessToken: () => Promise<string>
+  /**
+   * Jette le jeton en cache. Sans cela, une passerelle qui révoque un jeton avant son expiration
+   * annoncée fige le tableau de bord sur des 401 jusqu'au redémarrage du processus.
+   */
+  invalidateToken?: (token: string) => void
   /** Point d'injection du transport — c'est par là que passe le mTLS. */
   fetch?: typeof globalThis.fetch
   timeoutMs?: number
@@ -30,20 +35,33 @@ export type GatewayClientOptions = {
  */
 const DEFAULT_TIMEOUT_MS = 10_000
 
-/** Sans corps à rejouer et sans effet à dupliquer : ces deux méthodes seules se reprennent. */
+/** Sans effet à dupliquer : ces deux méthodes seules se reprennent après un échec de transport. */
 const REPLAYABLE_METHODS = new Set(['GET', 'HEAD'])
+
+/** Statuts pour lesquels la spécification interdit un corps. */
+const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304])
+
+type SendContext = {
+  fetch: typeof globalThis.fetch
+  timeoutMs: number
+  getAccessToken: () => Promise<string>
+  invalidateToken: ((token: string) => void) | undefined
+}
 
 export function createGatewayClient(options: GatewayClientOptions): Client<paths> {
   const {
     baseUrl,
     getAccessToken,
+    invalidateToken,
     fetch = globalThis.fetch,
     timeoutMs = DEFAULT_TIMEOUT_MS,
   } = options
 
+  const context: SendContext = { fetch, timeoutMs, getAccessToken, invalidateToken }
+
   const client = createClient<paths>({
     baseUrl,
-    fetch: (request) => send(request, { fetch, timeoutMs }),
+    fetch: (request) => send(request, context),
   })
 
   client.use(bearerToken(getAccessToken))
@@ -81,40 +99,96 @@ function bearerToken(getAccessToken: () => Promise<string>): Middleware {
   }
 }
 
-async function send(
-  request: Request,
-  { fetch, timeoutMs }: { fetch: typeof globalThis.fetch; timeoutMs: number },
-): Promise<Response> {
+async function send(request: Request, context: SendContext): Promise<Response> {
+  // Cloné avant tout envoi : le transport consomme le corps, et une `Request` déjà utilisée ne se
+  // rejoue pas (« Cannot construct a Request with a Request object that has already been used »).
+  const spare = request.clone()
+
+  let response: Response
   try {
-    return await attempt(request, { fetch, timeoutMs })
+    response = await attempt(request, context)
   } catch (error) {
     // Une reprise n'a de sens que si la requête n'a pas pu produire d'effet et si personne n'a
     // demandé l'arrêt. Rejouer un abandon volontaire doublerait le délai que l'on vient d'imposer.
     if (!REPLAYABLE_METHODS.has(request.method) || isAbort(error)) throw asGatewayError(error)
 
     try {
-      return await attempt(request, { fetch, timeoutMs })
+      response = await attempt(spare.clone(), context)
     } catch (retryError) {
       throw asGatewayError(retryError)
     }
   }
+
+  if (response.status !== 401 || !context.invalidateToken) return response
+
+  // Un 401 signifie que la passerelle n'a rien exécuté : rejouer est sûr, y compris sur une
+  // écriture. C'est le seul cas où une méthode non idempotente se reprend.
+  return retryWithFreshToken(spare, response, context)
 }
 
-function attempt(
-  request: Request,
-  { fetch, timeoutMs }: { fetch: typeof globalThis.fetch; timeoutMs: number },
+async function retryWithFreshToken(
+  spare: Request,
+  unauthorized: Response,
+  context: SendContext,
 ): Promise<Response> {
-  // Le signal de la requête est conservé : un appelant qui annule (navigation, démontage de
-  // composant) doit continuer d'être entendu. Le délai vient s'y ajouter, il ne le remplace pas.
-  const signal = request.signal
-    ? AbortSignal.any([request.signal, AbortSignal.timeout(timeoutMs)])
-    : AbortSignal.timeout(timeoutMs)
+  const presented = spare.headers.get('authorization')?.replace(/^Bearer /, '') ?? ''
+  if (!presented) return unauthorized
 
-  return fetch(request, { signal })
+  context.invalidateToken?.(presented)
+  const refreshed = await context.getAccessToken().catch(() => '')
+  // Un jeton inchangé signifie que le renouvellement n'a rien donné : rejouer produirait le même
+  // 401 et une requête de plus vers une passerelle qui refuse déjà.
+  if (!refreshed || refreshed === presented) return unauthorized
+
+  const replay = spare.clone()
+  replay.headers.set('authorization', `Bearer ${refreshed}`)
+
+  try {
+    return await attempt(replay, context)
+  } catch (error) {
+    throw asGatewayError(error)
+  }
+}
+
+/**
+ * Une tentative, corps compris.
+ *
+ * Le corps est lu **ici**, sous la même garde de délai que les en-têtes, puis la réponse est rendue
+ * détachée du transport. Sans cela, `openapi-fetch` lirait le corps après le retour de cette
+ * fonction : une réponse volumineuse coupée en cours de lecture lèverait un `DOMException` brut,
+ * hors de toute traduction, et l'appelant recevrait une erreur sans `code` exploitable.
+ */
+async function attempt(request: Request, context: SendContext): Promise<Response> {
+  // `AbortSignal.timeout` ne se désarme pas : chaque requête laisserait un minuteur armé jusqu'à
+  // son terme. Un contrôleur explicite s'annule dès la réponse entièrement lue.
+  const controller = new AbortController()
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException('Délai dépassé.', 'TimeoutError'))
+  }, context.timeoutMs)
+
+  const signal = request.signal
+    ? AbortSignal.any([request.signal, controller.signal])
+    : controller.signal
+
+  try {
+    const response = await context.fetch(request, { signal })
+    const body = NULL_BODY_STATUSES.has(response.status) ? null : await response.arrayBuffer()
+
+    return new Response(body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    })
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function isAbort(error: unknown): boolean {
-  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')
+  return (
+    (error instanceof Error || error instanceof DOMException) &&
+    (error.name === 'AbortError' || error.name === 'TimeoutError')
+  )
 }
 
 function asGatewayError(error: unknown): GatewayError {

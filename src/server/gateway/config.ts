@@ -65,8 +65,10 @@ export function readGatewayConfig(env: EnvironmentLike): GatewayConfig {
 }
 
 /**
- * Ne cite jamais la valeur lue — seulement le nom de la variable. Un message d'erreur de démarrage
- * part dans les logs de l'orchestrateur, et la variable manquante est souvent voisine d'un secret.
+ * Ne cite jamais la valeur d'une variable qui peut porter un secret — seulement son nom. Un message
+ * d'erreur de démarrage part dans les logs de l'orchestrateur, et la variable manquante est souvent
+ * voisine d'un secret. Seule exception, `GATEWAY_MODE` : son domaine est fermé à deux valeurs
+ * publiques, et voir la valeur refusée est ce qui rend la faute de frappe évidente.
  */
 export class ConfigurationError extends Error {
   constructor(message: string) {

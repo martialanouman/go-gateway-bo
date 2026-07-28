@@ -1,5 +1,6 @@
 // @vitest-environment node
 
+import { inspect } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { GatewayError, toGatewayError } from './errors'
 
@@ -19,10 +20,26 @@ describe('toGatewayError', () => {
     expect(error).toBeInstanceOf(GatewayError)
     expect(error.code).toBe('validation_error')
     expect(error.status).toBe(422)
-    expect(error.fieldErrors).toEqual([
-      { field: 'name', message: 'requis' },
-      { field: 'status', message: 'valeur inconnue' },
-    ])
+    expect(error.fieldErrors).toEqual([{ field: 'name' }, { field: 'status' }])
+  })
+
+  it('ne retient pas le texte de validation, seulement le nom du champ', async () => {
+    // Un message de validation cite volontiers la valeur qu'il refuse. Sur un champ de contenu,
+    // c'est le corps d'un message qui atterrirait dans une propriété énumérable de l'erreur, donc
+    // dans le premier `console.error(err)` venu — l'invariant (a) tombe sans qu'aucun code n'ait
+    // jamais « affiché » le corps.
+    const secret = 'RDV demain 14h chez le notaire'
+    const error = await toGatewayError(
+      jsonResponse(422, {
+        code: 'validation_error',
+        message: 'Champ invalide.',
+        errors: [{ field: 'text', message: `la valeur '${secret}' dépasse 160 caractères` }],
+      }),
+    )
+
+    expect(error.fieldErrors).toEqual([{ field: 'text' }])
+    expect(JSON.stringify(error.fieldErrors)).not.toContain(secret)
+    expect(inspectLikeALogger(error)).not.toContain(secret)
   })
 
   it('accepte une enveloppe sans `errors[]` — le contrat ne le rend pas obligatoire', async () => {
@@ -61,9 +78,8 @@ describe('toGatewayError', () => {
     })
 
     const error = await toGatewayError(response)
-    const serialised = JSON.stringify({ ...error, message: error.message, stack: error.stack })
 
-    expect(serialised).not.toContain(secret)
+    expect(inspectLikeALogger(error)).not.toContain(secret)
     expect(error.message).not.toContain(secret)
   })
 
@@ -76,6 +92,15 @@ describe('toGatewayError', () => {
     expect(error.message).toContain('403')
   })
 })
+
+/**
+ * Reproduit ce qu'un logger fait d'une erreur : `console.error(err)` et la plupart des
+ * bibliothèques passent par `util.inspect`, qui sérialise toutes les propriétés propres
+ * énumérables — pas seulement `message`. C'est par là qu'une donnée sensible s'échappe.
+ */
+function inspectLikeALogger(error: Error): string {
+  return inspect(error, { depth: null })
+}
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {

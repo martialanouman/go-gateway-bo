@@ -14,10 +14,13 @@
  *    serveur, qui n'a jamais été écrit pour un opérateur.
  */
 
-/** Détail de validation par champ, tel que décrit par le contrat. */
+/**
+ * Nom d'un champ refusé par la validation. Le contrat associe aussi un `message` à chaque champ ;
+ * il n'est **pas** conservé — voir le point 1 du docstring. Le nom du champ suffit à surligner le
+ * bon contrôle dans un formulaire, et la copie française vient de l'interface, pas du serveur.
+ */
 export type GatewayFieldError = {
   readonly field: string
-  readonly message: string
 }
 
 /** Codes produits par le BFF lui-même, quand la réponse ne vient pas du contrat. */
@@ -30,6 +33,12 @@ export const GATEWAY_TRANSPORT_CODES = {
   upstream: 'upstream_unavailable',
   /** 2xx ou 4xx dont le corps ne suit pas l'enveloppe attendue. */
   unexpected: 'unexpected_response',
+  /**
+   * Le BFF n'a pas pu obtenir son jeton machine. À distinguer d'un refus portant sur la requête de
+   * l'opérateur : « le tableau de bord ne sait pas s'authentifier » et « cette action vous est
+   * refusée » n'appellent ni la même copie, ni la même réaction.
+   */
+  authentication: 'gateway_authentication_failed',
 } as const
 
 export class GatewayError extends Error {
@@ -68,16 +77,17 @@ export async function toGatewayError(response: Response): Promise<GatewayError> 
 }
 
 /**
- * Ne retient que `field` et `message`. Recopier l'objet tel quel laisserait passer les clés que le
- * contrat ne décrit pas — exactement le chemin par lequel une donnée sensible s'échappe.
+ * Ne retient que le **nom** du champ. Le `message` associé est du texte libre écrit par la
+ * passerelle, et un message de validation cite volontiers la valeur qu'il refuse : « la valeur
+ * '…' dépasse 160 caractères » sur un champ de contenu recopierait le corps d'un message dans une
+ * propriété énumérable de l'erreur, donc dans le premier log qui l'inspecte. Recopier l'objet tel
+ * quel serait pire encore : il passerait aussi les clés que le contrat ne décrit pas.
  */
 function readFieldErrors(errors: unknown): readonly GatewayFieldError[] {
   if (!Array.isArray(errors)) return []
 
   return errors.flatMap((entry) =>
-    isRecord(entry) && typeof entry.field === 'string' && typeof entry.message === 'string'
-      ? [{ field: entry.field, message: entry.message }]
-      : [],
+    isRecord(entry) && typeof entry.field === 'string' ? [{ field: entry.field }] : [],
   )
 }
 
