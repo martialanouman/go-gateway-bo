@@ -18,7 +18,7 @@
  */
 
 import { sql } from 'drizzle-orm'
-import { index, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { index, inet, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { operators } from './auth'
 
 export const auditLog = pgTable(
@@ -38,7 +38,12 @@ export const auditLog = pgTable(
      */
     beforeJson: jsonb('before_json'),
     afterJson: jsonb('after_json'),
-    ipAddress: text('ip_address'),
+    /**
+     * `inet` et non `text` : le type valide la donnée à l'écriture, normalise les formes IPv6
+     * équivalentes, et permet les recherches par sous-réseau (« quelles actions depuis ce /24 ») —
+     * une question que tout audit finit par poser.
+     */
+    ipAddress: inet('ip_address'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

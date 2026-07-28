@@ -1,5 +1,5 @@
 {
-  "id": "c4ad0271-790f-4b6d-a52d-ac054b7d7d6a",
+  "id": "99fa091e-81bd-4930-be42-6bead5502145",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -259,7 +259,7 @@
         },
         "ip_address": {
           "name": "ip_address",
-          "type": "text",
+          "type": "inet",
           "primaryKey": false,
           "notNull": false
         },
@@ -473,17 +473,17 @@
         }
       },
       "indexes": {
-        "operators_status_idx": {
-          "name": "operators_status_idx",
+        "operators_email_lower_idx": {
+          "name": "operators_email_lower_idx",
           "columns": [
             {
-              "expression": "status",
-              "isExpression": false,
+              "expression": "lower(\"email\")",
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -491,13 +491,7 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "operators_email_unique": {
-          "name": "operators_email_unique",
-          "nullsNotDistinct": false,
-          "columns": ["email"]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

@@ -38,7 +38,7 @@ CREATE TABLE "audit_log" (
 	"target_id" text,
 	"before_json" jsonb,
 	"after_json" jsonb,
-	"ip_address" text,
+	"ip_address" "inet",
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "audit_log_id_created_at_pk" PRIMARY KEY("id","created_at")
 )
@@ -67,8 +67,7 @@ CREATE TABLE "operators" (
 	"status" "operator_status" DEFAULT 'active' NOT NULL,
 	"last_login_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "operators_email_unique" UNIQUE("email")
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "permissions" (
@@ -117,5 +116,5 @@ CREATE INDEX "notifications_created_at_idx" ON "notifications" USING btree ("cre
 CREATE INDEX "audit_log_created_at_idx" ON "audit_log" USING btree ("created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "audit_log_operator_idx" ON "audit_log" USING btree ("operator_id","created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "audit_log_action_idx" ON "audit_log" USING btree ("action","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "operators_status_idx" ON "operators" USING btree ("status");--> statement-breakpoint
+CREATE UNIQUE INDEX "operators_email_lower_idx" ON "operators" USING btree (lower("email"));--> statement-breakpoint
 CREATE INDEX "saved_views_operator_idx" ON "saved_views" USING btree ("operator_id","view_type");

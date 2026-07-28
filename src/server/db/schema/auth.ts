@@ -9,13 +9,13 @@
 import { sql } from 'drizzle-orm'
 import {
   boolean,
-  index,
   jsonb,
   pgEnum,
   pgTable,
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
 
@@ -42,7 +42,13 @@ export const operators = pgTable(
   'operators',
   {
     id: uuidv7(),
-    email: text().notNull().unique(),
+    /**
+     * Identifiant de connexion. L'unicité est posée sur `lower(email)` plus bas, et non par un
+     * `.unique()` sur la colonne : `Alice@corp.fr` et `alice@corp.fr` passeraient sinon pour deux
+     * opérateurs distincts. Sur une colonne d'identité, c'est un défaut de sécurité — un doublon
+     * peut masquer un compte existant, et l'opérateur qui tape une majuscule ne se connecte plus.
+     */
+    email: text().notNull(),
     displayName: text('display_name').notNull(),
 
     // ─── Colonnes de secret ───────────────────────────────────────────────────────────────────
@@ -50,6 +56,16 @@ export const operators = pgTable(
     // une réponse HTTP les emporterait avec lui : les lectures destinées à l'interface passent par
     // `operatorSafeColumns` ci-dessous, jamais par la table entière.
     passwordHash: text('password_hash').notNull(),
+    /**
+     * Secret TOTP partagé. Contrairement à `password_hash`, ce n'est pas un condensat : il est
+     * exploitable tel quel. Stocké en clair, une lecture de la base — dump, réplica, sauvegarde —
+     * donne des codes valides pour tous les opérateurs, et le second facteur ne coûte plus rien.
+     *
+     * **Il doit être chiffré au repos**, avec une clé qui ne vit pas dans la base. Ce n'est pas fait
+     * ici : la colonne est créée sans usage, et le chiffrement appartient à la step qui l'écrit et
+     * la lit pour de vrai (step-023, enrôlement TOTP), avec la gestion de clé qui va avec. Écrit ici
+     * pour que ce ne soit pas découvert au moment de s'en servir.
+     */
     mfaTotpSecret: text('mfa_totp_secret'),
     // ──────────────────────────────────────────────────────────────────────────────────────────
 
@@ -60,7 +76,11 @@ export const operators = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('operators_status_idx').on(table.status)],
+  (table) => [
+    // Unicité insensible à la casse : voir le commentaire de `email`. Le faire maintenant coûte une
+    // ligne ; après les seeds de step-020, ce serait une migration de données.
+    uniqueIndex('operators_email_lower_idx').on(sql`lower(${table.email})`),
+  ],
 )
 
 /**

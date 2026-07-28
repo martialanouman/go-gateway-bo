@@ -30,10 +30,6 @@ export default function setup(): void {
   }
 
   process.env.DOCKER_HOST = endpoint
-
-  // Testcontainers vérifie l'appartenance au groupe du socket avant de s'y connecter ; sur un socket
-  // utilisateur, ce contrôle n'a pas de sens et refuserait une connexion qui fonctionne.
-  process.env.TESTCONTAINERS_RYUK_DISABLED ??= 'true'
 }
 
 function dockerEndpointFromContext(): string | undefined {

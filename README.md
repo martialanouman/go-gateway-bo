@@ -81,6 +81,11 @@ native — un seul mécanisme, côté base, sans extension.
 `drizzle/0001_audit_log_partitions.sql`, écrite à la main. `pnpm db:migrate` repousse l'horizon de
 trois mois à chaque déploiement.
 
+`pnpm db:migrate` est une **étape de déploiement, à lancer une fois** — pas une étape de démarrage
+d'instance. Le migrator de Drizzle lit son journal puis applique dans une transaction, sans verrou :
+deux instances qui démarreraient ensemble sur une base vierge exécuteraient la même migration en
+parallèle et échoueraient sur un type déjà existant.
+
 Il n'y a **volontairement pas** de script `drizzle-kit push` : il applique un diff sans laisser de
 trace, ce qui rendrait l'état de la production indéductible de l'historique — et détruirait le
 partitionnement d'`audit_log`.
