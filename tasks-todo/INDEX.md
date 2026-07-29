@@ -8,9 +8,12 @@ Le **plan** donne le cadre : conventions transverses à figer avant M0, tranche 
 référence, critères de sortie par jalon, graphe de parallélisation et état réel de la passerelle.
 Cet index donne le découpage en PRs. Les deux se lisent ensemble.
 
-**Workflow :** on prend le prochain `step-NNN.md` dans `tasks-todo/`, on l'exécute (1 session = 1 PR),
-puis on déplace le fichier dans `tasks-done/` (dernier commit de la PR). Un jalon est terminé quand
-toutes ses steps sont dans `tasks-done/`.
+**Workflow :** on prend le prochain `step-NNN.md` dans `tasks-todo/` (**l'ordre de cette liste fait
+foi, pas le numéro**), on l'exécute en 1 session = 1 PR — **TDD strict, test rouge d'abord**, périmètre
+limité au fichier — puis revue par skill relancée tant qu'il reste un blocage, Definition of Done
+verte, déplacement du fichier dans `tasks-done/` (dernier commit de la PR), PR ouverte et mergée dès
+que la CI est verte. Un jalon est terminé quand toutes ses steps sont dans `tasks-done/`. Le détail
+de la boucle et la règle d'arbitrage sont dans `CLAUDE.md` § « La boucle de travail ».
 
 Légende : `[x]` = fait (dans `tasks-done/`) · `[ ]` = à faire (dans `tasks-todo/`).
 

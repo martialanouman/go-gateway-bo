@@ -108,15 +108,28 @@ Pyramide : beaucoup d'unitaires (logique BFF, permissions, mappings), des tests 
 
 ## La boucle de travail
 
-**Une step = une session = une PR.**
+**Une step = une session = une PR.** À suivre strictement, dans cet ordre.
 
-1. Prendre le prochain `tasks-todo/step-NNN.md` (l'ordre du fichier `INDEX.md` fait foi).
+1. Prendre le prochain `tasks-todo/step-NNN.md` — **l'ordre du fichier `INDEX.md` fait foi**, pas le
+   numéro.
 2. Créer la branche : `feat/step-NNN-slug` (ou `fix/`, `docs/`, `chore/`, `test/`).
-3. Implémenter le périmètre de la step, **tests écrits dans la même PR**.
-4. `pnpm check` vert.
-5. Dernier commit de la PR : `git mv tasks-todo/step-NNN.md tasks-done/` et cocher la ligne dans
+3. Implémenter en **TDD strict : le test rouge d'abord**, jamais le code en premier. Périmètre limité
+   à ce que le fichier de step décrit — rien de plus. Passer par `using-agent-skills` pour choisir
+   les skills à appliquer. **Commits atomiques au fil de l'eau** : une unité cohérente verte = un
+   commit, jamais la step entière d'un bloc.
+4. Après l'implémentation, lancer une **revue** via `using-agent-skills` (elle oriente vers
+   `code-review-and-quality`), et la **relancer tant qu'il reste des constats bloquants**.
+5. Vérifier la **Definition of Done du fichier de step** : `pnpm check` vert (typecheck · lint · test
+   · vuln · build), invariants (a…e) intacts.
+6. Dernier commit de la PR : `git mv tasks-todo/step-NNN.md tasks-done/` et cocher la ligne dans
    `tasks-todo/INDEX.md`.
-6. Titre de PR en conventional commit, avec la step : `feat(routing): éditeur de route (step-121)`.
+7. Ouvrir la PR — titre en conventional commit avec la step : `feat(routing): éditeur de route
+   (step-121)` — puis **merger dès que la CI est verte**.
+8. Un jalon est terminé quand **toutes** ses steps sont dans `tasks-done/`.
+
+**Arbitrage.** Une décision se tranche d'abord sur le contexte disponible : spec, plan d'exécution,
+contrat, fichier de step. Si elle reste indécidable après ça, consulter le modèle **Fable** plutôt
+que de trancher au hasard.
 
 Ne jamais déborder du périmètre d'une step. Ce qu'elle exclut est listé dans sa section « Hors
 périmètre » et appartient à une autre PR.
