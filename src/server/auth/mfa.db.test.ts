@@ -195,6 +195,33 @@ describe("confirmation de l'enrôlement", () => {
 
     expect(again.outcome).toBe('no_pending_enrollment')
   })
+
+  it("renvoie au démarrage quand l'enveloppe est devenue illisible", async () => {
+    // Le cas d'exploitation : la clé a changé entre le démarrage et la confirmation. On ne laisse pas
+    // l'opérateur taper un code juste indéfiniment — on lui dit de relancer l'enrôlement, ce qui
+    // remplacera l'enveloppe.
+    await startTotpEnrollment(db, KEYS, await pendingSession())
+    await sql`UPDATE operators SET mfa_totp_secret = 'v1.illisible' WHERE id = ${operatorId}`
+
+    const confirmed = await confirmTotpEnrollment(db, KEYS, await pendingSession(), '000000', NOW)
+
+    expect(confirmed.outcome).toBe('no_pending_enrollment')
+  })
+
+  it('est soumise au même plafond de tentatives que la vérification', async () => {
+    // Sans cela, la confirmation d'enrôlement serait un second point de devinette, sans plafond, sur
+    // le même code à six chiffres.
+    await startTotpEnrollment(db, KEYS, await pendingSession())
+    for (let attempt = 0; attempt < THRESHOLDS.mfa; attempt += 1) {
+      await confirmTotpEnrollment(db, KEYS, await pendingSession(), '000000', NOW)
+    }
+
+    const confirmed = await confirmTotpEnrollment(db, KEYS, await pendingSession(), '000000', NOW)
+
+    expect(confirmed.outcome).toBe('rate_limited')
+    if (confirmed.outcome !== 'rate_limited') return
+    expect(confirmed.retryAfterSeconds).toBeGreaterThan(0)
+  })
 })
 
 describe('vérification du second facteur', () => {
@@ -344,6 +371,17 @@ describe('vérification du second facteur', () => {
       SELECT subject FROM login_attempts WHERE scope = 'mfa'
     `
     expect(row?.subject).toBe(operatorId)
+  })
+
+  it("refuse tout code quand l'enveloppe du secret est illisible", async () => {
+    // Clé retirée, colonne bricolée : le refus est le même que pour un code faux. **Fermé par
+    // défaut** — une enveloppe qu'on ne sait plus lire ne peut pas valoir un second facteur.
+    const code = await totpCodeAt(secret, later(2))
+    await sql`UPDATE operators SET mfa_totp_secret = 'v1.illisible' WHERE id = ${operatorId}`
+
+    const result = await verifyMfaCode(db, KEYS, await pendingSession(), code, later(2))
+
+    expect(result).toEqual({ outcome: 'invalid_code' })
   })
 
   it('refuse tout code quand aucun facteur n’est actif', async () => {

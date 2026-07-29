@@ -20,7 +20,7 @@
  * l'en-tête de la table dans `db/schema/auth.ts`.
  */
 
-import { createHmac, randomBytes } from 'node:crypto'
+import { createHmac, randomInt } from 'node:crypto'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import type { Database, Querier } from '../db/index'
 import { operatorRecoveryCodes } from '../db/schema/auth'
@@ -48,24 +48,19 @@ export function generateRecoveryCodes(): string[] {
   )
 }
 
-function randomGroup(): string {
-  return Array.from({ length: GROUP_LENGTH }, () => ALPHABET[unbiasedIndex()]).join('')
-}
-
 /**
- * Un indice tiré **sans biais** dans l'alphabet.
+ * Un groupe tiré **sans biais** dans l'alphabet.
  *
- * `octet % 30` favoriserait les seize premiers caractères, puisque 256 n'est pas un multiple de 30 —
- * de quoi retirer quelques bits d'entropie à un secret qui n'en a pas de trop. On rejette donc les
- * octets qui dépassent le dernier multiple entier.
+ * `randomBytes(1)[0] % 30` favoriserait les seize premiers caractères, puisque 256 n'est pas un
+ * multiple de 30 — de quoi retirer discrètement quelques bits à un secret qui n'en a pas de trop.
+ * `randomInt` fait le rejet d'échantillons lui-même, dans la bibliothèque standard : on hérite d'une
+ * distribution uniforme sans écrire la boucle qui la produit, donc sans la branche impossible à
+ * couvrir qu'elle traînerait avec elle.
  */
-function unbiasedIndex(): number {
-  const limit = Math.floor(256 / ALPHABET.length) * ALPHABET.length
-
-  for (;;) {
-    const byte = randomBytes(1)[0] ?? 0
-    if (byte < limit) return byte % ALPHABET.length
-  }
+function randomGroup(): string {
+  return Array.from({ length: GROUP_LENGTH }, () =>
+    ALPHABET.charAt(randomInt(ALPHABET.length)),
+  ).join('')
 }
 
 /**
