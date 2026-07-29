@@ -22,7 +22,7 @@
 
 import { createHmac, randomBytes } from 'node:crypto'
 import { and, eq, isNull, sql } from 'drizzle-orm'
-import type { Database } from '../db/index'
+import type { Database, Querier } from '../db/index'
 import { operatorRecoveryCodes } from '../db/schema/auth'
 import type { MfaKeys } from './mfa-secret'
 
@@ -89,9 +89,13 @@ function normalize(code: string): string {
  * Remplacer, et non ajouter : un nouveau lot **invalide** le précédent, sinon les codes d'un
  * téléphone perdu resteraient valables aussi longtemps que l'opérateur existe. La transaction évite
  * qu'un échec entre la suppression et l'insertion laisse un compte sans aucune porte de sortie.
+ *
+ * Accepte une transaction déjà ouverte : l'activation d'un facteur et la création de ses codes
+ * doivent réussir ensemble, et c'est l'appelant qui tient cette transaction. Passer le pool ouvre la
+ * sienne ; passer une transaction pose un point de sauvegarde à l'intérieur.
  */
 export async function replaceRecoveryCodes(
-  db: Database,
+  db: Querier,
   operatorId: string,
   codes: readonly string[],
   keys: MfaKeys,

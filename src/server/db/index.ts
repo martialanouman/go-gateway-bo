@@ -15,6 +15,18 @@ import * as schema from './schema'
 
 export type Database = ReturnType<typeof connect>['db']
 
+/** Une transaction, telle que `db.transaction()` la passe à son bloc. */
+export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0]
+
+/**
+ * Ce qui accepte une requête : le pool, ou une transaction en cours.
+ *
+ * Le type existe pour qu'une fonction d'écriture puisse être appelée **dans** la transaction de son
+ * appelant. Sans lui, chacune ouvrirait la sienne, et deux écritures qui doivent réussir ensemble —
+ * activer un second facteur et créer ses codes de récupération — pourraient s'arrêter au milieu.
+ */
+export type Querier = Database | Transaction
+
 /**
  * Dix connexions par instance. Le tableau de bord sert 100 à 300 opérateurs depuis ≥2 instances, et
  * ses requêtes sont courtes : la contention viendra de l'API Admin, jamais de ce magasin. Un pool
