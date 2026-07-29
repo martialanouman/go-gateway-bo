@@ -4,7 +4,8 @@ Cette moitié du dépôt ne s'exécute **jamais** dans le navigateur. Elle est l
 
 - le jeton OAuth2 et les certificats mTLS de l'API Admin de la passerelle,
 - la connexion PostgreSQL et Redis,
-- le secret de signature de session et celui du webhook Alertmanager.
+- le secret de signature de session, celui qui chiffre les secrets TOTP, et celui du webhook
+  Alertmanager.
 
 C'est l'**invariant (d)** : le navigateur ne parle jamais directement à l'API Admin. Une règle de
 lint interdit d'importer `src/server/gateway/**` ou `src/server/db/**` depuis un composant client
@@ -14,6 +15,10 @@ C'est aussi ici que vit l'**invariant (c)** : l'autorisation s'applique côté s
 `requirePermission()`. Le rendu conditionnel de l'UI est un confort ; un contrôle masqué dont la
 route n'est pas gardée reste une faille.
 
+C'est ici, enfin, que vit l'**invariant (b)** : un secret n'est jamais réaffiché. Le secret TOTP et
+les codes de récupération ne sortent qu'une fois, à l'enrôlement (`auth/mfa*.ts`) ; aucune action
+« revoir mes codes » n'existe, et il n'y en aura pas.
+
 Contenu à venir : client Admin typé (step-001), accès Drizzle (step-002), session et MFA (M1),
-moteur de permissions et journal d'audit (step-025), hub WebSocket (step-043), évaluateur d'alertes
-métier (step-182).
+WebAuthn (step-024), moteur de permissions et journal d'audit (step-025), hub WebSocket (step-043),
+évaluateur d'alertes métier (step-182).
