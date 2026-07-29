@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { SESSION_COOKIE_NAME } from './cookie'
 import { INVALID_CREDENTIALS_MESSAGE, loginResponse, parseCredentials } from './http'
+import { ABSOLUTE_LIFETIME_MS } from './session'
 
 const SECRETS = { current: 'une-cle-de-session-de-test-assez-longue' }
 const SESSION_ID = '01890a5d-ac96-774b-bcce-b302099a8057'
@@ -35,6 +36,20 @@ describe('réponse de connexion', () => {
     expect(cookie).toContain('SameSite=Lax')
   })
 
+  it('ne fait pas vivre le cookie plus longtemps que la session qu il désigne', () => {
+    // Deux durées écrites séparément finissent par dire deux choses, et c'est le porteur qui
+    // survivrait. La base resterait l'autorité — mais l'interface, elle, croirait qu'il reste une
+    // session à reprendre, et n'irait au login qu'après un aller-retour pour rien.
+    const cookie = loginResponse(
+      { outcome: 'mfa_required', operatorId: 'x', sessionId: SESSION_ID },
+      SECRETS,
+    ).headers.get('set-cookie')
+
+    const maxAge = Number(cookie?.match(/Max-Age=(\d+)/)?.[1])
+    expect(maxAge).toBeGreaterThan(0)
+    expect(maxAge).toBeLessThanOrEqual(ABSOLUTE_LIFETIME_MS / 1000)
+  })
+
   it('ne pose aucun cookie sur un échec ni sur une limitation', () => {
     // Un cookie posé sur un échec donnerait une session à qui n'a rien prouvé.
     for (const outcome of [
@@ -46,7 +61,7 @@ describe('réponse de connexion', () => {
   })
 
   it('rend le même 401 et le même texte pour tous les échecs', async () => {
-    const response = loginResponse({ outcome: 'invalid_credentials' })
+    const response = loginResponse({ outcome: 'invalid_credentials' }, SECRETS)
 
     expect(response.status).toBe(401)
     expect(await response.json()).toEqual({ error: INVALID_CREDENTIALS_MESSAGE })
@@ -60,7 +75,7 @@ describe('réponse de connexion', () => {
   })
 
   it('annonce le délai d attente d une adresse limitée', async () => {
-    const response = loginResponse({ outcome: 'rate_limited', retryAfterSeconds: 90 })
+    const response = loginResponse({ outcome: 'rate_limited', retryAfterSeconds: 90 }, SECRETS)
 
     expect(response.status).toBe(429)
     expect(response.headers.get('retry-after')).toBe('90')
