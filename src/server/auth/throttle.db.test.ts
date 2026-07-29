@@ -12,6 +12,7 @@ import {
   registerFailure,
   subjectKey,
   THRESHOLDS,
+  type ThrottleScope,
 } from './throttle'
 
 const POSTGRES_IMAGE = 'postgres:18-alpine'
@@ -38,7 +39,7 @@ beforeEach(async () => {
 })
 
 /** Amène un sujet juste sous son seuil, sans le verrouiller. */
-async function failUpTo(scope: 'operator' | 'ip', subject: string, times: number): Promise<void> {
+async function failUpTo(scope: ThrottleScope, subject: string, times: number): Promise<void> {
   for (let i = 0; i < times; i++) await registerFailure(db, scope, subject)
 }
 
@@ -117,6 +118,50 @@ describe('compteur d échecs', () => {
     await registerFailure(db, 'operator', 'sujet-f')
 
     expect(await echeance()).toBeGreaterThan(premier)
+  })
+
+  it("n'oublie pas les échecs du second facteur pendant la durée de son propre verrou", async () => {
+    // **Le test qui rend l'escalade atteignable.** Avec une fenêtre d'oubli égale à la durée du verrou
+    // — ce qu'elle valait pour toutes les portées — un attaquant qui attend simplement la fin du
+    // verrou retrouve un compteur remis à zéro : il ne franchit jamais le premier palier, et gagne
+    // cinq essais par quart d'heure indéfiniment. Sur un code à six chiffres, cela suffit.
+    await failUpTo('mfa', 'sujet-g', THRESHOLDS.mfa)
+    await sql`UPDATE login_attempts SET window_started_at = now() - interval '30 minutes',
+                                        locked_until = now() - interval '1 minute'
+              WHERE subject = 'sujet-g'`
+
+    await registerFailure(db, 'mfa', 'sujet-g')
+
+    const [row] = await sql<{ failures: number }[]>`
+      SELECT failures FROM login_attempts WHERE subject = 'sujet-g'
+    `
+    expect(row?.failures).toBe(THRESHOLDS.mfa + 1)
+  })
+
+  it('allonge le verrou du second facteur, sans dépasser une heure', async () => {
+    // La borne haute est un choix de **disponibilité** : ce verrou se déclenche avec un mot de passe
+    // valide seul, si bien que quiconque détient le mot de passe sans le second facteur peut le
+    // provoquer. Une heure borne le dégât ; le plafond de quatre heures des autres portées aurait
+    // laissé mettre un opérateur nommé dehors pour l'après-midi.
+    const remaining = async () => {
+      const [row] = await sql<{ remaining: string }[]>`
+        SELECT extract(epoch FROM locked_until - now())::text AS remaining
+        FROM login_attempts WHERE subject = 'sujet-h'
+      `
+      return Number(row?.remaining)
+    }
+
+    await failUpTo('mfa', 'sujet-h', THRESHOLDS.mfa)
+    const first = await remaining()
+
+    for (let extra = 0; extra < 8; extra += 1) {
+      await registerFailure(db, 'mfa', 'sujet-h')
+    }
+
+    expect(await remaining()).toBeGreaterThan(first)
+    // Une seconde de marge : l'échéance est calculée par l'horloge de Node et mesurée par celle de
+    // PostgreSQL. Comparer au millième testerait l'écart entre les deux, pas le plafond.
+    expect(await remaining()).toBeLessThanOrEqual(60 * 60 + 1)
   })
 
   it('ne laisse pas une rafale parallèle passer sous le seuil', async () => {

@@ -1,9 +1,10 @@
 /**
  * Le schéma que le BFF possède — et **rien d'autre**.
  *
- * Onze tables : opérateurs, catalogue de permissions, rôles et leurs deux tables de liaison,
- * journal d'audit, règles d'alerte, notifications, vues sauvegardées, et le compteur d'échecs
- * d'authentification (step-021) et les sessions (step-022).
+ * Douze tables : opérateurs, catalogue de permissions, rôles et leurs deux tables de liaison,
+ * journal d'audit, règles d'alerte, notifications, vues sauvegardées, le compteur d'échecs
+ * d'authentification (step-021), les sessions (step-022) et les codes de récupération MFA
+ * (step-023).
  *
  * Ce qui n'est **pas** ici, et ne doit jamais y arriver : clients, groupes de clients, comptes
  * SMPP, identifiants de bind, connecteurs, sessions, CDR, traces, soldes, plans tarifaires. Toutes

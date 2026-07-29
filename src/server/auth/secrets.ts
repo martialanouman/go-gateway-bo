@@ -12,10 +12,24 @@
  */
 
 import { readSessionSecrets, type SessionSecrets } from './cookie'
+import { type MfaKeys, readMfaKeys } from './mfa-secret'
 
 let secrets: SessionSecrets | undefined
+let mfaKeys: MfaKeys | undefined
 
 export function getSessionSecrets(): SessionSecrets {
   secrets ??= readSessionSecrets(process.env)
   return secrets
+}
+
+/**
+ * Les clés du second facteur, dérivées une fois par process.
+ *
+ * La dérivation HKDF est bon marché, mais la relancer à chaque requête déplacerait le moment où une
+ * variable absente se remarque : au premier enrôlement plutôt qu'au premier appel, c'est-à-dire
+ * potentiellement des semaines plus tard.
+ */
+export function getMfaKeys(): MfaKeys {
+  mfaKeys ??= readMfaKeys(process.env)
+  return mfaKeys
 }

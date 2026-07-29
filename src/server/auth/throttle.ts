@@ -30,32 +30,115 @@ import { and, eq, lt, or, sql } from 'drizzle-orm'
 import type { Database } from '../db/index'
 import { loginAttempts } from '../db/schema/throttle'
 
-export type ThrottleScope = 'operator' | 'ip'
+export type ThrottleScope = 'operator' | 'ip' | 'mfa'
 
-/** Fenêtre d'oubli : au-delà, les échecs anciens ne comptent plus. */
-const WINDOW_MS = 15 * 60 * 1000
+/**
+ * Fenêtre d'oubli : au-delà, les échecs anciens ne comptent plus. **Par portée.**
+ *
+ * Sans oubli, un opérateur qui se trompe quatre fois en six mois se retrouverait verrouillé au
+ * cinquième essai, des mois plus tard, sans comprendre. Mais une fenêtre trop courte annule le
+ * ralentissement progressif, et le calcul est net : si elle vaut la durée du premier verrou, il
+ * suffit d'attendre la fin du verrou pour retrouver un compteur à zéro. On ne franchit alors jamais
+ * le second palier, et l'on garde cinq essais par quart d'heure — indéfiniment.
+ *
+ * Pour un mot de passe, c'est acceptable : l'espace de recherche est celui d'une phrase de passe. Pour
+ * un **code à six chiffres**, non — voir `MAX_LOCK_MS`. La portée `mfa` garde donc mémoire bien plus
+ * longtemps que ne dure son verrou, ce qui est la seule façon de rendre l'escalade atteignable.
+ */
+const WINDOW_MS: Readonly<Record<ThrottleScope, number>> = {
+  operator: 15 * 60 * 1000,
+  ip: 15 * 60 * 1000,
+  mfa: 4 * 60 * 60 * 1000,
+}
 
-/** Seuils, par portée. L'IP est plus large : plusieurs opérateurs peuvent partager une sortie NAT. */
-export const THRESHOLDS: Readonly<Record<ThrottleScope, number>> = { operator: 5, ip: 20 }
+/**
+ * Seuils, par portée. L'IP est plus large : plusieurs opérateurs peuvent partager une sortie NAT.
+ *
+ * `mfa` est aussi serré que `operator`, et pour une raison plus forte : l'espace de recherche d'un
+ * code à six chiffres est **minuscule** comparé à celui d'une phrase de passe. Le chiffre exact et ce
+ * qu'il implique sont sous `MAX_LOCK_MS` — écrits une seule fois, parce que deux commentaires qui
+ * énoncent le même nombre finissent par en énoncer deux.
+ *
+ * Le plafond court de la session partielle borne déjà la fenêtre d'attaque à dix minutes ; il la rend
+ * étroite, il ne la ferme pas, et il disparaît dès qu'une session complète re-demande un facteur.
+ */
+export const THRESHOLDS: Readonly<Record<ThrottleScope, number>> = { operator: 5, ip: 20, mfa: 5 }
 
-/** Verrouillage initial, puis doublement à chaque verrouillage successif, borné. */
+/** Verrouillage initial, puis doublement à chaque verrouillage successif, borné **par portée**. */
 const BASE_LOCK_MS = 15 * 60 * 1000
-const MAX_LOCK_MS = 4 * 60 * 60 * 1000
+
+/**
+ * Plafond du verrouillage, et il n'est pas le même partout.
+ *
+ * ## Le calcul, parce qu'un ordre de grandeur écrit de mémoire est faux
+ *
+ * Un code TOTP fait six chiffres, soit un million de valeurs, et la fenêtre de dérive en accepte
+ * **trois** à la fois : une tentative sur trois cent trente-trois mille aboutit. Ce qui décide, c'est
+ * donc le nombre d'essais par jour que le compteur laisse passer.
+ *
+ * - Fenêtre d'oubli égale au verrou, sans escalade atteignable : cinq essais par quart d'heure, soit
+ *   480 par jour → découverte en **moins de deux ans** de requêtes automatisées. Beaucoup trop peu
+ *   pour un second facteur.
+ * - Fenêtre de quatre heures et escalade bornée à une heure : cinq essais immédiats, puis un par
+ *   palier — une dizaine par fenêtre, une cinquantaine par jour → **une vingtaine d'années**.
+ *
+ * ## Pourquoi une heure, et pas les quatre des autres portées
+ *
+ * Parce que ce verrou-là se déclenche avec un mot de passe valide **seul** : la vérification du second
+ * facteur n'est atteignable qu'avec une session déjà ouverte. Quiconque détient le mot de passe d'un
+ * opérateur sans son second facteur peut donc le provoquer à volonté. Une heure borne le dégât ;
+ * quatre laisseraient mettre un opérateur nommé dehors pour l'après-midi, et le gain de résistance
+ * n'est que d'un facteur deux.
+ *
+ * Ce qui reste, et qu'aucun réglage ne règlera : un attaquant qui répète la manœuvre garde l'opérateur
+ * dehors. Cela se traite **hors bande** — une notification au titulaire au moment du verrouillage
+ * (step-046) — pas en desserrant le compteur.
+ *
+ * ## Ce que la mémoire longue coûte à un opérateur légitime
+ *
+ * Elle se paie, et il faut l'écrire : ses quatre saisies fausses tolérées s'accumulent désormais sur
+ * quatre heures, là où quinze minutes les oubliaient entre deux essais espacés. Cinq erreurs dans une
+ * demi-journée le verrouillent donc un quart d'heure, ce que l'ancien réglage lui aurait souvent
+ * épargné.
+ *
+ * C'est le prix du calcul ci-dessus, et il reste petit : le code est **recopié depuis une
+ * application**, pas retenu de mémoire, et le premier succès efface le compteur entièrement
+ * (`promote()`). Un opérateur qui finit par entrer repart de zéro, il ne traîne pas ses erreurs de la
+ * matinée.
+ */
+const MAX_LOCK_MS: Readonly<Record<ThrottleScope, number>> = {
+  operator: 4 * 60 * 60 * 1000,
+  ip: 4 * 60 * 60 * 1000,
+  mfa: 60 * 60 * 1000,
+}
 
 export type LockState = {
   readonly locked: boolean
-  /** Fin du verrouillage, seulement pour la portée `ip` — la portée `operator` ne la divulgue pas. */
+  /**
+   * Fin du verrouillage. **Absente pour la portée `operator`**, et pour elle seule : ce verrou est
+   * silencieux, puisque l'annoncer confirmerait l'existence du compte à qui ne l'a pas encore.
+   *
+   * Les portées `ip` et `mfa` la donnent. La première ne parle que de l'appelant. La seconde ne
+   * s'atteint qu'avec une session déjà ouverte par un mot de passe valide : celui qui la reçoit sait
+   * déjà que le compte existe, et lui cacher l'échéance ne ferait que le laisser réessayer en vain.
+   */
   readonly until?: Date
 }
 
 /**
  * La clé sous laquelle un sujet est compté.
  *
- * Une adresse IP est stockée telle quelle. Un identifiant passe par un **HMAC** : voir l'en-tête du
- * schéma. Le condensat nu ne suffirait pas — un SHA-256 d'adresse email se casse par dictionnaire.
+ * **Seule la portée `operator` passe par un HMAC**, parce qu'elle seule accumule des valeurs
+ * *tentées* : les suppositions d'un attaquant, et les mots de passe que des opérateurs tapent dans le
+ * champ email par inadvertance. Une adresse IP et un identifiant d'opérateur sont, eux, des faits
+ * que nous connaissons déjà — les masquer empêcherait l'exploitation de lire qui est bloqué sans rien
+ * protéger de plus.
+ *
+ * Et un HMAC plutôt qu'un condensat nu : un SHA-256 d'adresse email se casse par dictionnaire en
+ * quelques secondes, ce qui rendrait le hachage décoratif.
  */
 export function subjectKey(scope: ThrottleScope, value: string, secret: string): string {
-  if (scope === 'ip') return value
+  if (scope !== 'operator') return value
   return createHmac('sha256', secret).update(value.trim().toLowerCase(), 'utf8').digest('hex')
 }
 
@@ -89,7 +172,7 @@ export async function lockState(
   const until = row?.lockedUntil
   if (!until || until.getTime() <= Date.now()) return { locked: false }
 
-  return scope === 'ip' ? { locked: true, until } : { locked: true }
+  return scope === 'operator' ? { locked: true } : { locked: true, until }
 }
 
 /**
@@ -106,6 +189,15 @@ export async function registerFailure(
 ): Promise<LockState> {
   const threshold = THRESHOLDS[scope]
 
+  /**
+   * `interval '<n> milliseconds'`, la seule interpolation brute admise ici.
+   *
+   * La valeur vient de `WINDOW_MS`, une constante de ce module indexée par une portée qui est un type
+   * fermé — jamais une valeur venue d'une requête. Le jour où elle viendrait d'ailleurs, cette ligne
+   * devrait disparaître avec elle.
+   */
+  const window = sql.raw(`interval '${WINDOW_MS[scope]} milliseconds'`)
+
   const [row] = await db
     .insert(loginAttempts)
     .values({ scope, subject, failures: 1 })
@@ -115,9 +207,9 @@ export async function registerFailure(
         // La fenêtre glissante vit **dans le SQL** : hors fenêtre, le compteur repart à un plutôt
         // que de s'incrémenter. Le calculer côté application aurait exigé de relire d'abord, ce qui
         // rouvre la course que cette requête unique ferme.
-        failures: sql`CASE WHEN ${loginAttempts.windowStartedAt} < now() - ${sql.raw(`interval '${WINDOW_MS} milliseconds'`)}
+        failures: sql`CASE WHEN ${loginAttempts.windowStartedAt} < now() - ${window}
                            THEN 1 ELSE ${loginAttempts.failures} + 1 END`,
-        windowStartedAt: sql`CASE WHEN ${loginAttempts.windowStartedAt} < now() - ${sql.raw(`interval '${WINDOW_MS} milliseconds'`)}
+        windowStartedAt: sql`CASE WHEN ${loginAttempts.windowStartedAt} < now() - ${window}
                                   THEN now() ELSE ${loginAttempts.windowStartedAt} END`,
         updatedAt: sql`now()`,
       },
@@ -131,7 +223,7 @@ export async function registerFailure(
   // plafond. Un attaquant patient paie de plus en plus cher ; un opérateur qui se trompe cinq fois
   // attend un quart d'heure.
   const steps = Math.min(failures - threshold, 10)
-  const duration = Math.min(BASE_LOCK_MS * 2 ** steps, MAX_LOCK_MS)
+  const duration = Math.min(BASE_LOCK_MS * 2 ** steps, MAX_LOCK_MS[scope])
   const until = new Date(Date.now() + duration)
 
   await db
@@ -139,7 +231,7 @@ export async function registerFailure(
     .set({ lockedUntil: until, updatedAt: sql`now()` })
     .where(and(eq(loginAttempts.scope, scope), eq(loginAttempts.subject, subject)))
 
-  return scope === 'ip' ? { locked: true, until } : { locked: true }
+  return scope === 'operator' ? { locked: true } : { locked: true, until }
 }
 
 /** Efface le compteur après une authentification réussie. */

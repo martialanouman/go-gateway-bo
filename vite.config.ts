@@ -43,6 +43,18 @@ export default defineConfig({
           method: 'post',
         },
         { route: '/api/auth/me', handler: './src/server/auth/http/me.ts', method: 'get' },
+        // Deux phases sur un même point d'entrée : sans code, l'opérateur demande un QR code ; avec
+        // un code, il confirme l'enrôlement. C'est ce que décrit le §6.9 de la spécification.
+        {
+          route: '/api/auth/mfa/enroll',
+          handler: './src/server/auth/http/mfa-enroll.ts',
+          method: 'post',
+        },
+        {
+          route: '/api/auth/mfa/verify',
+          handler: './src/server/auth/http/mfa-verify.ts',
+          method: 'post',
+        },
         // `post` et non `get` : une déconnexion est une mutation, et un `get` se déclenche depuis
         // une image ou un lien préchargé — un tiers déconnecterait un opérateur à son insu.
         { route: '/api/auth/logout', handler: './src/server/auth/http/logout.ts', method: 'post' },

@@ -52,7 +52,7 @@ async function partitionNames(): Promise<string[]> {
 }
 
 describe('migrations', () => {
-  it('crée les onze tables que le BFF possède, et rien de plus', async () => {
+  it('crée les douze tables que le BFF possède, et rien de plus', async () => {
     const rows = await sql<{ tablename: string }[]>`
       SELECT tablename FROM pg_tables
       WHERE schemaname = 'public' AND tablename NOT LIKE 'audit_log_%'
@@ -64,6 +64,7 @@ describe('migrations', () => {
       'audit_log',
       'login_attempts',
       'notifications',
+      'operator_recovery_codes',
       'operator_roles',
       'operator_sessions',
       'operators',
@@ -101,7 +102,7 @@ describe('migrations', () => {
     const [row] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM drizzle.__drizzle_migrations
     `
-    expect(row?.count).toBe('4')
+    expect(row?.count).toBe('5')
   })
 
   it('rejoue la migration manuscrite sans erreur ni dérive du catalogue', async () => {
