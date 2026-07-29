@@ -173,7 +173,7 @@ sur tout écran touché • PR petite et focalisée (une step).
 - [ ] step-182 — Évaluateur BFF sur source durable à offset persisté
 - [ ] step-183 — Réconciliation Alertmanager  ⚠️ **bloqué : surface absente du contrat**
 - [ ] step-184 — Journal d'audit : écran de consultation
-- [ ] step-187 — Rétention d'`audit_log` : détachement et purge des partitions échues †
+- [ ] step-187 — Rétention : partitions d'`audit_log` détachées, sessions mortes purgées †
 - [ ] step-185 — Accessibilité WCAG 2.1 AA + parcours Playwright de bout en bout
 - [ ] step-186 — Déploiement HA (≥2 instances, affinité WS) + durcissement production
 

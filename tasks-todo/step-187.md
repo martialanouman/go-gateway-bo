@@ -1,7 +1,7 @@
 # step-187 — Rétention d'`audit_log` : détachement et purge des partitions échues
 
 > **Jalon :** M9 (§3.1, §1.3) · **Statut :** À FAIRE
-> **Dépend de :** step-002, step-025 · **Bloque :** step-186
+> **Dépend de :** step-002, step-022, step-025 · **Bloque :** step-186
 
 ## But
 Donner un propriétaire à la rétention du journal d'audit. La step-002 a livré la moitié créatrice du
@@ -25,6 +25,11 @@ borne jusqu'à ce que quelqu'un s'en aperçoive en production.
 - Manifeste de la tâche planifiée qui appelle `pnpm db:maintain` (fréquence, politique de reprise sur
   échec, une seule exécution à la fois). Il est livré ici parce que sinon personne ne le porte : le
   périmètre de step-186 couvre la topologie de service, pas les tâches planifiées.
+- **Purge des sessions d'opérateur mortes** : `db:maintain` appelle aussi `purgeDeadSessions()`,
+  livrée et testée en step-022 mais qu'aucun appelant ne déclenche. Même angle mort que les
+  partitions, en plus petit : chaque connexion crée une ligne dans `operator_sessions`, rien ne les
+  retire, et la table croît sans borne. Une seule entrée d'exploitation, c'est le principe de cette
+  step — pas une tâche planifiée par table.
 - Compteur `audit_log_default` exposé à la supervision (une seule ligne dans la partition par défaut
   empêche définitivement la création du mois correspondant) et procédure écrite de déplacement des
   lignes égarées.
@@ -59,6 +64,8 @@ borne jusqu'à ce que quelqu'un s'en aperçoive en production.
 - Une partition entièrement hors fenêtre est détachée puis supprimée ; celle qui chevauche la borne
   reste. Cas de bordure vérifié au jour près, en UTC.
 - Deux passages consécutifs de `pnpm db:maintain` donnent le même état (idempotence).
+- Une session morte depuis longtemps disparaît au passage ; une session vivante ou révoquée
+  récemment reste — le journal d'audit peut encore la citer.
 - `AUDIT_LOG_RETENTION_MONTHS` absent : le nombre de partitions est inchangé après passage.
 - `AUDIT_LOG_RETENTION_MONTHS` à `0`, à une valeur négative ou non entière : refus explicite, aucune
   partition supprimée. C'est le test qui empêche qu'une configuration fautive vide la table.
