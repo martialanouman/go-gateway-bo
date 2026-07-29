@@ -69,6 +69,38 @@ describe('configuration WebAuthn', () => {
     expect(config.rpId).toBe('example.test')
   })
 
+  it('refuse une adresse IP en clair, même en boucle locale', () => {
+    // La spécification ne reconnaît pas une adresse IP comme `rpID` valide : l'accepter aurait laissé
+    // configurer un facteur qui ne fonctionne pas, avec un échec ressemblant à un problème d'appareil.
+    expect(() =>
+      readWebAuthnConfig({
+        AUTH_WEBAUTHN_RP_ID: '127.0.0.1',
+        AUTH_WEBAUTHN_ORIGIN: 'http://127.0.0.1:3000',
+      }),
+    ).toThrow(/AUTH_WEBAUTHN_ORIGIN/)
+  })
+
+  it('accepte un hôte à label unique quand le domaine est exactement celui-là', () => {
+    // Un déploiement interne derrière `https://cockpit/` sous une autorité maison est valide : la
+    // spécification n'exige un point que pour la relation de parenté, pas pour l'égalité stricte.
+    expect(
+      readWebAuthnConfig({
+        AUTH_WEBAUTHN_RP_ID: 'cockpit',
+        AUTH_WEBAUTHN_ORIGIN: 'https://cockpit',
+      }).rpId,
+    ).toBe('cockpit')
+  })
+
+  it('refuse un suffixe nu pris pour un domaine parent', () => {
+    // `co` « couvrirait » `example.co` par simple comparaison de suffixe, et le navigateur refuserait.
+    expect(() =>
+      readWebAuthnConfig({
+        AUTH_WEBAUTHN_RP_ID: 'co',
+        AUTH_WEBAUTHN_ORIGIN: 'https://example.co',
+      }),
+    ).toThrow(/AUTH_WEBAUTHN_RP_ID/)
+  })
+
   it('accepte localhost en clair, et lui seul', () => {
     // Le développement local n'a pas de certificat ; la spécification WebAuthn traite `localhost`
     // comme une origine sûre. Ailleurs, `http://` annulerait la garantie de transport.

@@ -4,7 +4,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import type postgres from 'postgres'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { waitUntilBlocked } from '../../test/pg-locks'
+import { lockHolder, waitUntilBlocked } from '../../test/pg-locks'
 import { connect, type Database } from '../db/index'
 import { SESSION_COOKIE_NAME, signSessionId } from './cookie'
 import { resolveSession } from './guard'
@@ -401,26 +401,27 @@ describe('défi WebAuthn porté par la session', () => {
     await issueWebAuthnChallenge(db, sessionId, 'disputé')
 
     const other = connect(container.getConnectionUri(), { poolSize: 2 })
-    let release: () => void = () => {}
-    const held = new Promise<void>((resolve) => {
-      release = resolve
-    })
+    const lock = lockHolder()
 
     try {
       const holder = sql.begin(async (tx) => {
         await tx`SELECT id FROM operator_sessions WHERE id = ${sessionId} FOR UPDATE`
-        await held
+        lock.signalAcquired()
+        await lock.held
         await tx`UPDATE operator_sessions SET webauthn_challenge = NULL WHERE id = ${sessionId}`
       })
 
+      // Le rival n'est armé **qu'après** le signal : sans cet ordre, il peut prendre et relâcher le
+      // verrou avant que le détenteur ne l'ait demandé, et rien ne se bloque jamais.
+      await lock.acquired
       const contender = consumeWebAuthnChallenge(other.db, sessionId)
       await waitUntilBlocked(sql)
-      release()
+      lock.release()
       await holder
 
       expect(await contender).toBeUndefined()
     } finally {
-      release()
+      lock.release()
       await other.client.end({ timeout: 5 })
     }
   })

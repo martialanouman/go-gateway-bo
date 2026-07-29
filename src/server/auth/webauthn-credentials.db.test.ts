@@ -9,7 +9,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import type postgres from 'postgres'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { waitUntilBlocked } from '../../test/pg-locks'
+import { lockHolder, waitUntilBlocked } from '../../test/pg-locks'
 import { connect, type Database } from '../db/index'
 import { hashPassword } from './password'
 import {
@@ -105,15 +105,13 @@ describe('enregistrement', () => {
     // bloque — on l'observe dans `pg_locks`. Sans verrou, `cred-b` aurait lu la liste vide dans son
     // propre instantané et écraserait `cred-a` : un opérateur croirait détenir deux passkeys là où il
     // n'en a qu'une, et ne le découvrirait qu'en perdant le premier appareil.
-    let release: () => void = () => {}
-    const held = new Promise<void>((resolve) => {
-      release = resolve
-    })
+    const lock = lockHolder()
 
     try {
       const holder = sql.begin(async (tx) => {
         await tx`SELECT id FROM operators WHERE id = ${operatorId} FOR UPDATE`
-        await held
+        lock.signalAcquired()
+        await lock.held
         const first = JSON.stringify([
           { ...credential('cred-a', 'poste'), createdAt: new Date().toISOString() },
         ])
@@ -121,16 +119,18 @@ describe('enregistrement', () => {
                  WHERE id = ${operatorId}`
       })
 
+      // Le rival n'est armé **qu'après** le signal : voir `lockHolder()`.
+      await lock.acquired
       const contender = addCredential(otherInstance, operatorId, credential('cred-b', 'téléphone'))
       await waitUntilBlocked(sql)
-      release()
+      lock.release()
       await holder
       expect(await contender).toBe(true)
 
       const stored = await listCredentials(db, operatorId)
       expect(stored.map((entry) => entry.id).sort()).toEqual(['cred-a', 'cred-b'])
     } finally {
-      release()
+      lock.release()
     }
   })
 })
@@ -180,15 +180,13 @@ describe('renommage et révocation', () => {
     // L'entrelacement est construit : une transaction tient le verrou et retire `cred-a` sans valider,
     // le retrait de `cred-b` s'y bloque, et l'on observe cette attente dans `pg_locks`. Une garde lue
     // avant le verrou aurait laissé passer le second.
-    let release: () => void = () => {}
-    const held = new Promise<void>((resolve) => {
-      release = resolve
-    })
+    const lock = lockHolder()
 
     try {
       const holder = sql.begin(async (tx) => {
         await tx`SELECT id FROM operators WHERE id = ${operatorId} FOR UPDATE`
-        await held
+        lock.signalAcquired()
+        await lock.held
         const remaining = JSON.stringify([
           { ...credential('cred-b', 'téléphone'), createdAt: new Date().toISOString() },
         ])
@@ -196,15 +194,17 @@ describe('renommage et révocation', () => {
                  WHERE id = ${operatorId}`
       })
 
+      // Le rival n'est armé **qu'après** le signal : voir `lockHolder()`.
+      await lock.acquired
       const contender = revokeCredentialUnlessLastFactor(otherInstance, operatorId, 'cred-b')
       await waitUntilBlocked(sql)
-      release()
+      lock.release()
       await holder
 
       expect(await contender).toBe('last_factor')
       expect((await listCredentials(db, operatorId)).map((entry) => entry.id)).toEqual(['cred-b'])
     } finally {
-      release()
+      lock.release()
     }
   })
 

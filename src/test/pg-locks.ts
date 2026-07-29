@@ -23,6 +23,18 @@
 
 import type postgres from 'postgres'
 
+/**
+ * Le motif complet, parce que l'attente de verrou ne suffit pas.
+ *
+ * Armer les deux appelants en parallèle et espérer que le premier prenne le verrou d'abord **est une
+ * course**, et elle se perd : mesuré à trois échecs sur treize exécutions, avec le second appelant qui
+ * acquiert et relâche le verrou avant que le premier ne l'ait demandé — rien ne se bloque jamais, et
+ * `waitUntilBlocked` lève. Trois exécutions vertes ne suffisent pas à s'en convaincre du contraire.
+ *
+ * L'ordre doit donc être **forcé** : le premier signale qu'il tient le verrou, et le second n'est armé
+ * qu'après ce signal. `lockHolder()` fabrique ce couple signal / relâchement.
+ */
+
 /** Nombre de sondages avant d'abandonner, et intervalle entre deux. */
 const MAX_ATTEMPTS = 100
 const INTERVAL_MS = 20
@@ -47,4 +59,35 @@ export async function waitUntilBlocked(sql: postgres.Sql): Promise<void> {
   throw new Error(
     "Aucune requête ne s'est bloquée sur un verrou : l'entrelacement n'a pas eu lieu, et ce test ne prouve donc rien.",
   )
+}
+
+export type LockHolder = {
+  /** Résolue quand la transaction détient effectivement le verrou. À attendre avant d'armer le rival. */
+  readonly acquired: Promise<void>
+  /** À appeler pour laisser la transaction poursuivre puis valider. */
+  readonly release: () => void
+  /** À appeler par la transaction, une fois le verrou pris. */
+  readonly signalAcquired: () => void
+  /** À attendre par la transaction, avant d'écrire et de valider. */
+  readonly held: Promise<void>
+}
+
+/**
+ * Le couple de signaux qui rend un test de course déterministe.
+ *
+ * Sans lui, l'ordre des deux appelants dépend du temps de sortie du pool de connexions — c'est-à-dire
+ * de rien de ce que le test contrôle.
+ */
+export function lockHolder(): LockHolder {
+  let signalAcquired: () => void = () => {}
+  let release: () => void = () => {}
+
+  const acquired = new Promise<void>((resolve) => {
+    signalAcquired = resolve
+  })
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+
+  return { acquired, release, signalAcquired, held }
 }

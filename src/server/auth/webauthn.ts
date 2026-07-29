@@ -121,15 +121,24 @@ function parseOrigin(origin: string): { readonly hostname: string } | undefined 
 /**
  * `rpID` doit être l'hôte lui-même ou l'un de ses domaines parents.
  *
- * L'exigence d'un point — ou de `localhost` — écarte le cas où un suffixe nu serait pris pour un
- * domaine parent : `co` « couvrirait » `example.co` par simple comparaison de suffixe, et le navigateur
- * refuserait. Ce n'est pas la liste des suffixes publics, et cela ne prétend pas l'être : cela écarte
- * la faute de frappe qui produirait un second facteur inutilisable.
+ * ## L'égalité stricte n'exige rien de plus
+ *
+ * La spécification valide toujours un `rpID` égal au domaine effectif de l'origine, **sans exiger de
+ * point** : un déploiement interne derrière un hôte à label unique — `https://cockpit/` sous une
+ * autorité de certification maison, cas parfaitement plausible pour un outil interne — est valide.
+ *
+ * ## Le point n'est exigé que pour la relation de parenté
+ *
+ * Là, et là seulement, une comparaison de suffixe nue se trompe : `co` « couvrirait » `example.co`, le
+ * navigateur refuserait, et l'échec se lirait comme un problème d'appareil. Ce n'est pas la liste des
+ * suffixes publics et cela ne prétend pas l'être — cela écarte la faute de frappe qui produirait un
+ * second facteur n'ayant jamais fonctionné.
  */
 function coversHost(rpId: string, hostname: string): boolean {
-  if (rpId !== 'localhost' && !rpId.includes('.')) return false
+  if (hostname === rpId) return true
+  if (!rpId.includes('.')) return false
 
-  return hostname === rpId || hostname.endsWith(`.${rpId}`)
+  return hostname.endsWith(`.${rpId}`)
 }
 
 /**
