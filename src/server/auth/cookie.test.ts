@@ -10,32 +10,32 @@ import {
   verifySessionCookie,
 } from './cookie'
 
-const COURANTE = 'une-cle-de-session-de-test-assez-longue'
-const ANCIENNE = 'une-ancienne-cle-de-session-assez-longue'
-const ID = '01890a5d-ac96-774b-bcce-b302099a8057'
+const CURRENT_KEY = 'une-cle-de-session-de-test-assez-longue'
+const PREVIOUS_KEY = 'une-ancienne-cle-de-session-assez-longue'
+const SESSION_ID = '01890a5d-ac96-774b-bcce-b302099a8057'
 
 describe('signature du cookie de session', () => {
   it('signe puis relit son propre identifiant', () => {
-    const cookie = signSessionId(ID, { current: COURANTE })
+    const cookie = signSessionId(SESSION_ID, { current: CURRENT_KEY })
 
-    expect(verifySessionCookie(cookie, { current: COURANTE })).toBe(ID)
+    expect(verifySessionCookie(cookie, { current: CURRENT_KEY })).toBe(SESSION_ID)
   })
 
   it('refuse une signature produite avec une autre clé', () => {
-    const cookie = signSessionId(ID, { current: ANCIENNE })
+    const cookie = signSessionId(SESSION_ID, { current: PREVIOUS_KEY })
 
-    expect(verifySessionCookie(cookie, { current: COURANTE })).toBeUndefined()
+    expect(verifySessionCookie(cookie, { current: CURRENT_KEY })).toBeUndefined()
   })
 
   it('refuse un identifiant modifié après signature', () => {
     // Le cas qui compte : un attaquant garde une signature valide et change l'identifiant à côté,
     // pour désigner la session de quelqu'un d'autre.
-    const cookie = signSessionId(ID, { current: COURANTE })
+    const cookie = signSessionId(SESSION_ID, { current: CURRENT_KEY })
     const [, signature] = cookie.split('.')
 
     expect(
       verifySessionCookie(`01890a5d-ac96-774b-bcce-000000000000.${signature}`, {
-        current: COURANTE,
+        current: CURRENT_KEY,
       }),
     ).toBeUndefined()
   })
@@ -43,18 +43,26 @@ describe('signature du cookie de session', () => {
   it('ne lève jamais sur un cookie malformé', () => {
     // Cookie d'une ancienne version, troncature d'un proxy, bricolage d'un curieux : c'est le cas
     // ordinaire, pas une erreur serveur.
-    for (const value of ['', '.', 'sans-point', `${ID}.`, `.signature`, `${ID}.a.b`, '..']) {
+    for (const value of [
+      '',
+      '.',
+      'sans-point',
+      `${SESSION_ID}.`,
+      `.signature`,
+      `${SESSION_ID}.a.b`,
+      '..',
+    ]) {
       expect(
-        verifySessionCookie(value, { current: COURANTE }),
+        verifySessionCookie(value, { current: CURRENT_KEY }),
         JSON.stringify(value),
       ).toBeUndefined()
     }
   })
 
   it('produit une signature qui ne contient pas l identifiant', () => {
-    const [, signature] = signSessionId(ID, { current: COURANTE }).split('.')
+    const [, signature] = signSessionId(SESSION_ID, { current: CURRENT_KEY }).split('.')
 
-    expect(signature).not.toContain(ID)
+    expect(signature).not.toContain(SESSION_ID)
     expect(signature).toMatch(/^[A-Za-z0-9_-]+$/)
   })
 })
@@ -63,24 +71,26 @@ describe('rotation de clé', () => {
   it('accepte encore un cookie signé avec la clé précédente', () => {
     // **Ce qui rend la rotation praticable.** Sans cela, changer de clé déconnecterait tout le monde
     // d'un coup — c'est-à-dire qu'on ne changerait jamais de clé.
-    const ancien = signSessionId(ID, { current: ANCIENNE })
+    const previousCookie = signSessionId(SESSION_ID, { current: PREVIOUS_KEY })
 
-    expect(verifySessionCookie(ancien, { current: COURANTE, previous: ANCIENNE })).toBe(ID)
+    expect(
+      verifySessionCookie(previousCookie, { current: CURRENT_KEY, previous: PREVIOUS_KEY }),
+    ).toBe(SESSION_ID)
   })
 
   it('signe toujours avec la clé courante, jamais avec l ancienne', () => {
     // Sinon la fenêtre de rotation ne se refermerait jamais : de nouveaux cookies continueraient
     // d'être émis sous une clé qu'on cherche à retirer.
-    const emis = signSessionId(ID, { current: COURANTE, previous: ANCIENNE })
+    const issued = signSessionId(SESSION_ID, { current: CURRENT_KEY, previous: PREVIOUS_KEY })
 
-    expect(verifySessionCookie(emis, { current: COURANTE })).toBe(ID)
-    expect(verifySessionCookie(emis, { current: ANCIENNE })).toBeUndefined()
+    expect(verifySessionCookie(issued, { current: CURRENT_KEY })).toBe(SESSION_ID)
+    expect(verifySessionCookie(issued, { current: PREVIOUS_KEY })).toBeUndefined()
   })
 
   it('cesse d accepter l ancienne clé dès qu elle est retirée', () => {
-    const ancien = signSessionId(ID, { current: ANCIENNE })
+    const previousCookie = signSessionId(SESSION_ID, { current: PREVIOUS_KEY })
 
-    expect(verifySessionCookie(ancien, { current: COURANTE })).toBeUndefined()
+    expect(verifySessionCookie(previousCookie, { current: CURRENT_KEY })).toBeUndefined()
   })
 })
 
@@ -100,31 +110,31 @@ describe('lecture des clés', () => {
     // variable en cours de retrait serait pire que le problème.
     expect(
       readSessionSecrets({
-        AUTH_SESSION_SECRET: COURANTE,
+        AUTH_SESSION_SECRET: CURRENT_KEY,
         AUTH_SESSION_SECRET_PREVIOUS: 'trop-courte',
       }),
-    ).toEqual({ current: COURANTE })
+    ).toEqual({ current: CURRENT_KEY })
   })
 
   it('retient les deux clés quand elles sont valides', () => {
     expect(
       readSessionSecrets({
-        AUTH_SESSION_SECRET: COURANTE,
-        AUTH_SESSION_SECRET_PREVIOUS: ANCIENNE,
+        AUTH_SESSION_SECRET: CURRENT_KEY,
+        AUTH_SESSION_SECRET_PREVIOUS: PREVIOUS_KEY,
       }),
-    ).toEqual({ current: COURANTE, previous: ANCIENNE })
+    ).toEqual({ current: CURRENT_KEY, previous: PREVIOUS_KEY })
   })
 })
 
 describe('attributs du cookie', () => {
   it('porte les quatre protections attendues', () => {
-    const attributs = sessionCookieAttributes(3600)
+    const attributes = sessionCookieAttributes(3600)
 
-    expect(attributs).toContain('HttpOnly')
-    expect(attributs).toContain('Secure')
-    expect(attributs).toContain('SameSite=Lax')
-    expect(attributs).toContain('Path=/')
-    expect(attributs).toContain('Max-Age=3600')
+    expect(attributes).toContain('HttpOnly')
+    expect(attributes).toContain('Secure')
+    expect(attributes).toContain('SameSite=Lax')
+    expect(attributes).toContain('Path=/')
+    expect(attributes).toContain('Max-Age=3600')
   })
 
   it('utilise le préfixe __Host-, qui refuse un cookie posé par un sous-domaine', () => {
@@ -137,11 +147,11 @@ describe('attributs du cookie', () => {
   it('efface le cookie avec les mêmes attributs', () => {
     // Un navigateur n'efface un cookie que si les attributs correspondent : un `Path` différent
     // laisserait la session en place côté client.
-    const efface = clearedSessionCookie()
+    const cleared = clearedSessionCookie()
 
-    expect(efface).toContain(`${SESSION_COOKIE_NAME}=;`)
-    expect(efface).toContain('Path=/')
-    expect(efface).toContain('Max-Age=0')
-    expect(efface).toContain('HttpOnly')
+    expect(cleared).toContain(`${SESSION_COOKIE_NAME}=;`)
+    expect(cleared).toContain('Path=/')
+    expect(cleared).toContain('Max-Age=0')
+    expect(cleared).toContain('HttpOnly')
   })
 })

@@ -20,9 +20,9 @@ import { THRESHOLDS } from './throttle'
 const POSTGRES_IMAGE = 'postgres:18-alpine'
 
 /** Paramètres allégés : ce fichier teste des chemins, pas le coût de scrypt. */
-const RAPIDE = { N: 1024, r: 8, p: 1 } as const
+const FAST_SCRYPT = { N: 1024, r: 8, p: 1 } as const
 const SECRET = 'un-secret-de-throttle-de-test-assez-long'
-const MOT_DE_PASSE = 'un mot de passe assez long'
+const PASSWORD = 'un mot de passe assez long'
 
 let container: StartedPostgreSqlContainer
 let sql: postgres.Sql
@@ -48,7 +48,7 @@ beforeEach(async () => {
   await sql`TRUNCATE operators CASCADE`
   await sql`
     INSERT INTO operators (email, display_name, password_hash)
-    VALUES ('Operateur@Example.test', 'Opératrice', ${await hashPassword(MOT_DE_PASSE, RAPIDE)})
+    VALUES ('Operateur@Example.test', 'Opératrice', ${await hashPassword(PASSWORD, FAST_SCRYPT)})
   `
   // Plancher très bas : les tests vérifient les décisions, pas l'horloge. Le plancher réel a son
   // propre describe, avec sa propre instance.
@@ -56,12 +56,12 @@ beforeEach(async () => {
     db,
     throttleSecret: SECRET,
     semaphore: createSemaphore({ slots: 4, queueLimit: 50 }),
-    parameters: RAPIDE,
+    parameters: FAST_SCRYPT,
     floorMs: 1,
   })
 })
 
-const DEPUIS = '203.0.113.10'
+const CLIENT_IP = '203.0.113.10'
 
 describe('authentification par mot de passe', () => {
   it('rend un challenge MFA, jamais une session', async () => {
@@ -70,8 +70,8 @@ describe('authentification par mot de passe', () => {
     // quelqu'un aurait raccourci le chemin.
     const result = await service.attempt({
       identifier: 'operateur@example.test',
-      password: MOT_DE_PASSE,
-      ipAddress: DEPUIS,
+      password: PASSWORD,
+      ipAddress: CLIENT_IP,
     })
 
     expect(result.outcome).toBe('mfa_required')
@@ -84,8 +84,8 @@ describe('authentification par mot de passe', () => {
     // majuscule interdit l'accès à un compte qui existe.
     const result = await service.attempt({
       identifier: '  OPERATEUR@EXAMPLE.TEST ',
-      password: MOT_DE_PASSE,
-      ipAddress: DEPUIS,
+      password: PASSWORD,
+      ipAddress: CLIENT_IP,
     })
 
     expect(result.outcome).toBe('mfa_required')
@@ -95,7 +95,7 @@ describe('authentification par mot de passe', () => {
     const result = await service.attempt({
       identifier: 'operateur@example.test',
       password: 'pas le bon mot de passe',
-      ipAddress: DEPUIS,
+      ipAddress: CLIENT_IP,
     })
 
     expect(result).toEqual({ outcome: 'invalid_credentials' })
@@ -104,18 +104,18 @@ describe('authentification par mot de passe', () => {
   it('refuse un identifiant inconnu exactement comme un mot de passe faux', async () => {
     // Même forme de réponse, au champ près : toute différence — un code distinct, un champ en plus —
     // énumère les comptes aussi sûrement qu'un message explicite.
-    const inconnu = await service.attempt({
+    const unknownIdentifier = await service.attempt({
       identifier: 'personne@example.test',
-      password: MOT_DE_PASSE,
-      ipAddress: DEPUIS,
+      password: PASSWORD,
+      ipAddress: CLIENT_IP,
     })
-    const fauxMotDePasse = await service.attempt({
+    const wrongPassword = await service.attempt({
       identifier: 'operateur@example.test',
       password: 'pas le bon mot de passe',
-      ipAddress: DEPUIS,
+      ipAddress: CLIENT_IP,
     })
 
-    expect(inconnu).toEqual(fauxMotDePasse)
+    expect(unknownIdentifier).toEqual(wrongPassword)
   })
 
   it('refuse un opérateur désactivé sans le dire', async () => {
@@ -123,8 +123,8 @@ describe('authentification par mot de passe', () => {
 
     const result = await service.attempt({
       identifier: 'operateur@example.test',
-      password: MOT_DE_PASSE,
-      ipAddress: DEPUIS,
+      password: PASSWORD,
+      ipAddress: CLIENT_IP,
     })
 
     expect(result).toEqual({ outcome: 'invalid_credentials' })
@@ -136,7 +136,7 @@ describe('authentification par mot de passe', () => {
     await service.attempt({
       identifier: 'personne@example.test',
       password: 'peu importe',
-      ipAddress: DEPUIS,
+      ipAddress: CLIENT_IP,
     })
 
     const rows = await sql<
@@ -154,13 +154,13 @@ describe('authentification par mot de passe', () => {
     await service.attempt({
       identifier: 'operateur@example.test',
       password: 'raté',
-      ipAddress: DEPUIS,
+      ipAddress: CLIENT_IP,
     })
 
     await service.attempt({
       identifier: 'operateur@example.test',
-      password: MOT_DE_PASSE,
-      ipAddress: DEPUIS,
+      password: PASSWORD,
+      ipAddress: CLIENT_IP,
     })
 
     const rows = await sql<{ scope: string }[]>`SELECT scope::text FROM login_attempts`
@@ -181,22 +181,22 @@ describe('authentification par mot de passe', () => {
       })
     }
 
-    const echeance = async () => {
+    const deadline = async () => {
       const [row] = await sql<{ epoch: string }[]>`
         SELECT extract(epoch FROM locked_until)::text AS epoch
         FROM login_attempts WHERE scope = 'operator'
       `
       return Number(row?.epoch)
     }
-    const avant = await echeance()
+    const before = await deadline()
 
     await service.attempt({
       identifier: 'operateur@example.test',
-      password: MOT_DE_PASSE,
+      password: PASSWORD,
       ipAddress: '198.51.100.201',
     })
 
-    expect(await echeance()).toBe(avant)
+    expect(await deadline()).toBe(before)
   })
 })
 
@@ -214,7 +214,7 @@ describe('verrouillage', () => {
 
     const result = await service.attempt({
       identifier: 'operateur@example.test',
-      password: MOT_DE_PASSE,
+      password: PASSWORD,
       ipAddress: '198.51.100.200',
     })
 
@@ -227,14 +227,14 @@ describe('verrouillage', () => {
       await service.attempt({
         identifier: `inconnu${i}@example.test`,
         password: 'raté',
-        ipAddress: DEPUIS,
+        ipAddress: CLIENT_IP,
       })
     }
 
     const result = await service.attempt({
       identifier: 'operateur@example.test',
-      password: MOT_DE_PASSE,
-      ipAddress: DEPUIS,
+      password: PASSWORD,
+      ipAddress: CLIENT_IP,
     })
 
     expect(result.outcome).toBe('rate_limited')
@@ -251,23 +251,23 @@ describe('verrouillage', () => {
       await service.attempt({
         identifier: `inconnu${i}@example.test`,
         password: 'raté',
-        ipAddress: DEPUIS,
+        ipAddress: CLIENT_IP,
       })
     }
 
     // Un sémaphore sans aucune place : si le rejet passait par lui, cet appel n'aboutirait jamais.
-    const sature = createLoginService({
+    const saturated = createLoginService({
       db,
       throttleSecret: SECRET,
       semaphore: createSemaphore({ slots: 0, queueLimit: 0 }),
-      parameters: RAPIDE,
+      parameters: FAST_SCRYPT,
       floorMs: 1,
     })
 
-    const result = await sature.attempt({
+    const result = await saturated.attempt({
       identifier: 'operateur@example.test',
-      password: MOT_DE_PASSE,
-      ipAddress: DEPUIS,
+      password: PASSWORD,
+      ipAddress: CLIENT_IP,
     })
 
     expect(result.outcome).toBe('rate_limited')
@@ -276,17 +276,17 @@ describe('verrouillage', () => {
   it('traduit une file pleine en refus d adresse, pas en erreur', async () => {
     // Uniforme, donc muet sur les comptes : un 500 ou un message distinct ferait de la saturation
     // elle-même un canal d'énumération.
-    const sature = createLoginService({
+    const saturated = createLoginService({
       db,
       throttleSecret: SECRET,
       semaphore: createSemaphore({ slots: 0, queueLimit: 0 }),
-      parameters: RAPIDE,
+      parameters: FAST_SCRYPT,
       floorMs: 1,
     })
 
-    const result = await sature.attempt({
+    const result = await saturated.attempt({
       identifier: 'operateur@example.test',
-      password: MOT_DE_PASSE,
+      password: PASSWORD,
       ipAddress: '198.51.100.250',
     })
 
@@ -300,55 +300,55 @@ describe('plancher de latence', () => {
     // l'empreinte factice, pas de scrypt à payer. Le plancher est ce qui rend les deux
     // indiscernables — et il couvre aussi les écritures asymétriques, qu'une égalisation branche par
     // branche raterait à la première modification.
-    const FLOOR = 300
-    const mesure = createLoginService({
+    const FLOOR_MS = 300
+    const measured = createLoginService({
       db,
       throttleSecret: SECRET,
       semaphore: createSemaphore({ slots: 4, queueLimit: 50 }),
-      parameters: RAPIDE,
-      floorMs: FLOOR,
+      parameters: FAST_SCRYPT,
+      floorMs: FLOOR_MS,
     })
 
-    const chrono = async (identifier: string, password: string) => {
+    const timed = async (identifier: string, password: string) => {
       const start = Date.now()
-      await mesure.attempt({ identifier, password, ipAddress: '192.0.2.55' })
+      await measured.attempt({ identifier, password, ipAddress: '192.0.2.55' })
       return Date.now() - start
     }
 
-    const inconnu = await chrono('personne@example.test', MOT_DE_PASSE)
-    const fauxMotDePasse = await chrono('operateur@example.test', 'raté')
-    const succes = await chrono('operateur@example.test', MOT_DE_PASSE)
+    const unknownIdentifier = await timed('personne@example.test', PASSWORD)
+    const wrongPassword = await timed('operateur@example.test', 'raté')
+    const success = await timed('operateur@example.test', PASSWORD)
 
-    for (const [nom, duree] of [
-      ['inconnu', inconnu],
-      ['mot de passe faux', fauxMotDePasse],
-      ['succès', succes],
+    for (const [label, elapsed] of [
+      ['inconnu', unknownIdentifier],
+      ['mot de passe faux', wrongPassword],
+      ['succès', success],
     ] as const) {
-      expect(duree, nom).toBeGreaterThanOrEqual(FLOOR - 20)
-      expect(duree, nom).toBeLessThan(FLOOR + 250)
+      expect(elapsed, label).toBeGreaterThanOrEqual(FLOOR_MS - 20)
+      expect(elapsed, label).toBeLessThan(FLOOR_MS + 250)
     }
 
-    expect(mesure.deadlineMisses()).toBe(0)
+    expect(measured.deadlineMisses()).toBe(0)
   })
 
   it('compte les dépassements plutôt que de les taire', async () => {
     // Un dépassement est un **incident de sécurité** : la durée de réponse redevient fonction du
     // chemin parcouru, et c'est l'attaquant qui choisit le moment en produisant la charge.
-    const impossible = createLoginService({
+    const unreachableFloor = createLoginService({
       db,
       throttleSecret: SECRET,
       semaphore: createSemaphore({ slots: 4, queueLimit: 50 }),
-      parameters: RAPIDE,
+      parameters: FAST_SCRYPT,
       floorMs: 0,
     })
 
-    await impossible.attempt({
+    await unreachableFloor.attempt({
       identifier: 'operateur@example.test',
-      password: MOT_DE_PASSE,
+      password: PASSWORD,
       ipAddress: '192.0.2.77',
     })
 
-    expect(impossible.deadlineMisses()).toBe(1)
+    expect(unreachableFloor.deadlineMisses()).toBe(1)
   })
 })
 
@@ -363,35 +363,39 @@ describe('empreinte factice', () => {
     //
     // Paramètres volontairement plus coûteux que `RAPIDE` : à une milliseconde de vérification,
     // l'écart se perdrait dans le bruit de l'ordonnanceur.
-    const COUTEUX = { N: 16_384, r: 8, p: 1 } as const
+    const COSTLY_SCRYPT = { N: 16_384, r: 8, p: 1 } as const
     await sql`
       INSERT INTO operators (email, display_name, password_hash)
-      VALUES ('couteux@example.test', 'Coûteux', ${await hashPassword(MOT_DE_PASSE, COUTEUX)})
+      VALUES ('couteux@example.test', 'Coûteux', ${await hashPassword(PASSWORD, COSTLY_SCRYPT)})
     `
 
-    const nu = createLoginService({
+    const withoutFloor = createLoginService({
       db,
       throttleSecret: SECRET,
       semaphore: createSemaphore({ slots: 4, queueLimit: 50 }),
-      parameters: COUTEUX,
+      parameters: COSTLY_SCRYPT,
       floorMs: 0,
     })
 
-    const chrono = async (identifier: string) => {
+    const timed = async (identifier: string) => {
       const start = Date.now()
-      await nu.attempt({ identifier, password: 'un mot de passe faux', ipAddress: '192.0.2.99' })
+      await withoutFloor.attempt({
+        identifier,
+        password: 'un mot de passe faux',
+        ipAddress: '192.0.2.99',
+      })
       return Date.now() - start
     }
 
     // Le premier appel dérive l'empreinte factice ; le coût de cette dérivation n'appartient pas à
     // la mesure.
-    await chrono('amorcage@example.test')
+    await timed('amorcage@example.test')
 
-    const connu = await chrono('couteux@example.test')
-    const inconnu = await chrono('absent@example.test')
+    const knownIdentifier = await timed('couteux@example.test')
+    const unknownIdentifier = await timed('absent@example.test')
 
     // La vérification domine les deux chemins : un inconnu qui coûterait une fraction du connu
     // signalerait que scrypt a été sauté.
-    expect(inconnu).toBeGreaterThan(connu / 3)
+    expect(unknownIdentifier).toBeGreaterThan(knownIdentifier / 3)
   })
 })
