@@ -13,6 +13,9 @@
  *   bloquées, et `audit_log.ip_address` conserve déjà la même donnée.
  * - portée `operator` : un **HMAC-SHA-256 de l'identifiant normalisé**, sous une clé serveur qui ne
  *   vit pas en base. Jamais l'identifiant lui-même.
+ * - portée `mfa` : l'**identifiant d'opérateur**, en clair. Il n'a rien de deviné — il vient d'une
+ *   session que nous avons émise, il figure déjà en clair dans `audit_log.operator_id`, et le
+ *   masquer empêcherait de répondre à « qui est bloqué au second facteur » sans rien protéger.
  *
  * Le HMAC, et pas un condensat nu : un SHA-256 d'adresse email se casse par dictionnaire en quelques
  * secondes, ce qui rendrait le hachage décoratif. La clé le rend inattaquable sans une lecture du
@@ -29,13 +32,14 @@
 
 import { integer, pgEnum, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core'
 
-export const throttleScope = pgEnum('throttle_scope', ['operator', 'ip'])
+export const throttleScope = pgEnum('throttle_scope', ['operator', 'ip', 'mfa'])
 
 export const loginAttempts = pgTable(
   'login_attempts',
   {
     scope: throttleScope().notNull(),
-    /** Adresse IP en clair, ou HMAC-SHA-256 de l'identifiant — voir l'en-tête. */
+    /** Adresse IP ou identifiant d'opérateur en clair, ou HMAC-SHA-256 de l'identifiant de connexion
+     * — l'asymétrie est délibérée, voir l'en-tête. */
     subject: text().notNull(),
     failures: integer().notNull().default(0),
     /**

@@ -30,13 +30,21 @@ import { and, eq, lt, or, sql } from 'drizzle-orm'
 import type { Database } from '../db/index'
 import { loginAttempts } from '../db/schema/throttle'
 
-export type ThrottleScope = 'operator' | 'ip'
+export type ThrottleScope = 'operator' | 'ip' | 'mfa'
 
 /** Fenêtre d'oubli : au-delà, les échecs anciens ne comptent plus. */
 const WINDOW_MS = 15 * 60 * 1000
 
-/** Seuils, par portée. L'IP est plus large : plusieurs opérateurs peuvent partager une sortie NAT. */
-export const THRESHOLDS: Readonly<Record<ThrottleScope, number>> = { operator: 5, ip: 20 }
+/**
+ * Seuils, par portée. L'IP est plus large : plusieurs opérateurs peuvent partager une sortie NAT.
+ *
+ * `mfa` est aussi serré que `operator`, et pour une raison plus forte : un code à six chiffres, c'est
+ * un million de possibilités, mais la fenêtre de dérive en accepte trois à la fois — une tentative
+ * sur trois cent mille aboutit. Sans plafond, quelques heures de requêtes suffisent. Le plafond court
+ * de la session partielle borne déjà la fenêtre à dix minutes ; il la rend étroite, il ne la ferme
+ * pas, et il disparaît dès qu'une session complète re-demande un facteur.
+ */
+export const THRESHOLDS: Readonly<Record<ThrottleScope, number>> = { operator: 5, ip: 20, mfa: 5 }
 
 /** Verrouillage initial, puis doublement à chaque verrouillage successif, borné. */
 const BASE_LOCK_MS = 15 * 60 * 1000
@@ -44,18 +52,31 @@ const MAX_LOCK_MS = 4 * 60 * 60 * 1000
 
 export type LockState = {
   readonly locked: boolean
-  /** Fin du verrouillage, seulement pour la portée `ip` — la portée `operator` ne la divulgue pas. */
+  /**
+   * Fin du verrouillage. **Absente pour la portée `operator`**, et pour elle seule : ce verrou est
+   * silencieux, puisque l'annoncer confirmerait l'existence du compte à qui ne l'a pas encore.
+   *
+   * Les portées `ip` et `mfa` la donnent. La première ne parle que de l'appelant. La seconde ne
+   * s'atteint qu'avec une session déjà ouverte par un mot de passe valide : celui qui la reçoit sait
+   * déjà que le compte existe, et lui cacher l'échéance ne ferait que le laisser réessayer en vain.
+   */
   readonly until?: Date
 }
 
 /**
  * La clé sous laquelle un sujet est compté.
  *
- * Une adresse IP est stockée telle quelle. Un identifiant passe par un **HMAC** : voir l'en-tête du
- * schéma. Le condensat nu ne suffirait pas — un SHA-256 d'adresse email se casse par dictionnaire.
+ * **Seule la portée `operator` passe par un HMAC**, parce qu'elle seule accumule des valeurs
+ * *tentées* : les suppositions d'un attaquant, et les mots de passe que des opérateurs tapent dans le
+ * champ email par inadvertance. Une adresse IP et un identifiant d'opérateur sont, eux, des faits
+ * que nous connaissons déjà — les masquer empêcherait l'exploitation de lire qui est bloqué sans rien
+ * protéger de plus.
+ *
+ * Et un HMAC plutôt qu'un condensat nu : un SHA-256 d'adresse email se casse par dictionnaire en
+ * quelques secondes, ce qui rendrait le hachage décoratif.
  */
 export function subjectKey(scope: ThrottleScope, value: string, secret: string): string {
-  if (scope === 'ip') return value
+  if (scope !== 'operator') return value
   return createHmac('sha256', secret).update(value.trim().toLowerCase(), 'utf8').digest('hex')
 }
 
@@ -89,7 +110,7 @@ export async function lockState(
   const until = row?.lockedUntil
   if (!until || until.getTime() <= Date.now()) return { locked: false }
 
-  return scope === 'ip' ? { locked: true, until } : { locked: true }
+  return scope === 'operator' ? { locked: true } : { locked: true, until }
 }
 
 /**
@@ -139,7 +160,7 @@ export async function registerFailure(
     .set({ lockedUntil: until, updatedAt: sql`now()` })
     .where(and(eq(loginAttempts.scope, scope), eq(loginAttempts.subject, subject)))
 
-  return scope === 'ip' ? { locked: true, until } : { locked: true }
+  return scope === 'operator' ? { locked: true } : { locked: true, until }
 }
 
 /** Efface le compteur après une authentification réussie. */
