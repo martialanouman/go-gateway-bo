@@ -170,8 +170,16 @@ sur tout écran touché • PR petite et focalisée (une step).
 - [ ] step-182 — Évaluateur BFF sur source durable à offset persisté
 - [ ] step-183 — Réconciliation Alertmanager  ⚠️ **bloqué : surface absente du contrat**
 - [ ] step-184 — Journal d'audit : écran de consultation
+- [ ] step-187 — Rétention d'`audit_log` : détachement et purge des partitions échues †
 - [ ] step-185 — Accessibilité WCAG 2.1 AA + parcours Playwright de bout en bout
 - [ ] step-186 — Déploiement HA (≥2 instances, affinité WS) + durcissement production
+
+† Ajoutée après coup : la step-002 a livré la création des partitions d'`audit_log`, rien ne les
+détache ni ne les supprime — c'est pourtant l'unique raison d'avoir partitionné. Son numéro ne suit pas
+sa position parce que **l'ordre de cette liste fait foi, pas le numéro** : elle se lit après l'écran de
+consultation (step-184) et doit précéder la mise en production (step-186), qui ne doit pas partir sans
+propriétaire de rétention. Elle est en revanche **indépendante de step-185** : l'ordre entre ces
+deux-là est de convenance, pas une contrainte.
 
 ---
 
