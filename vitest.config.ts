@@ -71,6 +71,13 @@ export default defineConfig({
         // défaut calculée ou un type de colonne sur mesure y apparaît, cette logique sort de la
         // mesure sans que personne ne le voie — elle doit vivre à côté, pas dans le schéma.
         'src/server/db/schema/**',
+        // Point d'entrée d'exploitation (`pnpm db:seed`, `pnpm auth:bootstrap`). Il ne décide rien :
+        // il lit `process.argv`, appelle des fonctions testées ailleurs, choisit un code de sortie.
+        // Le couvrir exigerait de lancer un processus par cas pour n'exercer que de la plomberie.
+        // Corollaire à tenir, identique à celui du répertoire de schéma : **aucune règle métier ici**.
+        // Le jour où ce fichier décide quelque chose — un ordre d'appel conditionnel, une validation —
+        // cette logique sort de la mesure sans que personne ne le voie et doit vivre à côté.
+        'src/server/auth/cli.ts',
       ],
       thresholds: {
         /**

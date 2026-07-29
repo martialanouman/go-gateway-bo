@@ -285,7 +285,7 @@ l'écran Clients rendu selon ses permissions, crée un client, et l'action laiss
 
 **Livrables**
 - Catalogue des ~40 permissions et les **neuf rôles par défaut** du §6.10, seedés et idempotents.
-- Login email/mot de passe (Argon2id, anti-brute-force partagé entre instances), session BFF signée
+- Login email/mot de passe (scrypt — voir step-021, Argon2id écarté pour la politique d'approvisionnement ; anti-brute-force partagé entre instances), session BFF signée
   et partagée, `/auth/me` renvoyant l'union des permissions.
 - MFA **TOTP** (anti-rejeu, codes de récupération) et **WebAuthn/passkey** (`rpID`/`origin` vérifiés
   côté serveur, compteur de signature).
@@ -294,7 +294,7 @@ l'écran Clients rendu selon ses permissions, crée un client, et l'action laiss
 - Rendu UI par permission (contrôle **désactivé et expliqué**, jamais masqué), écrans Login et MFA,
   administration des opérateurs et des rôles.
 
-**Nouvelles dépendances :** `@simplewebauthn/server` + `/browser`, bibliothèque TOTP, Argon2.
+**Nouvelles dépendances :** `@simplewebauthn/server` + `/browser`, bibliothèque TOTP. (Argon2 retiré : le hachage passe par `node:crypto.scrypt`, sans dépendance — step-020.)
 
 **Hors périmètre :** l'écran de consultation du journal d'audit (M9) ; l'authentification de la
 passerelle elle-même (côté `go-gateway`, voir §15).
