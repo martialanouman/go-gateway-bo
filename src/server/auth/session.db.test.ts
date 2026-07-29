@@ -20,7 +20,7 @@ import {
 } from './session'
 
 const POSTGRES_IMAGE = 'postgres:18-alpine'
-const RAPIDE = { N: 1024, r: 8, p: 1 } as const
+const FAST_SCRYPT = { N: 1024, r: 8, p: 1 } as const
 
 let container: StartedPostgreSqlContainer
 let sql: postgres.Sql
@@ -45,7 +45,7 @@ beforeEach(async () => {
   await sql`DELETE FROM operators`
   const [row] = await sql<{ id: string }[]>`
     INSERT INTO operators (email, display_name, password_hash)
-    VALUES ('operateur@example.test', 'Opératrice', ${await hashPassword('un mot de passe long', RAPIDE)})
+    VALUES ('operateur@example.test', 'Opératrice', ${await hashPassword('un mot de passe long', FAST_SCRYPT)})
     RETURNING id::text
   `
   operatorId = row?.id ?? ''
@@ -102,16 +102,16 @@ describe('ouverture de session', () => {
     // date de passage MFA rafraîchie à chaque appel, ce qui masquerait depuis quand elle l'est.
     const { sessionId } = await openPendingSession(db, operatorId)
     await completeMfa(db, sessionId)
-    const [avant] = await sql<{ epoch: string }[]>`
+    const [before] = await sql<{ epoch: string }[]>`
       SELECT extract(epoch FROM mfa_completed_at)::text AS epoch FROM operator_sessions
     `
 
     await completeMfa(db, sessionId)
 
-    const [apres] = await sql<{ epoch: string }[]>`
+    const [after] = await sql<{ epoch: string }[]>`
       SELECT extract(epoch FROM mfa_completed_at)::text AS epoch FROM operator_sessions
     `
-    expect(apres?.epoch).toBe(avant?.epoch)
+    expect(after?.epoch).toBe(before?.epoch)
   })
 })
 
@@ -192,28 +192,28 @@ describe('lecture de session', () => {
     // chaud du tableau de bord pour une précision dont personne n'a besoin.
     const { sessionId } = await openPendingSession(db, operatorId)
     await completeMfa(db, sessionId)
-    const [avant] = await sql<{ epoch: string }[]>`
+    const [before] = await sql<{ epoch: string }[]>`
       SELECT extract(epoch FROM last_seen_at)::text AS epoch FROM operator_sessions
     `
 
     await readSession(db, sessionId)
 
-    const [apres] = await sql<{ epoch: string }[]>`
+    const [after] = await sql<{ epoch: string }[]>`
       SELECT extract(epoch FROM last_seen_at)::text AS epoch FROM operator_sessions
     `
-    expect(apres?.epoch).toBe(avant?.epoch)
+    expect(after?.epoch).toBe(before?.epoch)
   })
 })
 
 describe('révocation', () => {
   it('ferme toutes les sessions d un opérateur d un coup', async () => {
     // Le geste du jour où l'on désactive quelqu'un ou où l'on soupçonne un vol de cookie.
-    const premiere = await openPendingSession(db, operatorId)
-    const seconde = await openPendingSession(db, operatorId)
+    const first = await openPendingSession(db, operatorId)
+    const second = await openPendingSession(db, operatorId)
 
     expect(await revokeAllSessionsOf(db, operatorId)).toBe(2)
-    expect((await readSession(db, premiere.sessionId)).status).toBe('none')
-    expect((await readSession(db, seconde.sessionId)).status).toBe('none')
+    expect((await readSession(db, first.sessionId)).status).toBe('none')
+    expect((await readSession(db, second.sessionId)).status).toBe('none')
   })
 
   it('ferme une session partielle comme une autre', async () => {
@@ -242,17 +242,17 @@ describe('révocation', () => {
   it('est visible depuis une autre connexion, sans cache à invalider', async () => {
     // **L'exigence du périmètre** : la révocation doit être immédiate y compris pour les autres
     // instances. L'état vivant en base, une seconde connexion la constate sans qu'on lui dise rien.
-    const autre = connect(container.getConnectionUri(), { poolSize: 2 })
+    const other = connect(container.getConnectionUri(), { poolSize: 2 })
     try {
       const { sessionId } = await openPendingSession(db, operatorId)
       await completeMfa(db, sessionId)
-      expect((await readSession(autre.db, sessionId)).status).toBe('active')
+      expect((await readSession(other.db, sessionId)).status).toBe('active')
 
       await revokeSession(db, sessionId)
 
-      expect((await readSession(autre.db, sessionId)).status).toBe('none')
+      expect((await readSession(other.db, sessionId)).status).toBe('none')
     } finally {
-      await autre.client.end({ timeout: 5 })
+      await other.client.end({ timeout: 5 })
     }
   })
 })
@@ -281,13 +281,13 @@ describe('purge', () => {
 
 describe('résolution depuis un en-tête Cookie', () => {
   const SECRETS = { current: 'une-cle-de-session-de-test-assez-longue' }
-  const entete = (value: string) => `theme=sombre; ${SESSION_COOKIE_NAME}=${value}`
+  const cookieHeader = (value: string) => `theme=sombre; ${SESSION_COOKIE_NAME}=${value}`
 
   it('résout un cookie signé jusqu à la session', async () => {
     const { sessionId } = await openPendingSession(db, operatorId)
     await completeMfa(db, sessionId)
 
-    const state = await resolveSession(db, entete(signSessionId(sessionId, SECRETS)), SECRETS)
+    const state = await resolveSession(db, cookieHeader(signSessionId(sessionId, SECRETS)), SECRETS)
 
     expect(state).toEqual({ status: 'active', sessionId, operatorId })
   })
@@ -295,9 +295,11 @@ describe('résolution depuis un en-tête Cookie', () => {
   it('refuse un identifiant valide dont la signature vient d une autre clé', async () => {
     // Sans la signature, connaître un identifiant suffirait à prendre la session.
     const { sessionId } = await openPendingSession(db, operatorId)
-    const autre = { current: 'une-tout-autre-cle-de-session-assez-longue' }
+    const other = { current: 'une-tout-autre-cle-de-session-assez-longue' }
 
-    expect(await resolveSession(db, entete(signSessionId(sessionId, autre)), SECRETS)).toEqual({
+    expect(
+      await resolveSession(db, cookieHeader(signSessionId(sessionId, other)), SECRETS),
+    ).toEqual({
       status: 'none',
     })
   })
@@ -306,7 +308,7 @@ describe('résolution depuis un en-tête Cookie', () => {
     // **La signature dit « nous avons émis ceci », la base dit « ceci vaut encore ».** Les deux sont
     // nécessaires : sans la seconde, une déconnexion ne déconnecterait rien.
     const { sessionId } = await openPendingSession(db, operatorId)
-    const cookie = entete(signSessionId(sessionId, SECRETS))
+    const cookie = cookieHeader(signSessionId(sessionId, SECRETS))
     await revokeSession(db, sessionId)
 
     expect(await resolveSession(db, cookie, SECRETS)).toEqual({ status: 'none' })
