@@ -1,18 +1,21 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest'
-import {
-  isCountableIp,
-  readClientIp,
-  readClientIpFromRequest,
-  readTrustedProxyCount,
-  UNKNOWN_CLIENT_IP,
-} from './client-ip'
+import { isCountableIp, readClientIp, readTrustedProxyCount, UNKNOWN_CLIENT_IP } from './client-ip'
 
 describe('adresse de l appelant', () => {
-  it('ignore x-forwarded-for quand aucun proxy n est déclaré', () => {
-    // **Le défaut qui échoue du bon côté.** Sans déclaration, l'en-tête est fourni par le client :
-    // le croire reviendrait à laisser l'appelant choisir son identité de comptage.
+  it('ne compte rien tant que la topologie n est pas déclarée', () => {
+    // **Le défaut qui échoue du bon côté, et il a failli être inversé.** Rendre l'adresse du socket
+    // ici paraissait un progrès — enfin une valeur que l'appelant ne contrôle pas. Mais derrière le
+    // load balancer que la spec impose, cette adresse est celle du répartiteur, la même pour tous :
+    // vingt échecs de n'importe qui auraient verrouillé la console entière.
+    expect(readClientIp({ forwardedFor: '1.2.3.4', remoteAddress: '10.0.0.9' }, undefined)).toBe(
+      UNKNOWN_CLIENT_IP,
+    )
+  })
+
+  it('compte l adresse du socket quand zéro proxy est explicitement déclaré', () => {
+    // `0` est une affirmation — « aucun proxy ne s'intercale » — pas une absence de réponse.
     expect(readClientIp({ forwardedFor: '1.2.3.4', remoteAddress: '10.0.0.9' }, 0)).toBe('10.0.0.9')
   })
 
@@ -68,37 +71,6 @@ describe('adresse de l appelant', () => {
   })
 })
 
-describe('lecture depuis une requête entrante', () => {
-  const requete = (headers: Record<string, string>) => ({
-    headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
-  })
-
-  it('ne lit jamais x-real-ip', () => {
-    // **Le trou que la revue a trouvé.** `x-real-ip` est fourni par le client au même titre que
-    // `x-forwarded-for` : le lire refermait une porte tout en en ouvrant une autre, et l'appelant
-    // reprenait le contrôle de son identité de comptage — donc de l'anti-brute-force entier.
-    const ip = readClientIpFromRequest(
-      requete({ 'x-real-ip': '203.0.113.9', 'x-forwarded-for': '198.51.100.1' }),
-      {},
-    )
-
-    expect(ip).not.toBe('203.0.113.9')
-    expect(ip).toBe(UNKNOWN_CLIENT_IP)
-  })
-
-  it('utilise x-forwarded-for quand des proxies sont déclarés', () => {
-    const ip = readClientIpFromRequest(requete({ 'x-forwarded-for': 'forgé, 198.51.100.1' }), {
-      AUTH_TRUSTED_PROXIES: '1',
-    })
-
-    expect(ip).toBe('198.51.100.1')
-  })
-
-  it("retient l'adresse de connexion quand le serveur la fournit", () => {
-    expect(readClientIpFromRequest(requete({}), {}, '198.51.100.42')).toBe('198.51.100.42')
-  })
-})
-
 describe('adresse comptable', () => {
   it('ne compte pas une adresse indéterminée', () => {
     // Un seau commun serait pire que rien : vingt échecs de n'importe qui verrouilleraient la
@@ -120,17 +92,25 @@ describe('adresse comptable', () => {
 })
 
 describe('nombre de proxies de confiance', () => {
-  it('vaut zéro sans déclaration', () => {
-    expect(readTrustedProxyCount({})).toBe(0)
+  it('n est pas déclaré quand la variable est absente ou vide', () => {
+    // Distinct de zéro : voir l'en-tête du module. Confondre les deux rendait la console
+    // verrouillable par n'importe qui en vingt requêtes.
+    expect(readTrustedProxyCount({})).toBeUndefined()
+    expect(readTrustedProxyCount({ AUTH_TRUSTED_PROXIES: '   ' })).toBeUndefined()
+  })
+
+  it('lit un zéro explicite comme une déclaration', () => {
+    expect(readTrustedProxyCount({ AUTH_TRUSTED_PROXIES: '0' })).toBe(0)
   })
 
   it('lit une déclaration valide', () => {
     expect(readTrustedProxyCount({ AUTH_TRUSTED_PROXIES: '2' })).toBe(2)
   })
 
-  it('retombe à zéro sur une valeur absurde plutôt que de deviner', () => {
+  it('traite une valeur absurde comme une absence de déclaration', () => {
+    // Surtout pas comme un zéro : zéro engage, et une faute de frappe ne doit pas engager.
     for (const value of ['-1', 'deux', '1.5', '']) {
-      expect(readTrustedProxyCount({ AUTH_TRUSTED_PROXIES: value }), value).toBe(0)
+      expect(readTrustedProxyCount({ AUTH_TRUSTED_PROXIES: value }), value).toBeUndefined()
     }
   })
 })

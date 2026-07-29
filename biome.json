@@ -49,7 +49,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/**", "!src/server/**", "!src/test/**", "!src/routes/api/**"],
+      "includes": ["src/**", "!src/server/**", "!src/test/**"],
       "linter": {
         "rules": {
           "style": {

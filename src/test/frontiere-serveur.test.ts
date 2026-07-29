@@ -18,7 +18,7 @@
  */
 
 import { type Dirent, readdirSync, readFileSync } from 'node:fs'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
@@ -29,27 +29,13 @@ const CLIENT_DIRECTORIES = ['routes', 'components', 'lib', 'styles']
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx']
 
-/**
- * Les *server routes* de TanStack Start (`src/routes/api/`).
- *
- * Elles doivent vivre sous `src/routes/` — c'est le routage par fichiers qui leur donne leur URL —
- * mais elles sont du code serveur : leurs handlers sont retirés du bundle client, et elles ont
- * légitimement besoin du BFF. La règle Biome les exclut donc, et ce fichier aussi.
- *
- * L'exception ouvre une porte : un composant React glissé dans ce dossier ferait entrer les imports
- * serveur dans le bundle sans que rien ne le signale. Le `describe` du bas la referme.
- */
-const SERVER_ROUTES = join(SRC, 'routes', 'api') + sep
-
 describe('frontière client / serveur', () => {
   it("aucun fichier client n'atteint src/server/, même indirectement", () => {
     const offenders = CLIENT_DIRECTORIES.flatMap((directory) =>
-      sourceFilesIn(join(SRC, directory))
-        .filter((file) => !file.startsWith(SERVER_ROUTES))
-        .flatMap((file) => {
-          const path = pathToServer(file)
-          return path ? [path.map((step) => relative(SRC, step)).join('\n     → ')] : []
-        }),
+      sourceFilesIn(join(SRC, directory)).flatMap((file) => {
+        const path = pathToServer(file)
+        return path ? [path.map((step) => relative(SRC, step)).join('\n     → ')] : []
+      }),
     )
 
     expect(offenders).toEqual([])
@@ -121,17 +107,7 @@ function internalImportsOf(file: string): string[] {
         ? resolve(dirname(file), specifier)
         : undefined
 
-    if (!base) return []
-
-    // **La traversée s'arrête aux routes serveur**, et cela demande justification :
-    // `routeTree.gen.ts` référence *toutes* les routes, server routes comprises, si bien que
-    // n'importe quel écran atteindrait `src/server/` par ce chemin. C'est un artefact de l'arbre
-    // généré, pas une fuite — le bundler retire les handlers serveur du bundle client.
-    //
-    // Couper ici n'est sûr que parce que le `describe('routes serveur')` plus bas garantit que ce
-    // dossier ne contient **que** des handlers, aucun composant. Les deux gardes ne valent
-    // qu'ensemble : retirer l'une rend l'autre trompeuse.
-    return resolveSource(base).filter((resolved) => !resolved.startsWith(SERVER_ROUTES))
+    return base ? resolveSource(base) : []
   })
 }
 
@@ -170,36 +146,34 @@ function sourceFilesIn(directory: string): string[] {
 }
 
 /**
- * La contrepartie de l'exception accordée à `src/routes/api/`.
- *
- * Une exception sans garde est une porte de service. Ces trois vérifications tiennent lieu de
- * serrure, et elles vivent **hors de la configuration du linter** : une garde qui dépend du réglage
- * qu'elle protège ne protège rien.
+ * Les coquilles HTTP du BFF sont exclues de la mesure de couverture (`vitest.config.ts`) au motif
+ * qu'elles ne décident rien. Une exclusion sans garde est une porte de service : ce bloc en tient
+ * lieu, et il vit **hors** de la configuration qu'il protège.
  */
-describe('routes serveur', () => {
-  const files = sourceFilesIn(SERVER_ROUTES)
+describe('coquilles HTTP du BFF', () => {
+  const HTTP_HANDLERS = join(SRC, 'server', 'auth', 'http')
+  const files = sourceFilesIn(HTTP_HANDLERS)
 
   it('en déclare au moins une, sinon rien n’est gardé ici', () => {
-    // Un parcours de dossier vide passe toujours. Le dire évite que cette garde devienne muette le
-    // jour où le dossier serait renommé.
     expect(files.length).toBeGreaterThan(0)
   })
 
-  it("ne contient aucun composant : ce dossier n'atteint jamais le navigateur", () => {
-    const offenders = files.filter((file) => {
-      const source = readFileSync(file, 'utf8')
-      return (
-        /from ['"]react['"]/.test(source) || /\bcomponent\s*:/.test(source) || file.endsWith('.tsx')
-      )
-    })
+  it('ne lit jamais un en-tête qui laisserait l’appelant choisir son adresse', () => {
+    // `x-real-ip` est fourni par le client au même titre que `x-forwarded-for`. Le lire rendrait le
+    // compteur par adresse inutile — l'attaquant changerait de clé à chaque requête. C'est le trou
+    // qu'une revue a trouvé dans la première version de ce handler ; cette garde le referme, et elle
+    // porte sur le seul endroit où la décision se prend.
+    const offenders = files.filter((file) => /x-real-ip/i.test(readFileSync(file, 'utf8')))
 
     expect(offenders.map((file) => relative(SRC, file))).toEqual([])
   })
 
-  it('ne déclare que des handlers de méthode HTTP', () => {
-    // Le corollaire positif : un fichier de ce dossier qui n'a pas de `server.handlers` n'est pas
-    // une route serveur, et n'a donc rien à faire sous cette exception.
-    const offenders = files.filter((file) => !readFileSync(file, 'utf8').includes('handlers'))
+  it('n’exporte qu’un handler par défaut, sans logique d’authentification', () => {
+    // Le corollaire de l'exclusion : ces fichiers appellent, ils ne décident pas. Un `export` nommé
+    // y signalerait de la logique réutilisable — donc à tester, donc à sortir de l'exclusion.
+    const offenders = files.filter((file) =>
+      /^export (const|function|type|class) /m.test(readFileSync(file, 'utf8')),
+    )
 
     expect(offenders.map((file) => relative(SRC, file))).toEqual([])
   })

@@ -78,11 +78,11 @@ export default defineConfig({
         // Le jour où ce fichier décide quelque chose — un ordre d'appel conditionnel, une validation —
         // cette logique sort de la mesure sans que personne ne le voie et doit vivre à côté.
         'src/server/auth/cli.ts',
-        // Transport de `POST /api/auth/login` : lit une requête, appelle, rend une réponse. La
-        // décision, la discrétion de la réponse et l'adresse de l'appelant vivent dans
-        // `src/server/auth/` et y sont testées. **Même corollaire** : aucune règle
-        // d'authentification dans ce fichier, sinon elle sort de la mesure sans que personne ne le voie.
-        'src/routes/api/**',
+        // Coquille HTTP des routes du BFF : lit la requête, appelle, rend la réponse. La décision, la
+        // discrétion de la réponse et l'adresse de l'appelant vivent à côté et y sont testées.
+        // **Même corollaire** : aucune règle d'authentification dans ces fichiers, sinon elle sort de
+        // la mesure sans que personne ne le voie.
+        'src/server/auth/http/login.ts',
       ],
       thresholds: {
         /**

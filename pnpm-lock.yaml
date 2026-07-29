@@ -98,6 +98,9 @@ importers:
       drizzle-kit:
         specifier: 0.31.10
         version: 0.31.10
+      h3:
+        specifier: 1.15.11
+        version: 1.15.11
       jsdom:
         specifier: 29.1.1
         version: 29.1.1
