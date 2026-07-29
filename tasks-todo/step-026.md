@@ -13,6 +13,10 @@ produit conformément à la charte.
   masqué (« Nécessite la permission `suppressions:delete` »).
 - Écran de login (email + mot de passe) puis écran de challenge MFA (passkey d'abord, TOTP en repli),
   d'après `LoginScreen.jsx` du kit UI.
+- **Branchement de la garde de session sur les routes** (reporté de step-022) : toute route non
+  publique exige une session valide et **complète**, sinon redirection vers le login. La brique
+  existe — `resolveSession()` de step-022 — mais elle attend une route à garder et une cible où
+  rediriger, qui n'apparaissent qu'ici.
 - États d'erreur d'authentification explicites : identifiants invalides, compte verrouillé (avec
   durée), MFA requis, facteur indisponible.
 
@@ -26,6 +30,8 @@ produit conformément à la charte.
 
 ## Tests (écrits dans la même PR)
 - Sans la permission, le contrôle est rendu désactivé avec sa raison ; avec, il est actif.
+- Une route protégée redirige un anonyme **et** un opérateur dont le MFA n'est pas passé (reporté de
+  step-022).
 - Parcours e2e : login → MFA (TOTP et passkey) → console.
 - Compte verrouillé : message avec durée, aucune fuite d'existence de compte.
 

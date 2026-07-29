@@ -17,7 +17,10 @@ authenticator.
 
 ## Points d'implémentation clés
 - La limitation de débit s'applique aussi à la vérification MFA : un code à 6 chiffres se force
-  brutalement sans elle.
+  brutalement sans elle. Le plafond court de la session partielle (step-022) borne déjà la fenêtre à
+  quelques minutes — il rend la force brute plus étroite, il ne la remplace pas.
+- La vérification promeut la session par `completeMfa()`, qui déplace la fin de validité du plafond
+  court au plafond absolu. C'est le seul endroit qui a le droit de le faire.
 - L'anti-rejeu doit tenir en **multi-instance** (marqueur partagé du dernier pas de temps consommé).
 - Les codes de récupération suivent la même règle que les secrets d'identifiants (**invariant b**) :
   montrés une fois, jamais réaffichés.
