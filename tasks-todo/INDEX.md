@@ -99,12 +99,17 @@ sur tout écran touché • PR petite et focalisée (une step).
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [x] step-020 — Schéma auth (operators, roles, permissions, jointures) + seeds
 - [x] step-021 — Login email/mot de passe + anti-brute-force
-- [ ] step-022 — Session BFF (cookie signé) + `/auth/me` + gardes de route
+- [x] step-022 — Session BFF (cookie signé) + `/auth/me` + `/auth/logout` ‡
 - [ ] step-023 — MFA TOTP : enrôlement et vérification
 - [ ] step-024 — MFA WebAuthn / passkey
 - [ ] step-025 — Moteur de permissions côté serveur + journal d'audit + MFA obligatoire
 - [ ] step-026 — Rendu UI par permission + écrans Login & MFA
 - [ ] step-027 — Gestion des opérateurs et des rôles (CRUD)
+
+‡ La step-022 livre la brique de garde — `resolveSession()`, du cookie à l'état vérifié — mais son
+**branchement sur les routes** est reporté en step-026 : aucune route non publique n'existe avant
+l'AppShell (step-040) et la cible de la redirection, l'écran de login, arrive en step-026. Le
+brancher plus tôt aurait demandé une route factice, écrite pour porter un test et réécrite ensuite.
 
 ## M2 — Coquille applicative & temps réel  (§4.1, §4.2, §5.2)
 - [ ] step-040 — AppShell : rail de navigation, barre supérieure, layout, routage fichiers
