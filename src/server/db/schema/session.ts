@@ -28,7 +28,6 @@
  * permissions ferait survivre un pouvoir révoqué aussi longtemps que le cookie.
  */
 
-import { sql } from 'drizzle-orm'
 import { index, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { operators, uuidv7 } from './auth'
 
@@ -39,6 +38,9 @@ export const operatorSessions = pgTable(
      * L'identifiant que le cookie transporte, signé. UUIDv7 comme partout — et l'ordonnancement
      * temporel n'est pas un inconvénient ici : la signature empêche de forger un identifiant, et
      * deviner un identifiant existant ne sert à rien sans elle.
+     *
+     * **Ne sort jamais dans un corps de réponse** : le rendre au navigateur autrement que par le
+     * cookie le sortirait de `HttpOnly`, donc le mettrait à portée d'un script injecté.
      */
     id: uuidv7(),
     operatorId: uuid('operator_id')
@@ -79,19 +81,3 @@ export const operatorSessions = pgTable(
     index('operator_sessions_expires_idx').on(table.expiresAt),
   ],
 )
-
-/**
- * Les colonnes qu'une réponse peut porter.
- *
- * `id` n'en fait pas partie : c'est le secret que le cookie transporte, et le rendre au navigateur
- * dans un corps JSON le sortirait de `HttpOnly` — donc à portée d'un script injecté.
- */
-export const sessionSafeColumns = {
-  operatorId: operatorSessions.operatorId,
-  mfaCompletedAt: operatorSessions.mfaCompletedAt,
-  expiresAt: operatorSessions.expiresAt,
-  createdAt: operatorSessions.createdAt,
-} as const
-
-/** Vrai tant que la session est utilisable : ni révoquée, ni échue. Exprimé en SQL pour les requêtes. */
-export const sessionIsLive = sql`${operatorSessions.revokedAt} IS NULL AND ${operatorSessions.expiresAt} > now()`
