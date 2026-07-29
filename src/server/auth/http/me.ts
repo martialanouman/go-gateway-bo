@@ -12,7 +12,7 @@ import { getDatabase } from '../../db/index'
 import { resolveSession } from '../guard'
 import { meResponse } from '../http'
 import { currentOperator } from '../me'
-import { getSessionSecrets } from './secrets'
+import { getSessionSecrets } from '../secrets'
 
 export default defineEventHandler(async (event) => {
   const db = getDatabase()

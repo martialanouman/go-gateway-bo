@@ -15,8 +15,8 @@ import { defineEventHandler, getRequestHeader } from 'h3'
 import { getDatabase } from '../../db/index'
 import { resolveSession } from '../guard'
 import { logoutResponse } from '../http'
+import { getSessionSecrets } from '../secrets'
 import { endSession } from '../session'
-import { getSessionSecrets } from './secrets'
 
 export default defineEventHandler(async (event) => {
   const db = getDatabase()

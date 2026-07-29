@@ -37,8 +37,8 @@ import { readClientIp, readTrustedProxyCount } from '../client-ip'
 import { createSemaphore, readVerificationSlots } from '../concurrency'
 import { loginResponse, parseCredentials } from '../http'
 import { createLoginService, type LoginService } from '../login'
+import { getSessionSecrets } from '../secrets'
 import { readThrottleSecret } from '../throttle'
-import { getSessionSecrets } from './secrets'
 
 let service: LoginService | undefined
 
