@@ -1,18 +1,48 @@
 // @vitest-environment node
 
 import { describe, expect, it } from 'vitest'
+import { SESSION_COOKIE_NAME } from './cookie'
 import { INVALID_CREDENTIALS_MESSAGE, loginResponse, parseCredentials } from './http'
 
+const SECRETS = { current: 'une-cle-de-session-de-test-assez-longue' }
+const SESSION_ID = '01890a5d-ac96-774b-bcce-b302099a8057'
+
 describe('réponse de connexion', () => {
-  it('ne rend ni session ni identifiant d opérateur au succès', async () => {
-    // Rendre l'`operatorId` au navigateur transformerait la réussite du mot de passe en fuite
-    // d'identifiant interne — et la session n'existe de toute façon qu'après le second facteur.
-    const response = loginResponse({ outcome: 'mfa_required', operatorId: 'un-uuid-interne' })
+  it('ne met ni identifiant d opérateur ni identifiant de session dans le corps', async () => {
+    // Les rendre au navigateur les sortirait du `HttpOnly`, donc les mettrait à portée d'un script
+    // injecté. Tout le lien avec le second facteur passe par le cookie.
+    const response = loginResponse(
+      { outcome: 'mfa_required', operatorId: 'un-uuid-interne', sessionId: SESSION_ID },
+      SECRETS,
+    )
     const body = await response.json()
 
     expect(response.status).toBe(200)
     expect(body).toEqual({ mfa_required: true })
     expect(JSON.stringify(body)).not.toContain('un-uuid-interne')
+    expect(JSON.stringify(body)).not.toContain(SESSION_ID)
+  })
+
+  it('pose un cookie de session signé, protégé', async () => {
+    const cookie = loginResponse(
+      { outcome: 'mfa_required', operatorId: 'x', sessionId: SESSION_ID },
+      SECRETS,
+    ).headers.get('set-cookie')
+
+    expect(cookie).toContain(`${SESSION_COOKIE_NAME}=${SESSION_ID}.`)
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('Secure')
+    expect(cookie).toContain('SameSite=Lax')
+  })
+
+  it('ne pose aucun cookie sur un échec ni sur une limitation', () => {
+    // Un cookie posé sur un échec donnerait une session à qui n'a rien prouvé.
+    for (const outcome of [
+      { outcome: 'invalid_credentials' },
+      { outcome: 'rate_limited', retryAfterSeconds: 5 },
+    ] as const) {
+      expect(loginResponse(outcome, SECRETS).headers.get('set-cookie')).toBeNull()
+    }
   })
 
   it('rend le même 401 et le même texte pour tous les échecs', async () => {
@@ -39,11 +69,11 @@ describe('réponse de connexion', () => {
   it('interdit la mise en cache de toute réponse d authentification', () => {
     // Un intermédiaire qui garderait une de ces réponses la servirait à quelqu'un d'autre.
     for (const outcome of [
-      { outcome: 'mfa_required', operatorId: 'x' },
+      { outcome: 'mfa_required', operatorId: 'x', sessionId: SESSION_ID },
       { outcome: 'invalid_credentials' },
       { outcome: 'rate_limited', retryAfterSeconds: 5 },
     ] as const) {
-      expect(loginResponse(outcome).headers.get('cache-control')).toBe('no-store')
+      expect(loginResponse(outcome, SECRETS).headers.get('cache-control')).toBe('no-store')
     }
   })
 })

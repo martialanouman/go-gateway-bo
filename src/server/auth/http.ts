@@ -9,7 +9,22 @@
  * divulguer — et la distinction se glisse toujours par commodité de débogage.
  */
 
+import {
+  SESSION_COOKIE_NAME,
+  type SessionSecrets,
+  sessionCookieAttributes,
+  signSessionId,
+} from './cookie'
 import type { LoginOutcome } from './login'
+
+/**
+ * Durée de vie du cookie, en secondes.
+ *
+ * Volontairement plus courte que la session en base : le cookie n'est qu'un porteur, et le laisser
+ * survivre à ce qu'il désigne n'apporte rien qu'une reconnexion silencieuse de plus. La base reste
+ * l'autorité — un cookie encore présent sur une session révoquée ne vaut rien.
+ */
+const COOKIE_MAX_AGE_SECONDS = 12 * 60 * 60
 
 /** Le seul message d'échec de connexion. Il ne dit pas ce qui a échoué, parce qu'il ne le doit pas. */
 export const INVALID_CREDENTIALS_MESSAGE =
@@ -18,12 +33,16 @@ export const INVALID_CREDENTIALS_MESSAGE =
 const RATE_LIMITED_MESSAGE =
   'Connexion refusée : trop de tentatives depuis cette adresse. Réessayez plus tard.'
 
-export function loginResponse(outcome: LoginOutcome): Response {
+export function loginResponse(outcome: LoginOutcome, secrets?: SessionSecrets): Response {
   if (outcome.outcome === 'mfa_required') {
-    // Aucune session, aucun jeton, et surtout **pas d'identifiant d'opérateur** : le rendre au
-    // navigateur transformerait la réussite du mot de passe en fuite d'identifiant interne. Le lien
-    // entre cette réponse et la vérification du second facteur est établi côté serveur (step-023).
-    return json({ mfa_required: true }, 200)
+    // **Pas d'identifiant d'opérateur, ni d'identifiant de session dans le corps** : les rendre au
+    // navigateur sortirait du `HttpOnly`, donc les mettrait à portée d'un script injecté. Le lien
+    // avec la vérification du second facteur passe entièrement par le cookie.
+    const cookie = secrets
+      ? `${SESSION_COOKIE_NAME}=${signSessionId(outcome.sessionId, secrets)}; ${sessionCookieAttributes(COOKIE_MAX_AGE_SECONDS)}`
+      : undefined
+
+    return json({ mfa_required: true }, 200, cookie ? { 'set-cookie': cookie } : {})
   }
 
   if (outcome.outcome === 'rate_limited') {

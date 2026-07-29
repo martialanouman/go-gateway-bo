@@ -35,11 +35,13 @@ import { defineEventHandler, getRequestHeader, getRequestIP, readBody } from 'h3
 import { getDatabase } from '../../db/index'
 import { readClientIp, readTrustedProxyCount } from '../client-ip'
 import { createSemaphore, readVerificationSlots } from '../concurrency'
+import { readSessionSecrets, type SessionSecrets } from '../cookie'
 import { loginResponse, parseCredentials } from '../http'
 import { createLoginService, type LoginService } from '../login'
 import { readThrottleSecret } from '../throttle'
 
 let service: LoginService | undefined
+let secrets: SessionSecrets | undefined
 
 /**
  * Un service par process, construit au premier appel.
@@ -55,6 +57,11 @@ function getLoginService(): LoginService {
     semaphore: createSemaphore({ slots: readVerificationSlots(process.env), queueLimit: 64 }),
   })
   return service
+}
+
+function getSessionSecrets(): SessionSecrets {
+  secrets ??= readSessionSecrets(process.env)
+  return secrets
 }
 
 export default defineEventHandler(async (event) => {
@@ -97,5 +104,5 @@ export default defineEventHandler(async (event) => {
   // par une virgule et donc invalides dès qu'une date d'expiration en contient une. La step-022 pose
   // précisément un cookie de session sur cette réponse : le piège se serait déclenché là, sans
   // qu'aucun test de cette PR ne le voie.
-  return loginResponse(outcome)
+  return loginResponse(outcome, getSessionSecrets())
 })
