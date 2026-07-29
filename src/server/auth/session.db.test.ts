@@ -4,6 +4,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import type postgres from 'postgres'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { waitUntilBlocked } from '../../test/pg-locks'
 import { connect, type Database } from '../db/index'
 import { SESSION_COOKIE_NAME, signSessionId } from './cookie'
 import { resolveSession } from './guard'
@@ -413,7 +414,7 @@ describe('défi WebAuthn porté par la session', () => {
       })
 
       const contender = consumeWebAuthnChallenge(other.db, sessionId)
-      await waitUntilBlocked()
+      await waitUntilBlocked(sql)
       release()
       await holder
 
@@ -423,16 +424,4 @@ describe('défi WebAuthn porté par la session', () => {
       await other.client.end({ timeout: 5 })
     }
   })
-
-  /** Attend qu'une requête soit réellement en attente d'un verrou, plutôt que de dormir au hasard. */
-  async function waitUntilBlocked(): Promise<void> {
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      const [row] = await sql<{ waiting: number }[]>`
-        SELECT count(*)::int AS waiting FROM pg_locks WHERE NOT granted
-      `
-      if ((row?.waiting ?? 0) > 0) return
-      await new Promise((resolve) => setTimeout(resolve, 20))
-    }
-    throw new Error("Aucune requête ne s'est bloquée : le test ne prouve rien.")
-  }
 })

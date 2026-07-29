@@ -1,0 +1,233 @@
+/**
+ * Le magasin d'authentificateurs contre un vrai PostgreSQL.
+ *
+ * Ce qui ne se prouve que là : une liste JSONB se modifie par lecture-modification-écriture, et c'est
+ * le motif qui perd des données en concurrence. Le verrou de ligne est la seule chose qui l'empêche.
+ */
+
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+import { migrate } from 'drizzle-orm/postgres-js/migrator'
+import type postgres from 'postgres'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { waitUntilBlocked } from '../../test/pg-locks'
+import { connect, type Database } from '../db/index'
+import { hashPassword } from './password'
+import {
+  addCredential,
+  listCredentials,
+  recordCredentialUse,
+  renameCredential,
+  revokeCredential,
+} from './webauthn-credentials'
+
+const POSTGRES_IMAGE = 'postgres:18-alpine'
+const FAST_SCRYPT = { N: 1024, r: 8, p: 1 } as const
+
+let container: StartedPostgreSqlContainer
+let sql: postgres.Sql
+let db: Database
+let otherInstance: Database
+let otherClient: postgres.Sql
+let operatorId: string
+
+beforeAll(async () => {
+  container = await new PostgreSqlContainer(POSTGRES_IMAGE).start()
+  const connection = connect(container.getConnectionUri(), { poolSize: 5 })
+  sql = connection.client
+  db = connection.db
+  await migrate(db, { migrationsFolder: './drizzle' })
+
+  const other = connect(container.getConnectionUri(), { poolSize: 5 })
+  otherClient = other.client
+  otherInstance = other.db
+}, 180_000)
+
+afterAll(async () => {
+  await otherClient?.end({ timeout: 5 })
+  await sql?.end({ timeout: 5 })
+  await container?.stop()
+})
+
+beforeEach(async () => {
+  await sql`DELETE FROM operators`
+  const [row] = await sql<{ id: string }[]>`
+    INSERT INTO operators (email, display_name, password_hash)
+    VALUES ('operatrice@example.test', 'Opératrice', ${await hashPassword('un mot de passe long', FAST_SCRYPT)})
+    RETURNING id::text
+  `
+  operatorId = row?.id ?? ''
+})
+
+const credential = (id: string, name = 'MacBook') => ({
+  id,
+  publicKey: Buffer.from(`cle-publique-${id}`).toString('base64url'),
+  counter: 0,
+  name,
+})
+
+describe('enregistrement', () => {
+  it('ajoute un authentificateur et le relit', async () => {
+    expect(await addCredential(db, operatorId, credential('cred-a'))).toBe(true)
+
+    const stored = await listCredentials(db, operatorId)
+    expect(stored).toHaveLength(1)
+    expect(stored[0]).toMatchObject({ id: 'cred-a', name: 'MacBook', counter: 0 })
+    expect(stored[0]?.createdAt).toBeTypeOf('string')
+  })
+
+  it('refuse un identifiant déjà enregistré', async () => {
+    // `excludeCredentials` le dit déjà au navigateur, mais c'est une politesse côté client : sans cette
+    // garde, réenregistrer le même appareil ferait croire à deux facteurs là où il n'y en a qu'un.
+    await addCredential(db, operatorId, credential('cred-a'))
+
+    expect(await addCredential(db, operatorId, credential('cred-a', 'autre nom'))).toBe(false)
+    expect(await listCredentials(db, operatorId)).toHaveLength(1)
+  })
+
+  it('donne un nom de repli plutôt que de laisser un libellé vide', async () => {
+    await addCredential(db, operatorId, credential('cred-a', '   '))
+
+    expect((await listCredentials(db, operatorId))[0]?.name).toBe('Authentificateur')
+  })
+
+  it('borne la longueur du nom', async () => {
+    await addCredential(db, operatorId, credential('cred-a', 'x'.repeat(200)))
+
+    expect((await listCredentials(db, operatorId))[0]?.name).toHaveLength(60)
+  })
+
+  it("ne perd pas l'enregistrement de qui a lu la liste avant l'autre", async () => {
+    // **Le test qui justifie le verrou de ligne**, et l'entrelacement est construit : un `Promise.all`
+    // sur deux pools ne se chevauche presque jamais, et laissait passer la version sans verrou —
+    // vérifié par mutation.
+    //
+    // Ici, une transaction tient le verrou puis écrit `cred-a` sans valider ; l'ajout de `cred-b` s'y
+    // bloque — on l'observe dans `pg_locks`. Sans verrou, `cred-b` aurait lu la liste vide dans son
+    // propre instantané et écraserait `cred-a` : un opérateur croirait détenir deux passkeys là où il
+    // n'en a qu'une, et ne le découvrirait qu'en perdant le premier appareil.
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    try {
+      const holder = sql.begin(async (tx) => {
+        await tx`SELECT id FROM operators WHERE id = ${operatorId} FOR UPDATE`
+        await held
+        const first = JSON.stringify([
+          { ...credential('cred-a', 'poste'), createdAt: new Date().toISOString() },
+        ])
+        await tx`UPDATE operators SET mfa_webauthn_credentials = ${first}::jsonb
+                 WHERE id = ${operatorId}`
+      })
+
+      const contender = addCredential(otherInstance, operatorId, credential('cred-b', 'téléphone'))
+      await waitUntilBlocked(sql)
+      release()
+      await holder
+      expect(await contender).toBe(true)
+
+      const stored = await listCredentials(db, operatorId)
+      expect(stored.map((entry) => entry.id).sort()).toEqual(['cred-a', 'cred-b'])
+    } finally {
+      release()
+    }
+  })
+})
+
+describe('renommage et révocation', () => {
+  beforeEach(async () => {
+    await addCredential(db, operatorId, credential('cred-a', 'poste'))
+    await addCredential(db, operatorId, credential('cred-b', 'téléphone'))
+  })
+
+  it('renomme sans toucher aux autres', async () => {
+    expect(await renameCredential(db, operatorId, 'cred-a', 'MacBook du bureau')).toBe(true)
+
+    const stored = await listCredentials(db, operatorId)
+    expect(stored.find((entry) => entry.id === 'cred-a')?.name).toBe('MacBook du bureau')
+    expect(stored.find((entry) => entry.id === 'cred-b')?.name).toBe('téléphone')
+  })
+
+  it('refuse de renommer un authentificateur inconnu', async () => {
+    expect(await renameCredential(db, operatorId, 'cred-absent', 'x')).toBe(false)
+  })
+
+  it('révoque un authentificateur et garde les autres', async () => {
+    expect(await revokeCredential(db, operatorId, 'cred-a')).toBe(true)
+
+    expect((await listCredentials(db, operatorId)).map((entry) => entry.id)).toEqual(['cred-b'])
+  })
+
+  it('refuse de révoquer un authentificateur inconnu', async () => {
+    expect(await revokeCredential(db, operatorId, 'cred-absent')).toBe(false)
+  })
+
+  it("ne touche pas aux authentificateurs d'un autre opérateur", async () => {
+    const [row] = await sql<{ id: string }[]>`
+      INSERT INTO operators (email, display_name, password_hash)
+      VALUES ('autre@example.test', 'Autre', ${await hashPassword('un mot de passe long', FAST_SCRYPT)})
+      RETURNING id::text
+    `
+    const otherOperatorId = row?.id ?? ''
+    await addCredential(db, otherOperatorId, credential('cred-a', 'le sien'))
+
+    await revokeCredential(db, operatorId, 'cred-a')
+
+    expect((await listCredentials(db, otherOperatorId)).map((entry) => entry.id)).toEqual([
+      'cred-a',
+    ])
+  })
+})
+
+describe('compteur de signature', () => {
+  beforeEach(async () => {
+    await addCredential(db, operatorId, { ...credential('cred-a'), counter: 5 })
+  })
+
+  it('consigne un compteur qui progresse', async () => {
+    expect(await recordCredentialUse(db, operatorId, 'cred-a', 6)).toBe(true)
+
+    const stored = (await listCredentials(db, operatorId))[0]
+    expect(stored?.counter).toBe(6)
+    expect(stored?.lastUsedAt).toBeTypeOf('string')
+  })
+
+  it('refuse un compteur qui recule ou stagne', async () => {
+    // La détection de clonage de la spécification : un authentificateur dupliqué finit par présenter
+    // une valeur qui n'avance plus, et c'est ce refus qui la rend utile.
+    expect(await recordCredentialUse(db, operatorId, 'cred-a', 5)).toBe(false)
+    expect(await recordCredentialUse(db, operatorId, 'cred-a', 4)).toBe(false)
+    expect((await listCredentials(db, operatorId))[0]?.counter).toBe(5)
+  })
+
+  it('accepte un compteur resté à zéro', async () => {
+    // Les passkeys synchronisées laissent délibérément le compteur à zéro : leur refuser l'usage
+    // écarterait le facteur que la spécification recommande le plus.
+    await addCredential(db, operatorId, credential('cred-zero'))
+
+    expect(await recordCredentialUse(db, operatorId, 'cred-zero', 0)).toBe(true)
+  })
+
+  it('refuse de consigner un authentificateur inconnu', async () => {
+    expect(await recordCredentialUse(db, operatorId, 'cred-absent', 9)).toBe(false)
+  })
+})
+
+describe('colonne illisible', () => {
+  it('se lit comme une absence, sans lever', async () => {
+    // Une colonne bricolée en exploitation doit aboutir à un refus, jamais à une erreur serveur qui
+    // rendrait la panne indiscernable d'une attaque.
+    await sql`UPDATE operators SET mfa_webauthn_credentials = '"pas un tableau"'::jsonb WHERE id = ${operatorId}`
+
+    expect(await listCredentials(db, operatorId)).toEqual([])
+  })
+
+  it('écarte les entrées incomplètes plutôt que la liste entière', async () => {
+    await sql`UPDATE operators SET mfa_webauthn_credentials =
+      '[{"id":"bon","publicKey":"cGs","counter":0,"name":"n","createdAt":"x"},{"id":"incomplet"}]'::jsonb
+      WHERE id = ${operatorId}`
+
+    expect((await listCredentials(db, operatorId)).map((entry) => entry.id)).toEqual(['bon'])
+  })
+})
