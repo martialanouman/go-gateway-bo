@@ -32,8 +32,24 @@ import { loginAttempts } from '../db/schema/throttle'
 
 export type ThrottleScope = 'operator' | 'ip' | 'mfa'
 
-/** Fenêtre d'oubli : au-delà, les échecs anciens ne comptent plus. */
-const WINDOW_MS = 15 * 60 * 1000
+/**
+ * Fenêtre d'oubli : au-delà, les échecs anciens ne comptent plus. **Par portée.**
+ *
+ * Sans oubli, un opérateur qui se trompe quatre fois en six mois se retrouverait verrouillé au
+ * cinquième essai, des mois plus tard, sans comprendre. Mais une fenêtre trop courte annule le
+ * ralentissement progressif, et le calcul est net : si elle vaut la durée du premier verrou, il
+ * suffit d'attendre la fin du verrou pour retrouver un compteur à zéro. On ne franchit alors jamais
+ * le second palier, et l'on garde cinq essais par quart d'heure — indéfiniment.
+ *
+ * Pour un mot de passe, c'est acceptable : l'espace de recherche est celui d'une phrase de passe. Pour
+ * un **code à six chiffres**, non — voir `MAX_LOCK_MS`. La portée `mfa` garde donc mémoire bien plus
+ * longtemps que ne dure son verrou, ce qui est la seule façon de rendre l'escalade atteignable.
+ */
+const WINDOW_MS: Readonly<Record<ThrottleScope, number>> = {
+  operator: 15 * 60 * 1000,
+  ip: 15 * 60 * 1000,
+  mfa: 4 * 60 * 60 * 1000,
+}
 
 /**
  * Seuils, par portée. L'IP est plus large : plusieurs opérateurs peuvent partager une sortie NAT.
@@ -52,25 +68,34 @@ const BASE_LOCK_MS = 15 * 60 * 1000
 /**
  * Plafond du verrouillage, et il n'est pas le même partout.
  *
- * Le doublement existe pour rendre une force brute *patiente* de plus en plus chère. Il n'a de sens
- * que là où la patience paie.
+ * ## Le calcul, parce qu'un ordre de grandeur écrit de mémoire est faux
  *
- * **Pour `mfa`, elle ne paie pas** : cinq essais par quart d'heure contre un code à six chiffres
- * repoussent la découverte à des siècles, escalade ou non. Elle coûterait en revanche cher en
- * disponibilité, et d'une façon qui n'existe pas ailleurs — ce verrou ne se déclenche qu'avec une
- * session déjà ouverte par un mot de passe valide. Autrement dit, quiconque détient le mot de passe
- * d'un opérateur **sans** son second facteur peut le déclencher à volonté : avec l'escalade, cinq
- * requêtes par palier suffiraient à mettre le titulaire dehors quatre heures d'affilée, puis à
- * recommencer. Le plafond au premier palier borne le dégât à un quart d'heure sans rien céder.
+ * Un code TOTP fait six chiffres, soit un million de valeurs, et la fenêtre de dérive en accepte
+ * **trois** à la fois : une tentative sur trois cent trente-trois mille aboutit. Ce qui décide, c'est
+ * donc le nombre d'essais par jour que le compteur laisse passer.
  *
- * Ce qui reste, et qu'aucun plafond ne réglera : un attaquant qui répète la manœuvre garde
- * l'opérateur dehors. Cela se traite **hors bande** — une notification au titulaire au moment du
- * verrouillage (step-046) — pas en desserrant le compteur.
+ * - Fenêtre d'oubli égale au verrou, sans escalade atteignable : cinq essais par quart d'heure, soit
+ *   480 par jour → découverte en **moins de deux ans** de requêtes automatisées. Beaucoup trop peu
+ *   pour un second facteur.
+ * - Fenêtre de quatre heures et escalade bornée à une heure : cinq essais immédiats, puis un par
+ *   palier — une dizaine par fenêtre, une cinquantaine par jour → **une vingtaine d'années**.
+ *
+ * ## Pourquoi une heure, et pas les quatre des autres portées
+ *
+ * Parce que ce verrou-là se déclenche avec un mot de passe valide **seul** : la vérification du second
+ * facteur n'est atteignable qu'avec une session déjà ouverte. Quiconque détient le mot de passe d'un
+ * opérateur sans son second facteur peut donc le provoquer à volonté. Une heure borne le dégât ;
+ * quatre laisseraient mettre un opérateur nommé dehors pour l'après-midi, et le gain de résistance
+ * n'est que d'un facteur deux.
+ *
+ * Ce qui reste, et qu'aucun réglage ne règlera : un attaquant qui répète la manœuvre garde l'opérateur
+ * dehors. Cela se traite **hors bande** — une notification au titulaire au moment du verrouillage
+ * (step-046) — pas en desserrant le compteur.
  */
 const MAX_LOCK_MS: Readonly<Record<ThrottleScope, number>> = {
   operator: 4 * 60 * 60 * 1000,
   ip: 4 * 60 * 60 * 1000,
-  mfa: BASE_LOCK_MS,
+  mfa: 60 * 60 * 1000,
 }
 
 export type LockState = {
@@ -150,6 +175,15 @@ export async function registerFailure(
 ): Promise<LockState> {
   const threshold = THRESHOLDS[scope]
 
+  /**
+   * `interval '<n> milliseconds'`, la seule interpolation brute admise ici.
+   *
+   * La valeur vient de `WINDOW_MS`, une constante de ce module indexée par une portée qui est un type
+   * fermé — jamais une valeur venue d'une requête. Le jour où elle viendrait d'ailleurs, cette ligne
+   * devrait disparaître avec elle.
+   */
+  const window = sql.raw(`interval '${WINDOW_MS[scope]} milliseconds'`)
+
   const [row] = await db
     .insert(loginAttempts)
     .values({ scope, subject, failures: 1 })
@@ -159,9 +193,9 @@ export async function registerFailure(
         // La fenêtre glissante vit **dans le SQL** : hors fenêtre, le compteur repart à un plutôt
         // que de s'incrémenter. Le calculer côté application aurait exigé de relire d'abord, ce qui
         // rouvre la course que cette requête unique ferme.
-        failures: sql`CASE WHEN ${loginAttempts.windowStartedAt} < now() - ${sql.raw(`interval '${WINDOW_MS} milliseconds'`)}
+        failures: sql`CASE WHEN ${loginAttempts.windowStartedAt} < now() - ${window}
                            THEN 1 ELSE ${loginAttempts.failures} + 1 END`,
-        windowStartedAt: sql`CASE WHEN ${loginAttempts.windowStartedAt} < now() - ${sql.raw(`interval '${WINDOW_MS} milliseconds'`)}
+        windowStartedAt: sql`CASE WHEN ${loginAttempts.windowStartedAt} < now() - ${window}
                                   THEN now() ELSE ${loginAttempts.windowStartedAt} END`,
         updatedAt: sql`now()`,
       },

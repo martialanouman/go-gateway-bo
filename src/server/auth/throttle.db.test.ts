@@ -120,35 +120,48 @@ describe('compteur d échecs', () => {
     expect(await echeance()).toBeGreaterThan(premier)
   })
 
-  it("n'allonge jamais le verrou du second facteur", async () => {
-    // **Un choix de disponibilité, pas un oubli.** Le doublement protège contre une force brute
-    // patiente ; sur un code à six chiffres, cinq essais par quart d'heure la repoussent déjà à des
-    // siècles, et l'escalade n'achète donc rien. Elle coûte, en revanche : ce verrou se déclenche
-    // avec un mot de passe valide seul, si bien qu'un attaquant qui détient le mot de passe sans le
-    // second facteur mettrait le titulaire dehors pour quatre heures d'affilée.
-    const deadline = async (subject: string) => {
-      const [row] = await sql<{ epoch: string }[]>`
-        SELECT extract(epoch FROM locked_until)::text AS epoch
-        FROM login_attempts WHERE subject = ${subject}
-      `
-      return Number(row?.epoch)
-    }
-
+  it("n'oublie pas les échecs du second facteur pendant la durée de son propre verrou", async () => {
+    // **Le test qui rend l'escalade atteignable.** Avec une fenêtre d'oubli égale à la durée du verrou
+    // — ce qu'elle valait pour toutes les portées — un attaquant qui attend simplement la fin du
+    // verrou retrouve un compteur remis à zéro : il ne franchit jamais le premier palier, et gagne
+    // cinq essais par quart d'heure indéfiniment. Sur un code à six chiffres, cela suffit.
     await failUpTo('mfa', 'sujet-g', THRESHOLDS.mfa)
-    const first = await deadline('sujet-g')
+    await sql`UPDATE login_attempts SET window_started_at = now() - interval '30 minutes',
+                                        locked_until = now() - interval '1 minute'
+              WHERE subject = 'sujet-g'`
 
-    for (let extra = 0; extra < 4; extra += 1) {
-      await registerFailure(db, 'mfa', 'sujet-g')
+    await registerFailure(db, 'mfa', 'sujet-g')
+
+    const [row] = await sql<{ failures: number }[]>`
+      SELECT failures FROM login_attempts WHERE subject = 'sujet-g'
+    `
+    expect(row?.failures).toBe(THRESHOLDS.mfa + 1)
+  })
+
+  it('allonge le verrou du second facteur, sans dépasser une heure', async () => {
+    // La borne haute est un choix de **disponibilité** : ce verrou se déclenche avec un mot de passe
+    // valide seul, si bien que quiconque détient le mot de passe sans le second facteur peut le
+    // provoquer. Une heure borne le dégât ; le plafond de quatre heures des autres portées aurait
+    // laissé mettre un opérateur nommé dehors pour l'après-midi.
+    const remaining = async () => {
+      const [row] = await sql<{ remaining: string }[]>`
+        SELECT extract(epoch FROM locked_until - now())::text AS remaining
+        FROM login_attempts WHERE subject = 'sujet-h'
+      `
+      return Number(row?.remaining)
     }
 
-    // Repoussée à chaque échec — le verrou repart de maintenant — mais jamais **allongée** : l'écart
-    // à l'instant courant reste celui du premier palier, à la seconde près.
-    const [row] = await sql<{ remaining: string }[]>`
-      SELECT extract(epoch FROM locked_until - now())::text AS remaining
-      FROM login_attempts WHERE subject = 'sujet-g'
-    `
-    expect(Number(row?.remaining)).toBeLessThanOrEqual(15 * 60)
-    expect(await deadline('sujet-g')).toBeGreaterThanOrEqual(first)
+    await failUpTo('mfa', 'sujet-h', THRESHOLDS.mfa)
+    const first = await remaining()
+
+    for (let extra = 0; extra < 8; extra += 1) {
+      await registerFailure(db, 'mfa', 'sujet-h')
+    }
+
+    expect(await remaining()).toBeGreaterThan(first)
+    // Une seconde de marge : l'échéance est calculée par l'horloge de Node et mesurée par celle de
+    // PostgreSQL. Comparer au millième testerait l'écart entre les deux, pas le plafond.
+    expect(await remaining()).toBeLessThanOrEqual(60 * 60 + 1)
   })
 
   it('ne laisse pas une rafale parallèle passer sous le seuil', async () => {
