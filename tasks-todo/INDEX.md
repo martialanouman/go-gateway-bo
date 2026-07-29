@@ -95,7 +95,7 @@ sur tout écran touché • PR petite et focalisée (une step).
 
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [x] step-020 — Schéma auth (operators, roles, permissions, jointures) + seeds
-- [ ] step-021 — Login email/mot de passe + anti-brute-force
+- [x] step-021 — Login email/mot de passe + anti-brute-force
 - [ ] step-022 — Session BFF (cookie signé) + `/auth/me` + gardes de route
 - [ ] step-023 — MFA TOTP : enrôlement et vérification
 - [ ] step-024 — MFA WebAuthn / passkey
