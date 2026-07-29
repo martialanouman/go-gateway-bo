@@ -14,14 +14,33 @@ gh auth refresh --hostname github.com -s read:packages
 pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"
 
 pnpm install
-cp .env.example .env      # GATEWAY_MODE=mock suffit pour développer
+cp .env.example .env      # puis remplir les trois secrets — voir plus bas
 docker compose up -d      # PostgreSQL 18 + Redis
 pnpm db:migrate           # applique les migrations
+pnpm auth:bootstrap       # sème les permissions et crée le premier compte
 pnpm mock                 # Prism sert le contrat sur :4010 — dans un autre terminal
 pnpm dev                  # http://localhost:3000
 ```
 
 Node ≥ 24 (`.nvmrc` fait foi — la CI y lit sa version), pnpm 11.
+
+### Trois secrets sans valeur par défaut
+
+`AUTH_SESSION_SECRET`, `AUTH_THROTTLE_SECRET` et `AUTH_MFA_SECRET` sont à remplir dans `.env` :
+trente-deux caractères au minimum, `openssl rand -base64 48` fait le travail. Aucune n'a de repli, et
+c'est délibéré — une clé codée en dur serait publique, donc n'importe qui signerait une session.
+
+Le serveur **démarre** sans elles, puis lève dès qu'une requête touche l'authentification, en nommant
+la variable manquante. `AUTH_MFA_SECRET` mérite une attention à part : elle chiffre les secrets TOTP
+au repos, et la perdre rend illisibles tous les seconds facteurs, codes de récupération compris.
+
+### Le premier compte s'obtient par `pnpm auth:bootstrap`
+
+C'est la **seule** façon d'entrer dans une installation neuve — les comptes suivants se créent depuis
+l'écran de gestion des opérateurs, sous une permission et avec un audit. La commande lit
+`BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` et `BOOTSTRAP_ADMIN_NAME` dans l'environnement
+— et non en arguments, qu'un `ps aux` afficherait — puis refuse de s'exécuter à nouveau dès qu'un
+opérateur existe.
 
 Un `pnpm install` qui échoue en **401 ou 403 sur `npm.pkg.github.com`** a toujours l'une de ces deux
 causes : le jeton local n'a pas le scope `read:packages`, ou le package n'accorde pas la lecture à ce
@@ -37,14 +56,18 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm lint` / `pnpm format` | Biome (lint + format en un seul outil) |
 | `pnpm test` | Vitest — la boucle rapide, sans dépendance externe |
+| `pnpm test:watch` | la même, en continu |
 | `pnpm test:db` | Vitest sur un PostgreSQL 18 éphémère (Testcontainers) — **Docker requis** |
 | `pnpm db:migrate` | applique les migrations |
 | `pnpm db:generate` | génère une migration depuis le schéma Drizzle |
 | `pnpm db:studio` | explorateur de schéma Drizzle |
+| `pnpm db:seed` | (re)sème le catalogue de permissions et les rôles par défaut |
+| `pnpm auth:bootstrap` | crée le **premier** compte administrateur — voir « Démarrer » |
 | `pnpm mock` | Prism sert le contrat sur `:4010` |
 | `pnpm vuln` | `pnpm audit` — échoue sur tout avis non trié |
 | `pnpm coverage` | les deux projets Vitest en une passe, avec les seuils de couverture |
 | `pnpm e2e` | Playwright contre le build de production — **Docker non requis, navigateur oui** |
+| `pnpm e2e:ui` | la même, dans l'interface de Playwright |
 | `pnpm check` | typecheck + lint + coverage + vuln + build |
 
 `pnpm check` vert signifie une CI verte, à une garde près : la CI vérifie en plus que
@@ -54,10 +77,13 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 
 ```
 src/routes/      les écrans (routage par fichiers)
-src/server/      le BFF : session, permissions, audit, proxy Admin, hub WebSocket
+src/server/      le BFF : session, MFA, permissions, audit, proxy Admin, hub WebSocket
 src/components/  primitives et composants partagés
+src/lib/         utilitaires partagés client et serveur — sans aucun secret
 src/styles/      tokens de la charte graphique
+src/test/        le harnais : oracles d'invariants, fabriques, setup Vitest
 docs/            spécification technique et plan d'exécution
+drizzle/         migrations SQL, générées puis relues et commitées
 tasks-todo/      steps à faire · tasks-done/ steps livrées
 ```
 
@@ -68,11 +94,15 @@ fichier client l'atteigne, même par un intermédiaire.
 
 ## Base de données
 
-Le BFF possède **neuf tables et rien d'autre** : opérateurs, catalogue de permissions, rôles et leurs
-liaisons, journal d'audit, règles d'alerte, notifications, vues sauvegardées. Clients, comptes SMPP,
+Le BFF possède **douze tables et rien d'autre** : opérateurs, catalogue de permissions, rôles et leurs
+deux liaisons, sessions d'opérateur, codes de récupération MFA, compteur d'échecs d'authentification,
+journal d'audit, règles d'alerte, notifications, vues sauvegardées. Clients, comptes SMPP,
 connecteurs, CDR et soldes appartiennent à la passerelle et se lisent à travers l'API Admin **à chaque
 affichage** — les recopier ici créerait une seconde vérité qui divergerait en silence, et un cockpit
 qui montre un état périmé est pire qu'un cockpit en panne : il inspire confiance.
+
+Ce compte n'est pas tenu par cette phrase mais par un test : `migrations.db.test.ts` échoue si une
+table apparaît ou disparaît sans que quiconque l'ait décidé.
 
 Les identifiants sont des **UUIDv7 générés par PostgreSQL 18**, qui expose `uuidv7()` en fonction
 native — un seul mécanisme, côté base, sans extension.
@@ -106,9 +136,18 @@ Une pyramide, et l'ordre des étages est délibéré :
 
 `pnpm coverage` exécute les projets `unit` et `db` **en une passe**. C'est la seule mesure qui
 reflète la réalité : le code qui touche la base est exercé par le second, et le mesurer sur le
-premier seul le déclarerait mort. Les seuils sont dans `vitest.config.ts` — 85 % de lignes sur le
-dépôt, et **par fichier** sous `src/server/`, là où vivent les gardes et l'audit. Un seuil agrégé y
-serait décoratif : un nouveau module de permissions à 40 % passerait derrière un client à 95 %.
+premier seul le déclarerait mort.
+
+Les seuils sont dans `vitest.config.ts` : 88 % de lignes et d'instructions, 85 % de fonctions, 78 % de
+branches — et **`perFile`**, donc ce sont les planchers de *chaque* fichier mesuré, pas une moyenne du
+dépôt. Un seuil agrégé serait décoratif : un nouveau module de permissions à 40 % passerait derrière un
+client Admin à 96 %, alors que ses lignes non couvertes seraient précisément les chemins de refus.
+
+Le `perFile` s'applique **partout**, et non seulement sous `src/server/`. Un plancher différencié y
+serait plus juste, mais un seuil par glob est agrégé par défaut et le `perFile` que la documentation
+de Vitest annonce à l'intérieur d'un glob est refusé par le typage de la version installée — le détail
+est dans le commentaire de `vitest.config.ts`. Un fichier qui ne peut honnêtement pas tenir ces
+planchers se justifie par un `v8 ignore` commenté, jamais en abaissant le seuil pour tout le monde.
 
 ### L'invariant (a), outillé
 
@@ -193,8 +232,10 @@ sous `@esbuild-kit/core-utils`), corrigés par trois entrées ciblées de `overr
 Une **step = une PR**. Prendre le prochain fichier de `tasks-todo/` (l'ordre de `INDEX.md` fait foi),
 l'implémenter avec ses tests, puis déplacer le fichier dans `tasks-done/` en dernier commit.
 
-Les portes de qualité tournent en jobs parallèles (`typecheck`, `lint`, `test`, `vuln`, `build`).
-La protection de branche doit exiger le seul check **`CI`** : il agrège les cinq et reste valable
-quand une porte s'ajoute — lister les jobs nommément se périmerait au premier ajout.
+Les portes de qualité tournent en **jobs parallèles** : `Typecheck`, `Lint & format`, `Test`,
+`Test (base de données)`, `Bout en bout`, `Vulnérabilités` et `Build`. Une porte qui échoue n'empêche
+plus les autres de rendre leur verdict — on voit une erreur de type *et* un test rouge au même run.
+La protection de branche doit exiger le seul check **`CI`** : il les agrège et reste valable quand une
+porte s'ajoute — lister les jobs nommément se périmerait au premier ajout.
 Les conventions, invariants et la Definition of Done sont dans [`CLAUDE.md`](./CLAUDE.md) ; le cadre
 et l'ordre dans [`docs/plan-execution-tableau-de-bord.md`](./docs/plan-execution-tableau-de-bord.md).
