@@ -9,6 +9,11 @@ description: Installe pnpm, Node à la version de .nvmrc, et les dépendances du
 # runner ≥ 2.327.1. Sans objet sur les runners hébergés par GitHub, qui sont à jour — à vérifier le
 # jour où ce dépôt passerait à des runners auto-hébergés, car l'échec serait alors au démarrage de
 # l'action et non dans son travail.
+#
+# Elles sont **épinglées sur un condensat de commit**, la version restant en commentaire de fin de
+# ligne. Un tag est mutable : quiconque obtient le droit de le déplacer exécute son code ici, avec nos
+# jetons. Ne jamais revenir à `@v7` par confort de relecture — c'est Dependabot qui fait avancer ces
+# condensats (`.github/dependabot.yml`), et le commentaire qui les rend lisibles.
 runs:
   using: composite
   steps:
@@ -17,9 +22,9 @@ runs:
     # **v6 au minimum** : c'est la première version qui connaît pnpm 11, celle que déclare
     # `packageManager` dans `package.json`. Aucun `with:` ici, précisément pour que ce champ reste la
     # source unique de la version — l'écrire aussi ici, c'est se préparer à ce que les deux divergent.
-    - uses: pnpm/action-setup@v6
+    - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
-    - uses: actions/setup-node@v7
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         # .nvmrc est la source unique de la version de Node ; ne jamais la répéter ici.
         node-version-file: .nvmrc

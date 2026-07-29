@@ -158,10 +158,16 @@ Le package est publié sur GitHub Packages, qui exige une authentification même
 Chaque dépendance est une dette : préférer la bibliothèque déjà présente. Avant tout ajout, vérifier
 la version et l'API à jour via `ctx7`, puis lancer `pnpm vuln`.
 
-Deux protections sont actives et **ne doivent pas être désarmées par confort** :
+Trois protections sont actives et **ne doivent pas être désarmées par confort** :
 
 - **Scripts d'installation refusés par défaut.** Un paquet qui en a besoin s'autorise nommément dans
   `allowBuilds` (`pnpm-workspace.yaml`), avec sa justification.
+- **Actions GitHub épinglées sur un condensat de commit**, la version en commentaire de fin de ligne.
+  Un tag est mutable : quiconque obtient le droit de le déplacer sur un dépôt d'action exécute son
+  code dans notre CI, avec nos jetons. Ne pas revenir à `@v7` par confort de relecture — c'est
+  Dependabot qui fait avancer ces condensats, en un lot hebdomadaire relisible
+  (`.github/dependabot.yml`), et le commentaire qui les garde lisibles. Dependabot ne couvre
+  **délibérément pas** `npm` : il ouvrirait des PR que la quarantaine ci-dessous existe pour empêcher.
 - **Quarantaine des versions fraîchement publiées.** `minimumReleaseAge: 1440` : une version publiée
   il y a moins de 24 h ne s'installe pas, et `minimumReleaseAgeStrict` fait échouer la résolution
   plutôt que de la contourner en silence. Ce n'est pas un défaut de pnpm — retirer ces deux lignes

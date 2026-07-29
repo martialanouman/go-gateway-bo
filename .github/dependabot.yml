@@ -1,0 +1,37 @@
+# Mises à jour automatiques, et **seulement là où elles ne contredisent pas une politique existante**.
+#
+# ## Pourquoi ce fichier existe en même temps que l'épinglage sur SHA
+#
+# Les actions sont épinglées sur un condensat de commit : un tag est mutable, et quiconque obtient le
+# droit de le déplacer sur un dépôt d'action exécute son code dans notre CI, avec nos jetons. Le
+# condensat, lui, ne se réécrit pas.
+#
+# Mais un épinglage sans mécanisme de mise à jour est **pire** que rien : il fige aussi les correctifs
+# de sécurité, et personne ne relit un `uses:` de son plein gré. Les deux vont donc ensemble — c'est
+# Dependabot qui rouvre ce que le condensat a fermé, sous forme de PR relisible.
+#
+# ## Pourquoi `npm` n'est pas ici
+#
+# Le dépôt applique déjà une politique **manuelle et délibérée** sur ses dépendances npm : quarantaine
+# de 24 h sur les versions fraîchement publiées (`minimumReleaseAge`, avec `minimumReleaseAgeStrict`),
+# scripts d'installation refusés sauf autorisation nommée dans `allowBuilds`, et chaque avis
+# `pnpm audit` trié à la main avec son raisonnement écrit. Voir la section « Dépendances » du README.
+#
+# Un Dependabot npm ouvrirait des PR que cette politique existe pour empêcher — une version publiée il
+# y a deux heures, un paquet dont le script d'installation n'a pas été examiné. Le jour où l'on voudra
+# automatiser ce versant, ce sera une décision à prendre avec la quarantaine, pas contre elle.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Un seul lot par semaine plutôt qu'une PR par action : cinq PR de bump hebdomadaires ne se
+    # relisent pas, elles se fusionnent sans regarder — c'est-à-dire qu'elles annulent l'intérêt de
+    # l'épinglage.
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: chore(ci)
