@@ -15,6 +15,13 @@
       "when": 1785269995610,
       "tag": "0001_audit_log_partitions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785307128135,
+      "tag": "0002_login_attempts",
+      "breakpoints": true
     }
   ]
 }

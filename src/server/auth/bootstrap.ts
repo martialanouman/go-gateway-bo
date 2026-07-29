@@ -22,6 +22,7 @@ import { count as countRows, eq, sql } from 'drizzle-orm'
 import type { Database } from '../db/index'
 import { operatorRoles, operators, roles } from '../db/schema/auth'
 import { hashPassword, type ScryptParameters } from './password'
+import { checkPasswordPolicy, explainRejection } from './password-policy'
 import { seedAuth } from './seed'
 
 export type BootstrapIdentity = {
@@ -61,13 +62,6 @@ export function readBootstrapIdentity(env: NodeJS.ProcessEnv): BootstrapIdentity
   }
 }
 
-/**
- * Un compte qui détient l'intégralité du catalogue mérite mieux que le minimum. Douze caractères,
- * sans règle de composition : la longueur est ce qui protège réellement, et les règles de
- * composition poussent aux substitutions prévisibles.
- */
-const MIN_PASSWORD_LENGTH = 12
-
 /** Verrou consultatif propre à l'amorçage, distinct de celui du seed. */
 const BOOTSTRAP_LOCK = 'bootstrap_super_admin'
 
@@ -81,10 +75,12 @@ export async function bootstrapSuperAdmin(
   if (!/^[^\s@]+@[^\s@]+$/.test(identity.email)) {
     throw new Error("L'adresse email du premier administrateur est invalide.")
   }
-  if (identity.password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(
-      `Le mot de passe du premier administrateur doit faire au moins ${MIN_PASSWORD_LENGTH} caractères.`,
-    )
+  // La même politique que partout ailleurs (step-021), et non une règle propre à l'amorçage : deux
+  // politiques finiraient par diverger, et c'est celle du compte le plus puissant qui serait la plus
+  // faible.
+  const rejection = checkPasswordPolicy(identity.password, [identity.email, identity.displayName])
+  if (rejection) {
+    throw new Error(`Mot de passe du premier administrateur refusé. ${explainRejection(rejection)}`)
   }
 
   const passwordHash = await hashPassword(identity.password, parameters)

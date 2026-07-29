@@ -1,8 +1,9 @@
 /**
  * Le schéma que le BFF possède — et **rien d'autre**.
  *
- * Neuf tables : opérateurs, catalogue de permissions, rôles et leurs deux tables de liaison,
- * journal d'audit, règles d'alerte, notifications, vues sauvegardées.
+ * Dix tables : opérateurs, catalogue de permissions, rôles et leurs deux tables de liaison,
+ * journal d'audit, règles d'alerte, notifications, vues sauvegardées, et le compteur d'échecs
+ * d'authentification (step-021).
  *
  * Ce qui n'est **pas** ici, et ne doit jamais y arriver : clients, groupes de clients, comptes
  * SMPP, identifiants de bind, connecteurs, sessions, CDR, traces, soldes, plans tarifaires. Toutes
@@ -17,4 +18,5 @@
 export * from './alerting'
 export * from './audit'
 export * from './auth'
+export * from './throttle'
 export * from './views'
