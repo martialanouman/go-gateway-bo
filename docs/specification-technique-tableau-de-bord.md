@@ -86,8 +86,9 @@ operators
   last_login_at
 
 permissions                          -- fixed catalog, seeded/versioned with releases, not admin-editable
-  key                    (pk, e.g. routes:read, routes:write, routes:import, scripts:read, scripts:write,
-                           scripts:publish, sessions:read, sessions:disconnect, antispam:read, antispam:write,
+  key                    (pk, 44 clés — routes:read, routes:write, routes:import, scripts:read, scripts:write,
+                           scripts:publish, connectors:read, connectors:write, connectors:rebind,
+                           sessions:read, sessions:disconnect, antispam:read, antispam:write,
                            customers:read, customers:write, accounts:read, accounts:write,
                            credentials:read, credentials:write, credentials:rotate,
                            senderrewrite:read, senderrewrite:write,
@@ -95,7 +96,8 @@ permissions                          -- fixed catalog, seeded/versioned with rel
                            inbound:read, inbound:write, groups:read, groups:write,
                            billing:read, billing:write, billing:topup, billing:provider:write, billing:scope_change,
                            content:read, content:erase, gdpr:erase,
-                           cdr:export_bulk, alerts:read, alerts:write, audit:read, operators:manage, roles:manage)
+                           cdr:export_bulk, cdr:read_pii, alerts:read, alerts:write, audit:read,
+                           operators:manage, roles:manage)
   category               (routing|connectors|sessions|antispam|accounts|billing|content|compliance|alerts|audit|admin)
   description
 
@@ -388,7 +390,8 @@ Le client envoie `{"action":"subscribe","topics":[...]}` au montage et `unsubscr
 - Table de résultats virtualisée, pagination côté serveur.
 - Panneau de détail : chronologie complète (soumis → routé → SMSC → DLR → remis), route/script/connecteur/décision de facturation, rendu en cascade de spans.
 - **Corps du message (dégradation propre)** : affiché uniquement si (a) la politique du client le stocke et (b) l'opérateur a `content:read` ; sinon un état explicite (« non stocké », « expiré », « effacé », « non autorisé »). Afficher le corps déclenche un appel `content:read` **audité** — mention « lecture journalisée » à côté du bouton.
-- Export CSV de masse : job asynchrone gouverné (permission `cdr:export_bulk` hors lecture seule, plafond de lignes, masquage MSISDN par rôle, audit, TTL d'artefact).
+- Export CSV de masse : job asynchrone gouverné (permission `cdr:export_bulk` hors lecture seule, plafond de lignes, masquage MSISDN, audit, TTL d'artefact).
+- **Masquage MSISDN, uniformément** : les numéros sont masqués (`+3361••••89`) dans la recherche, dans le visualiseur de trace **et** dans l'export, sauf pour un opérateur détenant `cdr:read_pii`. C'est une clé du catalogue et non un contrôle de rôle : le §4.2 interdit qu'un rôle soit codé en dur, et masquer au seul export ne protégerait rien puisque les mêmes numéros se lisent à l'écran. *(Amendement step-020.)*
 
 ### 6.5 Moniteur de session
 
@@ -434,14 +437,21 @@ Autorisation **basée sur les permissions** : chaque action protégée correspon
 | Rôle | Cas d'usage | Portée |
 |---|---|---|
 | `super_admin` | Propriétaire | Toutes les permissions, y compris `operators:manage`/`roles:manage` |
-| `ops` | Exploitation réseau | Lecture/écriture routage (dont numéros exacts, `routes:import`), connecteurs, sessions, anti-spam, scripts, réécriture, numéros entrants ; `suppressions:read/write` **sans `:delete`** ; lecture seule facturation/audit |
+| `ops` | Exploitation réseau | Lecture/écriture routage (dont numéros exacts, `routes:import`), connecteurs (**dont `connectors:rebind`**), sessions, anti-spam, scripts (**dont `scripts:publish`**), réécriture, numéros entrants ; `suppressions:read/write` **sans `:delete`** ; `alerts:read/write` ; `cdr:read_pii` et `cdr:export_bulk` ; lecture seule facturation/audit |
 | `script_author` | Ingénieurs scripts | `scripts:read/write` (pas `publish` — revue par `ops`/`super_admin`) |
-| `support_readonly` | Support L1 | Lecture seule (comptes, routage, sessions, CDR/trace, facturation) — **hors** secrets d'identifiants, code source de script, et **corps des messages** (`content:read` jamais implicite) |
-| `billing_admin` | Finance | Facturation complète (`billing:read/write/topup/provider:write/scope_change`), lecture seule ailleurs |
+| `support_readonly` | Support L1 | Lecture seule (comptes, routage, connecteurs, sessions, CDR/trace, facturation, alertes) + `cdr:read_pii` — **hors** secrets d'identifiants, code source de script, réécriture, et **corps des messages** (`content:read` jamais implicite) |
+| `billing_admin` | Finance | Facturation complète (`billing:read/write/topup/provider:write/scope_change`), lecture seule ailleurs (mêmes exclusions que `support_readonly`, et sans `cdr:read_pii`) |
 | `billing_readonly` | Reporting finance | `billing:read` uniquement |
-| `account_manager` | Onboarding client | `customers:read/write`, `accounts:read/write`, `credentials:read/write/rotate`, `groups:read/write` ; pas de routage/connecteur/fournisseur de facturation, pas de `billing:topup` |
-| `compliance` | Conformité / juridique | `suppressions:read/write/delete`, `inbound:read`, `gdpr:erase`, lecture seule comptes/CDR. Seul rôle par défaut habilité à **lever** un désabonnement et à **exécuter un effacement RGPD**. Pas de `content:read` par défaut |
-| `auditor` | Revue conformité/sécurité | `audit:read` uniquement |
+| `account_manager` | Onboarding client | `customers:read/write`, `accounts:read/write`, `credentials:read/write/rotate`, `groups:read/write`, `billing:read/write/scope_change` ; pas de routage/connecteur/fournisseur de facturation, pas de `billing:topup` |
+| `compliance` | Conformité / juridique | `suppressions:read/write/delete`, `inbound:read`, `gdpr:erase`, **`content:erase`**, lecture seule comptes/CDR, `cdr:read_pii`, `cdr:export_bulk`. Seul rôle par défaut habilité à **lever** un désabonnement et à **exécuter un effacement RGPD**. Pas de `content:read` par défaut |
+| `auditor` | Revue conformité/sécurité | `audit:read` uniquement — **pas** `cdr:read_pii` : une ligne d'audit se corrèle avec un numéro masqué, et davantage relève d'une élévation explicite |
+
+**Trois clés ne sont détenues par aucun rôle par défaut hors `super_admin`, délibérément** : `content:read` (jamais
+implicite — accordée par un rôle taillé pour un opérateur nommé), `operators:manage` et
+`roles:manage` (qui peut éditer les rôles peut s'accorder tout le reste). Toute autre clé orpheline
+est un oubli, et un test bloquant le signale. *(Amendement step-020 : `connectors:read/write/rebind`
+et `cdr:read_pii` ajoutés au catalogue ; `alerts:*`, `content:erase` et `cdr:export_bulk` rattachés à
+des rôles — ils n'appartenaient à personne.)*
 
 ### 6.11 UI de solde de crédit SMS
 

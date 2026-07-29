@@ -94,7 +94,7 @@ sur tout écran touché • PR petite et focalisée (une step).
 - [x] step-004 — Harnais de test : Vitest, Testing Library, Playwright
 
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
-- [ ] step-020 — Schéma auth (operators, roles, permissions, jointures) + seeds
+- [x] step-020 — Schéma auth (operators, roles, permissions, jointures) + seeds
 - [ ] step-021 — Login email/mot de passe + anti-brute-force
 - [ ] step-022 — Session BFF (cookie signé) + `/auth/me` + gardes de route
 - [ ] step-023 — MFA TOTP : enrôlement et vérification
