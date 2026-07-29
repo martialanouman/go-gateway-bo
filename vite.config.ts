@@ -42,6 +42,10 @@ export default defineConfig({
           handler: './src/server/auth/http/login.ts',
           method: 'post',
         },
+        { route: '/api/auth/me', handler: './src/server/auth/http/me.ts', method: 'get' },
+        // `post` et non `get` : une déconnexion est une mutation, et un `get` se déclenche depuis
+        // une image ou un lien préchargé — un tiers déconnecterait un opérateur à son insu.
+        { route: '/api/auth/logout', handler: './src/server/auth/http/logout.ts', method: 'post' },
       ],
     }),
     // Le plugin React doit venir APRÈS celui de Start.

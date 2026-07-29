@@ -82,7 +82,7 @@ export default defineConfig({
         // discrétion de la réponse et l'adresse de l'appelant vivent à côté et y sont testées.
         // **Même corollaire** : aucune règle d'authentification dans ces fichiers, sinon elle sort de
         // la mesure sans que personne ne le voie.
-        'src/server/auth/http/login.ts',
+        'src/server/auth/http/**',
       ],
       thresholds: {
         /**

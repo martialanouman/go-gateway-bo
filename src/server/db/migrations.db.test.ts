@@ -52,7 +52,7 @@ async function partitionNames(): Promise<string[]> {
 }
 
 describe('migrations', () => {
-  it('crée les dix tables que le BFF possède, et rien de plus', async () => {
+  it('crée les onze tables que le BFF possède, et rien de plus', async () => {
     const rows = await sql<{ tablename: string }[]>`
       SELECT tablename FROM pg_tables
       WHERE schemaname = 'public' AND tablename NOT LIKE 'audit_log_%'
@@ -65,6 +65,7 @@ describe('migrations', () => {
       'login_attempts',
       'notifications',
       'operator_roles',
+      'operator_sessions',
       'operators',
       'permissions',
       'role_permissions',
@@ -77,12 +78,18 @@ describe('migrations', () => {
     // Le BFF lit clients, comptes, connecteurs, CDR et soldes à travers l'API Admin, à chaque
     // affichage. Une table qui les recopierait créerait une seconde vérité, et un cockpit qui
     // montre un état périmé est pire qu'un cockpit en panne : il inspire confiance (§3.2).
+    //
+    // `operator_sessions` est exclue **nommément**, et surtout pas en relâchant le motif : elle
+    // porte les sessions d'opérateur du tableau de bord, pas les binds SMPP du §6.5. C'est
+    // exactement l'homonymie que le préfixe `operator_` existe pour lever, et cette garde doit
+    // continuer d'attraper une table `sessions` ou `smpp_sessions` qui apparaîtrait un jour.
     const rows = await sql<{ tablename: string }[]>`
       SELECT tablename FROM pg_tables
       WHERE schemaname = 'public'
         AND (tablename LIKE '%customer%' OR tablename LIKE '%smpp%' OR tablename LIKE '%connector%'
              OR tablename LIKE '%message%' OR tablename LIKE '%cdr%' OR tablename LIKE '%balance%'
              OR tablename LIKE '%credential%' OR tablename LIKE '%session%')
+        AND tablename <> 'operator_sessions'
     `
 
     expect(rows).toEqual([])
@@ -94,7 +101,7 @@ describe('migrations', () => {
     const [row] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM drizzle.__drizzle_migrations
     `
-    expect(row?.count).toBe('3')
+    expect(row?.count).toBe('4')
   })
 
   it('rejoue la migration manuscrite sans erreur ni dérive du catalogue', async () => {

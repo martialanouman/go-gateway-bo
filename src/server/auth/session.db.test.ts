@@ -5,6 +5,9 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import type postgres from 'postgres'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { connect, type Database } from '../db/index'
+import { SESSION_COOKIE_NAME, signSessionId } from './cookie'
+import { resolveSession } from './guard'
+import { currentOperator } from './me'
 import { hashPassword } from './password'
 import {
   completeMfa,
@@ -217,5 +220,61 @@ describe('purge', () => {
     await openPendingSession(db, operatorId)
 
     expect(await purgeDeadSessions(db)).toBe(0)
+  })
+})
+
+describe('résolution depuis un en-tête Cookie', () => {
+  const SECRETS = { current: 'une-cle-de-session-de-test-assez-longue' }
+  const entete = (value: string) => `theme=sombre; ${SESSION_COOKIE_NAME}=${value}`
+
+  it('résout un cookie signé jusqu à la session', async () => {
+    const { sessionId } = await openPendingSession(db, operatorId)
+    await completeMfa(db, sessionId)
+
+    const state = await resolveSession(db, entete(signSessionId(sessionId, SECRETS)), SECRETS)
+
+    expect(state).toEqual({ status: 'active', sessionId, operatorId })
+  })
+
+  it('refuse un identifiant valide dont la signature vient d une autre clé', async () => {
+    // Sans la signature, connaître un identifiant suffirait à prendre la session.
+    const { sessionId } = await openPendingSession(db, operatorId)
+    const autre = { current: 'une-tout-autre-cle-de-session-assez-longue' }
+
+    expect(await resolveSession(db, entete(signSessionId(sessionId, autre)), SECRETS)).toEqual({
+      status: 'none',
+    })
+  })
+
+  it('refuse un identifiant correctement signé mais révoqué', async () => {
+    // **La signature dit « nous avons émis ceci », la base dit « ceci vaut encore ».** Les deux sont
+    // nécessaires : sans la seconde, une déconnexion ne déconnecterait rien.
+    const { sessionId } = await openPendingSession(db, operatorId)
+    const cookie = entete(signSessionId(sessionId, SECRETS))
+    await revokeSession(db, sessionId)
+
+    expect(await resolveSession(db, cookie, SECRETS)).toEqual({ status: 'none' })
+  })
+
+  it('refuse une absence de cookie sans toucher la base', async () => {
+    for (const header of [undefined, null, '', 'theme=sombre']) {
+      expect(await resolveSession(db, header, SECRETS), JSON.stringify(header)).toEqual({
+        status: 'none',
+      })
+    }
+  })
+})
+
+describe('opérateur disparu après la lecture de session', () => {
+  it('ne rend aucun opérateur courant', async () => {
+    // Cas de course réel : la session est lue, puis le compte est supprimé avant la composition de
+    // `/auth/me`. Rendre un opérateur vide serait pire qu'un refus.
+    const { sessionId } = await openPendingSession(db, operatorId)
+    await completeMfa(db, sessionId)
+    const state = await readSession(db, sessionId)
+
+    await sql`DELETE FROM operators WHERE id = ${operatorId}::uuid`
+
+    expect(await currentOperator(db, state)).toBeUndefined()
   })
 })
