@@ -196,6 +196,23 @@ describe("confirmation de l'enrôlement", () => {
     expect(again.outcome).toBe('no_pending_enrollment')
   })
 
+  it("n'active le facteur qu'une fois quand deux instances confirment ensemble", async () => {
+    // Deux onglets, ou deux instances, qui confirment le même enrôlement. Sans le `WHERE` conditionnel
+    // de l'activation, la seconde régénérerait un lot de codes de récupération — donc invaliderait
+    // celui que l'opérateur vient de noter, sans qu'aucune des deux réponses ne le dise.
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+    if (started.outcome !== 'started') throw new Error("L'enrôlement n'a pas démarré.")
+    const code = await totpCodeAt(started.secret, NOW)
+
+    const outcomes = await Promise.all([
+      confirmTotpEnrollment(db, KEYS, await pendingSession(), code, NOW),
+      confirmTotpEnrollment(otherInstance, KEYS, await pendingSession(otherInstance), code, NOW),
+    ])
+
+    expect(outcomes.filter((result) => result.outcome === 'activated')).toHaveLength(1)
+    expect(await countUnusedRecoveryCodes(db, operatorId)).toBe(RECOVERY_CODE_COUNT)
+  })
+
   it("renvoie au démarrage quand l'enveloppe est devenue illisible", async () => {
     // Le cas d'exploitation : la clé a changé entre le démarrage et la confirmation. On ne laisse pas
     // l'opérateur taper un code juste indéfiniment — on lui dit de relancer l'enrôlement, ce qui
@@ -290,6 +307,25 @@ describe('vérification du second facteur', () => {
     )
 
     expect(replayed).toEqual({ outcome: 'invalid_code' })
+  })
+
+  it("n'accorde le même code qu'à une seule des deux instances qui le présentent", async () => {
+    // **Le test qui justifie l'écriture conditionnelle.** Le cas séquentiel ci-dessus passerait encore
+    // si `advanceTimeStep` devenait un `SELECT` suivi d'un `UPDATE` : deux requêtes concurrentes
+    // liraient le même pas et l'écriraient toutes les deux, et le rejeu redeviendrait possible
+    // exactement sous la charge où il compte.
+    //
+    // Deux pools distincts, donc deux backends PostgreSQL qui se disputent la ligne. L'ordre reste
+    // celui de l'ordonnanceur : ce test ne prouve pas l'absence de course, il prouve que l'écriture
+    // conditionnelle désigne un seul gagnant quand elle a lieu.
+    const code = await totpCodeAt(secret, later(2))
+
+    const outcomes = await Promise.all([
+      verifyMfaCode(db, KEYS, await pendingSession(), code, later(2)),
+      verifyMfaCode(otherInstance, KEYS, await pendingSession(otherInstance), code, later(2)),
+    ])
+
+    expect(outcomes.filter((result) => result.outcome === 'completed')).toHaveLength(1)
   })
 
   it('refuse un code antérieur au dernier pas consommé', async () => {

@@ -12,6 +12,7 @@ import {
   registerFailure,
   subjectKey,
   THRESHOLDS,
+  type ThrottleScope,
 } from './throttle'
 
 const POSTGRES_IMAGE = 'postgres:18-alpine'
@@ -38,7 +39,7 @@ beforeEach(async () => {
 })
 
 /** Amène un sujet juste sous son seuil, sans le verrouiller. */
-async function failUpTo(scope: 'operator' | 'ip', subject: string, times: number): Promise<void> {
+async function failUpTo(scope: ThrottleScope, subject: string, times: number): Promise<void> {
   for (let i = 0; i < times; i++) await registerFailure(db, scope, subject)
 }
 
@@ -117,6 +118,37 @@ describe('compteur d échecs', () => {
     await registerFailure(db, 'operator', 'sujet-f')
 
     expect(await echeance()).toBeGreaterThan(premier)
+  })
+
+  it("n'allonge jamais le verrou du second facteur", async () => {
+    // **Un choix de disponibilité, pas un oubli.** Le doublement protège contre une force brute
+    // patiente ; sur un code à six chiffres, cinq essais par quart d'heure la repoussent déjà à des
+    // siècles, et l'escalade n'achète donc rien. Elle coûte, en revanche : ce verrou se déclenche
+    // avec un mot de passe valide seul, si bien qu'un attaquant qui détient le mot de passe sans le
+    // second facteur mettrait le titulaire dehors pour quatre heures d'affilée.
+    const deadline = async (subject: string) => {
+      const [row] = await sql<{ epoch: string }[]>`
+        SELECT extract(epoch FROM locked_until)::text AS epoch
+        FROM login_attempts WHERE subject = ${subject}
+      `
+      return Number(row?.epoch)
+    }
+
+    await failUpTo('mfa', 'sujet-g', THRESHOLDS.mfa)
+    const first = await deadline('sujet-g')
+
+    for (let extra = 0; extra < 4; extra += 1) {
+      await registerFailure(db, 'mfa', 'sujet-g')
+    }
+
+    // Repoussée à chaque échec — le verrou repart de maintenant — mais jamais **allongée** : l'écart
+    // à l'instant courant reste celui du premier palier, à la seconde près.
+    const [row] = await sql<{ remaining: string }[]>`
+      SELECT extract(epoch FROM locked_until - now())::text AS remaining
+      FROM login_attempts WHERE subject = 'sujet-g'
+    `
+    expect(Number(row?.remaining)).toBeLessThanOrEqual(15 * 60)
+    expect(await deadline('sujet-g')).toBeGreaterThanOrEqual(first)
   })
 
   it('ne laisse pas une rafale parallèle passer sous le seuil', async () => {

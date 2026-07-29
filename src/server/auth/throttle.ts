@@ -46,9 +46,32 @@ const WINDOW_MS = 15 * 60 * 1000
  */
 export const THRESHOLDS: Readonly<Record<ThrottleScope, number>> = { operator: 5, ip: 20, mfa: 5 }
 
-/** Verrouillage initial, puis doublement à chaque verrouillage successif, borné. */
+/** Verrouillage initial, puis doublement à chaque verrouillage successif, borné **par portée**. */
 const BASE_LOCK_MS = 15 * 60 * 1000
-const MAX_LOCK_MS = 4 * 60 * 60 * 1000
+
+/**
+ * Plafond du verrouillage, et il n'est pas le même partout.
+ *
+ * Le doublement existe pour rendre une force brute *patiente* de plus en plus chère. Il n'a de sens
+ * que là où la patience paie.
+ *
+ * **Pour `mfa`, elle ne paie pas** : cinq essais par quart d'heure contre un code à six chiffres
+ * repoussent la découverte à des siècles, escalade ou non. Elle coûterait en revanche cher en
+ * disponibilité, et d'une façon qui n'existe pas ailleurs — ce verrou ne se déclenche qu'avec une
+ * session déjà ouverte par un mot de passe valide. Autrement dit, quiconque détient le mot de passe
+ * d'un opérateur **sans** son second facteur peut le déclencher à volonté : avec l'escalade, cinq
+ * requêtes par palier suffiraient à mettre le titulaire dehors quatre heures d'affilée, puis à
+ * recommencer. Le plafond au premier palier borne le dégât à un quart d'heure sans rien céder.
+ *
+ * Ce qui reste, et qu'aucun plafond ne réglera : un attaquant qui répète la manœuvre garde
+ * l'opérateur dehors. Cela se traite **hors bande** — une notification au titulaire au moment du
+ * verrouillage (step-046) — pas en desserrant le compteur.
+ */
+const MAX_LOCK_MS: Readonly<Record<ThrottleScope, number>> = {
+  operator: 4 * 60 * 60 * 1000,
+  ip: 4 * 60 * 60 * 1000,
+  mfa: BASE_LOCK_MS,
+}
 
 export type LockState = {
   readonly locked: boolean
@@ -152,7 +175,7 @@ export async function registerFailure(
   // plafond. Un attaquant patient paie de plus en plus cher ; un opérateur qui se trompe cinq fois
   // attend un quart d'heure.
   const steps = Math.min(failures - threshold, 10)
-  const duration = Math.min(BASE_LOCK_MS * 2 ** steps, MAX_LOCK_MS)
+  const duration = Math.min(BASE_LOCK_MS * 2 ** steps, MAX_LOCK_MS[scope])
   const until = new Date(Date.now() + duration)
 
   await db
