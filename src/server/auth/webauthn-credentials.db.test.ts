@@ -107,31 +107,32 @@ describe('enregistrement', () => {
     // n'en a qu'une, et ne le découvrirait qu'en perdant le premier appareil.
     const lock = lockHolder()
 
-    try {
-      const holder = sql.begin(async (tx) => {
-        await tx`SELECT id FROM operators WHERE id = ${operatorId} FOR UPDATE`
-        lock.signalAcquired()
-        await lock.held
-        const first = JSON.stringify([
-          { ...credential('cred-a', 'poste'), createdAt: new Date().toISOString() },
-        ])
-        await tx`UPDATE operators SET mfa_webauthn_credentials = ${first}::jsonb
-                 WHERE id = ${operatorId}`
-      })
+    const holder = sql.begin(async (tx) => {
+      await tx`SELECT id FROM operators WHERE id = ${operatorId} FOR UPDATE`
+      lock.signalAcquired()
+      await lock.held
+      const first = JSON.stringify([
+        { ...credential('cred-a', 'poste'), createdAt: new Date().toISOString() },
+      ])
+      await tx`UPDATE operators SET mfa_webauthn_credentials = ${first}::jsonb
+               WHERE id = ${operatorId}`
+    })
 
-      // Le rival n'est armé **qu'après** le signal : voir `lockHolder()`.
-      await lock.acquired
-      const contender = addCredential(otherInstance, operatorId, credential('cred-b', 'téléphone'))
-      await waitUntilBlocked(sql)
-      lock.release()
-      await holder
-      expect(await contender).toBe(true)
+    // Le rival n'est armé **qu'après** le signal : voir `lockHolder()`.
+    await lock.acquired
+    const contender = addCredential(otherInstance, operatorId, credential('cred-b', 'téléphone'))
 
-      const stored = await listCredentials(db, operatorId)
-      expect(stored.map((entry) => entry.id).sort()).toEqual(['cred-a', 'cred-b'])
-    } finally {
-      lock.release()
-    }
+    // On relâche et on attend les deux **avant** toute assertion : une exception jetée ici laisserait
+    // une transaction et une requête en vol, dont le rejet tardif polluerait le test suivant.
+    const blocked = await waitUntilBlocked(sql)
+    lock.release()
+    const added = await contender
+    await holder
+
+    expect(blocked, "l'entrelacement n'a pas eu lieu : ce test ne prouve rien").toBe(true)
+    expect(added).toBe(true)
+    const stored = await listCredentials(db, operatorId)
+    expect(stored.map((entry) => entry.id).sort()).toEqual(['cred-a', 'cred-b'])
   })
 })
 
@@ -182,30 +183,28 @@ describe('renommage et révocation', () => {
     // avant le verrou aurait laissé passer le second.
     const lock = lockHolder()
 
-    try {
-      const holder = sql.begin(async (tx) => {
-        await tx`SELECT id FROM operators WHERE id = ${operatorId} FOR UPDATE`
-        lock.signalAcquired()
-        await lock.held
-        const remaining = JSON.stringify([
-          { ...credential('cred-b', 'téléphone'), createdAt: new Date().toISOString() },
-        ])
-        await tx`UPDATE operators SET mfa_webauthn_credentials = ${remaining}::jsonb
-                 WHERE id = ${operatorId}`
-      })
+    const holder = sql.begin(async (tx) => {
+      await tx`SELECT id FROM operators WHERE id = ${operatorId} FOR UPDATE`
+      lock.signalAcquired()
+      await lock.held
+      const remaining = JSON.stringify([
+        { ...credential('cred-b', 'téléphone'), createdAt: new Date().toISOString() },
+      ])
+      await tx`UPDATE operators SET mfa_webauthn_credentials = ${remaining}::jsonb
+               WHERE id = ${operatorId}`
+    })
 
-      // Le rival n'est armé **qu'après** le signal : voir `lockHolder()`.
-      await lock.acquired
-      const contender = revokeCredentialUnlessLastFactor(otherInstance, operatorId, 'cred-b')
-      await waitUntilBlocked(sql)
-      lock.release()
-      await holder
+    await lock.acquired
+    const contender = revokeCredentialUnlessLastFactor(otherInstance, operatorId, 'cred-b')
 
-      expect(await contender).toBe('last_factor')
-      expect((await listCredentials(db, operatorId)).map((entry) => entry.id)).toEqual(['cred-b'])
-    } finally {
-      lock.release()
-    }
+    const blocked = await waitUntilBlocked(sql)
+    lock.release()
+    const outcome = await contender
+    await holder
+
+    expect(blocked, "l'entrelacement n'a pas eu lieu : ce test ne prouve rien").toBe(true)
+    expect(outcome).toBe('last_factor')
+    expect((await listCredentials(db, operatorId)).map((entry) => entry.id)).toEqual(['cred-b'])
   })
 
   it('accepte de retirer la dernière passkey si un TOTP est actif', async () => {

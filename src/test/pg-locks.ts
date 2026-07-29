@@ -40,25 +40,25 @@ const MAX_ATTEMPTS = 100
 const INTERVAL_MS = 20
 
 /**
- * Attend qu'au moins une requête soit en attente d'un verrou.
+ * Attend qu'au moins une requête soit en attente d'un verrou, et dit si c'est arrivé.
  *
- * **Lève si rien ne se bloque.** C'est délibéré : un test qui continuerait sans que l'entrelacement
- * ait eu lieu ne vérifierait rien, et son succès se lirait comme une preuve. Mieux vaut un échec qui
- * dit « le test ne prouve rien » qu'un vert qui ment.
+ * **Rend `false` plutôt que de lever.** Le test doit alors l'asserter — un entrelacement qui n'a pas
+ * eu lieu ne vérifie rien, et son vert se lirait comme une preuve. Mais une *exception* ici déroulerait
+ * la pile au milieu de la cérémonie : la transaction du détenteur et la requête du rival resteraient
+ * en vol, non attendues, et leur rejet tardif polluerait le test suivant au lieu de celui-ci. Rendre un
+ * booléen laisse l'appelant relâcher et attendre les deux avant d'asserter quoi que ce soit.
  */
-export async function waitUntilBlocked(sql: postgres.Sql): Promise<void> {
+export async function waitUntilBlocked(sql: postgres.Sql): Promise<boolean> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const [row] = await sql<{ waiting: number }[]>`
       SELECT count(*)::int AS waiting FROM pg_locks WHERE NOT granted
     `
-    if ((row?.waiting ?? 0) > 0) return
+    if ((row?.waiting ?? 0) > 0) return true
 
     await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS))
   }
 
-  throw new Error(
-    "Aucune requête ne s'est bloquée sur un verrou : l'entrelacement n'a pas eu lieu, et ce test ne prouve donc rien.",
-  )
+  return false
 }
 
 export type LockHolder = {

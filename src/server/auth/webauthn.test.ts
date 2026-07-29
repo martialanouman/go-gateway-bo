@@ -69,15 +69,23 @@ describe('configuration WebAuthn', () => {
     expect(config.rpId).toBe('example.test')
   })
 
-  it('refuse une adresse IP en clair, même en boucle locale', () => {
-    // La spécification ne reconnaît pas une adresse IP comme `rpID` valide : l'accepter aurait laissé
-    // configurer un facteur qui ne fonctionne pas, avec un échec ressemblant à un problème d'appareil.
+  it('refuse une adresse IP comme domaine, même servie en https', () => {
+    // La spécification exige un nom de domaine ; le navigateur refuserait une adresse IP. Le cas
+    // **https** est celui qui compte : en `http`, l'origine est déjà rejetée bien avant, si bien qu'un
+    // test en clair donnerait une fausse assurance — c'est ce qu'il faisait.
     expect(() =>
       readWebAuthnConfig({
         AUTH_WEBAUTHN_RP_ID: '127.0.0.1',
-        AUTH_WEBAUTHN_ORIGIN: 'http://127.0.0.1:3000',
+        AUTH_WEBAUTHN_ORIGIN: 'https://127.0.0.1',
       }),
-    ).toThrow(/AUTH_WEBAUTHN_ORIGIN/)
+    ).toThrow(/AUTH_WEBAUTHN_RP_ID/)
+
+    expect(() =>
+      readWebAuthnConfig({
+        AUTH_WEBAUTHN_RP_ID: '2001:db8::1',
+        AUTH_WEBAUTHN_ORIGIN: 'https://[2001:db8::1]',
+      }),
+    ).toThrow(/AUTH_WEBAUTHN_RP_ID/)
   })
 
   it('accepte un hôte à label unique quand le domaine est exactement celui-là', () => {

@@ -27,6 +27,7 @@
  *   et croire le contraire reviendrait à déployer un second facteur qui n'a jamais fonctionné.
  */
 
+import { isIP } from 'node:net'
 import type {
   AuthenticationResponseJSON,
   AuthenticatorTransportFuture,
@@ -76,6 +77,15 @@ export function readWebAuthnConfig(env: NodeJS.ProcessEnv): WebAuthnConfig {
   if (!origin) {
     throw new Error(
       "AUTH_WEBAUTHN_ORIGIN est requise : c'est l'origine exacte que le navigateur annoncera.",
+    )
+  }
+
+  // Une adresse IP n'est pas un `rpID` valide : la spécification exige un nom de domaine, et le
+  // navigateur refuserait. La garde est **ici** et pas dans `coversHost`, où l'égalité stricte la
+  // court-circuiterait — `127.0.0.1` couvrant `127.0.0.1` est vrai par construction.
+  if (isIP(rpId) !== 0) {
+    throw new Error(
+      `AUTH_WEBAUTHN_RP_ID doit être un nom de domaine, pas une adresse IP : « ${rpId} » n'en est pas un.`,
     )
   }
 

@@ -415,11 +415,16 @@ describe('défi WebAuthn porté par la session', () => {
       // verrou avant que le détenteur ne l'ait demandé, et rien ne se bloque jamais.
       await lock.acquired
       const contender = consumeWebAuthnChallenge(other.db, sessionId)
-      await waitUntilBlocked(sql)
+
+      // Relâcher et attendre les deux **avant** d'asserter : une exception ici laisserait la
+      // transaction et la requête en vol, et le pool serait fermé sous elles par le `finally`.
+      const blocked = await waitUntilBlocked(sql)
       lock.release()
+      const consumed = await contender
       await holder
 
-      expect(await contender).toBeUndefined()
+      expect(blocked, "l'entrelacement n'a pas eu lieu : ce test ne prouve rien").toBe(true)
+      expect(consumed).toBeUndefined()
     } finally {
       lock.release()
       await other.client.end({ timeout: 5 })
