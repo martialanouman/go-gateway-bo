@@ -31,6 +31,18 @@ export default defineConfig({
       // 2024-04-03 : le build d'aujourd'hui et celui d'après le prochain bump ne suivraient pas
       // forcément les mêmes défauts, sans qu'aucun diff ne le montre.
       compatibilityDate: '2026-07-28',
+      // Les routes HTTP du BFF sont déclarées ici plutôt que posées sous `src/routes/`.
+      // Une server route TanStack devrait y vivre — c'est le routage par fichiers qui lui donne son
+      // URL — et devrait donc importer `src/server/` depuis `src/routes/`, ce que la règle de lint
+      // de l'invariant (d) interdit. Nitro enregistre un handler depuis n'importe quel chemin : le
+      // fichier reste sous `src/server/`, et la règle n'a besoin d'aucune exception.
+      handlers: [
+        {
+          route: '/api/auth/login',
+          handler: './src/server/auth/http/login.ts',
+          method: 'post',
+        },
+      ],
     }),
     // Le plugin React doit venir APRÈS celui de Start.
     viteReact(),
