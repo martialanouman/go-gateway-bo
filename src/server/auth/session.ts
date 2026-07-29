@@ -15,6 +15,14 @@
  * Elle n'est réécrite que lorsque l'écart dépasse `SLIDE_WRITE_THRESHOLD_MS` — sans ce seuil, chaque
  * affichage d'écran écrirait une ligne, et cette table deviendrait le point chaud du tableau de bord
  * pour une précision dont personne n'a besoin.
+ *
+ * ## Une session partielle vit peu, et ne glisse pas
+ *
+ * Elle ne sert qu'à porter le second facteur — celui que step-023 fera valider par un code à six
+ * chiffres. Lui donner le plafond d'une session complète laisserait douze heures pour deviner ce
+ * code, et la faire glisser suffirait à tenir cette fenêtre ouverte depuis un onglet oublié. Elle
+ * expire donc en `PENDING_LIFETIME_MS`, et c'est le passage du second facteur — lui seul — qui
+ * déplace la fin de validité au plafond absolu.
  */
 
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
@@ -22,14 +30,32 @@ import type { Database } from '../db/index'
 import { operators } from '../db/schema/auth'
 import { operatorSessions } from '../db/schema/session'
 
-/** Durée absolue : au-delà, il faut se reconnecter, quoi qu'il arrive. */
-const ABSOLUTE_LIFETIME_MS = 12 * 60 * 60 * 1000
+/**
+ * Durée absolue d'une session **complète** : au-delà, il faut se reconnecter, quoi qu'il arrive.
+ *
+ * Exportée parce que le `Max-Age` du cookie s'en déduit : deux constantes séparées finiraient par
+ * dire deux choses, et c'est le porteur qui survivrait à ce qu'il désigne.
+ */
+export const ABSOLUTE_LIFETIME_MS = 12 * 60 * 60 * 1000
+
+/** Durée d'une session **partielle**, sans glissement possible : voir l'en-tête. */
+const PENDING_LIFETIME_MS = 10 * 60 * 1000
 
 /** Inactivité tolérée avant qu'une session ne cesse d'être glissée. */
 const IDLE_LIFETIME_MS = 60 * 60 * 1000
 
 /** En deçà, on ne réécrit pas `lastSeenAt` : voir l'en-tête. */
 const SLIDE_WRITE_THRESHOLD_MS = 60 * 1000
+
+/**
+ * `interval '<n> milliseconds'`, la seule interpolation brute admise ici.
+ *
+ * Les durées sont des constantes de ce module — jamais une valeur venue d'une requête. Le jour où
+ * l'une d'elles viendrait d'ailleurs, ce helper devrait disparaître avec elle.
+ */
+function intervalMs(milliseconds: number) {
+  return sql.raw(`interval '${milliseconds} milliseconds'`)
+}
 
 export type SessionState =
   /** Session complète : second facteur passé, les écrans sont ouverts. */
@@ -57,7 +83,8 @@ export async function openPendingSession(
     .insert(operatorSessions)
     .values({
       operatorId,
-      expiresAt: new Date(Date.now() + ABSOLUTE_LIFETIME_MS),
+      // Le plafond court, pas l'absolu : la session ne porte encore qu'un mot de passe.
+      expiresAt: sql`now() + ${intervalMs(PENDING_LIFETIME_MS)}`,
     })
     .returning({ id: operatorSessions.id })
 
@@ -65,16 +92,26 @@ export async function openPendingSession(
   return { sessionId: row.id }
 }
 
-/** Promeut une session partielle en session complète. Sans effet sur une session déjà complète. */
+/**
+ * Promeut une session partielle en session complète. Sans effet sur une session déjà complète.
+ *
+ * C'est **ici** que la fin de validité passe du plafond court au plafond absolu : la promotion est le
+ * seul moment où l'on sait que les deux facteurs ont été présentés. La repousser ailleurs — à la
+ * première lecture, par exemple — reviendrait à prolonger une session qui n'a rien prouvé de plus.
+ */
 export async function completeMfa(db: Database, sessionId: string): Promise<void> {
   await db
     .update(operatorSessions)
-    .set({ mfaCompletedAt: sql`now()`, lastSeenAt: sql`now()` })
+    .set({
+      mfaCompletedAt: sql`now()`,
+      lastSeenAt: sql`now()`,
+      expiresAt: sql`now() + ${intervalMs(ABSOLUTE_LIFETIME_MS)}`,
+    })
     .where(and(eq(operatorSessions.id, sessionId), isNull(operatorSessions.mfaCompletedAt)))
 }
 
 /**
- * Lit l'état d'une session, et la fait glisser si elle est vivante.
+ * Lit l'état d'une session, et la fait glisser si elle est vivante **et complète**.
  *
  * Le filtre sur `operators.status` est **ici**, comme pour la résolution des permissions : désactiver
  * un opérateur doit le mettre dehors immédiatement, sans avoir à révoquer ses sessions une par une.
@@ -96,14 +133,16 @@ export async function readSession(db: Database, sessionId: string): Promise<Sess
         eq(operatorSessions.id, sessionId),
         isNull(operatorSessions.revokedAt),
         sql`${operatorSessions.expiresAt} > now()`,
-        sql`${operatorSessions.lastSeenAt} > now() - ${sql.raw(`interval '${IDLE_LIFETIME_MS} milliseconds'`)}`,
+        sql`${operatorSessions.lastSeenAt} > now() - ${intervalMs(IDLE_LIFETIME_MS)}`,
         eq(operators.status, 'active'),
       ),
     )
 
   if (!row) return { status: 'none' }
 
-  if (Date.now() - row.lastSeenAt.getTime() > SLIDE_WRITE_THRESHOLD_MS) {
+  // Une session partielle ne glisse pas : la faire glisser rendrait son plafond court inopérant, un
+  // onglet qui interroge `/auth/me` suffisant à le repousser indéfiniment.
+  if (row.mfaCompletedAt && Date.now() - row.lastSeenAt.getTime() > SLIDE_WRITE_THRESHOLD_MS) {
     await db
       .update(operatorSessions)
       .set({ lastSeenAt: sql`now()` })

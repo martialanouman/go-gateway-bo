@@ -71,6 +71,31 @@ describe('ouverture de session', () => {
     expect((await readSession(db, sessionId)).status).toBe('active')
   })
 
+  it('donne à une session partielle quelques minutes, pas la journée', async () => {
+    // **La fenêtre de devinette du second facteur.** Step-023 fera valider un code à six chiffres
+    // contre cette session : lui laisser le plafond d'une session complète offrirait douze heures
+    // pour l'atteindre.
+    await openPendingSession(db, operatorId)
+
+    const [row] = await sql<{ minutes: string }[]>`
+      SELECT extract(epoch FROM expires_at - now())::text AS minutes FROM operator_sessions
+    `
+    expect(Number(row?.minutes)).toBeLessThan(15 * 60)
+  })
+
+  it('repousse la fin de validité au plafond une fois le second facteur passé', async () => {
+    // Le plafond court ne doit pas se payer d'une déconnexion dix minutes après la connexion : la
+    // promotion est le moment où l'on sait que les deux facteurs ont été présentés.
+    const { sessionId } = await openPendingSession(db, operatorId)
+
+    await completeMfa(db, sessionId)
+
+    const [row] = await sql<{ heures: string }[]>`
+      SELECT extract(epoch FROM expires_at - now())::text AS heures FROM operator_sessions
+    `
+    expect(Number(row?.heures)).toBeGreaterThan(11 * 3600)
+  })
+
   it('ne repromeut pas une session déjà complète', async () => {
     // `completeMfa` doit être sans effet la seconde fois : sinon une session complète verrait sa
     // date de passage MFA rafraîchie à chaque appel, ce qui masquerait depuis quand elle l'est.
@@ -145,6 +170,20 @@ describe('lecture de session', () => {
       SELECT extract(epoch FROM now() - last_seen_at)::text AS ecart FROM operator_sessions
     `
     expect(Number(row?.ecart)).toBeLessThan(5)
+  })
+
+  it('ne fait pas glisser une session partielle', async () => {
+    // Sinon le plafond court ne tiendrait pas : un onglet qui interroge `/auth/me` maintiendrait
+    // ouverte, aussi longtemps qu'il veut, une session qui n'a présenté qu'un mot de passe.
+    const { sessionId } = await openPendingSession(db, operatorId)
+    await sql`UPDATE operator_sessions SET last_seen_at = now() - interval '5 minutes'`
+
+    await readSession(db, sessionId)
+
+    const [row] = await sql<{ ecart: string }[]>`
+      SELECT extract(epoch FROM now() - last_seen_at)::text AS ecart FROM operator_sessions
+    `
+    expect(Number(row?.ecart)).toBeGreaterThan(240)
   })
 
   it("n'écrit pas à chaque lecture", async () => {
