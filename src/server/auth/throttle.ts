@@ -54,11 +54,13 @@ const WINDOW_MS: Readonly<Record<ThrottleScope, number>> = {
 /**
  * Seuils, par portée. L'IP est plus large : plusieurs opérateurs peuvent partager une sortie NAT.
  *
- * `mfa` est aussi serré que `operator`, et pour une raison plus forte : un code à six chiffres, c'est
- * un million de possibilités, mais la fenêtre de dérive en accepte trois à la fois — une tentative
- * sur trois cent mille aboutit. Sans plafond, quelques heures de requêtes suffisent. Le plafond court
- * de la session partielle borne déjà la fenêtre à dix minutes ; il la rend étroite, il ne la ferme
- * pas, et il disparaît dès qu'une session complète re-demande un facteur.
+ * `mfa` est aussi serré que `operator`, et pour une raison plus forte : l'espace de recherche d'un
+ * code à six chiffres est **minuscule** comparé à celui d'une phrase de passe. Le chiffre exact et ce
+ * qu'il implique sont sous `MAX_LOCK_MS` — écrits une seule fois, parce que deux commentaires qui
+ * énoncent le même nombre finissent par en énoncer deux.
+ *
+ * Le plafond court de la session partielle borne déjà la fenêtre d'attaque à dix minutes ; il la rend
+ * étroite, il ne la ferme pas, et il disparaît dès qu'une session complète re-demande un facteur.
  */
 export const THRESHOLDS: Readonly<Record<ThrottleScope, number>> = { operator: 5, ip: 20, mfa: 5 }
 
@@ -91,6 +93,18 @@ const BASE_LOCK_MS = 15 * 60 * 1000
  * Ce qui reste, et qu'aucun réglage ne règlera : un attaquant qui répète la manœuvre garde l'opérateur
  * dehors. Cela se traite **hors bande** — une notification au titulaire au moment du verrouillage
  * (step-046) — pas en desserrant le compteur.
+ *
+ * ## Ce que la mémoire longue coûte à un opérateur légitime
+ *
+ * Elle se paie, et il faut l'écrire : ses quatre saisies fausses tolérées s'accumulent désormais sur
+ * quatre heures, là où quinze minutes les oubliaient entre deux essais espacés. Cinq erreurs dans une
+ * demi-journée le verrouillent donc un quart d'heure, ce que l'ancien réglage lui aurait souvent
+ * épargné.
+ *
+ * C'est le prix du calcul ci-dessus, et il reste petit : le code est **recopié depuis une
+ * application**, pas retenu de mémoire, et le premier succès efface le compteur entièrement
+ * (`promote()`). Un opérateur qui finit par entrer repart de zéro, il ne traîne pas ses erreurs de la
+ * matinée.
  */
 const MAX_LOCK_MS: Readonly<Record<ThrottleScope, number>> = {
   operator: 4 * 60 * 60 * 1000,
