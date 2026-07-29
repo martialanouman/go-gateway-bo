@@ -202,9 +202,19 @@ export async function verifyMfaCode(
   const lock = await lockState(db, 'mfa', session.operatorId)
   if (lock.locked) return { outcome: 'rate_limited', retryAfterSeconds: retryAfter(lock.until) }
 
+  // **Aucun facteur actif, aucun code n'ouvre rien** — ni TOTP, ni code de récupération. La garde est
+  // ici, avant l'aiguillage, et pas dans chaque branche : un code de récupération qui survivrait à la
+  // réinitialisation du facteur (step-027) deviendrait un second facteur pour un compte qui vient
+  // précisément de le perdre. Le mettre une seule fois, en amont, rend la règle indéformable.
+  const factor = await activeTotpFactor(db, session.operatorId)
+  if (!factor) {
+    await registerFailure(db, 'mfa', session.operatorId)
+    return { outcome: 'invalid_code' }
+  }
+
   const trimmed = code.trim()
   const accepted = TOTP_CODE_PATTERN.test(trimmed)
-    ? await consumeTotpCode(db, keys, session.operatorId, trimmed, now)
+    ? await consumeTotpCode(db, keys, session.operatorId, factor.envelope, trimmed, now)
     : await consumeRecovery(db, keys, session.operatorId, trimmed)
 
   if (!accepted.valid) {
@@ -222,6 +232,25 @@ export async function verifyMfaCode(
 type Consumption = { readonly valid: boolean; readonly remaining?: number }
 
 /**
+ * L'enveloppe du facteur **actif** d'un opérateur, ou `undefined` s'il n'en a pas.
+ *
+ * Un secret écrit sans `mfa_totp_activated_at` ne compte pas : c'est un enrôlement en cours, que seul
+ * `confirmTotpEnrollment` a le droit de faire aboutir.
+ */
+async function activeTotpFactor(
+  db: Database,
+  operatorId: string,
+): Promise<{ readonly envelope: string } | undefined> {
+  const [operator] = await db
+    .select({ secret: operators.mfaTotpSecret, activatedAt: operators.mfaTotpActivatedAt })
+    .from(operators)
+    .where(eq(operators.id, operatorId))
+
+  if (!operator?.secret || !operator.activatedAt) return undefined
+  return { envelope: operator.secret }
+}
+
+/**
  * Vérifie un code TOTP **et** consomme son pas de temps.
  *
  * Les deux sont indissociables : un code vérifié mais non consommé reste rejouable pendant toute sa
@@ -231,19 +260,11 @@ async function consumeTotpCode(
   db: Database,
   keys: MfaKeys,
   operatorId: string,
+  envelope: string,
   code: string,
   now: Date,
 ): Promise<Consumption> {
-  const [operator] = await db
-    .select({ secret: operators.mfaTotpSecret, activatedAt: operators.mfaTotpActivatedAt })
-    .from(operators)
-    .where(eq(operators.id, operatorId))
-
-  // Pas de facteur actif : le code ne peut rien valoir. Le refus est le même que pour un code faux —
-  // distinguer les deux renseignerait sur l'état du compte.
-  if (!operator?.secret || !operator.activatedAt) return { valid: false }
-
-  const secret = openTotpSecret(operator.secret, operatorId, keys)
+  const secret = openTotpSecret(envelope, operatorId, keys)
   if (!secret) return { valid: false }
 
   const check = await checkTotpCode(secret, code, now)

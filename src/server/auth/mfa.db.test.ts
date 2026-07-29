@@ -397,6 +397,20 @@ describe('vérification du second facteur', () => {
 
     expect(result).toEqual({ outcome: 'invalid_code' })
   })
+
+  it('refuse un code de récupération quand le facteur a été réinitialisé', async () => {
+    // Un code de récupération n'existe que pour rentrer quand l'appareil manque, **pas** quand le
+    // facteur lui-même a été retiré. S'il y survivait, la réinitialisation d'un second facteur
+    // (step-027) laisserait derrière elle dix codes qui l'ouvrent encore — c'est-à-dire qu'elle ne
+    // retirerait rien du tout.
+    const codes = await freshRecoveryCodes()
+    await sql`UPDATE operators SET mfa_totp_activated_at = NULL WHERE id = ${operatorId}`
+
+    const result = await verifyMfaCode(db, KEYS, await pendingSession(), codes[0] ?? '', later(2))
+
+    expect(result).toEqual({ outcome: 'invalid_code' })
+    expect(await countUnusedRecoveryCodes(db, operatorId)).toBe(RECOVERY_CODE_COUNT)
+  })
 })
 
 /**
