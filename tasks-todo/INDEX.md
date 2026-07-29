@@ -8,9 +8,12 @@ Le **plan** donne le cadre : conventions transverses à figer avant M0, tranche 
 référence, critères de sortie par jalon, graphe de parallélisation et état réel de la passerelle.
 Cet index donne le découpage en PRs. Les deux se lisent ensemble.
 
-**Workflow :** on prend le prochain `step-NNN.md` dans `tasks-todo/`, on l'exécute (1 session = 1 PR),
-puis on déplace le fichier dans `tasks-done/` (dernier commit de la PR). Un jalon est terminé quand
-toutes ses steps sont dans `tasks-done/`.
+**Workflow :** on prend le prochain `step-NNN.md` dans `tasks-todo/` (**l'ordre de cette liste fait
+foi, pas le numéro**), on l'exécute en 1 session = 1 PR — **TDD strict, test rouge d'abord**, périmètre
+limité au fichier — puis revue par skill relancée tant qu'il reste un blocage, Definition of Done
+verte, déplacement du fichier dans `tasks-done/` (dernier commit de la PR), PR ouverte et mergée dès
+que la CI est verte. Un jalon est terminé quand toutes ses steps sont dans `tasks-done/`. Le détail
+de la boucle et la règle d'arbitrage sont dans `CLAUDE.md` § « La boucle de travail ».
 
 Légende : `[x]` = fait (dans `tasks-done/`) · `[ ]` = à faire (dans `tasks-todo/`).
 
@@ -96,12 +99,17 @@ sur tout écran touché • PR petite et focalisée (une step).
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [x] step-020 — Schéma auth (operators, roles, permissions, jointures) + seeds
 - [x] step-021 — Login email/mot de passe + anti-brute-force
-- [ ] step-022 — Session BFF (cookie signé) + `/auth/me` + gardes de route
+- [x] step-022 — Session BFF (cookie signé) + `/auth/me` + `/auth/logout` ‡
 - [ ] step-023 — MFA TOTP : enrôlement et vérification
 - [ ] step-024 — MFA WebAuthn / passkey
 - [ ] step-025 — Moteur de permissions côté serveur + journal d'audit + MFA obligatoire
 - [ ] step-026 — Rendu UI par permission + écrans Login & MFA
 - [ ] step-027 — Gestion des opérateurs et des rôles (CRUD)
+
+‡ La step-022 livre la brique de garde — `resolveSession()`, du cookie à l'état vérifié — mais son
+**branchement sur les routes** est reporté en step-026 : aucune route non publique n'existe avant
+l'AppShell (step-040) et la cible de la redirection, l'écran de login, arrive en step-026. Le
+brancher plus tôt aurait demandé une route factice, écrite pour porter un test et réécrite ensuite.
 
 ## M2 — Coquille applicative & temps réel  (§4.1, §4.2, §5.2)
 - [ ] step-040 — AppShell : rail de navigation, barre supérieure, layout, routage fichiers
@@ -170,7 +178,7 @@ sur tout écran touché • PR petite et focalisée (une step).
 - [ ] step-182 — Évaluateur BFF sur source durable à offset persisté
 - [ ] step-183 — Réconciliation Alertmanager  ⚠️ **bloqué : surface absente du contrat**
 - [ ] step-184 — Journal d'audit : écran de consultation
-- [ ] step-187 — Rétention d'`audit_log` : détachement et purge des partitions échues †
+- [ ] step-187 — Rétention : partitions d'`audit_log` détachées, sessions mortes purgées †
 - [ ] step-185 — Accessibilité WCAG 2.1 AA + parcours Playwright de bout en bout
 - [ ] step-186 — Déploiement HA (≥2 instances, affinité WS) + durcissement production
 

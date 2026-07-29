@@ -78,11 +78,13 @@ export default defineConfig({
         // Le jour où ce fichier décide quelque chose — un ordre d'appel conditionnel, une validation —
         // cette logique sort de la mesure sans que personne ne le voie et doit vivre à côté.
         'src/server/auth/cli.ts',
-        // Coquille HTTP des routes du BFF : lit la requête, appelle, rend la réponse. La décision, la
-        // discrétion de la réponse et l'adresse de l'appelant vivent à côté et y sont testées.
+        // Coquilles HTTP des routes du BFF : lisent la requête, appellent, rendent la réponse. La
+        // décision, la forme de la réponse — 401 discret, 204 systématique, cookie effacé — et
+        // l'adresse de l'appelant vivent à côté et y sont testées.
         // **Même corollaire** : aucune règle d'authentification dans ces fichiers, sinon elle sort de
-        // la mesure sans que personne ne le voie.
-        'src/server/auth/http/login.ts',
+        // la mesure sans que personne ne le voie. C'est la raison pour laquelle la fermeture de
+        // session est `endSession` et la réponse `logoutResponse`, plutôt que trois lignes ici.
+        'src/server/auth/http/**',
       ],
       thresholds: {
         /**

@@ -37,6 +37,7 @@ import { readClientIp, readTrustedProxyCount } from '../client-ip'
 import { createSemaphore, readVerificationSlots } from '../concurrency'
 import { loginResponse, parseCredentials } from '../http'
 import { createLoginService, type LoginService } from '../login'
+import { getSessionSecrets } from '../secrets'
 import { readThrottleSecret } from '../throttle'
 
 let service: LoginService | undefined
@@ -97,5 +98,5 @@ export default defineEventHandler(async (event) => {
   // par une virgule et donc invalides dès qu'une date d'expiration en contient une. La step-022 pose
   // précisément un cookie de session sur cette réponse : le piège se serait déclenché là, sans
   // qu'aucun test de cette PR ne le voie.
-  return loginResponse(outcome)
+  return loginResponse(outcome, getSessionSecrets())
 })

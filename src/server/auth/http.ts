@@ -9,7 +9,26 @@
  * divulguer — et la distinction se glisse toujours par commodité de débogage.
  */
 
+import {
+  clearedSessionCookie,
+  SESSION_COOKIE_NAME,
+  type SessionSecrets,
+  sessionCookieAttributes,
+  signSessionId,
+} from './cookie'
 import type { LoginOutcome } from './login'
+import type { CurrentOperator } from './me'
+import { ABSOLUTE_LIFETIME_MS } from './session'
+
+/**
+ * Durée de vie du cookie, en secondes — **déduite** du plafond absolu, jamais réécrite.
+ *
+ * Le cookie n'est qu'un porteur : le laisser survivre à ce qu'il désigne n'apporte rien qu'une
+ * reconnexion silencieuse de plus, et deux constantes écrites séparément finissent toujours par dire
+ * deux choses. La base reste l'autorité — un cookie encore présent sur une session révoquée ne vaut
+ * rien — mais il ne doit pas pour autant promettre une session qui n'existe plus.
+ */
+const COOKIE_MAX_AGE_SECONDS = ABSOLUTE_LIFETIME_MS / 1000
 
 /** Le seul message d'échec de connexion. Il ne dit pas ce qui a échoué, parce qu'il ne le doit pas. */
 export const INVALID_CREDENTIALS_MESSAGE =
@@ -18,12 +37,20 @@ export const INVALID_CREDENTIALS_MESSAGE =
 const RATE_LIMITED_MESSAGE =
   'Connexion refusée : trop de tentatives depuis cette adresse. Réessayez plus tard.'
 
-export function loginResponse(outcome: LoginOutcome): Response {
+/**
+ * `secrets` n'est pas optionnel, et ne doit pas le redevenir : sans clé, cette fonction rendrait un
+ * succès sans cookie — un opérateur authentifié qui ne peut pas poursuivre, et une session ouverte en
+ * base que plus rien ne désigne. Le rendre requis fait disparaître la branche plutôt que de la
+ * documenter.
+ */
+export function loginResponse(outcome: LoginOutcome, secrets: SessionSecrets): Response {
   if (outcome.outcome === 'mfa_required') {
-    // Aucune session, aucun jeton, et surtout **pas d'identifiant d'opérateur** : le rendre au
-    // navigateur transformerait la réussite du mot de passe en fuite d'identifiant interne. Le lien
-    // entre cette réponse et la vérification du second facteur est établi côté serveur (step-023).
-    return json({ mfa_required: true }, 200)
+    // **Pas d'identifiant d'opérateur, ni d'identifiant de session dans le corps** : les rendre au
+    // navigateur sortirait du `HttpOnly`, donc les mettrait à portée d'un script injecté. Le lien
+    // avec la vérification du second facteur passe entièrement par le cookie.
+    const cookie = `${SESSION_COOKIE_NAME}=${signSessionId(outcome.sessionId, secrets)}; ${sessionCookieAttributes(COOKIE_MAX_AGE_SECONDS)}`
+
+    return json({ mfa_required: true }, 200, { 'set-cookie': cookie })
   }
 
   if (outcome.outcome === 'rate_limited') {
@@ -33,6 +60,34 @@ export function loginResponse(outcome: LoginOutcome): Response {
   }
 
   return json({ error: INVALID_CREDENTIALS_MESSAGE }, 401)
+}
+
+/** Le seul message de session absente. Comme pour la connexion, il ne dit pas ce qui manque. */
+export const SESSION_ABSENT_MESSAGE = 'Session absente ou expirée.'
+
+/**
+ * `GET /auth/me` — l'opérateur courant, ou un refus qui ne renseigne pas.
+ *
+ * Cookie absent, signature invalide, session révoquée, échue, inactive, ou opérateur désactivé : la
+ * même réponse. Le client n'a qu'une conduite à tenir — aller au login — et distinguer les cas ne
+ * l'aiderait pas, alors que cela renseignerait qui sonde.
+ */
+export function meResponse(me: CurrentOperator | undefined): Response {
+  return me ? json(me, 200) : json({ error: SESSION_ABSENT_MESSAGE }, 401)
+}
+
+/**
+ * `POST /auth/logout` — **toujours 204, toujours le cookie effacé**.
+ *
+ * Répondre différemment selon qu'il y avait une session indiquerait à l'appelant s'il en détenait
+ * une. Et effacer inconditionnellement évite qu'un cookie périmé reste collé au navigateur après une
+ * révocation décidée côté serveur.
+ */
+export function logoutResponse(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: { 'set-cookie': clearedSessionCookie(), 'cache-control': 'no-store' },
+  })
 }
 
 function json(body: unknown, status: number, headers: Record<string, string> = {}): Response {

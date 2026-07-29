@@ -39,6 +39,7 @@ import { operators } from '../db/schema/auth'
 import { isCountableIp } from './client-ip'
 import { QueueFullError, type Semaphore } from './concurrency'
 import { hashPassword, type ScryptParameters, verifyPassword } from './password'
+import { openPendingSession } from './session'
 import { clearFailures, lockState, registerFailure, subjectKey } from './throttle'
 
 export type LoginInput = {
@@ -56,8 +57,19 @@ export type LoginInput = {
 }
 
 export type LoginOutcome =
-  /** Mot de passe correct : reste le second facteur. Aucune session n'est ouverte ici. */
-  | { readonly outcome: 'mfa_required'; readonly operatorId: string }
+  /**
+   * Mot de passe correct : reste le second facteur.
+   *
+   * Une session **partielle** est ouverte ici — elle n'ouvre aucun écran, elle ne fait que porter la
+   * vérification à venir (step-023 / step-024). C'est ce qui donne un état serveur au challenge :
+   * sans elle, rien ne relierait cette réponse à la vérification du second facteur, et il faudrait
+   * refaire confiance au client pour dire qui il prétend être.
+   */
+  | {
+      readonly outcome: 'mfa_required'
+      readonly operatorId: string
+      readonly sessionId: string
+    }
   /**
    * Tout le reste : identifiant inconnu, mot de passe faux, compte verrouillé, compte désactivé.
    * **Un seul cas**, délibérément — les distinguer, c'est les divulguer.
@@ -176,7 +188,8 @@ export function createLoginService(deps: {
       // l'écoulement de sa fenêtre.
       await clearFailures(deps.db, 'operator', operatorKey)
 
-      return { outcome: 'mfa_required', operatorId: operator.id }
+      const { sessionId } = await openPendingSession(deps.db, operator.id)
+      return { outcome: 'mfa_required', operatorId: operator.id, sessionId }
     })
   }
 

@@ -108,15 +108,34 @@ Pyramide : beaucoup d'unitaires (logique BFF, permissions, mappings), des tests 
 
 ## La boucle de travail
 
-**Une step = une session = une PR.**
+**Une step = une session = une PR.** À suivre strictement, dans cet ordre.
 
-1. Prendre le prochain `tasks-todo/step-NNN.md` (l'ordre du fichier `INDEX.md` fait foi).
+1. Prendre le prochain `tasks-todo/step-NNN.md` — **l'ordre du fichier `INDEX.md` fait foi**, pas le
+   numéro.
 2. Créer la branche : `feat/step-NNN-slug` (ou `fix/`, `docs/`, `chore/`, `test/`).
-3. Implémenter le périmètre de la step, **tests écrits dans la même PR**.
-4. `pnpm check` vert.
-5. Dernier commit de la PR : `git mv tasks-todo/step-NNN.md tasks-done/` et cocher la ligne dans
+3. **Toujours établir un plan avant d'écrire la moindre ligne**, et en dériver la **todo list**
+   d'implémentation — une entrée par unité livrable, tenue à jour au fil de la step.
+4. Implémenter en **TDD strict : le test rouge d'abord**, jamais le code en premier. Périmètre limité
+   à ce que le fichier de step décrit — rien de plus. Passer par `using-agent-skills` **avant toute
+   modification du code source**, correctifs de revue compris — pas seulement au démarrage.
+   **Commits atomiques au fil de l'eau** : une unité cohérente verte = un commit, jamais la step
+   entière d'un bloc.
+5. Après l'implémentation, lancer la **revue dans des sous-agents en lecture seule** : ils remontent
+   des constats, ils ne corrigent rien. La correction revient à la session, via `using-agent-skills`.
+   Si le contexte manque pour corriger un constat, **replanifier avant de toucher au code**. Relancer
+   la revue **tant qu'il reste des constats bloquants**.
+6. Vérifier la **Definition of Done du fichier de step** : `pnpm check` vert (typecheck · lint · test
+   · vuln · build), invariants (a…e) intacts.
+7. Dernier commit de la PR : `git mv tasks-todo/step-NNN.md tasks-done/` et cocher la ligne dans
    `tasks-todo/INDEX.md`.
-6. Titre de PR en conventional commit, avec la step : `feat(routing): éditeur de route (step-121)`.
+8. Ouvrir la PR — titre en conventional commit avec la step : `feat(routing): éditeur de route
+   (step-121)` — puis **merger dès que la CI est verte**. Si la CI échoue : **deux relances au
+   maximum**, ensuite on s'arrête et on rend la main plutôt que d'insister.
+9. Un jalon est terminé quand **toutes** ses steps sont dans `tasks-done/`.
+
+**Arbitrage.** Une décision se tranche d'abord sur le contexte disponible : spec, plan d'exécution,
+contrat, fichier de step. Si elle reste indécidable après ça, consulter le modèle **Fable** plutôt
+que de trancher au hasard.
 
 Ne jamais déborder du périmètre d'une step. Ce qu'elle exclut est listé dans sa section « Hors
 périmètre » et appartient à une autre PR.
