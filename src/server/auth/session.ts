@@ -166,6 +166,18 @@ export async function revokeSession(db: Database, sessionId: string): Promise<vo
 }
 
 /**
+ * Ferme la session portée par une requête, s'il y en a une.
+ *
+ * Une session partielle se ferme comme une autre : abandonner un second facteur en cours doit fermer
+ * ce qui a été ouvert, sinon la session traînerait jusqu'à son expiration. Et une absence de session
+ * n'est pas une erreur — c'est le cas d'une déconnexion sans cookie, qui doit aboutir en silence.
+ */
+export async function endSession(db: Database, session: SessionState): Promise<void> {
+  if (session.status === 'none') return
+  await revokeSession(db, session.sessionId)
+}
+
+/**
  * Révoque **toutes** les sessions d'un opérateur.
  *
  * Le geste qui compte le jour où l'on désactive quelqu'un, où l'on soupçonne un vol de cookie, ou où

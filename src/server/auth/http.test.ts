@@ -2,7 +2,14 @@
 
 import { describe, expect, it } from 'vitest'
 import { SESSION_COOKIE_NAME } from './cookie'
-import { INVALID_CREDENTIALS_MESSAGE, loginResponse, parseCredentials } from './http'
+import {
+  INVALID_CREDENTIALS_MESSAGE,
+  loginResponse,
+  logoutResponse,
+  meResponse,
+  parseCredentials,
+  SESSION_ABSENT_MESSAGE,
+} from './http'
 import { ABSOLUTE_LIFETIME_MS } from './session'
 
 const SECRETS = { current: 'une-cle-de-session-de-test-assez-longue' }
@@ -90,6 +97,53 @@ describe('réponse de connexion', () => {
     ] as const) {
       expect(loginResponse(outcome, SECRETS).headers.get('cache-control')).toBe('no-store')
     }
+  })
+})
+
+describe('réponse de /auth/me', () => {
+  const OPERATRICE = {
+    id: '01890a5d-ac96-774b-bcce-000000000001',
+    email: 'auditrice@example.test',
+    displayName: 'Auditrice',
+    permissions: ['audit:read'],
+    mfaCompleted: true,
+  } as const
+
+  it('rend l opérateur courant, hors de tout cache', async () => {
+    // Cette réponse porte l'identité et les permissions du moment : gardée par un intermédiaire,
+    // elle donnerait à quelqu'un d'autre la vue d'un opérateur.
+    const response = meResponse(OPERATRICE)
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual(OPERATRICE)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('rend un 401 qui ne dit pas pourquoi', async () => {
+    // Cookie absent, signature invalide, session révoquée, échue, ou opérateur désactivé : une
+    // seule réponse. Le client n'a qu'une conduite à tenir — aller au login.
+    const response = meResponse(undefined)
+
+    expect(response.status).toBe(401)
+    // Un seul corps, constant : la cause n'atteint même pas cette fonction, qui ne reçoit qu'un
+    // `undefined`. Ce que le message ne doit pas faire, c'est nommer l'un des cas.
+    expect(await response.json()).toEqual({ error: SESSION_ABSENT_MESSAGE })
+    expect(SESSION_ABSENT_MESSAGE).not.toMatch(/révoqu|désactiv|inconnu|signature|verrouill/i)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+  })
+})
+
+describe('réponse de déconnexion', () => {
+  it('efface le cookie et ne dit pas s il y avait une session', () => {
+    // **Toujours 204, toujours le cookie effacé**, même sans session : répondre différemment
+    // indiquerait à l'appelant s'il en détenait une. Et effacer inconditionnellement évite qu'un
+    // cookie périmé reste collé au navigateur après une révocation côté serveur.
+    const response = logoutResponse()
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('set-cookie')).toContain(`${SESSION_COOKIE_NAME}=;`)
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
+    expect(response.headers.get('cache-control')).toBe('no-store')
   })
 })
 

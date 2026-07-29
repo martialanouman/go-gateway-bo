@@ -11,6 +11,7 @@ import { currentOperator } from './me'
 import { hashPassword } from './password'
 import {
   completeMfa,
+  endSession,
   openPendingSession,
   purgeDeadSessions,
   readSession,
@@ -213,6 +214,22 @@ describe('révocation', () => {
     expect(await revokeAllSessionsOf(db, operatorId)).toBe(2)
     expect((await readSession(db, premiere.sessionId)).status).toBe('none')
     expect((await readSession(db, seconde.sessionId)).status).toBe('none')
+  })
+
+  it('ferme une session partielle comme une autre', async () => {
+    // Abandonner un second facteur en cours doit fermer ce qui a été ouvert : sinon la session
+    // partielle traînerait jusqu'à son expiration, et le cookie avec elle.
+    const { sessionId } = await openPendingSession(db, operatorId)
+
+    await endSession(db, await readSession(db, sessionId))
+
+    expect((await readSession(db, sessionId)).status).toBe('none')
+  })
+
+  it('ne fait rien quand il n y a pas de session', async () => {
+    // Le cas d'une déconnexion sans cookie : elle doit aboutir sans rien révoquer, parce que la
+    // réponse ne dira pas non plus s'il y avait quelque chose à fermer.
+    await expect(endSession(db, { status: 'none' })).resolves.toBeUndefined()
   })
 
   it('ne recompte pas une session déjà révoquée', async () => {

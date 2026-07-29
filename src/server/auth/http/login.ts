@@ -35,13 +35,12 @@ import { defineEventHandler, getRequestHeader, getRequestIP, readBody } from 'h3
 import { getDatabase } from '../../db/index'
 import { readClientIp, readTrustedProxyCount } from '../client-ip'
 import { createSemaphore, readVerificationSlots } from '../concurrency'
-import { readSessionSecrets, type SessionSecrets } from '../cookie'
 import { loginResponse, parseCredentials } from '../http'
 import { createLoginService, type LoginService } from '../login'
 import { readThrottleSecret } from '../throttle'
+import { getSessionSecrets } from './secrets'
 
 let service: LoginService | undefined
-let secrets: SessionSecrets | undefined
 
 /**
  * Un service par process, construit au premier appel.
@@ -57,11 +56,6 @@ function getLoginService(): LoginService {
     semaphore: createSemaphore({ slots: readVerificationSlots(process.env), queueLimit: 64 }),
   })
   return service
-}
-
-function getSessionSecrets(): SessionSecrets {
-  secrets ??= readSessionSecrets(process.env)
-  return secrets
 }
 
 export default defineEventHandler(async (event) => {

@@ -10,12 +10,14 @@
  */
 
 import {
+  clearedSessionCookie,
   SESSION_COOKIE_NAME,
   type SessionSecrets,
   sessionCookieAttributes,
   signSessionId,
 } from './cookie'
 import type { LoginOutcome } from './login'
+import type { CurrentOperator } from './me'
 import { ABSOLUTE_LIFETIME_MS } from './session'
 
 /**
@@ -58,6 +60,34 @@ export function loginResponse(outcome: LoginOutcome, secrets: SessionSecrets): R
   }
 
   return json({ error: INVALID_CREDENTIALS_MESSAGE }, 401)
+}
+
+/** Le seul message de session absente. Comme pour la connexion, il ne dit pas ce qui manque. */
+export const SESSION_ABSENT_MESSAGE = 'Session absente ou expirée.'
+
+/**
+ * `GET /auth/me` — l'opérateur courant, ou un refus qui ne renseigne pas.
+ *
+ * Cookie absent, signature invalide, session révoquée, échue, inactive, ou opérateur désactivé : la
+ * même réponse. Le client n'a qu'une conduite à tenir — aller au login — et distinguer les cas ne
+ * l'aiderait pas, alors que cela renseignerait qui sonde.
+ */
+export function meResponse(me: CurrentOperator | undefined): Response {
+  return me ? json(me, 200) : json({ error: SESSION_ABSENT_MESSAGE }, 401)
+}
+
+/**
+ * `POST /auth/logout` — **toujours 204, toujours le cookie effacé**.
+ *
+ * Répondre différemment selon qu'il y avait une session indiquerait à l'appelant s'il en détenait
+ * une. Et effacer inconditionnellement évite qu'un cookie périmé reste collé au navigateur après une
+ * révocation décidée côté serveur.
+ */
+export function logoutResponse(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: { 'set-cookie': clearedSessionCookie(), 'cache-control': 'no-store' },
+  })
 }
 
 function json(body: unknown, status: number, headers: Record<string, string> = {}): Response {
