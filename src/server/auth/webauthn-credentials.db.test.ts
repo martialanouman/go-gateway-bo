@@ -17,7 +17,7 @@ import {
   listCredentials,
   recordCredentialUse,
   renameCredential,
-  revokeCredential,
+  revokeCredentialUnlessLastFactor,
 } from './webauthn-credentials'
 
 const POSTGRES_IMAGE = 'postgres:18-alpine'
@@ -154,13 +154,67 @@ describe('renommage et révocation', () => {
   })
 
   it('révoque un authentificateur et garde les autres', async () => {
-    expect(await revokeCredential(db, operatorId, 'cred-a')).toBe(true)
+    expect(await revokeCredentialUnlessLastFactor(db, operatorId, 'cred-a')).toBe('revoked')
 
     expect((await listCredentials(db, operatorId)).map((entry) => entry.id)).toEqual(['cred-b'])
   })
 
   it('refuse de révoquer un authentificateur inconnu', async () => {
-    expect(await revokeCredential(db, operatorId, 'cred-absent')).toBe(false)
+    expect(await revokeCredentialUnlessLastFactor(db, operatorId, 'cred-absent')).toBe(
+      'unknown_credential',
+    )
+  })
+
+  it('refuse de retirer le dernier facteur', async () => {
+    await revokeCredentialUnlessLastFactor(db, operatorId, 'cred-a')
+
+    expect(await revokeCredentialUnlessLastFactor(db, operatorId, 'cred-b')).toBe('last_factor')
+    expect(await listCredentials(db, operatorId)).toHaveLength(1)
+  })
+
+  it('ne laisse pas deux retraits concurrents vider tous les facteurs', async () => {
+    // **La course que la garde doit fermer**, et elle ne se ferme que sous le verrou : deux onglets
+    // retirent chacun un appareil différent, chacun constate qu'il en reste un autre, et les deux
+    // aboutissent — l'opérateur se retrouve sans aucun second facteur.
+    //
+    // L'entrelacement est construit : une transaction tient le verrou et retire `cred-a` sans valider,
+    // le retrait de `cred-b` s'y bloque, et l'on observe cette attente dans `pg_locks`. Une garde lue
+    // avant le verrou aurait laissé passer le second.
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    try {
+      const holder = sql.begin(async (tx) => {
+        await tx`SELECT id FROM operators WHERE id = ${operatorId} FOR UPDATE`
+        await held
+        const remaining = JSON.stringify([
+          { ...credential('cred-b', 'téléphone'), createdAt: new Date().toISOString() },
+        ])
+        await tx`UPDATE operators SET mfa_webauthn_credentials = ${remaining}::jsonb
+                 WHERE id = ${operatorId}`
+      })
+
+      const contender = revokeCredentialUnlessLastFactor(otherInstance, operatorId, 'cred-b')
+      await waitUntilBlocked(sql)
+      release()
+      await holder
+
+      expect(await contender).toBe('last_factor')
+      expect((await listCredentials(db, operatorId)).map((entry) => entry.id)).toEqual(['cred-b'])
+    } finally {
+      release()
+    }
+  })
+
+  it('accepte de retirer la dernière passkey si un TOTP est actif', async () => {
+    await revokeCredentialUnlessLastFactor(db, operatorId, 'cred-a')
+    await sql`UPDATE operators SET mfa_totp_secret = 'v1.peu-importe', mfa_totp_activated_at = now()
+              WHERE id = ${operatorId}`
+
+    expect(await revokeCredentialUnlessLastFactor(db, operatorId, 'cred-b')).toBe('revoked')
+    expect(await listCredentials(db, operatorId)).toEqual([])
   })
 
   it("ne touche pas aux authentificateurs d'un autre opérateur", async () => {
@@ -172,7 +226,7 @@ describe('renommage et révocation', () => {
     const otherOperatorId = row?.id ?? ''
     await addCredential(db, otherOperatorId, credential('cred-a', 'le sien'))
 
-    await revokeCredential(db, operatorId, 'cred-a')
+    await revokeCredentialUnlessLastFactor(db, operatorId, 'cred-a')
 
     expect((await listCredentials(db, otherOperatorId)).map((entry) => entry.id)).toEqual([
       'cred-a',
@@ -198,6 +252,14 @@ describe('compteur de signature', () => {
     // une valeur qui n'avance plus, et c'est ce refus qui la rend utile.
     expect(await recordCredentialUse(db, operatorId, 'cred-a', 5)).toBe(false)
     expect(await recordCredentialUse(db, operatorId, 'cred-a', 4)).toBe(false)
+    expect((await listCredentials(db, operatorId))[0]?.counter).toBe(5)
+  })
+
+  it('refuse un compteur annoncé à zéro contre un compteur déjà avancé', async () => {
+    // **La condition est un OU, et l'écrire en ET était une faille.** Un appareil qui annonce toujours
+    // zéro aurait pu faire reculer un compteur déjà à cinq, et rendre la détection de clonage
+    // inopérante pour toujours.
+    expect(await recordCredentialUse(db, operatorId, 'cred-a', 0)).toBe(false)
     expect((await listCredentials(db, operatorId))[0]?.counter).toBe(5)
   })
 

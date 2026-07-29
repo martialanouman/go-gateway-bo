@@ -54,7 +54,7 @@ import {
   type RegisteredCredential,
   recordCredentialUse,
   renameCredential,
-  revokeCredential,
+  revokeCredentialUnlessLastFactor,
 } from './webauthn-credentials'
 
 /** Repli quand la base ne rend pas d'échéance de verrou : mieux vaut une minute qu'un silence. */
@@ -254,29 +254,23 @@ export async function finishPasskeyAuthentication(
 /**
  * Retire un appareil, sauf s'il est le dernier facteur de l'opérateur.
  *
- * La garde est évaluée **après** avoir lu la liste et l'état du TOTP, et refuse avant toute écriture :
- * un opérateur qui se retire son dernier moyen d'entrer ne se répare qu'en base.
+ * **La garde n'est pas évaluée ici**, et c'est délibéré : elle doit l'être sous le même verrou que
+ * l'écriture, sinon deux retraits concurrents d'appareils différents constatent chacun qu'il en reste
+ * un autre et aboutissent tous les deux. Ce module se contente donc de traduire le verdict que
+ * `revokeCredentialUnlessLastFactor` rend depuis l'intérieur de sa transaction.
  */
 export async function revokePasskey(
   db: Database,
   session: AuthenticatedSession,
   credentialId: string,
 ): Promise<PasskeyRevocation> {
-  const existing = await listCredentials(db, session.operatorId)
-  if (!existing.some((entry) => entry.id === credentialId)) {
-    return { outcome: 'unknown_credential' }
-  }
+  const result = await revokeCredentialUnlessLastFactor(db, session.operatorId, credentialId)
+  if (result !== 'revoked') return { outcome: result }
 
-  const remaining = existing.filter((entry) => entry.id !== credentialId)
-  if (remaining.length === 0 && !(await hasActivatedTotp(db, session.operatorId))) {
-    return { outcome: 'last_factor' }
+  return {
+    outcome: 'revoked',
+    credentials: publicView(await listCredentials(db, session.operatorId)),
   }
-
-  if (!(await revokeCredential(db, session.operatorId, credentialId))) {
-    return { outcome: 'unknown_credential' }
-  }
-
-  return { outcome: 'revoked', credentials: publicView(remaining) }
 }
 
 /**

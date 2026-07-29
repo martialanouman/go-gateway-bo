@@ -86,16 +86,56 @@ export function renameCredential(
   })
 }
 
-/** Retire un authentificateur. Rend `false` s'il n'existe pas. La garde du dernier facteur est ailleurs. */
-export function revokeCredential(
+export type RevocationResult = 'revoked' | 'unknown_credential' | 'last_factor'
+
+/**
+ * Retire un authentificateur, **sauf s'il est le dernier facteur** de l'opérateur.
+ *
+ * ## Pourquoi la garde est ici et pas chez l'appelant
+ *
+ * Parce qu'elle doit être évaluée **sous le même verrou** que l'écriture. Lue avant, elle se contourne
+ * par une course parfaitement banale : deux onglets retirent chacun un appareil différent, chacun
+ * constate qu'il en reste un autre, et les deux aboutissent — l'opérateur se retrouve sans aucun second
+ * facteur, ce que cette garde existe précisément pour empêcher.
+ *
+ * Le nom dit ce qu'il garantit, et il n'existe **pas** de variante non gardée : une fonction
+ * `revokeCredential` nue posée à côté serait l'appel vers lequel on se tournerait un jour par
+ * commodité. La réinitialisation administrative d'un facteur (step-027) écrira sa propre garde, avec sa
+ * permission et son audit.
+ *
+ * `mfa_totp_activated_at` est relu dans la même transaction verrouillée : un TOTP actif rend le retrait
+ * de la dernière passkey inoffensif, mais seule une lecture sous le verrou permet de l'affirmer.
+ */
+export async function revokeCredentialUnlessLastFactor(
   db: Database,
   operatorId: string,
   credentialId: string,
-): Promise<boolean> {
-  return mutate(db, operatorId, (existing) => {
-    if (!existing.some((entry) => entry.id === credentialId)) return undefined
+): Promise<RevocationResult> {
+  return db.transaction(async (tx) => {
+    const locked = await tx.execute<{
+      mfa_webauthn_credentials: unknown
+      mfa_totp_activated_at: string | null
+    }>(sql`
+      SELECT mfa_webauthn_credentials, mfa_totp_activated_at
+      FROM operators WHERE id = ${operatorId}
+      FOR UPDATE
+    `)
 
-    return existing.filter((entry) => entry.id !== credentialId)
+    const row = locked[0]
+    if (!row) return 'unknown_credential'
+
+    const existing = parse(row.mfa_webauthn_credentials)
+    if (!existing.some((entry) => entry.id === credentialId)) return 'unknown_credential'
+
+    const remaining = existing.filter((entry) => entry.id !== credentialId)
+    if (remaining.length === 0 && !row.mfa_totp_activated_at) return 'last_factor'
+
+    await tx
+      .update(operators)
+      .set({ mfaWebauthnCredentials: remaining, updatedAt: sql`now()` })
+      .where(eq(operators.id, operatorId))
+
+    return 'revoked'
   })
 }
 
@@ -104,8 +144,19 @@ export function revokeCredential(
  *
  * **Le compteur doit progresser strictement.** C'est la détection de clonage de la spécification : un
  * authentificateur dupliqué finit par présenter une valeur qui n'avance plus, et refuser ce cas est ce
- * qui la rend utile. Certains appareils — les passkeys synchronisées, notamment — laissent
- * délibérément le compteur à zéro ; la comparaison ne s'applique donc qu'à ceux qui le tiennent.
+ * qui la rend utile.
+ *
+ * ## La condition est un OU, et l'écrire en ET est une faille
+ *
+ * Certains appareils — les passkeys synchronisées, notamment — laissent délibérément le compteur à
+ * zéro. Il faut donc les accepter, mais **seulement s'ils y sont restés** : la condition porte sur les
+ * deux valeurs, `(annoncé > 0 || stocké > 0)`, exactement comme la bibliothèque le fait elle-même.
+ *
+ * Écrite en `annoncé > 0 && …`, elle n'aurait rejeté aucun zéro : un appareil qui annonce toujours
+ * zéro aurait pu **faire reculer** un compteur déjà à cinq. La bibliothèque refuse ce cas en amont, mais
+ * sur son propre instantané — et l'écart entre cette lecture et l'écriture verrouillée ici suffit à ce
+ * qu'un usage légitime concurrent fasse progresser le compteur entre les deux. Le recul redeviendrait
+ * alors possible, et la détection de clonage inopérante pour toujours.
  */
 export function recordCredentialUse(
   db: Database,
@@ -116,7 +167,7 @@ export function recordCredentialUse(
   return mutate(db, operatorId, (existing) => {
     const target = existing.find((entry) => entry.id === credentialId)
     if (!target) return undefined
-    if (newCounter > 0 && newCounter <= target.counter) return undefined
+    if ((newCounter > 0 || target.counter > 0) && newCounter <= target.counter) return undefined
 
     return existing.map((entry) =>
       entry.id === credentialId ? { ...entry, counter: newCounter, lastUsedAt: nowIso() } : entry,

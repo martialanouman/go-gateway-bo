@@ -108,14 +108,27 @@ function parseOrigin(origin: string): { readonly hostname: string } | undefined 
   if (url.pathname !== '/' || url.search !== '' || url.hash !== '') return undefined
   if (origin.endsWith('/')) return undefined
 
-  const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalhost)) return undefined
+  // `localhost` et lui seul : la spécification ne reconnaît pas une adresse IP comme `rpID` valide, si
+  // bien qu'accepter `http://127.0.0.1` aurait laissé configurer un facteur qui ne fonctionne pas —
+  // avec un échec qui ressemble à un problème d'appareil.
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && url.hostname === 'localhost')) {
+    return undefined
+  }
 
   return { hostname: url.hostname }
 }
 
-/** `rpID` doit être l'hôte lui-même ou l'un de ses domaines parents. */
+/**
+ * `rpID` doit être l'hôte lui-même ou l'un de ses domaines parents.
+ *
+ * L'exigence d'un point — ou de `localhost` — écarte le cas où un suffixe nu serait pris pour un
+ * domaine parent : `co` « couvrirait » `example.co` par simple comparaison de suffixe, et le navigateur
+ * refuserait. Ce n'est pas la liste des suffixes publics, et cela ne prétend pas l'être : cela écarte
+ * la faute de frappe qui produirait un second facteur inutilisable.
+ */
 function coversHost(rpId: string, hostname: string): boolean {
+  if (rpId !== 'localhost' && !rpId.includes('.')) return false
+
   return hostname === rpId || hostname.endsWith(`.${rpId}`)
 }
 
