@@ -19,6 +19,12 @@ C'est ici, enfin, que vit l'**invariant (b)** : un secret n'est jamais réaffich
 les codes de récupération ne sortent qu'une fois, à l'enrôlement (`auth/mfa*.ts`) ; aucune action
 « revoir mes codes » n'existe, et il n'y en aura pas.
 
+Les passkeys (`auth/webauthn*.ts`, `auth/mfa-webauthn.ts`) n'y échappent pas mais posent l'inverse :
+ce qui est stocké est une clé **publique**, donc la lire ne permet pas de se faire passer pour
+l'opérateur. Ce qui compte là est ailleurs — `AUTH_WEBAUTHN_RP_ID` et `AUTH_WEBAUTHN_ORIGIN` sont
+vérifiés côté serveur à chaque cérémonie, et c'est **la seule** garantie cryptographique du dépôt
+qu'une valeur trop permissive annule au lieu d'affaiblir.
+
 Contenu à venir : client Admin typé (step-001), accès Drizzle (step-002), session et MFA (M1),
 WebAuthn (step-024), moteur de permissions et journal d'audit (step-025), hub WebSocket (step-043),
 évaluateur d'alertes métier (step-182).

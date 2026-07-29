@@ -53,6 +53,7 @@ import {
   listCredentials,
   type RegisteredCredential,
   recordCredentialUse,
+  renameCredential,
   revokeCredential,
 } from './webauthn-credentials'
 
@@ -276,6 +277,29 @@ export async function revokePasskey(
   }
 
   return { outcome: 'revoked', credentials: publicView(remaining) }
+}
+
+/**
+ * Renomme un appareil. Aucune garde de disponibilité : un nom ne protège rien.
+ *
+ * Le nom vient de l'opérateur — « MacBook », « clé du coffre » — et c'est ce qui rend une liste de
+ * trois appareils exploitable au moment d'en retirer un. Un libellé imposé par le serveur ferait de
+ * cette liste trois lignes indistinguables.
+ */
+export async function renamePasskey(
+  db: Database,
+  session: AuthenticatedSession,
+  credentialId: string,
+  name: string,
+): Promise<PasskeyRevocation> {
+  if (!(await renameCredential(db, session.operatorId, credentialId, name))) {
+    return { outcome: 'unknown_credential' }
+  }
+
+  return {
+    outcome: 'revoked',
+    credentials: publicView(await listCredentials(db, session.operatorId)),
+  }
 }
 
 /** Un facteur actif, tous types confondus : une passkey enregistrée ou un TOTP confirmé. */

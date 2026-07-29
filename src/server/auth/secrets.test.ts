@@ -56,3 +56,26 @@ describe('clés MFA du process', () => {
     expect(() => getMfaKeys()).toThrow(/AUTH_MFA_SECRET/)
   })
 })
+
+describe('configuration WebAuthn du process', () => {
+  it("ne lit et ne valide l'environnement qu'une fois", async () => {
+    vi.stubEnv('AUTH_WEBAUTHN_RP_ID', 'localhost')
+    vi.stubEnv('AUTH_WEBAUTHN_ORIGIN', 'http://localhost:3000')
+    const { getWebAuthnConfig } = await import('./secrets')
+
+    const first = getWebAuthnConfig()
+    vi.stubEnv('AUTH_WEBAUTHN_RP_ID', 'autre.test')
+
+    // Le même objet : un `rpID` qui changerait en vol invaliderait toutes les passkeys enregistrées.
+    expect(getWebAuthnConfig()).toBe(first)
+    expect(first.rpId).toBe('localhost')
+  })
+
+  it('refuse une origine incohérente au lieu de la corriger', async () => {
+    vi.stubEnv('AUTH_WEBAUTHN_RP_ID', 'autre.test')
+    vi.stubEnv('AUTH_WEBAUTHN_ORIGIN', 'https://cockpit.example.test')
+    const { getWebAuthnConfig } = await import('./secrets')
+
+    expect(() => getWebAuthnConfig()).toThrow(/AUTH_WEBAUTHN_RP_ID/)
+  })
+})

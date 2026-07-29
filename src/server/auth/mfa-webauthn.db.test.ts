@@ -17,6 +17,7 @@ import {
   finishPasskeyAuthentication,
   finishPasskeyRegistration,
   listPasskeys,
+  renamePasskey,
   revokePasskey,
   startPasskeyAuthentication,
   startPasskeyRegistration,
@@ -386,5 +387,127 @@ describe('ce que la liste expose', () => {
     const [entry] = await listPasskeys(db, session)
 
     expect(Object.keys(entry ?? {}).sort()).toEqual(['createdAt', 'id', 'name'])
+  })
+})
+
+describe('renommage', () => {
+  it('renomme un appareil et rend la liste à jour', async () => {
+    // Le nom vient de l'opérateur : c'est ce qui rend une liste de trois appareils exploitable au
+    // moment d'en retirer un.
+    const session = await activeSession()
+    const authenticator = await enrollPasskey(session, 'poste')
+
+    const renamed = await renamePasskey(
+      db,
+      session,
+      authenticator.credentialId,
+      'MacBook du bureau',
+    )
+
+    expect(renamed.outcome).toBe('revoked')
+    expect((await listPasskeys(db, session)).map((entry) => entry.name)).toEqual([
+      'MacBook du bureau',
+    ])
+  })
+
+  it('refuse de renommer un appareil inconnu', async () => {
+    const session = await activeSession()
+    await enrollPasskey(session)
+
+    expect((await renamePasskey(db, session, 'cred-absent', 'x')).outcome).toBe(
+      'unknown_credential',
+    )
+  })
+})
+
+describe('chemins de refus restants', () => {
+  it("refuse d'achever un enregistrement depuis une session partielle quand un facteur existe", async () => {
+    // La garde est évaluée aux **deux** phases : la contourner en n'appelant que la seconde ne doit
+    // pas marcher.
+    const session = await activeSession()
+    const authenticator = createSoftwareAuthenticator()
+    const started = await startPasskeyRegistration(db, CONFIG, session)
+    if (started.outcome !== 'started') throw new Error('Cérémonie non démarrée.')
+    await enrollPasskey(session, 'déjà là')
+
+    const response = authenticator.register({
+      challenge: started.options.challenge,
+      rpId: CONFIG.rpId,
+      origin: CONFIG.origin,
+    })
+    const partial: PendingSession = {
+      status: 'pending_mfa',
+      sessionId: session.sessionId,
+      operatorId,
+    }
+
+    expect((await finishPasskeyRegistration(db, CONFIG, partial, response, 'x')).outcome).toBe(
+      'mfa_required',
+    )
+  })
+
+  it('refuse un appareil déjà enrôlé', async () => {
+    // Le même authentificateur, deux cérémonies : `excludeCredentials` le dit au navigateur, et le
+    // magasin le refuse quand le navigateur ne l'écoute pas.
+    const session = await activeSession()
+    const authenticator = await enrollPasskey(session)
+
+    const started = await startPasskeyRegistration(db, CONFIG, session)
+    if (started.outcome !== 'started') throw new Error('Cérémonie non démarrée.')
+    const response = authenticator.register({
+      challenge: started.options.challenge,
+      rpId: CONFIG.rpId,
+      origin: CONFIG.origin,
+    })
+
+    expect((await finishPasskeyRegistration(db, CONFIG, session, response, 'x')).outcome).toBe(
+      'invalid_response',
+    )
+    expect(await listPasskeys(db, session)).toHaveLength(1)
+  })
+
+  it("refuse d'achever une authentification sans cérémonie en cours", async () => {
+    const authenticator = await enrollPasskey(await activeSession())
+    const session = await pendingSession()
+
+    const assertion = authenticator.authenticate({
+      challenge: 'un-defi-jamais-emis',
+      rpId: CONFIG.rpId,
+      origin: CONFIG.origin,
+      counter: 1,
+    })
+
+    expect(await finishPasskeyAuthentication(db, CONFIG, session, assertion)).toEqual({
+      outcome: 'no_pending_ceremony',
+    })
+  })
+
+  it('refuse une authentification quand le compteur a fermé la porte', async () => {
+    const authenticator = await enrollPasskey(await activeSession())
+    const session = await pendingSession()
+    const started = await startPasskeyAuthentication(db, CONFIG, session)
+    if (started.outcome !== 'started') throw new Error('Cérémonie non démarrée.')
+
+    for (let attempt = 0; attempt < THRESHOLDS.mfa; attempt += 1) {
+      await sql`INSERT INTO login_attempts (scope, subject, failures, locked_until)
+                VALUES ('mfa', ${operatorId}, 99, now() + interval '15 minutes')
+                ON CONFLICT (scope, subject) DO UPDATE SET locked_until = now() + interval '15 minutes'`
+    }
+
+    const outcome = await finishPasskeyAuthentication(
+      db,
+      CONFIG,
+      session,
+      authenticator.authenticate({
+        challenge: started.options.challenge,
+        rpId: CONFIG.rpId,
+        origin: CONFIG.origin,
+        counter: 1,
+      }),
+    )
+
+    expect(outcome.outcome).toBe('rate_limited')
+    if (outcome.outcome !== 'rate_limited') return
+    expect(outcome.retryAfterSeconds).toBeGreaterThan(0)
   })
 })

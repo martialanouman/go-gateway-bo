@@ -6,17 +6,30 @@ import {
   ALREADY_ENROLLED_MESSAGE,
   INVALID_CREDENTIALS_MESSAGE,
   INVALID_MFA_CODE_MESSAGE,
+  INVALID_PASSKEY_MESSAGE,
+  LAST_FACTOR_MESSAGE,
   loginResponse,
   logoutResponse,
   MFA_RATE_LIMITED_MESSAGE,
   meResponse,
   mfaEnrollResponse,
   mfaVerifyResponse,
+  NO_PASSKEY_MESSAGE,
+  NO_PENDING_CEREMONY_MESSAGE,
   NO_PENDING_ENROLLMENT_MESSAGE,
+  PASSKEY_MFA_REQUIRED_MESSAGE,
   parseCredentials,
   parseEnrollmentBody,
   parseMfaCode,
+  parsePasskeyAuthentication,
+  parsePasskeyId,
+  parsePasskeyRegistration,
+  passkeyListResponse,
+  passkeyRegisterResponse,
+  passkeyRevokeResponse,
+  passkeyVerifyResponse,
   SESSION_ABSENT_MESSAGE,
+  UNKNOWN_PASSKEY_MESSAGE,
 } from './http'
 import { ABSOLUTE_LIFETIME_MS } from './session'
 
@@ -327,5 +340,186 @@ describe('réponse de vérification', () => {
     expect(response.status).toBe(429)
     expect(response.headers.get('retry-after')).toBe('900')
     expect(await response.json()).toEqual({ error: MFA_RATE_LIMITED_MESSAGE })
+  })
+})
+
+const PASSKEY = {
+  id: 'cred-a',
+  name: 'MacBook',
+  createdAt: '2026-07-29T12:00:00.000Z',
+} as const
+
+describe("réponse d'enregistrement de passkey", () => {
+  it('rend les options que le navigateur doit signer', async () => {
+    const response = passkeyRegisterResponse({
+      outcome: 'started',
+      options: { challenge: 'un-defi' } as never,
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(await response.json()).toEqual({ options: { challenge: 'un-defi' } })
+  })
+
+  it('annonce le facteur passé et rend la liste des appareils', async () => {
+    const response = passkeyRegisterResponse({ outcome: 'registered', credentials: [PASSKEY] })
+
+    expect(await response.json()).toEqual({ mfa_completed: true, passkeys: [PASSKEY] })
+  })
+
+  it('refuse en 403 quand le second facteur actuel n’a pas été franchi', async () => {
+    // 403 et non 401 : la session est valide, c'est le *niveau* d'authentification qui manque. Un 401
+    // enverrait le client au login alors qu'il y est déjà passé.
+    const response = passkeyRegisterResponse({ outcome: 'mfa_required' })
+
+    expect(response.status).toBe(403)
+    expect(await response.json()).toEqual({ error: PASSKEY_MFA_REQUIRED_MESSAGE })
+  })
+
+  it('renvoie au démarrage quand aucune cérémonie n’est en cours', async () => {
+    const response = passkeyRegisterResponse({ outcome: 'no_pending_ceremony' })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({ error: NO_PENDING_CEREMONY_MESSAGE })
+  })
+
+  it('ne distingue pas les causes d’un refus de cérémonie', async () => {
+    const response = passkeyRegisterResponse({ outcome: 'invalid_response' })
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: INVALID_PASSKEY_MESSAGE })
+  })
+})
+
+describe('réponse de vérification de passkey', () => {
+  it('rend les options', async () => {
+    const response = passkeyVerifyResponse({
+      outcome: 'started',
+      options: { challenge: 'un-defi' } as never,
+    })
+
+    expect(await response.json()).toEqual({ options: { challenge: 'un-defi' } })
+  })
+
+  it('annonce le second facteur passé', async () => {
+    const response = passkeyVerifyResponse({ outcome: 'completed' })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ mfa_completed: true })
+  })
+
+  it('distingue l’absence d’appareil d’un refus', async () => {
+    // 409 et non 401 : le compte est connu, la session est valide, il n'y a rien à vérifier par ce
+    // facteur. L'interface doit alors proposer le TOTP, ce qu'un 401 ne lui dirait pas.
+    const response = passkeyVerifyResponse({ outcome: 'no_passkey' })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({ error: NO_PASSKEY_MESSAGE })
+  })
+
+  it('renvoie au démarrage quand la cérémonie a expiré', async () => {
+    expect(passkeyVerifyResponse({ outcome: 'no_pending_ceremony' }).status).toBe(409)
+  })
+
+  it('annonce le délai quand le compteur a fermé la porte', async () => {
+    const response = passkeyVerifyResponse({ outcome: 'rate_limited', retryAfterSeconds: 900 })
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBe('900')
+  })
+
+  it('ne distingue pas un appareil inconnu d’une signature invalide', async () => {
+    const response = passkeyVerifyResponse({ outcome: 'invalid_response' })
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: INVALID_PASSKEY_MESSAGE })
+  })
+})
+
+describe('liste et gestion des passkeys', () => {
+  it('rend la liste', async () => {
+    const response = passkeyListResponse([PASSKEY])
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ passkeys: [PASSKEY] })
+  })
+
+  it('rend la liste restante après retrait', async () => {
+    const response = passkeyRevokeResponse({ outcome: 'revoked', credentials: [] })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ passkeys: [] })
+  })
+
+  it('refuse le retrait du dernier facteur en disant quoi faire', async () => {
+    // « Refusé » sans suite pousserait à chercher un contournement.
+    const response = passkeyRevokeResponse({ outcome: 'last_factor' })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({ error: LAST_FACTOR_MESSAGE })
+  })
+
+  it('rend 404 pour un appareil inconnu', async () => {
+    const response = passkeyRevokeResponse({ outcome: 'unknown_credential' })
+
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: UNKNOWN_PASSKEY_MESSAGE })
+  })
+})
+
+describe('lecture des corps de cérémonie', () => {
+  const response = { id: 'cred-a', rawId: 'cred-a', type: 'public-key' }
+
+  it('sans réponse d’authentificateur, demande des options', () => {
+    for (const body of [undefined, null, {}, 'une chaîne', 42]) {
+      expect(parsePasskeyRegistration(body), JSON.stringify(body) ?? 'undefined').toEqual({
+        phase: 'start',
+      })
+      expect(parsePasskeyAuthentication(body), JSON.stringify(body) ?? 'undefined').toEqual({
+        phase: 'start',
+      })
+    }
+  })
+
+  it('avec une réponse, passe à la seconde phase et borne le nom', () => {
+    expect(parsePasskeyRegistration({ response, name: `  ${'x'.repeat(200)}  ` })).toEqual({
+      phase: 'finish',
+      response,
+      name: 'x'.repeat(60),
+    })
+    expect(parsePasskeyAuthentication({ response })).toEqual({ phase: 'finish', response })
+  })
+
+  it('accepte un enregistrement sans nom, que le magasin remplacera', () => {
+    expect(parsePasskeyRegistration({ response })).toEqual({ phase: 'finish', response, name: '' })
+  })
+
+  it('refuse une réponse présente mais inexploitable, sans retomber sur les options', () => {
+    // Retomber sur `start` émettrait un nouveau défi et effacerait celui de la cérémonie en cours :
+    // l'opérateur qui vient d'approuver sur son téléphone se verrait refusé sans comprendre.
+    for (const body of [
+      { response: 42 },
+      { response: null },
+      { response: {} },
+      { response: { id: '' } },
+    ]) {
+      expect(parsePasskeyRegistration(body), JSON.stringify(body)).toEqual({ phase: 'invalid' })
+      expect(parsePasskeyAuthentication(body), JSON.stringify(body)).toEqual({ phase: 'invalid' })
+    }
+  })
+
+  it('lit l’identifiant d’un appareil, ou rien', () => {
+    expect(parsePasskeyId({ credential_id: '  cred-a  ' })).toBe('cred-a')
+
+    for (const body of [
+      undefined,
+      null,
+      {},
+      { credential_id: 42 },
+      { credential_id: '' },
+      { credential_id: 'x'.repeat(600) },
+    ]) {
+      expect(parsePasskeyId(body), JSON.stringify(body) ?? 'undefined').toBeUndefined()
+    }
   })
 })
