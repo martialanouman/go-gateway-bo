@@ -72,5 +72,15 @@ test('la référence visuelle rend la charte', async ({ page }) => {
   await page.goto('/_design')
 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Référence visuelle')
-  await expect(page.getByRole('heading', { level: 2, name: 'États' })).toBeVisible()
+
+  // `exact: true` — sans lui, Playwright cherche une **sous-chaîne** insensible à la casse, et
+  // « États » désigne aussi « Les cinq états de contenu » depuis la step-042 : deux résultats, donc
+  // une violation du mode strict. Le test échouait pour une ambiguïté, pas pour une régression.
+  await expect(page.getByRole('heading', { level: 2, name: 'États', exact: true })).toBeVisible()
+
+  // Les cinq états de contenu, livrés en step-042 : c'est la page qui fait foi sur leur copie.
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'Les cinq états de contenu' }),
+  ).toBeVisible()
+  await expect(page.getByText('Facturation — module désactivé sur la passerelle')).toBeVisible()
 })
