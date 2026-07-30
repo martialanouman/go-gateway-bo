@@ -80,6 +80,30 @@ jobs:
   e2e:
     name: Bout en bout
     runs-on: ubuntu-latest
+
+    # Les parcours d'authentification exigent une vraie base : c'est tout leur intérêt. Un service du
+    # job plutôt que Testcontainers, parce que le serveur testé est un **process séparé** lancé par
+    # Playwright — il ne peut pas hériter d'un conteneur démarré depuis un test.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: dashboard
+          POSTGRES_PASSWORD: dashboard
+          POSTGRES_DB: dashboard
+        ports:
+          - 5432:5432
+        # Sans cette attente, `globalSetup` migrerait une base qui n'accepte pas encore les connexions,
+        # et l'échec se lirait comme un défaut du code testé.
+        options: >-
+          --health-cmd "pg_isready -U dashboard -d dashboard"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+
+    env:
+      DATABASE_URL: postgres://dashboard:dashboard@localhost:5432/dashboard
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup

@@ -25,8 +25,14 @@ export default defineConfig({
 
   reporter: process.env.CI ? [['html', { open: 'never' }], ['github']] : 'list',
 
+  // Une base migrée et un opérateur amorcé : les parcours d'authentification ne se simulent pas.
+  globalSetup: './e2e/global-setup.ts',
+
   use: {
-    baseURL: 'http://127.0.0.1:3100',
+    // **`localhost` et non `127.0.0.1`** : WebAuthn n'accepte pas une adresse IP comme `rpID`, ce que
+    // `readWebAuthnConfig` refuse désormais explicitement. `localhost` est par ailleurs un contexte
+    // sécurisé aux yeux du navigateur, ce qui rend l'API disponible sans certificat.
+    baseURL: 'http://localhost:3100',
     // La trace n'est enregistrée qu'à la reprise : un échec en CI livre alors le film complet
     // (réseau, DOM, console) sans ralentir les exécutions vertes.
     trace: 'on-first-retry',
@@ -52,7 +58,7 @@ export default defineConfig({
     // Port dédié, distinct du 3000 de `pnpm dev` : un serveur de développement qui traîne serait
     // sinon capté, et on croirait tester le build de production — la seule raison d'être de cette
     // suite — en testant Vite en mode développement.
-    url: 'http://127.0.0.1:3100',
+    url: 'http://localhost:3100',
     // **Jamais de réutilisation, même en local.** Un serveur resté en vie sert le build précédent :
     // le symptôme est un test vert sur du code qui n'existe plus, et il est arrivé pendant l'écriture
     // de ce fichier. Redémarrer coûte une seconde depuis que le build n'est plus dans cette commande.
@@ -64,6 +70,24 @@ export default defineConfig({
       // et une suite qui en dépendrait échouerait pour des raisons étrangères au code testé.
       GATEWAY_MODE: 'mock',
       GATEWAY_ADMIN_BASE_URL: 'http://127.0.0.1:4010',
+
+      // Le serveur est un **process séparé** : il ne peut pas hériter d'un conteneur démarré depuis un
+      // test, et il lui faut donc la même base que `globalSetup`. Celle de `docker-compose.yml` en
+      // local, un service du job « Bout en bout » en CI.
+      DATABASE_URL:
+        process.env.DATABASE_URL ?? 'postgres://dashboard:dashboard@localhost:5432/dashboard',
+
+      // Des secrets de test, et ils n'ont pas à ressembler à ceux de production — ils doivent
+      // seulement exister et faire trente-deux caractères, puisque le serveur refuse de servir
+      // l'authentification sans eux.
+      AUTH_SESSION_SECRET: 'secret-de-session-pour-le-bout-en-bout-000',
+      AUTH_THROTTLE_SECRET: 'secret-de-comptage-pour-le-bout-en-bout-0',
+      AUTH_MFA_SECRET: 'secret-mfa-pour-le-bout-en-bout-0000000000',
+
+      // L'origine doit correspondre **caractère pour caractère** à ce que le navigateur annoncera :
+      // c'est la vérification que la cérémonie WebAuthn exige, et un port oublié la ferait échouer.
+      AUTH_WEBAUTHN_RP_ID: 'localhost',
+      AUTH_WEBAUTHN_ORIGIN: 'http://localhost:3100',
     },
   },
 })
