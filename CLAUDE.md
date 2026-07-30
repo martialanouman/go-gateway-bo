@@ -111,7 +111,11 @@ Pyramide : beaucoup d'unitaires (logique BFF, permissions, mappings), des tests 
 **Une step = une session = une PR.** À suivre strictement, dans cet ordre.
 
 1. Prendre le prochain `tasks-todo/step-NNN.md` — **l'ordre du fichier `INDEX.md` fait foi**, pas le
-   numéro.
+   numéro. **Sauf quand la ligne « Dépend de » du fichier de step le contredit : les dépendances
+   déclarées priment toujours.** Les sections de l'INDEX groupent par jalon, donc par thème, et un
+   jalon peut se clore après le début du suivant. Une divergence constatée se corrige *dans le plan*
+   avant d'écrire du code — jamais en la contournant en silence. C'est arrivé une fois (M1 et M2, note
+   † de `INDEX.md`) et l'ordre annoncé était alors littéralement inexécutable.
 2. Créer la branche : `feat/step-NNN-slug` (ou `fix/`, `docs/`, `chore/`, `test/`).
 3. **Toujours établir un plan avant d'écrire la moindre ligne**, et en dériver la **todo list**
    d'implémentation — une entrée par unité livrable, tenue à jour au fil de la step.

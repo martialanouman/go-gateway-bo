@@ -280,8 +280,9 @@ l'écran Clients rendu selon ses permissions, crée un client, et l'action laiss
 ## 5. M1 — Authentification, permissions & audit
 
 **Objectif :** savoir qui est connecté, ce qu'il a le droit de faire, et garder trace de ce qu'il fait.
-**Dépend de :** M0
-**Steps :** 020 → 027
+**Dépend de :** M0 — et, pour ses deux dernières steps seulement, `041`, `042` et `040` de M2.
+**Steps :** 020 → 027, dont **020 → 025 en premier** (la moitié serveur, qui ne dépend de rien de M2)
+puis **026 → 027 après l'interface de M2** (ce sont des écrans). Voir §14.
 
 **Livrables**
 - Catalogue des ~40 permissions et les **neuf rôles par défaut** du §6.10, seedés et idempotents.
@@ -315,8 +316,9 @@ passerelle elle-même (côté `go-gateway`, voir §15).
 
 **Objectif :** la coquille dans laquelle tous les écrans se branchent, et le temps réel qui les
 alimente — en topologie multi-instance.
-**Dépend de :** M1
-**Steps :** 040 → 046
+**Dépend de :** la moitié serveur de M1 (`020 → 025`), pas M1 entier — voir §14.
+**Steps :** 040 → 046, dont **041 → 042 → 040 avant les écrans de M1** (`026`, `027`), puis
+`043 → 046`. L'AppShell consomme les primitives et les cinq états de contenu : il ne les précède pas.
 
 **Livrables**
 - `AppShell` (rail groupé, barre supérieure, pile de toasts), arborescence complète de routes en
@@ -566,22 +568,40 @@ module contenu/RGPD (`M10`).
 ## 14. Graphe de dépendances & parallélisation
 
 ```
-M0 ─► M1 ─► M2 ─► M3 ─┬─► M4 ─► M5 ─┐
-                      │             ├─► M9
-                      ├─► M6 ───────┤
-                      ├─► M7 ───────┤
-                      └─► M8 ───────┘
+M0 ─► M1 ⇄ M2 ─► M3 ─┬─► M4 ─► M5 ─┐
+                     │             ├─► M9
+                     ├─► M6 ───────┤
+                     ├─► M7 ───────┤
+                     └─► M8 ───────┘
 ```
 
 `M3` est le point de bascule : avant, on outille et on prouve la chaîne ; après, chaque jalon ajoute
 des écrans qui ne se marchent pas dessus.
 
+**`M1` et `M2` s'imbriquent, ils ne se suivent pas** — d'où le `⇄`. La moitié serveur de `M1`
+(steps 020 à 025 : authentification, MFA, permissions, audit) ne dépend de rien de `M2` et vient
+d'abord. Mais ses deux dernières steps sont des **écrans** : `step-026` (login, MFA) et `step-027`
+(opérateurs, rôles) reposent sur les primitives (`step-041`), les cinq états de contenu (`step-042`)
+et la coquille qui les accueille (`step-040`).
+
+L'ordre réel est donc :
+
+```
+020…025  ─►  041 ─► 042 ─► 040  ─►  026 ─► 027  ─►  043…046  ─► M3
+└─ M1 serveur ─┘    └───── M2 interface ─────┘   └─ M1 écrans ─┘  └ M2 temps réel ┘
+```
+
+Corrigé le 30/07/2026 : le graphe annonçait `M1 ─► M2`, ce que les dépendances déclarées des steps
+rendaient impossible. Un jalon groupe par **thème**, pas par tranche de calendrier — voir la note †
+de `tasks-todo/INDEX.md`.
+
 **Ce qui peut avancer en parallèle une fois `M3` acquis :** `M6` (routage), `M7` (conformité) et `M8`
 (facturation/contenu) touchent des écrans, des permissions et des endpoints **disjoints**. `M4` doit
 précéder `M5` (le drill-down vient du trafic). `M9` clôt et exige tout le reste.
 
-**Le chemin critique réel** est `M0 → M1 → M2 → M3 → M4 → M5 → M9` : c'est lui qu'il faut protéger
-des dérives. `M6`, `M7` et `M8` sont des branches latérales.
+**Le chemin critique réel** est `M0 → M1(serveur) → M2(interface) → M1(écrans) → M2(temps réel) →
+M3 → M4 → M5 → M9` : c'est lui qu'il faut protéger des dérives. `M6`, `M7` et `M8` sont des branches
+latérales.
 
 ---
 

@@ -1,16 +1,23 @@
 # step-026 — Rendu UI par permission + écrans Login & MFA
 
 > **Jalon :** M1 (§6.9, §6.10, §4.2) · **Statut :** À FAIRE
-> **Dépend de :** step-025, step-041, step-042 · **Bloque :** tous les écrans
+> **Dépend de :** step-025, step-041, step-042, step-040 · **Bloque :** step-027
+
+> **Dépendances corrigées le 30/07/2026.** `step-040` s'ajoute : la garde de session se branche sur
+> des routes non publiques, et celles-ci n'existent qu'avec l'AppShell (voir la note ‡ de
+> `INDEX.md`). En sens inverse, `usePermission` / `PermissionGate` **passent à `step-040`**, dont le
+> rail de navigation en a besoin dès sa naissance ; cette step les consomme et porte la règle de
+> copie qui les accompagne. Voir la note † de `INDEX.md`.
 
 ## But
 Rendre les permissions visibles et compréhensibles dans l'interface, et livrer la porte d'entrée du
 produit conformément à la charte.
 
 ## Périmètre (ce que fait CETTE PR)
-- Hook `usePermission(key)` alimenté par `/auth/me` ; composant `PermissionGate`.
-- **Règle de la charte** : un contrôle interdit est **désactivé et expliqué**, jamais silencieusement
-  masqué (« Nécessite la permission `suppressions:delete` »).
+- **Règle de la charte appliquée partout** : un contrôle interdit est **désactivé et expliqué**,
+  jamais silencieusement masqué (« Nécessite la permission `suppressions:delete` »). Le hook
+  `usePermission(key)` et `PermissionGate` viennent de `step-040` ; c'est ici qu'on fige la copie du
+  refus et qu'on la vérifie sur les écrans livrés.
 - Écran de login (email + mot de passe) puis écran de challenge MFA (passkey d'abord, TOTP en repli),
   d'après `LoginScreen.jsx` du kit UI.
 - **Branchement de la garde de session sur les routes** (reporté de step-022) : toute route non
