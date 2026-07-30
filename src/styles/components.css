@@ -1,0 +1,554 @@
+/*
+ * La couche `.ui-*` — l'habillage des primitives.
+ *
+ * **Aucune valeur n'est écrite ici.** Chaque couleur, rayon, durée et espacement vient d'un token de
+ * la charte. Si une valeur manque, la question se pose à la charte ; elle ne s'invente pas dans un
+ * composant. C'est ce qui permet à `pnpm check` de rester muet et à la revue de porter sur le sens
+ * plutôt que sur des hexadécimaux.
+ *
+ * Le préfixe `ui-` est distinct de `design-` (la page `/_design`, qui décrit) et de `pl-` (le kit de
+ * référence, qui n'est pas livré). Trois préfixes, trois raisons d'exister.
+ *
+ * Base UI expose son état en attributs de données — `[data-disabled]`, `[data-checked]`,
+ * `[data-selected]`, `[data-popup-open]`. On stylise ceux-ci plutôt que des classes maison : l'état
+ * vient de la bibliothèque qui le connaît, jamais d'un booléen recopié en React.
+ */
+
+/* ─── Bouton ──────────────────────────────────────────────────────────────────────────────────
+ *
+ * Contour et teinte, jamais un aplat. La charte l'écrit pour le destructif — « toujours en contour,
+ * jamais plein » — et ses spécimens montrent la même chose pour le primaire.
+ */
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: var(--control-height);
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-productive),
+    border-color var(--dur-fast) var(--ease-productive);
+}
+
+/* « Ni échelle, ni translation » : un mis-clic ici déconnecte un bind vivant. */
+.ui-button:hover:not([data-disabled]) {
+  background: var(--surface-hover);
+}
+
+.ui-button:active:not([data-disabled]) {
+  background: var(--surface-active);
+}
+
+.ui-button[data-disabled] {
+  background: var(--surface-disabled);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.ui-button--primary {
+  border-color: var(--teal-500);
+  background: var(--tint-teal);
+  color: var(--text-accent);
+}
+
+.ui-button--primary:hover:not([data-disabled]) {
+  background: var(--tint-teal-strong);
+}
+
+.ui-button--destructive {
+  border-color: var(--red-500);
+  color: var(--text-danger);
+}
+
+.ui-button--destructive:hover:not([data-disabled]) {
+  background: var(--tint-red);
+}
+
+/* Lien : teal nu, sans contour — le seul bouton sans bordure du système. */
+.ui-button--link {
+  height: auto;
+  padding: 0;
+  border-color: transparent;
+  color: var(--text-link);
+}
+
+.ui-button--link:hover:not([data-disabled]) {
+  background: transparent;
+  color: var(--text-link-hover);
+  text-decoration: underline;
+}
+
+.ui-button--sm {
+  height: var(--control-height-sm);
+  padding: 0 var(--sp-3);
+}
+
+.ui-button--lg {
+  height: var(--control-height-lg);
+  padding: 0 var(--sp-5);
+}
+
+/*
+ * Le seul spinner du système, et il ne tourne que pour une action ponctuelle — jamais en plein
+ * écran. `prefers-reduced-motion` l'arrête : la charte désactive toute animation dans ce mode.
+ */
+.ui-button__spinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--r-round);
+  animation: ui-spin var(--dur-spin) linear infinite;
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Champ ─────────────────────────────────────────────────────────────────────────────────── */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.ui-field__label {
+  color: var(--text-muted);
+  font: var(--text-label);
+  font-family: var(--font-sans);
+}
+
+.ui-field__required {
+  margin-left: var(--sp-1);
+  color: var(--text-danger);
+}
+
+.ui-input {
+  height: var(--control-height);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-family: var(--font-sans);
+}
+
+.ui-input::placeholder {
+  color: var(--text-faint);
+}
+
+/* « Le mono est réservé aux valeurs machine. Jamais pour du texte narratif. » */
+.ui-input--mono {
+  font-family: var(--font-mono);
+}
+
+.ui-input--sm {
+  height: var(--control-height-sm);
+}
+
+.ui-input[data-invalid] {
+  border-color: var(--red-500);
+}
+
+.ui-input[data-disabled] {
+  background: var(--surface-disabled);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.ui-field__hint {
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-family: var(--font-sans);
+}
+
+.ui-field__error {
+  color: var(--text-danger);
+  font: var(--text-caption);
+  font-family: var(--font-sans);
+}
+
+/* ─── Case à cocher, interrupteur, radio ────────────────────────────────────────────────────── */
+.ui-check,
+.ui-switch,
+.ui-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.ui-check__control,
+.ui-radio__control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-sunken);
+  cursor: pointer;
+}
+
+.ui-check__control {
+  border-radius: var(--r-1);
+}
+
+.ui-radio__control {
+  border-radius: var(--r-round);
+}
+
+.ui-check__control[data-checked],
+.ui-check__control[data-indeterminate],
+.ui-radio__control[data-checked] {
+  border-color: var(--teal-500);
+  background: var(--tint-teal-strong);
+}
+
+.ui-check__indicator,
+.ui-radio__indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-round);
+  background: var(--teal-500);
+}
+
+.ui-check__control[data-disabled],
+.ui-radio__control[data-disabled] {
+  background: var(--surface-disabled);
+  cursor: not-allowed;
+}
+
+.ui-check__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.ui-check__description {
+  color: var(--text-muted);
+  font: var(--text-caption);
+}
+
+.ui-switch__track {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  width: 34px;
+  height: 18px;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill);
+  background: var(--surface-sunken);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-productive);
+}
+
+.ui-switch__track[data-checked] {
+  border-color: var(--teal-500);
+  background: var(--tint-teal-strong);
+}
+
+.ui-switch__thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-round);
+  background: var(--text-muted);
+  transition: transform var(--dur-fast) var(--ease-productive);
+}
+
+.ui-switch__track[data-checked] .ui-switch__thumb {
+  transform: translateX(16px);
+  background: var(--teal-500);
+}
+
+.ui-radiogroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.ui-radiogroup__label {
+  color: var(--text-muted);
+  font: var(--text-label);
+}
+
+.ui-radiogroup__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* ─── Onglets ───────────────────────────────────────────────────────────────────────────────── */
+.ui-tabs__list {
+  position: relative;
+  display: flex;
+  gap: var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ui-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-1);
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: var(--text-body);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.ui-tab[data-selected] {
+  color: var(--text-primary);
+}
+
+.ui-tab[data-disabled] {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.ui-tab__count {
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-pill);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.ui-tabs__indicator {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: var(--active-tab-width);
+  height: 2px;
+  background: var(--teal-500);
+  transform: translateX(var(--active-tab-left));
+  transition:
+    transform var(--dur-base) var(--ease-productive),
+    width var(--dur-base) var(--ease-productive);
+}
+
+/* ─── Sélecteur ─────────────────────────────────────────────────────────────────────────────── */
+.ui-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  height: var(--control-height);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.ui-select--sm {
+  height: var(--control-height-sm);
+}
+
+.ui-select[data-disabled] {
+  background: var(--surface-disabled);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.ui-select__popup {
+  min-width: var(--anchor-width);
+  padding: var(--sp-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: var(--surface-raised);
+  /* Seules les couches flottantes portent une ombre ; les cartes n'en ont jamais. */
+  box-shadow: var(--elevation-popover);
+}
+
+.ui-select__item {
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-1);
+  color: var(--text-primary);
+  font: var(--text-body);
+  cursor: pointer;
+}
+
+.ui-select__item[data-highlighted] {
+  background: var(--surface-hover);
+}
+
+.ui-select__item[data-selected] {
+  background: var(--tint-teal);
+  color: var(--text-accent);
+}
+
+/* ─── Statut ────────────────────────────────────────────────────────────────────────────────────
+ *
+ * Deux rendus, deux dimensions, jamais confondus (charte §06). Le point porte `link_status`, la
+ * pilule porte `breaker_state`.
+ */
+.ui-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ui-status__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-round);
+  background: currentColor;
+}
+
+.ui-status--up {
+  color: var(--green-500);
+}
+
+.ui-status--degraded {
+  color: var(--amber-500);
+}
+
+.ui-status--down {
+  color: var(--red-500);
+}
+
+.ui-status--idle {
+  color: var(--text-faint);
+}
+
+.ui-status__label {
+  color: var(--text-primary);
+}
+
+.ui-status__meta {
+  color: var(--text-faint);
+}
+
+/*
+ * **La seule animation en boucle de tout le système** : le pouls de 1,8 s du point vivant. Elle ne
+ * marque que les valeurs alimentées par la WebSocket — la poser sur un instantané ferait mentir le
+ * seul signal de fraîcheur dont dispose l'opérateur.
+ */
+.ui-status--live .ui-status__dot {
+  animation: ui-pulse var(--dur-pulse) ease-in-out infinite;
+}
+
+@keyframes ui-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.ui-breaker {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--sp-3);
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.ui-breaker--closed {
+  background: var(--tint-green);
+  color: var(--green-500);
+}
+
+.ui-breaker--open {
+  background: var(--tint-red);
+  color: var(--red-500);
+}
+
+.ui-breaker--half_open {
+  background: var(--tint-amber);
+  color: var(--amber-500);
+}
+
+/* ─── Tableau ───────────────────────────────────────────────────────────────────────────────── */
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body);
+  font-family: var(--font-sans);
+}
+
+/*
+ * La légende nomme le tableau pour les technologies d'assistance. Elle est retirée de l'affichage —
+ * le titre de section la porte déjà — mais **jamais** `display: none`, qui la retirerait aussi de
+ * l'arbre d'accessibilité et rendrait le tableau anonyme.
+ */
+.ui-table__caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ui-table__header {
+  position: sticky;
+  top: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-muted);
+  font: var(--text-overline);
+  text-align: start;
+}
+
+.ui-table__sort {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ui-table__cell {
+  height: 38px;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ui-table--dense .ui-table__cell {
+  height: 32px;
+}
+
+.ui-table__cell--end,
+.ui-table__header.ui-table__cell--end {
+  text-align: end;
+}
+
+.ui-table__cell--mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ui-table__row:hover .ui-table__cell {
+  background: var(--surface-hover);
+}

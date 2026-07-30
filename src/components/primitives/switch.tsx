@@ -9,14 +9,19 @@
 
 import { Switch as BaseSwitch } from '@base-ui/react/switch'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import { useId } from 'react'
 
 export type SwitchProps = Omit<ComponentPropsWithoutRef<typeof BaseSwitch.Root>, 'render'> & {
   readonly label?: ReactNode
 }
 
-export function Switch({ label, className, ...rest }: SwitchProps) {
+export function Switch({ label, className, id, ...rest }: SwitchProps) {
+  const generatedId = useId()
+  /** Même raison que pour la case à cocher : voir `checkbox.tsx`. */
+  const controlId = id ?? generatedId
+
   const control = (
-    <BaseSwitch.Root className="ui-switch__track" {...rest}>
+    <BaseSwitch.Root className="ui-switch__track" id={controlId} {...rest}>
       <BaseSwitch.Thumb className="ui-switch__thumb" />
     </BaseSwitch.Root>
   )
@@ -24,7 +29,7 @@ export function Switch({ label, className, ...rest }: SwitchProps) {
   if (!label) return control
 
   return (
-    <label className={['ui-switch', className].filter(Boolean).join(' ')}>
+    <label className={['ui-switch', className].filter(Boolean).join(' ')} htmlFor={controlId}>
       {control}
       <span className="ui-switch__label">{label}</span>
     </label>

@@ -41,9 +41,12 @@ export function RadioGroup({ label, options, className, ...rest }: RadioGroupPro
 
       <BaseRadioGroup className="ui-radiogroup__options" aria-labelledby={labelId} {...rest}>
         {options.map((option) => (
-          <label className="ui-radio" key={option.value}>
+          // `htmlFor` explicite, même raison que dans `checkbox.tsx` : Base UI rend un bouton et un
+          // input masqué, que l'analyse statique ne relie pas au libellé qui les entoure.
+          <label className="ui-radio" key={option.value} htmlFor={`${labelId}-${option.value}`}>
             <Radio.Root
               className="ui-radio__control"
+              id={`${labelId}-${option.value}`}
               value={option.value}
               disabled={option.disabled}
             >

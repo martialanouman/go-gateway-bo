@@ -36,6 +36,38 @@ describe('Checkbox', () => {
     expect(getByRole('checkbox')).toHaveAttribute('aria-checked', 'mixed')
   })
 
+  it('rend le contrôle nu quand il n’a ni libellé ni description', () => {
+    // Le cas de la case « tout sélectionner » d'un en-tête de tableau : la colonne porte déjà le
+    // sens, et un libellé répété à chaque ligne encombrerait la lecture d'un lecteur d'écran.
+    const { getByRole, container } = renderComponent(
+      <Checkbox aria-label="Sélectionner la ligne" />,
+    )
+
+    expect(getByRole('checkbox')).toBeInTheDocument()
+    expect(container.querySelector('.ui-check__text')).toBeNull()
+  })
+
+  it('rend la description sous le libellé quand la conséquence ne tient pas en trois mots', () => {
+    const { getByText } = renderComponent(
+      <Checkbox label="Suspendre le client" description="Suspend aussi tous ses comptes SMPP." />,
+    )
+
+    expect(getByText('Suspend aussi tous ses comptes SMPP.')).toBeInTheDocument()
+  })
+
+  it('respecte un identifiant fourni, et le libellé reste associé', () => {
+    // Un formulaire qui pointe son propre `htmlFor` doit pouvoir imposer l'identifiant.
+    //
+    // L'assertion porte sur l'**association**, pas sur l'élément qui porte l'attribut : Base UI
+    // place l'`id` sur son input masqué et non sur le bouton `role="checkbox"`. Vérifier l'attribut
+    // aurait figé un détail interne de la bibliothèque au lieu du comportement qui nous intéresse.
+    const { getByRole, container } = renderComponent(<Checkbox label="Masquer" id="mask-msisdn" />)
+
+    expect(getByRole('checkbox', { name: 'Masquer' })).toBeInTheDocument()
+    expect(container.querySelector('#mask-msisdn')).not.toBeNull()
+    expect(container.querySelector('label')).toHaveAttribute('for', 'mask-msisdn')
+  })
+
   it('ne bascule pas quand il est désactivé', async () => {
     const onCheckedChange = vi.fn()
     const { getByRole, user } = renderComponent(
@@ -60,6 +92,15 @@ describe('Switch', () => {
     await user.click(toggle)
 
     expect(onCheckedChange).toHaveBeenCalledWith(true, expect.anything())
+  })
+})
+
+describe('Switch sans libellé', () => {
+  it('rend le contrôle nu, pour une bascule dont la colonne porte déjà le sens', () => {
+    const { getByRole, container } = renderComponent(<Switch aria-label="Activer" />)
+
+    expect(getByRole('switch')).toBeInTheDocument()
+    expect(container.querySelector('.ui-switch__label')).toBeNull()
   })
 })
 

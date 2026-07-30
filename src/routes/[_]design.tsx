@@ -11,6 +11,17 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
+import {
+  Button,
+  Checkbox,
+  RadioGroup,
+  Select,
+  StatusPill,
+  Switch,
+  Table,
+  Tabs,
+  TextField,
+} from '~/components/primitives'
 import designCss from '~/styles/design-reference.css?url'
 
 export const Route = createFileRoute('/_design')({
@@ -225,6 +236,148 @@ function DesignReference() {
           ))}
         </div>
       </section>
+
+      <PrimitivesSection />
     </main>
+  )
+}
+
+/**
+ * Les primitives du lot 1 (step-041), **avec leurs états**.
+ *
+ * Cette section n'est pas une vitrine : c'est là qu'on vérifie qu'un état existe et qu'il est
+ * lisible. Un champ invalide, un bouton occupé, un onglet désactivé ne se voient nulle part ailleurs
+ * avant qu'un écran ne les produise — et le jour où un écran les produit, il est trop tard pour
+ * découvrir qu'on ne les avait jamais dessinés.
+ */
+function PrimitivesSection() {
+  return (
+    <section className="design-section" aria-labelledby="primitives">
+      <h2 id="primitives">Primitives — lot 1</h2>
+      <p className="design-section__note">
+        Comportement et accessibilité par Base UI, forme par les tokens. Chaque primitive est
+        montrée avec les états qu’un écran rencontrera : défaut, désactivé, invalide, chargement.
+      </p>
+
+      <div className="design-grid">
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>Boutons</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-3)' }}>
+            <Button variant="primary">Effectuer la rotation</Button>
+            <Button>Annuler</Button>
+            <Button variant="destructive">Déconnecter</Button>
+            <Button variant="link">Tout afficher</Button>
+            <Button disabled>Indisponible</Button>
+            <Button loading>Lancer le job</Button>
+          </div>
+        </div>
+
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>Champs</span>
+          <TextField label="Nom du client" placeholder="Acme SA" />
+          <TextField label="MSISDN" mono placeholder="2250701020304" />
+          <TextField label="max_sessions" hint="Baisser ce quota ne coupe pas les binds vivants." />
+          <TextField label="Sender ID" error="Ce sender ID est déjà pris." />
+          <TextField label="Compte" disabled placeholder="Indisponible" />
+        </div>
+
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>Sélecteur et bascules</span>
+          <Select
+            options={[
+              { value: 'shared', label: 'Pool partagé' },
+              { value: 'per_account', label: 'Par compte' },
+            ]}
+            defaultValue="shared"
+          />
+          <Checkbox label="Masquer les MSISDN" defaultChecked />
+          <Checkbox label="Tout sélectionner" indeterminate />
+          <Checkbox label="Indisponible" disabled />
+          <Switch label="Facturation activée" defaultChecked />
+          <RadioGroup
+            label="balance_scope"
+            defaultValue="shared"
+            options={[
+              { value: 'shared', label: 'Pool partagé' },
+              { value: 'per_account', label: 'Par compte' },
+            ]}
+          />
+        </div>
+
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>Onglets</span>
+          <Tabs
+            defaultValue="sessions"
+            tabs={[
+              { value: 'sessions', label: 'Sessions' },
+              { value: 'binds', label: 'Binds', count: 12 },
+              { value: 'quotas', label: 'Quotas', disabled: true },
+            ]}
+          />
+        </div>
+
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>
+            Statut — deux dimensions, jamais fusionnées
+          </span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-4)' }}>
+            <StatusPill state="up" live meta="~2 s" />
+            <StatusPill state="reconnecting" />
+            <StatusPill state="down" />
+            <StatusPill state="unbound" />
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-4)' }}>
+            <StatusPill state="closed" />
+            <StatusPill state="half_open" />
+            <StatusPill state="open" />
+          </div>
+          <span className="design-swatch__value">
+            link_status en point · breaker_state en pilule
+          </span>
+        </div>
+      </div>
+
+      <div className="design-card" style={{ marginTop: 'var(--sp-4)' }}>
+        <span style={{ font: 'var(--text-label)' }}>Tableau</span>
+        <Table
+          caption="Connecteurs"
+          rowKey={(row) => row.id}
+          sort={{ key: 'throughput', direction: 'descending' }}
+          columns={[
+            { key: 'name', header: 'Connecteur', cell: (row) => row.name, sortable: true },
+            { key: 'id', header: 'Identifiant', cell: (row) => row.id, mono: true },
+            {
+              key: 'link',
+              header: 'link_status',
+              cell: (row) => <StatusPill state={row.link} live />,
+            },
+            {
+              key: 'breaker',
+              header: 'breaker_state',
+              cell: (row) => <StatusPill state={row.breaker} />,
+            },
+            {
+              key: 'throughput',
+              header: 'Débit',
+              cell: (row) => row.throughput,
+              align: 'end',
+              mono: true,
+              sortable: true,
+            },
+          ]}
+          rows={[
+            { id: 'cnx_01', name: 'Orange CI', link: 'up', breaker: 'closed', throughput: '8 123' },
+            {
+              id: 'cnx_02',
+              name: 'MTN CI',
+              link: 'reconnecting',
+              breaker: 'half_open',
+              throughput: '504',
+            },
+            { id: 'cnx_03', name: 'Moov CI', link: 'down', breaker: 'open', throughput: '0' },
+          ]}
+        />
+      </div>
+    </section>
   )
 }

@@ -40,6 +40,18 @@ describe('Select', () => {
     expect(onValueChange).toHaveBeenCalledWith('per_account', expect.anything())
   })
 
+  it('accepte la hauteur réduite et une classe d’écran', () => {
+    // 28 px au lieu de 34 : la charte prévoit trois hauteurs de contrôle, et une barre de filtres
+    // dense les utilise. Sans ce cas, la variante n'était rendue nulle part.
+    const { getByRole } = renderComponent(
+      <Select options={SCOPES} size="sm" className="filtre-compte" />,
+    )
+
+    const trigger = getByRole('combobox')
+    expect(trigger).toHaveClass('ui-select--sm')
+    expect(trigger).toHaveClass('filtre-compte')
+  })
+
   it('rend la valeur choisie plutôt que l’invite', () => {
     const { getByRole } = renderComponent(<Select options={SCOPES} defaultValue="shared" />)
 
