@@ -1,0 +1,50 @@
+/**
+ * Les onglets.
+ *
+ * `role="tablist"` est une **promesse de comportement** : les flèches déplacent la sélection, la
+ * tabulation saute au panneau plutôt que de parcourir chaque onglet. L'annoncer sans le tenir est
+ * pire que de ne rien annoncer, puisque l'utilisateur au clavier fait confiance à l'annonce. Base UI
+ * tient la promesse ; ce fichier ne fait que l'habiller.
+ *
+ * Le compteur est rendu **dans** l'onglet et non à côté : il fait partie du nom accessible, si bien
+ * qu'un lecteur d'écran annonce « Binds 12 » plutôt que « Binds » suivi d'un nombre orphelin.
+ */
+
+import { Tabs as BaseTabs } from '@base-ui/react/tabs'
+import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+
+export type TabDefinition = {
+  readonly value: string
+  readonly label: ReactNode
+  /** Affiché quand il est connu. `0` reste affiché — c'est une information, pas une absence. */
+  readonly count?: number
+  readonly disabled?: boolean
+}
+
+export type TabsProps = Omit<
+  ComponentPropsWithoutRef<typeof BaseTabs.Root>,
+  'render' | 'children'
+> & {
+  readonly tabs: readonly TabDefinition[]
+}
+
+export function Tabs({ tabs, className, ...rest }: TabsProps) {
+  return (
+    <BaseTabs.Root className={['ui-tabs', className].filter(Boolean).join(' ')} {...rest}>
+      <BaseTabs.List className="ui-tabs__list">
+        {tabs.map((tab) => (
+          <BaseTabs.Tab
+            className="ui-tab"
+            key={tab.value}
+            value={tab.value}
+            disabled={tab.disabled}
+          >
+            {tab.label}
+            {tab.count !== undefined ? <span className="ui-tab__count">{tab.count}</span> : null}
+          </BaseTabs.Tab>
+        ))}
+        <BaseTabs.Indicator className="ui-tabs__indicator" />
+      </BaseTabs.List>
+    </BaseTabs.Root>
+  )
+}
