@@ -94,23 +94,11 @@ describe('routes du BFF', () => {
   })
 
   it('toute route de mutation est gardée par une permission, ou exemptée avec sa raison', () => {
-    const unguarded = handlers
-      .filter((entry) => MUTATING_METHODS.has(entry.method))
-      .filter((entry) => !(entry.route in UNGUARDED_BY_DESIGN))
-      .filter((entry) => !reaches(entry.handler, PERMISSION_MARKERS))
-      .map((entry) => `${entry.method.toUpperCase()} ${entry.route} → ${entry.handler}`)
-
-    expect(unguarded).toEqual([])
+    expect(offenders(handlers, PERMISSION_MARKERS)).toEqual([])
   })
 
   it('toute route de mutation gardée écrit au journal d’audit', () => {
-    const unaudited = handlers
-      .filter((entry) => MUTATING_METHODS.has(entry.method))
-      .filter((entry) => !(entry.route in UNGUARDED_BY_DESIGN))
-      .filter((entry) => !reaches(entry.handler, AUDIT_MARKERS))
-      .map((entry) => `${entry.method.toUpperCase()} ${entry.route} → ${entry.handler}`)
-
-    expect(unaudited).toEqual([])
+    expect(offenders(handlers, AUDIT_MARKERS)).toEqual([])
   })
 })
 
@@ -164,6 +152,41 @@ describe('le détecteur se prouve lui-même', () => {
     ])
   })
 
+  it('signale une route de mutation non gardée déclarée pour de bon', () => {
+    // **Le cas que la step demande explicitement**, joué de bout en bout : une déclaration de route
+    // complète, passée par l'extraction puis par la détection, exactement comme celles de
+    // `vite.config.ts`. Les deux cas précédents éprouvent les pièces séparément ; celui-ci éprouve
+    // la chaîne — une extraction correcte branchée sur une détection correcte peut encore ne rien
+    // signaler si le filtrage entre les deux est faux.
+    const source = `handlers: [
+      { route: '/api/customers', handler: './src/test/fixtures/route-nue.ts', method: 'post' },
+      { route: '/api/customers/list', handler: './src/test/fixtures/route-gardee.ts', method: 'get' },
+    ]`
+
+    const fabricated = parseHandlers(source)
+    expect(fabricated).toHaveLength(2)
+
+    // La route gardée est en `get` : elle ne mute pas, donc elle n'a rien à prouver. Seule la
+    // mutation nue doit remonter — sur la permission comme sur l'audit.
+    expect(offenders(fabricated, PERMISSION_MARKERS)).toEqual([
+      'POST /api/customers → ./src/test/fixtures/route-nue.ts',
+    ])
+    expect(offenders(fabricated, AUDIT_MARKERS)).toEqual([
+      'POST /api/customers → ./src/test/fixtures/route-nue.ts',
+    ])
+  })
+
+  it('ne signale pas une route de mutation correctement gardée', () => {
+    // Le pendant du cas précédent : un détecteur qui crierait sur tout serait tout aussi inutile,
+    // et se ferait désarmer à la première route légitime.
+    const source = `handlers: [
+      { route: '/api/customers', handler: './src/test/fixtures/route-gardee.ts', method: 'post' },
+    ]`
+
+    expect(offenders(parseHandlers(source), PERMISSION_MARKERS)).toEqual([])
+    expect(offenders(parseHandlers(source), AUDIT_MARKERS)).toEqual([])
+  })
+
   it('voit une garde atteinte par un import indirect, et son absence', () => {
     const guarded = join(ROOT, 'src', 'test', 'fixtures', 'route-gardee.ts')
     const bare = join(ROOT, 'src', 'test', 'fixtures', 'route-nue.ts')
@@ -175,6 +198,22 @@ describe('le détecteur se prouve lui-même', () => {
     expect(reaches(bare, AUDIT_MARKERS)).toBe(false)
   })
 })
+
+/**
+ * Les routes de mutation qui n'atteignent pas les marqueurs, hors exemptions.
+ *
+ * Extraite en fonction pour être exerçable sur une déclaration fabriquée : la vérification qui
+ * compte n'est pas « l'extraction marche » ni « la détection marche », mais que les deux, branchées
+ * l'une sur l'autre, signalent bien une route nue. Le filtrage entre les deux est l'endroit où une
+ * erreur rendrait le test vert à jamais.
+ */
+function offenders(entries: readonly Handler[], markers: readonly string[]): string[] {
+  return entries
+    .filter((entry) => MUTATING_METHODS.has(entry.method))
+    .filter((entry) => !(entry.route in UNGUARDED_BY_DESIGN))
+    .filter((entry) => !reaches(entry.handler, markers))
+    .map((entry) => `${entry.method.toUpperCase()} ${entry.route} → ${entry.handler}`)
+}
 
 /** Le contenu du bloc `handlers: [ … ]` de `vite.config.ts`. */
 function handlersBlock(): string {
