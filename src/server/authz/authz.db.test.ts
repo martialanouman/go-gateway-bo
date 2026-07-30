@@ -244,6 +244,63 @@ describe('mutate', () => {
     expect(await auditRows()).toHaveLength(0)
   })
 
+  it('annule tout quand un secret est glissé dans `before` — et pas seulement dans `after`', async () => {
+    await grantRole('super_admin')
+
+    // `before` est fourni par l'appelant **avant** le bloc : c'est le payload le plus facile à
+    // remplir sans réfléchir, et il n'était vérifié par aucun test. Retirer sa vérification laissait
+    // toute la suite verte, et un `api_key` s'écrivait en base.
+    await expect(
+      mutate(
+        db,
+        {
+          session: activeSession(),
+          permission: 'operators:manage',
+          action: 'operator.rename',
+          before: { api_key: 'sk-live-42' },
+        },
+        rename('Renommée'),
+      ),
+    ).rejects.toThrow(/nom réservé/)
+
+    expect(await displayName()).toBe('Opératrice')
+    expect(await auditRows()).toHaveLength(0)
+  })
+
+  it('refuse un corps de message glissé dans `target_id`', async () => {
+    await grantRole('super_admin')
+
+    await expect(
+      mutate(
+        db,
+        {
+          session: activeSession(),
+          permission: 'operators:manage',
+          action: 'content.read',
+          targetId: 'RDV demain 14h chez le docteur',
+        },
+        rename('Renommée'),
+      ),
+    ).rejects.toThrow(/identifiant/)
+
+    expect(await auditRows()).toHaveLength(0)
+  })
+
+  it('écrit `null` plutôt qu’un objet vide quand rien n’a été journalisé', async () => {
+    await grantRole('super_admin')
+
+    await mutate(
+      db,
+      { session: activeSession(), permission: 'operators:manage', action: 'operator.touch' },
+      async () => ({ result: null, after: {} }),
+    )
+
+    // `{}` se lirait comme un diff légitimement vide. La relecture après incident (step-184) ne
+    // distinguerait pas « pas d'après » de « après vide » — deux choses très différentes.
+    const rows = await auditRows()
+    expect(rows[0]?.after_json).toBeNull()
+  })
+
   it('n’audite rien quand la mutation elle-même échoue', async () => {
     await grantRole('super_admin')
 
@@ -284,9 +341,9 @@ describe('mutate', () => {
     await mutate(
       db,
       { session: activeSession(), permission: 'operators:manage', action: 'operator.create' },
-      async () => ({ result: 'x', targetId: 'créé-après-coup' }),
+      async () => ({ result: 'x', targetId: '018f4c1e-0000-7000-8000-00000000beef' }),
     )
 
-    expect((await auditRows())[0]?.target_id).toBe('créé-après-coup')
+    expect((await auditRows())[0]?.target_id).toBe('018f4c1e-0000-7000-8000-00000000beef')
   })
 })

@@ -29,7 +29,7 @@
 import type { PermissionKey } from '~/lib/permissions'
 import type { SessionState } from '../auth/session'
 import type { Database, Transaction } from '../db/index'
-import { type AuditPayload, recordAudit } from './audit'
+import { type AuditPayload, checkAuditPayload, checkAuditSubject, recordAudit } from './audit'
 import { type Refusal, requirePermission } from './permission'
 
 export type MutationRequest = {
@@ -78,6 +78,12 @@ export async function mutate<T>(
 ): Promise<MutationOutcome<T>> {
   const decision = await requirePermission(db, request.session, request.permission)
   if (!decision.granted) return decision
+
+  // Ce qui peut être vérifié **avant** d'agir l'est avant d'agir. `before` et le sujet ne dépendent
+  // pas du bloc : les laisser échouer après coup ferait payer à la passerelle un refus purement
+  // local — elle aurait muté, la transaction serait annulée, et il ne resterait aucune trace.
+  checkAuditSubject(request)
+  checkAuditPayload('before', request.before)
 
   const result = await db.transaction(async (tx) => {
     const mutation = await run(tx)

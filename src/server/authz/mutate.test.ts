@@ -31,7 +31,13 @@ const { recordAuditSpy, requirePermissionSpy } = vi.hoisted(() => ({
   requirePermissionSpy: vi.fn(),
 }))
 
-vi.mock('./audit', () => ({ recordAudit: recordAuditSpy }))
+// Les deux vérifications restent **les vraies** : ce fichier ne double que ce qu'il observe. Les
+// neutraliser laisserait passer un `action` mal formé sans que rien ne le dise, et ce test
+// deviendrait le seul endroit du dépôt où la garde n'existe pas.
+vi.mock('./audit', async () => ({
+  ...(await vi.importActual<typeof import('./audit')>('./audit')),
+  recordAudit: recordAuditSpy,
+}))
 vi.mock('./permission', () => ({ requirePermission: requirePermissionSpy }))
 
 const { mutate } = await import('./mutate')
