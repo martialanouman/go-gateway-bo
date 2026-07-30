@@ -80,25 +80,24 @@ const SEMANTIC_COLORS = [
  * Les libellés restent en `snake_case` anglais, verbatim de l'API : ce sont eux qu'un opérateur
  * cherche dans les logs. Le point double le texte, il ne le remplace pas — la couleur seule ne
  * porte jamais l'information (WCAG 1.4.1).
+ *
+ * **Les valeurs viennent du contrat, et la page les rend par `StatusPill`.** Elle annonçait
+ * auparavant `bound` / `unbound`, qui n'existent dans aucune énumération, avec des `<span>` peints à
+ * la main : la référence enseignait donc deux valeurs que le payload n'émet jamais, et dans des
+ * couleurs qui ont fini par diverger de celles du composant. Une page de référence qui contredit ce
+ * qu'elle documente est pire qu'absente.
  */
-const LINK_STATUS = [
-  { label: 'bound', color: 'var(--status-up)' },
-  { label: 'reconnecting', color: 'var(--status-degraded)' },
-  { label: 'unbound', color: 'var(--status-down)' },
-] as const
+const LINK_STATUS = ['up', 'reconnecting', 'down'] as const satisfies readonly LinkStatus[]
 
 /**
  * `breaker_state` — l'état du disjoncteur. Rendu en **pilule teintée**, jamais en point, et jamais
  * dérivé du champ précédent.
  *
- * Le texte posé sur un fond teinté rouge prend `--text-danger-on-tint` : le rouge de pleine surface
- * n'atteint que 4,05 sur sa propre teinte, sous le seuil AA.
+ * `open` est **ambre**, comme la charte le range : un disjoncteur ouvert est un état dégradé dont on
+ * attend la reprise, pas une panne qui appelle un rebind. Cette page le peignait en rouge, à côté
+ * d'un composant qui le peignait en ambre.
  */
-const BREAKER_STATE = [
-  { label: 'closed', color: 'var(--breaker-closed)', tint: 'var(--tint-green)' },
-  { label: 'half_open', color: 'var(--breaker-half-open)', tint: 'var(--tint-amber)' },
-  { label: 'open', color: 'var(--text-danger-on-tint)', tint: 'var(--tint-red)' },
-] as const
+const BREAKER_STATE = ['closed', 'half_open', 'open'] as const satisfies readonly BreakerState[]
 
 /**
  * Les pas canoniques. Aucune valeur en pixels n'est répétée ici : la barre tire sa largeur du token
@@ -210,19 +209,15 @@ function DesignReference() {
 
         <span className="design-item__label">link_status — point et libellé</span>
         <div className="design-pills">
-          {LINK_STATUS.map(({ label, color }) => (
-            <span className="design-link-status" key={label} style={{ color }}>
-              {label}
-            </span>
+          {LINK_STATUS.map((state) => (
+            <StatusPill kind="link" key={state} state={state} />
           ))}
         </div>
 
         <span className="design-item__label">breaker_state — pilule teintée</span>
         <div className="design-pills">
-          {BREAKER_STATE.map(({ label, color, tint }) => (
-            <span className="design-pill" key={label} style={{ color, background: tint }}>
-              {label}
-            </span>
+          {BREAKER_STATE.map((state) => (
+            <StatusPill kind="breaker" key={state} state={state} />
           ))}
         </div>
       </section>

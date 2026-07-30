@@ -28,6 +28,12 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react'
  * `never` — une erreur de compilation illisible, attrapée par `pnpm typecheck`.
  */
 export type TextFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'className' | 'size'> & {
+  /**
+   * Appliqué à l'**enveloppe**, pas au contrôle : c'est l'ensemble libellé + champ + message qu'un
+   * écran place dans une grille. Le retirer sans le redéclarer, comme c'était le cas, faisait de ce
+   * champ la seule primitive du lot qu'aucun écran ne pouvait ni positionner ni élargir.
+   */
+  readonly className?: string
   readonly label: ReactNode
   /** Message d'aide. Effacé par `error` quand celui-ci est présent — voir l'en-tête. */
   readonly hint?: ReactNode
@@ -48,6 +54,7 @@ export function TextField({
   mono = false,
   size = 'md',
   required,
+  className,
   ...rest
 }: TextFieldProps) {
   const invalid = error !== undefined && error !== null && error !== false
@@ -57,7 +64,7 @@ export function TextField({
     .join(' ')
 
   return (
-    <Field.Root className="ui-field" invalid={invalid}>
+    <Field.Root className={['ui-field', className].filter(Boolean).join(' ')} invalid={invalid}>
       <Field.Label className="ui-field__label">
         {label}
         {required ? (

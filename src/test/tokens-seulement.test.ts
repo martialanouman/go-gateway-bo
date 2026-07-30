@@ -42,7 +42,7 @@ const COLOUR_PATTERN = new RegExp(
     String.raw`\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(`,
     // Couleur nommée, mais seulement en valeur d'une propriété de couleur : `color: red`,
     // `background: white`, `border: 1px solid tomato`.
-    String.raw`(color|background|background-color|border|border-color|outline|fill|stroke|box-shadow)\s*:[^;]*\b(${NAMED_COLOURS})\b`,
+    String.raw`(color|background|background-color|border(-(top|right|bottom|left))?(-color)?|outline|fill|stroke|box-shadow|column-rule)\s*:[^;]*\b(${NAMED_COLOURS})\b`,
   ].join('|'),
 )
 
@@ -133,6 +133,12 @@ describe('couleurs en dur', () => {
     expect(
       COLOUR_PATTERN.test(stripTokenReferences('border: 1px solid tomato; color: var(--a);')),
     ).toBe(true)
+
+    // Et surtout : la **valeur de repli** d'un token n'est pas une exemption.
+    expect(COLOUR_PATTERN.test(stripTokenReferences('color: var(--absent, #ff0000);'))).toBe(true)
+    expect(
+      COLOUR_PATTERN.test(stripTokenReferences('background: var(--absent, rgb(255, 0, 0));')),
+    ).toBe(true)
   })
 
   it('ne tronque plus une ligne à la première multiplication', () => {
@@ -159,7 +165,10 @@ describe('couleurs en dur', () => {
  * lignes conformes. Une garde qui punit le bon usage se fait retirer dans la semaine.
  */
 function stripTokenReferences(line: string): string {
-  return line.replaceAll(/var\(\s*--[a-z0-9-]+\s*(,[^)]*)?\)/g, 'TOKEN')
+  // **Seulement le nom, jamais le repli.** Dépouiller `var(--x, #ff0000)` en entier laissait passer
+  // une couleur en dur sous une forme CSS parfaitement idiomatique — le correctif rouvrait la porte
+  // qu'il venait de fermer. Le repli reste donc dans la ligne analysée.
+  return line.replaceAll(/var\(\s*--[a-z0-9-]+/g, 'var(TOKEN')
 }
 
 /**

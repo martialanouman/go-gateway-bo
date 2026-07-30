@@ -34,8 +34,10 @@ export type TabDefinition = {
 
 export type TabsProps = Omit<
   ComponentPropsWithoutRef<typeof BaseTabs.Root>,
-  'render' | 'children'
+  'render' | 'children' | 'className'
 > & {
+  /** Voir `button.tsx` : Base UI type `className` en `string | ((state) => string)`, et on concatène. */
+  readonly className?: string
   readonly tabs: readonly TabDefinition[]
 }
 

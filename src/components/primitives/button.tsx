@@ -73,19 +73,21 @@ export function Button({
       type={type}
       className={classes}
       disabled={disabled}
-      aria-busy={loading || undefined}
       // `aria-disabled` et non `disabled` : le bouton **reste** dans le parcours clavier — un
       // `disabled` nu déplace le focus sans prévenir — mais s'annonce indisponible. `aria-busy` seul
-      // ne suffisait pas : aucun des trois lecteurs d'écran majeurs ne l'annonce sur un bouton, si
-      // bien que l'opérateur entendait « Lancer le job, bouton », pressait Entrée, et n'obtenait ni
-      // action ni explication.
-      aria-disabled={loading || undefined}
+      // ne suffisait pas : aucun des trois lecteurs d'écran majeurs ne l'annonce sur un bouton.
+      // Les deux attributs sont posés **après** le spread, plus bas.
       // **`preventDefault`, et non un `onClick` neutralisé.** Neutraliser le handler ne couvre que le
       // chemin React : `<Button type="submit" loading>` soumettait quand même le formulaire, par le
       // clic comme par `Entrée`. Sur un écran de rotation de secret, cela valait une seconde
       // rotation et une seconde ligne d'audit.
       onClick={loading ? (event) => event.preventDefault() : onClick}
       {...rest}
+      // **Après le spread**, délibérément : un appelant qui passerait `aria-disabled={false}` ou son
+      // propre `aria-busy` désarmerait sinon l'annonce sans avertissement — la même famille de
+      // défaut que celle corrigée juste au-dessus.
+      aria-busy={loading || undefined}
+      aria-disabled={loading || undefined}
     >
       {loading ? <span className="ui-button__spinner" aria-hidden="true" /> : null}
       {children}
