@@ -23,6 +23,7 @@ import {
   Tabs,
   TextField,
 } from '~/components/primitives'
+import { Empty, ErrorState, Loading, ModuleDisabled, NoResults } from '~/components/states'
 import designCss from '~/styles/design-reference.css?url'
 
 export const Route = createFileRoute('/_design')({
@@ -254,7 +255,48 @@ function DesignReference() {
       </section>
 
       <PrimitivesSection />
+      <ContentStatesSection />
     </main>
+  )
+}
+
+/**
+ * Les cinq états de contenu (step-042), **avec leur copie française définitive**.
+ *
+ * Ils sont côte à côte parce que c'est ainsi qu'on vérifie ce qui compte : qu'ils ne se ressemblent
+ * pas. « Ils sont la différence entre "rien à afficher" et "c'est cassé" » — et un seul des cinq
+ * porte du rouge.
+ */
+function ContentStatesSection() {
+  return (
+    <section className="design-section" aria-labelledby="etats-contenu">
+      <h2 id="etats-contenu">Les cinq états de contenu</h2>
+      <p className="design-section__note">
+        Chargement · vide · aucun résultat · module désactivé · erreur. Cinq copies distinctes, et
+        jamais un blanc. Un module désactivé rendu comme une erreur fait ouvrir un ticket pour une
+        fonctionnalité que personne n’a activée ; une erreur rendue comme un vide fait croire qu’il
+        n’y a rien, alors que la passerelle ne répond plus.
+      </p>
+
+      <div className="design-grid">
+        <Loading label="Chargement des connecteurs" rows={3} />
+
+        <Empty
+          title="Aucun connecteur"
+          description="Les connecteurs portent les binds SMPP vers les opérateurs. Le premier se crée depuis cette page."
+          action={{ label: 'Créer un connecteur', onClick: () => {} }}
+        />
+
+        <NoResults query="2250701020304" onReset={() => {}} />
+
+        <ModuleDisabled
+          module="Facturation"
+          stillAvailable="Le trafic, les connecteurs et les CDR restent consultables."
+        />
+
+        <ErrorState status={503} onRetry={() => {}} />
+      </div>
+    </section>
   )
 }
 
