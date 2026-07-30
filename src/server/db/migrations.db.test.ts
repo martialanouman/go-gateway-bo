@@ -102,7 +102,7 @@ describe('migrations', () => {
     const [row] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM drizzle.__drizzle_migrations
     `
-    expect(row?.count).toBe('5')
+    expect(row?.count).toBe('6')
   })
 
   it('rejoue la migration manuscrite sans erreur ni dérive du catalogue', async () => {

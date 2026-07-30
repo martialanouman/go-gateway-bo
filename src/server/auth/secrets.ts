@@ -13,9 +13,11 @@
 
 import { readSessionSecrets, type SessionSecrets } from './cookie'
 import { type MfaKeys, readMfaKeys } from './mfa-secret'
+import { readWebAuthnConfig, type WebAuthnConfig } from './webauthn'
 
 let secrets: SessionSecrets | undefined
 let mfaKeys: MfaKeys | undefined
+let webAuthnConfig: WebAuthnConfig | undefined
 
 export function getSessionSecrets(): SessionSecrets {
   secrets ??= readSessionSecrets(process.env)
@@ -32,4 +34,17 @@ export function getSessionSecrets(): SessionSecrets {
 export function getMfaKeys(): MfaKeys {
   mfaKeys ??= readMfaKeys(process.env)
   return mfaKeys
+}
+
+/**
+ * La configuration WebAuthn, lue et **validée** une fois par process.
+ *
+ * La validation est la partie qui compte : `rpID` et `origin` portent la résistance au hameçonnage, et
+ * une valeur approximative ne refuse pas à moitié — elle refuse tout, avec un échec qui ressemble à un
+ * problème d'appareil. La lire une fois fait remarquer l'erreur au premier appel plutôt qu'au
+ * cinquantième.
+ */
+export function getWebAuthnConfig(): WebAuthnConfig {
+  webAuthnConfig ??= readWebAuthnConfig(process.env)
+  return webAuthnConfig
 }

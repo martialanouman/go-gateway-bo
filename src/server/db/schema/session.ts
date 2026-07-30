@@ -28,7 +28,7 @@
  * permissions ferait survivre un pouvoir révoqué aussi longtemps que le cookie.
  */
 
-import { index, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { operators, uuidv7 } from './auth'
 
 export const operatorSessions = pgTable(
@@ -64,6 +64,26 @@ export const operatorSessions = pgTable(
      * une précision dont personne n'a besoin.
      */
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+
+    /**
+     * Le défi d'une cérémonie WebAuthn en cours, et sa date de péremption (step-024).
+     *
+     * **Côté serveur, et porté par la session** — pas par le client, pas en mémoire de process. Trois
+     * propriétés en découlent, et elles sont toutes exigées par la cérémonie :
+     *
+     * 1. **Usage unique.** La consommation est une écriture conditionnelle qui le remet à `NULL` :
+     *    deux réponses portant le même défi ne peuvent pas aboutir toutes les deux, y compris depuis
+     *    deux instances.
+     * 2. **Durée de vie courte.** L'échéance est vérifiée dans le `WHERE`, jamais après lecture : un
+     *    défi périmé n'est pas rendu, il n'existe plus.
+     * 3. **Lié à une session.** Un défi émis pour une session ne vaut pour aucune autre, ce qui
+     *    interdit de faire valider ailleurs une cérémonie commencée ici.
+     *
+     * Une colonne plutôt qu'une table : le défi ne survit jamais à la session qui le porte, et une
+     * table aurait demandé sa propre purge pour la même durée de vie de quelques minutes.
+     */
+    webauthnChallenge: text('webauthn_challenge'),
+    webauthnChallengeExpiresAt: timestamp('webauthn_challenge_expires_at', { withTimezone: true }),
 
     /**
      * Non nul dès la déconnexion. On marque plutôt qu'on ne supprime : la ligne reste lisible le

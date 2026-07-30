@@ -4,6 +4,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import type postgres from 'postgres'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { lockHolder, waitUntilBlocked } from '../../test/pg-locks'
 import { connect, type Database } from '../db/index'
 import { SESSION_COOKIE_NAME, signSessionId } from './cookie'
 import { resolveSession } from './guard'
@@ -11,7 +12,9 @@ import { currentOperator } from './me'
 import { hashPassword } from './password'
 import {
   completeMfa,
+  consumeWebAuthnChallenge,
   endSession,
+  issueWebAuthnChallenge,
   openPendingSession,
   purgeDeadSessions,
   readSession,
@@ -334,5 +337,97 @@ describe('opérateur disparu après la lecture de session', () => {
     await sql`DELETE FROM operators WHERE id = ${operatorId}::uuid`
 
     expect(await currentOperator(db, state)).toBeUndefined()
+  })
+})
+
+describe('défi WebAuthn porté par la session', () => {
+  it('rend le défi émis, une fois et une seule', async () => {
+    // **L'usage unique est la propriété qui compte.** Un défi rejouable rendrait la cérémonie
+    // rejouable, et c'est précisément ce que WebAuthn existe pour empêcher.
+    const { sessionId } = await openPendingSession(db, operatorId)
+    await issueWebAuthnChallenge(db, sessionId, 'un-defi-en-base64url')
+
+    expect(await consumeWebAuthnChallenge(db, sessionId)).toBe('un-defi-en-base64url')
+    expect(await consumeWebAuthnChallenge(db, sessionId)).toBeUndefined()
+  })
+
+  it("ne rend rien quand aucun défi n'a été émis", async () => {
+    const { sessionId } = await openPendingSession(db, operatorId)
+
+    expect(await consumeWebAuthnChallenge(db, sessionId)).toBeUndefined()
+  })
+
+  it('remplace un défi précédent plutôt que de les accumuler', async () => {
+    // Recommencer une cérémonie est ordinaire — l'opérateur ferme la fenêtre du navigateur. Le
+    // premier défi doit cesser de valoir quelque chose, sinon deux cérémonies restent ouvertes.
+    const { sessionId } = await openPendingSession(db, operatorId)
+    await issueWebAuthnChallenge(db, sessionId, 'le-premier')
+    await issueWebAuthnChallenge(db, sessionId, 'le-second')
+
+    expect(await consumeWebAuthnChallenge(db, sessionId)).toBe('le-second')
+  })
+
+  it('ne rend pas un défi périmé', async () => {
+    const { sessionId } = await openPendingSession(db, operatorId)
+    await issueWebAuthnChallenge(db, sessionId, 'trop-vieux')
+    await sql`UPDATE operator_sessions SET webauthn_challenge_expires_at = now() - interval '1 second'
+              WHERE id = ${sessionId}`
+
+    expect(await consumeWebAuthnChallenge(db, sessionId)).toBeUndefined()
+  })
+
+  it("ne rend pas le défi d'une autre session", async () => {
+    // Le défi est lié à la session qui l'a demandé : sans cela, une cérémonie commencée ici pourrait
+    // être achevée ailleurs.
+    const mine = await openPendingSession(db, operatorId)
+    const other = await openPendingSession(db, operatorId)
+    await issueWebAuthnChallenge(db, mine.sessionId, 'le-mien')
+
+    expect(await consumeWebAuthnChallenge(db, other.sessionId)).toBeUndefined()
+    expect(await consumeWebAuthnChallenge(db, mine.sessionId)).toBe('le-mien')
+  })
+
+  it('refuse un défi à qui a lu la ligne avant sa consommation', async () => {
+    // **Le test qui justifie le `FOR UPDATE`, et il a fallu le forcer.** Un `Promise.all` sur deux
+    // pools ne prouve rien ici : les deux appels ne se chevauchent presque jamais, le second part
+    // après que le premier a validé, et il voit donc un défi déjà remis à `NULL`. Vérifié par
+    // mutation — le verrou retiré, cette version-là passait encore.
+    //
+    // L'entrelacement est donc construit : une transaction tient le verrou de la ligne, le second
+    // appelant s'y bloque — on l'observe dans `pg_locks`, pas par une attente arbitraire — puis la
+    // première consomme le défi et valide. Sans `FOR UPDATE`, le second aurait déjà lu la valeur
+    // dans son propre instantané et la rendrait malgré tout.
+    const { sessionId } = await openPendingSession(db, operatorId)
+    await issueWebAuthnChallenge(db, sessionId, 'disputé')
+
+    const other = connect(container.getConnectionUri(), { poolSize: 2 })
+    const lock = lockHolder()
+
+    try {
+      const holder = sql.begin(async (tx) => {
+        await tx`SELECT id FROM operator_sessions WHERE id = ${sessionId} FOR UPDATE`
+        lock.signalAcquired()
+        await lock.held
+        await tx`UPDATE operator_sessions SET webauthn_challenge = NULL WHERE id = ${sessionId}`
+      })
+
+      // Le rival n'est armé **qu'après** le signal : sans cet ordre, il peut prendre et relâcher le
+      // verrou avant que le détenteur ne l'ait demandé, et rien ne se bloque jamais.
+      await lock.acquired
+      const contender = consumeWebAuthnChallenge(other.db, sessionId)
+
+      // Relâcher et attendre les deux **avant** d'asserter : une exception ici laisserait la
+      // transaction et la requête en vol, et le pool serait fermé sous elles par le `finally`.
+      const blocked = await waitUntilBlocked(sql)
+      lock.release()
+      const consumed = await contender
+      await holder
+
+      expect(blocked, "l'entrelacement n'a pas eu lieu : ce test ne prouve rien").toBe(true)
+      expect(consumed).toBeUndefined()
+    } finally {
+      lock.release()
+      await other.client.end({ timeout: 5 })
+    }
   })
 })

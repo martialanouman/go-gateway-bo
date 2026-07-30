@@ -33,3 +33,4 @@ sans code à recopier.
 
 ## Hors périmètre
 L'obligation de MFA selon le rôle → step-025.
+

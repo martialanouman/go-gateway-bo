@@ -55,6 +55,32 @@ export default defineConfig({
           handler: './src/server/auth/http/mfa-verify.ts',
           method: 'post',
         },
+        // Les passkeys demandent deux allers-retours par cérémonie — options, puis réponse signée —
+        // et suivent donc le même motif à deux phases que l'enrôlement TOTP : sans réponse
+        // d'authentificateur dans le corps, le point d'entrée rend des options.
+        {
+          route: '/api/auth/mfa/passkey/register',
+          handler: './src/server/auth/http/mfa-passkey-register.ts',
+          method: 'post',
+        },
+        {
+          route: '/api/auth/mfa/passkey/verify',
+          handler: './src/server/auth/http/mfa-passkey-verify.ts',
+          method: 'post',
+        },
+        {
+          route: '/api/auth/mfa/passkeys',
+          handler: './src/server/auth/http/mfa-passkeys.ts',
+          method: 'get',
+        },
+        // `post` et non `delete` : le même point d'entrée renomme et retire, selon la présence d'un
+        // nom dans le corps. Deux routes pour deux gestes sur la même liste auraient dupliqué la
+        // garde de session complète, qui est ce qui compte ici.
+        {
+          route: '/api/auth/mfa/passkeys/manage',
+          handler: './src/server/auth/http/mfa-passkey-manage.ts',
+          method: 'post',
+        },
         // `post` et non `get` : une déconnexion est une mutation, et un `get` se déclenche depuis
         // une image ou un lien préchargé — un tiers déconnecterait un opérateur à son insu.
         { route: '/api/auth/logout', handler: './src/server/auth/http/logout.ts', method: 'post' },

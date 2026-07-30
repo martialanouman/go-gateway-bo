@@ -155,6 +155,77 @@ export async function readSession(db: Database, sessionId: string): Promise<Sess
 }
 
 /**
+ * Durée de vie d'un défi WebAuthn.
+ *
+ * Quelques minutes : c'est le temps qu'il faut à un opérateur pour approuver sur son téléphone ou
+ * poser son doigt, pas davantage. Un défi qui traîne est un défi qu'on peut essayer de faire signer.
+ */
+const WEBAUTHN_CHALLENGE_LIFETIME_MS = 5 * 60 * 1000
+
+/**
+ * Émet un défi pour une cérémonie WebAuthn, en **remplaçant** celui qui traînait.
+ *
+ * Remplacer et non ajouter : recommencer une cérémonie est ordinaire — l'opérateur ferme la fenêtre
+ * du navigateur — et laisser deux défis valables laisserait deux cérémonies ouvertes.
+ */
+export async function issueWebAuthnChallenge(
+  db: Database,
+  sessionId: string,
+  challenge: string,
+): Promise<void> {
+  await db
+    .update(operatorSessions)
+    .set({
+      webauthnChallenge: challenge,
+      webauthnChallengeExpiresAt: sql`now() + ${intervalMs(WEBAUTHN_CHALLENGE_LIFETIME_MS)}`,
+    })
+    .where(eq(operatorSessions.id, sessionId))
+}
+
+/**
+ * Consomme le défi d'une session, ou rend `undefined`.
+ *
+ * ## Pourquoi un `SELECT … FOR UPDATE` et pas un simple `UPDATE … RETURNING`
+ *
+ * Parce que `RETURNING` rend la ligne **après** écriture : la colonne y vaut déjà `NULL`, et l'on
+ * perdrait précisément la valeur qu'on vient de consommer. Le contourner par un auto-join
+ * (`UPDATE … FROM operator_sessions prev`) marche en séquentiel et se casse en concurrence : la
+ * relecture que PostgreSQL fait après avoir attendu la transaction concurrente ne réévalue pas les
+ * conditions portées par l'autre côté du join, si bien que deux appelants pourraient lire le même
+ * défi.
+ *
+ * Le verrou explicite ferme les deux problèmes d'un coup. En `READ COMMITTED`, `FOR UPDATE` fait
+ * attendre le second appelant, puis **relit la ligne et réapplique le `WHERE`** : il voit alors un
+ * défi remis à `NULL`, la clause commune ne rend aucune ligne, et l'usage unique tient — y compris
+ * entre deux instances.
+ *
+ * L'échéance vit dans le `WHERE` plutôt qu'après lecture : un défi périmé n'est pas rendu puis
+ * rejeté, il n'existe plus.
+ */
+export async function consumeWebAuthnChallenge(
+  db: Database,
+  sessionId: string,
+): Promise<string | undefined> {
+  const rows = await db.execute<{ challenge: string }>(sql`
+    WITH locked AS (
+      SELECT id, webauthn_challenge
+      FROM operator_sessions
+      WHERE id = ${sessionId}
+        AND webauthn_challenge IS NOT NULL
+        AND webauthn_challenge_expires_at > now()
+      FOR UPDATE
+    )
+    UPDATE operator_sessions AS s
+    SET webauthn_challenge = NULL, webauthn_challenge_expires_at = NULL
+    FROM locked
+    WHERE s.id = locked.id
+    RETURNING locked.webauthn_challenge AS challenge
+  `)
+
+  return rows[0]?.challenge ?? undefined
+}
+
+/**
  * Révoque une session. Idempotent, et **immédiat pour toutes les instances** puisque l'état vit en
  * base : aucune n'a de cache à invalider.
  */

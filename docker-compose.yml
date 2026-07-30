@@ -18,7 +18,12 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # **Monté sur `/var/lib/postgresql`, pas sur `.../data`.** Depuis la 18, l'image range les données
+      # dans un sous-répertoire nommé d'après la version majeure, afin que `pg_upgrade --link` puisse
+      # fonctionner sans traverser une frontière de point de montage. Monter l'ancien chemin fait
+      # **refuser le démarrage** : le conteneur détecte des données là où il n'en attend plus, et le
+      # `docker compose up -d` du démarrage échoue en silence pour qui ne lit pas les logs.
+      - postgres-18-data:/var/lib/postgresql
     healthcheck:
       # `pg_isready` répond avant que la base accepte réellement les connexions applicatives ;
       # préciser l'utilisateur et la base évite un `pnpm db:migrate` lancé une seconde trop tôt.
@@ -41,4 +46,7 @@ services:
       retries: 15
 
 volumes:
-  postgres-data:
+  # Nom distinct de l'ancien `postgres-data` : ce dernier contient une arborescence de données à la
+  # racine du volume, héritée du montage précédent, que l'image 18 ne sait pas relire. Le laisser en
+  # place ne coûte rien et `docker volume rm go-gateway-bo_postgres-data` s'en débarrasse.
+  postgres-18-data:
