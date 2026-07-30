@@ -10,7 +10,8 @@
 
 import { describe, expect, it } from 'vitest'
 import type { SessionState } from '../auth/session'
-import { AUTHZ_CODES, authorize } from './permission'
+import type { Database } from '../db/index'
+import { AUTHZ_CODES, authorize, requirePermission } from './permission'
 
 const OPERATOR_ID = '018f4c1e-0000-7000-8000-000000000001'
 const SESSION_ID = '018f4c1e-0000-7000-8000-000000000002'
@@ -95,6 +96,43 @@ describe('MFA obligatoire', () => {
   it('distingue le second facteur manquant de la permission manquante', () => {
     // Deux conduites à tenir différentes : franchir son facteur, ou demander un rôle. Les
     // confondre enverrait l'opérateur au mauvais endroit.
-    expect(AUTHZ_CODES.mfaRequired).not.toBe(AUTHZ_CODES.denied)
+    //
+    // L'assertion porte sur deux **décisions** et non sur deux littéraux de `AUTHZ_CODES` : comparer
+    // les constantes entre elles serait vrai par construction, et resterait vert même si `authorize`
+    // rendait le même code dans les deux cas.
+    const withoutFactor = authorize(pending, ['routes:write'], 'routes:write')
+    const withoutRole = authorize(active, [], 'routes:write')
+
+    expect(withoutFactor.granted === false && withoutFactor.refusal.code).not.toBe(
+      withoutRole.granted === false && withoutRole.refusal.code,
+    )
+  })
+})
+
+/**
+ * Le court-circuit : une session qui ne peut rien obtenir ne doit rien coûter.
+ *
+ * Documenté dans `requirePermission` — « un refus ne doit pas coûter une requête, sinon il devient
+ * un moyen de charger la base sans être connecté » — et jusqu'ici prouvé par rien. Le retirer
+ * laissait la suite verte : même décision, coût différent.
+ */
+describe('coût d’un refus', () => {
+  /** Une base qui hurle dès qu'on l'interroge : la seule façon d'observer qu'on ne l'a pas fait. */
+  const explodingDatabase = new Proxy({} as Database, {
+    get() {
+      throw new Error('La base a été interrogée alors que la session ne pouvait rien obtenir.')
+    },
+  })
+
+  it('n’interroge pas la base sans session', async () => {
+    const decision = await requirePermission(explodingDatabase, absent, 'customers:read')
+
+    expect(decision.granted === false && decision.refusal.code).toBe(AUTHZ_CODES.sessionAbsent)
+  })
+
+  it('n’interroge pas la base pour une session sans second facteur', async () => {
+    const decision = await requirePermission(explodingDatabase, pending, 'customers:read')
+
+    expect(decision.granted === false && decision.refusal.code).toBe(AUTHZ_CODES.mfaRequired)
   })
 })

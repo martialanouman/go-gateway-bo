@@ -231,8 +231,17 @@ describe('partitionnement de audit_log', () => {
   })
 
   it('peut recréer les partitions sans erreur, autant de fois qu on veut', async () => {
-    // La fonction est appelée à chaque déploiement, et potentiellement par plusieurs instances au
-    // même instant : elle doit être idempotente et sérialisée.
+    // Elle doit être idempotente et sérialisée, plusieurs instances pouvant l'appeler au même
+    // instant.
+    //
+    // **Elle n'est appelée par rien en production**, contrairement à ce qui était écrit ici :
+    // l'unique appel réel est celui du corps de la migration 0001, et `drizzle-kit migrate`
+    // n'applique une migration qu'une fois. L'horizon posé le jour de la première migration
+    // s'épuise donc au bout de quelques mois, et les lignes tombent ensuite dans
+    // `audit_log_default` — où leur seule présence rend la création du mois correspondant
+    // définitivement impossible (voir le garde-fou de la migration). C'est step-187 qui pose la
+    // maintenance périodique ; d'ici là, la partition par défaut fait office de filet et rien
+    // n'échoue, mais la table redevient monolithique en silence.
     await sql`SELECT ensure_audit_log_partitions(3)`
     await sql`SELECT ensure_audit_log_partitions(3)`
 

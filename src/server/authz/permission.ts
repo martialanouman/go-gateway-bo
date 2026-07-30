@@ -43,7 +43,15 @@ import type { Database } from '../db/index'
  * d'enveloppe (§1.4), parce qu'il n'y a qu'une forme d'erreur dans tout le produit.
  */
 export const AUTHZ_CODES = {
-  /** Aucune session exploitable : absente, expirée, révoquée, ou opérateur désactivé. */
+  /**
+   * Aucune session exploitable : absente, expirée, ou révoquée.
+   *
+   * Un opérateur **désactivé** y tombe aussi, mais par un autre chemin : `readSession` filtre sur
+   * `operators.status`, si bien que sa session ne se résout déjà plus. Il n'atteint donc pas
+   * `authorize` avec une session active — et s'il y était forcé, il obtiendrait `permission_denied`,
+   * `resolveOperatorPermissions` filtrant lui aussi sur le statut. La distinction n'a pas d'effet
+   * observable ; l'écrire évite de croire que cette garde-ci s'occupe des comptes fermés.
+   */
   sessionAbsent: 'session_absent',
   /** Session ouverte, second facteur pas encore franchi. */
   mfaRequired: 'mfa_required',

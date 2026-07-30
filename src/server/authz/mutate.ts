@@ -24,6 +24,25 @@
  * appeler la passerelle **dans** le bloc, de sorte qu'un échec distant lève avant la validation et
  * n'écrive aucune ligne. Une passerelle qui réussit et une transaction qui échoue reste possible —
  * la trace manque alors pour une action faite, ce qui est le sens le moins dangereux des deux.
+ *
+ * Deux conséquences à ne pas découvrir en production, et qui portent sur l'appelant :
+ *
+ * - l'appel distant tient une connexion du pool et ses verrous pendant tout l'aller-retour. Il doit
+ *   être borné par un `AbortSignal.timeout()` plus court que l'`idle_in_transaction_session_timeout`
+ *   posé dans `db/index.ts` — sinon dix mutations lentes figent la console entière ;
+ * - `checkAuditSubject` et `before` sont vérifiés **avant** la transaction, mais `after` ne peut
+ *   l'être qu'après le bloc. Un payload `after` refusé après un appel distant réussi laisse donc la
+ *   passerelle mutée sans trace. C'est l'unique fenêtre de ce genre, et la refermer demanderait une
+ *   ligne d'intention validée avant l'appel — à trancher en step-061, pas ici.
+ *
+ * ## Ce que ce combinateur ne peut pas empêcher
+ *
+ * Que `run` ignore le `tx` reçu et écrive par le `db` extérieur, resté dans la portée lexicale de
+ * l'appelant. La mutation sortirait alors de la transaction et survivrait à un échec d'audit. Aucun
+ * typage raisonnable ne le referme ; c'est un point de revue, et le test d'énumération n'en dit
+ * rien. De même, un appelant peut appeler `requirePermission` et **jeter le résultat** : le refus
+ * est une valeur, pas une exception. `mutate` est le chemin par défaut précisément pour que ces deux
+ * fautes demandent d'en sortir délibérément.
  */
 
 import type { PermissionKey } from '~/lib/permissions'

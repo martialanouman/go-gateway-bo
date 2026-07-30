@@ -41,6 +41,26 @@ const DEFAULT_POOL_SIZE = 10
  */
 const STATEMENT_TIMEOUT_MS = 10_000
 
+/**
+ * Une transaction ouverte qui n'exécute rien est tuée au bout de ce délai.
+ *
+ * `statement_timeout` ne couvre **pas** ce cas : il borne une requête, jamais l'attente entre deux.
+ * Or `mutate()` (step-025) prescrit d'appeler l'API Admin **dans** la transaction, pour qu'un échec
+ * distant lève avant la validation. Une passerelle lente y tient donc une connexion du pool, et les
+ * verrous de ligne qui vont avec, pendant tout l'aller-retour.
+ *
+ * Le pool fait dix connexions par instance : dix mutations concurrentes derrière une passerelle qui
+ * ne répond plus suffisent à figer **toute** la console — `readSession` et la résolution des
+ * permissions comprises, donc les écrans en lecture aussi. Ce serait l'inverse de l'invariant (e),
+ * qui veut qu'une panne dégrade la visualisation sans l'arrêter.
+ *
+ * Trente secondes : au-delà de tout aller-retour légitime vers l'API Admin, très en deçà du moment
+ * où le pool s'épuise. Un appel distant doit rester borné de son côté par un `AbortSignal.timeout()`
+ * plus court que ce seuil — sinon c'est PostgreSQL qui tranche, et l'erreur désignera la
+ * transaction plutôt que l'appel qui l'a fait traîner.
+ */
+const IDLE_IN_TRANSACTION_TIMEOUT_MS = 30_000
+
 /** Une connexion inactive plus longtemps que cela est rendue plutôt que gardée à vie. */
 const IDLE_TIMEOUT_S = 30
 
@@ -95,7 +115,10 @@ export function resetDatabaseForTests(): void {
 export function connect(url: string, options?: { poolSize?: number }) {
   const client = postgres(url, {
     max: options?.poolSize ?? DEFAULT_POOL_SIZE,
-    connection: { statement_timeout: STATEMENT_TIMEOUT_MS },
+    connection: {
+      statement_timeout: STATEMENT_TIMEOUT_MS,
+      idle_in_transaction_session_timeout: IDLE_IN_TRANSACTION_TIMEOUT_MS,
+    },
     // Sans `idle_timeout`, postgres.js garde ses dix connexions ouvertes à vie, par instance.
     idle_timeout: IDLE_TIMEOUT_S,
     // Trente secondes par défaut : un écran qui attend une demi-minute sur une base injoignable

@@ -139,10 +139,14 @@ describe('requirePermission contre la base', () => {
     expect((await requirePermission(db, activeSession(), 'customers:write')).granted).toBe(false)
   })
 
-  it('ne rend rien à un opérateur désactivé, rôle ou pas', async () => {
+  it('ne rend rien à un opérateur désactivé, même si l’on force une session active', async () => {
     await grantRole('super_admin')
     await sql`UPDATE operators SET status = 'disabled' WHERE id = ${operatorId}`
 
+    // La session est fabriquée à la main : dans le vrai flux, `readSession` filtre déjà sur le
+    // statut et l'opérateur n'arrive jamais ici avec une session active. Ce test couvre la seconde
+    // ligne de défense — `resolveOperatorPermissions` filtre aussi — et c'est pourquoi le code rendu
+    // est `permission_denied` et non `session_absent`.
     const decision = await requirePermission(db, activeSession(), 'customers:write')
 
     expect(decision.granted === false && decision.refusal.code).toBe(AUTHZ_CODES.denied)
