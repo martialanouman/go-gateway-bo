@@ -7,9 +7,12 @@
  *    retiré retire le pouvoir sans attendre de reconnexion.
  * 2. Une mutation refusée **ne mute rien et n'audite rien** : il ne suffit pas que la fonction rende
  *    un refus, encore faut-il que la base n'ait pas bougé.
- * 3. La mutation et sa ligne d'audit **valident ensemble ou pas du tout**. C'est la seule façon de
- *    tenir « échec d'audit = échec de l'opération » de la step, et un `expect` sur un booléen ne
- *    l'établirait jamais : seul un `ROLLBACK` observé le fait.
+ * 3. Un audit refusé **annule la mutation** : « échec d'audit = échec de l'opération », et un
+ *    `expect` sur un booléen ne l'établirait jamais — seul un `ROLLBACK` observé le fait.
+ *
+ * Ce que ce fichier ne peut pas établir : que l'audit passe bien par la transaction et non par le
+ * pool. Le refus de payload lance **avant** toute insertion, donc les deux câblages donnent le même
+ * résultat observable ici. Cette moitié-là vit dans `mutate.test.ts`.
  */
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
@@ -231,8 +234,12 @@ describe('mutate', () => {
       ),
     ).rejects.toThrow()
 
-    // **Le cœur de la step** : l'audit a échoué, donc l'opération aussi. Un `ROLLBACK` observé, pas
-    // un booléen — c'est la seule preuve que les deux écritures partagent une transaction.
+    // L'audit a échoué, donc l'opération aussi : un `ROLLBACK` observé, pas un booléen.
+    //
+    // Ce que ce test **ne** prouve pas, contrairement à ce qui était écrit ici : que les deux
+    // écritures partagent une transaction. `checkAuditPayload` lance avant toute insertion, si bien
+    // que passer le pool à `recordAudit` laisserait ce test vert — vérifié en mutant. L'identité du
+    // querier se prouve dans `mutate.test.ts`, où elle se lit directement.
     expect(await displayName()).toBe('Opératrice')
     expect(await auditRows()).toHaveLength(0)
   })
