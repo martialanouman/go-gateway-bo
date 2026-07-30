@@ -19,27 +19,34 @@
  * `logout.ts` — qui ne contient pas une ligne d'autorisation — était déclaré gardé **et** audité.
  * Le filet était troué avant d'avoir servi.
  *
- * La version actuelle résout chaque `import` jusqu'au fichier visé et regarde si c'est un module
- * d'`src/server/authz/`, et quel symbole en est tiré. Un commentaire ne peut plus compter, un
- * homonyme local non plus, et un `import type` est écarté : un type ne garde rien.
+ * La version actuelle résout les `import` du **handler lui-même** jusqu'au fichier visé, et regarde
+ * si c'est un module d'`src/server/authz/` et quel symbole en est tiré. Un commentaire ne peut plus
+ * compter, un homonyme local non plus, et un `import type` est écarté : un type ne garde rien.
  *
- * ## Ce que cela prouve, et ce que cela ne prouve pas
+ * ## Pas de transitivité, et c'est une convention assumée
  *
- * Qu'une garde est **atteignable** depuis cette route, pas qu'elle est appelée sur tous les chemins.
- * Deux trous connus, assumés faute d'analyse de flot :
+ * Suivre la fermeture d'imports refermait le trou du texte et rouvrait le même un cran plus loin :
+ * un handler qui importe un module de service — lequel utilise `mutate` pour d'autres fonctions —
+ * était crédité sans appeler la moindre garde. Le détecteur exige donc l'import **dans la fonction
+ * serveur**, ce que `CLAUDE.md` demande déjà (« `requirePermission()` dans la fonction serveur »).
+ * Un handler qui délègue sa garde est signalé ; le remède est de remonter l'appel d'un cran.
  *
- * - un handler qui appelle `requirePermission` et **jette le résultat** passe (le refus est une
- *   valeur, pas une exception) ;
- * - un handler qui importe un module tiers lequel importe l'authz pour son propre compte passe.
+ * ## Ce que cela ne prouve toujours pas
  *
- * Le test attrape l'oubli complet — le cas réel — pas la garde contournée. Le reste est au ressort
- * des tests de la route elle-même.
+ * Qu'une garde importée soit **appelée**. Un handler qui appelle `requirePermission` et jette le
+ * résultat passe — le refus est une valeur, pas une exception. Fermer ce cas demanderait un graphe
+ * d'appels, donc l'AST de TypeScript. Le test attrape l'oubli complet, qui est le cas réel.
  *
- * ## Angle mort à porter
+ * ## Deux angles morts à porter
  *
- * Seules les **routes HTTP** sont énumérées. Les fonctions serveur TanStack (`createServerFn`, zéro
- * occurrence à ce jour) et les commandes du hub WebSocket (step-043) obtiennent leur point d'entrée
- * autrement et échapperaient à ce test. À couvrir quand la première apparaîtra.
+ * 1. Seules les **routes HTTP** sont énumérées. Les fonctions serveur TanStack (`createServerFn`,
+ *    zéro occurrence à ce jour) et les commandes du hub WebSocket (step-043) obtiennent leur point
+ *    d'entrée autrement. À couvrir quand la première apparaîtra.
+ * 2. **Aujourd'hui, aucune route réelle n'est éprouvée par ce test.** Les sept routes de mutation du
+ *    BFF sont les sept points d'entrée de l'authentification, donc les sept exemptions : les deux
+ *    assertions centrales portent sur une liste vide. Le détecteur n'est exercé que par les fixtures
+ *    de `src/test/fixtures/`. C'est un filet posé au-dessus d'un sol encore vide — il fonctionne, il
+ *    ne travaille pas encore. La première route métier (step-061) le mettra en service.
  */
 
 import { readFileSync } from 'node:fs'
@@ -231,12 +238,23 @@ describe('le détecteur se prouve lui-même', () => {
     ])
   })
 
-  it('ne signale pas une route gardée par un import indirect', () => {
-    // `route-gardee.ts` n'importe pas l'authz : elle passe par `mutation-fictive.ts`. C'est le motif
-    // réel — un handler délègue toujours — et un détecteur qui ne lirait que le premier niveau
-    // laisserait passer toutes les routes du produit.
+  it('ne signale pas une route qui appelle la garde elle-même', () => {
     expect(offenders([guarded], PERMISSION_SYMBOLS)).toEqual([])
     expect(offenders([guarded], AUDIT_SYMBOLS)).toEqual([])
+  })
+
+  it('signale une route qui délègue sa garde à un service — la convention l’interdit', () => {
+    // Le faux positif que la transitivité rouvrait : un module de service exporte des lectures ET
+    // des mutations, le handler n'en importe qu'une lecture, et l'import suffisait à le créditer.
+    // `route-deleguee.ts` n'importe que `renameFixture`, dont le module utilise `mutate`.
+    const delegating = {
+      route: '/api/customers',
+      handler: './src/test/fixtures/route-deleguee.ts',
+      method: 'post',
+    } as const
+
+    expect(offenders([delegating], PERMISSION_SYMBOLS)).toHaveLength(1)
+    expect(offenders([delegating], AUDIT_SYMBOLS)).toHaveLength(1)
   })
 
   it('ne signale pas une route qui ne mute pas', () => {
@@ -248,7 +266,7 @@ describe('le détecteur se prouve lui-même', () => {
     // prose, et tout handler importe `guard.ts`. Ce cas fige la correction.
     const fromGuard = join(SRC, 'server', 'auth', 'guard.ts')
     expect(read(fromGuard)).toContain('requirePermission')
-    expect(authzSymbolsReachedFrom(fromGuard)).toEqual(new Set())
+    expect(authzSymbolsImportedBy(fromGuard)).toEqual(new Set())
   })
 
   it('ne prend pas une fonction privée homonyme pour le combinateur', () => {
@@ -256,7 +274,7 @@ describe('le détecteur se prouve lui-même', () => {
     // aucun rapport avec l'authz, et il est atteint depuis tous les handlers de passkey.
     const homonym = join(SRC, 'server', 'auth', 'webauthn-credentials.ts')
     expect(read(homonym)).toContain('function mutate(')
-    expect(authzSymbolsReachedFrom(homonym)).toEqual(new Set())
+    expect(authzSymbolsImportedBy(homonym)).toEqual(new Set())
   })
 
   it('écarte un import de type — un type ne garde rien', () => {
@@ -285,7 +303,7 @@ function offenders(entries: readonly BffRoute[], symbols: ReadonlySet<string>): 
   return entries
     .filter((entry) => MUTATING_METHODS.has(entry.method))
     .filter((entry) => !(entry.route in UNGUARDED_BY_DESIGN))
-    .filter((entry) => !intersects(authzSymbolsReachedFrom(resolve(ROOT, entry.handler)), symbols))
+    .filter((entry) => !intersects(authzSymbolsImportedBy(resolve(ROOT, entry.handler)), symbols))
     .map((entry) => `${entry.method.toUpperCase()} ${entry.route} → ${entry.handler}`)
 }
 
@@ -294,28 +312,38 @@ function intersects(reached: ReadonlySet<string>, expected: ReadonlySet<string>)
 }
 
 /**
- * Tous les symboles d'`src/server/authz/` tirés par le fichier ou par sa fermeture d'imports.
+ * Les symboles d'`src/server/authz/` que **ce fichier** importe. Aucune transitivité.
  *
- * La fermeture est parcourue largement — tout import interne, pas seulement l'authz — parce qu'un
- * handler délègue toujours : la garde vit dans le module qu'il appelle, pas dans sa coquille HTTP.
+ * ## Pourquoi pas la fermeture d'imports
+ *
+ * La version précédente suivait tout le graphe. Elle refermait bien le trou du texte, mais rouvrait
+ * la même classe de faux positif un cran plus loin, et le scénario n'a rien de tordu : dès la
+ * step-061, un handler métier importera un module de service qui exporte à la fois des lectures et
+ * des mutations. L'import est réellement utilisé — le linter ne dit rien — et il suffit à créditer
+ * une route qui n'appelle ni `requirePermission` ni `mutate` :
+ *
+ * ```ts
+ * import { listCustomers } from '~/server/customers/service'  // ce module utilise `mutate` ailleurs
+ * export default defineEventHandler(async () => { await db.insert(notes).values(…) })
+ * ```
+ *
+ * Vérifier que le *symbole importé* mène à la garde demanderait un vrai graphe d'appels, donc l'AST
+ * de TypeScript. Exiger l'import dans le handler coûte une convention et referme le trou en entier.
+ *
+ * ## La convention que cela impose
+ *
+ * **La garde vit dans la fonction serveur**, comme le disent `CLAUDE.md` et la step : le handler
+ * appelle `mutate()` ou `requirePermission()` lui-même, et délègue à l'intérieur du bloc. Un handler
+ * qui déléguerait sa garde à un service est signalé — bruyamment, et c'est le bon sens de l'erreur :
+ * le remède est de remonter l'appel d'un cran, pas d'élargir le détecteur.
  */
-function authzSymbolsReachedFrom(entryPoint: string): Set<string> {
+function authzSymbolsImportedBy(file: string): Set<string> {
+  const source = read(file)
+  if (source === undefined) return new Set()
+
   const found = new Set<string>()
-  const seen = new Set<string>()
-  const queue = [entryPoint]
-
-  while (queue.length > 0) {
-    const current = queue.shift()
-    if (!current || seen.has(current)) continue
-    seen.add(current)
-
-    const source = read(current)
-    if (source === undefined) continue
-
-    for (const entry of importsIn(source, dirname(current))) {
-      if (isAuthzModule(entry.path)) for (const symbol of entry.symbols) found.add(symbol)
-      queue.push(entry.path)
-    }
+  for (const entry of importsIn(source, dirname(file))) {
+    if (isAuthzModule(entry.path)) for (const symbol of entry.symbols) found.add(symbol)
   }
 
   return found

@@ -168,6 +168,68 @@ describe('enrôlement TOTP face à un facteur déjà actif', () => {
     expect(row?.count).toBe(1)
   })
 
+  it('refuse de confirmer un secret enrôlé AVANT l’enregistrement d’une passkey', async () => {
+    // Le cas que la garde de `confirmTotpEnrollment` couvre, et le plus subtil des deux : un
+    // enrôlement commencé quand le compte n'avait aucun facteur, jamais confirmé, puis une passkey
+    // enregistrée. Le secret en attente resterait sinon une porte ouverte indéfiniment — l'attaquant
+    // qui l'a obtenu au démarrage n'aurait qu'à revenir confirmer plus tard.
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+    if (started.outcome !== 'started') throw new Error("L'enrôlement n'a pas démarré.")
+
+    await registerPasskeyOnly()
+
+    const code = await totpCodeAt(started.secret, NOW)
+    const confirmed = await confirmTotpEnrollment(db, KEYS, await pendingSession(), code, NOW)
+
+    // Le code est **valide** : c'est bien la garde qui refuse, pas la vérification du code.
+    //
+    // `mfa_required` et non `no_pending_enrollment` : ce dernier dit « relancez l'enrôlement pour
+    // obtenir un nouveau QR code », geste que le démarrage refuserait à son tour. L'opératrice
+    // tournerait entre deux refus contradictoires.
+    expect(confirmed.outcome).toBe('mfa_required')
+  })
+
+  it('n’émet aucun code de récupération quand la confirmation est refusée', async () => {
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+    if (started.outcome !== 'started') throw new Error("L'enrôlement n'a pas démarré.")
+
+    await registerPasskeyOnly()
+    await confirmTotpEnrollment(
+      db,
+      KEYS,
+      await pendingSession(),
+      await totpCodeAt(started.secret, NOW),
+      NOW,
+    )
+
+    // L'activation et les codes partagent une transaction : un refus ne doit rien laisser derrière.
+    expect(await countUnusedRecoveryCodes(db, operatorId)).toBe(0)
+  })
+
+  it('ne promeut pas la session quand la confirmation est refusée', async () => {
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+    if (started.outcome !== 'started') throw new Error("L'enrôlement n'a pas démarré.")
+
+    await registerPasskeyOnly()
+    const session = await pendingSession()
+    await confirmTotpEnrollment(db, KEYS, session, await totpCodeAt(started.secret, NOW), NOW)
+
+    // Ce qui compte au bout du compte : la session reste partielle, donc `requirePermission`
+    // n'accorde rien (step-025).
+    expect((await readSession(db, session.sessionId)).status).toBe('pending_mfa')
+  })
+
+  it('refuse plutôt que de lever quand la colonne des passkeys est corrompue', async () => {
+    // `jsonb_array_length` lève sur un scalaire ou un objet. Sans garde de type, une colonne
+    // bricolée remonterait en 500 — ce que `webauthn-credentials.ts` interdit explicitement : une
+    // erreur serveur rend la panne indiscernable d'une attaque. Fail-closed, et lisible.
+    await sql`UPDATE operators SET mfa_webauthn_credentials = '{"pas":"un tableau"}'::jsonb WHERE id = ${operatorId}`
+
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+
+    expect(started).not.toHaveProperty('secret')
+  })
+
   it('laisse l’enrôlement ouvert à qui n’a aucun facteur', async () => {
     // Le pendant indispensable : durcir la garde ne doit pas enfermer dehors le premier opérateur,
     // qui doit bien pouvoir enrôler son tout premier facteur depuis une session partielle.

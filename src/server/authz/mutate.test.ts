@@ -23,7 +23,7 @@
  * une vraie base à côté. Les deux fichiers se complètent au lieu de se remplacer.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Database, Transaction } from '../db/index'
 
 const { recordAuditSpy, requirePermissionSpy } = vi.hoisted(() => ({
@@ -38,7 +38,13 @@ vi.mock('./audit', async () => ({
   ...(await vi.importActual<typeof import('./audit')>('./audit')),
   recordAudit: recordAuditSpy,
 }))
-vi.mock('./permission', () => ({ requirePermission: requirePermissionSpy }))
+// Même motif que pour `./audit` : remplacement partiel. Un remplacement total casserait ce fichier
+// avec un `undefined is not a function` opaque le jour où `mutate.ts` importerait `authorize` ou
+// `AUTHZ_CODES` de ce module — dans un test qui ne parle pas de permissions.
+vi.mock('./permission', async () => ({
+  ...(await vi.importActual<typeof import('./permission')>('./permission')),
+  requirePermission: requirePermissionSpy,
+}))
 
 const { mutate } = await import('./mutate')
 
@@ -66,9 +72,12 @@ const REQUEST = {
   action: 'operator.rename',
 } as const
 
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
 describe('câblage de la transaction', () => {
   it('écrit l’audit sur le querier reçu par le bloc, pas sur le pool', async () => {
-    recordAuditSpy.mockClear()
     granted()
     const db = databaseHandingOut(TRANSACTION)
 
@@ -86,7 +95,6 @@ describe('câblage de la transaction', () => {
   })
 
   it('n’ouvre aucune transaction quand la permission est refusée', async () => {
-    recordAuditSpy.mockClear()
     requirePermissionSpy.mockResolvedValue({
       granted: false,
       refusal: { code: 'permission_denied', message: 'refusé', errors: [] },
@@ -105,7 +113,6 @@ describe('câblage de la transaction', () => {
 
 describe('composition de l’entrée d’audit', () => {
   it('prend l’opérateur de la décision, jamais de la requête', async () => {
-    recordAuditSpy.mockClear()
     granted()
 
     await mutate(
@@ -119,7 +126,6 @@ describe('composition de l’entrée d’audit', () => {
   })
 
   it('laisse le bloc primer sur la requête pour la cible', async () => {
-    recordAuditSpy.mockClear()
     granted()
 
     await mutate(
@@ -135,7 +141,6 @@ describe('composition de l’entrée d’audit', () => {
   })
 
   it('retombe sur la cible de la requête quand le bloc n’en nomme pas', async () => {
-    recordAuditSpy.mockClear()
     granted()
 
     await mutate(
@@ -145,5 +150,53 @@ describe('composition de l’entrée d’audit', () => {
     )
 
     expect(recordAuditSpy.mock.calls[0]?.[1]).toMatchObject({ targetId: 'connue-d-avance' })
+  })
+})
+
+/**
+ * L'ordre : vérifier avant d'ouvrir la transaction.
+ *
+ * `mutate` documente longuement pourquoi `checkAuditSubject` et `before` sont vérifiés **avant**
+ * `db.transaction` — un refus purement local ne doit pas survenir après un appel distant réussi,
+ * sinon la passerelle a muté et il ne reste aucune trace. Cette propriété n'était tenue par rien :
+ * la déplacer à l'intérieur du bloc produit exactement les mêmes observables en base, puisque le
+ * `ROLLBACK` annule tout de la même façon.
+ */
+describe('ordre de vérification', () => {
+  it('refuse une action mal formée sans ouvrir de transaction', async () => {
+    granted()
+    const db = databaseHandingOut(TRANSACTION)
+
+    await expect(
+      mutate(db, { ...REQUEST, action: 'Pas Un Verbe' }, async () => ({ result: null })),
+    ).rejects.toThrow(/forme attendue/)
+
+    expect(db.transaction).not.toHaveBeenCalled()
+  })
+
+  it('refuse un `before` interdit sans ouvrir de transaction', async () => {
+    granted()
+    const db = databaseHandingOut(TRANSACTION)
+
+    await expect(
+      mutate(db, { ...REQUEST, before: { api_key: 'sk-live-42' } }, async () => ({ result: null })),
+    ).rejects.toThrow(/nom réservé/)
+
+    expect(db.transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('la garde reçoit ce que l’appelant a demandé', () => {
+  it('transmet la session et la clé exigée', async () => {
+    granted()
+
+    await mutate(databaseHandingOut(TRANSACTION), REQUEST, async () => ({ result: null }))
+
+    // Sans cette assertion, coder la clé en dur dans `mutate` ne rougirait nulle part.
+    expect(requirePermissionSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      REQUEST.session,
+      'operators:manage',
+    )
   })
 })

@@ -89,6 +89,12 @@ export type EnrollmentConfirmation =
   | { readonly outcome: 'invalid_code' }
   /** Aucun enrôlement à confirmer : jamais démarré, déjà confirmé, ou secret devenu illisible. */
   | { readonly outcome: 'no_pending_enrollment' }
+  /**
+   * Un autre facteur est apparu **entre** le démarrage et la confirmation, et la session n'a pas été
+   * promue. Distinct de `no_pending_enrollment`, dont la copie dit « relancez l'enrôlement » : ce
+   * geste-là échouerait à son tour, et l'opérateur tournerait en rond entre deux refus.
+   */
+  | { readonly outcome: 'mfa_required' }
   | { readonly outcome: 'rate_limited'; readonly retryAfterSeconds: number }
 
 export type MfaVerification =
@@ -124,7 +130,17 @@ export type MfaVerification =
  */
 function noOtherFactorFrom(session: AuthenticatedSession) {
   if (session.status === 'active') return []
-  return [sql`jsonb_array_length(${operators.mfaWebauthnCredentials}) = 0`]
+
+  // `jsonb_typeof = 'array'` d'abord, et ce n'est pas de la ceinture-bretelles : `jsonb_array_length`
+  // **lève** sur un scalaire ou un objet. Sans ce garde, une colonne bricolée ferait remonter une
+  // erreur PostgreSQL jusqu'au 500 au lieu du refus typé — et `webauthn-credentials.ts` pose déjà la
+  // règle inverse : « jamais une erreur serveur qui rendrait la panne indiscernable d'une attaque ».
+  // Une colonne qui n'est pas un tableau ne prouve pas l'absence de facteur : la condition est fausse,
+  // donc l'enrôlement est refusé. Fail-closed, et lisible.
+  return [
+    sql`jsonb_typeof(${operators.mfaWebauthnCredentials}) = 'array'
+        AND jsonb_array_length(${operators.mfaWebauthnCredentials}) = 0`,
+  ]
 }
 
 /**
@@ -253,7 +269,16 @@ export async function confirmTotpEnrollment(
     return true
   })
 
-  if (!activated) return { outcome: 'no_pending_enrollment' }
+  // Deux causes possibles à l'écriture sans effet, et deux conduites à tenir opposées : le facteur
+  // a été activé entre-temps (relancer n'a pas de sens, c'est fait), ou une passkey est apparue
+  // depuis le démarrage (il faut la présenter). `refusedStart` fait déjà cette distinction côté
+  // démarrage ; la refaire ici évite d'envoyer l'opérateur relancer un enrôlement qui sera refusé.
+  if (!activated) {
+    const refusal = await refusedStart(db, session)
+    return refusal.outcome === 'mfa_required'
+      ? { outcome: 'mfa_required' }
+      : { outcome: 'no_pending_enrollment' }
+  }
 
   await promote(db, session)
 

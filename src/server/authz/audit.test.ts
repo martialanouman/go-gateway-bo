@@ -95,18 +95,46 @@ describe('inventaire des secrets du produit', () => {
     })
   }
 
-  it('laisse passer les champs de contrôle voisins qu’il ne faut pas bloquer', () => {
-    // Le pendant indispensable : une liste trop large se fait désarmer à la première gêne.
-    // `permission_key` contient « key », `message_id` contient « message » — deux raisons de ne pas
-    // avoir ajouté ces fragments-là.
+  it('laisse passer les champs de contrôle du contrat qui portent un mot réservé', () => {
+    // **Le pendant indispensable.** Une garde qui gêne se fait désactiver, et celle-ci gênerait à la
+    // première step client, à la première step d'identifiants et à la première step de routage :
+    // `content_retention_days` est le réglage de conformité qu'il faut précisément tracer, et le
+    // refuser rendait ce réglage impossible à changer — `mutate` annule la mutation quand l'audit
+    // refuse. Les noms viennent du contrat, verbatim, et CLAUDE.md interdit de les renommer.
     expect(() =>
       checkAuditPayload('after', {
+        content_storage: 'encrypted',
+        content_retention_days: 30,
+        content_key_id: '018f4c1e-0000-7000-8000-000000000001',
+        match_content_pattern: '^URGENT',
+        recovery_codes_remaining: 8,
+        credential_id: '018f4c1e-0000-7000-8000-000000000002',
+        credential_status: 'revoked',
         permission_key: 'routes:write',
         message_id: '018f4c1e',
         max_sessions: 4,
         balance_scope: 'shared',
       }),
     ).not.toThrow()
+  })
+
+  it('ne colle pas deux mots pour fabriquer un mot réservé', () => {
+    // La normalisation par concaténation créait des collisions à cheval : `has_header` contenait
+    // « hash », `group_email` contenait « pem », `is_alt` contenait « salt ». Trois refus dont le
+    // message était incompréhensible pour qui le recevait — le genre de refus qui fait retirer la
+    // garde plutôt que corriger l'appel.
+    expect(() =>
+      checkAuditPayload('after', { has_header: true, group_email: 'a@b.test', is_alt: false }),
+    ).not.toThrow()
+  })
+
+  it('attrape quand même les noms composés', () => {
+    // Le revers : `api_key` se découpe en « api » + « key », et aucun des deux jetons ne peut être
+    // interdit seul — `permission_key` et `content_key_id` sont légitimes. Seule la forme recollée
+    // identifie le secret.
+    for (const key of ['api_key', 'apiKey', 'private_key', 'signing_key', 'encryption_key']) {
+      expect(() => checkAuditPayload('after', { [key]: 'x' })).toThrow(/nom réservé/)
+    }
   })
 })
 
@@ -121,6 +149,18 @@ describe('valeurs du payload', () => {
 
   it('refuse un tableau sérialisé', () => {
     expect(() => checkAuditPayload('after', { items: '["a","b"]' })).toThrow(/sérialisée/)
+  })
+
+  it('laisse passer un motif de routage qui commence par un crochet', () => {
+    // `match_dest_pattern` et `match_sender_pattern` sont des expressions régulières du contrat.
+    // Tester le seul premier caractère les refusait, avec un message parlant de `JSON.stringify`
+    // alors que l'appelant n'en avait fait aucun — le message envoyait chercher au mauvais endroit.
+    expect(() =>
+      checkAuditPayload('after', {
+        match_dest_pattern: '[0-9]{8}',
+        match_sender_pattern: '[A-Z]{3,11}',
+      }),
+    ).not.toThrow()
   })
 
   it('ne recopie pas l’entité refusée dans le message d’erreur', () => {
@@ -168,6 +208,21 @@ describe('checkAuditSubject', () => {
     expect(() => checkAuditSubject({ action: 'content.read', targetId: body })).not.toThrow(
       new RegExp(body),
     )
+  })
+
+  it('ne prétend PAS écarter tout corps de message', () => {
+    // Ce que la forme d'identifiant n'attrape pas, écrit pour qu'on ne s'y fie pas : un corps sans
+    // espace la satisfait. Un OTP est l'essentiel du trafic A2P, et un secret de rotation SMPP tient
+    // dans le même alphabet. La défense reste que l'appelant journalise l'identifiant de la cible.
+    for (const body of ['847392', 'STOP', 'OUI']) {
+      expect(() => checkAuditSubject({ action: 'content.read', targetId: body })).not.toThrow()
+    }
+  })
+
+  it('borne la cible à 64 caractères — une clé API n’y tient pas, un identifiant si', () => {
+    expect(() =>
+      checkAuditSubject({ action: 'customer.update', targetId: 'x'.repeat(65) }),
+    ).toThrow(/identifiant/)
   })
 
   it('laisse passer les identifiants réels du produit', () => {

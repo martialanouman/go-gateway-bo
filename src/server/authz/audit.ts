@@ -56,10 +56,9 @@ export type AuditPayload = Readonly<Record<string, AuditValue>>
  * message (`errors[].field === 'text'` sur un envoi trop long). Le retirer viderait de sa substance
  * la protection de l'invariant (a) au profit d'une gêne théorique.
  */
-const FORBIDDEN_FRAGMENTS: readonly string[] = [
-  // Invariant (a) — le corps d'un message ne sort pas de l'onglet qui l'affiche. `text` couvre
-  // `sms_text`, `body` couvre `message_body`. Les trois derniers sont les noms qu'on donne à un
-  // corps qu'on croit avoir rendu inoffensif en le tronquant — il ne l'est pas.
+const FORBIDDEN_TOKENS: ReadonlySet<string> = new Set([
+  // Invariant (a) — le corps d'un message ne sort pas de l'onglet qui l'affiche. Les trois derniers
+  // sont les noms qu'on donne à un corps qu'on croit avoir rendu inoffensif en le tronquant.
   'body',
   'content',
   'text',
@@ -67,19 +66,19 @@ const FORBIDDEN_FRAGMENTS: readonly string[] = [
   'preview',
   'snippet',
   'excerpt',
-  // Invariant (b) — un secret ne se réaffiche pas, donc ne se journalise pas non plus.
+  // Invariant (b). Tirés du schéma de ce dépôt (`mfa_totp_secret`, `password_hash`, `code_hash`,
+  // `webauthn_challenge`, `mfa_webauthn_credentials`) et du contrat (`secret`, `password`,
+  // `api_key`), plus l'inventaire cryptographique habituel.
   //
-  // Les six premiers viennent du contrat et du schéma de ce dépôt : `mfa_totp_secret`,
-  // `password_hash`, `code_hash` (codes de récupération), `webauthn_challenge`,
-  // `mfa_webauthn_credentials`, et les `secret` / `password` / `api_key` de l'API Admin. Le reste
-  // est l'inventaire habituel du matériel cryptographique, ajouté avant d'en avoir besoin.
+  // `credentials` au **pluriel** : `mfa_webauthn_credentials` est un secret, `credential_id` est un
+  // identifiant d'entité de premier plan du contrat, et `credentials.rotate` est l'exemple d'action
+  // que ce dépôt cite partout. Bloquer le singulier rendrait inauditable l'action la plus sensible
+  // du produit.
   'password',
   'passphrase',
   'secret',
   'token',
-  'apikey',
-  'privatekey',
-  'credential',
+  'credentials',
   'recovery',
   'challenge',
   'hash',
@@ -87,10 +86,45 @@ const FORBIDDEN_FRAGMENTS: readonly string[] = [
   'pepper',
   'hmac',
   'signature',
+  'pem',
+])
+
+/**
+ * Les noms composés, comparés en sous-chaîne sur la clé normalisée.
+ *
+ * `api_key` se découpe en `api` + `key`, et aucun des deux jetons ne doit être interdit seul :
+ * `permission_key` et `content_key_id` sont des champs de contrôle parfaitement légitimes. Seule la
+ * forme recollée identifie le secret.
+ */
+const FORBIDDEN_COMPOUNDS: readonly string[] = [
+  'apikey',
+  'privatekey',
   'encryptionkey',
   'signingkey',
-  'pem',
+  'messagebody',
 ]
+
+/**
+ * Les clés qui portent un jeton interdit sans porter ce qu'il désigne.
+ *
+ * **Cette liste est ce qui empêche la garde d'être désactivée.** Elle vient du contrat, et chaque
+ * entrée est un réglage qu'il faut précisément pouvoir tracer :
+ *
+ * - `content_storage`, `content_retention_days`, `content_key_id` (`Customer`, `CustomerGroup`) —
+ *   la politique de conservation des contenus. Refuser leur audit rendrait le réglage de conformité
+ *   impossible à changer, puisque `mutate` annule la mutation quand l'audit refuse ;
+ * - `match_content_pattern` (`Route`) — un motif de routage, pas un contenu ;
+ * - `recovery_codes_remaining` — un entier déjà rendu par `/auth/mfa/verify`, jamais un code.
+ *
+ * Ajouter une entrée ici demande de dire pourquoi le champ ne porte pas ce que son nom évoque.
+ */
+const ALLOWED_KEYS: ReadonlySet<string> = new Set([
+  'contentstorage',
+  'contentretentiondays',
+  'contentkeyid',
+  'matchcontentpattern',
+  'recoverycodesremaining',
+])
 
 /**
  * Bornes de forme sur les champs qui ne sont pas des payloads.
@@ -100,10 +134,21 @@ const FORBIDDEN_FRAGMENTS: readonly string[] = [
  * message.text` compilait, passait tous les filtres, et écrivait un corps de message dans la table
  * faite pour être relue.
  *
- * Un identifiant n'a ni espace ni saut de ligne : cette seule contrainte écarte tout corps de
- * message, tout en laissant passer les UUID, les codes de compte et les MSISDN.
+ * Un identifiant n'a ni espace ni saut de ligne, et reste court. La borne est à 64 : aucun
+ * identifiant du produit n'en approche — UUID 36, MSISDN 16, `system_id` 15 — alors qu'une clé API
+ * y tiendrait très bien.
+ *
+ * **Ce que cette forme n'écarte pas, et il ne faut pas croire qu'elle le fait.** Un corps de message
+ * sans espace la satisfait : `847392` (un OTP, l'essentiel du trafic A2P), `STOP`, `OUI`. Un secret
+ * de rotation aussi — `CredentialWithSecret.secret` du contrat est un mot de passe SMPP de neuf
+ * caractères ASCII ou une clé encodée, donc dans l'alphabet et sous la borne. `targetId:
+ * rotated.secret` reste écrivable, et c'est le copier-coller le plus probable au moment d'auditer
+ * une rotation.
+ *
+ * Elle écarte les corps **à espaces**, ce qui est le gros du volume, et rien de plus. Le reste tient
+ * à ce que l'appelant journalise l'identifiant de la cible plutôt que ce qu'elle contient.
  */
-const IDENTIFIER_PATTERN = /^[A-Za-z0-9._:+-]{1,128}$/
+const IDENTIFIER_PATTERN = /^[A-Za-z0-9._:+-]{1,64}$/
 
 /** Le verbe d'audit, tel que l'en-tête le décrit : `route.update`, `content.read`. */
 const ACTION_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/
@@ -111,6 +156,33 @@ const ACTION_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/
 /** `webhook_secret` et `webhookSecret` doivent se comparer à l'identique. */
 function normalizeKey(key: string): string {
   return key.toLowerCase().replaceAll(/[^a-z0-9]/g, '')
+}
+
+/**
+ * Découpe une clé en mots, `snake_case` comme `camelCase`.
+ *
+ * La comparaison porte sur les **jetons** et non sur la clé recollée, parce que recoller crée des
+ * collisions à cheval sur deux mots : `has_header` contient `hash`, `group_email` contient `pem`,
+ * `is_alt` contient `salt`. Trois refus incompréhensibles pour qui les reçoit — et c'est ce genre de
+ * refus qui fait retirer la garde plutôt que corriger l'appel.
+ */
+function tokenize(key: string): string[] {
+  return key
+    .replaceAll(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length > 0)
+}
+
+/** Le jeton ou le composé qui fait refuser la clé, ou `undefined`. */
+function forbiddenNameIn(key: string): string | undefined {
+  const normalized = normalizeKey(key)
+  if (ALLOWED_KEYS.has(normalized)) return undefined
+
+  const token = tokenize(key).find((candidate) => FORBIDDEN_TOKENS.has(candidate))
+  if (token) return token
+
+  return FORBIDDEN_COMPOUNDS.find((compound) => normalized.includes(compound))
 }
 
 /**
@@ -129,8 +201,7 @@ export function checkAuditPayload(where: 'before' | 'after', payload?: AuditPayl
   if (!payload) return
 
   for (const [key, value] of Object.entries(payload)) {
-    const normalized = normalizeKey(key)
-    const hit = FORBIDDEN_FRAGMENTS.find((fragment) => normalized.includes(fragment))
+    const hit = forbiddenNameIn(key)
 
     if (hit) {
       throw new Error(
@@ -156,12 +227,30 @@ const MAX_VALUE_LENGTH = 512
  * La borne de longueur, elle, **ne prouve rien sur l'invariant (a)** — un SMS fait 160 caractères et
  * tiendrait dans n'importe quelle borne raisonnable. Elle est là pour la taille des lignes.
  */
+/**
+ * Vrai si la chaîne **se relit** comme un objet ou un tableau JSON.
+ *
+ * Tester le seul premier caractère refusait `[0-9]{8}` — c'est-à-dire `match_dest_pattern` et
+ * `match_sender_pattern`, deux motifs de routage du contrat — avec un message parlant de
+ * `JSON.stringify` alors que l'appelant n'en avait fait aucun. Un motif ne parse pas ; une entité
+ * sérialisée, si.
+ */
+function isSerializedStructure(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return false
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed)
+    return typeof parsed === 'object' && parsed !== null
+  } catch {
+    return false
+  }
+}
+
 function checkAuditValue(where: 'before' | 'after', key: string, value: AuditValue): void {
   if (typeof value !== 'string') return
 
-  const trimmed = value.trim()
-
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+  if (isSerializedStructure(value)) {
     throw new Error(
       `Journal d'audit : la valeur de « ${key} » dans \`${where}_json\` est une structure sérialisée. ` +
         `Journalisez les champs un par un — un \`JSON.stringify\` d'entité y verserait corps et secrets (invariants a et b).`,

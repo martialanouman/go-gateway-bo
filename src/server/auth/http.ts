@@ -166,9 +166,10 @@ export function mfaEnrollResponse(outcome: EnrollmentStart | EnrollmentConfirmat
     case 'already_enrolled':
       return json({ error: ALREADY_ENROLLED_MESSAGE }, 409)
 
-    // 403 et le même message que côté passkey : dans les deux cas l'opérateur détient déjà un
-    // facteur et doit le franchir avant d'en ajouter un autre. Deux copies pour une même conduite
-    // se mettraient à diverger.
+    // 403, comme le refus symétrique côté passkey : dans les deux cas l'opérateur détient déjà un
+    // facteur et doit le franchir avant d'en ajouter un autre. Le **message**, lui, diffère — l'un
+    // parle d'enregistrer un appareil, l'autre d'ajouter une application authenticator, et
+    // l'opérateur a besoin de savoir laquelle des deux opérations vient d'être refusée.
     case 'mfa_required':
       return json({ error: MFA_ENROLL_REQUIRED_MESSAGE }, 403)
 
