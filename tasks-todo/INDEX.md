@@ -102,7 +102,7 @@ sur tout écran touché • PR petite et focalisée (une step).
 - [x] step-022 — Session BFF (cookie signé) + `/auth/me` + `/auth/logout` ‡
 - [x] step-023 — MFA TOTP : enrôlement et vérification
 - [x] step-024 — MFA WebAuthn / passkey
-- [ ] step-025 — Moteur de permissions côté serveur + journal d'audit + MFA obligatoire
+- [x] step-025 — Moteur de permissions côté serveur + journal d'audit + MFA obligatoire
 - [ ] step-026 — Rendu UI par permission + écrans Login & MFA
 - [ ] step-027 — Gestion des opérateurs et des rôles (CRUD)
 
