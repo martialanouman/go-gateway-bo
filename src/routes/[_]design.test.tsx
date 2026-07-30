@@ -45,7 +45,10 @@ describe('/_design', () => {
     const etats = screen.getByRole('heading', { level: 2, name: 'États' }).closest('section')
     expect(etats).not.toBeNull()
 
-    for (const label of ['bound', 'reconnecting', 'unbound', 'half_open', 'closed', 'open']) {
+    // Les valeurs sont celles du contrat, verbatim : `bound` et `unbound` figuraient ici et
+    // n'existent dans aucune énumération — la page de référence enseignait deux libellés que le
+    // payload n'émet jamais.
+    for (const label of ['up', 'reconnecting', 'down', 'half_open', 'closed', 'open']) {
       expect(within(etats as HTMLElement).getByText(label)).toBeInTheDocument()
     }
   })
@@ -59,10 +62,17 @@ describe('/_design', () => {
     const etats = screen.getByRole('heading', { level: 2, name: 'États' }).closest('section')
     const dansEtats = within(etats as HTMLElement)
 
+    // La page rend désormais ces états par `StatusPill` lui-même, et non par des `<span>` peints à
+    // la main : elle ne peut donc plus diverger du composant qu'elle documente. Elle le faisait —
+    // elle annonçait `bound` / `unbound`, absents de toute énumération du contrat, et peignait le
+    // disjoncteur `open` en rouge quand le composant le peint en ambre.
+    //
     // Un `link_status` est un point et un libellé — jamais une pilule.
-    expect(dansEtats.getByText('bound')).toHaveClass('design-link-status')
+    expect(dansEtats.getByText('up').closest('.ui-status')).not.toBeNull()
+    expect(dansEtats.getByText('up').closest('.ui-breaker')).toBeNull()
+
     // Un `breaker_state` est une pilule teintée — jamais un point.
-    expect(dansEtats.getByText('half_open')).toHaveClass('design-pill')
+    expect(dansEtats.getByText('half_open')).toHaveClass('ui-breaker')
   })
 
   test('ne saute aucun niveau de titre', async () => {

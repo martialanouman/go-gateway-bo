@@ -23,3 +23,6 @@
 @import "./tokens/motion.css";
 @import "./tokens/layout.css";
 @import "./tokens/base.css";
+
+/* La couche des primitives vient après les tokens : elle les consomme, elle n en déclare aucun. */
+@import "./components.css";

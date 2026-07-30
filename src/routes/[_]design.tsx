@@ -11,6 +11,18 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
+import type { BreakerState, LinkStatus } from '~/components/primitives'
+import {
+  Button,
+  Checkbox,
+  RadioGroup,
+  Select,
+  StatusPill,
+  Switch,
+  Table,
+  Tabs,
+  TextField,
+} from '~/components/primitives'
 import designCss from '~/styles/design-reference.css?url'
 
 export const Route = createFileRoute('/_design')({
@@ -68,31 +80,50 @@ const SEMANTIC_COLORS = [
  * Les libellés restent en `snake_case` anglais, verbatim de l'API : ce sont eux qu'un opérateur
  * cherche dans les logs. Le point double le texte, il ne le remplace pas — la couleur seule ne
  * porte jamais l'information (WCAG 1.4.1).
+ *
+ * **Les valeurs viennent du contrat, et la page les rend par `StatusPill`.** Elle annonçait
+ * auparavant `bound` / `unbound`, qui n'existent dans aucune énumération, avec des `<span>` peints à
+ * la main : la référence enseignait donc deux valeurs que le payload n'émet jamais, et dans des
+ * couleurs qui ont fini par diverger de celles du composant. Une page de référence qui contredit ce
+ * qu'elle documente est pire qu'absente.
  */
-const LINK_STATUS = [
-  { label: 'bound', color: 'var(--status-up)' },
-  { label: 'reconnecting', color: 'var(--status-degraded)' },
-  { label: 'unbound', color: 'var(--status-down)' },
-] as const
+const LINK_STATUS = ['up', 'reconnecting', 'down'] as const satisfies readonly LinkStatus[]
 
 /**
  * `breaker_state` — l'état du disjoncteur. Rendu en **pilule teintée**, jamais en point, et jamais
  * dérivé du champ précédent.
  *
- * Le texte posé sur un fond teinté rouge prend `--text-danger-on-tint` : le rouge de pleine surface
- * n'atteint que 4,05 sur sa propre teinte, sous le seuil AA.
+ * `open` est **ambre**, comme la charte le range : un disjoncteur ouvert est un état dégradé dont on
+ * attend la reprise, pas une panne qui appelle un rebind. Cette page le peignait en rouge, à côté
+ * d'un composant qui le peignait en ambre.
  */
-const BREAKER_STATE = [
-  { label: 'closed', color: 'var(--breaker-closed)', tint: 'var(--tint-green)' },
-  { label: 'half_open', color: 'var(--breaker-half-open)', tint: 'var(--tint-amber)' },
-  { label: 'open', color: 'var(--text-danger-on-tint)', tint: 'var(--tint-red)' },
-] as const
+const BREAKER_STATE = ['closed', 'half_open', 'open'] as const satisfies readonly BreakerState[]
 
 /**
  * Les pas canoniques. Aucune valeur en pixels n'est répétée ici : la barre tire sa largeur du token
  * lui-même, de sorte que la page ne puisse pas mentir si `spacing.css` change.
  */
 const SPACING = ['--sp-2', '--sp-4', '--sp-6', '--sp-7', '--sp-9', '--sp-11'] as const
+
+/**
+ * Trois connecteurs figés, typés sur les unions du contrat.
+ *
+ * Le typage n'est pas décoratif ici : la version précédente de cette page annonçait `bound` et
+ * `unbound` comme valeurs de `link_status`, alors que le contrat dit `up | reconnecting | down`.
+ * La page de référence enseignait donc deux valeurs que le payload n'émet jamais — et `StatusPill`
+ * les aurait peintes en gris « au repos ».
+ */
+const CONNECTOR_ROWS = [
+  { id: 'cnx_01', name: 'Orange CI', link: 'up', breaker: 'closed', throughput: '8 123' },
+  { id: 'cnx_02', name: 'MTN CI', link: 'reconnecting', breaker: 'half_open', throughput: '504' },
+  { id: 'cnx_03', name: 'Moov CI', link: 'down', breaker: 'open', throughput: '0' },
+] as const satisfies readonly {
+  id: string
+  name: string
+  link: LinkStatus
+  breaker: BreakerState
+  throughput: string
+}[]
 
 const RADII = [
   { token: '--r-field', usage: 'Champs, boutons, petits contrôles' },
@@ -178,19 +209,15 @@ function DesignReference() {
 
         <span className="design-item__label">link_status — point et libellé</span>
         <div className="design-pills">
-          {LINK_STATUS.map(({ label, color }) => (
-            <span className="design-link-status" key={label} style={{ color }}>
-              {label}
-            </span>
+          {LINK_STATUS.map((state) => (
+            <StatusPill kind="link" key={state} state={state} />
           ))}
         </div>
 
         <span className="design-item__label">breaker_state — pilule teintée</span>
         <div className="design-pills">
-          {BREAKER_STATE.map(({ label, color, tint }) => (
-            <span className="design-pill" key={label} style={{ color, background: tint }}>
-              {label}
-            </span>
+          {BREAKER_STATE.map((state) => (
+            <StatusPill kind="breaker" key={state} state={state} />
           ))}
         </div>
       </section>
@@ -225,6 +252,147 @@ function DesignReference() {
           ))}
         </div>
       </section>
+
+      <PrimitivesSection />
     </main>
+  )
+}
+
+/**
+ * Les primitives du lot 1 (step-041), **avec leurs états**.
+ *
+ * Cette section n'est pas une vitrine : c'est là qu'on vérifie qu'un état existe et qu'il est
+ * lisible. Un champ invalide, un bouton occupé, un onglet désactivé ne se voient nulle part ailleurs
+ * avant qu'un écran ne les produise — et le jour où un écran les produit, il est trop tard pour
+ * découvrir qu'on ne les avait jamais dessinés.
+ */
+function PrimitivesSection() {
+  return (
+    <section className="design-section" aria-labelledby="primitives">
+      <h2 id="primitives">Primitives — lot 1</h2>
+      <p className="design-section__note">
+        Comportement et accessibilité par Base UI, forme par les tokens. Chaque primitive est
+        montrée avec les états qu’un écran rencontrera : défaut, désactivé, invalide, chargement.
+      </p>
+
+      <div className="design-grid">
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>Boutons</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-3)' }}>
+            <Button variant="primary">Effectuer la rotation</Button>
+            <Button>Annuler</Button>
+            <Button variant="destructive">Déconnecter</Button>
+            <Button variant="link">Tout afficher</Button>
+            <Button disabled>Indisponible</Button>
+            <Button loading>Lancer le job</Button>
+          </div>
+        </div>
+
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>Champs</span>
+          <TextField label="Nom du client" placeholder="Acme SA" />
+          <TextField label="MSISDN" mono placeholder="2250701020304" />
+          <TextField label="max_sessions" hint="Baisser ce quota ne coupe pas les binds vivants." />
+          <TextField label="Sender ID" error="Ce sender ID est déjà pris." />
+          <TextField label="Compte" disabled placeholder="Indisponible" />
+        </div>
+
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>Sélecteur et bascules</span>
+          <Select
+            label="balance_scope"
+            options={[
+              { value: 'shared', label: 'Pool partagé' },
+              { value: 'per_account', label: 'Par compte' },
+            ]}
+            defaultValue="shared"
+          />
+          <Checkbox label="Masquer les MSISDN" defaultChecked />
+          <Checkbox label="Tout sélectionner" indeterminate />
+          <Checkbox label="Indisponible" disabled />
+          <Switch label="Facturation activée" defaultChecked />
+          <RadioGroup
+            label="balance_scope"
+            defaultValue="shared"
+            options={[
+              { value: 'shared', label: 'Pool partagé' },
+              { value: 'per_account', label: 'Par compte' },
+            ]}
+          />
+        </div>
+
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>Onglets</span>
+          <Tabs
+            defaultValue="sessions"
+            tabs={[
+              { value: 'sessions', label: 'Sessions' },
+              { value: 'binds', label: 'Binds', count: 12 },
+              { value: 'quotas', label: 'Quotas', disabled: true },
+            ]}
+          />
+        </div>
+
+        <div className="design-card">
+          <span style={{ font: 'var(--text-label)' }}>
+            Statut — deux dimensions, jamais fusionnées
+          </span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-4)' }}>
+            <StatusPill kind="link" state="up" live meta="~2 s" />
+            <StatusPill kind="link" state="reconnecting" />
+            <StatusPill kind="link" state="down" />
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-4)' }}>
+            <StatusPill kind="breaker" state="closed" />
+            <StatusPill kind="breaker" state="half_open" />
+            <StatusPill kind="breaker" state="open" />
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-4)' }}>
+            <StatusPill kind="entity" state="active" />
+            <StatusPill kind="entity" state="suspended" />
+            <StatusPill kind="entity" state="closed" />
+            <StatusPill kind="delivery" state="rejected" />
+          </div>
+          <span className="design-swatch__value">
+            link_status en point · breaker_state en pilule · `closed` ne veut pas dire la même chose
+            selon la dimension, d’où le `kind` obligatoire
+          </span>
+        </div>
+      </div>
+
+      <div className="design-card" style={{ marginTop: 'var(--sp-4)' }}>
+        <span style={{ font: 'var(--text-label)' }}>Tableau</span>
+        <Table
+          caption="Connecteurs"
+          rowKey={(row) => row.id}
+          sort={{ key: 'throughput', direction: 'descending' }}
+          columns={[
+            { key: 'name', header: 'Connecteur', cell: (row) => row.name, sortable: true },
+            { key: 'id', header: 'Identifiant', cell: (row) => row.id, mono: true },
+            {
+              key: 'link',
+              header: 'link_status',
+              // Pas de `live` ici : cette page est un instantané en dur, et le pouls est le seul
+              // signal de fraîcheur du produit. Le poser sur des lignes figées le ferait mentir.
+              cell: (row) => <StatusPill kind="link" state={row.link} />,
+            },
+            {
+              key: 'breaker',
+              header: 'breaker_state',
+              cell: (row) => <StatusPill kind="breaker" state={row.breaker} />,
+            },
+            {
+              key: 'throughput',
+              header: 'Débit',
+              cell: (row) => row.throughput,
+              align: 'end',
+              mono: true,
+              sortable: true,
+            },
+          ]}
+          rows={CONNECTOR_ROWS}
+        />
+      </div>
+    </section>
   )
 }
