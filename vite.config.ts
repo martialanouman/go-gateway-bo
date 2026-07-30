@@ -2,6 +2,7 @@ import { nitroV2Plugin } from '@tanstack/nitro-v2-vite-plugin'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { BFF_ROUTES } from './src/server/bff-routes'
 
 export default defineConfig({
   server: {
@@ -36,55 +37,10 @@ export default defineConfig({
       // URL — et devrait donc importer `src/server/` depuis `src/routes/`, ce que la règle de lint
       // de l'invariant (d) interdit. Nitro enregistre un handler depuis n'importe quel chemin : le
       // fichier reste sous `src/server/`, et la règle n'a besoin d'aucune exception.
-      handlers: [
-        {
-          route: '/api/auth/login',
-          handler: './src/server/auth/http/login.ts',
-          method: 'post',
-        },
-        { route: '/api/auth/me', handler: './src/server/auth/http/me.ts', method: 'get' },
-        // Deux phases sur un même point d'entrée : sans code, l'opérateur demande un QR code ; avec
-        // un code, il confirme l'enrôlement. C'est ce que décrit le §6.9 de la spécification.
-        {
-          route: '/api/auth/mfa/enroll',
-          handler: './src/server/auth/http/mfa-enroll.ts',
-          method: 'post',
-        },
-        {
-          route: '/api/auth/mfa/verify',
-          handler: './src/server/auth/http/mfa-verify.ts',
-          method: 'post',
-        },
-        // Les passkeys demandent deux allers-retours par cérémonie — options, puis réponse signée —
-        // et suivent donc le même motif à deux phases que l'enrôlement TOTP : sans réponse
-        // d'authentificateur dans le corps, le point d'entrée rend des options.
-        {
-          route: '/api/auth/mfa/passkey/register',
-          handler: './src/server/auth/http/mfa-passkey-register.ts',
-          method: 'post',
-        },
-        {
-          route: '/api/auth/mfa/passkey/verify',
-          handler: './src/server/auth/http/mfa-passkey-verify.ts',
-          method: 'post',
-        },
-        {
-          route: '/api/auth/mfa/passkeys',
-          handler: './src/server/auth/http/mfa-passkeys.ts',
-          method: 'get',
-        },
-        // `post` et non `delete` : le même point d'entrée renomme et retire, selon la présence d'un
-        // nom dans le corps. Deux routes pour deux gestes sur la même liste auraient dupliqué la
-        // garde de session complète, qui est ce qui compte ici.
-        {
-          route: '/api/auth/mfa/passkeys/manage',
-          handler: './src/server/auth/http/mfa-passkey-manage.ts',
-          method: 'post',
-        },
-        // `post` et non `get` : une déconnexion est une mutation, et un `get` se déclenche depuis
-        // une image ou un lien préchargé — un tiers déconnecterait un opérateur à son insu.
-        { route: '/api/auth/logout', handler: './src/server/auth/http/logout.ts', method: 'post' },
-      ],
+      // La liste vit dans `src/server/bff-routes.ts` et non ici : le test d'énumération de
+      // l'invariant (c) doit pouvoir la lire comme une **valeur**, pas en regexper le texte de ce
+      // fichier. Voir l'en-tête de ce module pour ce que la lecture textuelle ratait.
+      handlers: [...BFF_ROUTES],
     }),
     // Le plugin React doit venir APRÈS celui de Start.
     viteReact(),

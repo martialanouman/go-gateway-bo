@@ -3,44 +3,65 @@
 /**
  * Invariant (c), en test bloquant : **aucune route de mutation du BFF sans garde ni audit**.
  *
- * ## Pourquoi ce test existe, et pourquoi il est bloquant
+ * ## Pourquoi ce test existe
  *
  * Le jeton machine du BFF porte `content:read` en permanence (§1.3 du plan d'exécution). Une seule
  * route de mutation posée sans `requirePermission` suffit donc à ouvrir à tout opérateur ce que le
- * catalogue réserve à quelques-uns — et une route oubliée ne ressemble à rien : elle marche.
+ * catalogue réserve à quelques-uns — et une route oubliée ne ressemble à rien : elle marche. La
+ * revue humaine n'attrape pas cet oubli, parce qu'il n'y a rien à voir. Une énumération, si.
  *
- * La revue humaine n'attrape pas cet oubli, parce qu'il n'y a rien à voir. Une énumération, si.
+ * ## La détection porte sur les imports, pas sur le texte
  *
- * ## La source de vérité est `vite.config.ts`
+ * La première version cherchait les chaînes `requirePermission` et `mutate(` dans le texte des
+ * fichiers atteints. Elle ne bloquait **rien** : le mot `requirePermission` figure dans les
+ * doc-comments de `guard.ts`, `me.ts` et `resolve.ts`, et `webauthn-credentials.ts` porte une
+ * fonction privée nommée `mutate`. Comme tout handler importe `resolveSession` depuis `guard.ts`,
+ * `logout.ts` — qui ne contient pas une ligne d'autorisation — était déclaré gardé **et** audité.
+ * Le filet était troué avant d'avoir servi.
  *
- * Les routes HTTP du BFF y sont déclarées (`nitroV2Plugin({ handlers })`) plutôt que posées sous
- * `src/routes/` — voir le commentaire sur place, c'est ce qui évite une exception de lint à
- * l'invariant (d). C'est donc là, et nulle part ailleurs, qu'on sait quelles routes existent. Lire
- * le répertoire des handlers ne suffirait pas : un fichier non déclaré n'est pas une route, et une
- * route peut être déclarée vers n'importe quel chemin.
+ * La version actuelle résout chaque `import` jusqu'au fichier visé et regarde si c'est un module
+ * d'`src/server/authz/`, et quel symbole en est tiré. Un commentaire ne peut plus compter, un
+ * homonyme local non plus, et un `import type` est écarté : un type ne garde rien.
  *
- * ## Ce que « gardée » veut dire ici, et ce que cela ne prouve pas
+ * ## Ce que cela prouve, et ce que cela ne prouve pas
  *
- * Le test suit les imports internes du handler et cherche `requirePermission` ou `mutate` dans la
- * fermeture. Il établit donc qu'une garde est **atteignable** depuis cette route, pas qu'elle est
- * appelée sur tous les chemins. C'est la limite d'une analyse statique de cette taille, et elle est
- * du côté permissif : le test attrape l'oubli complet — le cas réel — pas la garde contournée par
- * une branche. Le second cas reste au ressort des tests de la route elle-même.
+ * Qu'une garde est **atteignable** depuis cette route, pas qu'elle est appelée sur tous les chemins.
+ * Deux trous connus, assumés faute d'analyse de flot :
+ *
+ * - un handler qui appelle `requirePermission` et **jette le résultat** passe (le refus est une
+ *   valeur, pas une exception) ;
+ * - un handler qui importe un module tiers lequel importe l'authz pour son propre compte passe.
+ *
+ * Le test attrape l'oubli complet — le cas réel — pas la garde contournée. Le reste est au ressort
+ * des tests de la route elle-même.
+ *
+ * ## Angle mort à porter
+ *
+ * Seules les **routes HTTP** sont énumérées. Les fonctions serveur TanStack (`createServerFn`, zéro
+ * occurrence à ce jour) et les commandes du hub WebSocket (step-043) obtiennent leur point d'entrée
+ * autrement et échapperaient à ce test. À couvrir quand la première apparaîtra.
  */
 
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { BFF_ROUTES, type BffRoute } from '~/server/bff-routes'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const SRC = join(ROOT, 'src')
 
 /** Les méthodes qui changent l'état. `get` et `head` n'ont rien à auditer. */
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
 
-/** Ce qui, dans la fermeture d'imports d'un handler, atteste d'une garde puis d'un audit. */
-const PERMISSION_MARKERS = ['requirePermission', 'mutate(']
-const AUDIT_MARKERS = ['recordAudit', 'mutate(']
+/**
+ * Les symboles d'`src/server/authz/` qui attestent d'une garde, puis d'un audit.
+ *
+ * `mutate` figure dans les deux : c'est le combinateur qui vérifie la permission **et** écrit la
+ * ligne d'audit dans la même transaction, donc il satisfait les deux exigences à lui seul.
+ */
+const PERMISSION_SYMBOLS = new Set(['requirePermission', 'mutate'])
+const AUDIT_SYMBOLS = new Set(['recordAudit', 'mutate'])
 
 /**
  * Les routes de mutation qui n'ont **pas** de permission, et pourquoi.
@@ -53,62 +74,78 @@ const AUDIT_MARKERS = ['recordAudit', 'mutate(']
  * sa raison, est tout l'intérêt : c'est ce qui empêche l'exemption d'être le chemin de moindre
  * résistance quand une route protégée devient gênante à garder.
  */
-const UNGUARDED_BY_DESIGN: Readonly<Record<string, string>> = {
-  '/api/auth/login':
-    'Point d’entrée d’authentification : gardé par le mot de passe et l’anti-brute-force (step-021), pas par une permission.',
-  '/api/auth/logout':
-    'Ferme la session de l’appelant et rien d’autre. Toujours 204, y compris sans session : il n’y a rien à autoriser.',
-  '/api/auth/mfa/enroll':
-    'Enrôlement du second facteur depuis une session partielle — l’état que `requirePermission` refuse par construction.',
-  '/api/auth/mfa/verify':
-    'Vérification du second facteur : c’est l’acte qui rend une session complète, il ne peut pas en exiger une.',
-  '/api/auth/mfa/passkey/register':
-    'Même cérémonie que l’enrôlement TOTP, gardée par la session et par la signature de l’authentificateur.',
-  '/api/auth/mfa/passkey/verify':
-    'Même acte que la vérification TOTP : il promeut la session, il ne peut pas la présupposer complète.',
-  '/api/auth/mfa/passkeys/manage':
-    'Gestion de ses propres facteurs, exigeant une session complète (`session.status !== "active"` refusé dans le handler) et gardée par la règle du dernier facteur.',
+type Exemption = {
+  /** Ce qui protège la route à la place d'une permission. Jamais « rien ». */
+  readonly reason: string
+  /** Le symbole dont l'import atteste cette garde : `<module>` sous `src/server/auth/`. */
+  readonly guardedBy: { readonly module: string; readonly symbol: string }
 }
 
-type Handler = {
-  readonly route: string
-  readonly handler: string
-  readonly method: string
+const UNGUARDED_BY_DESIGN: Readonly<Record<string, Exemption>> = {
+  '/api/auth/login': {
+    reason:
+      'Point d’entrée d’authentification : gardé par le mot de passe et l’anti-brute-force (step-021), pas par une permission. Il ne résout aucune session — il en ouvre une.',
+    guardedBy: { module: 'login', symbol: 'createLoginService' },
+  },
+  '/api/auth/logout': {
+    reason:
+      'Ferme la session de l’appelant et rien d’autre. Toujours 204, y compris sans session : il n’y a rien à autoriser.',
+    guardedBy: { module: 'guard', symbol: 'resolveSession' },
+  },
+  '/api/auth/mfa/enroll': {
+    reason:
+      'Enrôlement du second facteur : refuse une session absente, et refuse d’enrôler quand un facteur existe déjà sans avoir été franchi (`noOtherFactorFrom`). Il ne peut pas exiger la session complète qu’il sert à obtenir.',
+    guardedBy: { module: 'guard', symbol: 'resolveSession' },
+  },
+  '/api/auth/mfa/verify': {
+    reason:
+      'Vérification du second facteur : n’accepte qu’une session partielle, et c’est l’acte qui la rend complète. Il ne peut pas en exiger une.',
+    guardedBy: { module: 'guard', symbol: 'resolveSession' },
+  },
+  '/api/auth/mfa/passkey/register': {
+    reason:
+      'Enregistrement d’un appareil : refuse une session absente, refuse l’ajout quand un facteur existe sans avoir été franchi, et vérifie la signature de l’authentificateur à la phase finale.',
+    guardedBy: { module: 'guard', symbol: 'resolveSession' },
+  },
+  '/api/auth/mfa/passkey/verify': {
+    reason:
+      'Même acte que la vérification TOTP : il promeut la session, il ne peut pas la présupposer complète. Gardé par la signature de l’authentificateur.',
+    guardedBy: { module: 'guard', symbol: 'resolveSession' },
+  },
+  '/api/auth/mfa/passkeys/manage': {
+    reason:
+      'Gestion de ses propres facteurs, exigeant une session complète (`session.status !== "active"` refusé dans le handler) et gardée par la règle du dernier facteur.',
+    guardedBy: { module: 'guard', symbol: 'resolveSession' },
+  },
 }
 
 describe('routes du BFF', () => {
-  const handlers = declaredHandlers()
-
   it('en déclare, sinon ce test ne garde rien', () => {
-    // Sans cette vérification, un `vite.config.ts` restructuré ferait rendre un tableau vide à
-    // l'analyse, et toutes les assertions suivantes passeraient sur zéro route.
-    expect(handlers.length).toBeGreaterThan(0)
-  })
-
-  it('les lit toutes — un motif non reconnu vaudrait une route invisible', () => {
-    // Une entrée écrite autrement que les autres serait silencieusement sautée par l'extraction,
-    // donc jamais vérifiée. On compare donc au nombre d'occurrences de `handler:` dans le bloc.
-    const occurrences = handlersBlock().match(/\bhandler:/g)?.length ?? 0
-
-    expect(handlers.length).toBe(occurrences)
+    expect(BFF_ROUTES.length).toBeGreaterThan(0)
   })
 
   it('toute route de mutation est gardée par une permission, ou exemptée avec sa raison', () => {
-    expect(offenders(handlers, PERMISSION_MARKERS)).toEqual([])
+    expect(offenders(BFF_ROUTES, PERMISSION_SYMBOLS)).toEqual([])
   })
 
   it('toute route de mutation gardée écrit au journal d’audit', () => {
-    expect(offenders(handlers, AUDIT_MARKERS)).toEqual([])
+    expect(offenders(BFF_ROUTES, AUDIT_SYMBOLS)).toEqual([])
+  })
+
+  it('désigne des handlers qui existent', () => {
+    // Un chemin fautif ferait rendre `false` à la détection — donc un échec bruyant, pas un trou.
+    // Mais le diagnostic serait « route non gardée » là où le défaut est « fichier absent ».
+    const missing = BFF_ROUTES.filter((entry) => read(resolve(ROOT, entry.handler)) === undefined)
+
+    expect(missing.map((entry) => entry.handler)).toEqual([])
   })
 })
 
 describe('exemptions', () => {
-  const handlers = declaredHandlers()
-
   it('ne survivent pas à la route qu’elles couvraient', () => {
     // Une exemption orpheline est un piège à retardement : la route disparaît, l'entrée reste, et
     // le jour où le même chemin renaît — protégé, cette fois — elle le dispense en silence.
-    const declared = new Set(handlers.map((entry) => entry.route))
+    const declared = new Set<string>(BFF_ROUTES.map((entry) => entry.route))
     const orphans = Object.keys(UNGUARDED_BY_DESIGN).filter((route) => !declared.has(route))
 
     expect(orphans).toEqual([])
@@ -127,139 +164,145 @@ describe('exemptions', () => {
 
   it('portent toutes une justification, et pas un mot', () => {
     const thin = Object.entries(UNGUARDED_BY_DESIGN)
-      .filter(([, reason]) => reason.trim().length < 40)
+      .filter(([, exemption]) => exemption.reason.trim().length < 40)
       .map(([route]) => route)
 
     expect(thin).toEqual([])
   })
+
+  it('tiennent la garde qu’elles affirment tenir', () => {
+    // Aucune de ces gardes n'est couverte par un test de comportement : les coquilles HTTP sont
+    // hors mesure (`vitest.config.ts`), et rien n'exerce ces handlers. Une justification pouvait
+    // donc décrire une protection retirée depuis longtemps.
+    //
+    // Ce test est structurel et l'assume : il vérifie que le handler **importe** le symbole nommé
+    // par son exemption. C'est faible — un import ne prouve pas un appel — mais cela ferme le cas
+    // qui compte : la garde supprimée. Écrire la garde attendue oblige en outre à la nommer, ce qui
+    // a déjà servi : la première version supposait `resolveSession` pour les sept routes, alors que
+    // `login` n'en résout aucune — il en ouvre une.
+    const broken = BFF_ROUTES.filter((entry) => entry.route in UNGUARDED_BY_DESIGN)
+      .filter((entry) => {
+        const { module, symbol } = UNGUARDED_BY_DESIGN[entry.route]?.guardedBy ?? {
+          module: '',
+          symbol: '',
+        }
+        return !importsSymbol(entry.handler, module, symbol)
+      })
+      .map((entry) => entry.route)
+
+    expect(broken).toEqual([])
+  })
 })
 
 describe('le détecteur se prouve lui-même', () => {
-  // Sans ces deux cas, une extraction cassée ou un `reaches` toujours vrai rendraient les
-  // assertions précédentes vertes à jamais — le pire des modes d'échec pour un test bloquant.
+  // Sans ces cas, un `reaches` toujours vrai — ce qu'il était — rendrait les assertions précédentes
+  // vertes à jamais. C'est le pire des modes d'échec pour un test bloquant.
 
-  it('extrait route, handler et méthode d’une déclaration fabriquée', () => {
-    const source = `nitroV2Plugin({ handlers: [
-      { route: '/api/customers', handler: './src/server/customers/http/create.ts', method: 'post' },
-    ] })`
+  const bare: BffRoute = {
+    route: '/api/customers',
+    handler: './src/test/fixtures/route-nue.ts',
+    method: 'post',
+  }
+  const guarded: BffRoute = {
+    route: '/api/customers',
+    handler: './src/test/fixtures/route-gardee.ts',
+    method: 'post',
+  }
 
-    expect(parseHandlers(source)).toEqual([
-      {
-        route: '/api/customers',
-        handler: './src/server/customers/http/create.ts',
-        method: 'post',
-      },
-    ])
+  it('signale une route qui résout la session mais ne garde rien — le trou d’avant', () => {
+    // Exactement le handler que l'ancienne version déclarait « gardé et audité » : il importe
+    // `guard.ts`, dont la prose contient le mot `requirePermission`. C'est le scénario de la
+    // step-06x, et il doit remonter.
+    const realistic = {
+      route: '/api/customers',
+      handler: './src/test/fixtures/route-realiste.ts',
+      method: 'post',
+    } as const
+    expect(offenders([realistic], PERMISSION_SYMBOLS)).toHaveLength(1)
+    expect(offenders([realistic], AUDIT_SYMBOLS)).toHaveLength(1)
   })
 
-  it('signale une route de mutation non gardée déclarée pour de bon', () => {
-    // **Le cas que la step demande explicitement**, joué de bout en bout : une déclaration de route
-    // complète, passée par l'extraction puis par la détection, exactement comme celles de
-    // `vite.config.ts`. Les deux cas précédents éprouvent les pièces séparément ; celui-ci éprouve
-    // la chaîne — une extraction correcte branchée sur une détection correcte peut encore ne rien
-    // signaler si le filtrage entre les deux est faux.
-    const source = `handlers: [
-      { route: '/api/customers', handler: './src/test/fixtures/route-nue.ts', method: 'post' },
-      { route: '/api/customers/list', handler: './src/test/fixtures/route-gardee.ts', method: 'get' },
-    ]`
-
-    const fabricated = parseHandlers(source)
-    expect(fabricated).toHaveLength(2)
-
-    // La route gardée est en `get` : elle ne mute pas, donc elle n'a rien à prouver. Seule la
-    // mutation nue doit remonter — sur la permission comme sur l'audit.
-    expect(offenders(fabricated, PERMISSION_MARKERS)).toEqual([
+  it('signale une route de mutation qui ne garde rien', () => {
+    expect(offenders([bare], PERMISSION_SYMBOLS)).toEqual([
       'POST /api/customers → ./src/test/fixtures/route-nue.ts',
     ])
-    expect(offenders(fabricated, AUDIT_MARKERS)).toEqual([
+    expect(offenders([bare], AUDIT_SYMBOLS)).toEqual([
       'POST /api/customers → ./src/test/fixtures/route-nue.ts',
     ])
   })
 
-  it('ne signale pas une route de mutation correctement gardée', () => {
-    // Le pendant du cas précédent : un détecteur qui crierait sur tout serait tout aussi inutile,
-    // et se ferait désarmer à la première route légitime.
-    const source = `handlers: [
-      { route: '/api/customers', handler: './src/test/fixtures/route-gardee.ts', method: 'post' },
-    ]`
-
-    expect(offenders(parseHandlers(source), PERMISSION_MARKERS)).toEqual([])
-    expect(offenders(parseHandlers(source), AUDIT_MARKERS)).toEqual([])
+  it('ne signale pas une route gardée par un import indirect', () => {
+    // `route-gardee.ts` n'importe pas l'authz : elle passe par `mutation-fictive.ts`. C'est le motif
+    // réel — un handler délègue toujours — et un détecteur qui ne lirait que le premier niveau
+    // laisserait passer toutes les routes du produit.
+    expect(offenders([guarded], PERMISSION_SYMBOLS)).toEqual([])
+    expect(offenders([guarded], AUDIT_SYMBOLS)).toEqual([])
   })
 
-  it('voit une garde atteinte par un import indirect, et son absence', () => {
-    const guarded = join(ROOT, 'src', 'test', 'fixtures', 'route-gardee.ts')
-    const bare = join(ROOT, 'src', 'test', 'fixtures', 'route-nue.ts')
+  it('ne signale pas une route qui ne mute pas', () => {
+    expect(offenders([{ ...bare, method: 'get' }], PERMISSION_SYMBOLS)).toEqual([])
+  })
 
-    expect(reaches(guarded, PERMISSION_MARKERS)).toBe(true)
-    expect(reaches(guarded, AUDIT_MARKERS)).toBe(true)
-    // Le cas fabriqué que la step demande : une route de mutation qui ne garde rien.
-    expect(reaches(bare, PERMISSION_MARKERS)).toBe(false)
-    expect(reaches(bare, AUDIT_MARKERS)).toBe(false)
+  it('ne prend pas un commentaire pour une garde', () => {
+    // Le défaut exact de la première version : `guard.ts` mentionne `requirePermission` dans sa
+    // prose, et tout handler importe `guard.ts`. Ce cas fige la correction.
+    const fromGuard = join(SRC, 'server', 'auth', 'guard.ts')
+    expect(read(fromGuard)).toContain('requirePermission')
+    expect(authzSymbolsReachedFrom(fromGuard)).toEqual(new Set())
+  })
+
+  it('ne prend pas une fonction privée homonyme pour le combinateur', () => {
+    // L'autre moitié du défaut : `webauthn-credentials.ts` déclare `async function mutate(`, sans
+    // aucun rapport avec l'authz, et il est atteint depuis tous les handlers de passkey.
+    const homonym = join(SRC, 'server', 'auth', 'webauthn-credentials.ts')
+    expect(read(homonym)).toContain('function mutate(')
+    expect(authzSymbolsReachedFrom(homonym)).toEqual(new Set())
+  })
+
+  it('écarte un import de type — un type ne garde rien', () => {
+    const source = "import type { Refusal } from '~/server/authz/permission'"
+    expect(importsIn(source, SRC)).toEqual([])
+  })
+
+  it('écarte un import mis en commentaire', () => {
+    const source = "// import { mutate } from '~/server/authz/mutate'\nconst x = 1"
+    expect(importsIn(source, SRC)).toEqual([])
+  })
+
+  it('ne confond pas `//` d’une URL avec un commentaire', () => {
+    // Le piège du dépouillement naïf : `https://` couperait la ligne en deux et ferait disparaître
+    // des imports qui suivent, ce qui rendrait des routes invisibles — donc jamais vérifiées.
+    const source =
+      "/** voir https://example.test/doc */\nimport { mutate } from '~/server/authz/mutate'"
+    expect(importsIn(source, SRC)).toEqual([
+      { path: join(SRC, 'server', 'authz', 'mutate.ts'), symbols: ['mutate'] },
+    ])
   })
 })
 
-/**
- * Les routes de mutation qui n'atteignent pas les marqueurs, hors exemptions.
- *
- * Extraite en fonction pour être exerçable sur une déclaration fabriquée : la vérification qui
- * compte n'est pas « l'extraction marche » ni « la détection marche », mais que les deux, branchées
- * l'une sur l'autre, signalent bien une route nue. Le filtrage entre les deux est l'endroit où une
- * erreur rendrait le test vert à jamais.
- */
-function offenders(entries: readonly Handler[], markers: readonly string[]): string[] {
+/** Les routes de mutation qui n'atteignent aucun des symboles attendus, hors exemptions. */
+function offenders(entries: readonly BffRoute[], symbols: ReadonlySet<string>): string[] {
   return entries
     .filter((entry) => MUTATING_METHODS.has(entry.method))
     .filter((entry) => !(entry.route in UNGUARDED_BY_DESIGN))
-    .filter((entry) => !reaches(entry.handler, markers))
+    .filter((entry) => !intersects(authzSymbolsReachedFrom(resolve(ROOT, entry.handler)), symbols))
     .map((entry) => `${entry.method.toUpperCase()} ${entry.route} → ${entry.handler}`)
 }
 
-/** Le contenu du bloc `handlers: [ … ]` de `vite.config.ts`. */
-function handlersBlock(): string {
-  const source = readFileSync(join(ROOT, 'vite.config.ts'), 'utf8')
-  const start = source.indexOf('handlers: [')
-  if (start < 0) return ''
-
-  const end = source.indexOf('\n      ],', start)
-  return end < 0 ? source.slice(start) : source.slice(start, end)
-}
-
-function declaredHandlers(): Handler[] {
-  return parseHandlers(handlersBlock())
+function intersects(reached: ReadonlySet<string>, expected: ReadonlySet<string>): boolean {
+  return [...expected].some((symbol) => reached.has(symbol))
 }
 
 /**
- * Extrait les déclarations d'un bloc.
+ * Tous les symboles d'`src/server/authz/` tirés par le fichier ou par sa fermeture d'imports.
  *
- * Chaque entrée est un objet plat sans accolade imbriquée, ce qui rend l'expression régulière
- * suffisante — et le test de comptage ci-dessus garantit qu'aucune entrée ne lui échappe.
+ * La fermeture est parcourue largement — tout import interne, pas seulement l'authz — parce qu'un
+ * handler délègue toujours : la garde vit dans le module qu'il appelle, pas dans sa coquille HTTP.
  */
-function parseHandlers(source: string): Handler[] {
-  return [...source.matchAll(/\{[^{}]*\bhandler:[^{}]*\}/g)].flatMap((match) => {
-    const entry = match[0]
-    const route = field(entry, 'route')
-    const handler = field(entry, 'handler')
-    const method = field(entry, 'method')
-
-    return route && handler && method ? [{ route, handler, method }] : []
-  })
-}
-
-function field(entry: string, name: string): string | undefined {
-  return new RegExp(`\\b${name}:\\s*'([^']+)'`).exec(entry)?.[1]
-}
-
-/**
- * Vrai si l'un des marqueurs apparaît dans le fichier ou dans sa fermeture d'imports internes.
- *
- * Même parcours que `frontiere-serveur.test.ts`, et pour la même raison : ce qui compte n'est pas ce
- * que le fichier écrit lui-même, mais ce que son code atteint.
- */
-function reaches(entryPoint: string, markers: readonly string[]): boolean {
-  const start = entryPoint.startsWith('.') ? resolve(ROOT, entryPoint) : entryPoint
+function authzSymbolsReachedFrom(entryPoint: string): Set<string> {
+  const found = new Set<string>()
   const seen = new Set<string>()
-  const queue = [start]
+  const queue = [entryPoint]
 
   while (queue.length > 0) {
     const current = queue.shift()
@@ -268,40 +311,90 @@ function reaches(entryPoint: string, markers: readonly string[]): boolean {
 
     const source = read(current)
     if (source === undefined) continue
-    if (markers.some((marker) => source.includes(marker))) return true
 
-    queue.push(...internalImportsOf(current, source))
+    for (const entry of importsIn(source, dirname(current))) {
+      if (isAuthzModule(entry.path)) for (const symbol of entry.symbols) found.add(symbol)
+      queue.push(entry.path)
+    }
   }
 
-  return false
+  return found
 }
 
-function internalImportsOf(file: string, source: string): string[] {
-  const specifiers = [...source.matchAll(/from\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]/g)]
-    .map((match) => match[1] ?? match[2])
-    .filter((specifier): specifier is string => specifier !== undefined)
+/** Vrai si le handler tire ce symbole du module `src/server/auth/<moduleName>`. */
+function importsSymbol(handler: string, moduleName: string, symbol: string): boolean {
+  const absolute = resolve(ROOT, handler)
+  const source = read(absolute)
+  if (source === undefined) return false
 
-  return specifiers.flatMap((specifier) => {
-    const base = specifier.startsWith('~/')
-      ? join(ROOT, 'src', specifier.slice(2))
-      : specifier.startsWith('.')
-        ? resolve(dirname(file), specifier)
-        : undefined
+  const target = join(SRC, 'server', 'auth', `${moduleName}.ts`)
 
-    return base ? resolveSource(base) : []
+  return importsIn(source, dirname(absolute)).some(
+    (entry) => entry.path === target && entry.symbols.includes(symbol),
+  )
+}
+
+function isAuthzModule(path: string): boolean {
+  return path.replaceAll('\\', '/').includes('/src/server/authz/')
+}
+
+type ImportEntry = { readonly path: string; readonly symbols: readonly string[] }
+
+/**
+ * Les imports internes d'une source, résolus jusqu'au fichier, avec les symboles nommés.
+ *
+ * Les commentaires sont dépouillés d'abord : un `// import { mutate } …` ne garde rien, et c'est
+ * exactement la forme qu'aurait une garde retirée à la hâte. `import type` est écarté pour la même
+ * raison — un type ne s'exécute pas.
+ */
+function importsIn(source: string, from: string): ImportEntry[] {
+  const code = stripComments(source)
+  const pattern = /import\s+(type\s+)?\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g
+
+  return [...code.matchAll(pattern)].flatMap((match) => {
+    const [, typeOnly, named, specifier] = match
+    if (typeOnly || !named || !specifier) return []
+
+    const resolved = resolveInternal(specifier, from)
+    if (!resolved) return []
+
+    const symbols = named
+      .split(',')
+      .map(
+        (part) =>
+          part
+            .trim()
+            .replace(/^type\s+/, '')
+            .split(/\s+as\s+/)[0]
+            ?.trim() ?? '',
+      )
+      .filter((symbol) => symbol.length > 0)
+
+    return symbols.length > 0 ? [{ path: resolved, symbols }] : []
   })
 }
 
-function resolveSource(base: string): string[] {
-  const candidates = [
-    `${base}.ts`,
-    `${base}.tsx`,
-    join(base, 'index.ts'),
-    join(base, 'index.tsx'),
-    base,
-  ]
+/**
+ * Retire les commentaires, sans casser les URL.
+ *
+ * `(^|[^:])` devant `//` évite de couper `https://…` en deux : une ligne tronquée ferait disparaître
+ * les imports qui la suivent, donc rendrait une route invisible au lieu de la signaler.
+ */
+function stripComments(source: string): string {
+  return source.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/(^|[^:])\/\/[^\n]*/g, '$1')
+}
 
-  return candidates.filter((candidate) => read(candidate) !== undefined).slice(0, 1)
+function resolveInternal(specifier: string, from: string): string | undefined {
+  const base = specifier.startsWith('~/')
+    ? join(SRC, specifier.slice(2))
+    : specifier.startsWith('.')
+      ? resolve(from, specifier)
+      : undefined
+
+  if (!base) return undefined
+
+  const candidates = [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]
+  return candidates.find((candidate) => read(candidate) !== undefined)
 }
 
 function read(path: string): string | undefined {
