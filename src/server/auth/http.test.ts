@@ -10,6 +10,7 @@ import {
   LAST_FACTOR_MESSAGE,
   loginResponse,
   logoutResponse,
+  MFA_ENROLL_REQUIRED_MESSAGE,
   MFA_RATE_LIMITED_MESSAGE,
   meResponse,
   mfaEnrollResponse,
@@ -521,5 +522,24 @@ describe('lecture des corps de cérémonie', () => {
     ]) {
       expect(parsePasskeyId(body), JSON.stringify(body) ?? 'undefined').toBeUndefined()
     }
+  })
+})
+
+describe('mfaEnrollResponse — refus faute de second facteur franchi', () => {
+  it('rend 403 et dit quoi faire, sans parler d’administrateur', async () => {
+    // Le seul chemin de refus du dépôt qui n'était couvert par rien : le seuil `perFile` ne l'a pas
+    // vu parce qu'une ligne sur 91 fait encore 98,9 %. La granularité du seuil est le fichier, et
+    // c'est exactement ce que la couverture ne peut pas garder à elle seule.
+    const response = mfaEnrollResponse({ outcome: 'mfa_required' })
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toEqual({ error: MFA_ENROLL_REQUIRED_MESSAGE })
+  })
+
+  it('n’envoie pas vers un administrateur, contrairement au refus de réenrôlement', async () => {
+    // La distinction qui justifie le second message : l'opérateur qui détient une passkey n'a besoin
+    // de personne. Les confondre le ferait ouvrir un ticket pour un geste qu'il peut faire seul.
+    expect(MFA_ENROLL_REQUIRED_MESSAGE).not.toContain('administrateur')
+    expect(ALREADY_ENROLLED_MESSAGE).toContain('administrateur')
   })
 })

@@ -70,8 +70,17 @@ export type EnrollmentStart =
    * lire : c'est l'objet même de l'opération. Rien ne les rendra plus après cet appel.
    */
   | { readonly outcome: 'started'; readonly secret: string; readonly uri: string }
-  /** Un facteur est déjà actif. Le remplacer est une opération administrative — voir l'en-tête. */
+  /** Un TOTP est déjà actif. Le remplacer est une opération administrative — voir l'en-tête. */
   | { readonly outcome: 'already_enrolled' }
+  /**
+   * Un **autre** facteur est actif — une passkey — et la session n'a pas encore été promue.
+   *
+   * Distinct d'`already_enrolled` parce que la conduite à tenir est distincte : l'opérateur n'a
+   * besoin de personne, il lui suffit de franchir la passkey qu'il détient, ce qui rendra sa session
+   * complète et l'autorisera à ajouter une application authenticator. L'envoyer vers un
+   * administrateur, comme le fait `already_enrolled`, serait un mauvais conseil.
+   */
+  | { readonly outcome: 'mfa_required' }
 
 export type EnrollmentConfirmation =
   /** Facteur actif, session promue, et le lot de codes de récupération — **montré une seule fois**. */
@@ -80,6 +89,12 @@ export type EnrollmentConfirmation =
   | { readonly outcome: 'invalid_code' }
   /** Aucun enrôlement à confirmer : jamais démarré, déjà confirmé, ou secret devenu illisible. */
   | { readonly outcome: 'no_pending_enrollment' }
+  /**
+   * Un autre facteur est apparu **entre** le démarrage et la confirmation, et la session n'a pas été
+   * promue. Distinct de `no_pending_enrollment`, dont la copie dit « relancez l'enrôlement » : ce
+   * geste-là échouerait à son tour, et l'opérateur tournerait en rond entre deux refus.
+   */
+  | { readonly outcome: 'mfa_required' }
   | { readonly outcome: 'rate_limited'; readonly retryAfterSeconds: number }
 
 export type MfaVerification =
@@ -90,11 +105,72 @@ export type MfaVerification =
   | { readonly outcome: 'rate_limited'; readonly retryAfterSeconds: number }
 
 /**
+ * La condition « aucun autre facteur », à poser **dans le `WHERE`** d'une écriture d'enrôlement.
+ *
+ * ## Pourquoi elle existe
+ *
+ * Le côté WebAuthn refuse depuis la step-024 d'enregistrer un appareil depuis une session partielle
+ * quand un facteur existe déjà (`hasActiveFactor`). Le côté TOTP ne regardait, lui, que le TOTP —
+ * et cette asymétrie était un **contournement complet du second facteur** : un opérateur protégé par
+ * une passkey, c'est-à-dire le mieux protégé, voyait un mot de passe volé suffire à enrôler une
+ * application authenticator, à promouvoir la session et à emporter les codes de récupération. Le
+ * facteur résistant au hameçonnage se contournait par le plus faible.
+ *
+ * ## Pourquoi dans le `WHERE` et non dans un `if`
+ *
+ * Même raison qu'ailleurs dans ce module : un `if` qui précède l'écriture laisse deux onglets, ou
+ * deux instances, se glisser entre la lecture et l'écriture. La condition doit être évaluée par
+ * l'instruction qui écrit.
+ *
+ * ## Pourquoi une session complète en est dispensée
+ *
+ * Elle a déjà franchi un facteur. Ajouter une application authenticator à côté de sa passkey est
+ * exactement ce qu'un opérateur prudent doit pouvoir faire — et c'est la règle que le côté WebAuthn
+ * applique déjà, dans l'autre sens.
+ */
+function noOtherFactorFrom(session: AuthenticatedSession) {
+  if (session.status === 'active') return []
+
+  // `jsonb_typeof = 'array'` d'abord, et ce n'est pas de la ceinture-bretelles : `jsonb_array_length`
+  // **lève** sur un scalaire ou un objet. Sans ce garde, une colonne bricolée ferait remonter une
+  // erreur PostgreSQL jusqu'au 500 au lieu du refus typé — et `webauthn-credentials.ts` pose déjà la
+  // règle inverse : « jamais une erreur serveur qui rendrait la panne indiscernable d'une attaque ».
+  // Une colonne qui n'est pas un tableau ne prouve pas l'absence de facteur : la condition est fausse,
+  // donc l'enrôlement est refusé. Fail-closed, et lisible.
+  return [
+    sql`jsonb_typeof(${operators.mfaWebauthnCredentials}) = 'array'
+        AND jsonb_array_length(${operators.mfaWebauthnCredentials}) = 0`,
+  ]
+}
+
+/**
+ * Dit **pourquoi** l'enrôlement a été refusé, une fois l'écriture conditionnelle sans effet.
+ *
+ * Les deux refus n'appellent pas la même conduite : un TOTP déjà actif se remplace par un
+ * administrateur, tandis qu'une passkey détenue se franchit soi-même. Rendre le même code pour les
+ * deux enverrait la moitié des opérateurs à la mauvaise porte.
+ */
+async function refusedStart(db: Database, session: AuthenticatedSession): Promise<EnrollmentStart> {
+  const [operator] = await db
+    .select({
+      activatedAt: operators.mfaTotpActivatedAt,
+      credentials: operators.mfaWebauthnCredentials,
+    })
+    .from(operators)
+    .where(eq(operators.id, session.operatorId))
+
+  const passkeys = Array.isArray(operator?.credentials) ? operator.credentials.length : 0
+  if (!operator?.activatedAt && passkeys > 0) return { outcome: 'mfa_required' }
+
+  return { outcome: 'already_enrolled' }
+}
+
+/**
  * Démarre un enrôlement TOTP.
  *
- * L'écriture est **conditionnelle** : elle n'aboutit que si aucun facteur n'est actif. La condition
- * est dans le `WHERE` et non dans un `if` qui la précéderait — deux onglets, ou deux instances, se
- * glisseraient entre la lecture et l'écriture.
+ * L'écriture est **conditionnelle** : elle n'aboutit que si aucun facteur n'est actif — ni TOTP, ni
+ * passkey. La condition est dans le `WHERE` et non dans un `if` qui la précéderait : deux onglets,
+ * ou deux instances, se glisseraient entre la lecture et l'écriture.
  */
 export async function startTotpEnrollment(
   db: Database,
@@ -112,10 +188,16 @@ export async function startTotpEnrollment(
       mfaTotpLastStep: null,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(operators.id, session.operatorId), isNull(operators.mfaTotpActivatedAt)))
+    .where(
+      and(
+        eq(operators.id, session.operatorId),
+        isNull(operators.mfaTotpActivatedAt),
+        ...noOtherFactorFrom(session),
+      ),
+    )
     .returning({ email: operators.email })
 
-  if (!row) return { outcome: 'already_enrolled' }
+  if (!row) return refusedStart(db, session)
 
   return { outcome: 'started', secret, uri: totpEnrollmentUri(secret, row.email) }
 }
@@ -169,7 +251,16 @@ export async function confirmTotpEnrollment(
         mfaTotpLastStep: check.timeStep,
         updatedAt: sql`now()`,
       })
-      .where(and(eq(operators.id, session.operatorId), isNull(operators.mfaTotpActivatedAt)))
+      .where(
+        and(
+          eq(operators.id, session.operatorId),
+          isNull(operators.mfaTotpActivatedAt),
+          // La même condition qu'au démarrage, et pas seulement par symétrie : un secret en attente
+          // peut dater d'**avant** l'enregistrement d'une passkey — enrôlement commencé, jamais
+          // confirmé, puis appareil enregistré. Sans elle, ce secret oublié resterait une porte.
+          ...noOtherFactorFrom(session),
+        ),
+      )
       .returning({ id: operators.id })
 
     if (!row) return false
@@ -178,7 +269,16 @@ export async function confirmTotpEnrollment(
     return true
   })
 
-  if (!activated) return { outcome: 'no_pending_enrollment' }
+  // Deux causes possibles à l'écriture sans effet, et deux conduites à tenir opposées : le facteur
+  // a été activé entre-temps (relancer n'a pas de sens, c'est fait), ou une passkey est apparue
+  // depuis le démarrage (il faut la présenter). `refusedStart` fait déjà cette distinction côté
+  // démarrage ; la refaire ici évite d'envoyer l'opérateur relancer un enrôlement qui sera refusé.
+  if (!activated) {
+    const refusal = await refusedStart(db, session)
+    return refusal.outcome === 'mfa_required'
+      ? { outcome: 'mfa_required' }
+      : { outcome: 'no_pending_enrollment' }
+  }
 
   await promote(db, session)
 

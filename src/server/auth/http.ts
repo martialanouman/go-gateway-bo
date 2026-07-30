@@ -132,6 +132,17 @@ export const MFA_RATE_LIMITED_MESSAGE =
 export const ALREADY_ENROLLED_MESSAGE =
   'Enrôlement refusé : un authentificateur est déjà associé à ce compte. Son remplacement passe par un administrateur.'
 
+/**
+ * Refus d'enrôlement à qui détient déjà un facteur, sans avoir franchi le sien.
+ *
+ * Distinct d'`ALREADY_ENROLLED_MESSAGE`, qui renvoie vers un administrateur : ici l'opérateur n'a
+ * besoin de personne. Il détient une passkey, il lui suffit de la présenter — sa session devient
+ * complète, et il peut alors ajouter une application authenticator. Lui parler d'administrateur
+ * l'enverrait à la mauvaise porte, et pousserait à chercher un contournement.
+ */
+export const MFA_ENROLL_REQUIRED_MESSAGE =
+  'Enrôlement refusé : franchissez d’abord le second facteur que vous détenez déjà pour en ajouter un autre.'
+
 export const NO_PENDING_ENROLLMENT_MESSAGE =
   'Aucun enrôlement en cours : relancez l’enrôlement pour obtenir un nouveau QR code.'
 
@@ -154,6 +165,13 @@ export function mfaEnrollResponse(outcome: EnrollmentStart | EnrollmentConfirmat
 
     case 'already_enrolled':
       return json({ error: ALREADY_ENROLLED_MESSAGE }, 409)
+
+    // 403, comme le refus symétrique côté passkey : dans les deux cas l'opérateur détient déjà un
+    // facteur et doit le franchir avant d'en ajouter un autre. Le **message**, lui, diffère — l'un
+    // parle d'enregistrer un appareil, l'autre d'ajouter une application authenticator, et
+    // l'opérateur a besoin de savoir laquelle des deux opérations vient d'être refusée.
+    case 'mfa_required':
+      return json({ error: MFA_ENROLL_REQUIRED_MESSAGE }, 403)
 
     case 'no_pending_enrollment':
       return json({ error: NO_PENDING_ENROLLMENT_MESSAGE }, 409)

@@ -87,6 +87,158 @@ async function enroll(): Promise<string> {
   return started.secret
 }
 
+/**
+ * Un opérateur qui ne s'authentifie que par passkey : aucune application authenticator, un appareil
+ * enregistré. C'est la configuration que la spec recommande (« WebAuthn/passkey privilégié quand
+ * l'appareil le supporte », §6.9), donc celle du compte le mieux protégé.
+ */
+async function registerPasskeyOnly(): Promise<void> {
+  // `JSON.stringify` puis cast explicite : passer un tableau JavaScript à postgres.js le fait
+  // partir en tableau PostgreSQL, pas en `jsonb`, et l'erreur est un `TypeError` de sérialisation —
+  // trois tests rouges pour la mauvaise raison, ce qui n'aurait rien prouvé du tout.
+  const credentials = JSON.stringify([
+    {
+      id: 'une-passkey-enregistree',
+      publicKey: 'peu-importe',
+      counter: 0,
+      name: 'Téléphone',
+      createdAt: NOW.toISOString(),
+    },
+  ])
+
+  await sql`
+    UPDATE operators
+    SET mfa_webauthn_credentials = ${credentials}::jsonb
+    WHERE id = ${operatorId}
+  `
+}
+
+/**
+ * **Le second facteur ne se contourne pas en en enrôlant un autre.**
+ *
+ * Le côté WebAuthn refuse déjà l'ajout d'un appareil depuis une session partielle quand un facteur
+ * existe (`hasActiveFactor`). Le côté TOTP doit refuser symétriquement, sinon le facteur le mieux
+ * protégé — une passkey, résistante au hameçonnage — se contourne par le facteur le plus faible.
+ */
+describe('enrôlement TOTP face à un facteur déjà actif', () => {
+  it('refuse de démarrer un enrôlement à qui détient déjà une passkey', async () => {
+    await registerPasskeyOnly()
+
+    // Un mot de passe volé suffit à ouvrir cette session : c'est tout ce que l'attaquant détient.
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+
+    // `mfa_required` et non `already_enrolled` : l'opérateur légitime, lui, n'a besoin de personne —
+    // il présente sa passkey, sa session devient complète, et il peut ajouter son application.
+    expect(started.outcome).toBe('mfa_required')
+  })
+
+  it('laisse une session complète ajouter un TOTP à côté de sa passkey', async () => {
+    await registerPasskeyOnly()
+    const { sessionId } = await openPendingSession(db, operatorId)
+
+    // Session complète : le second facteur a été franchi. C'est la règle que le côté WebAuthn
+    // applique déjà dans l'autre sens — durcir la garde ne doit pas interdire la prudence.
+    const started = await startTotpEnrollment(db, KEYS, {
+      status: 'active',
+      sessionId,
+      operatorId,
+    })
+
+    expect(started.outcome).toBe('started')
+  })
+
+  it('ne divulgue aucun secret TOTP dans ce refus', async () => {
+    await registerPasskeyOnly()
+
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+
+    // Le secret rendu serait la clé du contournement : l'attaquant calcule le code et promeut la
+    // session lui-même, sans jamais toucher à la passkey de la victime.
+    expect(started).not.toHaveProperty('secret')
+  })
+
+  it('n’écrase pas la passkey de la victime en tentant l’enrôlement', async () => {
+    await registerPasskeyOnly()
+    await startTotpEnrollment(db, KEYS, await pendingSession())
+
+    const [row] = await sql<{ count: number }[]>`
+      SELECT jsonb_array_length(mfa_webauthn_credentials)::int AS count
+      FROM operators WHERE id = ${operatorId}
+    `
+    expect(row?.count).toBe(1)
+  })
+
+  it('refuse de confirmer un secret enrôlé AVANT l’enregistrement d’une passkey', async () => {
+    // Le cas que la garde de `confirmTotpEnrollment` couvre, et le plus subtil des deux : un
+    // enrôlement commencé quand le compte n'avait aucun facteur, jamais confirmé, puis une passkey
+    // enregistrée. Le secret en attente resterait sinon une porte ouverte indéfiniment — l'attaquant
+    // qui l'a obtenu au démarrage n'aurait qu'à revenir confirmer plus tard.
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+    if (started.outcome !== 'started') throw new Error("L'enrôlement n'a pas démarré.")
+
+    await registerPasskeyOnly()
+
+    const code = await totpCodeAt(started.secret, NOW)
+    const confirmed = await confirmTotpEnrollment(db, KEYS, await pendingSession(), code, NOW)
+
+    // Le code est **valide** : c'est bien la garde qui refuse, pas la vérification du code.
+    //
+    // `mfa_required` et non `no_pending_enrollment` : ce dernier dit « relancez l'enrôlement pour
+    // obtenir un nouveau QR code », geste que le démarrage refuserait à son tour. L'opératrice
+    // tournerait entre deux refus contradictoires.
+    expect(confirmed.outcome).toBe('mfa_required')
+  })
+
+  it('n’émet aucun code de récupération quand la confirmation est refusée', async () => {
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+    if (started.outcome !== 'started') throw new Error("L'enrôlement n'a pas démarré.")
+
+    await registerPasskeyOnly()
+    await confirmTotpEnrollment(
+      db,
+      KEYS,
+      await pendingSession(),
+      await totpCodeAt(started.secret, NOW),
+      NOW,
+    )
+
+    // L'activation et les codes partagent une transaction : un refus ne doit rien laisser derrière.
+    expect(await countUnusedRecoveryCodes(db, operatorId)).toBe(0)
+  })
+
+  it('ne promeut pas la session quand la confirmation est refusée', async () => {
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+    if (started.outcome !== 'started') throw new Error("L'enrôlement n'a pas démarré.")
+
+    await registerPasskeyOnly()
+    const session = await pendingSession()
+    await confirmTotpEnrollment(db, KEYS, session, await totpCodeAt(started.secret, NOW), NOW)
+
+    // Ce qui compte au bout du compte : la session reste partielle, donc `requirePermission`
+    // n'accorde rien (step-025).
+    expect((await readSession(db, session.sessionId)).status).toBe('pending_mfa')
+  })
+
+  it('refuse plutôt que de lever quand la colonne des passkeys est corrompue', async () => {
+    // `jsonb_array_length` lève sur un scalaire ou un objet. Sans garde de type, une colonne
+    // bricolée remonterait en 500 — ce que `webauthn-credentials.ts` interdit explicitement : une
+    // erreur serveur rend la panne indiscernable d'une attaque. Fail-closed, et lisible.
+    await sql`UPDATE operators SET mfa_webauthn_credentials = '{"pas":"un tableau"}'::jsonb WHERE id = ${operatorId}`
+
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+
+    expect(started).not.toHaveProperty('secret')
+  })
+
+  it('laisse l’enrôlement ouvert à qui n’a aucun facteur', async () => {
+    // Le pendant indispensable : durcir la garde ne doit pas enfermer dehors le premier opérateur,
+    // qui doit bien pouvoir enrôler son tout premier facteur depuis une session partielle.
+    const started = await startTotpEnrollment(db, KEYS, await pendingSession())
+
+    expect(started.outcome).toBe('started')
+  })
+})
+
 describe("démarrage de l'enrôlement", () => {
   it("rend un secret et l'URI que scanne l'application", async () => {
     const started = await startTotpEnrollment(db, KEYS, await pendingSession())
