@@ -17,9 +17,20 @@ const SCOPES = [
 ]
 
 describe('Select', () => {
+  it('porte un nom accessible, et pas seulement sa valeur', () => {
+    // Le point le plus fragile de l'abandon du `<select>` natif : celui-là s'associait à un
+    // `<label>` gratuitement. Sans nom, un lecteur d'écran annonce « Pool partagé, zone de liste »
+    // sans jamais dire de quoi l'opérateur choisit la portée.
+    const { getByRole } = renderComponent(
+      <Select label="balance_scope" options={SCOPES} defaultValue="shared" />,
+    )
+
+    expect(getByRole('combobox', { name: 'balance_scope' })).toBeInTheDocument()
+  })
+
   it('annonce le choix courant, ou l’invite quand rien n’est choisi', () => {
     const { getByRole } = renderComponent(
-      <Select options={SCOPES} placeholder="Choisir une portée" />,
+      <Select label="balance_scope" options={SCOPES} placeholder="Choisir une portée" />,
     )
 
     expect(getByRole('combobox')).toHaveTextContent('Choisir une portée')
@@ -28,7 +39,7 @@ describe('Select', () => {
   it('s’ouvre et se choisit entièrement au clavier', async () => {
     const onValueChange = vi.fn()
     const { getByRole, user } = renderComponent(
-      <Select options={SCOPES} onValueChange={onValueChange} />,
+      <Select label="balance_scope" options={SCOPES} onValueChange={onValueChange} />,
     )
 
     await user.tab()
@@ -44,7 +55,7 @@ describe('Select', () => {
     // 28 px au lieu de 34 : la charte prévoit trois hauteurs de contrôle, et une barre de filtres
     // dense les utilise. Sans ce cas, la variante n'était rendue nulle part.
     const { getByRole } = renderComponent(
-      <Select options={SCOPES} size="sm" className="filtre-compte" />,
+      <Select label="balance_scope" options={SCOPES} size="sm" className="filtre-compte" />,
     )
 
     const trigger = getByRole('combobox')
@@ -53,7 +64,9 @@ describe('Select', () => {
   })
 
   it('rend la valeur choisie plutôt que l’invite', () => {
-    const { getByRole } = renderComponent(<Select options={SCOPES} defaultValue="shared" />)
+    const { getByRole } = renderComponent(
+      <Select label="balance_scope" options={SCOPES} defaultValue="shared" />,
+    )
 
     expect(getByRole('combobox')).toHaveTextContent('Pool partagé')
   })

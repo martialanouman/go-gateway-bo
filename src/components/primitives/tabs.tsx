@@ -19,6 +19,17 @@ export type TabDefinition = {
   /** Affiché quand il est connu. `0` reste affiché — c'est une information, pas une absence. */
   readonly count?: number
   readonly disabled?: boolean
+  /**
+   * Le contenu de l'onglet.
+   *
+   * **Sans panneau, `role="tablist"` est une promesse intenable** : les onglets n'annoncent aucun
+   * `aria-controls`, et la tabulation — qui doit sauter au panneau — atterrit sur le premier élément
+   * focusable venu. Le rôle serait annoncé sans être tenu, ce qui est pire que de ne rien annoncer.
+   *
+   * Optionnel malgré tout : des onglets qui pilotent la **route** n'ont pas de panneau local, et
+   * c'est un usage légitime. Le composant rend alors la liste seule — voir le test.
+   */
+  readonly panel?: ReactNode
 }
 
 export type TabsProps = Omit<
@@ -45,6 +56,14 @@ export function Tabs({ tabs, className, ...rest }: TabsProps) {
         ))}
         <BaseTabs.Indicator className="ui-tabs__indicator" />
       </BaseTabs.List>
+
+      {tabs.map((tab) =>
+        tab.panel === undefined ? null : (
+          <BaseTabs.Panel className="ui-tabs__panel" key={tab.value} value={tab.value}>
+            {tab.panel}
+          </BaseTabs.Panel>
+        ),
+      )}
     </BaseTabs.Root>
   )
 }

@@ -13,6 +13,7 @@
 
 import { Select as BaseSelect } from '@base-ui/react/select'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import { useId } from 'react'
 
 export type SelectOption = {
   readonly value: string
@@ -22,8 +23,18 @@ export type SelectOption = {
 
 export type SelectProps = Omit<
   ComponentPropsWithoutRef<typeof BaseSelect.Root>,
-  'render' | 'children'
+  'render' | 'children' | 'items' | 'multiple'
 > & {
+  /**
+   * **Obligatoire**, et c'est le seul champ du lot à l'exiger.
+   *
+   * Sans lui, le nom accessible du `combobox` se réduit au texte de la valeur : un lecteur d'écran
+   * annonce « Pool partagé, zone de liste » sans jamais dire de quoi on choisit la portée. Les
+   * quatre autres primitives de saisie portent leur libellé ; celle-ci l'oubliait, et c'était le
+   * point le plus fragile de l'abandon du `<select>` natif — celui-là s'associait à un `<label>`
+   * gratuitement.
+   */
+  readonly label: ReactNode
   readonly options: readonly SelectOption[]
   /** Texte affiché tant que rien n'est choisi. Jamais une valeur déguisée en choix. */
   readonly placeholder?: string
@@ -32,12 +43,14 @@ export type SelectProps = Omit<
 }
 
 export function Select({
+  label,
   options,
   placeholder = 'Choisir…',
   className,
   size = 'md',
   ...rest
 }: SelectProps) {
+  const labelId = useId()
   const triggerClasses = ['ui-select', size === 'sm' ? 'ui-select--sm' : '', className]
     .filter(Boolean)
     .join(' ')
@@ -48,7 +61,11 @@ export function Select({
     // déclencheur fermé afficherait la **valeur brute** (`per_account`) au lieu de son libellé —
     // c'est-à-dire un identifiant technique là où la charte veut une phrase.
     <BaseSelect.Root items={options as SelectOption[]} {...rest}>
-      <BaseSelect.Trigger className={triggerClasses}>
+      <span className="ui-select__label" id={labelId}>
+        {label}
+      </span>
+
+      <BaseSelect.Trigger className={triggerClasses} aria-labelledby={labelId}>
         <BaseSelect.Value placeholder={placeholder} />
         <BaseSelect.Icon className="ui-select__caret" aria-hidden="true" />
       </BaseSelect.Trigger>

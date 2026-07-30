@@ -54,22 +54,29 @@
 }
 
 .ui-button--primary {
-  border-color: var(--teal-500);
-  background: var(--tint-teal);
-  color: var(--text-accent);
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-bg);
+  color: var(--action-primary-fg);
 }
 
 .ui-button--primary:hover:not([data-disabled]) {
-  background: var(--tint-teal-strong);
+  background: var(--action-primary-bg-hover);
 }
 
+/*
+ * `--action-danger-fg` et non `--text-danger` : au survol, le fond passe à `--tint-red`, et
+ * `colors.css` documente que le rouge de pleine surface n'atteint que **4,05** sur sa propre
+ * teinte — sous le seuil AA. Le token d'action porte déjà la bonne valeur pour les deux états.
+ */
 .ui-button--destructive {
-  border-color: var(--red-500);
-  color: var(--text-danger);
+  border-color: var(--action-danger-border);
+  background: var(--action-danger-bg);
+  color: var(--action-danger-fg);
 }
 
 .ui-button--destructive:hover:not([data-disabled]) {
-  background: var(--tint-red);
+  background: var(--action-danger-bg-hover);
+  color: var(--text-danger-on-tint);
 }
 
 /* Lien : teal nu, sans contour — le seul bouton sans bordure du système. */
@@ -135,7 +142,7 @@
 
 .ui-input {
   height: var(--control-height);
-  padding: 0 var(--sp-3);
+  padding: 0 var(--pad-control-x);
   border: 1px solid var(--border-default);
   border-radius: var(--r-field);
   background: var(--surface-sunken);
@@ -158,7 +165,7 @@
 }
 
 .ui-input[data-invalid] {
-  border-color: var(--red-500);
+  border-color: var(--status-down);
 }
 
 .ui-input[data-disabled] {
@@ -283,9 +290,27 @@
   gap: var(--sp-2);
 }
 
-.ui-radiogroup__label {
+.ui-radiogroup__label,
+.ui-select__label,
+.ui-check__label {
   color: var(--text-muted);
   font: var(--text-label);
+}
+
+.ui-select {
+  /* Le libellé se place au-dessus, comme pour un champ. */
+  margin-top: 0;
+}
+
+.ui-selectfield {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.ui-radio__label,
+.ui-switch__label {
+  color: var(--text-primary);
 }
 
 .ui-radiogroup__options {
@@ -353,7 +378,7 @@
   justify-content: space-between;
   gap: var(--sp-2);
   height: var(--control-height);
-  padding: 0 var(--sp-3);
+  padding: 0 var(--pad-control-x);
   border: 1px solid var(--border-default);
   border-radius: var(--r-field);
   background: var(--surface-sunken);
@@ -365,6 +390,18 @@
 
 .ui-select--sm {
   height: var(--control-height-sm);
+}
+
+/*
+ * L'affordance de liste déroulante. Sans elle, `justify-content: space-between` réservait la place
+ * d'un chevron qui n'était jamais dessiné : un champ qui ne dit pas qu'il s'ouvre.
+ */
+.ui-select__caret {
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: translateY(-2px) rotate(45deg);
 }
 
 .ui-select[data-disabled] {
@@ -421,20 +458,25 @@
   background: currentColor;
 }
 
+/*
+ * Les alias sémantiques, pas la palette brute. `colors.css` les déclare précisément pour que la
+ * charte puisse déplacer une couleur sans rouvrir chaque composant — les court-circuiter aurait
+ * rendu ces tokens décoratifs.
+ */
 .ui-status--up {
-  color: var(--green-500);
+  color: var(--status-up);
 }
 
 .ui-status--degraded {
-  color: var(--amber-500);
+  color: var(--status-degraded);
 }
 
 .ui-status--down {
-  color: var(--red-500);
+  color: var(--status-down);
 }
 
 .ui-status--idle {
-  color: var(--text-faint);
+  color: var(--status-idle);
 }
 
 .ui-status__label {
@@ -473,19 +515,26 @@
   font-size: 11px;
 }
 
+/*
+ * Texte sur teinte : `--text-danger-on-tint` et non `--text-danger`. Le rouge de pleine surface
+ * tombe à 4,05 sur `--tint-red`, sous le seuil AA que la Definition of Done impose.
+ *
+ * `open` suit la charte, qui range « breaker open » avec l'ambre (§ palette) : un disjoncteur ouvert
+ * est un état **dégradé** dont on attend la reprise, pas une panne qui appelle un rebind.
+ */
 .ui-breaker--closed {
   background: var(--tint-green);
-  color: var(--green-500);
+  color: var(--breaker-closed);
 }
 
 .ui-breaker--open {
-  background: var(--tint-red);
-  color: var(--red-500);
+  background: var(--tint-amber);
+  color: var(--breaker-open);
 }
 
 .ui-breaker--half_open {
   background: var(--tint-amber);
-  color: var(--amber-500);
+  color: var(--breaker-half-open);
 }
 
 /* ─── Tableau ───────────────────────────────────────────────────────────────────────────────── */
@@ -510,10 +559,15 @@
   white-space: nowrap;
 }
 
+/*
+ * `--pad-cell-*` et non `--sp-2/--sp-3` : la charte dit « cells 8×12 », et `--sp-3` vaut 6 px, un pas
+ * que `spacing.css` réserve aux hairlines et aux pilules. Le tableau était livré à la moitié de la
+ * densité prévue.
+ */
 .ui-table__header {
   position: sticky;
   top: 0;
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--pad-cell-y) var(--pad-cell-x);
   border-bottom: 1px solid var(--border-default);
   background: var(--surface-card);
   color: var(--text-muted);
@@ -531,7 +585,7 @@
 
 .ui-table__cell {
   height: 38px;
-  padding: var(--sp-2) var(--sp-3);
+  padding: var(--pad-cell-y) var(--pad-cell-x);
   border-bottom: 1px solid var(--border-subtle);
 }
 

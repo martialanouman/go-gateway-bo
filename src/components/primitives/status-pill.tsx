@@ -1,97 +1,141 @@
 /**
- * Les deux dimensions de statut de la charte, et l'interdiction de les confondre.
+ * Les statuts de la charte, et l'interdiction de confondre leurs dimensions.
  *
- * ## Pourquoi un seul composant pour deux rendus
+ * ## Pourquoi `kind` est obligatoire
  *
- * Parce que le mode d'échec à empêcher est qu'un écran choisisse le mauvais. La charte §06 est
- * catégorique : `link_status` se rend en **point coloré + libellé mono**, `breaker_state` en
- * **pilule teintée**, « jamais fusionnés et jamais dérivés l'un de l'autre ». La raison est
- * opérationnelle, pas esthétique :
+ * La première version prenait `state: string` et **devinait** la dimension : si la valeur était
+ * `closed`, `open` ou `half_open`, c'était un disjoncteur. Le contrat rend cette devinette fausse —
+ * `closed` appartient à deux vocabulaires :
  *
- * > Un disjoncteur ouvert sur un lien vivant (attendre la reprise) et un bind mort (rebind manuel)
- * > demandent des actions opposées.
+ * ```yaml
+ * BreakerState: { enum: [closed, open, half_open] }          # le disjoncteur
+ * status:       { enum: [active, suspended, closed] }        # Customer, SmppAccount
+ * ```
  *
- * Un composant unique qui **reconnaît** l'état et choisit lui-même le rendu retire à l'appelant
- * l'occasion de se tromper. C'est la raison d'être du `BREAKER_STATES` ci-dessous : la bascule est
- * une donnée, pas un paramètre que l'écran passerait.
+ * `<StatusPill state={customer.status} />` — le geste le plus naturel du monde — aurait donc peint un
+ * **client résilié en pilule verte « circuit sain »**. C'est exactement la confusion que la charte §06
+ * interdit, et une devinette ne peut pas la prévenir : seule la déclaration de la dimension le peut.
+ *
+ * D'où l'union discriminée. Le typage refuse `kind="breaker"` avec `state="suspended"`, et refuse
+ * `live` ailleurs que sur un lien. La règle de la charte devient une propriété du compilateur au lieu
+ * d'un commentaire.
+ *
+ * ## Deux rendus, jamais mélangés
+ *
+ * `breaker_state` est une **pilule teintée**. Tout le reste est un **point coloré + libellé mono**.
+ * La raison est opérationnelle : « un disjoncteur ouvert sur un lien vivant (attendre la reprise) et
+ * un bind mort (rebind manuel) demandent des actions opposées ».
  *
  * ## Le libellé reste en `snake_case`
  *
- * `half_open`, `reconnecting`, `unbound` : ce sont les valeurs du contrat, et un opérateur les grep
- * dans les logs. Les traduire couperait le lien entre l'écran et la trace.
+ * `half_open`, `reconnecting`, `suspended` : ce sont les valeurs du contrat, et un opérateur les
+ * grep dans les logs. Les traduire couperait le lien entre l'écran et la trace.
  */
 
-/** Les trois états du disjoncteur. Leur seule présence bascule le rendu en pilule. */
-const BREAKER_STATES = ['closed', 'open', 'half_open'] as const
+/** `openapi-admin.yaml` — `BreakerState`. */
+export type BreakerState = 'closed' | 'open' | 'half_open'
 
-export type BreakerState = (typeof BREAKER_STATES)[number]
+/** `openapi-admin.yaml` — `LinkStatus`. La seule dimension alimentée par la WebSocket. */
+export type LinkStatus = 'up' | 'reconnecting' | 'down'
+
+/** `openapi-admin.yaml` — `Customer.status`, `SmppAccount.status`. */
+export type EntityStatus = 'active' | 'suspended' | 'closed'
 
 /**
- * La tonalité de chaque état de lien, d'après la sémantique de couleur de la charte.
- *
- * Quatre tonalités et pas une de plus : vert « sain », ambre « dégradé », rouge « panne », neutre
- * « au repos ». Un état inconnu retombe sur `idle` — un statut qu'on ne sait pas lire n'est pas une
- * panne, et le peindre en rouge déclencherait une intervention pour rien.
+ * `openapi-admin.yaml` — `CdrStatus`. Recopié depuis l'énumération du contrat, pas inventé : une
+ * première version portait `pending` et `throttled`, qui n'y figurent pas, et **omettait `rejected`**
+ * — un échec, qui serait donc tombé sur le repli gris « au repos » et aurait disparu de l'œil de
+ * l'opérateur qui balaie la colonne à la recherche des rouges.
  */
-const LINK_TONES: Readonly<Record<string, 'up' | 'degraded' | 'down' | 'idle'>> = {
+export type DeliveryStatus =
+  | 'enroute'
+  | 'delivered'
+  | 'failed'
+  | 'expired'
+  | 'rejected'
+  | 'rerouted'
+
+type Tone = 'up' | 'degraded' | 'down' | 'idle'
+
+/**
+ * La tonalité par dimension. Séparées, et non fusionnées en une table unique : c'est la fusion qui
+ * avait produit la collision sur `closed`.
+ */
+const LINK_TONES: Readonly<Record<LinkStatus, Tone>> = {
   up: 'up',
-  active: 'up',
-  connected: 'up',
-  delivered: 'up',
-  closed_ok: 'up',
   reconnecting: 'degraded',
-  pending: 'degraded',
-  throttled: 'degraded',
-  expired: 'degraded',
-  degraded: 'degraded',
   down: 'down',
-  failed: 'down',
-  suspended: 'down',
-  idle: 'idle',
-  unbound: 'idle',
-  unknown: 'idle',
 }
 
-export type StatusPillProps = {
-  /** La valeur du contrat, telle quelle : `up`, `reconnecting`, `half_open`… */
-  readonly state: string
+const ENTITY_TONES: Readonly<Record<EntityStatus, Tone>> = {
+  active: 'up',
+  suspended: 'down',
+  // Un client résilié n'est pas une panne : c'est une fin de vie administrative. Le peindre en rouge
+  // enverrait chercher une intervention là où il n'y a rien à réparer.
+  closed: 'idle',
+}
+
+const DELIVERY_TONES: Readonly<Record<DeliveryStatus, Tone>> = {
+  delivered: 'up',
+  enroute: 'degraded',
+  rerouted: 'degraded',
+  expired: 'degraded',
+  failed: 'down',
+  // `rejected` est un échec, pas une attente : il doit se voir dans la colonne au même titre qu'un
+  // `failed`. C'est exactement la valeur que l'oubli précédent peignait en gris.
+  rejected: 'down',
+}
+
+type CommonProps = {
   /** Libellé de remplacement. Reste en `snake_case` — voir l'en-tête. */
   readonly label?: string
   /** Métadonnée mono à droite du libellé : durée, compteur, horodatage. */
   readonly meta?: string
-  /**
-   * Valeur alimentée par la WebSocket. **Réservé aux données en direct** : c'est la seule animation
-   * en boucle du système, et la poser sur un instantané ferait mentir le seul signal de fraîcheur
-   * dont dispose l'opérateur.
-   */
-  readonly live?: boolean
   readonly className?: string
 }
 
-function isBreakerState(state: string): state is BreakerState {
-  return (BREAKER_STATES as readonly string[]).includes(state)
-}
+export type StatusPillProps =
+  /** `breaker_state` — **pilule teintée**, et la seule dimension rendue ainsi. */
+  | (CommonProps & { readonly kind: 'breaker'; readonly state: BreakerState })
+  /**
+   * `link_status` — point + libellé. `live` n'existe que sur cette dimension : c'est la seule que la
+   * WebSocket alimente, et le pouls est le seul signal de fraîcheur du produit.
+   */
+  | (CommonProps & { readonly kind: 'link'; readonly state: LinkStatus; readonly live?: boolean })
+  | (CommonProps & { readonly kind: 'entity'; readonly state: EntityStatus })
+  | (CommonProps & { readonly kind: 'delivery'; readonly state: DeliveryStatus })
 
-export function StatusPill({ state, label, meta, live = false, className }: StatusPillProps) {
-  if (isBreakerState(state)) {
+export function StatusPill(props: StatusPillProps) {
+  const { kind, state, label, meta, className } = props
+
+  if (kind === 'breaker') {
     return (
-      <span
-        role="status"
-        className={['ui-breaker', `ui-breaker--${state}`, className].filter(Boolean).join(' ')}
-      >
+      <span className={['ui-breaker', `ui-breaker--${state}`, className].filter(Boolean).join(' ')}>
         {label ?? state}
       </span>
     )
   }
 
-  const tone = LINK_TONES[state] ?? 'idle'
+  const tone =
+    kind === 'link'
+      ? LINK_TONES[state]
+      : kind === 'entity'
+        ? ENTITY_TONES[state]
+        : DELIVERY_TONES[state]
+
+  const live = kind === 'link' && props.live === true
 
   return (
     <span
-      role="status"
       className={['ui-status', `ui-status--${tone}`, live ? 'ui-status--live' : '', className]
         .filter(Boolean)
         .join(' ')}
+      // `role="status"` **seulement** sur une valeur en direct, et jamais par défaut. Un `role`
+      // inconditionnel ferait de chaque pilule une région live : un tableau de 50 connecteurs à deux
+      // dimensions en compterait cent, et la première salve WebSocket les annoncerait toutes, en
+      // file d'attente polie et sans contexte. Le lecteur d'écran deviendrait inutilisable au moment
+      // précis où l'incident arrive.
+      role={live ? 'status' : undefined}
     >
       <span className="ui-status__dot" aria-hidden="true" />
       <span className="ui-status__label">{label ?? state}</span>

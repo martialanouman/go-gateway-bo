@@ -23,7 +23,17 @@ export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'link'
 /** 28 / 34 / 40 px — les trois hauteurs de contrôle de la charte, et rien entre les deux. */
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
-export type ButtonProps = Omit<ComponentPropsWithoutRef<typeof BaseButton>, 'render'> & {
+/**
+ * `className` est retiré des props de Base UI : la bibliothèque le type `string | ((state) => string)`,
+ * et ce composant le concatène. Une fonction passée par un appelant serait alors interpolée
+ * littéralement dans l'attribut — `class="ui-button (s) => s.disabled ? …"`. Invisible au typecheck,
+ * invisible en revue, découvert à l'écran.
+ */
+export type ButtonProps = Omit<
+  ComponentPropsWithoutRef<typeof BaseButton>,
+  'render' | 'className'
+> & {
+  readonly className?: string
   readonly variant?: ButtonVariant
   readonly size?: ButtonSize
   /**
@@ -64,9 +74,17 @@ export function Button({
       className={classes}
       disabled={disabled}
       aria-busy={loading || undefined}
-      // Occupé veut dire « ne repartez pas » : le second clic ne relance pas l'action. La garde est
-      // ici plutôt que dans `disabled`, pour ne pas retirer le bouton du clavier.
-      onClick={loading ? undefined : onClick}
+      // `aria-disabled` et non `disabled` : le bouton **reste** dans le parcours clavier — un
+      // `disabled` nu déplace le focus sans prévenir — mais s'annonce indisponible. `aria-busy` seul
+      // ne suffisait pas : aucun des trois lecteurs d'écran majeurs ne l'annonce sur un bouton, si
+      // bien que l'opérateur entendait « Lancer le job, bouton », pressait Entrée, et n'obtenait ni
+      // action ni explication.
+      aria-disabled={loading || undefined}
+      // **`preventDefault`, et non un `onClick` neutralisé.** Neutraliser le handler ne couvre que le
+      // chemin React : `<Button type="submit" loading>` soumettait quand même le formulaire, par le
+      // clic comme par `Entrée`. Sur un écran de rotation de secret, cela valait une seconde
+      // rotation et une seconde ligne d'audit.
+      onClick={loading ? (event) => event.preventDefault() : onClick}
       {...rest}
     >
       {loading ? <span className="ui-button__spinner" aria-hidden="true" /> : null}

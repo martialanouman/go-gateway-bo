@@ -57,7 +57,36 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
-  it('reste annoncé pendant le chargement, plutôt que de disparaître du clavier', async () => {
+  it('occupé, il ne soumet pas le formulaire qui l’entoure', async () => {
+    // **Le test qui manquait, et le bug qu'il a révélé.** Neutraliser `onClick` ne couvre que le
+    // chemin React : un `type="submit"` soumettait quand même, par le clic comme par Entrée. Sur un
+    // écran de rotation de secret, cela valait une seconde rotation et une seconde ligne d'audit.
+    const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault())
+    const { getByRole, user } = renderComponent(
+      <form onSubmit={onSubmit}>
+        <Button type="submit" loading>
+          Effectuer la rotation
+        </Button>
+      </form>,
+    )
+
+    await user.click(getByRole('button'))
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('soumet normalement quand il n’est pas occupé — la garde ne doit pas tout bloquer', async () => {
+    const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault())
+    const { getByRole, user } = renderComponent(
+      <form onSubmit={onSubmit}>
+        <Button type="submit">Effectuer la rotation</Button>
+      </form>,
+    )
+
+    await user.click(getByRole('button'))
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('s’annonce indisponible pendant le chargement, sans quitter le clavier', async () => {
     const onClick = vi.fn()
     const { getByRole, user } = renderComponent(
       <Button loading onClick={onClick}>
@@ -67,6 +96,9 @@ describe('Button', () => {
 
     const button = getByRole('button', { name: 'Lancer le job' })
     expect(button).toHaveAttribute('aria-busy', 'true')
+    // `aria-busy` seul n'est annoncé par aucun lecteur d'écran majeur sur un bouton : l'opérateur
+    // entendait « bouton », pressait Entrée, et n'obtenait ni action ni explication.
+    expect(button).toHaveAttribute('aria-disabled', 'true')
 
     // Occupé veut dire « ne repartez pas » : le second clic ne doit pas relancer le job.
     await user.click(button)

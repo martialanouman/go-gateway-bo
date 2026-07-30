@@ -11,6 +11,7 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router'
+import type { BreakerState, LinkStatus } from '~/components/primitives'
 import {
   Button,
   Checkbox,
@@ -104,6 +105,26 @@ const BREAKER_STATE = [
  * lui-même, de sorte que la page ne puisse pas mentir si `spacing.css` change.
  */
 const SPACING = ['--sp-2', '--sp-4', '--sp-6', '--sp-7', '--sp-9', '--sp-11'] as const
+
+/**
+ * Trois connecteurs figés, typés sur les unions du contrat.
+ *
+ * Le typage n'est pas décoratif ici : la version précédente de cette page annonçait `bound` et
+ * `unbound` comme valeurs de `link_status`, alors que le contrat dit `up | reconnecting | down`.
+ * La page de référence enseignait donc deux valeurs que le payload n'émet jamais — et `StatusPill`
+ * les aurait peintes en gris « au repos ».
+ */
+const CONNECTOR_ROWS = [
+  { id: 'cnx_01', name: 'Orange CI', link: 'up', breaker: 'closed', throughput: '8 123' },
+  { id: 'cnx_02', name: 'MTN CI', link: 'reconnecting', breaker: 'half_open', throughput: '504' },
+  { id: 'cnx_03', name: 'Moov CI', link: 'down', breaker: 'open', throughput: '0' },
+] as const satisfies readonly {
+  id: string
+  name: string
+  link: LinkStatus
+  breaker: BreakerState
+  throughput: string
+}[]
 
 const RADII = [
   { token: '--r-field', usage: 'Champs, boutons, petits contrôles' },
@@ -284,6 +305,7 @@ function PrimitivesSection() {
         <div className="design-card">
           <span style={{ font: 'var(--text-label)' }}>Sélecteur et bascules</span>
           <Select
+            label="balance_scope"
             options={[
               { value: 'shared', label: 'Pool partagé' },
               { value: 'per_account', label: 'Par compte' },
@@ -321,18 +343,24 @@ function PrimitivesSection() {
             Statut — deux dimensions, jamais fusionnées
           </span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-4)' }}>
-            <StatusPill state="up" live meta="~2 s" />
-            <StatusPill state="reconnecting" />
-            <StatusPill state="down" />
-            <StatusPill state="unbound" />
+            <StatusPill kind="link" state="up" live meta="~2 s" />
+            <StatusPill kind="link" state="reconnecting" />
+            <StatusPill kind="link" state="down" />
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-4)' }}>
-            <StatusPill state="closed" />
-            <StatusPill state="half_open" />
-            <StatusPill state="open" />
+            <StatusPill kind="breaker" state="closed" />
+            <StatusPill kind="breaker" state="half_open" />
+            <StatusPill kind="breaker" state="open" />
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-4)' }}>
+            <StatusPill kind="entity" state="active" />
+            <StatusPill kind="entity" state="suspended" />
+            <StatusPill kind="entity" state="closed" />
+            <StatusPill kind="delivery" state="rejected" />
           </div>
           <span className="design-swatch__value">
-            link_status en point · breaker_state en pilule
+            link_status en point · breaker_state en pilule · `closed` ne veut pas dire la même chose
+            selon la dimension, d’où le `kind` obligatoire
           </span>
         </div>
       </div>
@@ -349,12 +377,14 @@ function PrimitivesSection() {
             {
               key: 'link',
               header: 'link_status',
-              cell: (row) => <StatusPill state={row.link} live />,
+              // Pas de `live` ici : cette page est un instantané en dur, et le pouls est le seul
+              // signal de fraîcheur du produit. Le poser sur des lignes figées le ferait mentir.
+              cell: (row) => <StatusPill kind="link" state={row.link} />,
             },
             {
               key: 'breaker',
               header: 'breaker_state',
-              cell: (row) => <StatusPill state={row.breaker} />,
+              cell: (row) => <StatusPill kind="breaker" state={row.breaker} />,
             },
             {
               key: 'throughput',
@@ -365,17 +395,7 @@ function PrimitivesSection() {
               sortable: true,
             },
           ]}
-          rows={[
-            { id: 'cnx_01', name: 'Orange CI', link: 'up', breaker: 'closed', throughput: '8 123' },
-            {
-              id: 'cnx_02',
-              name: 'MTN CI',
-              link: 'reconnecting',
-              breaker: 'half_open',
-              throughput: '504',
-            },
-            { id: 'cnx_03', name: 'Moov CI', link: 'down', breaker: 'open', throughput: '0' },
-          ]}
+          rows={CONNECTOR_ROWS}
         />
       </div>
     </section>

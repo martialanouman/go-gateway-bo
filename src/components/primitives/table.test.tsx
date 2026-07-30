@@ -66,9 +66,12 @@ describe('Table', () => {
 
     expect(sorted).toHaveLength(1)
     expect(sorted[0]).toHaveAttribute('aria-sort', 'descending')
+    // **Et sur la bonne colonne.** Sans cette ligne, poser l'attribut sur la première colonne au
+    // lieu de celle qui est triée laissait le test vert.
+    expect(sorted[0]).toHaveTextContent('Débit')
   })
 
-  it('trie au clavier depuis l’en-tête', async () => {
+  it('trie au clavier depuis l’en-tête, pas seulement à la souris', async () => {
     const onSortChange = vi.fn()
     const { getByRole, user } = renderComponent(
       <Table
@@ -79,6 +82,11 @@ describe('Table', () => {
         onSortChange={onSortChange}
       />,
     )
+
+    // Au clavier réellement : un `<span onClick>` passerait le clic et échouerait ici.
+    getByRole('button', { name: 'Connecteur' }).focus()
+    await user.keyboard('{Enter}')
+    expect(onSortChange).toHaveBeenCalledWith('name')
 
     await user.click(getByRole('button', { name: 'Débit' }))
     expect(onSortChange).toHaveBeenCalledWith('throughput')

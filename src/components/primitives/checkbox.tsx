@@ -11,7 +11,11 @@ import { Checkbox as BaseCheckbox } from '@base-ui/react/checkbox'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { useId } from 'react'
 
-export type CheckboxProps = Omit<ComponentPropsWithoutRef<typeof BaseCheckbox.Root>, 'render'> & {
+export type CheckboxProps = Omit<
+  ComponentPropsWithoutRef<typeof BaseCheckbox.Root>,
+  'render' | 'className'
+> & {
+  readonly className?: string
   readonly label?: ReactNode
   /** Précision sous le libellé, pour une conséquence qui ne tient pas en trois mots. */
   readonly description?: ReactNode
@@ -24,9 +28,19 @@ export function Checkbox({ label, description, className, id, ...rest }: Checkbo
   // travers la bibliothèque. L'identifiant explicite la rend visible **et** garde le libellé
   // cliquable — un `aria-labelledby` aurait satisfait le linter en perdant la cible de clic.
   const controlId = id ?? generatedId
+  const descriptionId = `${controlId}-description`
 
   const control = (
-    <BaseCheckbox.Root className="ui-check__control" id={controlId} {...rest}>
+    <BaseCheckbox.Root
+      className="ui-check__control"
+      id={controlId}
+      // **La description est liée, jamais imbriquée dans le libellé.** Le calcul du nom accessible
+      // concatène tout le contenu textuel d'un `<label>` : une description rendue dedans donnait
+      // « Suspendre le client Suspend aussi tous ses comptes SMPP., case à cocher », relu en entier
+      // à chaque retour du focus. Sur six cases, la liste devenait illisible.
+      aria-describedby={description ? descriptionId : undefined}
+      {...rest}
+    >
       <BaseCheckbox.Indicator className="ui-check__indicator" />
     </BaseCheckbox.Root>
   )
@@ -34,12 +48,20 @@ export function Checkbox({ label, description, className, id, ...rest }: Checkbo
   if (!label && !description) return control
 
   return (
-    <label className={['ui-check', className].filter(Boolean).join(' ')} htmlFor={controlId}>
+    <span className={['ui-check', className].filter(Boolean).join(' ')}>
       {control}
       <span className="ui-check__text">
-        {label}
-        {description ? <span className="ui-check__description">{description}</span> : null}
+        {label ? (
+          <label className="ui-check__label" htmlFor={controlId}>
+            {label}
+          </label>
+        ) : null}
+        {description ? (
+          <span className="ui-check__description" id={descriptionId}>
+            {description}
+          </span>
+        ) : null}
       </span>
-    </label>
+    </span>
   )
 }

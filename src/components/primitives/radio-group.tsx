@@ -24,8 +24,9 @@ export type RadioOption = {
 
 export type RadioGroupProps = Omit<
   ComponentPropsWithoutRef<typeof BaseRadioGroup>,
-  'render' | 'children'
+  'render' | 'children' | 'className'
 > & {
+  readonly className?: string
   readonly label: ReactNode
   readonly options: readonly RadioOption[]
 }

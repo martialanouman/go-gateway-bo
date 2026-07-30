@@ -45,6 +45,34 @@ describe('Tabs', () => {
     expect(onValueChange).toHaveBeenCalledWith('binds', expect.anything())
   })
 
+  it('rend un panneau relié à son onglet, quand le contenu est local', () => {
+    // **Sans panneau, `role="tablist"` est une promesse intenable** : aucun `aria-controls`, et la
+    // tabulation — qui doit sauter au panneau — atterrit sur le premier élément focusable venu. Le
+    // rôle serait annoncé sans être tenu, ce que la docstring du composant qualifie elle-même de
+    // pire que de ne rien annoncer.
+    const { getByRole } = renderComponent(
+      <Tabs
+        defaultValue="sessions"
+        tabs={[
+          { value: 'sessions', label: 'Sessions', panel: <p>Douze binds actifs.</p> },
+          { value: 'binds', label: 'Binds', panel: <p>Rien à afficher.</p> },
+        ]}
+      />,
+    )
+
+    const panel = getByRole('tabpanel')
+    expect(panel).toHaveTextContent('Douze binds actifs.')
+    expect(getByRole('tab', { name: 'Sessions' })).toHaveAttribute('aria-controls', panel.id)
+  })
+
+  it('rend la liste seule quand les onglets pilotent la route', () => {
+    // Usage légitime : des onglets qui changent d'URL n'ont pas de panneau local. Le composant ne
+    // doit pas en inventer un vide, qui annoncerait une zone de contenu inexistante.
+    const { queryByRole } = renderComponent(<Tabs tabs={TABS} defaultValue="sessions" />)
+
+    expect(queryByRole('tabpanel')).toBeNull()
+  })
+
   it('affiche le compteur quand il est connu', () => {
     const { getByRole } = renderComponent(<Tabs tabs={TABS} defaultValue="sessions" />)
 

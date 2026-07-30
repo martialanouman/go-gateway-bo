@@ -12,7 +12,14 @@ export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from '.
 export { Checkbox, type CheckboxProps } from './checkbox'
 export { RadioGroup, type RadioGroupProps, type RadioOption } from './radio-group'
 export { Select, type SelectOption, type SelectProps } from './select'
-export { type BreakerState, StatusPill, type StatusPillProps } from './status-pill'
+export {
+  type BreakerState,
+  type DeliveryStatus,
+  type EntityStatus,
+  type LinkStatus,
+  StatusPill,
+  type StatusPillProps,
+} from './status-pill'
 export { Switch, type SwitchProps } from './switch'
 export { type SortDirection, Table, type TableColumn, type TableProps } from './table'
 export { type TabDefinition, Tabs, type TabsProps } from './tabs'

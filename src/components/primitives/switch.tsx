@@ -11,7 +11,11 @@ import { Switch as BaseSwitch } from '@base-ui/react/switch'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { useId } from 'react'
 
-export type SwitchProps = Omit<ComponentPropsWithoutRef<typeof BaseSwitch.Root>, 'render'> & {
+export type SwitchProps = Omit<
+  ComponentPropsWithoutRef<typeof BaseSwitch.Root>,
+  'render' | 'className'
+> & {
+  readonly className?: string
   readonly label?: ReactNode
 }
 

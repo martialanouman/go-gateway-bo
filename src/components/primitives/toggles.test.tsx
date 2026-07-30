@@ -55,6 +55,28 @@ describe('Checkbox', () => {
     expect(getByText('Suspend aussi tous ses comptes SMPP.')).toBeInTheDocument()
   })
 
+  it('n’avale pas la description dans le nom accessible', async () => {
+    // Rendue **dans** le `<label>`, la description était concaténée au nom : « Suspendre le client
+    // Suspend aussi tous ses comptes SMPP., case à cocher », relu en entier à chaque retour du
+    // focus. Elle doit être liée par `aria-describedby`, pas imbriquée.
+    const { getByRole } = renderComponent(
+      <Checkbox label="Suspendre le client" description="Suspend aussi tous ses comptes SMPP." />,
+    )
+
+    const box = getByRole('checkbox', { name: 'Suspendre le client' })
+    expect(box.getAttribute('aria-describedby')).toBeTruthy()
+  })
+
+  it('laisse le libellé cliquable', async () => {
+    const onCheckedChange = vi.fn()
+    const { getByText, user } = renderComponent(
+      <Checkbox label="Masquer les MSISDN" onCheckedChange={onCheckedChange} />,
+    )
+
+    await user.click(getByText('Masquer les MSISDN'))
+    expect(onCheckedChange).toHaveBeenCalledWith(true, expect.anything())
+  })
+
   it('respecte un identifiant fourni, et le libellé reste associé', () => {
     // Un formulaire qui pointe son propre `htmlFor` doit pouvoir imposer l'identifiant.
     //
@@ -128,6 +150,12 @@ describe('RadioGroup', () => {
 
     await user.keyboard('{ArrowDown}')
     expect(onValueChange).toHaveBeenCalledWith('per_account', expect.anything())
+
+    // **La propriété que le nom du test annonce**, et qui n'était pas vérifiée : une seconde
+    // tabulation **quitte** le groupe. Six options ne font qu'un arrêt, pas six.
+    await user.tab()
+    expect(getByRole('radio', { name: 'Pool partagé' })).not.toHaveFocus()
+    expect(getByRole('radio', { name: 'Par compte' })).not.toHaveFocus()
   })
 
   it('nomme le groupe, pas seulement chaque choix', () => {
