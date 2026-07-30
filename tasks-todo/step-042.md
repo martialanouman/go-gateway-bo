@@ -1,7 +1,7 @@
 # step-042 — Primitives UI lot 2 : dialog, menu, tooltip, toast + les cinq états de contenu
 
 > **Jalon :** M2 (charte §08) · **Statut :** À FAIRE
-> **Dépend de :** step-041 · **Bloque :** step-026 et tous les écrans
+> **Dépend de :** step-041 · **Bloque :** step-040, step-026 et tous les écrans
 
 ## But
 Livrer les surfaces flottantes et, surtout, normaliser les cinq états de contenu pour qu'aucun écran

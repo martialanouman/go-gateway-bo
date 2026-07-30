@@ -1,7 +1,11 @@
 # step-027 — Gestion des opérateurs et des rôles (CRUD)
 
 > **Jalon :** M1 (§6.10, §5.1) · **Statut :** À FAIRE
-> **Dépend de :** step-026 · **Bloque :** —
+> **Dépend de :** step-026 (donc `041`, `042`, `040`) · **Bloque :** —
+
+> Dernière step de M1, et elle se joue **après** les trois premières de M2 : ce sont deux écrans, et
+> ils ont besoin de la coquille qui les accueille et de la navigation qui y mène. Voir la note † de
+> `INDEX.md`.
 
 ## But
 Permettre à un `super_admin` d'administrer qui accède au tableau de bord et avec quels droits, sans

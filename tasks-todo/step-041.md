@@ -1,7 +1,7 @@
 # step-041 — Primitives UI lot 1 : bouton, champ, select, pilule de statut, tabs, table
 
 > **Jalon :** M2 (§4.2) · **Statut :** À FAIRE
-> **Dépend de :** step-003 · **Bloque :** step-026 et tous les écrans
+> **Dépend de :** step-003 · **Bloque :** step-042, step-040, step-026 et tous les écrans
 
 ## But
 Construire les composants les plus utilisés, une fois, correctement : Base UI pour le comportement

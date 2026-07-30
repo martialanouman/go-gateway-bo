@@ -2,7 +2,8 @@
 
 Dérivé de `docs/plan-execution-tableau-de-bord.md` (lui-même dérivé de la spec v2.0). **Un fichier
 `step-NNN.md` = une PR** : petite, reviewable, laisse le dépôt vert une fois mergée. Découpage par
-jalon (M0…M9) ; numérotation par blocs de 20 (marge d'insertion), ordre = exécution.
+jalon (M0…M9) ; numérotation par blocs de 20 (marge d'insertion). L'ordre de lecture est celui de
+l'exécution **sauf divergence notée** — voir l'encadré ci-dessous.
 
 Le **plan** donne le cadre : conventions transverses à figer avant M0, tranche verticale de
 référence, critères de sortie par jalon, graphe de parallélisation et état réel de la passerelle.
@@ -14,6 +15,12 @@ limité au fichier — puis revue par skill relancée tant qu'il reste un blocag
 verte, déplacement du fichier dans `tasks-done/` (dernier commit de la PR), PR ouverte et mergée dès
 que la CI est verte. Un jalon est terminé quand toutes ses steps sont dans `tasks-done/`. Le détail
 de la boucle et la règle d'arbitrage sont dans `CLAUDE.md` § « La boucle de travail ».
+
+> **Les sections ci-dessous groupent par jalon, c'est-à-dire par thème — pas toujours par ordre
+> d'exécution.** Quand la ligne « Dépend de » d'un fichier de step contredit l'ordre de cette liste,
+> **ce sont les dépendances qui priment**, et la divergence est notée ici, avec sa raison. Un jalon
+> peut donc se clore après le début du suivant : c'est le cas de M1, dont les deux dernières steps
+> reposent sur les fondations d'interface de M2 (voir † sous M1).
 
 Légende : `[x]` = fait (dans `tasks-done/`) · `[ ]` = à faire (dans `tasks-todo/`).
 
@@ -37,7 +44,7 @@ petit schéma PostgreSQL propre (opérateurs, rôles, audit, alertes, notificati
 | État serveur | TanStack Query | `@tanstack/react-query` 5.101.x |
 | Primitives UI | Base UI (headless, accessible) habillé par les tokens de la charte | `@base-ui/react` 1.6.x |
 | Accès DB | Drizzle ORM + drizzle-kit | `drizzle-orm` 0.45.x / `drizzle-kit` 0.31.x |
-| Contrat API | `@martialanouman/gateway-api-contracts` (GitHub Packages) | **1.0.0** |
+| Contrat API | `@martialanouman/gateway-api-contracts` (GitHub Packages) | **1.2.0** |
 | Client HTTP typé | `openapi-fetch` sur les types générés du contrat | 0.17.x |
 | Mock d'API | Prism (`@stoplight/prism-cli`) sur `openapi-admin.yaml` | 5.16.x |
 | Temps réel | WebSocket + Redis Pub/Sub (`ioredis`) | 5.11.x |
@@ -103,8 +110,27 @@ sur tout écran touché • PR petite et focalisée (une step).
 - [x] step-023 — MFA TOTP : enrôlement et vérification
 - [x] step-024 — MFA WebAuthn / passkey
 - [x] step-025 — Moteur de permissions côté serveur + journal d'audit + MFA obligatoire
-- [ ] step-026 — Rendu UI par permission + écrans Login & MFA
-- [ ] step-027 — Gestion des opérateurs et des rôles (CRUD)
+- [ ] step-026 — Rendu UI par permission + écrans Login & MFA †
+- [ ] step-027 — Gestion des opérateurs et des rôles (CRUD) †
+
+† **Ces deux steps s'exécutent après `step-041`, `step-042` et `step-040`**, dans cet ordre :
+
+```
+M2 · 041  primitives lot 1      →  M2 · 042  overlays + cinq états
+                                →  M2 · 040  AppShell (+ usePermission / PermissionGate)
+                                →  M1 · 026  login, MFA, garde de route
+                                →  M1 · 027  opérateurs & rôles
+```
+
+Ce sont des écrans, et ils reposent sur des fondations qui vivent en M2 : les primitives (041), les
+cinq états de contenu (042) et la coquille qui les accueille (040). L'ordre initial de cet index —
+M1 entier avant M2 — était inexécutable, `step-026` déclarant dépendre de `041` et `042`.
+
+`usePermission` / `PermissionGate` sont livrés par **`step-040`** et non par `step-026` : le rail de
+navigation filtre ses entrées par permission dès qu'il existe. Les livrer plus tard aurait fait
+sortir une navigation montrant des entrées inutilisables, puis l'aurait corrigée — une régression
+inscrite au plan. La `step-026` les **consomme** et porte la règle de la charte : un contrôle interdit
+est désactivé et expliqué, jamais masqué.
 
 ‡ La step-022 livre la brique de garde — `resolveSession()`, du cookie à l'état vérifié — mais son
 **branchement sur les routes** est reporté en step-026 : aucune route non publique n'existe avant
@@ -112,9 +138,14 @@ l'AppShell (step-040) et la cible de la redirection, l'écran de login, arrive e
 brancher plus tôt aurait demandé une route factice, écrite pour porter un test et réécrite ensuite.
 
 ## M2 — Coquille applicative & temps réel  (§4.1, §4.2, §5.2)
-- [ ] step-040 — AppShell : rail de navigation, barre supérieure, layout, routage fichiers
+
+> **Les trois premières steps de ce jalon précèdent les deux dernières de M1** (voir † sous M1), et
+> entre elles l'ordre est `041 → 042 → 040` : l'AppShell consomme les primitives et les cinq états de
+> contenu, il ne les précède pas.
+
 - [ ] step-041 — Primitives UI lot 1 : bouton, champ, select, pilule de statut, tabs, table
 - [ ] step-042 — Primitives UI lot 2 : dialog, menu, tooltip, toast + les cinq états de contenu
+- [ ] step-040 — AppShell : rail de navigation, barre supérieure, layout, routage fichiers
 - [ ] step-043 — Hub WebSocket BFF : trois flux passerelle agrégés en une socket client
 - [ ] step-044 — HA : Redis Pub/Sub entre instances BFF
 - [ ] step-045 — Client WS React : abonnement par sujet, reconnexion, remise en état
