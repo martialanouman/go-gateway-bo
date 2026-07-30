@@ -118,7 +118,12 @@ describe('createGatewayClient', () => {
       })
 
       const { response } = await client.POST('/admin/customers', {
-        body: { name: 'ACME', billing_enabled: false, overdraft_enabled: false },
+        body: {
+          name: 'ACME',
+          billing_enabled: false,
+          overdraft_enabled: false,
+          credit_limit_is_hard: false,
+        },
       })
 
       expect(response.status).toBe(201)
@@ -167,7 +172,12 @@ describe('createGatewayClient', () => {
 
       await expect(
         client.POST('/admin/customers', {
-          body: { name: 'ACME', billing_enabled: false, overdraft_enabled: false },
+          body: {
+            name: 'ACME',
+            billing_enabled: false,
+            overdraft_enabled: false,
+            credit_limit_is_hard: false,
+          },
         }),
       ).rejects.toThrow()
       expect(fetch).toHaveBeenCalledTimes(1)
