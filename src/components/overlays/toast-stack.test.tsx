@@ -73,7 +73,7 @@ describe('ToastStack', () => {
     expect(queryByText('Identifiant renouvelé')).toBeNull()
   })
 
-  it('refuse **avant** d’afficher quand le texte porte une valeur opaque', async () => {
+  it('refuse **avant** d’afficher quand le texte cite un contenu', async () => {
     let refusal: unknown
 
     function Leaky() {
@@ -86,7 +86,7 @@ describe('ToastStack', () => {
             // normalement. Ce que le test doit établir n'est de toute façon pas la levée — elle est
             // couverte dans `toast.test.ts` — mais que **rien n'a été rendu**.
             try {
-              notify({ title: 'Secret : sk-live-0123456789abcdef' })
+              notify({ title: 'Le message « RDV demain 14h » a été renvoyé' })
             } catch (error) {
               refusal = error
             }
@@ -109,6 +109,6 @@ describe('ToastStack', () => {
     expect(refusal).toBeInstanceOf(Error)
     // **Le cœur du test** : la garde est à l'entrée, donc la valeur n'a jamais atteint le DOM. Un
     // refus posé à l'affichage l'aurait laissée paraître le temps d'un cycle de rendu.
-    expect(queryByText(/sk-live/)).toBeNull()
+    expect(queryByText(/RDV demain/)).toBeNull()
   })
 })

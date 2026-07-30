@@ -13,7 +13,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { renderComponent } from '~/test/render'
 import { Empty } from './empty'
-import { ErrorState } from './error-state'
+import { ErrorState, type ErrorStateProps } from './error-state'
 import { Loading } from './loading'
 import { ModuleDisabled } from './module-disabled'
 import { NoResults } from './no-results'
@@ -90,10 +90,18 @@ describe('ModuleDisabled', () => {
     // Le point le plus important des cinq. La facturation désactivée sur la passerelle n'est pas une
     // panne : rendre cet état en rouge ferait ouvrir un ticket pour une fonctionnalité que personne
     // n'a activée.
-    const { queryByRole, getByText } = renderComponent(<ModuleDisabled module="Facturation" />)
+    //
+    // Le rôle ARIA ne suffit pas à le vérifier : c'est le **rendu** qui fait ouvrir le ticket. On
+    // assert donc aussi l'absence de l'habillage d'erreur et de l'issue « Réessayer », qui n'aurait
+    // aucun sens ici — réessayer n'activerait rien.
+    const { queryByRole, getByText, container } = renderComponent(
+      <ModuleDisabled module="Facturation" />,
+    )
 
     expect(queryByRole('alert')).toBeNull()
     expect(getByText(/désactivé/i)).toBeInTheDocument()
+    expect(container.querySelector('.ui-state--error')).toBeNull()
+    expect(queryByRole('button', { name: /Réessayer/ })).toBeNull()
   })
 
   it('nomme le module, pour que l’opérateur sache quoi demander', () => {
@@ -146,13 +154,20 @@ describe('ErrorState', () => {
     }
   })
 
-  it('ne recopie jamais le corps de la réponse distante', async () => {
-    // Invariant (a) : un message d'erreur de la passerelle cite volontiers la valeur qu'il refuse.
-    // L'état d'erreur ne porte donc que le statut, jamais un texte venu du réseau.
-    const onRetry = vi.fn()
-    const { container } = renderComponent(<ErrorState status={422} onRetry={onRetry} />)
+  it('n’a **aucun moyen** de recevoir un texte distant — le typage le garantit', () => {
+    // Une version précédente écrivait `expect(container.textContent).not.toMatch(/RDV demain/)`.
+    // C'était une tautologie : rien dans le test ne fournissait jamais cette chaîne, et aucune
+    // mutation d'`error-state.tsx` ne pouvait la faire rougir.
+    //
+    // La vraie protection est que le composant n'expose **aucune** prop de texte : ni `message`, ni
+    // `detail`, ni `body`. On le vérifie au niveau du type, si bien que le jour où quelqu'un en
+    // ajoute une, `pnpm typecheck` échoue ici — un `@ts-expect-error` aurait été déplacé par le
+    // formateur, ce qui l'a rendu inopérant deux fois.
+    type ForbiddenProp = 'message' | 'detail' | 'body' | 'error'
+    type HasNoTextProp = ForbiddenProp & keyof ErrorStateProps extends never ? true : never
 
-    expect(container.textContent).not.toMatch(/RDV demain/)
+    const guard: HasNoTextProp = true
+    expect(guard).toBe(true)
   })
 })
 

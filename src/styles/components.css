@@ -93,6 +93,13 @@
   text-decoration: underline;
 }
 
+/* Un contrôle bloqué se lit comme indisponible, sans quitter le parcours clavier. */
+.ui-button--blocked {
+  background: var(--surface-disabled);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
 .ui-button--sm {
   height: var(--control-height-sm);
   padding: 0 var(--sp-3);
@@ -650,6 +657,37 @@
   gap: var(--sp-3);
 }
 
+/*
+ * Les déclencheurs de menu et de popover rendent un `<button>` natif — donc, sans règle, un fond
+ * gris clair et un texte noir posés sur une surface quasi-noire. Ils reprennent la spécification du
+ * bouton secondaire de la charte.
+ */
+.ui-menu__trigger,
+.ui-popover__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--control-height);
+  padding: 0 var(--pad-control-x);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.ui-menu__trigger:hover,
+.ui-popover__trigger:hover {
+  background: var(--surface-hover);
+}
+
+/* L'infobulle n'habille pas son déclencheur : c'est l'élément de l'appelant, déjà stylé. */
+.ui-tooltip__trigger {
+  display: contents;
+}
+
 .ui-menu__popup,
 .ui-popover {
   min-width: 200px;
@@ -723,6 +761,9 @@
 }
 
 .ui-toast {
+  /* Sans cela, `.ui-toast__close` s'ancre sur la pile et tous les boutons se superposent au même
+     point en haut à droite. */
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
@@ -829,7 +870,9 @@
 }
 
 .ui-loading__row {
-  height: 38px;
+  /* Le token de la vraie ligne : un squelette dont la raison d'être est de reproduire la mise en
+     page ne doit pas pouvoir diverger d'elle. */
+  height: var(--row-height);
   border-radius: var(--r-1);
   background: var(--surface-sunken);
   animation: ui-shimmer var(--dur-skeleton) ease-in-out infinite;

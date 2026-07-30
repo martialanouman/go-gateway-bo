@@ -75,6 +75,7 @@ export function ConfirmDialog({
       {confirmationPhrase !== undefined ? (
         <TextField
           label={`Saisissez « ${confirmationPhrase} » pour confirmer`}
+          hint="Le bouton s’active quand la phrase est recopiée à l’identique."
           value={typed}
           mono
           onChange={(event) => setTyped(event.target.value)}
@@ -85,7 +86,12 @@ export function ConfirmDialog({
         <Button onClick={close}>Annuler</Button>
         <Button
           variant={destructive ? 'destructive' : 'primary'}
-          disabled={locked}
+          // `blocked` et non `disabled` : le dépôt a déjà tranché cette question dans `button.tsx`.
+          // Un `disabled` nu retire le bouton du parcours clavier **et** de l'arbre
+          // d'accessibilité : l'opérateur au lecteur d'écran ne saurait ni que l'action existe, ni
+          // pourquoi elle est bloquée, ni ce qu'il faut faire — alors que la charte exige un
+          // contrôle « désactivé **et expliqué** ».
+          blocked={locked}
           onClick={() => {
             onConfirm()
             close()

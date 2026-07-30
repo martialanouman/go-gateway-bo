@@ -18,49 +18,60 @@
  */
 
 import { Toast as BaseToast } from '@base-ui/react/toast'
-import type { ReactNode } from 'react'
+import { useMemo } from 'react'
 
 export type ToastSeverity = 'success' | 'info' | 'warning' | 'error'
 
 /**
- * Une **valeur** opaque : au moins seize caractères de l'alphabet des identifiants, sans espace.
+ * Longueur maximale d'un toast. **Sous la taille d'un SMS**, délibérément.
  *
- * ## Pourquoi la forme et non le mot
- *
- * La première version refusait les mots « secret », « password », « token ». Elle a immédiatement
- * rejeté une copie parfaitement correcte — « L'ancien secret cesse d'être accepté dans 24 heures » —
- * et la charte elle-même écrit « le nouveau secret ne sera affiché qu'une seule fois ». Le mot est
- * **légitime en français** ; c'est la valeur qui ne doit pas sortir.
- *
- * Une garde qui refuse la bonne copie se fait retirer dans la semaine. Celle-ci vise donc
- * `sk-live-0123456789`, une clé en base64, un identifiant de bind — des suites longues et sans
- * espace, que personne n'écrit dans une phrase.
- *
- * ## Ce qu'elle n'attrape pas
- *
- * Un corps de SMS court et anodin, ou un secret volontairement espacé. La défense reste que
- * l'appelant annonce **ce qui a eu lieu**, pas ce que cela contenait — voir l'en-tête.
+ * Un SMS GSM-7 fait 160 caractères. Une borne à 200 — celle de la première version — laissait donc
+ * passer un corps de message **entier**, alors que le commentaire du test affirmait le contraire.
+ * 120 est au-dessus de toute annonce légitime (« Identifiant renouvelé. L'ancien secret cesse d'être
+ * accepté dans 24 heures. » en fait 74) et en dessous du volume qu'on cite sans y penser.
  */
-const OPAQUE_VALUE = /[A-Za-z0-9_\-+/=]{16,}/
+const MAX_TOAST_LENGTH = 120
 
-/** Longueur au-delà de laquelle un texte n'est plus une notification mais un contenu. */
-const MAX_TOAST_LENGTH = 200
+/**
+ * Un segment cité. **C'est le vrai signal**, et il vaut mieux que n'importe quelle heuristique de
+ * forme : un toast annonce un fait, il ne rapporte jamais un contenu. La phrase que l'en-tête de ce
+ * fichier dit vouloir empêcher — « Le message "RDV demain 14h" a été renvoyé » — se reconnaît à ses
+ * guillemets, pas à la forme de ce qu'ils entourent.
+ */
+const QUOTED_SEGMENT = /[«"„][^»"]{3,}[»"]/
 
+/**
+ * ## Ce que cette garde peut, et ce qu'elle ne peut pas
+ *
+ * Elle ne peut **pas** décider si une chaîne est un corps de message : « RDV demain » et « Rotation
+ * effectuée » ont la même forme. Une première version prétendait le contraire, par une heuristique
+ * de « suite opaque de seize caractères », et se trompait dans les deux sens :
+ *
+ * - un MSISDN plafonne à quinze chiffres (E.164), donc **aucun** n'était jamais attrapé ;
+ * - un corps de SMS est fait de mots séparés par des espaces, donc il passait ;
+ * - un UUID en fait trente-six, tous dans la classe — et le contrat en déclare **125**. Le premier
+ *   écran qui aurait écrit `notify({ title: \`Client ${id} suspendu\` })` aurait donc levé en plein
+ *   gestionnaire de clic, sur une copie parfaitement conforme à CLAUDE.md.
+ *
+ * Elle protégeait donc l'inverse de ce qu'elle annonçait. Ce qui reste ici est ce qui se décide
+ * vraiment : **la longueur** et **la citation**. Le reste tient à ce que l'appelant annonce ce qui a
+ * eu lieu, et la seule défense qui le garantirait est un catalogue fermé de messages — à poser quand
+ * les écrans existeront (step-06x), pas à simuler par une expression régulière.
+ */
 export function assertToastText(field: 'title' | 'description', text: string): void {
-  if (OPAQUE_VALUE.test(text)) {
-    // La valeur n'est **pas** citée : c'est précisément parce qu'elle pourrait être un secret, et
-    // le message d'erreur part au log.
+  if (QUOTED_SEGMENT.test(text)) {
+    // La citation n'est **pas** reproduite dans l'erreur : c'est précisément parce qu'elle pourrait
+    // être un corps de message, et le message d'erreur part au log.
     throw new Error(
-      `Toast : le ${field} contient une suite opaque d'au moins seize caractères, qui a la forme ` +
-        `d'un secret ou d'un identifiant. Un toast ne porte ni secret ni corps de message ` +
-        `(invariants a et b) — dites ce qui a eu lieu, pas ce que cela contenait.`,
+      `Toast : le ${field} cite un contenu entre guillemets. Un toast annonce un fait, il ne ` +
+        `rapporte jamais ce qu'un message contenait (invariants a et b).`,
     )
   }
 
   if (text.length > MAX_TOAST_LENGTH) {
     throw new Error(
-      `Toast : le ${field} dépasse ${MAX_TOAST_LENGTH} caractères. Un toast annonce un fait ; ` +
-        `au-delà, c'est un contenu, et il a sa place dans l'écran plutôt que dans une bulle.`,
+      `Toast : le ${field} dépasse ${MAX_TOAST_LENGTH} caractères — un SMS en fait 160. ` +
+        `Un toast annonce un fait ; au-delà, c'est un contenu, et sa place est dans l'écran.`,
     )
   }
 }
@@ -80,14 +91,19 @@ export type ToastInput = {
 export function useToast() {
   const manager = BaseToast.useToastManager()
 
-  return {
-    notify({ title, description, severity = 'info' }: ToastInput) {
-      assertToastText('title', title)
-      if (description !== undefined) assertToastText('description', description)
+  // Mémoïsé : sans cela `notify` change d'identité à chaque rendu, et un `useEffect` qui en dépend
+  // boucle indéfiniment — le genre de défaut qui se découvre en production, jamais en test.
+  return useMemo(
+    () => ({
+      notify({ title, description, severity = 'info' }: ToastInput) {
+        assertToastText('title', title)
+        if (description !== undefined) assertToastText('description', description)
 
-      manager.add({ title, description, data: { severity } })
-    },
-  }
+        manager.add({ title, description, data: { severity } })
+      },
+    }),
+    [manager],
+  )
 }
 
 export const ToastProvider = BaseToast.Provider
@@ -113,10 +129,11 @@ export function ToastStack() {
                 Un enfant visible plutôt qu'un `aria-label` : la charte n'a pas de glyphe de croix
                 hors du jeu d'`Icon`, que la step-041 n'a pas porté, et le mot fait le travail.
                 
-                À savoir : **Base UI pose `aria-hidden` sur ce bouton** — constaté en inspectant le
-                DOM rendu. Le toast est annoncé d'un bloc et la fermeture au clavier passe par leur
-                parcours, plutôt que d'ajouter une cible dans l'arbre pour chaque toast empilé. Un
-                `aria-label` ici n'aurait donc rien changé pour un lecteur d'écran.
+                Base UI pose `aria-hidden` sur ce bouton, mais **conditionnellement** —
+                `!expanded && !hasFocus` dans `ToastClose.mjs`. Il retombe donc dans l'arbre dès
+                qu'il reçoit le focus, et c'est ce texte qui lui donne alors son nom accessible. Une
+                première version de ce commentaire le disait masqué en permanence : c'était faux, et
+                cela dissuadait d'écrire le test clavier — qui existe désormais.
               */}
               <BaseToast.Close className="ui-toast__close">Fermer</BaseToast.Close>
             </BaseToast.Root>
@@ -126,5 +143,3 @@ export function ToastStack() {
     </BaseToast.Portal>
   )
 }
-
-export type ToastStackProps = { readonly children?: ReactNode }

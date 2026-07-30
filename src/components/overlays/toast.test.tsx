@@ -24,8 +24,7 @@ describe('assertToastText', () => {
 
   it('laisse passer une copie qui **parle** d’un secret', () => {
     // Le mot est légitime en français, et la charte l'emploie : « le nouveau secret ne sera affiché
-    // qu'une seule fois ». Une première version refusait le mot et rejetait donc la bonne copie —
-    // exactement le profil de garde qui se fait retirer dans la semaine.
+    // qu'une seule fois ». Une version refusait le mot et rejetait donc la bonne copie.
     for (const text of [
       'L’ancien secret cesse d’être accepté dans 24 heures.',
       'Le nouveau secret ne sera affiché qu’une seule fois.',
@@ -35,39 +34,53 @@ describe('assertToastText', () => {
     }
   })
 
-  it('refuse une **valeur** qui a la forme d’un secret', () => {
+  it('laisse passer les identifiants que le contrat émet', () => {
+    // **Le défaut le plus grave de la version précédente.** Elle refusait toute suite de seize
+    // caractères sans espace : un UUID en fait trente-six, et le contrat en déclare 125. Le premier
+    // écran qui aurait annoncé une suspension par identifiant aurait levé en plein clic, sur une
+    // copie conforme à CLAUDE.md — qui exige justement l'identifiant verbatim.
     for (const text of [
-      'Nouveau secret : sk-live-0123456789abcdef',
-      'Identifiant de bind : YWJjZGVmZ2hpamtsbW5vcA==',
-      'Clé émise : 4f3c2b1a9e8d7c6b5a4f3e2d',
+      'Client 550e8400-e29b-41d4-a716-446655440000 suspendu',
+      'Message msg_01J9K2A7QF8ZC3T4V5W6X7Y8Z renvoyé',
+      'Export cdr_2026-07-30_orange.csv prêt',
+      'Renvoi vers 2250701020304 effectué',
     ]) {
-      expect(() => assertToastText('title', text), text).toThrow(/invariants a et b/)
+      expect(() => assertToastText('title', text), text).not.toThrow()
     }
   })
 
-  it('ne recopie jamais la valeur refusée dans l’erreur', () => {
-    // Le message d'erreur part au log : y citer le secret le publierait, ce qui est exactement la
-    // fuite que la garde existe pour empêcher.
-    const text = 'Nouveau secret : sk-live-0123456789'
-
-    expect(() => assertToastText('title', text)).toThrow(/suite opaque/)
-    expect(() => assertToastText('title', text)).not.toThrow(/sk-live-0123456789/)
+  it('refuse un contenu cité — le vrai signal', () => {
+    // Un toast annonce un fait, il ne rapporte jamais ce qu'un message contenait. La phrase que ce
+    // module existe pour empêcher se reconnaît à ses guillemets, pas à la forme de ce qu'ils
+    // entourent.
+    for (const text of [
+      'Le message « RDV demain 14h chez le docteur » a été renvoyé',
+      'Contenu "RDV demain 14h" transmis',
+    ]) {
+      expect(() => assertToastText('description', text), text).toThrow(/invariants a et b/)
+    }
   })
 
-  it('refuse un texte trop long pour être une notification', () => {
-    // Au-delà, ce n'est plus un fait annoncé mais un contenu — et un corps de SMS y tiendrait
-    // largement. Un toast dit ce qui a eu lieu, pas ce que cela contenait.
-    // Du texte avec des espaces : `'x'.repeat(201)` serait attrapé par la garde de forme avant
-    // celle de longueur, et le test n'aurait vérifié que la première.
-    const long = 'Le connecteur a été mis à jour. '.repeat(8)
-    expect(long.length).toBeGreaterThan(200)
-    expect(() => assertToastText('description', long)).toThrow(/200/)
+  it('ne reproduit jamais la citation dans l’erreur', () => {
+    // Le message d'erreur part au log : y recopier le contenu le publierait.
+    const text = 'Le message « RDV demain 14h chez le docteur » a été renvoyé'
+
+    expect(() => assertToastText('description', text)).toThrow(/guillemets/)
+    expect(() => assertToastText('description', text)).not.toThrow(/RDV demain/)
+  })
+
+  it('refuse un texte plus long qu’un SMS n’est court', () => {
+    // 120, **sous** les 160 d'un SMS GSM-7. Une borne à 200 — celle de la version précédente —
+    // laissait passer un corps de message entier, alors que le commentaire affirmait l'inverse.
+    const long = 'Le connecteur a été mis à jour. '.repeat(5)
+    expect(long.length).toBeGreaterThan(120)
+    expect(() => assertToastText('description', long)).toThrow(/120/)
   })
 
   it('nomme le champ fautif', () => {
-    const value = 'sk-live-0123456789abcdef'
+    const quoted = 'Contenu « RDV demain » transmis'
 
-    expect(() => assertToastText('title', value)).toThrow(/title/)
-    expect(() => assertToastText('description', value)).toThrow(/description/)
+    expect(() => assertToastText('title', quoted)).toThrow(/title/)
+    expect(() => assertToastText('description', quoted)).toThrow(/description/)
   })
 })
