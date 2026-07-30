@@ -42,6 +42,17 @@ export type ButtonProps = Omit<
    * le fil au moment précis où l'opérateur attend une nouvelle.
    */
   readonly loading?: boolean
+  /**
+   * Action **interdite pour l'instant**, mais dont l'existence doit rester visible.
+   *
+   * Même raisonnement que `loading`, et même mécanique : `aria-disabled` plutôt que `disabled`, pour
+   * que le bouton reste dans le parcours clavier et s'annonce. « Un contrôle interdit est désactivé
+   * **et expliqué**, jamais silencieusement masqué » — or un `disabled` nu le retire de l'arbre, et
+   * l'opérateur au lecteur d'écran ne sait ni qu'il existe ni ce qui le débloquerait.
+   *
+   * L'appelant reste tenu de dire **pourquoi**, via `aria-describedby`.
+   */
+  readonly blocked?: boolean
   readonly children?: ReactNode
 }
 
@@ -49,6 +60,7 @@ export function Button({
   variant = 'secondary',
   size = 'md',
   loading = false,
+  blocked = false,
   disabled = false,
   type = 'button',
   className,
@@ -61,6 +73,7 @@ export function Button({
     `ui-button--${variant}`,
     size !== 'md' ? `ui-button--${size}` : '',
     loading ? 'ui-button--loading' : '',
+    blocked ? 'ui-button--blocked' : '',
     className,
   ]
     .filter(Boolean)
@@ -81,13 +94,13 @@ export function Button({
       // chemin React : `<Button type="submit" loading>` soumettait quand même le formulaire, par le
       // clic comme par `Entrée`. Sur un écran de rotation de secret, cela valait une seconde
       // rotation et une seconde ligne d'audit.
-      onClick={loading ? (event) => event.preventDefault() : onClick}
+      onClick={loading || blocked ? (event) => event.preventDefault() : onClick}
       {...rest}
       // **Après le spread**, délibérément : un appelant qui passerait `aria-disabled={false}` ou son
       // propre `aria-busy` désarmerait sinon l'annonce sans avertissement — la même famille de
       // défaut que celle corrigée juste au-dessus.
       aria-busy={loading || undefined}
-      aria-disabled={loading || undefined}
+      aria-disabled={loading || blocked || undefined}
     >
       {loading ? <span className="ui-button__spinner" aria-hidden="true" /> : null}
       {children}

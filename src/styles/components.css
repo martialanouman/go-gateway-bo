@@ -93,6 +93,13 @@
   text-decoration: underline;
 }
 
+/* Un contrôle bloqué se lit comme indisponible, sans quitter le parcours clavier. */
+.ui-button--blocked {
+  background: var(--surface-disabled);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
 .ui-button--sm {
   height: var(--control-height-sm);
   padding: 0 var(--sp-3);
@@ -605,4 +612,278 @@
 
 .ui-table__row:hover .ui-table__cell {
   background: var(--surface-hover);
+}
+
+/* ─── Surfaces flottantes (step-042) ────────────────────────────────────────────────────────────
+ *
+ * Seules ces couches portent une ombre : « les cartes n'en ont jamais ». Le voile ne floute pas —
+ * flouter des métriques en direct derrière une boîte de dialogue coûte plus que cela n'apporte.
+ */
+.ui-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim-modal);
+}
+
+.ui-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: min(520px, calc(100vw - var(--sp-9)));
+  padding: var(--sp-7);
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-card);
+  background: var(--surface-card);
+  box-shadow: var(--elevation-modal);
+}
+
+.ui-dialog__title {
+  color: var(--text-primary);
+  font: var(--text-section-title);
+}
+
+.ui-dialog__description {
+  color: var(--text-muted);
+  font: var(--text-body);
+}
+
+.ui-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+}
+
+/*
+ * Les déclencheurs de menu et de popover rendent un `<button>` natif — donc, sans règle, un fond
+ * gris clair et un texte noir posés sur une surface quasi-noire. Ils reprennent la spécification du
+ * bouton secondaire de la charte.
+ */
+.ui-menu__trigger,
+.ui-popover__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--control-height);
+  padding: 0 var(--pad-control-x);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.ui-menu__trigger:hover,
+.ui-popover__trigger:hover {
+  background: var(--surface-hover);
+}
+
+/* L'infobulle n'habille pas son déclencheur : c'est l'élément de l'appelant, déjà stylé. */
+.ui-tooltip__trigger {
+  display: contents;
+}
+
+.ui-menu__popup,
+.ui-popover {
+  min-width: 200px;
+  padding: var(--sp-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: var(--surface-raised);
+  box-shadow: var(--elevation-popover);
+}
+
+.ui-menu__item {
+  padding: var(--sp-2) var(--pad-control-x);
+  border-radius: var(--r-1);
+  color: var(--text-primary);
+  font: var(--text-body);
+  cursor: pointer;
+}
+
+.ui-menu__item[data-highlighted] {
+  background: var(--surface-hover);
+}
+
+/* Une entrée destructive se **lit** différemment ; elle n'agit pas différemment. */
+.ui-menu__item--destructive {
+  color: var(--action-danger-fg);
+}
+
+.ui-menu__item--destructive[data-highlighted] {
+  background: var(--action-danger-bg-hover);
+  color: var(--text-danger-on-tint);
+}
+
+.ui-menu__item[data-disabled] {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.ui-tooltip {
+  max-width: 280px;
+  padding: var(--sp-2) var(--pad-control-x);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: var(--text-caption);
+  box-shadow: var(--elevation-popover);
+}
+
+.ui-popover {
+  padding: var(--sp-5);
+}
+
+.ui-popover__title {
+  color: var(--text-primary);
+  font: var(--text-card-title);
+}
+
+/* ─── Toasts ───────────────────────────────────────────────────────────────────────────────────
+ *
+ * Charte §10 : une barre latérale colorée par sévérité. La couleur ne porte pas seule le sens — le
+ * titre le dit aussi — mais elle permet de trier trois toasts empilés d'un coup d'œil.
+ */
+.ui-toasts {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 360px;
+}
+
+.ui-toast {
+  /* Sans cela, `.ui-toast__close` s'ancre sur la pile et tous les boutons se superposent au même
+     point en haut à droite. */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--border-default);
+  border-left-width: 3px;
+  border-radius: var(--r-card);
+  background: var(--surface-raised);
+  box-shadow: var(--elevation-popover);
+}
+
+.ui-toast--success {
+  border-left-color: var(--status-up);
+}
+
+.ui-toast--info {
+  border-left-color: var(--text-info);
+}
+
+.ui-toast--warning {
+  border-left-color: var(--status-degraded);
+}
+
+.ui-toast--error {
+  border-left-color: var(--status-down);
+}
+
+.ui-toast__title {
+  color: var(--text-primary);
+  font: var(--text-card-title);
+}
+
+.ui-toast__description {
+  color: var(--text-muted);
+  font: var(--text-caption);
+}
+
+.ui-toast__close {
+  position: absolute;
+  top: var(--sp-3);
+  right: var(--sp-3);
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+/* ─── Les cinq états de contenu ─────────────────────────────────────────────────────────────────
+ *
+ * Cinq blocs, et **un seul porte du rouge**. C'est toute la règle : « ils sont la différence entre
+ * "rien à afficher" et "c'est cassé" ».
+ */
+.ui-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-9) var(--sp-7);
+  border: 1px dashed var(--border-dashed);
+  border-radius: var(--r-card);
+  background: var(--surface-card);
+}
+
+.ui-state__title {
+  color: var(--text-primary);
+  font: var(--text-card-title);
+}
+
+.ui-state__body {
+  max-width: 60ch;
+  color: var(--text-muted);
+  font: var(--text-body);
+}
+
+.ui-state__query {
+  font-family: var(--font-mono);
+}
+
+/* Le seul des cinq à porter une couleur d'alerte — et une bordure pleine, pas pointillée. */
+.ui-state--error {
+  border-style: solid;
+  border-color: var(--action-danger-border);
+}
+
+.ui-state__status {
+  font-family: var(--font-mono);
+  color: var(--text-danger);
+}
+
+/* ─── Squelette de chargement ───────────────────────────────────────────────────────────────────
+ *
+ * Il reproduit la mise en page, il ne la remplace pas par un spinner. Le scintillement est la
+ * seconde et dernière animation en boucle du système, et `base.css` l'arrête en mouvement réduit.
+ */
+.ui-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.ui-loading__label {
+  color: var(--text-muted);
+  font: var(--text-caption);
+}
+
+.ui-loading__row {
+  /* Le token de la vraie ligne : un squelette dont la raison d'être est de reproduire la mise en
+     page ne doit pas pouvoir diverger d'elle. */
+  height: var(--row-height);
+  border-radius: var(--r-1);
+  background: var(--surface-sunken);
+  animation: ui-shimmer var(--dur-skeleton) ease-in-out infinite;
+}
+
+@keyframes ui-shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
