@@ -24,6 +24,8 @@ test("l'application démarre et rend sa page d'accueil", async ({ page }) => {
   const response = await page.goto('/')
 
   expect(response?.status()).toBe(200)
+  // `/` redirige vers le premier écran accessible depuis la step-040. Sans session, aucune
+  // permission n'est connue : la racine explique la situation plutôt que de boucler.
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Tableau de bord')
 
   // L'hydratation n'est pas terminée au rendu du titre — il vient du serveur. On attend que React
