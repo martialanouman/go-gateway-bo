@@ -40,14 +40,26 @@ export const Route = createFileRoute('/connexion/verification')({
 /**
  * Le second facteur est passé, mais la console reste hors d'atteinte.
  *
- * Le dire explicitement, et dire quoi faire : sans cela, l'opérateur reprend une vérification qu'il
- * a déjà réussie, et se demande pourquoi rien ne change.
+ * **La conduite à tenir compte autant que le constat, et la première version disait la mauvaise.**
+ * « Réessayez dans un instant » envoyait l'opérateur vers les seuls contrôles de l'écran — les deux
+ * onglets — donc vers une nouvelle cérémonie. Or le serveur a déjà promu la session : les points
+ * d'entrée du second facteur n'acceptent plus qu'une session `pending_mfa` et répondent 401
+ * « Session absente ou expirée ». L'opérateur lisait donc « la vérification est acquise », puis
+ * « session expirée », sans autre issue qu'un rechargement de page.
+ *
+ * Ce qu'il faut relancer est la **relecture**, pas la vérification. D'où le bouton qui accompagne ce
+ * message, et un texte qui désigne ce bouton plutôt que les onglets.
  */
 const CONSOLE_UNREACHABLE_MESSAGE =
-  'Second facteur accepté, mais la console n’a pas répondu. Réessayez dans un instant : la vérification, elle, est acquise.'
+  'Second facteur accepté : la vérification est acquise. C’est la console qui n’a pas répondu — ouvrez-la à nouveau ci-dessous.'
 
 /** Un refus se lit en `alert`, une information en `status` : deux urgences, deux annonces. */
-type Notice = { readonly tone: 'refusal' | 'information'; readonly message: string }
+type Notice = {
+  readonly tone: 'refusal' | 'information'
+  readonly message: string
+  /** Accompagne le message d'un bouton qui relance la **relecture**, jamais la vérification. */
+  readonly retryConsole?: boolean
+}
 
 function MfaChallengeScreen() {
   const queryClient = useQueryClient()
@@ -77,9 +89,10 @@ function MfaChallengeScreen() {
    * les deux partaient ensemble, se disputaient la même transition, et le rendu ne se stabilisait
    * jamais — la suite de tests se bloquait sans message.
    *
-   * `fetchQuery` et non `invalidateQueries` : invalider ne fait que marquer périmé. Et
-   * `staleTime: 0` explicite, sans quoi le client de production rendrait la session partielle qu'il
-   * tient encore pour fraîche — la coquille renverrait alors ici, en boucle.
+   * Le détail du **comment** est dans les commentaires du corps, et il a changé trois fois : ce bloc
+   * décrivait encore `fetchQuery` et un `staleTime` explicite que le corps n'utilise plus. Un
+   * en-tête qui décrit un code disparu est le défaut que cette step a déjà corrigé ailleurs — il ne
+   * redira donc pas ici ce que les lignes disent elles-mêmes.
    */
   async function enterConsole() {
     // **`refetchQueries` et non `fetchQuery`.** Le second déduplique : si une relecture de fond est
@@ -105,7 +118,7 @@ function MfaChallengeScreen() {
     // Reste le cas qui compte : le facteur est acquis côté serveur, et l'écran ne peut pas le
     // montrer. Le dire, plutôt que de re-rendre le même formulaire sans un mot.
     setBusy(false)
-    setNotice({ tone: 'refusal', message: CONSOLE_UNREACHABLE_MESSAGE })
+    setNotice({ tone: 'refusal', message: CONSOLE_UNREACHABLE_MESSAGE, retryConsole: true })
   }
 
   async function runPasskey() {
@@ -180,12 +193,26 @@ function MfaChallengeScreen() {
       </div>
 
       {notice ? (
-        <p
+        <div
           className={notice.tone === 'refusal' ? 'ui-auth__failure' : 'ui-auth__notice'}
           role={notice.tone === 'refusal' ? 'alert' : 'status'}
         >
-          {notice.message}
-        </p>
+          <p>{notice.message}</p>
+          {notice.retryConsole ? (
+            <Button
+              loading={busy}
+              onClick={() => {
+                setBusy(true)
+                void enterConsole()
+              }}
+              size="sm"
+              type="button"
+              variant="secondary"
+            >
+              Ouvrir la console
+            </Button>
+          ) : null}
+        </div>
       ) : null}
 
       <Tabs

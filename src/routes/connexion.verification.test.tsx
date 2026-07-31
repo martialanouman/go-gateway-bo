@@ -10,6 +10,7 @@
  * pas aboutir.
  */
 
+import { within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OPERATOR_QUERY_KEY } from '~/components/permission'
 import { createTestQueryClient } from '~/test/render'
@@ -148,9 +149,70 @@ describe('le challenge du second facteur', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/Second facteur accepté/)
-    // Et la reprise redevient possible : un bouton laissé en « Vérification en cours » aurait
-    // enfermé l'opérateur sur un écran qu'il ne pouvait plus quitter.
-    expect(screen.getByRole('button', { name: /Utiliser la passkey/ })).toBeInTheDocument()
+
+    // **La reprise porte sur la relecture, pas sur la vérification.** Le serveur a déjà promu la
+    // session : les points d'entrée du second facteur n'acceptent plus qu'une session `pending_mfa`
+    // et répondraient 401 « Session absente ou expirée ». Envoyer l'opérateur relancer une cérémonie
+    // — ce que faisait le message précédent — lui faisait lire « acquise » puis « expirée », sans
+    // autre issue qu'un rechargement de page.
+    expect(within(alert).getByRole('button', { name: /Ouvrir la console/ })).toBeInTheDocument()
+    expect(alert.textContent).not.toMatch(/Réessayez dans un instant/)
+  })
+
+  it('rouvre la console sur ce bouton, sans relancer la cérémonie', async () => {
+    verifyPasskey.mockResolvedValue({ outcome: 'completed' })
+
+    let reachable = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        reachable
+          ? Response.json({ ...PARTIAL_OPERATOR, mfaCompleted: true })
+          : new Response('nope', { status: 502 }),
+      ),
+    )
+
+    const screen = await renderRoute('/connexion/verification', { queryClient: pendingSession() })
+    await screen.user.click(screen.getByRole('button', { name: /Utiliser la passkey/ }))
+    await screen.findByRole('alert')
+
+    reachable = true
+    await screen.user.click(screen.getByRole('button', { name: /Ouvrir la console/ }))
+
+    // La console s'ouvre, et `verifyPasskey` n'a été appelé qu'une fois : la cérémonie n'est pas
+    // rejouée, elle serait refusée.
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Tableau de bord')
+    expect(verifyPasskey).toHaveBeenCalledTimes(1)
+  })
+
+  it('garde le bouton fermé pendant la relecture', async () => {
+    // **Le correctif « troisième porte », qui n'était gardé par rien.** Relâcher `busy` avant la
+    // relecture rouvrait le bouton pendant l'aller-retour `/auth/me`, reprise comprise, sans qu'un
+    // message n'accompagne l'attente : un second clic relançait une cérémonie complète.
+    verifyPasskey.mockResolvedValue({ outcome: 'completed' })
+
+    let respond: ((value: Response) => void) | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            respond = resolve
+          }),
+      ),
+    )
+
+    const screen = await renderRoute('/connexion/verification', { queryClient: pendingSession() })
+    await screen.user.click(screen.getByRole('button', { name: /Utiliser la passkey/ }))
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /Vérification en cours/ })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      )
+    })
+
+    respond?.(Response.json({ ...PARTIAL_OPERATOR, mfaCompleted: true }))
   })
 
   it('relit vraiment la session, sans rejoindre une requête déjà en vol', async () => {
