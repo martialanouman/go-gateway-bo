@@ -145,7 +145,7 @@ brancher plus tôt aurait demandé une route factice, écrite pour porter un tes
 
 - [x] step-041 — Primitives UI lot 1 : bouton, champ, select, pilule de statut, tabs, table
 - [x] step-042 — Primitives UI lot 2 : dialog, menu, tooltip, toast + les cinq états de contenu
-- [ ] step-040 — AppShell : rail de navigation, barre supérieure, layout, routage fichiers
+- [x] step-040 — AppShell : rail de navigation, barre supérieure, layout, routage fichiers
 - [ ] step-043 — Hub WebSocket BFF : trois flux passerelle agrégés en une socket client
 - [ ] step-044 — HA : Redis Pub/Sub entre instances BFF
 - [ ] step-045 — Client WS React : abonnement par sujet, reconnexion, remise en état
