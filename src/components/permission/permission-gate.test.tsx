@@ -97,6 +97,18 @@ describe('PermissionGate', () => {
     expect(control.getAttribute('aria-describedby')).toBeTruthy()
   })
 
+  it('n’accepte qu’un enfant qui sait être bloqué', () => {
+    // **Le contrat, vérifié à la compilation.** Une version précédente le décrivait dans une phrase
+    // — « doit accepter aria-disabled » — alors qu'`aria-disabled` posé par la Gate est écrasé par
+    // `Button` et n'empêche rien sur un `<a href>`. Un écran aurait donc pu envelopper un lien, le
+    // voir grisé avec sa raison, et le lien aurait navigué.
+    type ChildProps = Parameters<typeof PermissionGate>[0]['children']['props']
+    type RequiresBlocked = 'blocked' extends keyof ChildProps ? true : never
+
+    const guard: RequiresBlocked = true
+    expect(guard).toBe(true)
+  })
+
   it('masque — et seulement là — quand l’écran le demande explicitement', () => {
     // L'exception : une **entrée de navigation** vers une section entièrement inaccessible. La
     // désactiver laisserait un rail encombré d'entrées mortes, sans rien apprendre à personne. Elle

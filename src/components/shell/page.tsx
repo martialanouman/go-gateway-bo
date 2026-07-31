@@ -6,6 +6,7 @@
  * suppriment ce repère.
  */
 
+import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
 export type Breadcrumb = { readonly label: string; readonly to?: string }
@@ -33,17 +34,36 @@ export function Page({ title, breadcrumbs, actions, children }: PageProps) {
         {breadcrumbs && breadcrumbs.length > 0 ? (
           <nav aria-label="Fil d’Ariane" className="ui-page__breadcrumbs">
             <ol>
-              {breadcrumbs.map((crumb, index) => (
-                <li key={crumb.label}>
-                  {crumb.to && index < breadcrumbs.length - 1 ? (
-                    <a href={crumb.to}>{crumb.label}</a>
-                  ) : (
-                    // Le dernier maillon est la page courante : `aria-current` évite qu'un lecteur
-                    // d'écran l'annonce comme un lien vers là où l'on est déjà.
-                    <span aria-current="page">{crumb.label}</span>
-                  )}
-                </li>
-              ))}
+              {breadcrumbs.map((crumb, index) => {
+                const isCurrent = index === breadcrumbs.length - 1
+
+                return (
+                  // La clé est le **chemin parcouru** et non l'index : deux maillons homonymes —
+                  // « Routes › Orange CI › Routes » — entreraient sinon en collision, et un index
+                  // ne dit rien de l'identité d'un élément.
+                  <li
+                    key={breadcrumbs
+                      .slice(0, index + 1)
+                      .map((step) => step.label)
+                      .join('/')}
+                  >
+                    {isCurrent ? (
+                      // Le dernier maillon est la page courante : `aria-current` évite qu'un lecteur
+                      // d'écran l'annonce comme un lien vers là où l'on est déjà.
+                      <span aria-current="page">{crumb.label}</span>
+                    ) : crumb.to ? (
+                      // `Link` et non `<a href>` : un ancrage brut recharge la page entière, donc
+                      // perd le cache Query, la WebSocket et les toasts en cours. Sur un cockpit
+                      // temps réel, cela se voit.
+                      <Link to={crumb.to}>{crumb.label}</Link>
+                    ) : (
+                      // Un maillon intermédiaire non navigable reste du texte — **sans**
+                      // `aria-current`, qui ne désigne qu'une seule page.
+                      <span>{crumb.label}</span>
+                    )}
+                  </li>
+                )
+              })}
             </ol>
           </nav>
         ) : null}

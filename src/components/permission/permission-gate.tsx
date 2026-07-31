@@ -23,8 +23,20 @@ import { usePermission } from './use-permission'
 
 export type PermissionGateProps = {
   readonly permission: PermissionKey
-  /** Le contrôle à garder. Doit accepter `aria-disabled` et `aria-describedby`. */
-  readonly children: ReactElement
+  /**
+   * Le contrôle à peindre. **Il doit accepter `blocked`** — c'est-à-dire être un `Button` du lot 1,
+   * ou un composant qui implémente le même couple `aria-disabled` + neutralisation du clic.
+   *
+   * Le typage l'exige désormais, et ce n'était pas le cas : une version précédente annonçait
+   * « accepte `aria-disabled` et `aria-describedby` », or `aria-disabled` posé ici est **écrasé**
+   * par `Button` et n'empêche rien sur un `<a href>`. Un écran aurait donc pu envelopper un lien,
+   * le voir grisé avec sa raison — et le lien aurait navigué. Le contrat est maintenant vérifié à la
+   * compilation plutôt que décrit dans une phrase.
+   */
+  readonly children: ReactElement<{
+    blocked?: boolean
+    'aria-describedby'?: string
+  }>
   /**
    * Masquer au lieu de désactiver. **À demander explicitement, jamais par défaut.**
    *
@@ -58,12 +70,13 @@ export function PermissionGate({
 
   return (
     <span className="ui-permission-gate">
-      {cloneElement(children as ReactElement<Record<string, unknown>>, {
-        'aria-disabled': true,
-        'aria-describedby': reasonId,
-        // Le contrôle reste dans le parcours clavier — c'est la moitié « expliqué » de la règle :
-        // un `disabled` nu le retirerait de l'arbre, et l'explication ne serait jamais lue.
+      {cloneElement(children, {
+        // `blocked` seul : c'est lui qui porte **à la fois** l'annonce `aria-disabled` et la
+        // neutralisation du clic (voir `button.tsx`). Poser `aria-disabled` ici en plus serait au
+        // mieux redondant — `Button` l'écrase — et au pire trompeur, en laissant croire qu'un
+        // enfant quelconque serait neutralisé.
         blocked: true,
+        'aria-describedby': reasonId,
       })}
       <span className="ui-permission-gate__reason" id={reasonId}>
         {reason ?? (

@@ -47,8 +47,10 @@ describe('AppShell — repères', () => {
     //
     // L'assertion porte sur l'**ordre du document** plutôt que sur une tabulation simulée : dans cet
     // arbre complet — coquille, providers Base UI, dix-sept liens — `user.tab()` ne rend jamais la
-    // main. Je n'ai pas trouvé pourquoi, et je préfère un test déterministe qui vérifie la bonne
-    // propriété à un test qui bloque la suite. Le parcours clavier réel ira au e2e (step-026).
+    // main, et la cause reste à trouver. Un test déterministe qui vérifie la bonne propriété vaut
+    // mieux qu'un test qui bloque la suite ; aucun `tabindex` positif n'existant dans cet arbre,
+    // l'ordre du document **est** l'ordre de tabulation. Le parcours clavier réel ira au e2e
+    // (step-026), où il est de toute façon plus probant.
     const { container, getByRole } = await renderRoute('/clients', {
       queryClient: clientWithPermissions(['customers:read']),
     })
@@ -96,8 +98,33 @@ describe('AppShell — le rail suit les permissions', () => {
       queryClient: clientWithPermissions(NAV_ENTRIES.map((entry) => entry.permission)),
     })
 
-    // Le lien d'évitement en plus des entrées du rail.
-    expect(getAllByRole('link')).toHaveLength(NAV_ENTRIES.length + 1)
+    // Dix-sept entrées plus le lien d'évitement. Le nombre est **figé** : le dériver de
+    // `NAV_ENTRIES.length` rendait le test auto-référentiel — supprimer une entrée déplaçait les
+    // deux côtés de l'égalité, et la suite restait verte.
+    expect(NAV_ENTRIES).toHaveLength(17)
+    expect(getAllByRole('link')).toHaveLength(18)
+  })
+
+  it('fait disparaître un groupe entièrement refusé, intitulé compris', async () => {
+    // La version précédente rendait l'intitulé et les puces inconditionnellement : un
+    // `billing_readonly` voyait six titres de groupe, seize puces vides et un seul lien — et un
+    // lecteur d'écran annonçait « liste, 3 éléments » sous un groupe sans aucun lien.
+    const { queryByText, getByRole } = await renderRoute('/facturation', {
+      queryClient: clientWithPermissions(['billing:read']),
+    })
+
+    expect(getByRole('link', { name: 'Facturation' })).toBeInTheDocument()
+    expect(queryByText('Exploitation')).toBeNull()
+    expect(queryByText('Administration')).toBeNull()
+  })
+
+  it('ne laisse aucune puce vide dans le rail', async () => {
+    const { container } = await renderRoute('/facturation', {
+      queryClient: clientWithPermissions(['billing:read']),
+    })
+
+    const items = container.ownerDocument.querySelectorAll('.ui-shell__rail li')
+    expect(items).toHaveLength(1)
   })
 
   it('marque l’entrée active depuis l’URL, jamais depuis un état local', async () => {

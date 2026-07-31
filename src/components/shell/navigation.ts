@@ -18,7 +18,14 @@ import type { PermissionKey } from '~/lib/permissions'
 export type NavEntry = {
   readonly to: string
   readonly label: string
-  /** La permission qui rend l'écran utile. L'entrée est masquée sans elle — voir l'en-tête. */
+  /**
+   * La permission qui rend l'écran utile. L'entrée est masquée sans elle — voir l'en-tête.
+   *
+   * **Cette clé peint le rail ; elle ne garde rien.** La garde d'un écran est celle de la fonction
+   * serveur qu'il appelle (`requirePermission`, step-025), et la garde de session viendra sur la
+   * route de mise en page en step-026. Lire cette liste comme une matrice d'autorisation serait la
+   * plus naturelle des erreurs, et la plus coûteuse.
+   */
   readonly permission: PermissionKey
 }
 
@@ -31,7 +38,16 @@ export const NAVIGATION: readonly NavGroup[] = [
   {
     label: 'Exploitation',
     entries: [
-      { to: '/trafic', label: 'Trafic', permission: 'cdr:read_pii' },
+      // `connectors:read` et **non** `cdr:read_pii` : le catalogue décrit cette dernière comme
+      // « voir les MSISDN **en clair** … sinon ils restent masqués ». C'est une clé de démasquage,
+      // pas de lecture — son absence doit masquer des colonnes, pas faire disparaître l'écran phare
+      // de l'exploitation. Un `billing_admin`, décrit comme « consultation seule sur le reste de la
+      // plateforme », voyait Connecteurs, Sessions et Alertes mais pas Trafic.
+      //
+      // Une clé `metrics:read` dédiée serait plus juste ; l'ajouter demande trois endroits dans une
+      // même PR (catalogue, garde serveur, rôles par défaut) et relève d'un amendement du §3.1, pas
+      // d'une décision de cette step.
+      { to: '/trafic', label: 'Trafic', permission: 'connectors:read' },
       { to: '/connecteurs', label: 'Connecteurs', permission: 'connectors:read' },
       { to: '/sessions', label: 'Sessions', permission: 'sessions:read' },
       { to: '/alertes', label: 'Alertes', permission: 'alerts:read' },
@@ -69,6 +85,9 @@ export const NAVIGATION: readonly NavGroup[] = [
   {
     label: 'Administration',
     entries: [
+      // Seul `super_admin` détient ces deux clés parmi les rôles par défaut : le groupe entier est
+      // donc invisible pour les huit autres. C'est conforme au §6.10 — « qui peut éditer les rôles
+      // peut s'accorder tout le reste » — et c'est le seul groupe dans ce cas.
       { to: '/operateurs', label: 'Opérateurs', permission: 'operators:manage' },
       { to: '/roles', label: 'Rôles', permission: 'roles:manage' },
     ],

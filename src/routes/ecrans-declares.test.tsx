@@ -56,10 +56,4 @@ describe('les écrans déclarés', () => {
 
     expect(queryByRole('alert')).toBeNull()
   })
-
-  it('couvre toutes les entrées du rail — aucune n’est un lien mort', () => {
-    // La garde qui relie la carte de navigation à l'arborescence : une entrée ajoutée au rail sans
-    // route correspondante ferait échouer le cas `it.each` ci-dessus, à l'URL manquante.
-    expect(NAV_ENTRIES.length).toBeGreaterThan(0)
-  })
 })

@@ -13,7 +13,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { usePermission } from './use-permission'
+import { useCurrentOperator, usePermission } from './use-permission'
 
 function wrapper(client: QueryClient) {
   return ({ children }: { children: ReactNode }) => (
@@ -102,14 +102,29 @@ describe('usePermission', () => {
   })
 
   it('lève sur un vrai échec HTTP — un 500 n’est pas « personne »', async () => {
+    // **Ce test était mort.** Il attendait `granted === undefined`, ce qui est déjà vrai au premier
+    // rendu, avant tout appel : `waitFor` passait immédiatement, et remplacer la levée par un
+    // `return null` le laissait vert. Il faut donc observer l'état de la requête, pas la valeur
+    // dérivée — la distinction entre « pas connecté » et « la passerelle est tombée » compte, la
+    // première envoie au login et la seconde à un état d'erreur.
     respondWith(500)
 
-    const { result } = renderHook(() => usePermission('customers:read'), {
+    const { result } = renderHook(() => useCurrentOperator(), {
       wrapper: wrapper(freshClient()),
     })
 
-    // La distinction compte : confondre « pas connecté » et « la passerelle est tombée » enverrait
-    // l'opérateur se reconnecter pour rien.
-    await waitFor(() => expect(result.current.granted).toBeUndefined())
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.data).toBeUndefined()
+  })
+
+  it('distingue 401 de 500 — l’un n’est pas une panne, l’autre si', async () => {
+    respondWith(401)
+
+    const { result } = renderHook(() => useCurrentOperator(), {
+      wrapper: wrapper(freshClient()),
+    })
+
+    await waitFor(() => expect(result.current.data).toBeNull())
+    expect(result.current.isError).toBe(false)
   })
 })

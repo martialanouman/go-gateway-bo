@@ -23,13 +23,25 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { ToastProvider, ToastStack, TooltipProvider } from '~/components/overlays'
-import { PermissionGate, useCurrentOperator } from '~/components/permission'
+import { useCurrentOperator } from '~/components/permission'
+import { Loading } from '~/components/states'
 import { NAVIGATION } from './navigation'
 
 export type AppShellProps = { readonly children?: ReactNode }
 
 export function AppShell({ children }: AppShellProps) {
-  const { data: operator } = useCurrentOperator()
+  const { data: operator, isPending } = useCurrentOperator()
+
+  // Le filtrage se fait **ici** et non par un `PermissionGate` posé sur chaque entrée : un groupe
+  // dont aucune entrée n'est accessible doit disparaître entièrement, intitulé compris. La version
+  // précédente rendait l'intitulé et les `<li>` inconditionnellement, si bien qu'un
+  // `billing_readonly` voyait six titres de groupe, seize puces vides et un seul lien — et qu'un
+  // lecteur d'écran annonçait « liste, 3 éléments » sous un groupe sans aucun lien.
+  const granted = new Set<string>(operator?.permissions ?? [])
+  const groups = NAVIGATION.map((group) => ({
+    ...group,
+    entries: group.entries.filter((entry) => granted.has(entry.permission)),
+  })).filter((group) => group.entries.length > 0)
 
   return (
     <TooltipProvider>
@@ -54,28 +66,29 @@ export function AppShell({ children }: AppShellProps) {
           </header>
 
           <nav aria-label="Navigation principale" className="ui-shell__rail">
-            {NAVIGATION.map((group) => (
-              <div className="ui-shell__group" key={group.label}>
-                <span className="ui-shell__group-label">{group.label}</span>
-                <ul>
-                  {group.entries.map((entry) => (
-                    <li key={entry.to}>
-                      {/*
-                        `hideWhenDenied` — l'unique exception à « désactivé et expliqué », et elle
-                        est argumentée dans `navigation.ts` : un rail plein d'entrées mortes
-                        n'apprend rien à personne, là où un bouton désactivé dans un écran dit quoi
-                        demander.
-                      */}
-                      <PermissionGate hideWhenDenied permission={entry.permission}>
+            {/*
+              Un squelette pendant l'aller-retour `/auth/me`, et non un rail vide : la charte §08
+              demande une forme qui reproduit la mise en page. Sans lui, le rail se remplit d'un coup
+              et toute la page saute au moment où l'opérateur pose les yeux dessus.
+            */}
+            {isPending ? (
+              <Loading label="Chargement de la navigation" rows={8} />
+            ) : (
+              groups.map((group) => (
+                <div className="ui-shell__group" key={group.label}>
+                  <span className="ui-shell__group-label">{group.label}</span>
+                  <ul>
+                    {group.entries.map((entry) => (
+                      <li key={entry.to}>
                         <Link className="ui-shell__link" to={entry.to}>
                           {entry.label}
                         </Link>
-                      </PermissionGate>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
+            )}
           </nav>
 
           <main className="ui-shell__content" id="contenu">

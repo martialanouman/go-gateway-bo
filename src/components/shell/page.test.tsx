@@ -6,10 +6,38 @@
  * dernier maillon n'est pas un lien : pointer vers la page où l'on se trouve déjà n'apprend rien.
  */
 
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router'
+import type { ReactElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import { Button } from '~/components/primitives'
 import { renderComponent } from '~/test/render'
 import { Page, Toolbar } from './page'
+
+/**
+ * Un routeur minimal, parce que le fil d'Ariane rend des `Link`.
+ *
+ * Il en rend depuis que l'ancrage brut a été remplacé : un `<a href>` rechargeait la page entière et
+ * faisait perdre le cache Query, la WebSocket et les toasts en cours. Le prix est ce harnais ; il
+ * est plus petit que le défaut.
+ */
+async function renderWithRouter(ui: ReactElement) {
+  const router = createRouter({
+    routeTree: createRootRoute({ component: () => ui }),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
+
+  // `load()` avant le rendu, comme `renderRoute` : `RouterProvider` ne rend le composant d'une route
+  // qu'une fois celle-ci résolue. Sans cette attente, le conteneur reste vide et l'assertion échoue
+  // sur une absence qui n'a rien à voir avec ce qu'on teste.
+  await router.load()
+
+  return renderComponent(<RouterProvider router={router} />)
+}
 
 describe('Page', () => {
   it('rend le titre en `h1`, et un seul', () => {
@@ -29,8 +57,8 @@ describe('Page', () => {
     expect(queryByRole('banner')).toBeNull()
   })
 
-  it('rend le fil d’Ariane en navigation nommée', () => {
-    const { getByRole } = renderComponent(
+  it('rend le fil d’Ariane en navigation nommée', async () => {
+    const { getByRole } = await renderWithRouter(
       <Page
         title="Orange CI"
         breadcrumbs={[{ label: 'Connecteurs', to: '/connecteurs' }, { label: 'Orange CI' }]}
@@ -40,8 +68,8 @@ describe('Page', () => {
     expect(getByRole('navigation', { name: 'Fil d’Ariane' })).toBeInTheDocument()
   })
 
-  it('ne fait pas du dernier maillon un lien', () => {
-    const { getByText, queryByRole } = renderComponent(
+  it('ne fait pas du dernier maillon un lien', async () => {
+    const { getByText, queryByRole } = await renderWithRouter(
       <Page
         title="Orange CI"
         breadcrumbs={[{ label: 'Connecteurs', to: '/connecteurs' }, { label: 'Orange CI' }]}

@@ -946,7 +946,6 @@
   font: var(--text-label);
 }
 
-/* « Le rail se réduit, il ne disparaît pas » (§1.2) : dégradation propre sur tablette. */
 .ui-shell__rail {
   display: flex;
   flex-direction: column;
@@ -1003,6 +1002,39 @@
   grid-area: content;
   padding: var(--sp-7);
   overflow-y: auto;
+}
+
+/*
+ * « Le rail se réduit, il ne disparaît pas » (§1.2).
+ *
+ * Le commentaire existait sans la règle, et `--nav-width-collapsed` était un token déclaré que rien
+ * ne consommait. Sous le point de rupture desktop, le rail garde sa place et ses cibles de clic ;
+ * seuls les intitulés de groupe s'effacent. Le faire disparaître derrière un bouton coûterait deux
+ * gestes pour changer d'écran, sur l'outil dont c'est le geste le plus fréquent.
+ */
+@media (max-width: 1280px) {
+  .ui-shell {
+    grid-template-columns: var(--nav-width-collapsed) 1fr;
+  }
+
+  .ui-shell__rail {
+    padding: var(--sp-5) var(--sp-2);
+  }
+
+  .ui-shell__group-label {
+    /* Masqué à l'œil, conservé pour les technologies d'assistance : le groupe garde son sens. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .ui-shell__link {
+    padding: var(--sp-2);
+    font-size: 11px;
+    text-align: center;
+  }
 }
 
 /* ─── Ossature d'écran ─────────────────────────────────────────────────────────────────────── */
