@@ -1260,3 +1260,70 @@
   font: var(--text-data-sm);
   color: var(--text-faint);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * L'enrôlement du second facteur (step-028)
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/*
+ * Le QR code repose sur un fond clair, seul écart au thème sombre de tout le produit — et il est
+ * imposé par le sujet : un lecteur de QR attend un contraste franc entre modules sombres et fond
+ * clair, et l'inverser fait échouer la moitié des applications authenticator.
+ */
+.ui-enroll__qr {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-5);
+  border-radius: var(--r-field);
+  background: #ffffff;
+}
+
+.ui-enroll__secret {
+  margin: 0;
+  font: var(--text-body);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ui-enroll__secret code {
+  font: var(--text-data);
+  color: var(--text-primary);
+}
+
+.ui-enroll__codes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+  margin: 0;
+  padding: var(--sp-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-field);
+  background: var(--surface-sunken);
+  list-style: none;
+}
+
+.ui-enroll__codes code {
+  font: var(--text-data);
+  color: var(--text-primary);
+}
+
+.ui-enroll__devices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-enroll__devices li {
+  display: flex;
+  gap: var(--sp-5);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-field);
+  font: var(--text-body);
+  color: var(--text-primary);
+}
