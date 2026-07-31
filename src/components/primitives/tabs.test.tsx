@@ -90,3 +90,38 @@ describe('Tabs', () => {
     expect(onValueChange).not.toHaveBeenCalled()
   })
 })
+
+describe('keepMounted', () => {
+  it('démonte le panneau caché par défaut', () => {
+    const { queryByText } = renderComponent(
+      <Tabs
+        defaultValue="a"
+        tabs={[
+          { value: 'a', label: 'A', panel: <p>Contenu A</p> },
+          { value: 'b', label: 'B', panel: <p>Contenu B</p> },
+        ]}
+      />,
+    )
+
+    expect(queryByText('Contenu B')).toBeNull()
+  })
+
+  it('le garde monté quand l’écran le demande', () => {
+    // **Ce que ce réglage protège.** Un panneau démonté perd son état local — une saisie en cours,
+    // une cérémonie préparée. L'enrôlement du second facteur l'a payé cher : un aller-retour
+    // d'onglet détruisait un secret déjà scanné, puis des codes de récupération que rien ne peut
+    // réafficher.
+    const { getByText } = renderComponent(
+      <Tabs
+        defaultValue="a"
+        keepMounted
+        tabs={[
+          { value: 'a', label: 'A', panel: <p>Contenu A</p> },
+          { value: 'b', label: 'B', panel: <p>Contenu B</p> },
+        ]}
+      />,
+    )
+
+    expect(getByText('Contenu B')).toBeInTheDocument()
+  })
+})

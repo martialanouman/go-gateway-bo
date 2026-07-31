@@ -27,13 +27,13 @@
  */
 
 import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Navigate, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, Navigate, useNavigate } from '@tanstack/react-router'
 import { QRCodeSVG } from 'qrcode.react'
 import { type FormEvent, useEffect, useId, useState } from 'react'
 import {
   confirmTotpEnrollment,
   listPasskeys,
-  type Passkey,
+  type PasskeyList,
   registerPasskey,
   revokePasskey,
   startTotpEnrollment,
@@ -90,10 +90,25 @@ function EnrollmentScreen() {
         <h1 ref={heading} tabIndex={-1}>
           Second facteur
         </h1>
-        <p>
-          Un second facteur est requis pour ouvrir la console. Choisissez celui que votre matériel
-          permet ; vous pourrez en ajouter un autre ensuite.
-        </p>
+        {/*
+          **Deux publics, deux copies.** Cet écran s'adressait à un opérateur bloqué dehors — « un
+          second facteur est requis pour ouvrir la console » — et le lien ajouté dans la barre y
+          amène désormais quelqu'un dont la console est déjà ouverte et qui a déjà un facteur. Lui
+          servir la première phrase lui fait croire qu'il a perdu son accès.
+        */}
+        {totp.phase === 'activated' ? (
+          <p>Conservez vos codes de récupération avant de continuer.</p>
+        ) : status === 'complete' ? (
+          <p>
+            Ajoutez un second facteur à ce compte. Celui que vous utilisez déjà reste actif — le
+            remplacer passe par un administrateur.
+          </p>
+        ) : (
+          <p>
+            Un second facteur est requis pour ouvrir la console. Choisissez celui que votre matériel
+            permet ; vous pourrez en ajouter un autre ensuite.
+          </p>
+        )}
       </div>
 
       {/*
@@ -111,17 +126,37 @@ function EnrollmentScreen() {
           onAcknowledge={setAcknowledged}
         />
       ) : (
-        <Tabs
-          defaultValue="totp"
-          tabs={[
-            {
-              value: 'totp',
-              label: 'Application authenticator',
-              panel: <TotpPanel onEnrolled={setTotp} totp={totp} />,
-            },
-            { value: 'passkey', label: 'Passkey', panel: <PasskeyPanel status={status} /> },
-          ]}
-        />
+        <>
+          {/*
+            **La sortie de secours de l'écran.** Le lien ajouté dans la barre de la coquille ouvrait
+            une porte à sens unique : ce cadre n'a ni rail, ni barre, ni retour, et la seule sortie
+            n'apparaissait qu'après un enrôlement réussi. Un opérateur qui change d'avis n'avait que
+            le bouton du navigateur.
+          */}
+          {status === 'complete' ? (
+            <p className="ui-auth__note">
+              <Link to="/">Revenir à la console</Link>
+            </p>
+          ) : null}
+
+          <Tabs
+            // Une session complète a déjà un facteur : lui ouvrir l'onglet TOTP la mènerait au
+            // bouton primaire « Préparer l'enrôlement », que le serveur refuse en 409. On lui ouvre
+            // l'onglet qui peut aboutir — ajouter un appareil.
+            defaultValue={status === 'complete' ? 'passkey' : 'totp'}
+            // Les panneaux restent montés : un aller-retour d'onglet perdait un code à moitié tapé
+            // et le message qui expliquait pourquoi le précédent avait été refusé.
+            keepMounted
+            tabs={[
+              {
+                value: 'totp',
+                label: 'Application authenticator',
+                panel: <TotpPanel onEnrolled={setTotp} totp={totp} />,
+              },
+              { value: 'passkey', label: 'Passkey', panel: <PasskeyPanel status={status} /> },
+            ]}
+          />
+        </>
       )}
     </div>
   )
@@ -408,11 +443,20 @@ function RecoveryCodes({
 }
 
 function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
+  const queryClient = useQueryClient()
+  const enrolled = useFocusHeading<HTMLHeadingElement>()
   const [name, setName] = useState('')
-  const [passkeys, setPasskeys] = useState<readonly Passkey[]>([])
+  /**
+   * **Une seule source, et pas deux.** La liste et son indisponibilité vivaient dans deux états
+   * séparés, et le second n'était jamais remis à `false` : après un enregistrement réussi, l'écran
+   * affichait la liste **et**, au-dessus, « la liste n'a pas pu être lue ». L'ambiguïté que le
+   * correctif visait, reconduite d'un cran.
+   */
+  const [list, setList] = useState<PasskeyList>({ outcome: 'listed', passkeys: [] })
+  const passkeys = list.outcome === 'listed' ? list.passkeys : []
   const [busy, setBusy] = useState(false)
   const [registered, setRegistered] = useState(false)
-  const [listUnavailable, setListUnavailable] = useState(false)
+
   const [notice, setNotice] = useState<Notice | undefined>()
   const removalId = useId()
 
@@ -432,9 +476,7 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
   useEffect(() => {
     let mounted = true
     void listPasskeys().then((result) => {
-      if (!mounted) return
-      if (result.outcome === 'listed') setPasskeys(result.passkeys)
-      else setListUnavailable(true)
+      if (mounted) setList(result)
     })
     return () => {
       mounted = false
@@ -452,12 +494,16 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
     if (result.outcome === 'registered') {
       // `passkeys` peut manquer : garder alors celle qu'on affichait plutôt que de faire disparaître
       // l'appareil qu'on vient d'enregistrer.
-      if (result.passkeys) setPasskeys(result.passkeys)
+      if (result.passkeys) setList({ outcome: 'listed', passkeys: result.passkeys })
       setName('')
       // La cérémonie promeut la session côté serveur, et cet écran vit **hors de la coquille** : sans
       // sortie explicite, l'opérateur se retrouvait avec une session complète et aucun moyen d'entrer
       // — ni rail, ni lien. Le cul-de-sac que cette step supprime se reformait sur cet onglet.
       setRegistered(true)
+      // **La cérémonie a promu la session côté serveur** : sans relecture, `canRemove` restait figé
+      // sur le cache d'avant, les boutons de retrait restaient bloqués, et l'explication affirmait
+      // qu'il fallait « franchir d'abord » un facteur qu'il venait justement de franchir.
+      await queryClient.refetchQueries({ queryKey: OPERATOR_QUERY_KEY, exact: true })
       return
     }
 
@@ -477,7 +523,12 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
     setBusy(false)
 
     if (result.outcome === 'updated') {
-      if (result.passkeys) setPasskeys(result.passkeys)
+      // **Sur un retrait, garder la liste précédente serait mentir** : elle contiendrait encore
+      // l'appareil qu'on vient de supprimer, et un second clic répondrait « appareil non enregistré ».
+      // On relit plutôt, et l'indisponibilité se dit comme ailleurs.
+      setList(
+        result.passkeys ? { outcome: 'listed', passkeys: result.passkeys } : await listPasskeys(),
+      )
       return
     }
 
@@ -530,9 +581,21 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
         {busy ? 'Enregistrement en cours' : 'Enregistrer cet appareil'}
       </Button>
 
-      {registered ? <ConsoleExit label="Continuer vers la console" /> : null}
+      {registered ? (
+        <>
+          {/*
+            La troisième transition de l'écran, et la seule qui restait muette : le focus ne bougeait
+            pas, aucune région live n'apparaissait, et le bouton de sortie surgissait en silence. Elle
+            promeut pourtant la session, comme les deux autres.
+          */}
+          <h2 className="ui-enroll__step" ref={enrolled} tabIndex={-1}>
+            Appareil enregistré
+          </h2>
+          <ConsoleExit label="Continuer vers la console" />
+        </>
+      ) : null}
 
-      {listUnavailable ? (
+      {list.outcome === 'unavailable' ? (
         <p className="ui-auth__notice" role="status">
           La liste des appareils enregistrés n’a pas pu être lue. Ce n’est pas la preuve qu’il n’y
           en a aucun — l’enrôlement, lui, reste possible.

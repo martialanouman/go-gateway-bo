@@ -1349,33 +1349,18 @@
 }
 
 /*
- * Masqué à l'œil, conservé pour les technologies d'assistance.
- *
- * `clip-path` plutôt que `display: none`, qui retirerait aussi le contenu de l'arbre d'accessibilité
- * — c'est-à-dire sa seule raison d'être. Le motif existait déjà à trois endroits ; il est nommé ici
- * parce qu'un quatrième usage l'a rendu partageable, sans toucher aux trois autres.
- */
-.ui-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-/*
  * Le lien vers l'enrôlement, dans la barre supérieure. Discret par défaut — ce n'est pas une action
  * quotidienne — mais jamais masqué : c'est le seul chemin vers ses propres facteurs depuis la
  * console.
  */
 .ui-shell__factor {
   margin-left: var(--sp-5);
-  font: var(--text-data-sm);
-  color: var(--text-muted);
-}
-
-.ui-shell__factor:hover,
-.ui-shell__factor:focus-visible {
+  /*
+   * `--text-body` et non `--text-data-sm` : la charte réserve la mono aux identifiants techniques
+   * verbatim du contrat, et « Second facteur » est de la prose. Et `--text-link` dès le repos, sans
+   * quoi le lien prenait exactement la couleur du nom d'opérateur qui l'entoure — les liens n'étant
+   * pas soulignés globalement, rien ne le distinguait d'un morceau de texte.
+   */
+  font: var(--text-body);
   color: var(--text-link);
 }

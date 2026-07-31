@@ -513,3 +513,49 @@ describe('la garde de l’écran', () => {
     )
   })
 })
+
+describe('l’écran ouvert depuis la console', () => {
+  it('s’adresse à qui a déjà un facteur, et sait revenir', async () => {
+    // **Deux publics, deux copies.** Le lien de la barre amène ici quelqu'un dont la console est
+    // déjà ouverte : lui servir « un second facteur est requis pour ouvrir la console » lui ferait
+    // croire qu'il a perdu son accès. Et ce cadre n'a ni rail ni barre — sans lien de retour, la
+    // porte était à sens unique et seul le bouton du navigateur en sortait.
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+
+    expect(screen.getByText(/Ajoutez un second facteur/)).toBeInTheDocument()
+    expect(screen.queryByText(/requis pour ouvrir la console/)).toBeNull()
+    expect(screen.getByRole('link', { name: /Revenir à la console/ })).toHaveAttribute('href', '/')
+  })
+
+  it('ouvre sur l’onglet qui peut aboutir', async () => {
+    // L'onglet TOTP mènerait au bouton primaire « Préparer l'enrôlement », que le serveur refuse en
+    // 409 quand un facteur existe déjà. On ouvre celui qui peut aboutir.
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+
+    expect(screen.getByRole('tab', { name: /Passkey/i })).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+describe('la liste des appareils', () => {
+  it('dit son indisponibilité, puis se tait quand elle redevient lisible', async () => {
+    // **Le défaut du premier correctif** : l'indisponibilité vivait dans un état séparé qui n'était
+    // jamais remis à zéro. Après un enregistrement réussi, l'écran affichait la liste **et**, juste
+    // au-dessus, « la liste n'a pas pu être lue » — l'ambiguïté qu'on voulait lever, reconduite.
+    listPasskeys.mockResolvedValue({ outcome: 'unavailable' })
+    registerPasskey.mockResolvedValue({
+      outcome: 'registered',
+      passkeys: [{ id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' }],
+    })
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+
+    expect(await screen.findByText(/n’a pas pu être lue/)).toBeInTheDocument()
+
+    await screen.user.type(screen.getByLabelText(/Nom de l’appareil/), 'Poste')
+    await screen.user.click(screen.getByRole('button', { name: /Enregistrer cet appareil/ }))
+
+    await vi.waitFor(() => {
+      expect(screen.queryByText(/n’a pas pu être lue/)).toBeNull()
+    })
+    expect(screen.getByRole('button', { name: /Retirer Poste/ })).toBeInTheDocument()
+  })
+})
