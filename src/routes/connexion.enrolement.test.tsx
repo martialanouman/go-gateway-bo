@@ -18,6 +18,7 @@
 
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PasskeyList } from '~/components/auth/enrollment'
 import { OPERATOR_QUERY_KEY } from '~/components/permission'
 import { createTestQueryClient } from '~/test/render'
 import { renderRoute } from '~/test/render-route'
@@ -525,11 +526,21 @@ describe('l’écran ouvert depuis la console', () => {
     expect(screen.getByText(/Ajoutez un facteur à ce compte/)).toBeInTheDocument()
     expect(screen.queryByText(/requis pour ouvrir la console/)).toBeNull()
 
-    // **Et elle ne renvoie pas vers un administrateur.** Une version précédente disait « le
-    // remplacer passe par un administrateur » : faux pour qui n'a qu'une passkey — `noOtherFactorFrom`
-    // dispense une session active de toute exclusion, et le serveur a un test dédié pour l'ajout d'un
-    // TOTP à côté d'une passkey. Le retrait est en libre-service tant qu'il reste un facteur.
-    expect(screen.queryByText(/passe par un administrateur/)).toBeNull()
+    // **Elle ne renvoie plus vers un administrateur pour l'ajout.** Une version précédente disait
+    // « le remplacer passe par un administrateur » : faux pour qui n'a qu'une passkey —
+    // `noOtherFactorFrom` dispense une session active de toute exclusion, et le serveur a un test
+    // dédié pour l'ajout d'un TOTP à côté d'une passkey.
+    //
+    // Elle dit en revanche **ce qui se retire** : un appareil, en libre-service tant qu'il reste un
+    // facteur ; une application authenticator, non — aucun point d'entrée ne le permet, et
+    // `ALREADY_ENROLLED_MESSAGE` renvoie à un administrateur. « En retirer un » sans préciser lequel
+    // laissait chercher un contrôle qui n'existe pas.
+    expect(
+      screen.getByText(/retirer un appareil tant qu’il vous reste un facteur/),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/application\s+authenticator, lui, passe par un administrateur/),
+    ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Revenir à la console/ })).toHaveAttribute('href', '/')
   })
 
@@ -613,6 +624,98 @@ describe('ce que les onglets et la cérémonie conservent', () => {
     await vi.waitFor(() => {
       expect(screen.queryByRole('button', { name: /Retirer Poste/ })).toBeNull()
     })
+  })
+})
+
+describe('ce que l’enregistrement verrouille pendant qu’il travaille', () => {
+  it('ne laisse pas relancer une cérémonie pendant la relecture de la liste', async () => {
+    // **Corriger `busy` d'un seul côté a ouvert le trou de l'autre.** Au retrait, un relâchement
+    // anticipé coûtait un message d'erreur ; ici il coûte un facteur : le bouton redevenait actif, le
+    // champ portait encore le nom, rien n'annonçait le succès — et un second clic relançait une
+    // cérémonie WebAuthn complète, enrôlant un second appareil sous le même nom.
+    registerPasskey.mockResolvedValue({ outcome: 'registered' })
+
+    let release: ((value: PasskeyList) => void) | undefined
+    listPasskeys.mockResolvedValueOnce({ outcome: 'listed', passkeys: [] }).mockImplementationOnce(
+      () =>
+        new Promise<PasskeyList>((resolve) => {
+          release = resolve
+        }),
+    )
+
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+    await screen.user.type(screen.getByLabelText(/Nom de l’appareil/), 'Poste')
+    await screen.user.click(screen.getByRole('button', { name: /Enregistrer cet appareil/ }))
+
+    const button = screen.getByRole('button', { name: /Enregistrement en cours/ })
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+
+    await screen.user.click(button)
+    expect(registerPasskey).toHaveBeenCalledTimes(1)
+
+    release?.({ outcome: 'listed', passkeys: [{ id: 'c1', name: 'Poste', createdAt: 'x' }] })
+    expect(await screen.findByRole('button', { name: /Retirer Poste/ })).toBeInTheDocument()
+  })
+
+  it('ne laisse pas relancer un retrait pendant la relecture de la liste', async () => {
+    // Le pendant du test précédent, côté retrait. Le relâchement anticipé laissait l'appareil
+    // supprimé affiché avec un bouton actif : un second clic partait sur un identifiant déjà retiré,
+    // et le serveur répondait « cet appareil n'est pas enregistré » — une alerte pour un geste que
+    // l'interface avait laissé passer.
+    revokePasskey.mockResolvedValue({ outcome: 'updated' })
+
+    let release: ((value: PasskeyList) => void) | undefined
+    listPasskeys
+      .mockResolvedValueOnce({
+        outcome: 'listed',
+        passkeys: [{ id: 'c1', name: 'Poste', createdAt: 'x' }],
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise<PasskeyList>((resolve) => {
+            release = resolve
+          }),
+      )
+
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+
+    const remove = await screen.findByRole('button', { name: /Retirer Poste/ })
+    await screen.user.click(remove)
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /Retirer Poste/ })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      )
+    })
+
+    await screen.user.click(screen.getByRole('button', { name: /Retirer Poste/ }))
+    expect(revokePasskey).toHaveBeenCalledTimes(1)
+
+    release?.({ outcome: 'listed', passkeys: [] })
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Retirer Poste/ })).toBeNull()
+    })
+  })
+
+  it('relit la liste quand l’enregistrement ne la renvoie pas', async () => {
+    // Garder la liste précédente ne suffit pas : quand elle est vide — le cas du premier appareil —
+    // l'écran annonçait « Appareil enregistré » au-dessus de zéro ligne, sans rien qui dise que
+    // l'appareil existe.
+    registerPasskey.mockResolvedValue({ outcome: 'registered' })
+    listPasskeys.mockResolvedValueOnce({ outcome: 'listed', passkeys: [] }).mockResolvedValue({
+      outcome: 'listed',
+      passkeys: [{ id: 'c1', name: 'Poste', createdAt: 'x' }],
+    })
+
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+    await screen.user.type(screen.getByLabelText(/Nom de l’appareil/), 'Poste')
+    await screen.user.click(screen.getByRole('button', { name: /Enregistrer cet appareil/ }))
+
+    expect(await screen.findByRole('button', { name: /Retirer Poste/ })).toBeInTheDocument()
   })
 })
 

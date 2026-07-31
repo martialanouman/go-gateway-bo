@@ -108,7 +108,8 @@ function EnrollmentScreen() {
         ) : status === 'complete' ? (
           <p>
             Ajoutez un facteur à ce compte. Ceux que vous utilisez déjà restent actifs, et vous
-            pouvez en retirer un tant qu’il vous en reste au moins un.
+            pouvez retirer un appareil tant qu’il vous reste un facteur. Le retrait d’une
+            application authenticator, lui, passe par un administrateur.
           </p>
         ) : (
           <p>
@@ -500,7 +501,6 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
     setNotice(undefined)
 
     const result = await registerPasskey(name.trim())
-    setBusy(false)
 
     if (result.outcome === 'registered') {
       // `passkeys` peut manquer. Garder la liste précédente ne suffit pas : quand celle-ci est vide
@@ -510,6 +510,14 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
         result.passkeys ? { outcome: 'listed', passkeys: result.passkeys } : await listPasskeys(),
       )
       setName('')
+
+      // **`busy` tient jusqu'à la relecture**, comme au retrait — et le corriger d'un seul côté a
+      // ouvert le trou de l'autre. Ici il coûte plus cher qu'un message d'erreur : pendant
+      // l'aller-retour, le bouton redevenait actif, le champ portait encore le nom, et rien
+      // n'annonçait le succès. Un second clic relançait une **cérémonie WebAuthn complète** et
+      // enrôlait un second appareil sous le même nom.
+      setBusy(false)
+
       // La cérémonie promeut la session côté serveur, et cet écran vit **hors de la coquille** : sans
       // sortie explicite, l'opérateur se retrouvait avec une session complète et aucun moyen d'entrer
       // — ni rail, ni lien. Le cul-de-sac que cette step supprime se reformait sur cet onglet.
@@ -520,6 +528,8 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
       await queryClient.refetchQueries({ queryKey: OPERATOR_QUERY_KEY, exact: true })
       return
     }
+
+    setBusy(false)
 
     // Fermer la fenêtre système n'est pas une panne — même partage qu'au challenge.
     setNotice({
@@ -637,6 +647,11 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
               <Button
                 aria-describedby={canRemove ? undefined : removalId}
                 blocked={!canRemove}
+                // **Le verrou se voit.** `revoke()` refusait déjà un second appel par son garde
+                // `if (busy) return`, mais rien ne l'affichait : le bouton restait d'aspect actif
+                // pendant la relecture de la liste, et l'opérateur cliquait sur un geste que
+                // l'interface avalait en silence.
+                loading={busy}
                 onClick={() => revoke(passkey.id)}
                 size="sm"
                 type="button"
