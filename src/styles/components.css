@@ -1496,3 +1496,51 @@
   font: var(--text-caption);
   color: var(--text-muted);
 }
+
+/* Le catalogue de permissions, groupé par catégorie, dans la modale d'édition d'un rôle. */
+.ui-directory__catalog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.ui-directory__category {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: var(--sp-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-field);
+}
+
+.ui-directory__category-title {
+  padding: 0 var(--sp-3);
+  font: var(--text-label);
+  color: var(--text-secondary);
+}
+
+/* Combien de clés d'une famille sont retenues : la densité se lit sans déplier la liste. */
+.ui-directory__category-count {
+  font: var(--text-data-sm);
+  color: var(--text-muted);
+}
+
+/*
+ * L'aperçu d'impact. Neutre tant que rien n'est retiré, ambré dès qu'un droit disparaît : c'est le
+ * seul chiffre de l'écran qui doit faire hésiter, et la teinte est ce qui l'arrête à la lecture.
+ */
+.ui-directory__impact {
+  margin: 0;
+  padding: var(--sp-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-field);
+  font: var(--text-body);
+  color: var(--text-muted);
+}
+
+.ui-directory__impact--warning {
+  border-color: var(--amber-500);
+  background: var(--tint-amber);
+  color: var(--text-warning);
+}
