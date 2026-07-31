@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignRouteImport } from './routes/[_]design'
 import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as ConnexionRouteImport } from './routes/connexion'
 import { Route as ShellAlertesRouteImport } from './routes/_shell.alertes'
 import { Route as ShellAntispamRouteImport } from './routes/_shell.antispam'
 import { Route as ShellAuditRouteImport } from './routes/_shell.audit'
@@ -29,6 +30,8 @@ import { Route as ShellRoutesRouteImport } from './routes/_shell.routes'
 import { Route as ShellScriptsRouteImport } from './routes/_shell.scripts'
 import { Route as ShellSessionsRouteImport } from './routes/_shell.sessions'
 import { Route as ShellTraficRouteImport } from './routes/_shell.trafic'
+import { Route as ConnexionIndexRouteImport } from './routes/connexion.index'
+import { Route as ConnexionVerificationRouteImport } from './routes/connexion.verification'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -42,6 +45,11 @@ const DesignRoute = DesignRouteImport.update({
 } as any)
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnexionRoute = ConnexionRouteImport.update({
+  id: '/connexion',
+  path: '/connexion',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShellAlertesRoute = ShellAlertesRouteImport.update({
@@ -129,10 +137,21 @@ const ShellTraficRoute = ShellTraficRouteImport.update({
   path: '/trafic',
   getParentRoute: () => ShellRoute,
 } as any)
+const ConnexionIndexRoute = ConnexionIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ConnexionRoute,
+} as any)
+const ConnexionVerificationRoute = ConnexionVerificationRouteImport.update({
+  id: '/verification',
+  path: '/verification',
+  getParentRoute: () => ConnexionRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/_design': typeof DesignRoute
+  '/connexion': typeof ConnexionRouteWithChildren
   '/alertes': typeof ShellAlertesRoute
   '/antispam': typeof ShellAntispamRoute
   '/audit': typeof ShellAuditRoute
@@ -150,6 +169,8 @@ export interface FileRoutesByFullPath {
   '/scripts': typeof ShellScriptsRoute
   '/sessions': typeof ShellSessionsRoute
   '/trafic': typeof ShellTraficRoute
+  '/connexion/verification': typeof ConnexionVerificationRoute
+  '/connexion/': typeof ConnexionIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -171,12 +192,15 @@ export interface FileRoutesByTo {
   '/scripts': typeof ShellScriptsRoute
   '/sessions': typeof ShellSessionsRoute
   '/trafic': typeof ShellTraficRoute
+  '/connexion/verification': typeof ConnexionVerificationRoute
+  '/connexion': typeof ConnexionIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_design': typeof DesignRoute
   '/_shell': typeof ShellRouteWithChildren
+  '/connexion': typeof ConnexionRouteWithChildren
   '/_shell/alertes': typeof ShellAlertesRoute
   '/_shell/antispam': typeof ShellAntispamRoute
   '/_shell/audit': typeof ShellAuditRoute
@@ -194,12 +218,15 @@ export interface FileRoutesById {
   '/_shell/scripts': typeof ShellScriptsRoute
   '/_shell/sessions': typeof ShellSessionsRoute
   '/_shell/trafic': typeof ShellTraficRoute
+  '/connexion/verification': typeof ConnexionVerificationRoute
+  '/connexion/': typeof ConnexionIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/_design'
+    | '/connexion'
     | '/alertes'
     | '/antispam'
     | '/audit'
@@ -217,6 +244,8 @@ export interface FileRouteTypes {
     | '/scripts'
     | '/sessions'
     | '/trafic'
+    | '/connexion/verification'
+    | '/connexion/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -238,11 +267,14 @@ export interface FileRouteTypes {
     | '/scripts'
     | '/sessions'
     | '/trafic'
+    | '/connexion/verification'
+    | '/connexion'
   id:
     | '__root__'
     | '/'
     | '/_design'
     | '/_shell'
+    | '/connexion'
     | '/_shell/alertes'
     | '/_shell/antispam'
     | '/_shell/audit'
@@ -260,12 +292,15 @@ export interface FileRouteTypes {
     | '/_shell/scripts'
     | '/_shell/sessions'
     | '/_shell/trafic'
+    | '/connexion/verification'
+    | '/connexion/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DesignRoute: typeof DesignRoute
   ShellRoute: typeof ShellRouteWithChildren
+  ConnexionRoute: typeof ConnexionRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -289,6 +324,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ShellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connexion': {
+      id: '/connexion'
+      path: '/connexion'
+      fullPath: '/connexion'
+      preLoaderRoute: typeof ConnexionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shell/alertes': {
@@ -410,6 +452,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellTraficRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/connexion/': {
+      id: '/connexion/'
+      path: '/'
+      fullPath: '/connexion/'
+      preLoaderRoute: typeof ConnexionIndexRouteImport
+      parentRoute: typeof ConnexionRoute
+    }
+    '/connexion/verification': {
+      id: '/connexion/verification'
+      path: '/verification'
+      fullPath: '/connexion/verification'
+      preLoaderRoute: typeof ConnexionVerificationRouteImport
+      parentRoute: typeof ConnexionRoute
+    }
   }
 }
 
@@ -455,10 +511,25 @@ const ShellRouteChildren: ShellRouteChildren = {
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 
+interface ConnexionRouteChildren {
+  ConnexionVerificationRoute: typeof ConnexionVerificationRoute
+  ConnexionIndexRoute: typeof ConnexionIndexRoute
+}
+
+const ConnexionRouteChildren: ConnexionRouteChildren = {
+  ConnexionVerificationRoute: ConnexionVerificationRoute,
+  ConnexionIndexRoute: ConnexionIndexRoute,
+}
+
+const ConnexionRouteWithChildren = ConnexionRoute._addFileChildren(
+  ConnexionRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DesignRoute: DesignRoute,
   ShellRoute: ShellRouteWithChildren,
+  ConnexionRoute: ConnexionRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
