@@ -98,8 +98,13 @@ restent affichées » + Réessayer).
 ## Tests
 
 Pyramide : beaucoup d'unitaires (logique BFF, permissions, mappings), des tests de composant
-(Testing Library), très peu de bout en bout (Playwright, cinq parcours). Les écrans se testent
-**contre le mock Prism**, jamais contre la vraie passerelle.
+(Testing Library), très peu de bout en bout (Playwright, une poignée de parcours). Les écrans se
+testent **contre le mock Prism**, jamais contre la vraie passerelle.
+
+Le critère 1 de la DoD demande qu'un chemin humain soit traversé de bout en bout, et il **ne
+contredit pas** cette règle : une step étend un parcours existant plutôt que d'en ajouter un. Un
+fichier par step donnerait une soixantaine de parcours à la fin du plan — exactement la suite qu'on
+n'ose plus croire, et que `playwright.config.ts` met en garde contre.
 
 > **71 des 134 opérations du contrat ne sont pas encore implémentées côté passerelle.** Métriques,
 > CDR/trace, sessions, facturation, contenu/RGPD, groupes de clients, webhooks et sender-rewrite
@@ -151,41 +156,55 @@ périmètre » et appartient à une autre PR.
 
 ## Definition of Done (chaque PR)
 
-`pnpm check` vert (typecheck · lint · test · vuln · build) • aucun invariant (a…e) violé • clavier
-et libellés accessibles (WCAG 2.1 AA) sur tout écran touché • PR petite et focalisée (une step) —
-plus les quatre critères ci-dessous.
+`pnpm check` vert (typecheck · lint · test · vuln · build) • aucun invariant (a…e) violé • copie
+conforme aux fondamentaux de contenu de la charte • clavier et libellés accessibles (WCAG 2.1 AA)
+sur tout écran touché • PR petite et focalisée (une step) — plus les quatre critères ci-dessous.
 
-> **Pourquoi quatre critères et non quatre portes de plus.** Les steps 026 et 028 ont franchi
-> **toutes** les portes mécaniques à chaque commit, y compris ceux qui contenaient un bloquant :
-> `pnpm check` était vert quand le bandeau de refus s'affichait sans bordure faute de tokens
-> existants, et quand le QR code était un carré noir. Deux lignes de l'ancienne DoD — « copie
-> conforme », « critères couverts par des tests » — pouvaient être déclarées vraies sans aucune
-> preuve, et l'ont été pendant qu'on livrait quatre affirmations fausses sur le produit et une série
-> de correctifs qu'aucun test ne tenait. Ce qui manquait n'était pas une vérification de plus :
-> c'était de rendre falsifiable ce qu'on affirmait déjà.
+> **Pourquoi quatre critères et non quatre portes de plus.** Les deux bloquants de M1 ont franchi les
+> douze portes de la CI sur des commits de tête de PR : `pnpm check` était vert quand le bandeau de
+> refus s'affichait sans bordure faute de tokens existants (`2886bb4`), et quand le QR code était un
+> carré noir de 176 pixels (`da32549`). Deux lignes de l'ancienne DoD — « copie conforme », « critères
+> couverts par des tests » — se déclaraient vraies sans aucune preuve, et l'ont été pendant qu'on
+> livrait **six affirmations fausses** sur le produit et **neuf correctifs qu'aucun test ne tenait**.
+> Ce qui manquait n'était pas une vérification de plus : c'était de rendre falsifiable ce qu'on
+> affirmait déjà.
 
-**1. Un parcours réel par step, sans rien de simulé entre le navigateur et la base.** Un seul, pas un
-par comportement. Les quatre pires défauts des steps 040, 026 et 028 y ont été trouvés et par rien
-d'autre : un `QueryClientProvider` absent de l'application, une garde qui ne s'exécutait jamais sur une
-URL collée, une boucle entre deux écrans, un QR code peint en noir sur noir par une règle CSS. jsdom
-n'applique pas les styles et ne s'hydrate pas — ce qu'il ne peut pas voir, il faut aller le voir.
+**1. Le chemin qu'un humain traverse est traversé pour de bon.** Toute step qui livre un chemin
+d'écran l'exerce de bout en bout au moins une fois — **en étendant un parcours existant** plutôt qu'en
+ajoutant un fichier : la règle du dépôt reste « très peu de bout en bout » (§Tests,
+`playwright.config.ts`), et une suite qu'on n'ose plus croire est pire qu'une suite absente. « De bout
+en bout » veut dire **rien de simulé dans le produit** : pas de provider fourni par le test, pas de
+client Query injecté, pas de module interne remplacé. Le mock Prism, lui, est la frontière du système
+sous test — le mock-first est la condition de faisabilité du projet, pas une entorse.
+
+> Trois défauts de M1 y ont été trouvés et par rien d'autre : un `QueryClientProvider` absent de
+> l'application, que `renderComponent` fournissait lui-même à tous les tests de composant ; une garde
+> de session qui ne s'exécutait jamais sur une URL collée, pendant que trois tests de route la
+> déclaraient verte ; et une boucle entre le login et le second facteur.
 
 **2. Toute affirmation sur le monde extérieur est confrontée à sa source.** Trois formes, et les trois
-ont menti au moins une fois : la **copie** qui décrit le produit se lit contre le code serveur qui
-l'implémente ; un **commentaire** qui décrit un mécanisme se relit contre le code qu'il surplombe ; et
-ce qu'on écrit dans un message de commit ou dans un rapport se vérifie sur la **sortie livrée**, pas
-sur l'intention du diff — un remplacement scripté échoue en silence dès que le formateur a reflué le
-bloc visé, et la ligne fautive apparaît alors en contexte, jamais en `+`.
+ont menti : la **copie** qui décrit le produit se lit contre le code serveur qui l'implémente ; un
+**commentaire** qui décrit un mécanisme se relit contre le code qu'il surplombe ; et ce qu'on écrit
+dans un message de commit ou dans un rapport se vérifie sur la **sortie livrée**, pas sur l'intention
+du diff — un remplacement scripté qui ne trouve pas son motif ne le dit pas, et la ligne fautive
+apparaît alors en contexte, jamais en `+`.
 
-**3. Mutation obligatoire là où l'absence serait silencieuse.** Gardes, refus, invariants,
-redirections, verrous : ce sont les choses qui restent vertes quand on les retire. Tous les correctifs
-que les revues de M1 ont trouvés non tenus appartenaient à cette famille. Un test de rendu n'en a pas
-besoin — il tombe de lui-même. Et la mutation doit **reproduire le défaut réel** : une qui laisse un
-verrou plus fermé que la version correcte reste verte et ne prouve rien.
+> C'est ce critère, et non le premier, qu'illustre le QR code noir : la règle CSS avait été écrite
+> sans lire ce que `qrcode.react` émet — **deux** chemins, dont le fond. Une revue l'a trouvé en allant
+> lire la bibliothèque ; le parcours qui l'avait introduit, lui, assertait la visibilité du QR et
+> restait vert.
+
+**3. Mutation obligatoire partout où le retrait laisserait la suite verte.** Le critère est cette
+propriété, pas une liste : gardes, refus, redirections et verrous en font partie, mais aussi un focus
+posé, un état conservé d'un onglet à l'autre, un succès annoncé. Sur les neuf correctifs de M1 livrés
+sans filet, trois ne rentraient dans aucune énumération écrite d'avance. Un test de rendu, lui, n'a
+pas besoin de mutation : il tombe de lui-même. Et la mutation doit **reproduire le défaut réel** —
+une qui laisse un verrou plus fermé que la version correcte reste verte et ne prouve rien.
 
 **4. Ce qui n'est pas testable s'écrit là où il vit.** « Aucun test ne rougit si cette ligne
-disparaît, ce qui a été vérifié plutôt que supposé » vaut mieux qu'un test qui fait semblant. Une
-DoD qui n'accepte pas « je n'ai pas pu le tester, voici pourquoi » fabrique ce test-là.
+disparaît, ce qui a été vérifié plutôt que supposé » (`connexion.index.tsx`) vaut mieux qu'un test qui
+fait semblant. Une DoD qui n'accepte pas « je n'ai pas pu le tester, voici pourquoi » fabrique ce
+test-là.
 
 **Les tests que réclame la step** sont ceux de sa section « Tests », qui énumère ses risques. Chacun a
 une preuve, **de la forme qui lui convient** — test, mutation, parcours, ou constat écrit sur place.
@@ -193,9 +212,10 @@ Un test par critère d'acceptation n'est pas demandé : c'est ainsi qu'on écrit
 sur du code défensif que la passerelle ne produit jamais.
 
 **Un seuil de couverture manqué est une question, jamais un ordre.** Ou bien le code est atteignable
-et mérite un test, ou bien il ne l'est pas et mérite d'être supprimé ou exempté — `vitest.config.ts`
-porte déjà ce motif pour `cli.ts` et le répertoire de schéma. Répondre systématiquement « écrire un
-test » a produit les pires tests de M1.
+et mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couvert par un `v8 ignore`
+**commenté** — jamais en abaissant le seuil pour tout le monde, et `vitest.config.ts` porte déjà trois
+exemptions de fichier avec leur justification et leur corollaire. Répondre systématiquement « écrire
+un test » a produit les pires tests de M1.
 
 ## Recettes fréquentes
 

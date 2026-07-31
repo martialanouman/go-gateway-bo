@@ -77,10 +77,16 @@ petit schéma PostgreSQL propre (opérateurs, rôles, audit, alertes, notificati
 
 ## Definition of Done (chaque PR)
 
-`pnpm check` vert (typecheck · lint · test · vuln · build) • critères d'acceptation couverts
-par des tests • aucun invariant (a…e) violé • copie FR conforme aux fondamentaux de contenu de la
-charte (`.claude/skills/sms-gateway-design/README.md`) • clavier + libellés accessibles (WCAG 2.1 AA)
-sur tout écran touché • PR petite et focalisée (une step).
+**La DoD vit dans `CLAUDE.md`, et nulle part ailleurs.** Elle était recopiée ici et dans le plan
+d'exécution — trois exemplaires, dont deux ont continué à prescrire « un test par critère
+d'acceptation » après que le troisième l'eut retiré. Une règle en trois copies finit par en dire
+trois choses ; celle-ci est repartie en une.
+
+Elle demande, en résumé : `pnpm check` vert, invariants (a…e) intacts, copie et accessibilité
+conformes à la charte, PR focalisée sur une step — **plus quatre critères** qui rendent falsifiable ce
+qu'on affirme : un chemin humain traversé de bout en bout, toute affirmation confrontée à sa source,
+la mutation partout où le retrait laisserait la suite verte, et ce qui n'est pas testable écrit là où
+il vit. Le détail et le pourquoi sont dans `CLAUDE.md` § « Definition of Done ».
 
 ## Conventions transverses
 
