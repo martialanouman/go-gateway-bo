@@ -24,7 +24,7 @@
 
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Navigate } from '@tanstack/react-router'
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { verifyPasskey, verifyTotp } from '~/components/auth/api'
 import { useFocusHeading } from '~/components/auth/focus-heading'
 import { SessionBoundary } from '~/components/auth/session-boundary'
@@ -72,6 +72,21 @@ function MfaChallengeScreen() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice | undefined>()
   const [switched, setSwitched] = useState(false)
+  const noticeId = useId()
+
+  /**
+   * Le second facteur est acquis : **les deux onglets ne peuvent plus aboutir**.
+   *
+   * Le serveur a promu la session, et ses points d'entrée de vérification n'acceptent qu'une session
+   * `pending_mfa` : relancer une cérémonie répond 401 « Session absente ou expirée », un refus faux
+   * sur une session valide — qui **effaçait** au passage le seul bouton menant à la console. La
+   * copie avait été déplacée loin des onglets ; les onglets, eux, étaient restés les contrôles
+   * dominants de l'écran.
+   *
+   * D'où la règle de la charte, appliquée ici : un contrôle qui ne peut pas aboutir est **désactivé
+   * et expliqué**, jamais laissé actif ni masqué. La raison est la notice elle-même.
+   */
+  const consoleOnly = notice?.retryConsole === true
 
   // Le focus suit la bascule d'onglet. Sans cela, le panneau passkey se démontait **avec le bouton
   // qui portait le focus** : celui-ci retombait sur `body`, la seule annonce était un `status` poli,
@@ -193,11 +208,16 @@ function MfaChallengeScreen() {
       </div>
 
       {notice ? (
-        <div
-          className={notice.tone === 'refusal' ? 'ui-auth__failure' : 'ui-auth__notice'}
-          role={notice.tone === 'refusal' ? 'alert' : 'status'}
-        >
-          <p>{notice.message}</p>
+        <div className={notice.tone === 'refusal' ? 'ui-auth__failure' : 'ui-auth__notice'}>
+          {/*
+            Le rôle vit sur le **paragraphe**, pas sur l'enveloppe. Une région `alert` porte
+            implicitement `aria-live="assertive"` et `aria-atomic="true"` : le bouton étant à
+            l'intérieur, l'apparition puis le retrait de son indicateur d'attente faisaient
+            ré-annoncer le message entier, deux fois par tentative.
+          */}
+          <p id={noticeId} role={notice.tone === 'refusal' ? 'alert' : 'status'}>
+            {notice.message}
+          </p>
           {notice.retryConsole ? (
             <Button
               loading={busy}
@@ -227,8 +247,15 @@ function MfaChallengeScreen() {
                   Approuvez sur cet appareil. Le navigateur ne signe que pour cette origine, ce qui
                   rend la cérémonie inutilisable depuis une page qui l’imite.
                 </p>
-                <Button loading={busy} onClick={runPasskey} type="button" variant="primary">
-                  {busy ? 'Vérification en cours' : 'Utiliser la passkey'}
+                <Button
+                  aria-describedby={consoleOnly ? noticeId : undefined}
+                  blocked={consoleOnly}
+                  loading={busy && !consoleOnly}
+                  onClick={runPasskey}
+                  type="button"
+                  variant="primary"
+                >
+                  {busy && !consoleOnly ? 'Vérification en cours' : 'Utiliser la passkey'}
                 </Button>
               </div>
             ),
@@ -250,8 +277,14 @@ function MfaChallengeScreen() {
                   required
                   value={code}
                 />
-                <Button loading={busy} type="submit" variant="primary">
-                  {busy ? 'Vérification en cours' : 'Vérifier'}
+                <Button
+                  aria-describedby={consoleOnly ? noticeId : undefined}
+                  blocked={consoleOnly}
+                  loading={busy && !consoleOnly}
+                  type="submit"
+                  variant="primary"
+                >
+                  {busy && !consoleOnly ? 'Vérification en cours' : 'Vérifier'}
                 </Button>
               </form>
             ),

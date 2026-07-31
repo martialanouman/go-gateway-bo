@@ -10,7 +10,6 @@
  * pas aboutir.
  */
 
-import { within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OPERATOR_QUERY_KEY } from '~/components/permission'
 import { createTestQueryClient } from '~/test/render'
@@ -155,8 +154,20 @@ describe('le challenge du second facteur', () => {
     // et répondraient 401 « Session absente ou expirée ». Envoyer l'opérateur relancer une cérémonie
     // — ce que faisait le message précédent — lui faisait lire « acquise » puis « expirée », sans
     // autre issue qu'un rechargement de page.
-    expect(within(alert).getByRole('button', { name: /Ouvrir la console/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Ouvrir la console/ })).toBeInTheDocument()
     expect(alert.textContent).not.toMatch(/Réessayez dans un instant/)
+
+    // **Et les onglets ne peuvent plus détruire cette sortie.** Le serveur a promu la session : une
+    // nouvelle cérémonie répondrait 401 « Session absente ou expirée » — un refus faux sur une
+    // session valide — et ce refus **effaçait** le bouton menant à la console. Un contrôle qui ne
+    // peut plus aboutir est désactivé et expliqué, jamais laissé actif.
+    const passkey = screen.getByRole('button', { name: /Utiliser la passkey/ })
+    expect(passkey).toHaveAttribute('aria-disabled', 'true')
+    expect(passkey.getAttribute('aria-describedby')).toBe(alert.id)
+
+    await screen.user.click(passkey)
+    expect(verifyPasskey).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: /Ouvrir la console/ })).toBeInTheDocument()
   })
 
   it('rouvre la console sur ce bouton, sans relancer la cérémonie', async () => {

@@ -1237,6 +1237,24 @@
   color: var(--text-muted);
 }
 
+/*
+ * Le message et son bouton de reprise. La marge par défaut d'un `<p>` vaut `1em` — une valeur qui
+ * n'est aucun token d'espacement — et le même encadré rendait donc plus lâche ici que sur l'écran de
+ * connexion, où la classe est portée par le paragraphe lui-même.
+ */
+.ui-auth__failure p,
+.ui-auth__notice p {
+  margin: 0;
+}
+
+.ui-auth__failure:has(button),
+.ui-auth__notice:has(button) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-5);
+}
+
 .ui-auth__note {
   margin: 0;
   font: var(--text-data-sm);
