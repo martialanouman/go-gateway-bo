@@ -110,7 +110,7 @@ sur tout écran touché • PR petite et focalisée (une step).
 - [x] step-023 — MFA TOTP : enrôlement et vérification
 - [x] step-024 — MFA WebAuthn / passkey
 - [x] step-025 — Moteur de permissions côté serveur + journal d'audit + MFA obligatoire
-- [ ] step-026 — Rendu UI par permission + écrans Login & MFA †
+- [x] step-026 — Rendu UI par permission + écrans Login & MFA †
 - [ ] step-028 — Écran d'enrôlement du second facteur ★
 - [ ] step-027 — Gestion des opérateurs et des rôles (CRUD) †
 
