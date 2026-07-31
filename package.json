@@ -44,6 +44,7 @@
     "openapi-fetch": "0.17.0",
     "otplib": "13.4.1",
     "postgres": "3.4.9",
+    "qrcode.react": "4.2.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "undici": "8.9.0"
