@@ -244,3 +244,92 @@ describe('verifyPasskey', () => {
     expect(result.outcome).toBe('cancelled')
   })
 })
+
+/**
+ * Les issues que personne ne pense à peindre — et qui laissent pourtant un écran figé.
+ *
+ * Chacune correspond à une panne réelle : un proxy qui rend du HTML sur un 502, un serveur qui tombe
+ * entre les deux moitiés d'une cérémonie, un compte suspendu pendant la vérification.
+ */
+describe('les issues de bordure', () => {
+  it('suspend la cérémonie passkey comme le reste', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        respond(429, { error: 'Vérification suspendue.' }, { 'retry-after': '90' }),
+      ),
+    )
+
+    const result = await verifyPasskey()
+
+    expect(result.outcome === 'suspended' && result.message).toContain('2 minutes')
+  })
+
+  it('reste lisible quand le corps n’est pas exploitable', async () => {
+    // Un proxy qui rend une page HTML sur un 502 : `response.json()` échoue, et l'écran doit quand
+    // même dire quelque chose de vrai plutôt que de rester figé sur « Connexion en cours ».
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>502</html>', { status: 502 })),
+    )
+
+    await expect(login({ identifier: 'a@b.test', password: 'x' })).resolves.toEqual({
+      outcome: 'refused',
+      message: 'Connexion refusée.',
+    })
+  })
+
+  it('signale un serveur injoignable au début de la cérémonie', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    expect((await verifyPasskey()).outcome).toBe('unreachable')
+  })
+
+  it('signale un serveur injoignable **après** la signature', async () => {
+    // Le pire moment : l'appareil a signé, l'opérateur croit avoir fini. Sans ce cas, la promesse
+    // rejetée remonterait en surface non gérée et l'écran resterait sur « Vérification en cours ».
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(respond(200, { options: {} }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', fetchMock)
+    startAuthentication.mockResolvedValueOnce({ id: 'cred-1' })
+
+    expect((await verifyPasskey()).outcome).toBe('unreachable')
+  })
+
+  it('refuse une signature que le serveur rejette', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(respond(200, { options: {} }))
+      .mockResolvedValueOnce(
+        respond(401, { error: 'Vérification refusée : cet appareil n’a pas pu être vérifié.' }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    startAuthentication.mockResolvedValueOnce({ id: 'cred-1' })
+
+    await expect(verifyPasskey()).resolves.toEqual({
+      outcome: 'refused',
+      message: 'Vérification refusée : cet appareil n’a pas pu être vérifié.',
+    })
+  })
+
+  it('ignore un `retry-after` illisible plutôt que d’annoncer une durée fausse', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        respond(429, { error: 'Trop de tentatives.' }, { 'retry-after': 'bientôt' }),
+      ),
+    )
+
+    await expect(verifyTotp('000000')).resolves.toEqual({
+      outcome: 'suspended',
+      message: 'Trop de tentatives.',
+    })
+  })
+})

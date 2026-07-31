@@ -23,31 +23,28 @@
  * neutraliserait cette garde dans son navigateur verrait une coquille vide et se ferait refuser
  * chaque appel.
  *
- * **Deux points d'application, une seule règle** — `sessionRedirect()`. Le `beforeLoad` refuse la
- * route avant de monter l'écran, ce qui vaut pour une navigation interne ; il ne s'exécute pas sur
- * une **ouverture directe d'URL**, puisque le rendu serveur ne peut pas lire un cookie `HttpOnly` et
- * que le routeur ne rejoue pas `beforeLoad` à l'hydratation. Le composant reprend donc la main. Ce
- * trou-là avait passé trois tests de route au vert avant que le parcours de bout en bout ne le
- * trouve.
+ * **Dans le composant, et non dans un `beforeLoad`.** Le premier jet gardait la route : il ne
+ * s'exécutait jamais sur une **ouverture directe d'URL**, puisque le rendu serveur ne peut pas lire
+ * un cookie `HttpOnly` et que le routeur ne rejoue pas `beforeLoad` à l'hydratation. Coller une URL
+ * entrait donc dans la console sans session, et trois tests de route déclaraient la garde verte —
+ * c'est `e2e/connexion.spec.ts` qui l'a trouvé.
+ *
+ * Le réflexe suivant a été d'ajouter le composant **en plus** de la route. Deux applications d'une
+ * même règle, dont l'une portait un cas que rien ne pouvait exercer : le `beforeLoad` ne redirigeait
+ * plus jamais avant le composant, sa branche « rendu serveur » était intestable, et la couverture
+ * l'a signalé. Une seule application, celle qui couvre tous les chemins.
+ *
+ * Le prix est visible et assumé : sur une navigation interne, la coquille se monte le temps d'une
+ * image avant de repartir. Le prix de l'autre était une branche que personne n'aurait pu vérifier.
  */
 
-import { createFileRoute, Outlet, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { sessionRedirect } from '~/components/auth/session-gate'
-import { operatorQueryOptions, useCurrentOperator } from '~/components/permission'
+import { useCurrentOperator } from '~/components/permission'
 import { AppShell } from '~/components/shell'
 
 export const Route = createFileRoute('/_shell')({
-  beforeLoad: async ({ context }) => {
-    // **Côté navigateur seulement.** Le cookie de session est `HttpOnly` et voyage avec la requête
-    // du navigateur ; en rendu serveur, ce `fetch` partirait sans lui, avec une URL relative que
-    // Node ne sait pas résoudre. C'est aussi pourquoi le composant reprend la main — voir l'en-tête.
-    if (typeof window === 'undefined') return
-
-    const to = sessionRedirect(await context.queryClient.ensureQueryData(operatorQueryOptions()))
-
-    if (to) throw redirect({ to })
-  },
   component: ShellLayout,
 })
 

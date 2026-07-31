@@ -9,11 +9,11 @@
  *
  * Elle **redirige**, elle ne protège pas. La protection vit dans le BFF : chaque handler revérifie
  * la session, et `requirePermission()` revérifie les droits (invariant c). Un opérateur qui
- * neutraliserait ce `beforeLoad` dans son navigateur verrait une coquille vide et se ferait refuser
+ * neutraliserait cette garde dans son navigateur verrait une coquille vide et se ferait refuser
  * chaque appel — c'est la propriété qui compte, et elle ne dépend pas de ce fichier.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { OPERATOR_QUERY_KEY } from '~/components/permission'
 import { createTestQueryClient } from '~/test/render'
 import { renderRoute } from '~/test/render-route'
@@ -28,9 +28,12 @@ describe('la garde de session', () => {
   it('renvoie un anonyme au login', async () => {
     const screen = await renderRoute('/trafic', { queryClient: clientWith(null) })
 
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
-      'Connexion opérateur',
-    )
+    // `waitFor` et non `findByRole` : la redirection tombe dans un effet, et le titre déjà présent
+    // — celui de l'écran qu'on quitte — satisfait `findByRole` avant elle. L'assertion porterait
+    // alors sur un nœud détaché, et le message d'échec dirait « reçu : (vide) » sans dire pourquoi.
+    await vi.waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Connexion opérateur')
+    })
   })
 
   it('renvoie au second facteur une session partielle', async () => {
@@ -47,9 +50,11 @@ describe('la garde de session', () => {
       }),
     })
 
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
-      'Vérification en deux étapes',
-    )
+    await vi.waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        'Vérification en deux étapes',
+      )
+    })
   })
 
   it('laisse entrer une session complète', async () => {
@@ -65,5 +70,10 @@ describe('la garde de session', () => {
 
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Trafic')
     expect(screen.getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument()
+
+    // Et la coquille y reste : un effet qui redirigerait après coup ferait sortir l'opérateur une
+    // fraction de seconde après son entrée.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Trafic')
   })
 })

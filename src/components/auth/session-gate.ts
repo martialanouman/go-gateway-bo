@@ -1,17 +1,13 @@
 /**
- * La décision de garde, isolée : **une seule règle, deux endroits qui l'appliquent**.
+ * La décision de garde, isolée de son application.
  *
- * ## Pourquoi deux endroits
+ * Elle est appliquée par le composant de la coquille (`src/routes/_shell.tsx`), et **pas** par un
+ * `beforeLoad` : celui-ci ne s'exécute pas sur une ouverture directe d'URL, ce qui laissait entrer
+ * sans session — voir l'en-tête de ce fichier-là pour l'histoire complète.
  *
- * Le `beforeLoad` de la coquille suffit pour une navigation interne — il refuse la route avant même
- * de monter l'écran. Il ne suffit pas pour une **ouverture directe d'URL** : le rendu serveur ne peut
- * pas lire le cookie `HttpOnly` d'un `fetch` relatif, et le routeur ne rejoue pas `beforeLoad` à
- * l'hydratation puisque la route est déjà résolue. La garde ne s'exécutait donc jamais sur le cas le
- * plus courant — un opérateur qui colle une URL — et c'est `e2e/connexion.spec.ts` qui l'a montré,
- * après que trois tests de route l'ont déclarée verte.
- *
- * D'où le second point d'application, dans le composant. Et d'où ce module : deux applications d'une
- * règle écrite deux fois finiraient par diverger, et c'est toujours la plus permissive qui survit.
+ * Elle vit à part parce qu'elle est la seule chose de la garde qui **décide**. Le reste est du
+ * câblage, et une règle mêlée à son câblage ne se teste qu'à travers un routeur monté : les cas
+ * qu'on oublie alors sont précisément ceux qui n'arrivent qu'en production.
  */
 
 import type { CurrentOperator } from '~/components/permission'
