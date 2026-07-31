@@ -19,7 +19,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { hashPassword } from '../auth/password'
 import { seedAuth } from '../auth/seed'
 import { connect, type Database } from '../db/index'
-import { listOperators, listRoles, previewPermissionChange } from './directory'
+import {
+  listOperators,
+  listRoles,
+  previewPermissionChange,
+  readOperatorSnapshot,
+  readRoleSnapshot,
+} from './directory'
 
 const POSTGRES_IMAGE = 'postgres:18-alpine'
 const FAST_SCRYPT = { N: 1024, r: 8, p: 1 } as const
@@ -141,6 +147,35 @@ describe('la liste des rôles', () => {
 
     expect(unused).toBeDefined()
     expect(unused?.operatorCount).toBe(0)
+  })
+})
+
+describe('l’état d’avant, pour le journal d’audit', () => {
+  it('rend rôles et permissions triés, sans les recoller', async () => {
+    const operator = await createOperator('audite@example.test')
+    const admin = await roleIdNamed('super_admin')
+    const auditor = await roleIdNamed('auditor')
+    await sql`INSERT INTO operator_roles (operator_id, role_id) VALUES (${operator}::uuid, ${admin}::uuid)`
+    await sql`INSERT INTO operator_roles (operator_id, role_id) VALUES (${operator}::uuid, ${auditor}::uuid)`
+
+    // Le tri n'est pas cosmétique : deux lignes d'audit consécutives doivent se comparer, et un
+    // ordre d'insertion ferait passer un simple changement d'ordre pour une modification.
+    expect(await readOperatorSnapshot(db, operator)).toEqual({
+      status: 'active',
+      roles: ['auditor', 'super_admin'],
+    })
+    expect(await readRoleSnapshot(db, auditor)).toEqual({
+      name: 'auditor',
+      description: expect.any(String),
+      permissions: ['audit:read'],
+    })
+  })
+
+  it('rend rien du tout pour une cible disparue', async () => {
+    // L'écran était ouvert, quelqu'un d'autre a supprimé la ligne. Auditer un état vide ferait
+    // croire à une modification.
+    expect(await readOperatorSnapshot(db, '00000000-0000-7000-8000-000000000000')).toBeUndefined()
+    expect(await readRoleSnapshot(db, '00000000-0000-7000-8000-000000000000')).toBeUndefined()
   })
 })
 

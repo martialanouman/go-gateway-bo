@@ -160,6 +160,67 @@ export async function listRoles(db: Database): Promise<readonly DirectoryRole[]>
 }
 
 /**
+ * L'état d'avant, pour la ligne d'audit — **des scalaires, jamais l'entité**.
+ *
+ * `mutate()` vérifie son `before` hors de la transaction : il faut donc le lire ici, une requête
+ * avant. Les listes sortent **en tableaux triés** et non recollées : `AuditValue` exclut les
+ * tableaux, mais la mise en forme appartient à `auditList` (`http.ts`), qui sait aussi quoi faire
+ * d'un paquet de quarante-quatre clés — une valeur d'audit s'arrête à 512 caractères, et un audit
+ * refusé **annule la mutation**.
+ *
+ * Rend `undefined` pour une cible disparue : l'écran était ouvert, quelqu'un d'autre a supprimé la
+ * ligne, et le refus doit le dire plutôt que d'auditer un état vide.
+ */
+export type OperatorSnapshot = { readonly status: string; readonly roles: readonly string[] }
+
+export async function readOperatorSnapshot(
+  db: Database,
+  operatorId: string,
+): Promise<OperatorSnapshot | undefined> {
+  const [row] = await db
+    .select({ status: operators.status })
+    .from(operators)
+    .where(eq(operators.id, operatorId))
+
+  if (!row) return undefined
+
+  const held = await db
+    .select({ name: roles.name })
+    .from(operatorRoles)
+    .innerJoin(roles, eq(roles.id, operatorRoles.roleId))
+    .where(eq(operatorRoles.operatorId, operatorId))
+    .orderBy(asc(roles.name))
+
+  return { status: row.status, roles: held.map((entry) => entry.name) }
+}
+
+export type RoleSnapshot = {
+  readonly name: string
+  readonly description: string
+  readonly permissions: readonly string[]
+}
+
+export async function readRoleSnapshot(
+  db: Database,
+  roleId: string,
+): Promise<RoleSnapshot | undefined> {
+  const [row] = await db
+    .select({ name: roles.name, description: roles.description })
+    .from(roles)
+    .where(eq(roles.id, roleId))
+
+  if (!row) return undefined
+
+  const held = await db
+    .select({ key: rolePermissions.permissionKey })
+    .from(rolePermissions)
+    .where(eq(rolePermissions.roleId, roleId))
+    .orderBy(asc(rolePermissions.permissionKey))
+
+  return { ...row, permissions: held.map((entry) => entry.key) }
+}
+
+/**
  * Ce qu'un changement de permissions coûterait, **avant** de le sauvegarder.
  *
  * « Ce changement retire *N* permissions à *M* opérateurs » : c'est la seule information qui permet

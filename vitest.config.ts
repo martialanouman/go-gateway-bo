@@ -85,6 +85,13 @@ export default defineConfig({
         // la mesure sans que personne ne le voie. C'est la raison pour laquelle la fermeture de
         // session est `endSession` et la réponse `logoutResponse`, plutôt que trois lignes ici.
         'src/server/auth/http/**',
+        // Coquilles HTTP de l'annuaire (step-027), et **même corollaire** : elles lisent, appellent,
+        // rendent. Les parseurs et les réponses vivent dans `src/server/admin/http.ts`, les règles
+        // et leurs gardes dans `directory-write.ts` — les deux mesurés. Ces fichiers-ci sont, eux,
+        // traversés pour de bon par le parcours Playwright, ce qu'aucun pourcentage ne dit.
+        // Le jour où l'un d'eux déciderait quelque chose — une garde, une validation, un choix de
+        // code HTTP —, cette logique sortirait de la mesure sans que personne ne le voie.
+        'src/server/admin/http/**',
       ],
       thresholds: {
         /**
