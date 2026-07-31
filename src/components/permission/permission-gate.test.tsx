@@ -66,6 +66,42 @@ describe('PermissionGate', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
+  it('fige la copie du refus, mot pour mot', () => {
+    // **La copie est figée ici** (step-026), pas décrite ailleurs. Trois propriétés la définissent :
+    // elle dit ce qui manque, elle nomme la clé **verbatim et en mono** — un opérateur la grep dans
+    // le catalogue des rôles — et elle ne promet rien. « Sécurisé » n'apparaît nulle part : la charte
+    // interdit d'en faire un argument, et un refus n'est pas un gage de sécurité, c'est une clé
+    // manquante.
+    const { getByText } = renderComponent(
+      <PermissionGate permission="routes:write">
+        <Button>Créer une route</Button>
+      </PermissionGate>,
+      { queryClient: clientWithPermissions([]) },
+    )
+
+    const reason = getByText(/Nécessite la permission/)
+    expect(reason.textContent).toBe('Nécessite la permission routes:write.')
+    expect(reason.querySelector('code')?.textContent).toBe('routes:write')
+    expect(reason.textContent).not.toMatch(/sécuris/i)
+  })
+
+  it('laisse l’écran préciser, quand la clé seule ne suffit pas', () => {
+    // La copie figée est le **défaut**, pas un carcan : un écran dont le refus demande une phrase de
+    // contexte la fournit, et elle remplace alors la clé plutôt que de s'y ajouter.
+    const { getByText, queryByText } = renderComponent(
+      <PermissionGate
+        permission="content:read"
+        reason="La lecture d’un corps de message est auditée et réservée aux enquêtes."
+      >
+        <Button>Afficher le corps</Button>
+      </PermissionGate>,
+      { queryClient: clientWithPermissions([]) },
+    )
+
+    expect(getByText(/auditée et réservée aux enquêtes/)).toBeInTheDocument()
+    expect(queryByText(/Nécessite la permission/)).toBeNull()
+  })
+
   it('nomme la permission manquante', () => {
     const { getByText } = renderComponent(
       <PermissionGate permission="suppressions:delete">
