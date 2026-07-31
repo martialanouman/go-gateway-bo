@@ -11,6 +11,24 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignRouteImport } from './routes/[_]design'
+import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as ShellAlertesRouteImport } from './routes/_shell.alertes'
+import { Route as ShellAntispamRouteImport } from './routes/_shell.antispam'
+import { Route as ShellAuditRouteImport } from './routes/_shell.audit'
+import { Route as ShellClientsRouteImport } from './routes/_shell.clients'
+import { Route as ShellComptesRouteImport } from './routes/_shell.comptes'
+import { Route as ShellConnecteursRouteImport } from './routes/_shell.connecteurs'
+import { Route as ShellDesabonnementsRouteImport } from './routes/_shell.desabonnements'
+import { Route as ShellEntrantsRouteImport } from './routes/_shell.entrants'
+import { Route as ShellFacturationRouteImport } from './routes/_shell.facturation'
+import { Route as ShellGroupesRouteImport } from './routes/_shell.groupes'
+import { Route as ShellOperateursRouteImport } from './routes/_shell.operateurs'
+import { Route as ShellReecritureRouteImport } from './routes/_shell.reecriture'
+import { Route as ShellRolesRouteImport } from './routes/_shell.roles'
+import { Route as ShellRoutesRouteImport } from './routes/_shell.routes'
+import { Route as ShellScriptsRouteImport } from './routes/_shell.scripts'
+import { Route as ShellSessionsRouteImport } from './routes/_shell.sessions'
+import { Route as ShellTraficRouteImport } from './routes/_shell.trafic'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +40,232 @@ const DesignRoute = DesignRouteImport.update({
   path: '/_design',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShellRoute = ShellRouteImport.update({
+  id: '/_shell',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShellAlertesRoute = ShellAlertesRouteImport.update({
+  id: '/alertes',
+  path: '/alertes',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellAntispamRoute = ShellAntispamRouteImport.update({
+  id: '/antispam',
+  path: '/antispam',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellAuditRoute = ShellAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellClientsRoute = ShellClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellComptesRoute = ShellComptesRouteImport.update({
+  id: '/comptes',
+  path: '/comptes',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellConnecteursRoute = ShellConnecteursRouteImport.update({
+  id: '/connecteurs',
+  path: '/connecteurs',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellDesabonnementsRoute = ShellDesabonnementsRouteImport.update({
+  id: '/desabonnements',
+  path: '/desabonnements',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellEntrantsRoute = ShellEntrantsRouteImport.update({
+  id: '/entrants',
+  path: '/entrants',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellFacturationRoute = ShellFacturationRouteImport.update({
+  id: '/facturation',
+  path: '/facturation',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellGroupesRoute = ShellGroupesRouteImport.update({
+  id: '/groupes',
+  path: '/groupes',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellOperateursRoute = ShellOperateursRouteImport.update({
+  id: '/operateurs',
+  path: '/operateurs',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellReecritureRoute = ShellReecritureRouteImport.update({
+  id: '/reecriture',
+  path: '/reecriture',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellRolesRoute = ShellRolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellRoutesRoute = ShellRoutesRouteImport.update({
+  id: '/routes',
+  path: '/routes',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellScriptsRoute = ShellScriptsRouteImport.update({
+  id: '/scripts',
+  path: '/scripts',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellSessionsRoute = ShellSessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellTraficRoute = ShellTraficRouteImport.update({
+  id: '/trafic',
+  path: '/trafic',
+  getParentRoute: () => ShellRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/_design': typeof DesignRoute
+  '/alertes': typeof ShellAlertesRoute
+  '/antispam': typeof ShellAntispamRoute
+  '/audit': typeof ShellAuditRoute
+  '/clients': typeof ShellClientsRoute
+  '/comptes': typeof ShellComptesRoute
+  '/connecteurs': typeof ShellConnecteursRoute
+  '/desabonnements': typeof ShellDesabonnementsRoute
+  '/entrants': typeof ShellEntrantsRoute
+  '/facturation': typeof ShellFacturationRoute
+  '/groupes': typeof ShellGroupesRoute
+  '/operateurs': typeof ShellOperateursRoute
+  '/reecriture': typeof ShellReecritureRoute
+  '/roles': typeof ShellRolesRoute
+  '/routes': typeof ShellRoutesRoute
+  '/scripts': typeof ShellScriptsRoute
+  '/sessions': typeof ShellSessionsRoute
+  '/trafic': typeof ShellTraficRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/_design': typeof DesignRoute
+  '/alertes': typeof ShellAlertesRoute
+  '/antispam': typeof ShellAntispamRoute
+  '/audit': typeof ShellAuditRoute
+  '/clients': typeof ShellClientsRoute
+  '/comptes': typeof ShellComptesRoute
+  '/connecteurs': typeof ShellConnecteursRoute
+  '/desabonnements': typeof ShellDesabonnementsRoute
+  '/entrants': typeof ShellEntrantsRoute
+  '/facturation': typeof ShellFacturationRoute
+  '/groupes': typeof ShellGroupesRoute
+  '/operateurs': typeof ShellOperateursRoute
+  '/reecriture': typeof ShellReecritureRoute
+  '/roles': typeof ShellRolesRoute
+  '/routes': typeof ShellRoutesRoute
+  '/scripts': typeof ShellScriptsRoute
+  '/sessions': typeof ShellSessionsRoute
+  '/trafic': typeof ShellTraficRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_design': typeof DesignRoute
+  '/_shell': typeof ShellRouteWithChildren
+  '/_shell/alertes': typeof ShellAlertesRoute
+  '/_shell/antispam': typeof ShellAntispamRoute
+  '/_shell/audit': typeof ShellAuditRoute
+  '/_shell/clients': typeof ShellClientsRoute
+  '/_shell/comptes': typeof ShellComptesRoute
+  '/_shell/connecteurs': typeof ShellConnecteursRoute
+  '/_shell/desabonnements': typeof ShellDesabonnementsRoute
+  '/_shell/entrants': typeof ShellEntrantsRoute
+  '/_shell/facturation': typeof ShellFacturationRoute
+  '/_shell/groupes': typeof ShellGroupesRoute
+  '/_shell/operateurs': typeof ShellOperateursRoute
+  '/_shell/reecriture': typeof ShellReecritureRoute
+  '/_shell/roles': typeof ShellRolesRoute
+  '/_shell/routes': typeof ShellRoutesRoute
+  '/_shell/scripts': typeof ShellScriptsRoute
+  '/_shell/sessions': typeof ShellSessionsRoute
+  '/_shell/trafic': typeof ShellTraficRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/_design'
+  fullPaths:
+    | '/'
+    | '/_design'
+    | '/alertes'
+    | '/antispam'
+    | '/audit'
+    | '/clients'
+    | '/comptes'
+    | '/connecteurs'
+    | '/desabonnements'
+    | '/entrants'
+    | '/facturation'
+    | '/groupes'
+    | '/operateurs'
+    | '/reecriture'
+    | '/roles'
+    | '/routes'
+    | '/scripts'
+    | '/sessions'
+    | '/trafic'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/_design'
-  id: '__root__' | '/' | '/_design'
+  to:
+    | '/'
+    | '/_design'
+    | '/alertes'
+    | '/antispam'
+    | '/audit'
+    | '/clients'
+    | '/comptes'
+    | '/connecteurs'
+    | '/desabonnements'
+    | '/entrants'
+    | '/facturation'
+    | '/groupes'
+    | '/operateurs'
+    | '/reecriture'
+    | '/roles'
+    | '/routes'
+    | '/scripts'
+    | '/sessions'
+    | '/trafic'
+  id:
+    | '__root__'
+    | '/'
+    | '/_design'
+    | '/_shell'
+    | '/_shell/alertes'
+    | '/_shell/antispam'
+    | '/_shell/audit'
+    | '/_shell/clients'
+    | '/_shell/comptes'
+    | '/_shell/connecteurs'
+    | '/_shell/desabonnements'
+    | '/_shell/entrants'
+    | '/_shell/facturation'
+    | '/_shell/groupes'
+    | '/_shell/operateurs'
+    | '/_shell/reecriture'
+    | '/_shell/roles'
+    | '/_shell/routes'
+    | '/_shell/scripts'
+    | '/_shell/sessions'
+    | '/_shell/trafic'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DesignRoute: typeof DesignRoute
+  ShellRoute: typeof ShellRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +284,181 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_shell': {
+      id: '/_shell'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ShellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_shell/alertes': {
+      id: '/_shell/alertes'
+      path: '/alertes'
+      fullPath: '/alertes'
+      preLoaderRoute: typeof ShellAlertesRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/antispam': {
+      id: '/_shell/antispam'
+      path: '/antispam'
+      fullPath: '/antispam'
+      preLoaderRoute: typeof ShellAntispamRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/audit': {
+      id: '/_shell/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof ShellAuditRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/clients': {
+      id: '/_shell/clients'
+      path: '/clients'
+      fullPath: '/clients'
+      preLoaderRoute: typeof ShellClientsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/comptes': {
+      id: '/_shell/comptes'
+      path: '/comptes'
+      fullPath: '/comptes'
+      preLoaderRoute: typeof ShellComptesRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/connecteurs': {
+      id: '/_shell/connecteurs'
+      path: '/connecteurs'
+      fullPath: '/connecteurs'
+      preLoaderRoute: typeof ShellConnecteursRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/desabonnements': {
+      id: '/_shell/desabonnements'
+      path: '/desabonnements'
+      fullPath: '/desabonnements'
+      preLoaderRoute: typeof ShellDesabonnementsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/entrants': {
+      id: '/_shell/entrants'
+      path: '/entrants'
+      fullPath: '/entrants'
+      preLoaderRoute: typeof ShellEntrantsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/facturation': {
+      id: '/_shell/facturation'
+      path: '/facturation'
+      fullPath: '/facturation'
+      preLoaderRoute: typeof ShellFacturationRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/groupes': {
+      id: '/_shell/groupes'
+      path: '/groupes'
+      fullPath: '/groupes'
+      preLoaderRoute: typeof ShellGroupesRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/operateurs': {
+      id: '/_shell/operateurs'
+      path: '/operateurs'
+      fullPath: '/operateurs'
+      preLoaderRoute: typeof ShellOperateursRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/reecriture': {
+      id: '/_shell/reecriture'
+      path: '/reecriture'
+      fullPath: '/reecriture'
+      preLoaderRoute: typeof ShellReecritureRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/roles': {
+      id: '/_shell/roles'
+      path: '/roles'
+      fullPath: '/roles'
+      preLoaderRoute: typeof ShellRolesRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/routes': {
+      id: '/_shell/routes'
+      path: '/routes'
+      fullPath: '/routes'
+      preLoaderRoute: typeof ShellRoutesRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/scripts': {
+      id: '/_shell/scripts'
+      path: '/scripts'
+      fullPath: '/scripts'
+      preLoaderRoute: typeof ShellScriptsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/sessions': {
+      id: '/_shell/sessions'
+      path: '/sessions'
+      fullPath: '/sessions'
+      preLoaderRoute: typeof ShellSessionsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/trafic': {
+      id: '/_shell/trafic'
+      path: '/trafic'
+      fullPath: '/trafic'
+      preLoaderRoute: typeof ShellTraficRouteImport
+      parentRoute: typeof ShellRoute
+    }
   }
 }
+
+interface ShellRouteChildren {
+  ShellAlertesRoute: typeof ShellAlertesRoute
+  ShellAntispamRoute: typeof ShellAntispamRoute
+  ShellAuditRoute: typeof ShellAuditRoute
+  ShellClientsRoute: typeof ShellClientsRoute
+  ShellComptesRoute: typeof ShellComptesRoute
+  ShellConnecteursRoute: typeof ShellConnecteursRoute
+  ShellDesabonnementsRoute: typeof ShellDesabonnementsRoute
+  ShellEntrantsRoute: typeof ShellEntrantsRoute
+  ShellFacturationRoute: typeof ShellFacturationRoute
+  ShellGroupesRoute: typeof ShellGroupesRoute
+  ShellOperateursRoute: typeof ShellOperateursRoute
+  ShellReecritureRoute: typeof ShellReecritureRoute
+  ShellRolesRoute: typeof ShellRolesRoute
+  ShellRoutesRoute: typeof ShellRoutesRoute
+  ShellScriptsRoute: typeof ShellScriptsRoute
+  ShellSessionsRoute: typeof ShellSessionsRoute
+  ShellTraficRoute: typeof ShellTraficRoute
+}
+
+const ShellRouteChildren: ShellRouteChildren = {
+  ShellAlertesRoute: ShellAlertesRoute,
+  ShellAntispamRoute: ShellAntispamRoute,
+  ShellAuditRoute: ShellAuditRoute,
+  ShellClientsRoute: ShellClientsRoute,
+  ShellComptesRoute: ShellComptesRoute,
+  ShellConnecteursRoute: ShellConnecteursRoute,
+  ShellDesabonnementsRoute: ShellDesabonnementsRoute,
+  ShellEntrantsRoute: ShellEntrantsRoute,
+  ShellFacturationRoute: ShellFacturationRoute,
+  ShellGroupesRoute: ShellGroupesRoute,
+  ShellOperateursRoute: ShellOperateursRoute,
+  ShellReecritureRoute: ShellReecritureRoute,
+  ShellRolesRoute: ShellRolesRoute,
+  ShellRoutesRoute: ShellRoutesRoute,
+  ShellScriptsRoute: ShellScriptsRoute,
+  ShellSessionsRoute: ShellSessionsRoute,
+  ShellTraficRoute: ShellTraficRoute,
+}
+
+const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DesignRoute: DesignRoute,
+  ShellRoute: ShellRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

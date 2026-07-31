@@ -1,9 +1,20 @@
 /// <reference types="vite/client" />
-import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import appCss from '~/styles/app.css?url'
 
-export const Route = createRootRoute({
+/**
+ * Le contexte du routeur porte le client Query.
+ *
+ * **Un seul point de création**, dans `getRouter()`. Le créer ici aurait deux défauts : en rendu
+ * serveur, un client de module serait partagé entre les requêtes — le cache d'un opérateur servant à
+ * un autre — et un client créé dans le composant racine **masquerait** celui qu'un test injecte, ce
+ * qui est arrivé et a fait rougir neuf tests d'un coup.
+ */
+export type RouterContext = { readonly queryClient: QueryClient }
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -16,9 +27,16 @@ export const Route = createRootRoute({
 })
 
 function RootComponent() {
+  // **Le provider manquait**, et rien ne le disait : `renderComponent` le fournit lui-même, si bien
+  // que toute la couche de permissions passait au vert pendant que le rendu serveur levait
+  // « No QueryClient set » à chaque requête. C'est le parcours de bout en bout qui l'a trouvé.
+  const { queryClient } = Route.useRouteContext()
+
   return (
     <RootDocument>
-      <Outlet />
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+      </QueryClientProvider>
     </RootDocument>
   )
 }

@@ -11,9 +11,10 @@
  * refusant un diff sur ce fichier.
  */
 
+import type { QueryClient } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
 import { routeTree } from '~/routeTree.gen'
-import { type RenderResult, renderComponent } from './render'
+import { createTestQueryClient, type RenderResult, renderComponent } from './render'
 
 /**
  * Monte le produit à l'URL demandée.
@@ -27,13 +28,24 @@ import { type RenderResult, renderComponent } from './render'
  * Les contextes viennent de `renderComponent` plutôt que d'être remontés ici : un seul endroit
  * décide ce qui enveloppe un composant du produit.
  */
-export async function renderRoute(path: string): Promise<RenderResult> {
+export async function renderRoute(
+  path: string,
+  options: { queryClient?: QueryClient } = {},
+): Promise<RenderResult> {
+  const queryClient = options.queryClient ?? createTestQueryClient()
+
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [path] }),
+    // Le client passe par le **contexte du routeur**, comme en production : la racine le lit au lieu
+    // d'en créer un, sans quoi elle masquerait celui que le test amorce.
+    context: { queryClient },
   })
 
   await router.load()
 
-  return renderComponent(<RouterProvider router={router} />)
+  // Le client est **transmis** plutôt que recréé : depuis la step-040, les écrans vivent sous une
+  // coquille dont le rail se peint à partir de `/auth/me`. Un test qui ne peut pas amorcer ce cache
+  // ne peut vérifier ni la navigation par permission, ni ce qu'un opérateur donné voit.
+  return renderComponent(<RouterProvider router={router} />, { ...options, queryClient })
 }
