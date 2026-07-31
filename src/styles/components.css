@@ -887,3 +887,193 @@
     opacity: 0.55;
   }
 }
+
+/* ─── Coquille applicative (step-040) ───────────────────────────────────────────────────────────
+ *
+ * Shell fixe, contenu qui défile : rail 236 px, barre 56 px, contenu plafonné à 1600 px. Les trois
+ * viennent des tokens de mise en page de la charte.
+ */
+.ui-shell {
+  display: grid;
+  grid-template-areas: "topbar topbar" "rail content";
+  grid-template-columns: var(--nav-width) 1fr;
+  grid-template-rows: var(--topbar-height) 1fr;
+  min-height: 100vh;
+  background: var(--surface-page);
+}
+
+/*
+ * Le lien d'évitement : hors écran jusqu'au focus, puis visible. `clip-path` plutôt que
+ * `display: none`, qui le retirerait aussi du parcours clavier — c'est-à-dire de sa seule raison
+ * d'être.
+ */
+.ui-shell__skip {
+  position: absolute;
+  z-index: 10;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.ui-shell__skip:focus {
+  width: auto;
+  height: auto;
+  padding: var(--sp-3) var(--sp-5);
+  clip-path: none;
+  border-radius: var(--r-field);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.ui-shell__topbar {
+  display: flex;
+  grid-area: topbar;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-6);
+  border-bottom: 1px solid var(--border-chrome);
+  background: var(--surface-chrome);
+}
+
+.ui-shell__brand {
+  color: var(--text-primary);
+  font: var(--text-card-title);
+}
+
+.ui-shell__operator {
+  color: var(--text-muted);
+  font: var(--text-label);
+}
+
+/* « Le rail se réduit, il ne disparaît pas » (§1.2) : dégradation propre sur tablette. */
+.ui-shell__rail {
+  display: flex;
+  flex-direction: column;
+  grid-area: rail;
+  gap: var(--sp-6);
+  padding: var(--sp-6) var(--sp-4);
+  border-right: 1px solid var(--border-chrome);
+  background: var(--surface-chrome);
+  overflow-y: auto;
+}
+
+.ui-shell__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.ui-shell__group-label {
+  padding: 0 var(--sp-3);
+  color: var(--text-faint);
+  font: var(--text-overline);
+}
+
+.ui-shell__rail ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-shell__link {
+  display: block;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-field);
+  color: var(--text-muted);
+  font: var(--text-body);
+  text-decoration: none;
+}
+
+.ui-shell__link:hover {
+  background: var(--surface-chrome-hover);
+  color: var(--text-primary);
+}
+
+/* L'état actif vient du routeur, jamais d'un état local dupliqué. */
+.ui-shell__link[data-status="active"] {
+  background: var(--surface-selected);
+  color: var(--text-accent);
+}
+
+.ui-shell__content {
+  grid-area: content;
+  padding: var(--sp-7);
+  overflow-y: auto;
+}
+
+/* ─── Ossature d'écran ─────────────────────────────────────────────────────────────────────── */
+.ui-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  max-width: var(--content-max);
+}
+
+.ui-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.ui-page__breadcrumbs ol {
+  display: flex;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  color: var(--text-faint);
+  font: var(--text-caption);
+  list-style: none;
+}
+
+.ui-page__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-5);
+}
+
+.ui-page__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-page-title);
+}
+
+.ui-page__actions {
+  display: flex;
+  gap: var(--sp-3);
+}
+
+.ui-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--subbar-height);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+/* La légende nomme le groupe pour les technologies d'assistance ; la barre se lit seule à l'écran. */
+.ui-toolbar__legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* Le refus de permission, à côté du contrôle qu'il explique. */
+.ui-permission-gate {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.ui-permission-gate__reason {
+  color: var(--text-faint);
+  font: var(--text-caption);
+}
