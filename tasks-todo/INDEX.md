@@ -111,16 +111,25 @@ sur tout écran touché • PR petite et focalisée (une step).
 - [x] step-024 — MFA WebAuthn / passkey
 - [x] step-025 — Moteur de permissions côté serveur + journal d'audit + MFA obligatoire
 - [ ] step-026 — Rendu UI par permission + écrans Login & MFA †
+- [ ] step-028 — Écran d'enrôlement du second facteur ★
 - [ ] step-027 — Gestion des opérateurs et des rôles (CRUD) †
 
-† **Ces deux steps s'exécutent après `step-041`, `step-042` et `step-040`**, dans cet ordre :
+† **Ces steps s'exécutent après `step-041`, `step-042` et `step-040`**, dans cet ordre :
 
 ```
 M2 · 041  primitives lot 1      →  M2 · 042  overlays + cinq états
                                 →  M2 · 040  AppShell (+ usePermission / PermissionGate)
                                 →  M1 · 026  login, MFA, garde de route
+                                →  M1 · 028  enrôlement du second facteur
                                 →  M1 · 027  opérateurs & rôles
 ```
+
+★ **`step-028` ajoutée le 31/07/2026 : elle manquait, et son absence rendait le produit
+inaccessible.** La `step-025` a rendu le second facteur obligatoire, et `installFirstAdministrator`
+crée le premier administrateur sans aucun facteur. Les points d'entrée d'enrôlement existent depuis
+les step-023 et step-024, mais aucune step ne prévoyait l'écran qui les appelle : le premier
+opérateur se serait connecté, serait arrivé au challenge, et n'aurait eu aucun moyen d'enrôler quoi
+que ce soit. Elle passe **avant `step-027`** : administrer des opérateurs suppose de pouvoir entrer.
 
 Ce sont des écrans, et ils reposent sur des fondations qui vivent en M2 : les primitives (041), les
 cinq états de contenu (042) et la coquille qui les accueille (040). L'ordre initial de cet index —
