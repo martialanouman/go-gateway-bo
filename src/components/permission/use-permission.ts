@@ -28,7 +28,7 @@ export type CurrentOperator = {
   readonly mfaCompleted: boolean
 }
 
-async function fetchCurrentOperator(): Promise<CurrentOperator | null> {
+export async function fetchCurrentOperator(): Promise<CurrentOperator | null> {
   const response = await fetch('/api/auth/me', { headers: { accept: 'application/json' } })
 
   // 401 n'est pas une erreur ici : c'est la réponse normale d'un visiteur non connecté. La lever
@@ -39,8 +39,19 @@ async function fetchCurrentOperator(): Promise<CurrentOperator | null> {
   return (await response.json()) as CurrentOperator
 }
 
+/**
+ * La requête, en un seul endroit.
+ *
+ * Le hook la consomme, et le `beforeLoad` de la coquille l'attend par `ensureQueryData` : deux
+ * définitions séparées auraient fini par diverger sur la clé de cache, et la garde aurait alors
+ * interrogé le serveur pour un résultat que l'écran n'aurait jamais lu.
+ */
+export function operatorQueryOptions() {
+  return { queryKey: OPERATOR_QUERY_KEY, queryFn: fetchCurrentOperator }
+}
+
 export function useCurrentOperator() {
-  return useQuery({ queryKey: OPERATOR_QUERY_KEY, queryFn: fetchCurrentOperator })
+  return useQuery(operatorQueryOptions())
 }
 
 export type PermissionState = {

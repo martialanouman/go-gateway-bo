@@ -10,6 +10,7 @@ export { PermissionGate, type PermissionGateProps } from './permission-gate'
 export {
   type CurrentOperator,
   OPERATOR_QUERY_KEY,
+  operatorQueryOptions,
   type PermissionState,
   useCurrentOperator,
   usePermission,
