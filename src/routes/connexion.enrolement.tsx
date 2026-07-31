@@ -466,7 +466,18 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
    */
   const [list, setList] = useState<PasskeyList>({ outcome: 'listed', passkeys: [] })
   const passkeys = list.outcome === 'listed' ? list.passkeys : []
-  const [busy, setBusy] = useState(false)
+  /**
+   * **Ce qui est en cours, et pas seulement « quelque chose ».**
+   *
+   * Un booléen partagé faisait porter `aria-busy` à **tous** les boutons de la liste : avec trois
+   * appareils, retirer « Poste » annonçait trois retraits occupés, et une cérémonie d'enregistrement
+   * — qui peut durer une minute sur une attente d'empreinte — annonçait occupés des retraits qui ne
+   * tournaient pas. Un lecteur d'écran ne pouvait pas dire lequel des trois était en cours.
+   *
+   * `'register'` ou l'identifiant de l'appareil en cours de retrait.
+   */
+  const [pending, setPending] = useState<string | undefined>()
+  const busy = pending !== undefined
   const [registered, setRegistered] = useState(false)
 
   const [notice, setNotice] = useState<Notice | undefined>()
@@ -497,31 +508,33 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
 
   async function register() {
     if (busy || name.trim().length === 0) return
-    setBusy(true)
+    setPending('register')
     setNotice(undefined)
 
     const result = await registerPasskey(name.trim())
 
     if (result.outcome === 'registered') {
+      // **Le succès s'affiche avant la relecture, et non après.** `listPasskeys` n'a ni délai ni
+      // signal d'annulation : le temps qu'elle traîne, la cérémonie avait réussi, la session était
+      // promue côté serveur, et l'écran ne montrait ni « Appareil enregistré » ni la sortie vers la
+      // console. Le cul-de-sac que cette step supprime se reformait le temps d'un aller-retour.
+      setRegistered(true)
+      setName('')
+
       // `passkeys` peut manquer. Garder la liste précédente ne suffit pas : quand celle-ci est vide
       // — le cas du premier appareil — l'écran annonçait « Appareil enregistré » au-dessus de zéro
       // ligne, sans rien qui dise que l'appareil existe. On relit, comme au retrait.
       setList(
         result.passkeys ? { outcome: 'listed', passkeys: result.passkeys } : await listPasskeys(),
       )
-      setName('')
 
       // **`busy` tient jusqu'à la relecture**, comme au retrait — et le corriger d'un seul côté a
       // ouvert le trou de l'autre. Ici il coûte plus cher qu'un message d'erreur : pendant
       // l'aller-retour, le bouton redevenait actif, le champ portait encore le nom, et rien
       // n'annonçait le succès. Un second clic relançait une **cérémonie WebAuthn complète** et
       // enrôlait un second appareil sous le même nom.
-      setBusy(false)
+      setPending(undefined)
 
-      // La cérémonie promeut la session côté serveur, et cet écran vit **hors de la coquille** : sans
-      // sortie explicite, l'opérateur se retrouvait avec une session complète et aucun moyen d'entrer
-      // — ni rail, ni lien. Le cul-de-sac que cette step supprime se reformait sur cet onglet.
-      setRegistered(true)
       // **La cérémonie a promu la session côté serveur** : sans relecture, `canRemove` restait figé
       // sur le cache d'avant, les boutons de retrait restaient bloqués, et l'explication affirmait
       // qu'il fallait « franchir d'abord » un facteur qu'il venait justement de franchir.
@@ -529,7 +542,7 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
       return
     }
 
-    setBusy(false)
+    setPending(undefined)
 
     // Fermer la fenêtre système n'est pas une panne — même partage qu'au challenge.
     setNotice({
@@ -540,7 +553,7 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
 
   async function revoke(credentialId: string) {
     if (busy) return
-    setBusy(true)
+    setPending(credentialId)
     setNotice(undefined)
 
     const result = await revokePasskey(credentialId)
@@ -556,11 +569,11 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
       // affiché avec un bouton actif : un second clic partait sur un identifiant déjà retiré, et le
       // serveur répondait « cet appareil n'est pas enregistré » — le scénario que le commentaire
       // ci-dessus dit prévenir.
-      setBusy(false)
+      setPending(undefined)
       return
     }
 
-    setBusy(false)
+    setPending(undefined)
 
     // Le refus du dernier facteur passe par ici : le message du serveur dit **pourquoi**, et c'est
     // ce qui empêche l'opérateur de se verrouiller dehors.
@@ -647,11 +660,11 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
               <Button
                 aria-describedby={canRemove ? undefined : removalId}
                 blocked={!canRemove}
-                // **Le verrou se voit.** `revoke()` refusait déjà un second appel par son garde
-                // `if (busy) return`, mais rien ne l'affichait : le bouton restait d'aspect actif
-                // pendant la relecture de la liste, et l'opérateur cliquait sur un geste que
-                // l'interface avalait en silence.
-                loading={busy}
+                // **Chaque bouton n'annonce que son propre retrait.** `revoke()` refuse déjà un
+                // second appel par son garde `if (busy) return` — un clic sur un autre appareil
+                // pendant une opération ne part donc pas — mais faire porter `aria-busy` à toute la
+                // liste désignait des gestes qui ne tournaient pas.
+                loading={pending === passkey.id}
                 onClick={() => revoke(passkey.id)}
                 size="sm"
                 type="button"

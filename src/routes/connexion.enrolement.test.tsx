@@ -700,6 +700,52 @@ describe('ce que l’enregistrement verrouille pendant qu’il travaille', () =>
     })
   })
 
+  it('n’annonce occupés que les gestes qui le sont', async () => {
+    // **Un booléen partagé désignait la mauvaise action.** Avec trois appareils, retirer « Poste »
+    // posait `aria-busy` sur les trois boutons, et une cérémonie d'enregistrement — qui peut durer
+    // une minute sur une attente d'empreinte — annonçait occupés des retraits qui ne tournaient pas.
+    // Un lecteur d'écran ne pouvait pas dire lequel était en cours.
+    revokePasskey.mockReturnValue(new Promise(() => {}))
+    listPasskeys.mockResolvedValue({
+      outcome: 'listed',
+      passkeys: [
+        { id: 'c1', name: 'Poste', createdAt: 'x' },
+        { id: 'c2', name: 'Portable', createdAt: 'x' },
+      ],
+    })
+
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+    await screen.user.click(await screen.findByRole('button', { name: /Retirer Poste/ }))
+
+    expect(screen.getByRole('button', { name: /Retirer Poste/ })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    )
+    expect(screen.getByRole('button', { name: /Retirer Portable/ })).not.toHaveAttribute(
+      'aria-busy',
+    )
+  })
+
+  it('annonce le succès sans attendre la relecture de la liste', async () => {
+    // `listPasskeys` n'a ni délai ni signal d'annulation : le temps qu'elle traîne, la cérémonie a
+    // réussi et promu la session côté serveur, mais l'écran ne montrait ni « Appareil enregistré »
+    // ni la sortie vers la console. Le cul-de-sac que cette step supprime se reformait le temps
+    // d'un aller-retour.
+    registerPasskey.mockResolvedValue({ outcome: 'registered' })
+    listPasskeys
+      .mockResolvedValueOnce({ outcome: 'listed', passkeys: [] })
+      .mockReturnValue(new Promise(() => {}))
+
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+    await screen.user.type(screen.getByLabelText(/Nom de l’appareil/), 'Poste')
+    await screen.user.click(screen.getByRole('button', { name: /Enregistrer cet appareil/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Appareil enregistré' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Continuer vers la console/ })).toBeInTheDocument()
+  })
+
   it('relit la liste quand l’enregistrement ne la renvoie pas', async () => {
     // Garder la liste précédente ne suffit pas : quand elle est vide — le cas du premier appareil —
     // l'écran annonçait « Appareil enregistré » au-dessus de zéro ligne, sans rien qui dise que
