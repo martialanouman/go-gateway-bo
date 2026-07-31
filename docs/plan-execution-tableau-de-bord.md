@@ -43,10 +43,16 @@ part.
 
 ### 0.4 Definition of Done (chaque PR)
 
-`pnpm check` vert (typecheck · lint · test · vuln · build) • critères d'acceptation couverts
-par des tests • aucun invariant (a…e) violé • copie française conforme aux fondamentaux de contenu du
-design system • clavier et libellés accessibles (WCAG 2.1 AA) sur tout écran touché • PR focalisée
-sur une step.
+**Voir `CLAUDE.md` § « Definition of Done » — c'est le seul exemplaire.** Il était recopié ici et
+dans `tasks-todo/INDEX.md`, et les trois copies ont divergé : deux ont continué à prescrire « un test
+par critère d'acceptation » après que la première l'eut retiré, précisément parce qu'il fabriquait des
+tests de complaisance.
+
+Aux portes mécaniques — `pnpm check`, invariants (a…e), copie et accessibilité conformes à la charte,
+PR focalisée sur une step — s'ajoutent quatre critères qui rendent falsifiable ce qu'on affirme : un
+chemin humain traversé de bout en bout sans rien de simulé dans le produit, toute affirmation
+confrontée à sa source, la mutation partout où le retrait laisserait la suite verte, et ce qui n'est
+pas testable écrit là où il vit.
 
 ### 0.5 Les 5 invariants (tests bloquants, verts à vie)
 
