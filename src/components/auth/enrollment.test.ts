@@ -274,3 +274,117 @@ describe('la liste des appareils', () => {
     expect(JSON.parse(init.body as string)).toEqual({ credential_id: 'c1' })
   })
 })
+
+/**
+ * Les pannes de réseau, à chaque étape.
+ *
+ * Elles méritent leurs propres tests parce que ce module promet en en-tête que **rien ne lève** : une
+ * promesse rejetée ici laisserait l'écran figé avec un secret affiché qu'on ne pourra plus revoir.
+ */
+describe('quand le réseau tombe', () => {
+  const offline = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+  it('l’enrôlement TOTP le dit', async () => {
+    offline()
+    expect((await startTotpEnrollment()).outcome).toBe('unreachable')
+  })
+
+  it('la confirmation le dit', async () => {
+    offline()
+    expect((await confirmTotpEnrollment('123456')).outcome).toBe('unreachable')
+  })
+
+  it('la liste se tait et rend vide', async () => {
+    // Seul appel du module qui ne remonte pas l'échec : la liste est un confort, et une panne
+    // d'affichage ne doit pas fermer la seule porte d'entrée du produit.
+    offline()
+    await expect(listPasskeys()).resolves.toEqual([])
+  })
+
+  it('la cérémonie interrompue **après** la signature le dit', async () => {
+    // Le pire moment : l'appareil a signé, l'opérateur croit avoir fini. Sans ce cas, la promesse
+    // rejetée remonterait en surface non gérée et le bouton resterait sur « Enregistrement en cours ».
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(respond(200, { options: { challenge: 'abc' } }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', fetchMock)
+    startRegistration.mockResolvedValueOnce({ id: 'c1' })
+
+    expect((await registerPasskey('Poste')).outcome).toBe('unreachable')
+  })
+
+  it('un refus **après** la signature garde le message du serveur', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(respond(200, { options: { challenge: 'abc' } }))
+      .mockResolvedValueOnce(
+        respond(401, { error: 'Ajout refusé : cet appareil n’a pas pu être vérifié.' }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    startRegistration.mockResolvedValueOnce({ id: 'c1' })
+
+    await expect(registerPasskey('Poste')).resolves.toEqual({
+      outcome: 'refused',
+      message: 'Ajout refusé : cet appareil n’a pas pu être vérifié.',
+    })
+  })
+})
+
+/**
+ * Les corps incomplets.
+ *
+ * Un serveur derrière un proxy peut rendre un 200 dont le corps n'est pas celui qu'on attend. Chaque
+ * repli existe pour que l'écran affiche **quelque chose de vrai** plutôt que de lever sur un champ
+ * absent — et chacun est testé, sans quoi le repli est une intention, pas un comportement.
+ */
+describe('les corps incomplets', () => {
+  it('l’enregistrement sans liste rend une liste vide', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(respond(200, { options: { challenge: 'abc' } }))
+      .mockResolvedValueOnce(respond(200, { mfa_completed: true }))
+    vi.stubGlobal('fetch', fetchMock)
+    startRegistration.mockResolvedValueOnce({ id: 'c1' })
+
+    await expect(registerPasskey('Poste')).resolves.toEqual({
+      outcome: 'registered',
+      passkeys: [],
+    })
+  })
+
+  it('la liste sans champ `passkeys` rend une liste vide', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => respond(200, {})),
+    )
+
+    await expect(listPasskeys()).resolves.toEqual([])
+  })
+
+  it('la gestion d’un appareil signale une panne du serveur', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>502</html>', { status: 502 })),
+    )
+
+    expect((await revokePasskey('c1')).outcome).toBe('unreachable')
+  })
+
+  it('la gestion d’un appareil signale un serveur injoignable', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    expect((await renamePasskey('c1', 'Portable')).outcome).toBe('unreachable')
+  })
+})

@@ -377,9 +377,13 @@ describe('le challenge du second facteur', () => {
     })
     const screen = await renderRoute('/connexion/verification', { queryClient: pendingSession() })
 
-    // Un opérateur tout juste amorcé n'a ni appareil ni application : le produit lui doit une
-    // conduite à tenir, pas un formulaire qui refuse. L'écran d'enrôlement arrive en step-028 ; d'ici
-    // là, l'écran nomme la marche à suivre au lieu d'être un cul-de-sac.
+    // Un opérateur tout juste amorcé n'a ni appareil ni application : le produit lui doit une sortie,
+    // pas un formulaire qui refuse. Depuis la step-028, cette sortie existe — et c'est un lien, pas
+    // une phrase qui décrit un recours.
     expect(screen.getByText(/Aucun second facteur enrôlé/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /posez-en un maintenant/ })).toHaveAttribute(
+      'href',
+      '/connexion/enrolement',
+    )
   })
 })

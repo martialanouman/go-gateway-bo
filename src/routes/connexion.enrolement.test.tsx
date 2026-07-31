@@ -279,6 +279,30 @@ describe('l’enrôlement d’une passkey', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('dernier second facteur')
   })
 
+  it('retire un appareil et le fait disparaître de la liste', async () => {
+    listPasskeys.mockResolvedValue([
+      { id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' },
+      { id: 'c2', name: 'Portable', createdAt: '2026-07-31T00:00:00Z' },
+    ])
+    revokePasskey.mockResolvedValue({
+      outcome: 'updated',
+      passkeys: [{ id: 'c2', name: 'Portable', createdAt: '2026-07-31T00:00:00Z' }],
+    })
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
+
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+    await screen.user.click(
+      (await screen.findAllByRole('button', { name: /Retirer/ }))[0] as HTMLElement,
+    )
+
+    // La liste vient du serveur, pas d'un retrait local : deux sources finiraient par diverger, et
+    // c'est l'affichage qui mentirait sur ce qui protège réellement le compte.
+    await vi.waitFor(() => {
+      expect(screen.queryByText('Poste')).toBeNull()
+    })
+    expect(screen.getByText('Portable')).toBeInTheDocument()
+  })
+
   it('traite l’abandon de la cérémonie autrement qu’une panne', async () => {
     registerPasskey.mockResolvedValue({
       outcome: 'cancelled',
@@ -295,7 +319,54 @@ describe('l’enrôlement d’une passkey', () => {
   })
 })
 
+describe('la sortie vers la console', () => {
+  it('relit la session avant de partir, et emmène l’opérateur', async () => {
+    startTotpEnrollment.mockResolvedValue({
+      outcome: 'started',
+      secret: SECRET,
+      uri: 'otpauth://x',
+    })
+    confirmTotpEnrollment.mockResolvedValue({ outcome: 'activated', recoveryCodes: RECOVERY })
+
+    // `/auth/me` répond ce qu'il répondrait après l'activation : une session **complète**. Sans
+    // relecture, la coquille garderait l'opérateur sans permission lu avant l'enrôlement, et la
+    // garde le renverrait ici — la boucle que `connexion.verification.tsx` a déjà connue.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ ...PARTIAL_OPERATOR, mfaCompleted: true })),
+    )
+
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
+
+    await screen.user.click(screen.getByRole('button', { name: /Préparer/ }))
+    await screen.user.type(await screen.findByLabelText(/Code à 6 chiffres/), '123456')
+    await screen.user.click(screen.getByRole('button', { name: /^Confirmer/ }))
+    await screen.findByText(RECOVERY[0] as string)
+
+    await screen.user.click(screen.getByRole('checkbox', { name: /J’ai noté ces codes/ }))
+    await screen.user.click(screen.getByRole('button', { name: /Continuer vers la console/ }))
+
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Tableau de bord')
+  })
+})
+
 describe('la garde de l’écran', () => {
+  it('montre un squelette tant que la session n’est pas connue', async () => {
+    // Peindre le formulaire avant de savoir **pour qui** enrôler laisserait un visiteur préparer un
+    // secret qui ne serait attaché à aucun compte.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {})),
+    )
+
+    const screen = await renderRoute('/connexion/enrolement', {
+      queryClient: createTestQueryClient(),
+    })
+
+    expect(await screen.findByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByRole('button', { name: /Préparer/ })).toBeNull()
+  })
+
   it('renvoie au login un visiteur sans session', async () => {
     const empty = createTestQueryClient()
     empty.setQueryData(OPERATOR_QUERY_KEY, null)

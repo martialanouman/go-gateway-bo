@@ -190,9 +190,13 @@ function TotpPanel() {
             de toute façon.
           */}
           <div className="ui-enroll__qr">
+            {/*
+              Aucune couleur passée en propriété : elles vivent dans `components.css`, où une règle
+              CSS l'emporte sur les attributs de présentation de la bibliothèque. Les écrire ici
+              aurait posé deux littéraux dans un fichier d'écran, là où personne n'aurait su
+              pourquoi ils ne suivent pas le thème — voir `--qr-paper` et `--qr-ink`.
+            */}
             <QRCodeSVG
-              bgColor="#ffffff"
-              fgColor="#000000"
               level="M"
               marginSize={2}
               size={176}

@@ -164,3 +164,23 @@ describe('RadioGroup', () => {
     expect(getByRole('radiogroup', { name: 'balance_scope' })).toBeInTheDocument()
   })
 })
+
+describe('l’exposition ARIA de la case', () => {
+  it('n’expose qu’une case, et elle porte le libellé', () => {
+    // **Ce test naît d'une fausse alerte, et c'est pour cela qu'il existe.** L'instantané ARIA de
+    // Playwright, pendant le parcours d'enrôlement (step-028), montrait deux entrées `checkbox` —
+    // l'une nommée, l'autre anonyme — et j'en ai conclu que le libellé nommait l'input masqué que
+    // Base UI rend pour la soumission de formulaire, laissant la case réelle anonyme. J'ai « corrigé »
+    // en posant un `aria-labelledby`.
+    //
+    // La mutation a tranché : retirer ce `aria-labelledby` ne fait rougir personne. Base UI associe
+    // déjà le libellé lui-même, et l'input porte `aria-hidden` — donc une seule case est exposée, et
+    // elle est nommée. Le correctif a été annulé ; ce qui reste est le test qui aurait dû être écrit
+    // d'abord, et qui garde le comportement réel contre une régression de la bibliothèque.
+    const { getAllByRole } = renderComponent(<Checkbox label="J’ai noté ces codes" />)
+
+    const exposed = getAllByRole('checkbox')
+    expect(exposed).toHaveLength(1)
+    expect(exposed[0]).toHaveAccessibleName('J’ai noté ces codes')
+  })
+})

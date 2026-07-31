@@ -111,7 +111,7 @@ sur tout écran touché • PR petite et focalisée (une step).
 - [x] step-024 — MFA WebAuthn / passkey
 - [x] step-025 — Moteur de permissions côté serveur + journal d'audit + MFA obligatoire
 - [x] step-026 — Rendu UI par permission + écrans Login & MFA †
-- [ ] step-028 — Écran d'enrôlement du second facteur ★
+- [x] step-028 — Écran d'enrôlement du second facteur ★
 - [ ] step-027 — Gestion des opérateurs et des rôles (CRUD) †
 
 † **Ces steps s'exécutent après `step-041`, `step-042` et `step-040`**, dans cet ordre :

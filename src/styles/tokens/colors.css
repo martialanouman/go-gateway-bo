@@ -75,6 +75,22 @@
   --surface-card: var(--n-800);
   --surface-raised: var(--n-800);
   --surface-sunken: var(--n-850);
+
+  /*
+   * Le QR code d'enrôlement — **la seule surface du produit qui ne suit pas le thème sombre**, et
+   * ce n'est pas une exception esthétique. Un lecteur de QR attend un contraste franc entre modules
+   * sombres et fond clair : inverser fait échouer la moitié des applications authenticator, et
+   * atténuer le blanc les fait échouer sur les téléphones à faible luminosité. Ces deux valeurs sont
+   * dictées par la norme, pas par la charte — d'où leurs propres tokens plutôt qu'un littéral perdu
+   * dans un écran, où personne ne saurait pourquoi il ne suit pas le reste.
+   *
+   * « papier » et « encre » plutôt que « clair » et « sombre » : la garde « aucun thème clair » de
+   * `charte.test.ts` cherche `light` dans les noms de tokens, et elle a raison de le faire — un
+   * `--qr-light` l'aurait fait rougir pour une bonne raison sur un cas qui n'en est pas un. Le nom
+   * juste évite d'avoir à assouplir la garde.
+   */
+  --qr-paper: #ffffff;
+  --qr-ink: #000000;
   --surface-hover: color-mix(in srgb, var(--n-50) 4%, var(--n-800));
   --surface-active: color-mix(in srgb, var(--n-50) 7%, var(--n-800));
   --surface-selected: var(--tint-teal);

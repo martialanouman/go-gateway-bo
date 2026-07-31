@@ -1266,16 +1266,21 @@
  * ───────────────────────────────────────────────────────────────────────────── */
 
 /*
- * Le QR code repose sur un fond clair, seul écart au thème sombre de tout le produit — et il est
- * imposé par le sujet : un lecteur de QR attend un contraste franc entre modules sombres et fond
- * clair, et l'inverser fait échouer la moitié des applications authenticator.
+ * Le QR code repose sur un fond clair : voir `--qr-paper` dans les tokens pour la raison, qui n'est
+ * pas esthétique. Les modules eux-mêmes sont peints ici plutôt que par les propriétés de la
+ * bibliothèque — une règle CSS l'emporte sur un attribut de présentation, et cela garde les deux
+ * couleurs du QR au même endroit.
  */
 .ui-enroll__qr {
   display: flex;
   justify-content: center;
   padding: var(--sp-5);
   border-radius: var(--r-field);
-  background: #ffffff;
+  background: var(--qr-paper);
+}
+
+.ui-enroll__qr svg path {
+  fill: var(--qr-ink);
 }
 
 .ui-enroll__secret {
