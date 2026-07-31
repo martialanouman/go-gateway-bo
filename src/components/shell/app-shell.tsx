@@ -61,7 +61,22 @@ export function AppShell({ children }: AppShellProps) {
           */}
           <header className="ui-shell__topbar">
             <span className="ui-shell__brand">SMS Gateway</span>
-            {operator ? <span className="ui-shell__operator">{operator.displayName}</span> : null}
+            {operator ? (
+              <span className="ui-shell__operator">
+                {operator.displayName}
+                {/*
+                  **La seule porte vers l'enrôlement depuis la console.** La step-028 demande que
+                  l'écran soit « atteignable volontairement pour ajouter un facteur à une session
+                  complète » ; il ne l'était que depuis le challenge, c'est-à-dire seulement pour qui
+                  n'en a aucun. Un opérateur voulant ajouter une passkey à son TOTP devait taper
+                  l'URL. Le lien vit ici plutôt que dans le rail : le rail se filtre par permission,
+                  et gérer **ses propres** facteurs n'en demande aucune.
+                */}
+                <Link className="ui-shell__factor" to="/connexion/enrolement">
+                  Second facteur
+                </Link>
+              </span>
+            ) : null}
           </header>
 
           <nav aria-label="Navigation principale" className="ui-shell__rail">

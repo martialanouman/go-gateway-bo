@@ -39,9 +39,21 @@ export type TabsProps = Omit<
   /** Voir `button.tsx` : Base UI type `className` en `string | ((state) => string)`, et on concatène. */
   readonly className?: string
   readonly tabs: readonly TabDefinition[]
+  /**
+   * Garde les panneaux montés, y compris celui qui n'est pas sélectionné.
+   *
+   * Base UI démonte le panneau caché par défaut, ce qui est le bon choix pour des onglets qui ne font
+   * qu'afficher : cela évite de payer le rendu de ce que personne ne regarde. Il devient un piège dès
+   * qu'un panneau **porte un état** — une saisie en cours, une cérémonie préparée. L'enrôlement du
+   * second facteur (step-028) l'a payé cher : un aller-retour d'onglet détruisait un secret déjà
+   * scanné, puis les codes de récupération, que rien ne peut réafficher.
+   *
+   * À demander explicitement, jamais par défaut : la plupart des onglets n'ont rien à conserver.
+   */
+  readonly keepMounted?: boolean
 }
 
-export function Tabs({ tabs, className, ...rest }: TabsProps) {
+export function Tabs({ tabs, className, keepMounted = false, ...rest }: TabsProps) {
   return (
     <BaseTabs.Root className={['ui-tabs', className].filter(Boolean).join(' ')} {...rest}>
       <BaseTabs.List className="ui-tabs__list">
@@ -61,7 +73,12 @@ export function Tabs({ tabs, className, ...rest }: TabsProps) {
 
       {tabs.map((tab) =>
         tab.panel === undefined ? null : (
-          <BaseTabs.Panel className="ui-tabs__panel" key={tab.value} value={tab.value}>
+          <BaseTabs.Panel
+            className="ui-tabs__panel"
+            key={tab.value}
+            keepMounted={keepMounted}
+            value={tab.value}
+          >
             {tab.panel}
           </BaseTabs.Panel>
         ),

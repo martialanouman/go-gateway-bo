@@ -18,12 +18,12 @@
  * ## Ce que cet écran ne fait pas
  *
  * Il n'enrôle rien. Un opérateur sans aucun facteur — le premier administrateur, notamment — ne peut
- * pas franchir cette porte, et c'est la `step-028` qui lui ouvrira l'écran d'enrôlement. D'ici là,
- * l'écran **nomme la marche à suivre** plutôt que de le laisser devant un formulaire qui refuse.
+ * franchir aucun des deux onglets, et c'est `/connexion/enrolement` (step-028) qui lui pose un
+ * facteur. L'écran y renvoie explicitement plutôt que de le laisser devant un formulaire qui refuse.
  */
 
 import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Navigate } from '@tanstack/react-router'
+import { createFileRoute, Link, Navigate } from '@tanstack/react-router'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { verifyPasskey, verifyTotp } from '~/components/auth/api'
 import { useFocusHeading } from '~/components/auth/focus-heading'
@@ -298,16 +298,14 @@ function MfaChallengeScreen() {
         des deux onglets ne peut aboutir pour lui : le produit lui doit une conduite à tenir.
       */}
       {/*
-        La conduite à tenir est **de ne rien promettre**. Une version précédente disait « signalez-le
-        à l'administrateur de la console » — or le destinataire de cette phrase est justement le
-        premier administrateur, celui qu'`installFirstAdministrator` crée sans facteur, et la
-        réinitialisation par un tiers est renvoyée à la step-027. Il n'y avait personne à qui
-        signaler. Nommer un remède inexistant est pire qu'un cul-de-sac reconnu.
+        **Le cul-de-sac est maintenant une porte.** Deux versions de cette phrase ont dû être
+        corrigées avant d'y arriver : la première renvoyait vers un administrateur qui, pour le
+        premier compte installé, n'existe pas ; la seconde reconnaissait honnêtement n'avoir aucun
+        recours à offrir. La step-028 en fournit un.
       */}
       <p className="ui-auth__note">
-        Aucun second facteur enrôlé ? Aucun des deux onglets ne peut alors aboutir : l’écran
-        d’enrôlement arrive au jalon M1 (step-028), et rien ne permet encore d’en poser un depuis
-        l’interface.
+        Aucun second facteur enrôlé ? Aucun des deux onglets ne peut alors aboutir —{' '}
+        <Link to="/connexion/enrolement">posez-en un maintenant</Link>.
       </p>
     </div>
   )

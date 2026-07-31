@@ -75,6 +75,24 @@
   --surface-card: var(--n-800);
   --surface-raised: var(--n-800);
   --surface-sunken: var(--n-850);
+
+  /*
+   * Le QR code d'enrôlement — **la seule surface du produit qui ne suit pas le thème sombre**, et
+   * ce n'est pas une exception esthétique. Un lecteur de QR attend un contraste franc entre modules
+   * sombres et fond clair : inverser fait échouer la moitié des applications authenticator, et
+   * atténuer le blanc les fait échouer sur les téléphones à faible luminosité.
+   *
+   * **Seul le fond de la vignette est un token.** Les modules du QR gardent le noir pur que la
+   * bibliothèque pose elle-même : les peindre par CSS a coûté un carré uni, `qrcode.react` émettant
+   * deux chemins qu'un même sélecteur prenait tous les deux — voir `.ui-enroll__qr` dans
+   * `components.css`.
+   *
+   * « papier » plutôt que « clair » : la garde « aucun thème clair » de `charte.test.ts` cherche
+   * `light` dans les noms de tokens, et elle a raison de le faire. Un `--qr-light` l'aurait fait
+   * rougir pour une bonne raison sur un cas qui n'en est pas un ; le nom juste évite d'avoir à
+   * assouplir la garde.
+   */
+  --qr-paper: #ffffff;
   --surface-hover: color-mix(in srgb, var(--n-50) 4%, var(--n-800));
   --surface-active: color-mix(in srgb, var(--n-50) 7%, var(--n-800));
   --surface-selected: var(--tint-teal);

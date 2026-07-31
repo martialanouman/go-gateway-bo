@@ -1260,3 +1260,107 @@
   font: var(--text-data-sm);
   color: var(--text-faint);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * L'enrôlement du second facteur (step-028)
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/*
+ * Le QR code repose sur un fond clair : voir `--qr-paper` dans les tokens pour la raison, qui n'est
+ * pas esthétique.
+ *
+ * **Aucune règle ne peint le SVG lui-même**, et c'est une correction. Une version précédente posait
+ * `.ui-enroll__qr svg path { fill: var(--qr-ink) }` pour garder les deux couleurs au même endroit :
+ * `qrcode.react` émet **deux** chemins — le fond, puis les modules — et la règle peignait les deux
+ * en noir. Le QR devenait un carré uni de 176 pixels, illisible par toute application authenticator,
+ * sur le chemin que cet écran met délibérément en premier. Ni jsdom ni l'assertion de visibilité du
+ * parcours ne pouvaient le voir.
+ *
+ * Les valeurs par défaut de la bibliothèque — noir pur sur blanc pur — sont exactement celles que la
+ * norme de lecture demande : on ne les remplace pas.
+ */
+.ui-enroll__qr {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-5);
+  border-radius: var(--r-field);
+  background: var(--qr-paper);
+}
+
+.ui-enroll__step {
+  margin: 0;
+  font: var(--text-section-title);
+  color: var(--text-primary);
+}
+
+.ui-enroll__step:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--sp-2);
+}
+
+.ui-enroll__secret {
+  margin: 0;
+  font: var(--text-body);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ui-enroll__secret code {
+  font: var(--text-data);
+  color: var(--text-primary);
+}
+
+.ui-enroll__codes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+  margin: 0;
+  padding: var(--sp-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-field);
+  background: var(--surface-sunken);
+  list-style: none;
+}
+
+.ui-enroll__codes code {
+  font: var(--text-data);
+  color: var(--text-primary);
+}
+
+.ui-enroll__devices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-enroll__devices li {
+  display: flex;
+  gap: var(--sp-5);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-field);
+  font: var(--text-body);
+  color: var(--text-primary);
+}
+
+/*
+ * Le lien vers l'enrôlement, dans la barre supérieure. Discret par défaut — ce n'est pas une action
+ * quotidienne — mais jamais masqué : c'est le seul chemin vers ses propres facteurs depuis la
+ * console.
+ */
+.ui-shell__factor {
+  margin-left: var(--sp-5);
+  /*
+   * `--text-body` et non `--text-data-sm` : la charte réserve la mono aux identifiants techniques
+   * verbatim du contrat, et « Second facteur » est de la prose. Et `--text-link` dès le repos, sans
+   * quoi le lien prenait exactement la couleur du nom d'opérateur qui l'entoure — les liens n'étant
+   * pas soulignés globalement, rien ne le distinguait d'un morceau de texte.
+   */
+  font: var(--text-body);
+  color: var(--text-link);
+}

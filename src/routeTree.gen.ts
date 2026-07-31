@@ -31,6 +31,7 @@ import { Route as ShellScriptsRouteImport } from './routes/_shell.scripts'
 import { Route as ShellSessionsRouteImport } from './routes/_shell.sessions'
 import { Route as ShellTraficRouteImport } from './routes/_shell.trafic'
 import { Route as ConnexionIndexRouteImport } from './routes/connexion.index'
+import { Route as ConnexionEnrolementRouteImport } from './routes/connexion.enrolement'
 import { Route as ConnexionVerificationRouteImport } from './routes/connexion.verification'
 
 const IndexRoute = IndexRouteImport.update({
@@ -142,6 +143,11 @@ const ConnexionIndexRoute = ConnexionIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ConnexionRoute,
 } as any)
+const ConnexionEnrolementRoute = ConnexionEnrolementRouteImport.update({
+  id: '/enrolement',
+  path: '/enrolement',
+  getParentRoute: () => ConnexionRoute,
+} as any)
 const ConnexionVerificationRoute = ConnexionVerificationRouteImport.update({
   id: '/verification',
   path: '/verification',
@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/scripts': typeof ShellScriptsRoute
   '/sessions': typeof ShellSessionsRoute
   '/trafic': typeof ShellTraficRoute
+  '/connexion/enrolement': typeof ConnexionEnrolementRoute
   '/connexion/verification': typeof ConnexionVerificationRoute
   '/connexion/': typeof ConnexionIndexRoute
 }
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/scripts': typeof ShellScriptsRoute
   '/sessions': typeof ShellSessionsRoute
   '/trafic': typeof ShellTraficRoute
+  '/connexion/enrolement': typeof ConnexionEnrolementRoute
   '/connexion/verification': typeof ConnexionVerificationRoute
   '/connexion': typeof ConnexionIndexRoute
 }
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/_shell/scripts': typeof ShellScriptsRoute
   '/_shell/sessions': typeof ShellSessionsRoute
   '/_shell/trafic': typeof ShellTraficRoute
+  '/connexion/enrolement': typeof ConnexionEnrolementRoute
   '/connexion/verification': typeof ConnexionVerificationRoute
   '/connexion/': typeof ConnexionIndexRoute
 }
@@ -244,6 +253,7 @@ export interface FileRouteTypes {
     | '/scripts'
     | '/sessions'
     | '/trafic'
+    | '/connexion/enrolement'
     | '/connexion/verification'
     | '/connexion/'
   fileRoutesByTo: FileRoutesByTo
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/scripts'
     | '/sessions'
     | '/trafic'
+    | '/connexion/enrolement'
     | '/connexion/verification'
     | '/connexion'
   id:
@@ -292,6 +303,7 @@ export interface FileRouteTypes {
     | '/_shell/scripts'
     | '/_shell/sessions'
     | '/_shell/trafic'
+    | '/connexion/enrolement'
     | '/connexion/verification'
     | '/connexion/'
   fileRoutesById: FileRoutesById
@@ -459,6 +471,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnexionIndexRouteImport
       parentRoute: typeof ConnexionRoute
     }
+    '/connexion/enrolement': {
+      id: '/connexion/enrolement'
+      path: '/enrolement'
+      fullPath: '/connexion/enrolement'
+      preLoaderRoute: typeof ConnexionEnrolementRouteImport
+      parentRoute: typeof ConnexionRoute
+    }
     '/connexion/verification': {
       id: '/connexion/verification'
       path: '/verification'
@@ -512,11 +531,13 @@ const ShellRouteChildren: ShellRouteChildren = {
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 
 interface ConnexionRouteChildren {
+  ConnexionEnrolementRoute: typeof ConnexionEnrolementRoute
   ConnexionVerificationRoute: typeof ConnexionVerificationRoute
   ConnexionIndexRoute: typeof ConnexionIndexRoute
 }
 
 const ConnexionRouteChildren: ConnexionRouteChildren = {
+  ConnexionEnrolementRoute: ConnexionEnrolementRoute,
   ConnexionVerificationRoute: ConnexionVerificationRoute,
   ConnexionIndexRoute: ConnexionIndexRoute,
 }
