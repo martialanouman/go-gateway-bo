@@ -522,8 +522,14 @@ describe('l’écran ouvert depuis la console', () => {
     // porte était à sens unique et seul le bouton du navigateur en sortait.
     const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
 
-    expect(screen.getByText(/Ajoutez un second facteur/)).toBeInTheDocument()
+    expect(screen.getByText(/Ajoutez un facteur à ce compte/)).toBeInTheDocument()
     expect(screen.queryByText(/requis pour ouvrir la console/)).toBeNull()
+
+    // **Et elle ne renvoie pas vers un administrateur.** Une version précédente disait « le
+    // remplacer passe par un administrateur » : faux pour qui n'a qu'une passkey — `noOtherFactorFrom`
+    // dispense une session active de toute exclusion, et le serveur a un test dédié pour l'ajout d'un
+    // TOTP à côté d'une passkey. Le retrait est en libre-service tant qu'il reste un facteur.
+    expect(screen.queryByText(/passe par un administrateur/)).toBeNull()
     expect(screen.getByRole('link', { name: /Revenir à la console/ })).toHaveAttribute('href', '/')
   })
 
@@ -533,6 +539,80 @@ describe('l’écran ouvert depuis la console', () => {
     const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
 
     expect(screen.getByRole('tab', { name: /Passkey/i })).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+describe('ce que les onglets et la cérémonie conservent', () => {
+  it('ne perd pas un code à moitié tapé quand l’opérateur change d’onglet', async () => {
+    // **Ce que `keepMounted` protège.** Base UI démonte le panneau caché : un aller-retour d'onglet
+    // effaçait la saisie en cours, et le message qui expliquait pourquoi le code précédent avait été
+    // refusé.
+    startTotpEnrollment.mockResolvedValue({
+      outcome: 'started',
+      secret: SECRET,
+      uri: 'otpauth://x',
+    })
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
+
+    await screen.user.click(screen.getByRole('button', { name: /Préparer/ }))
+    await screen.user.type(await screen.findByLabelText(/Code à 6 chiffres/), '123')
+
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+    await screen.user.click(screen.getByRole('tab', { name: /authenticator/i }))
+
+    expect(screen.getByLabelText(/Code à 6 chiffres/)).toHaveValue('123')
+  })
+
+  it('relit la session après la cérémonie, ce qui débloque le retrait', async () => {
+    // La cérémonie promeut la session côté serveur. Sans relecture, `canRemove` restait figé sur le
+    // cache d'avant : les boutons de retrait restaient bloqués sous une explication devenue fausse.
+    registerPasskey.mockResolvedValue({
+      outcome: 'registered',
+      passkeys: [{ id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' }],
+    })
+
+    let completed = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ ...PARTIAL_OPERATOR, mfaCompleted: completed })),
+    )
+
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+    await screen.user.type(screen.getByLabelText(/Nom de l’appareil/), 'Poste')
+
+    completed = true
+    await screen.user.click(screen.getByRole('button', { name: /Enregistrer cet appareil/ }))
+
+    // Le succès s'annonce — troisième transition de l'écran, longtemps la seule restée muette.
+    expect(await screen.findByRole('heading', { name: 'Appareil enregistré' })).toBeInTheDocument()
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /Retirer Poste/ })).not.toHaveAttribute(
+        'aria-disabled',
+      )
+    })
+    expect(screen.queryByText(/demande une session complète/)).toBeNull()
+  })
+
+  it('relit la liste quand le retrait ne la renvoie pas', async () => {
+    listPasskeys
+      .mockResolvedValueOnce({
+        outcome: 'listed',
+        passkeys: [{ id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' }],
+      })
+      .mockResolvedValue({ outcome: 'listed', passkeys: [] })
+    revokePasskey.mockResolvedValue({ outcome: 'updated' })
+
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+    await screen.user.click(await screen.findByRole('button', { name: /Retirer Poste/ }))
+
+    // Garder la liste précédente afficherait un appareil qu'on vient de supprimer, et un second clic
+    // répondrait « cet appareil n'est pas enregistré ».
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Retirer Poste/ })).toBeNull()
+    })
   })
 })
 

@@ -95,13 +95,20 @@ function EnrollmentScreen() {
           second facteur est requis pour ouvrir la console » — et le lien ajouté dans la barre y
           amène désormais quelqu'un dont la console est déjà ouverte et qui a déjà un facteur. Lui
           servir la première phrase lui fait croire qu'il a perdu son accès.
+
+          La seconde version disait « le remplacer passe par un administrateur ». Faux pour la moitié
+          des opérateurs : `noOtherFactorFrom` dispense une session **active** de toute exclusion, si
+          bien qu'une opératrice authentifiée par passkey peut ajouter un TOTP à côté — le serveur a
+          un test dédié pour ce cas. Et le retrait est en libre-service tant qu'il reste un facteur,
+          ce que `LAST_FACTOR_MESSAGE` prescrit lui-même. La phrase envoyait à une porte
+          administrative pour un geste offert dix lignes plus bas.
         */}
         {totp.phase === 'activated' ? (
           <p>Conservez vos codes de récupération avant de continuer.</p>
         ) : status === 'complete' ? (
           <p>
-            Ajoutez un second facteur à ce compte. Celui que vous utilisez déjà reste actif — le
-            remplacer passe par un administrateur.
+            Ajoutez un facteur à ce compte. Ceux que vous utilisez déjà restent actifs, et vous
+            pouvez en retirer un tant qu’il vous en reste au moins un.
           </p>
         ) : (
           <p>
@@ -140,9 +147,13 @@ function EnrollmentScreen() {
           ) : null}
 
           <Tabs
-            // Une session complète a déjà un facteur : lui ouvrir l'onglet TOTP la mènerait au
-            // bouton primaire « Préparer l'enrôlement », que le serveur refuse en 409. On lui ouvre
-            // l'onglet qui peut aboutir — ajouter un appareil.
+            // **On ne sait pas quel facteur détient une session complète** : `/auth/me` ne le dit
+            // pas. Ouvrir l'onglet TOTP mènerait au bouton primaire « Préparer l'enrôlement », qui
+            // aboutit pour qui n'a qu'une passkey et rend 409 pour qui a déjà un TOTP. Ajouter un
+            // appareil, lui, aboutit dans les deux cas : c'est cet onglet qu'on ouvre.
+            //
+            // Une version précédente justifiait ce choix par « le serveur refuse en 409 », ce qui
+            // n'est vrai que d'une des deux moitiés.
             defaultValue={status === 'complete' ? 'passkey' : 'totp'}
             // Les panneaux restent montés : un aller-retour d'onglet perdait un code à moitié tapé
             // et le message qui expliquait pourquoi le précédent avait été refusé.
@@ -492,9 +503,12 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
     setBusy(false)
 
     if (result.outcome === 'registered') {
-      // `passkeys` peut manquer : garder alors celle qu'on affichait plutôt que de faire disparaître
-      // l'appareil qu'on vient d'enregistrer.
-      if (result.passkeys) setList({ outcome: 'listed', passkeys: result.passkeys })
+      // `passkeys` peut manquer. Garder la liste précédente ne suffit pas : quand celle-ci est vide
+      // — le cas du premier appareil — l'écran annonçait « Appareil enregistré » au-dessus de zéro
+      // ligne, sans rien qui dise que l'appareil existe. On relit, comme au retrait.
+      setList(
+        result.passkeys ? { outcome: 'listed', passkeys: result.passkeys } : await listPasskeys(),
+      )
       setName('')
       // La cérémonie promeut la session côté serveur, et cet écran vit **hors de la coquille** : sans
       // sortie explicite, l'opérateur se retrouvait avec une session complète et aucun moyen d'entrer
@@ -520,7 +534,6 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
     setNotice(undefined)
 
     const result = await revokePasskey(credentialId)
-    setBusy(false)
 
     if (result.outcome === 'updated') {
       // **Sur un retrait, garder la liste précédente serait mentir** : elle contiendrait encore
@@ -529,8 +542,15 @@ function PasskeyPanel({ status }: { readonly status: 'partial' | 'complete' }) {
       setList(
         result.passkeys ? { outcome: 'listed', passkeys: result.passkeys } : await listPasskeys(),
       )
+      // **`busy` tient jusqu'à la relecture.** Le relâcher avant laissait l'appareil supprimé
+      // affiché avec un bouton actif : un second clic partait sur un identifiant déjà retiré, et le
+      // serveur répondait « cet appareil n'est pas enregistré » — le scénario que le commentaire
+      // ci-dessus dit prévenir.
+      setBusy(false)
       return
     }
+
+    setBusy(false)
 
     // Le refus du dernier facteur passe par ici : le message du serveur dit **pourquoi**, et c'est
     // ce qui empêche l'opérateur de se verrouiller dehors.
