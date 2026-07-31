@@ -1364,3 +1364,135 @@
   font: var(--text-body);
   color: var(--text-link);
 }
+
+/* ═══ L'annuaire — opérateurs et rôles (step-027) ═══════════════════════════════════════════════ */
+
+/*
+ * Le bandeau de refus d'une action. Même forme que celui de l'authentification — même teinte, même
+ * texte sur teinte — mais posé dans le flux d'un écran plutôt que dans une carte : il apparaît sous
+ * le titre, au-dessus du contenu qui, lui, reste affiché.
+ */
+.ui-directory__refusal {
+  margin: 0 0 var(--sp-6);
+  padding: var(--sp-5);
+  border: 1px solid var(--action-danger-border);
+  border-radius: var(--r-field);
+  background: var(--tint-red);
+  font: var(--text-body);
+  color: var(--text-danger-on-tint);
+}
+
+/* L'écran qu'on atteint sans la permission : expliqué, jamais une page blanche ni une erreur. */
+.ui-directory__blocked {
+  padding: var(--pad-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-card);
+  background: var(--surface-card);
+}
+
+.ui-directory__blocked-title {
+  margin: 0 0 var(--sp-4);
+  font: var(--text-card-title);
+  color: var(--text-primary);
+}
+
+.ui-directory__blocked-body {
+  margin: 0;
+  font: var(--text-body);
+  color: var(--text-muted);
+}
+
+/*
+ * Une valeur machine : nom de rôle, clé de permission, adresse de connexion. Mono, parce que
+ * l'opérateur la grep — la charte réserve la mono à cela et la refuse au texte narratif.
+ */
+.ui-directory__key {
+  font: var(--text-data-sm);
+  color: var(--text-primary);
+}
+
+.ui-directory__identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.ui-directory__name {
+  font: var(--text-body);
+  color: var(--text-primary);
+}
+
+.ui-directory__email {
+  font: var(--text-data-sm);
+  color: var(--text-muted);
+}
+
+/* Une absence, et non une valeur : elle se lit en retrait, sans passer pour un identifiant. */
+.ui-directory__none {
+  font: var(--text-body);
+  color: var(--text-faint);
+}
+
+.ui-directory__roles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ui-directory__roles-legend {
+  padding: 0 0 var(--sp-3);
+  font: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.ui-directory__empty-roles {
+  margin: 0;
+  font: var(--text-body);
+  color: var(--text-muted);
+}
+
+/*
+ * Le mot de passe initial, montré une seule fois. Encadré et teinté teal : c'est la seule valeur de
+ * l'écran qui disparaît pour de bon si on ne la note pas, et elle doit se distinguer du reste de la
+ * modale au premier regard.
+ */
+.ui-directory__secret {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  border: 1px solid var(--action-primary-border);
+  border-radius: var(--r-field);
+  background: var(--tint-teal);
+}
+
+.ui-directory__secret-label {
+  margin: 0;
+  font: var(--text-overline);
+  letter-spacing: var(--ls-caps);
+  color: var(--text-accent);
+}
+
+.ui-directory__secret-value {
+  font: var(--text-data);
+  letter-spacing: var(--ls-mono);
+  color: var(--text-primary);
+  /* Sélectionnable d'un geste : il se recopie dans un gestionnaire de mots de passe, pas à la main. */
+  user-select: all;
+}
+
+.ui-directory__secret-note {
+  margin: 0;
+  font: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.ui-directory__busy {
+  display: block;
+  margin-top: var(--sp-5);
+  font: var(--text-caption);
+  color: var(--text-muted);
+}
