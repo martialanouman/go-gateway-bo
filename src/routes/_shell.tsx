@@ -40,9 +40,10 @@
 
 import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { sessionRedirect } from '~/components/auth/session-gate'
-import { useCurrentOperator } from '~/components/permission'
+import { SessionBoundary } from '~/components/auth/session-boundary'
+import { sessionRedirect, useSessionStatus } from '~/components/auth/session-gate'
 import { AppShell } from '~/components/shell'
+import { Loading } from '~/components/states'
 
 export const Route = createFileRoute('/_shell')({
   component: ShellLayout,
@@ -50,8 +51,8 @@ export const Route = createFileRoute('/_shell')({
 
 function ShellLayout() {
   const navigate = useNavigate()
-  const { data: operator } = useCurrentOperator()
-  const to = sessionRedirect(operator)
+  const { status, retry } = useSessionStatus()
+  const to = sessionRedirect(status)
 
   // Dans un effet, et non pendant le rendu : naviguer pendant le rendu d'un composant est refusé par
   // React, et le ferait au milieu de la peinture de la coquille.
@@ -59,9 +60,18 @@ function ShellLayout() {
     if (to) void navigate({ to, replace: true })
   }, [to, navigate])
 
+  // **La coquille ne se peint pas avant d'être méritée.** La version précédente la rendait
+  // inconditionnellement : un anonyme voyait la barre et le rail apparaître puis disparaître, et —
+  // plus grave — l'écran cible se montait pour un visiteur qu'on était en train d'expulser. Rien ne
+  // fuit aujourd'hui, les écrans sous la coquille étant des états vides ; le jour où l'un d'eux
+  // déclenche une lecture auditée au montage, l'invariant (a) ne doit pas reposer sur ce hasard.
+  if (to) return <Loading label="Ouverture de la console" rows={6} />
+
   return (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <SessionBoundary label="Ouverture de la console" retry={retry} rows={6} status={status}>
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    </SessionBoundary>
   )
 }

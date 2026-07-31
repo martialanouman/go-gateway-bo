@@ -31,6 +31,21 @@ function clientWithPermissions(permissions: readonly string[]): QueryClient {
   return client
 }
 
+describe('la racine, quand la session manque', () => {
+  it('renvoie un anonyme au login plutôt que de lui parler de rôles', async () => {
+    // **L'URL la plus tapée du produit, et elle n'était pas gardée.** Un visiteur sans session y
+    // lisait « Aucun écran n'est accessible avec les permissions de ce compte. Demandez un rôle à un
+    // administrateur. » — une copie qui impute à un problème de rôle ce qui est une absence de
+    // session, et qui envoie l'opérateur ouvrir un ticket au lieu de se connecter.
+    const empty = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    empty.setQueryData(OPERATOR_QUERY_KEY, null)
+
+    const { findByRole } = await renderRoute('/', { queryClient: empty })
+
+    expect(await findByRole('heading', { level: 1 })).toHaveTextContent('Connexion opérateur')
+  })
+})
+
 describe('la racine', () => {
   it('mène au premier écran accessible', async () => {
     const { findByRole } = await renderRoute('/', {

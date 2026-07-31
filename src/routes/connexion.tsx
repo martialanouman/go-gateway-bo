@@ -13,6 +13,10 @@
  * `/connexion` et `/connexion/verification` partagent la marque, la largeur et le bandeau du bas.
  * Les dupliquer aurait fait diverger les deux moitiés d'un même geste — et le second écran, moins
  * regardé, aurait pris du retard.
+ *
+ * Le `<main>` enveloppe **tout le panneau**, marque et note comprises. Une première version ne
+ * l'enroulait qu'autour de la carte, ce qui laissait ces deux blocs hors de tout repère : un
+ * opérateur qui navigue par landmarks ne les atteignait jamais.
  */
 
 import { createFileRoute, Outlet } from '@tanstack/react-router'
@@ -23,7 +27,7 @@ export const Route = createFileRoute('/connexion')({
 
 function AuthLayout() {
   return (
-    <div className="ui-auth">
+    <main className="ui-auth">
       <div className="ui-auth__panel">
         <div className="ui-auth__brand">
           <span aria-hidden="true" className="ui-auth__mark">
@@ -35,20 +39,23 @@ function AuthLayout() {
           </span>
         </div>
 
-        <main className="ui-auth__card">
+        <div className="ui-auth__card">
           <Outlet />
-        </main>
+        </div>
 
         {/*
-          Un fait, pas une promesse. La charte interdit « sécurisé » comme argument : on dit ce que
-          la protection couvre — les identifiants ne quittent pas la couche serveur — et on s'arrête
-          là, sans laisser entendre que tout le reste serait garanti.
+          Un fait, et il a fallu s'y reprendre. La première version annonçait que « les identifiants
+          ne quittent pas la couche serveur » — sous un formulaire où l'opérateur tape justement son
+          mot de passe dans son navigateur, d'où il part en clair vers le BFF. La phrase promettait
+          une frontière que le geste en cours traverse. La charte demande de dire ce que la
+          protection couvre **et où elle s'arrête** ; c'est ce que dit celle-ci.
         */}
         <p className="ui-auth__note">
-          Les identifiants ne quittent pas la couche serveur : hachage, enrôlement TOTP et
-          cérémonies WebAuthn sont traités par le BFF, qui émet sa propre session signée.
+          Le mot de passe n’est jamais conservé en clair, et ni le secret TOTP ni les clés
+          d’appareil ne sont renvoyés au navigateur. La saisie, elle, voyage jusqu’au serveur : elle
+          n’est protégée que par le chiffrement du transport.
         </p>
       </div>
-    </div>
+    </main>
   )
 }

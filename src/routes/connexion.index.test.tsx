@@ -31,6 +31,15 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+/** Ce que `/auth/me` répond juste après un mot de passe accepté. */
+const PARTIAL_OPERATOR = {
+  id: 'op-1',
+  email: 'operatrice@example.test',
+  displayName: 'Opératrice',
+  permissions: [],
+  mfaCompleted: false,
+} as const
+
 /** Remplit et soumet, comme un opérateur : par le clavier et par les libellés, jamais par un id. */
 async function submitCredentials(
   screen: Awaited<ReturnType<typeof renderRoute>>,
@@ -61,19 +70,27 @@ describe('l’écran de connexion', () => {
   })
 
   it('mène au second facteur quand le mot de passe passe', async () => {
-    login.mockResolvedValue({ outcome: 'mfa_required' })
-
-    // Le cache amorcé tient lieu de ce que `/auth/me` répondrait une fois le mot de passe accepté :
-    // une session **partielle**, qui sait qui s'authentifie et ne porte aucune permission. Sans
-    // elle, l'écran d'arrivée n'aurait rien à compléter et renverrait aussitôt ici.
+    // On part de l'état réel : **aucune session**. Amorcer le cache avec une session partielle
+    // renverrait immédiatement au second facteur sans laisser taper quoi que ce soit — c'est
+    // précisément la garde en sens inverse que cet écran porte désormais.
     const client = createTestQueryClient()
-    client.setQueryData(OPERATOR_QUERY_KEY, {
-      id: 'op-1',
-      email: 'operatrice@example.test',
-      displayName: 'Opératrice',
-      permissions: [],
-      mfaCompleted: false,
+    client.setQueryData(OPERATOR_QUERY_KEY, null)
+
+    // Et `/auth/me` **change de réponse** au moment du login, comme le vrai : 401 avant, session
+    // partielle après. Un stub constant faisait basculer l'écran dès le montage, puisque le client
+    // de test tient tout pour périmé et rafraîchit aussitôt — le formulaire disparaissait avant que
+    // le mot de passe soit tapé.
+    let authenticated = false
+    login.mockImplementation(async () => {
+      authenticated = true
+      return { outcome: 'mfa_required' }
     })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        authenticated ? Response.json(PARTIAL_OPERATOR) : new Response(null, { status: 401 }),
+      ),
+    )
 
     const screen = await renderRoute('/connexion', { queryClient: client })
 
@@ -86,6 +103,24 @@ describe('l’écran de connexion', () => {
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
       'Vérification en deux étapes',
     )
+  })
+
+  it('n’offre pas de se reconnecter à qui est déjà connecté', async () => {
+    // Un opérateur qui ouvre son signet `/connexion` recevait le formulaire, ressaisissait son mot
+    // de passe et ouvrait une seconde session pour rien — en consommant une tentative du compteur
+    // anti-brute-force si sa saisie ratait.
+    const client = createTestQueryClient()
+    client.setQueryData(OPERATOR_QUERY_KEY, { ...PARTIAL_OPERATOR, mfaCompleted: true })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ ...PARTIAL_OPERATOR, mfaCompleted: true })),
+    )
+
+    const screen = await renderRoute('/connexion', { queryClient: client })
+
+    await vi.waitFor(() => {
+      expect(screen.queryByLabelText(/Mot de passe/)).toBeNull()
+    })
   })
 
   it('relit la session avant de partir au second facteur', async () => {
@@ -106,15 +141,7 @@ describe('l’écran de connexion', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        Response.json({
-          id: 'op-1',
-          email: 'operatrice@example.test',
-          displayName: 'Opératrice',
-          permissions: [],
-          mfaCompleted: false,
-        }),
-      ),
+      vi.fn(async () => Response.json(PARTIAL_OPERATOR)),
     )
 
     const screen = await renderRoute('/connexion', { queryClient: client })
@@ -123,6 +150,54 @@ describe('l’écran de connexion', () => {
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
       'Vérification en deux étapes',
     )
+  })
+
+  it('n’appelle pas une panne du serveur un refus', async () => {
+    // Une panne et un mot de passe faux sont deux des cinq états de contenu, et les peindre à
+    // l'identique fait conclure à un identifiant devenu invalide pendant une indisponibilité du BFF.
+    // L'opérateur essaie des variantes, puis appelle le support pour une réinitialisation dont il
+    // n'a pas besoin.
+    login.mockResolvedValue({ outcome: 'unreachable', message: 'Le serveur n’a pas répondu.' })
+    const screen = await renderRoute('/connexion')
+
+    await submitCredentials(screen)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).not.toHaveTextContent(/refus/i)
+    expect(alert).toHaveTextContent(/n’a pas répondu/)
+
+    // Pas de bouton « Réessayer » séparé : le formulaire **est** la reprise, et il reste utilisable.
+    // En ajouter un deuxième laisserait l'opérateur choisir entre deux façons de faire la même
+    // chose, dont une seule renvoie ses identifiants.
+    expect(screen.getByRole('button', { name: /Continuer/ })).toBeInTheDocument()
+  })
+
+  it('part quand même au second facteur si la relecture de session échoue', async () => {
+    // Le mot de passe est accepté : c'est acquis, et un `/auth/me` qui tombe juste après ne doit pas
+    // retenir l'opérateur sur un formulaire qu'il vient de remplir avec succès. L'écran suivant
+    // portera lui-même l'état de panne.
+    const client = createTestQueryClient()
+    client.setQueryData(OPERATOR_QUERY_KEY, null)
+
+    let authenticated = false
+    login.mockImplementation(async () => {
+      authenticated = true
+      return { outcome: 'mfa_required' }
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        authenticated ? new Response('nope', { status: 502 }) : new Response(null, { status: 401 }),
+      ),
+    )
+
+    const screen = await renderRoute('/connexion', { queryClient: client })
+    await submitCredentials(screen)
+
+    // Ni exception non gérée, ni formulaire figé sur « Connexion en cours ».
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Connexion en cours/ })).toBeNull()
+    })
   })
 
   it('affiche le refus du serveur sans rien y ajouter', async () => {
@@ -202,9 +277,18 @@ describe('l’écran de connexion', () => {
     await submitCredentials(screen, 'operatrice@example.test', 'un-secret-a-ne-pas-repeindre')
     await screen.findByRole('alert')
 
-    // Ni dans l'URL, ni dans un message, ni dans un attribut de trace. Le champ est de type
-    // `password` et sa valeur ne se lit pas dans le texte rendu.
-    expect(document.body.textContent).not.toContain('un-secret-a-ne-pas-repeindre')
+    // **Le document privé de son champ de mot de passe**, et non `textContent`. La valeur d'un
+    // `<input>` est une propriété que `textContent` ne rend jamais : l'assertion précédente passait
+    // donc même si le mot de passe avait été recopié dans un attribut `value` ou `data-*` ailleurs.
+    // React reflète bien la valeur en attribut — c'est visible dans le sérialisé — d'où le retrait
+    // du champ légitime avant de regarder tout le reste.
+    const elsewhere = document.body.cloneNode(true) as HTMLElement
+    for (const field of elsewhere.querySelectorAll('input[type="password"]')) field.remove()
+
+    expect(elsewhere.innerHTML).not.toContain('un-secret-a-ne-pas-repeindre')
     expect(window.location.href).not.toContain('un-secret-a-ne-pas-repeindre')
+
+    // Et le champ reste masqué : `type="password"` est ce qui empêche l'épaule voisine de lire.
+    expect(screen.getByLabelText(/Mot de passe/)).toHaveAttribute('type', 'password')
   })
 })

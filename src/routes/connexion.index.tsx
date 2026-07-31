@@ -15,11 +15,14 @@
  */
 
 import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Navigate, useNavigate } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
 import { login } from '~/components/auth/api'
+import { useFocusHeading } from '~/components/auth/focus-heading'
+import { useSessionStatus } from '~/components/auth/session-gate'
 import { operatorQueryOptions } from '~/components/permission'
 import { Button, TextField } from '~/components/primitives'
+import { ErrorState } from '~/components/states'
 
 export const Route = createFileRoute('/connexion/')({
   component: LoginScreen,
@@ -28,10 +31,13 @@ export const Route = createFileRoute('/connexion/')({
 function LoginScreen() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const heading = useFocusHeading<HTMLHeadingElement>()
+  const { status } = useSessionStatus()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<string | undefined>()
+  const [unreachable, setUnreachable] = useState(false)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -45,6 +51,7 @@ function LoginScreen() {
 
     setPending(true)
     setFailure(undefined)
+    setUnreachable(false)
 
     const result = await login({ identifier, password })
     setPending(false)
@@ -71,20 +78,50 @@ function LoginScreen() {
       return
     }
 
+    if (result.outcome === 'unreachable') {
+      setUnreachable(true)
+      return
+    }
+
     setFailure(result.message)
   }
 
+  // **La garde en sens inverse.** Un opérateur déjà connecté qui ouvre son signet `/connexion`
+  // recevait le formulaire, ressaisissait son mot de passe et ouvrait une seconde session pour rien
+  // — en consommant une tentative du compteur si sa saisie ratait. C'était le seul écran du produit
+  // qui ne disait pas où l'on est.
+  if (status === 'complete') return <Navigate replace to="/" />
+  if (status === 'partial') return <Navigate replace to="/connexion/verification" />
+
   return (
     <form className="ui-auth__form" noValidate onSubmit={submit}>
-      <header className="ui-auth__heading">
-        <h1>Connexion opérateur</h1>
+      {/*
+        Un `<div>` et non un `<header>` : `<main>` n'est pas un élément de sectionnement, et un
+        `<header>` posé dedans hérite du rôle `banner`. C'est la convention que `page.tsx` s'est
+        donnée après que le défaut a bloqué une suite de tests entière.
+      */}
+      <div className="ui-auth__heading">
+        {/*
+          `tabIndex={-1}` et focus au montage : cet écran remplace l'arbre entier, le focus retombe
+          sinon sur `body` et un opérateur au lecteur d'écran n'entend rien. Voir `focus-heading.ts`.
+        */}
+        <h1 ref={heading} tabIndex={-1}>
+          Connexion opérateur
+        </h1>
         <p>Tableau de bord d’exploitation de la passerelle SMS.</p>
-      </header>
+      </div>
 
       {/*
         `role="alert"` et non un simple paragraphe : le lecteur d'écran interrompt et lit le refus.
         Sans lui, l'opérateur ne saurait qu'il a échoué qu'en revenant lui-même sur le formulaire.
       */}
+      {/*
+        Une panne du serveur n'est pas un refus, et ne se peint pas comme tel : `ErrorState` porte la
+        copie prescrite par la charte — réalité HTTP, données locales conservées, Réessayer. Les
+        confondre faisait conclure à un mot de passe devenu faux pendant une indisponibilité du BFF.
+      */}
+      {unreachable ? <ErrorState status={0} /> : null}
+
       {failure ? (
         <p className="ui-auth__failure" role="alert">
           {failure}

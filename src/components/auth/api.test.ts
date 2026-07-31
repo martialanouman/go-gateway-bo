@@ -95,10 +95,15 @@ describe('login', () => {
 
     const result = await login({ identifier: 'a@b.test', password: 'x' })
 
-    // « Réessayez plus tard » sans échéance fait réessayer immédiatement, donc prolonge le
-    // verrouillage. La durée est dans l'en-tête, pas dans le corps : c'est ici qu'elle se raccroche.
-    expect(result).toMatchObject({ outcome: 'suspended' })
-    expect(result.outcome === 'suspended' && result.message).toContain('2 minutes')
+    // **Le message exact, et non un `toContain`.** Le serveur finit sa phrase par « Réessayez plus
+    // tard. » ; y ajouter la nôtre donnait « Réessayez plus tard. Réessayez dans 2 minutes. », deux
+    // consignes dans une phrase dont la première est celle que l'échéance existe pour corriger. Un
+    // `toContain('2 minutes')` laissait passer la contradiction.
+    expect(result).toEqual({
+      outcome: 'suspended',
+      message:
+        'Connexion refusée : trop de tentatives depuis cette adresse. Réessayez dans 2 minutes.',
+    })
   })
 
   it('reste lisible quand `retry-after` manque', async () => {
@@ -229,7 +234,7 @@ describe('verifyPasskey', () => {
   it('traite l’abandon de l’opérateur comme un abandon, pas comme un échec', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => respond(200, { options: {} })),
+      vi.fn(async () => respond(200, { options: { challenge: 'abc' } })),
     )
     startAuthentication.mockRejectedValueOnce(
       Object.assign(new Error('The operation either timed out or was not allowed.'), {
@@ -265,18 +270,49 @@ describe('les issues de bordure', () => {
     expect(result.outcome === 'suspended' && result.message).toContain('2 minutes')
   })
 
-  it('reste lisible quand le corps n’est pas exploitable', async () => {
-    // Un proxy qui rend une page HTML sur un 502 : `response.json()` échoue, et l'écran doit quand
-    // même dire quelque chose de vrai plutôt que de rester figé sur « Connexion en cours ».
+  it('appelle une panne du serveur une panne, jamais un refus', async () => {
+    // **Ce que « quelque chose de vrai » veut dire.** Une première version rendait ici « Connexion
+    // refusée. » : pendant une panne du BFF, chaque opérateur en concluait que son mot de passe ne
+    // marchait plus, essayait des variantes, puis appelait le support pour une réinitialisation
+    // dont il n'avait pas besoin. Rien n'a été refusé.
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response('<html>502</html>', { status: 502 })),
     )
 
-    await expect(login({ identifier: 'a@b.test', password: 'x' })).resolves.toEqual({
-      outcome: 'refused',
-      message: 'Connexion refusée.',
-    })
+    const result = await login({ identifier: 'a@b.test', password: 'x' })
+
+    expect(result.outcome).toBe('unreachable')
+    expect(result.outcome === 'unreachable' && result.message).not.toMatch(/refus/i)
+  })
+
+  it('rend une issue plutôt que de lever quand la phase 1 n’est pas du JSON', async () => {
+    // Un intermédiaire qui rend un 200 avec du HTML. Sans ce cas, `json()` rejetait, l'écran restait
+    // figé sur « Vérification en cours » et **les deux onglets** étaient bloqués par le même `busy`.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>bonjour</html>', { status: 200 })),
+    )
+
+    expect((await verifyPasskey()).outcome).toBe('unreachable')
+  })
+
+  it('distingue une erreur de déploiement d’un abandon', async () => {
+    // `SecurityError` : le `rpID` ne correspond pas à l'origine. Peint en « l'appareil n'a pas
+    // confirmé », l'incident serait invisible — tous les opérateurs verraient la même invitation à
+    // réessayer, en ton information, indéfiniment.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => respond(200, { options: { challenge: 'abc' } })),
+    )
+    startAuthentication.mockRejectedValueOnce(
+      Object.assign(new Error('origine inattendue'), { name: 'SecurityError' }),
+    )
+
+    const result = await verifyPasskey()
+
+    expect(result.outcome).toBe('refused')
+    expect(result.outcome === 'refused' && result.message).toContain('SecurityError')
   })
 
   it('signale un serveur injoignable au début de la cérémonie', async () => {
@@ -295,7 +331,7 @@ describe('les issues de bordure', () => {
     // rejetée remonterait en surface non gérée et l'écran resterait sur « Vérification en cours ».
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(respond(200, { options: {} }))
+      .mockResolvedValueOnce(respond(200, { options: { challenge: 'abc' } }))
       .mockRejectedValueOnce(new TypeError('Failed to fetch'))
     vi.stubGlobal('fetch', fetchMock)
     startAuthentication.mockResolvedValueOnce({ id: 'cred-1' })
@@ -306,7 +342,7 @@ describe('les issues de bordure', () => {
   it('refuse une signature que le serveur rejette', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(respond(200, { options: {} }))
+      .mockResolvedValueOnce(respond(200, { options: { challenge: 'abc' } }))
       .mockResolvedValueOnce(
         respond(401, { error: 'Vérification refusée : cet appareil n’a pas pu être vérifié.' }),
       )

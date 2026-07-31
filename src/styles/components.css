@@ -1203,11 +1203,15 @@
 .ui-auth__failure {
   margin: 0;
   padding: var(--sp-5);
-  border: 1px solid var(--danger-border);
+  border: 1px solid var(--action-danger-border);
   border-radius: var(--r-field);
-  background: var(--danger-surface);
+  background: var(--tint-red);
   font: var(--text-body);
-  color: var(--danger-text);
+  /* `--text-danger-on-tint` et non `--text-danger` : ce rouge repose sur une teinte et non sur une
+     surface plate, ce que ce token existe précisément pour porter. Les trois premiers noms écrits
+     ici — `--danger-border`, `--danger-surface`, `--danger-text` — n'existaient pas : le bandeau
+     retombait sans bordure, sans fond, et le refus s'affichait comme un paragraphe ordinaire. */
+  color: var(--text-danger-on-tint);
 }
 
 .ui-auth__notice {

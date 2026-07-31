@@ -19,7 +19,7 @@
  */
 
 import { Field } from '@base-ui/react/field'
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 
 /**
  * `size` est retiré des props natives : l'attribut HTML `size` d'un `<input>` est un **nombre** de
@@ -27,7 +27,13 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react'
  * de contrôle de la charte. Le laisser passer faisait s'intersecter `number` et `'sm' | 'md'` en
  * `never` — une erreur de compilation illisible, attrapée par `pnpm typecheck`.
  */
-export type TextFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'className' | 'size'> & {
+/**
+ * `ComponentPropsWithRef` et non `…WithoutRef` : un champ qu'aucun écran ne peut focaliser par le
+ * code n'est pas complet. Le premier besoin est venu du second facteur (step-026), où la bascule
+ * automatique vers l'onglet TOTP démontait le bouton qui portait le focus — celui-ci retombait sur
+ * `body`, et le champ ouvert n'était atteignable qu'en re-tabulant tout l'écran.
+ */
+export type TextFieldProps = Omit<ComponentPropsWithRef<'input'>, 'className' | 'size'> & {
   /**
    * Appliqué à l'**enveloppe**, pas au contrôle : c'est l'ensemble libellé + champ + message qu'un
    * écran place dans une grille. Le retirer sans le redéclarer, comme c'était le cas, faisait de ce

@@ -23,12 +23,14 @@
  */
 
 import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { type FormEvent, useState } from 'react'
+import { createFileRoute, Navigate } from '@tanstack/react-router'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { verifyPasskey, verifyTotp } from '~/components/auth/api'
+import { useFocusHeading } from '~/components/auth/focus-heading'
+import { SessionBoundary } from '~/components/auth/session-boundary'
+import { useSessionStatus } from '~/components/auth/session-gate'
 import { operatorQueryOptions, useCurrentOperator } from '~/components/permission'
 import { Button, Tabs, TextField } from '~/components/primitives'
-import { Loading } from '~/components/states'
 
 export const Route = createFileRoute('/connexion/verification')({
   component: MfaChallengeScreen,
@@ -38,40 +40,39 @@ export const Route = createFileRoute('/connexion/verification')({
 type Notice = { readonly tone: 'refusal' | 'information'; readonly message: string }
 
 function MfaChallengeScreen() {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data: operator, isPending } = useCurrentOperator()
+  const { data: operator } = useCurrentOperator()
+  const { status, retry } = useSessionStatus()
+  const heading = useFocusHeading<HTMLHeadingElement>()
+  const codeField = useRef<HTMLInputElement>(null)
   const [method, setMethod] = useState('passkey')
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<Notice | undefined>()
+  const [switched, setSwitched] = useState(false)
 
-  // Rien à compléter : ni session, ou second facteur déjà franchi. Rester ici afficherait un
-  // formulaire dont aucune soumission ne peut aboutir.
-  if (!isPending && !operator) {
-    void navigate({ to: '/connexion', replace: true })
-    return null
-  }
-
-  if (!isPending && operator?.mfaCompleted) {
-    void navigate({ to: '/', replace: true })
-    return null
-  }
-
-  if (isPending) return <Loading label="Chargement de la session" rows={3} />
+  // Le focus suit la bascule d'onglet. Sans cela, le panneau passkey se démontait **avec le bouton
+  // qui portait le focus** : celui-ci retombait sur `body`, la seule annonce était un `status` poli,
+  // et l'opérateur au clavier devait re-tabuler tout l'écran pour atteindre le champ qu'on venait de
+  // lui ouvrir (WCAG 2.4.3).
+  useEffect(() => {
+    if (switched) codeField.current?.focus()
+  }, [switched])
 
   /**
-   * La session vient de devenir complète : le cache doit être relu **avant** de partir, sinon la
-   * coquille garderait l'opérateur sans permission qu'elle a lu avant la cérémonie — et la garde le
-   * renverrait ici, en boucle.
+   * La session vient de devenir complète : le cache est relu, et **rien d'autre**.
    *
-   * `fetchQuery` comme au login, et pour la même raison : invalider ne fait que marquer périmé.
+   * La relecture fait passer le statut à `complete`, et c'est le `<Navigate>` du corps de ce
+   * composant qui emmène à la console. Une première version ajoutait ici un `navigate()` impératif :
+   * les deux partaient ensemble, se disputaient la même transition, et le rendu ne se stabilisait
+   * jamais — la suite de tests se bloquait sans message.
+   *
+   * `fetchQuery` et non `invalidateQueries` : invalider ne fait que marquer périmé. Et
+   * `staleTime: 0` explicite, sans quoi le client de production rendrait la session partielle qu'il
+   * tient encore pour fraîche — la coquille renverrait alors ici, en boucle.
    */
   async function enterConsole() {
-    // `staleTime: 0` explicite : voir `connexion.index.tsx`. Sans lui, le client de production rend
-    // la session partielle qu'il tient encore pour fraîche, et la coquille renvoie ici en boucle.
     await queryClient.fetchQuery({ ...operatorQueryOptions(), staleTime: 0 }).catch(() => undefined)
-    await navigate({ to: '/', replace: true })
   }
 
   async function runPasskey() {
@@ -86,8 +87,9 @@ function MfaChallengeScreen() {
 
     if (result.outcome === 'no_passkey') {
       // Bascule et information, pas alerte : l'opérateur n'a rien fait de mal, il lui manque un
-      // appareil sur ce compte.
+      // appareil sur ce compte. `switched` déclenche le déplacement du focus vers le champ de code.
       setMethod('totp')
+      setSwitched(true)
       setNotice({ tone: 'information', message: result.message })
       return
     }
@@ -115,14 +117,28 @@ function MfaChallengeScreen() {
     setNotice({ tone: 'refusal', message: result.message })
   }
 
+  // **Une seule règle, lue par `sessionStatus`.** La version précédente testait `!isPending &&
+  // !operator`, ce qui rangeait une requête **en erreur** avec « aucune session » : à chaque hoquet
+  // de `/auth/me`, l'opérateur repartait au login, ressaisissait son mot de passe, revenait ici, et
+  // recommençait — en consommant une tentative du compteur à chaque tour.
+  if (status === 'unknown' || status === 'unavailable') {
+    return (
+      <SessionBoundary label="Chargement de la session" retry={retry} rows={3} status={status} />
+    )
+  }
+  if (status === 'anonymous') return <Navigate replace to="/connexion" />
+  if (status === 'complete') return <Navigate replace to="/" />
+
   return (
     <div className="ui-auth__form">
-      <header className="ui-auth__heading">
-        <h1>Vérification en deux étapes</h1>
+      <div className="ui-auth__heading">
+        <h1 ref={heading} tabIndex={-1}>
+          Vérification en deux étapes
+        </h1>
         <p>
           Second facteur requis pour <span className="ui-auth__identity">{operator?.email}</span>.
         </p>
-      </header>
+      </div>
 
       {notice ? (
         <p
@@ -157,6 +173,7 @@ function MfaChallengeScreen() {
             panel: (
               <form className="ui-auth__method" noValidate onSubmit={submitCode}>
                 <TextField
+                  ref={codeField}
                   autoComplete="one-time-code"
                   inputMode="numeric"
                   label="Code à 6 chiffres"
@@ -181,9 +198,17 @@ function MfaChallengeScreen() {
         Le cul-de-sac nommé. Un opérateur tout juste amorcé n'a ni appareil ni application, et aucun
         des deux onglets ne peut aboutir pour lui : le produit lui doit une conduite à tenir.
       */}
+      {/*
+        La conduite à tenir est **de ne rien promettre**. Une version précédente disait « signalez-le
+        à l'administrateur de la console » — or le destinataire de cette phrase est justement le
+        premier administrateur, celui qu'`installFirstAdministrator` crée sans facteur, et la
+        réinitialisation par un tiers est renvoyée à la step-027. Il n'y avait personne à qui
+        signaler. Nommer un remède inexistant est pire qu'un cul-de-sac reconnu.
+      */}
       <p className="ui-auth__note">
-        Aucun second facteur enrôlé ? Aucun des deux onglets ne peut aboutir : l’écran d’enrôlement
-        arrive au jalon M1 (step-028). Signalez-le à l’administrateur de la console.
+        Aucun second facteur enrôlé ? Aucun des deux onglets ne peut alors aboutir : l’écran
+        d’enrôlement arrive au jalon M1 (step-028), et rien ne permet encore d’en poser un depuis
+        l’interface.
       </p>
     </div>
   )

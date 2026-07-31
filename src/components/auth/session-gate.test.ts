@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { sessionRedirect } from './session-gate'
+import { sessionRedirect, sessionStatus } from './session-gate'
 
 const OPERATOR = {
   id: 'op-1',
@@ -17,22 +17,53 @@ const OPERATOR = {
   mfaCompleted: true,
 } as const
 
+describe('sessionStatus', () => {
+  it('distingue « on attend » de « on ne saura pas »', () => {
+    // **Le cœur du module.** Une requête en erreur porte `data: undefined`, exactement comme une
+    // requête en cours. Les confondre a produit deux défauts symétriques : la coquille restait vide
+    // indéfiniment, et l'écran de vérification renvoyait au login — d'où un va-et-vient entre les
+    // deux à chaque hoquet du serveur, chaque tour consommant une tentative du compteur.
+    expect(sessionStatus({ data: undefined, isError: false })).toBe('unknown')
+    expect(sessionStatus({ data: undefined, isError: true })).toBe('unavailable')
+  })
+
+  it('garde une session connue quand un rafraîchissement échoue', () => {
+    // Une requête qui échoue **après** avoir réussi reste en erreur tout en conservant sa réponse.
+    // Regarder l'erreur en premier expulsait l'opérateur, ou peignait une panne par-dessus une
+    // console qui marchait, au premier rafraîchissement raté.
+    expect(sessionStatus({ data: OPERATOR, isError: true })).toBe('complete')
+  })
+
+  it('lit les trois états de session', () => {
+    expect(sessionStatus({ data: null, isError: false })).toBe('anonymous')
+    expect(sessionStatus({ data: { ...OPERATOR, mfaCompleted: false }, isError: false })).toBe(
+      'partial',
+    )
+    expect(sessionStatus({ data: OPERATOR, isError: false })).toBe('complete')
+  })
+})
+
 describe('sessionRedirect', () => {
   it('ne renvoie nulle part tant que la session n’est pas connue', () => {
-    // **Le cas qui compte le plus.** Rediriger pendant l'attente sortirait de la console un
-    // opérateur parfaitement légitime, à chaque rechargement de page.
-    expect(sessionRedirect(undefined)).toBeUndefined()
+    // Rediriger pendant l'attente sortirait de la console un opérateur légitime, à chaque
+    // rechargement de page.
+    expect(sessionRedirect('unknown')).toBeUndefined()
+  })
+
+  it('ne déconnecte personne sur une panne', () => {
+    // Un 502 passager ne vaut pas une expulsion : l'écran doit se dégrader, pas naviguer.
+    expect(sessionRedirect('unavailable')).toBeUndefined()
   })
 
   it('renvoie un anonyme au login', () => {
-    expect(sessionRedirect(null)).toBe('/connexion')
+    expect(sessionRedirect('anonymous')).toBe('/connexion')
   })
 
   it('renvoie une session partielle au second facteur', () => {
-    expect(sessionRedirect({ ...OPERATOR, mfaCompleted: false })).toBe('/connexion/verification')
+    expect(sessionRedirect('partial')).toBe('/connexion/verification')
   })
 
   it('laisse passer une session complète', () => {
-    expect(sessionRedirect(OPERATOR)).toBeUndefined()
+    expect(sessionRedirect('complete')).toBeUndefined()
   })
 })

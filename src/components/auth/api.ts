@@ -74,14 +74,21 @@ async function readErrorMessage(response: Response): Promise<string | undefined>
   return typeof body?.error === 'string' ? body.error : undefined
 }
 
-/** Raccroche l'échéance au message. Sans en-tête, on n'en fabrique pas : « 0 seconde » serait faux. */
+/**
+ * Raccroche l'échéance au message. Sans en-tête, on n'en fabrique pas : « 0 seconde » serait faux.
+ *
+ * La phrase vague du serveur est **remplacée**, pas complétée. Ses messages de suspension finissent
+ * par « Réessayez plus tard. » ; y ajouter la nôtre donnait « Réessayez plus tard. Réessayez dans
+ * 2 minutes. » — deux consignes dans une phrase, dont la première est celle que l'échéance existe
+ * pour corriger.
+ */
 function withDelay(message: string, response: Response): string {
   const header = response.headers.get('retry-after')
   const seconds = header === null ? Number.NaN : Number(header)
 
   if (!Number.isFinite(seconds) || seconds <= 0) return message
 
-  return `${message} Réessayez dans ${formatRetryDelay(seconds)}.`
+  return `${message.replace(/\s*Réessayez plus tard\.\s*$/u, '')} Réessayez dans ${formatRetryDelay(seconds)}.`
 }
 
 /**
@@ -91,6 +98,12 @@ function withDelay(message: string, response: Response): string {
  * rendre une page HTML sur un 502, et l'écran doit quand même dire quelque chose de vrai.
  */
 async function refusalFrom(response: Response, fallback: string): Promise<LoginResult & MfaResult> {
+  // **Un 5xx n'est pas un refus, et le dire compte.** Peindre « Connexion refusée » pendant une
+  // panne du BFF fait conclure à chaque opérateur que son mot de passe ne marche plus : il essaie
+  // des variantes, puis appelle le support pour une réinitialisation dont il n'a pas besoin. Rien
+  // n'a été refusé — le serveur est cassé.
+  if (response.status >= 500) return { outcome: 'unreachable', message: UNREACHABLE_MESSAGE }
+
   const message = (await readErrorMessage(response)) ?? fallback
 
   return response.status === 429
@@ -134,6 +147,29 @@ export const PASSKEY_CANCELLED_MESSAGE =
   'Vérification interrompue : l’appareil n’a pas confirmé. Réessayez, ou utilisez votre code TOTP.'
 
 /**
+ * Refus de cérémonie qui **n'est pas** un abandon.
+ *
+ * `SecurityError` — origine ou `rpID` qui ne correspondent pas —, `NotSupportedError`, contexte non
+ * sécurisé : autant d'erreurs de déploiement. Les peindre en « l'appareil n'a pas confirmé » les
+ * rendrait indiagnosticables : tous les opérateurs verraient la même invitation à réessayer, en ton
+ * information, indéfiniment, et personne n'aurait de quoi remonter la vraie cause. Le nom technique
+ * est conservé pour cela, et lui seul — il ne porte aucune donnée.
+ */
+function passkeyCeremonyFailure(error: unknown): PasskeyResult {
+  // `NotAllowedError` couvre la fermeture de la fenêtre système, le délai écoulé et la biométrie
+  // refusée. Rien de tout cela n'est une panne, et rien ne doit être peint comme telle.
+  if (error instanceof Error && error.name === 'NotAllowedError') {
+    return { outcome: 'cancelled', message: PASSKEY_CANCELLED_MESSAGE }
+  }
+
+  const name = error instanceof Error ? error.name : 'erreur inconnue'
+  return {
+    outcome: 'refused',
+    message: `Vérification impossible sur cet appareil (${name}). Utilisez votre code TOTP, et signalez ce code à l’exploitation.`,
+  }
+}
+
+/**
  * La cérémonie d'authentification par passkey, en deux allers-retours.
  *
  * Le premier demande les options — elles portent le défi, qui ne vaut que pour cette session — le
@@ -156,13 +192,22 @@ export async function verifyPasskey(): Promise<PasskeyResult> {
       : { outcome: 'refused', message }
   }
 
-  const { options } = (await started.json()) as { options: PublicKeyCredentialRequestOptionsJSON }
+  // **Le seul `await` qui pouvait encore lever**, alors que l'en-tête de ce fichier promet le
+  // contraire. Un intermédiaire qui rend un 200 avec du HTML faisait rejeter `json()` : l'écran
+  // restait figé sur « Vérification en cours », les deux onglets bloqués par le même `busy`, sans
+  // un mot — le seul recours étant de recharger la page.
+  const payload = (await started.json().catch(() => undefined)) as
+    | { options?: PublicKeyCredentialRequestOptionsJSON }
+    | undefined
 
-  const assertion = await startAuthentication({ optionsJSON: options }).catch(() => undefined)
-  // Fermer la fenêtre système, laisser expirer le délai, refuser la biométrie : le navigateur les
-  // renvoie tous en `NotAllowedError`, et aucun n'est une panne. Les peindre en alerte apprendrait à
-  // l'opérateur à ignorer les alertes.
-  if (!assertion) return { outcome: 'cancelled', message: PASSKEY_CANCELLED_MESSAGE }
+  if (!payload?.options) return { outcome: 'unreachable', message: UNREACHABLE_MESSAGE }
+
+  const assertion = await startAuthentication({ optionsJSON: payload.options }).catch(
+    (error: unknown) => passkeyCeremonyFailure(error),
+  )
+
+  // Une issue plutôt qu'une signature : la cérémonie a échoué, et son diagnostic est déjà composé.
+  if ('outcome' in assertion) return assertion
 
   const verified = await postJson('/api/auth/mfa/passkey/verify', { response: assertion }).catch(
     () => undefined,

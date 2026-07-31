@@ -13,10 +13,14 @@
  * chaque appel — c'est la propriété qui compte, et elle ne dépend pas de ce fichier.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OPERATOR_QUERY_KEY } from '~/components/permission'
 import { createTestQueryClient } from '~/test/render'
 import { renderRoute } from '~/test/render-route'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 function clientWith(operator: unknown) {
   const client = createTestQueryClient()

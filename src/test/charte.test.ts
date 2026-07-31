@@ -8,6 +8,13 @@
  * 1. **Les tokens que les écrans consomment existent.** Un `var(--surface-card)` qui ne résout rien
  *    ne casse pas : le navigateur applique la valeur héritée, et l'écran s'affiche presque juste.
  *    Un token renommé se remarquerait donc des semaines plus tard, sur une capture d'écran.
+ *
+ *    **Cette garantie était écrite sans être tenue.** La première version n'énumérait qu'une liste
+ *    blanche de tokens attendus, et vérifiait leur déclaration : elle protégeait contre la
+ *    suppression d'un token connu, jamais contre l'usage d'un token inventé — c'est-à-dire contre
+ *    exactement le défaut que son propre commentaire décrivait. La step-026 en a produit trois
+ *    (`--danger-border`, `--danger-surface`, `--danger-text`) et le bandeau de refus s'affichait
+ *    sans bordure ni fond, comme un paragraphe ordinaire. Le sens manquant est maintenant testé.
  * 2. **Le contraste est conforme dès les tokens**, pas rattrapé écran par écran — sur les surfaces
  *    plates *et* sur les surfaces composées. Ces dernières sont le vrai point bas : une pilule pose
  *    son texte sur sa propre teinte, une ligne se survole et se sélectionne. Un test qui ne
@@ -16,10 +23,31 @@
  *    et deux paires étaient sous le seuil.
  */
 
+import { readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { contrastRatio, readTokens, resolveColor, resolveToken } from './tokens'
 
 const tokens = readTokens()
+
+/**
+ * Les trois variables posées par le code, jamais déclarées en CSS.
+ *
+ * Les exempter nommément plutôt que d'assouplir la règle : le jour où l'une disparaît du JavaScript,
+ * cette liste devient fausse et se remarque, là où un filtre générique aurait tout laissé passer.
+ */
+const JS_DRIVEN = new Set(['--active-tab-left', '--active-tab-width', '--anchor-width'])
+
+function readComponentsCss(): string {
+  const here = dirname(fileURLToPath(import.meta.url))
+  // Les commentaires sortent d'abord : l'un d'eux cite les trois noms inventés qui ont motivé ce
+  // test, et les compter comme consommés le ferait rougir pour la mauvaise raison.
+  return readFileSync(join(resolve(here, '..'), 'styles/components.css'), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    '',
+  )
+}
 
 /** Seuils WCAG 2.1 AA. Le texte large commence à 18,66 px en gras ou 24 px en normal. */
 const AA_NORMAL_TEXT = 4.5
@@ -78,6 +106,24 @@ describe('tokens de la charte', () => {
 
   it.each(expected)('%s est défini', (name) => {
     expect(resolveToken(tokens, name)).toBeDefined()
+  })
+
+  it('n’en consomme aucun qui n’existe pas', () => {
+    // **Le sens qui manquait.** On part de ce que `components.css` consomme réellement, et non
+    // d'une liste écrite à la main : une liste ne voit jamais le token qu'on vient d'inventer.
+    const css = readComponentsCss()
+    const used = new Set([...css.matchAll(/var\(\s*(--[\w-]+)/g)].map(([, name]) => name as string))
+
+    const missing = [...used].filter((name) => !JS_DRIVEN.has(name) && !tokens.has(name)).sort()
+
+    expect(missing).toEqual([])
+  })
+
+  it('en consomme assez pour que ce test garde quelque chose', () => {
+    // Sans ce garde-fou, une expression régulière qui cesserait de reconnaître `var(--…)` rendrait
+    // le test précédent vert et vide — la panne la plus discrète qu'un test puisse avoir.
+    const used = [...readComponentsCss().matchAll(/var\(\s*(--[\w-]+)/g)]
+    expect(used.length).toBeGreaterThan(100)
   })
 
   it('ne promet pas de thème clair', () => {

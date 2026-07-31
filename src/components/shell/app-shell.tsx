@@ -24,13 +24,12 @@ import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { ToastProvider, ToastStack, TooltipProvider } from '~/components/overlays'
 import { useCurrentOperator } from '~/components/permission'
-import { Loading } from '~/components/states'
 import { NAVIGATION } from './navigation'
 
 export type AppShellProps = { readonly children?: ReactNode }
 
 export function AppShell({ children }: AppShellProps) {
-  const { data: operator, isPending } = useCurrentOperator()
+  const { data: operator } = useCurrentOperator()
 
   // Le filtrage se fait **ici** et non par un `PermissionGate` posé sur chaque entrée : un groupe
   // dont aucune entrée n'est accessible doit disparaître entièrement, intitulé compris. La version
@@ -67,28 +66,25 @@ export function AppShell({ children }: AppShellProps) {
 
           <nav aria-label="Navigation principale" className="ui-shell__rail">
             {/*
-              Un squelette pendant l'aller-retour `/auth/me`, et non un rail vide : la charte §08
-              demande une forme qui reproduit la mise en page. Sans lui, le rail se remplit d'un coup
-              et toute la page saute au moment où l'opérateur pose les yeux dessus.
+              Plus de squelette ici : depuis la step-026, cette coquille n'est montée qu'une fois la
+              session **décidée** — `SessionBoundary` peint l'attente et la panne un cran plus haut,
+              sur toute la page plutôt que sur le seul rail. La branche qui restait était morte, et
+              une branche morte finit par être « corrigée » par quelqu'un qui la croit atteignable.
             */}
-            {isPending ? (
-              <Loading label="Chargement de la navigation" rows={8} />
-            ) : (
-              groups.map((group) => (
-                <div className="ui-shell__group" key={group.label}>
-                  <span className="ui-shell__group-label">{group.label}</span>
-                  <ul>
-                    {group.entries.map((entry) => (
-                      <li key={entry.to}>
-                        <Link className="ui-shell__link" to={entry.to}>
-                          {entry.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))
-            )}
+            {groups.map((group) => (
+              <div className="ui-shell__group" key={group.label}>
+                <span className="ui-shell__group-label">{group.label}</span>
+                <ul>
+                  {group.entries.map((entry) => (
+                    <li key={entry.to}>
+                      <Link className="ui-shell__link" to={entry.to}>
+                        {entry.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </nav>
 
           <main className="ui-shell__content" id="contenu">

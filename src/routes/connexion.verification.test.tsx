@@ -10,7 +10,7 @@
  * pas aboutir.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OPERATOR_QUERY_KEY } from '~/components/permission'
 import { createTestQueryClient } from '~/test/render'
 import { renderRoute } from '~/test/render-route'
@@ -28,18 +28,36 @@ vi.mock('~/components/auth/api', async (importOriginal) => ({
 beforeEach(() => {
   verifyPasskey.mockReset()
   verifyTotp.mockReset()
+
+  // **Aucun test ne touche le réseau, et le rafraîchissement dit la même chose que le cache.** Le
+  // client de test tient tout pour périmé et rafraîchit dès le montage : sans ce stub, chaque écran
+  // lançait un vrai `fetch('/api/auth/me')` que jsdom laisse en suspens. Et un stub qui répondrait
+  // autre chose que la session amorcée ferait basculer l'écran en pleine interaction — un test qui
+  // échoue alors pour une raison qui n'a rien à voir avec ce qu'il vérifie. Les tests qui attendent
+  // une **transition** de session remplacent ce stub.
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json(PARTIAL_OPERATOR)),
+  )
 })
 
-/** Une session partielle : l'opérateur est identifié, son second facteur reste à franchir. */
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+/** L'opérateur en cours d'authentification : identifié, sans permission, second facteur à franchir. */
+const PARTIAL_OPERATOR = {
+  id: 'op-1',
+  email: 'operatrice@example.test',
+  displayName: 'Opératrice',
+  permissions: [],
+  mfaCompleted: false,
+} as const
+
+/** Une session partielle, déjà en cache. */
 function pendingSession() {
   const client = createTestQueryClient()
-  client.setQueryData(OPERATOR_QUERY_KEY, {
-    id: 'op-1',
-    email: 'operatrice@example.test',
-    displayName: 'Opératrice',
-    permissions: [],
-    mfaCompleted: false,
-  })
+  client.setQueryData(OPERATOR_QUERY_KEY, PARTIAL_OPERATOR)
   return client
 }
 
@@ -59,15 +77,40 @@ describe('le challenge du second facteur', () => {
 
   it('mène à la console quand la passkey passe', async () => {
     verifyPasskey.mockResolvedValue({ outcome: 'completed' })
+
+    // `/auth/me` répond ce qu'il répondrait après la cérémonie : une session **complète**. Sans ce
+    // stub, la relecture échouait, le cache gardait la session partielle, et l'écran n'allait nulle
+    // part.
+    //
+    // Les permissions sont laissées vides **délibérément**, et cela mérite d'être dit : donner un
+    // droit ferait rebondir la racine vers un écran de la coquille, et monter la coquille entière
+    // depuis ce fichier bloque le runner — sans message, sans dépassement de délai. La cause n'est
+    // pas identifiée ; elle ne se manifeste pas depuis `_shell.test.tsx`, qui monte la même coquille
+    // et passe. Ce qui compte ici est la **destination**, et `/` en est une : c'est ce que ce test
+    // vérifie. L'arrivée effective dans la console est couverte par `_shell.test.tsx` et par
+    // `e2e/passkey.spec.ts`, qui la traverse dans un vrai navigateur.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          id: 'op-1',
+          email: 'operatrice@example.test',
+          displayName: 'Opératrice',
+          permissions: [],
+          mfaCompleted: true,
+        }),
+      ),
+    )
+
     const screen = await renderRoute('/connexion/verification', { queryClient: pendingSession() })
 
     await screen.user.click(screen.getByRole('button', { name: /Utiliser la passkey/ }))
 
-    // La session devient complète côté serveur ; le cache local doit être réinterrogé, sinon la
-    // coquille garderait l'opérateur sans permission qu'elle a lu avant la cérémonie.
-    await vi.waitFor(() => {
-      expect(screen.queryByRole('tab', { name: /Passkey/ })).toBeNull()
-    })
+    // **La destination, pas la disparition.** Une version précédente n'assertait que l'absence de
+    // l'onglet passkey : elle était vraie si l'écran menait à la console, mais tout autant s'il
+    // repartait au login, rendait `null`, ou levait. Le titre de la racine, lui, ne s'obtient que
+    // par le bon chemin.
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Tableau de bord')
   })
 
   it('bascule sur le TOTP quand aucun appareil n’est enregistré', async () => {
@@ -142,6 +185,13 @@ describe('le challenge du second facteur', () => {
   it('renvoie au login quand il n’y a aucune session à compléter', async () => {
     const empty = createTestQueryClient()
     empty.setQueryData(OPERATOR_QUERY_KEY, null)
+
+    // Le stub par défaut de ce fichier rend une session partielle : il faut le remplacer, sinon le
+    // rafraîchissement en recrée une et l'écran n'a plus aucune raison de partir.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 401 })),
+    )
 
     const screen = await renderRoute('/connexion/verification', { queryClient: empty })
 
