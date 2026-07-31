@@ -9,7 +9,9 @@
 import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 import { OPERATOR_QUERY_KEY } from '~/components/permission'
+import { renderComponent } from '~/test/render'
 import { renderRoute } from '~/test/render-route'
+import { AppShell } from './app-shell'
 import { NAV_ENTRIES, NAVIGATION } from './navigation'
 
 function clientWithPermissions(permissions: readonly string[]): QueryClient {
@@ -139,10 +141,30 @@ describe('AppShell — le rail suit les permissions', () => {
 
   it('ne montre aucune entrée tant que les permissions sont inconnues', async () => {
     // Rendre le rail complet « en attendant » le ferait se vider sous les yeux de l'opérateur.
+    //
+    // **Ce test ne teste plus la coquille**, et il faut le dire : depuis que la garde de session
+    // (step-026) précède le montage, un cache vide n'atteint jamais `AppShell` — la frontière de
+    // session peint un squelette sur toute la page, ce que couvre `session-boundary.test.tsx`. Ce
+    // qui reste vérifié ici est la propriété qui compte pour un opérateur : **aucun lien de rail
+    // n'apparaît** tant que ses permissions sont inconnues, par quelque chemin que ce soit.
     const empty = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const { queryAllByRole } = await renderRoute('/clients', { queryClient: empty })
 
     expect(queryAllByRole('link', { name: /Clients|Routes|Facturation/ })).toHaveLength(0)
+  })
+
+  it('ne peint aucun lien quand elle est montée sans opérateur', () => {
+    // La coquille est montée **directement**, sans routeur : c'est le seul moyen d'atteindre ce cas
+    // depuis que la garde de session la précède. Il reste atteignable — un écran futur pourrait
+    // monter la coquille ailleurs — et il doit alors se dégrader en rail vide, jamais lever sur un
+    // opérateur absent.
+    const empty = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { queryAllByRole, getByRole } = renderComponent(<AppShell />, { queryClient: empty })
+
+    // Le lien d'évitement reste, et c'est voulu : il mène au contenu, pas à une section interdite.
+    expect(queryAllByRole('link', { name: /Clients|Trafic|Facturation|Audit/ })).toHaveLength(0)
+    // Les repères, eux, restent posés : un lecteur d'écran garde sa structure.
+    expect(getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument()
   })
 })
 

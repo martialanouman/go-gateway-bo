@@ -21,7 +21,11 @@ export default defineConfig({
   // Une reprise en CI, aucune en local. Deux reprises masqueraient un test réellement instable ;
   // zéro rendrait la CI sensible au moindre aléa de démarrage.
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // **Un seul worker, partout.** Les parcours partagent un opérateur — l'amorçage refuse d'en
+  // installer un second — et ceux qui enrôlent un second facteur écrivent donc sur les mêmes lignes.
+  // En parallèle, le résultat dépendrait de l'ordre des workers, ce qui est la définition d'un test
+  // intermittent. La suite tient en quelques secondes : la parallélisation ne rachetait rien.
+  workers: 1,
 
   reporter: process.env.CI ? [['html', { open: 'never' }], ['github']] : 'list',
 

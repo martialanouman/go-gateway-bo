@@ -24,9 +24,13 @@ test("l'application démarre et rend sa page d'accueil", async ({ page }) => {
   const response = await page.goto('/')
 
   expect(response?.status()).toBe(200)
-  // `/` redirige vers le premier écran accessible depuis la step-040. Sans session, aucune
-  // permission n'est connue : la racine explique la situation plutôt que de boucler.
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Tableau de bord')
+  // `/` redirige vers le premier écran accessible depuis la step-040, et la garde de session la
+  // couvre depuis la step-026 : sans session, on atterrit sur le login.
+  //
+  // Une version précédente attendait ici « Tableau de bord » — c'est-à-dire l'écran qui annonçait
+  // « aucun écran n'est accessible avec les permissions de ce compte » à un visiteur qui n'était
+  // simplement pas connecté. Ce test épinglait donc le défaut plutôt que le comportement.
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Connexion opérateur')
 
   // L'hydratation n'est pas terminée au rendu du titre — il vient du serveur. On attend que React
   // ait pris la main avant de conclure qu'aucune exception n'est survenue.

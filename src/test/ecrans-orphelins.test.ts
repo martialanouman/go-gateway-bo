@@ -28,6 +28,10 @@ describe('écrans sous la coquille', () => {
       // comme une route `/` orpheline.
       .filter((name) => name.startsWith('_shell.') && name.endsWith('.tsx'))
       .filter((name) => name !== '_shell.tsx')
+      // Un fichier de test posé à côté n'est pas un écran. Sans cette exclusion,
+      // `_shell.test.tsx` se présentait comme une route `/test` orpheline — et le premier réflexe
+      // aurait été de lui inventer une entrée de rail.
+      .filter((name) => !name.endsWith('.test.tsx'))
       .map((name) => `/${name.slice('_shell.'.length, -'.tsx'.length)}`)
 
     const reachable = new Set(NAV_ENTRIES.map((entry) => entry.to))
@@ -37,7 +41,7 @@ describe('écrans sous la coquille', () => {
 
   it('en trouve, sinon ce test ne garde rien', () => {
     const screens = readdirSync(ROUTES).filter(
-      (name) => name.startsWith('_shell.') && name !== '_shell.tsx',
+      (name) => name.startsWith('_shell.') && name !== '_shell.tsx' && !name.endsWith('.test.tsx'),
     )
 
     expect(screens.length).toBeGreaterThan(0)

@@ -1109,3 +1109,154 @@
   color: var(--text-faint);
   font: var(--text-caption);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Les écrans d'authentification (step-026)
+ *
+ * Une colonne centrée, hors de la coquille : ni rail, ni barre supérieure, parce qu'il n'y a pas
+ * encore d'opérateur dont on pourrait afficher le nom ou filtrer la navigation.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+.ui-auth {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--sp-9);
+  background: var(--surface-page);
+}
+
+.ui-auth__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  width: min(400px, 100%);
+}
+
+.ui-auth__brand {
+  display: flex;
+  gap: var(--sp-5);
+  align-items: center;
+}
+
+.ui-auth__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-field);
+  background: linear-gradient(140deg, var(--teal-300), var(--teal-700));
+  color: var(--n-900);
+  font: var(--text-data-sm);
+  font-weight: 700;
+}
+
+.ui-auth__wordmark {
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-auth__product {
+  font: var(--text-card-title);
+  color: var(--text-primary);
+}
+
+.ui-auth__tagline {
+  font: var(--text-data-sm);
+  color: var(--text-faint);
+}
+
+.ui-auth__card {
+  padding: var(--sp-8);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-card);
+  background: var(--surface-raised);
+}
+
+.ui-auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-7);
+}
+
+.ui-auth__heading h1 {
+  margin: 0;
+  font: var(--text-card-title);
+  color: var(--text-primary);
+}
+
+.ui-auth__heading p {
+  margin: var(--sp-2) 0 0;
+  font: var(--text-body);
+  color: var(--text-muted);
+}
+
+.ui-auth__identity {
+  font: var(--text-data-sm);
+  color: var(--text-primary);
+}
+
+/*
+ * Refus et information ne partagent pas la même couleur, parce qu'ils n'appellent pas la même
+ * conduite : l'un dit « recommencez autrement », l'autre « prenez l'autre chemin ».
+ */
+.ui-auth__failure {
+  margin: 0;
+  padding: var(--sp-5);
+  border: 1px solid var(--action-danger-border);
+  border-radius: var(--r-field);
+  background: var(--tint-red);
+  font: var(--text-body);
+  /* `--text-danger-on-tint` et non `--text-danger` : ce rouge repose sur une teinte et non sur une
+     surface plate, ce que ce token existe précisément pour porter. Les trois premiers noms écrits
+     ici — `--danger-border`, `--danger-surface`, `--danger-text` — n'existaient pas : le bandeau
+     retombait sans bordure, sans fond, et le refus s'affichait comme un paragraphe ordinaire. */
+  color: var(--text-danger-on-tint);
+}
+
+.ui-auth__notice {
+  margin: 0;
+  padding: var(--sp-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-field);
+  background: var(--surface-sunken);
+  font: var(--text-body);
+  color: var(--text-muted);
+}
+
+.ui-auth__method {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding-top: var(--sp-6);
+}
+
+.ui-auth__method p {
+  margin: 0;
+  font: var(--text-body);
+  color: var(--text-muted);
+}
+
+/*
+ * Le message et son bouton de reprise. La marge par défaut d'un `<p>` vaut `1em` — une valeur qui
+ * n'est aucun token d'espacement — et le même encadré rendait donc plus lâche ici que sur l'écran de
+ * connexion, où la classe est portée par le paragraphe lui-même.
+ */
+.ui-auth__failure p,
+.ui-auth__notice p {
+  margin: 0;
+}
+
+.ui-auth__failure:has(button),
+.ui-auth__notice:has(button) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-5);
+}
+
+.ui-auth__note {
+  margin: 0;
+  font: var(--text-data-sm);
+  color: var(--text-faint);
+}

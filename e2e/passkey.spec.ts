@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
+import { callApi } from './api'
 import { E2E_OPERATOR } from './global-setup'
+import { resetMfaFactors } from './reset-mfa'
 
 /**
  * Le parcours passkey, dans un vrai navigateur.
@@ -15,12 +17,12 @@ import { E2E_OPERATOR } from './global-setup'
  * Une erreur de déploiement sur `AUTH_WEBAUTHN_RP_ID` ou `AUTH_WEBAUTHN_ORIGIN` ne se voit **que** là.
  * C'est la raison d'être de ce fichier.
  *
- * ## Pourquoi il n'y a pas d'écran
+ * ## Deux moitiés, deux façons d'appeler
  *
- * Les écrans de connexion et de second facteur arrivent en step-026. Le parcours appelle donc les
- * routes du BFF depuis le contexte de la page — ce qui suffit : le navigateur applique la même règle
- * d'origine, qu'un formulaire ou un `fetch` déclenche la cérémonie. Quand les écrans existeront, ce
- * parcours se réécrira en cliquant, et c'est bien.
+ * L'**enregistrement** passe encore par les routes du BFF : son écran arrive en step-028, et le
+ * navigateur applique de toute façon la même règle d'origine qu'un formulaire ou un `fetch`
+ * déclenche la cérémonie. La **seconde connexion**, elle, se fait en cliquant — les écrans existent
+ * depuis la step-026, et c'est la promesse que cet en-tête portait.
  *
  * ## L'authentificateur virtuel
  *
@@ -30,6 +32,10 @@ import { E2E_OPERATOR } from './global-setup'
 
 /** Le nom que l'opérateur donne à son appareil, tel qu'il doit revenir dans la liste. */
 const DEVICE_NAME = 'Poste de test'
+
+// Les parcours partagent un opérateur, et celui-ci enrôle : sans remise à zéro, le résultat
+// dépendrait de l'ordre des fichiers. Voir `reset-mfa.ts`.
+test.beforeAll(resetMfaFactors)
 
 test('un opérateur enregistre une passkey, puis entre avec elle', async ({ page }) => {
   const client = await page.context().newCDPSession(page)
@@ -79,27 +85,30 @@ test('un opérateur enregistre une passkey, puis entre avec elle', async ({ page
   expect(me.body.mfaCompleted).toBe(true)
   expect(me.body.email).toBe(E2E_OPERATOR.email)
 
-  // ─── Nouvelle connexion, et cette fois c'est la passkey qui ouvre ───
+  // ─── Nouvelle connexion, et cette fois par les écrans ───
   await callApi(page, '/api/auth/logout', {})
-  const secondLogin = await callApi(page, '/api/auth/login', {
-    identifier: E2E_OPERATOR.email,
-    password: E2E_OPERATOR.password,
-  })
-  expect(secondLogin.body).toEqual({ mfa_required: true })
+
+  await page.goto('/trafic')
+  await expect(page).toHaveURL(/\/connexion$/)
+
+  await page.getByLabel(/Adresse e-mail/).fill(E2E_OPERATOR.email)
+  await page.getByLabel(/Mot de passe/).fill(E2E_OPERATOR.password)
+  await page.getByRole('button', { name: /Continuer/ }).click()
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Vérification en deux étapes')
 
   const pending = await callApi(page, '/api/auth/me')
   expect(pending.body.mfaCompleted, 'la session doit être partielle avant la cérémonie').toBe(false)
   expect(pending.body.permissions, 'une session partielle ne porte aucune permission').toEqual([])
 
-  const authenticationOptions = await callApi(page, '/api/auth/mfa/passkey/verify', {})
-  expect(authenticationOptions.status, JSON.stringify(authenticationOptions.body)).toBe(200)
+  // **Le clic qui déclenche la cérémonie.** L'authentificateur virtuel signe sans qu'aucun code de
+  // test ne construise la requête : c'est l'écran qui demande les options, le navigateur qui décide
+  // de signer, et l'écran qui présente la signature.
+  await page.getByRole('button', { name: /Utiliser la passkey/ }).click()
 
-  const assertion = await getCredential(page, authenticationOptions.body.options)
-  const verified = await callApi(page, '/api/auth/mfa/passkey/verify', { response: assertion })
-  expect(verified.status, JSON.stringify(verified.body)).toBe(200)
-  expect(verified.body).toEqual({ mfa_completed: true })
+  // Le bout du fil : la console, et une session complète qui porte les permissions du rôle.
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible()
 
-  // Le bout du fil : la session est complète et porte les permissions du rôle.
   const promoted = await callApi(page, '/api/auth/me')
   expect(promoted.body.mfaCompleted).toBe(true)
   expect(promoted.body.permissions.length).toBeGreaterThan(0)
@@ -149,26 +158,6 @@ test('le navigateur refuse de signer pour un autre domaine', async ({ page }) =>
  * La distinction compte : le cookie de session doit vivre dans le même bocal que celui qui portera les
  * cérémonies, et l'origine annoncée doit être celle de la page. `page.request` a son propre contexte.
  */
-async function callApi(
-  page: import('@playwright/test').Page,
-  path: string,
-  body?: unknown,
-  // biome-ignore lint/suspicious/noExplicitAny: le corps des réponses du BFF varie selon la route.
-): Promise<{ status: number; body: any }> {
-  return page.evaluate(
-    async ({ path, body }) => {
-      const response = await fetch(path, {
-        method: body === undefined ? 'GET' : 'POST',
-        headers: body === undefined ? {} : { 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      })
-
-      const text = await response.text()
-      return { status: response.status, body: text ? JSON.parse(text) : {} }
-    },
-    { path, body },
-  )
-}
 
 /**
  * Joue `navigator.credentials.create()` et rend la réponse au format que le serveur attend.
@@ -224,47 +213,3 @@ async function createCredential(
 }
 
 /** Joue `navigator.credentials.get()` et rend l'assertion au format attendu par le serveur. */
-async function getCredential(
-  page: import('@playwright/test').Page,
-  // biome-ignore lint/suspicious/noExplicitAny: les options viennent du serveur, déjà typées là-bas.
-  options: any,
-  // biome-ignore lint/suspicious/noExplicitAny: l'assertion repart telle quelle vers le serveur.
-): Promise<any> {
-  return page.evaluate(async (options) => {
-    const fromBase64Url = (value: string) =>
-      Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))
-    const toBase64Url = (buffer: ArrayBuffer) =>
-      btoa(String.fromCharCode(...new Uint8Array(buffer)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '')
-
-    const credential = (await navigator.credentials.get({
-      publicKey: {
-        ...options,
-        challenge: fromBase64Url(options.challenge),
-        allowCredentials: (options.allowCredentials ?? []).map(
-          (entry: { id: string; transports?: AuthenticatorTransport[] }) => ({
-            ...entry,
-            id: fromBase64Url(entry.id),
-          }),
-        ),
-      },
-    })) as PublicKeyCredential
-
-    const response = credential.response as AuthenticatorAssertionResponse
-
-    return {
-      id: credential.id,
-      rawId: toBase64Url(credential.rawId),
-      type: credential.type,
-      clientExtensionResults: credential.getClientExtensionResults(),
-      response: {
-        clientDataJSON: toBase64Url(response.clientDataJSON),
-        authenticatorData: toBase64Url(response.authenticatorData),
-        signature: toBase64Url(response.signature),
-        userHandle: response.userHandle ? toBase64Url(response.userHandle) : undefined,
-      },
-    }
-  }, options)
-}

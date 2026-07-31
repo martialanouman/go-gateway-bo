@@ -47,4 +47,8 @@ produit conformément à la charte.
 - [ ] aucun contrôle silencieusement masqué · clavier et libellés conformes (WCAG 2.1 AA)
 
 ## Hors périmètre
+L'**enrôlement** d'un second facteur → step-028, ajoutée le 31/07/2026 parce qu'elle manquait au
+plan. Cette step traite le cas « aucun facteur enrôlé » par un état nommé qui dit quoi faire ; elle
+ne livre pas le QR code, la confirmation ni les codes de récupération.
+
 La gestion des opérateurs et des rôles → step-027.
