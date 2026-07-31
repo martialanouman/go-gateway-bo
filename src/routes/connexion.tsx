@@ -44,11 +44,15 @@ function AuthLayout() {
         </div>
 
         {/*
-          Un fait, et il a fallu s'y reprendre. La première version annonçait que « les identifiants
-          ne quittent pas la couche serveur » — sous un formulaire où l'opérateur tape justement son
-          mot de passe dans son navigateur, d'où il part en clair vers le BFF. La phrase promettait
-          une frontière que le geste en cours traverse. La charte demande de dire ce que la
-          protection couvre **et où elle s'arrête** ; c'est ce que dit celle-ci.
+          Un fait, et il a fallu s'y reprendre deux fois. La première version annonçait que « les
+          identifiants ne quittent pas la couche serveur » — sous un formulaire où l'opérateur tape
+          justement son mot de passe, d'où il part en clair vers le BFF. La deuxième ajoutait que
+          « ni le secret TOTP ni les clés d'appareil ne sont renvoyés au navigateur » : faux aussi,
+          `POST /api/auth/mfa/enroll` rend le secret et son URI, une fois, à l'enrôlement — c'est
+          même ce que fait l'invariant (b), montrer une fois et jamais plus.
+
+          Ce qui reste ne parle que de ce que cet écran-ci fait, et dit où la protection s'arrête.
+          Une promesse de sécurité se vérifie avant d'être écrite, pas après.
         */}
         <p className="ui-auth__note">
           Le mot de passe n’est jamais conservé en clair, et ni le secret TOTP ni les clés

@@ -181,15 +181,20 @@ export async function verifyPasskey(): Promise<PasskeyResult> {
   if (!started) return { outcome: 'unreachable', message: UNREACHABLE_MESSAGE }
 
   if (!started.ok) {
-    const message = (await readErrorMessage(started)) ?? 'Vérification refusée.'
-
     // 409 sur la **première** phase signifie « rien à vérifier par ce facteur » : le compte est
-    // connu et la session valide, il n'y a simplement aucun appareil.
-    if (started.status === 409) return { outcome: 'no_passkey', message }
+    // connu et la session valide, il n'y a simplement aucun appareil. C'est le seul cas propre à
+    // cette phase.
+    if (started.status === 409) {
+      return {
+        outcome: 'no_passkey',
+        message: (await readErrorMessage(started)) ?? 'Aucun appareil enregistré sur ce compte.',
+      }
+    }
 
-    return started.status === 429
-      ? { outcome: 'suspended', message: withDelay(message, started) }
-      : { outcome: 'refused', message }
+    // Tout le reste suit la règle commune, y compris « un 5xx n'est pas un refus ». Cette phase
+    // l'appliquait à la main et avait oublié cette moitié-là : un 502 rendait « Vérification
+    // refusée », et l'opérateur en concluait que sa passkey était rejetée pendant une panne du BFF.
+    return refusalFrom(started, 'Vérification refusée.')
   }
 
   // **Le seul `await` qui pouvait encore lever**, alors que l'en-tête de ce fichier promet le

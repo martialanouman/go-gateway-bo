@@ -34,6 +34,15 @@ describe('sessionStatus', () => {
     expect(sessionStatus({ data: OPERATOR, isError: true })).toBe('complete')
   })
 
+  it('ne croit plus un `null` en cache quand le serveur est injoignable', () => {
+    // **L'autre moitié, et elle a coûté une boucle entière.** Ce `null` est celui que la garde écrit
+    // en renvoyant au login ; après un mot de passe accepté, il est périmé. Le lire comme « anonyme »
+    // ramenait au formulaire qu'on venait de remplir, à chaque tentative, tant que le serveur
+    // tombait. Un opérateur en cache est une observation positive ; un `null`, non.
+    expect(sessionStatus({ data: null, isError: true })).toBe('unavailable')
+    expect(sessionStatus({ data: null, isError: false })).toBe('anonymous')
+  })
+
   it('lit les trois états de session', () => {
     expect(sessionStatus({ data: null, isError: false })).toBe('anonymous')
     expect(sessionStatus({ data: { ...OPERATOR, mfaCompleted: false }, isError: false })).toBe(

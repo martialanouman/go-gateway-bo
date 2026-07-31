@@ -42,12 +42,22 @@ export type SessionQuery = {
 }
 
 export function sessionStatus({ data, isError }: SessionQuery): SessionStatus {
-  // **La donnée prime sur l'erreur, et pas l'inverse.** Une requête qui échoue après avoir réussi
-  // reste en `error` tout en conservant sa réponse : regarder `isError` en premier jetait une
-  // session parfaitement connue au premier rafraîchissement raté, et peignait un état d'erreur
-  // par-dessus une console qui marchait.
-  if (data === undefined) return isError ? 'unavailable' : 'unknown'
+  // **Une session connue survit à une panne ; un `null` en cache, non.**
+  //
+  // Ces deux moitiés ont chacune coûté un défaut. Regarder `isError` en premier jetait une session
+  // parfaitement connue au premier rafraîchissement raté — TanStack Query conserve `data` et passe
+  // en `error` — et peignait une panne par-dessus une console qui marchait.
+  //
+  // Mais faire primer la donnée **quelle qu'elle soit** rouvrait la boucle qu'on croyait fermée. Le
+  // `null` en cache n'est pas une observation de plus : c'est celui que la garde vient d'écrire en
+  // renvoyant au login. Après un mot de passe accepté, si la relecture échoue, ce `null` est
+  // **périmé** — la session existe désormais — et le lire comme « anonyme » renvoyait l'opérateur au
+  // formulaire qu'il venait de remplir, en boucle tant que le serveur tombait.
+  //
+  // Un opérateur, lui, est une observation positive : elle vaut mieux qu'un aveu d'ignorance.
+  if (isError && !data) return 'unavailable'
 
+  if (data === undefined) return 'unknown'
   if (data === null) return 'anonymous'
 
   return data.mfaCompleted ? 'complete' : 'partial'

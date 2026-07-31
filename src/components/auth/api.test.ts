@@ -315,6 +315,21 @@ describe('les issues de bordure', () => {
     expect(result.outcome === 'refused' && result.message).toContain('SecurityError')
   })
 
+  it('n’appelle pas non plus un 5xx un refus, sur la cérémonie', async () => {
+    // La phase 1 traitait ses codes à la main et avait oublié cette moitié : un 502 rendait
+    // « Vérification refusée », et l'opérateur en concluait que sa passkey était rejetée pendant une
+    // panne du BFF. Elle suit désormais la règle commune.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>502</html>', { status: 502 })),
+    )
+
+    const result = await verifyPasskey()
+
+    expect(result.outcome).toBe('unreachable')
+    expect(result.outcome === 'unreachable' && result.message).not.toMatch(/refus/i)
+  })
+
   it('signale un serveur injoignable au début de la cérémonie', async () => {
     vi.stubGlobal(
       'fetch',

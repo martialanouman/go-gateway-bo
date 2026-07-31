@@ -14,14 +14,18 @@
  * tabulation, où il ferait un arrêt de plus sans rien apprendre.
  */
 
-import { useEffect, useRef } from 'react'
+import { useCallback } from 'react'
 
+/**
+ * Une **ref de rappel**, et non un effet au montage.
+ *
+ * Un effet à dépendances vides s'exécute une fois, au premier rendu — or le premier rendu de ces
+ * écrans est souvent la frontière de session : un squelette, sans titre. La `ref` était alors nulle,
+ * et le `<h1>` qui paraissait ensuite ne recevait jamais le focus. Une ref de rappel se déclenche
+ * quand le nœud apparaît, quel que soit le rendu qui le fait apparaître.
+ */
 export function useFocusHeading<T extends HTMLElement>() {
-  const heading = useRef<T>(null)
-
-  useEffect(() => {
-    heading.current?.focus()
+  return useCallback((node: T | null) => {
+    node?.focus()
   }, [])
-
-  return heading
 }

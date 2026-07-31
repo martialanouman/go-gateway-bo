@@ -36,6 +36,15 @@ export const Route = createFileRoute('/connexion/verification')({
   component: MfaChallengeScreen,
 })
 
+/**
+ * Le second facteur est passé, mais la console reste hors d'atteinte.
+ *
+ * Le dire explicitement, et dire quoi faire : sans cela, l'opérateur reprend une vérification qu'il
+ * a déjà réussie, et se demande pourquoi rien ne change.
+ */
+const CONSOLE_UNREACHABLE_MESSAGE =
+  'Second facteur accepté, mais la console n’a pas répondu. Réessayez dans un instant : la vérification, elle, est acquise.'
+
 /** Un refus se lit en `alert`, une information en `status` : deux urgences, deux annonces. */
 type Notice = { readonly tone: 'refusal' | 'information'; readonly message: string }
 
@@ -72,7 +81,14 @@ function MfaChallengeScreen() {
    * tient encore pour fraîche — la coquille renverrait alors ici, en boucle.
    */
   async function enterConsole() {
-    await queryClient.fetchQuery({ ...operatorQueryOptions(), staleTime: 0 }).catch(() => undefined)
+    try {
+      await queryClient.fetchQuery({ ...operatorQueryOptions(), staleTime: 0 })
+    } catch {
+      // **Le second facteur est franchi côté serveur, et l'écran ne peut pas le montrer.** Avaler
+      // cet échec en silence re-rendait le même formulaire, sans un mot, après une cérémonie qui
+      // avait pourtant réussi : l'opérateur recommençait une vérification déjà acquise.
+      setNotice({ tone: 'refusal', message: CONSOLE_UNREACHABLE_MESSAGE })
+    }
   }
 
   async function runPasskey() {

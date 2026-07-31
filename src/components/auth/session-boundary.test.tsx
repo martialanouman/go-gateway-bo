@@ -94,13 +94,17 @@ describe('SessionBoundary', () => {
     expect(retry).toHaveBeenCalledTimes(1)
   })
 
-  it('ne déconnecte personne sur une panne', () => {
+  it('retient le contenu gardé pendant la panne, sans le remplacer par une redirection', () => {
     // La redirection est décidée ailleurs — `sessionRedirect` rend `undefined` pour cet état — et ce
-    // composant ne doit rien y ajouter. Un 502 le temps d'un redéploiement ne vaut pas une
-    // expulsion vers le login.
-    const { queryByText } = render('unavailable')
+    // composant ne doit rien y ajouter. Un 502 le temps d'un redéploiement ne vaut pas une expulsion.
+    //
+    // Une version précédente vérifiait ici l'absence du titre « Connexion opérateur » : ce composant
+    // est monté **sans routeur** et ne peut structurellement jamais rendre l'écran de login.
+    // L'assertion était vraie quel que soit le comportement.
+    const { queryByText, getByRole } = render('unavailable')
 
-    expect(queryByText(/Connexion opérateur/)).toBeNull()
+    expect(queryByText('Le contenu gardé')).toBeNull()
+    expect(getByRole('alert')).toBeInTheDocument()
   })
 
   it('laisse passer une session décidée', () => {

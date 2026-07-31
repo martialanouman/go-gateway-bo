@@ -172,10 +172,15 @@ describe('l’écran de connexion', () => {
     expect(screen.getByRole('button', { name: /Continuer/ })).toBeInTheDocument()
   })
 
-  it('part quand même au second facteur si la relecture de session échoue', async () => {
-    // Le mot de passe est accepté : c'est acquis, et un `/auth/me` qui tombe juste après ne doit pas
-    // retenir l'opérateur sur un formulaire qu'il vient de remplir avec succès. L'écran suivant
-    // portera lui-même l'état de panne.
+  it('n’enferme pas dans une boucle quand la relecture de session échoue', async () => {
+    // **La boucle que deux correctifs successifs ont mis à jour.** Le mot de passe est accepté, mais
+    // `/auth/me` tombe : le cache garde alors le `null` que la garde y avait écrit en renvoyant ici.
+    // Le lire comme « anonyme » ramenait au formulaire qu'on vient de remplir — et recommençait à
+    // chaque tentative, tant que le serveur tombait.
+    //
+    // Une version précédente de ce test n'assertait que l'absence du bouton « Connexion en cours » :
+    // elle était vraie sur l'écran d'arrivée **comme** sur le retour au login, donc elle ne gardait
+    // rien. C'est la destination qu'il faut regarder.
     const client = createTestQueryClient()
     client.setQueryData(OPERATOR_QUERY_KEY, null)
 
@@ -194,10 +199,9 @@ describe('l’écran de connexion', () => {
     const screen = await renderRoute('/connexion', { queryClient: client })
     await submitCredentials(screen)
 
-    // Ni exception non gérée, ni formulaire figé sur « Connexion en cours ».
-    await vi.waitFor(() => {
-      expect(screen.queryByRole('button', { name: /Connexion en cours/ })).toBeNull()
-    })
+    // L'écran d'arrivée dit la panne — il ne renvoie pas au formulaire, et ne reste pas figé.
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Mot de passe/)).toBeNull()
   })
 
   it('affiche le refus du serveur sans rien y ajouter', async () => {
