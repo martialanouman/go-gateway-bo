@@ -1,11 +1,20 @@
 /// <reference types="vite/client" />
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
 import appCss from '~/styles/app.css?url'
 
-export const Route = createRootRoute({
+/**
+ * Le contexte du routeur porte le client Query.
+ *
+ * **Un seul point de création**, dans `getRouter()`. Le créer ici aurait deux défauts : en rendu
+ * serveur, un client de module serait partagé entre les requêtes — le cache d'un opérateur servant à
+ * un autre — et un client créé dans le composant racine **masquerait** celui qu'un test injecte, ce
+ * qui est arrivé et a fait rougir neuf tests d'un coup.
+ */
+export type RouterContext = { readonly queryClient: QueryClient }
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -18,30 +27,10 @@ export const Route = createRootRoute({
 })
 
 function RootComponent() {
-  /**
-   * Le client Query de l'application.
-   *
-   * **Il manquait**, et rien ne le disait : les tests de composant le fournissent eux-mêmes par
-   * `renderComponent`, si bien que toute la couche de permissions passait au vert pendant que
-   * l'application réelle levait « No QueryClient set » au premier rendu serveur. C'est le parcours
-   * de bout en bout qui l'a trouvé — un cas d'école de ce qu'un test unitaire ne peut pas voir.
-   *
-   * Créé dans un `useState` et non au niveau du module : en rendu serveur, un client de module
-   * serait **partagé entre les requêtes**, et le cache d'un opérateur servirait à un autre.
-   */
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            // Les écrans sont denses et l'opérateur navigue vite : refaire chaque requête à chaque
-            // retour sur un écran chargerait la passerelle pour rien.
-            staleTime: 30_000,
-            retry: 1,
-          },
-        },
-      }),
-  )
+  // **Le provider manquait**, et rien ne le disait : `renderComponent` le fournit lui-même, si bien
+  // que toute la couche de permissions passait au vert pendant que le rendu serveur levait
+  // « No QueryClient set » à chaque requête. C'est le parcours de bout en bout qui l'a trouvé.
+  const { queryClient } = Route.useRouteContext()
 
   return (
     <RootDocument>
