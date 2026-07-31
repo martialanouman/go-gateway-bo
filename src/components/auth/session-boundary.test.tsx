@@ -94,13 +94,14 @@ describe('SessionBoundary', () => {
     expect(retry).toHaveBeenCalledTimes(1)
   })
 
-  it('retient le contenu gardé pendant la panne, sans le remplacer par une redirection', () => {
+  it('remplace le contenu gardé par l’état de panne', () => {
     // La redirection est décidée ailleurs — `sessionRedirect` rend `undefined` pour cet état — et ce
     // composant ne doit rien y ajouter. Un 502 le temps d'un redéploiement ne vaut pas une expulsion.
     //
-    // Une version précédente vérifiait ici l'absence du titre « Connexion opérateur » : ce composant
-    // est monté **sans routeur** et ne peut structurellement jamais rendre l'écran de login.
-    // L'assertion était vraie quel que soit le comportement.
+    // Deux titres se sont succédé ici sans que les assertions changent : l'un promettait de
+    // « retenir le contenu gardé », l'autre cherchait le titre du login sur un composant monté
+    // **sans routeur**, qui ne peut structurellement jamais le rendre. Le titre dit désormais ce que
+    // les assertions vérifient.
     const { queryByText, getByRole } = render('unavailable')
 
     expect(queryByText('Le contenu gardé')).toBeNull()

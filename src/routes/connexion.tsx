@@ -52,12 +52,15 @@ function AuthLayout() {
           même ce que fait l'invariant (b), montrer une fois et jamais plus.
 
           Ce qui reste ne parle que de ce que cet écran-ci fait, et dit où la protection s'arrête.
-          Une promesse de sécurité se vérifie avant d'être écrite, pas après.
+          Une promesse de sécurité se vérifie avant d'être écrite — et le correctif se vérifie sur le
+          texte livré : la deuxième tentative n'a réécrit que ce commentaire, laissant la phrase
+          fausse dix lignes plus bas. D'où le test qui **fige cette copie** ; rien ne la gardait, et
+          c'est exactement pour cela qu'elle a survécu à deux revues.
         */}
         <p className="ui-auth__note">
-          Le mot de passe n’est jamais conservé en clair, et ni le secret TOTP ni les clés
-          d’appareil ne sont renvoyés au navigateur. La saisie, elle, voyage jusqu’au serveur : elle
-          n’est protégée que par le chiffrement du transport.
+          Le mot de passe n’est jamais conservé en clair : le serveur n’en garde qu’une empreinte
+          scrypt. La saisie, elle, voyage jusqu’au serveur — elle n’est protégée que par le
+          chiffrement du transport.
         </p>
       </div>
     </main>

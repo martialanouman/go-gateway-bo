@@ -29,7 +29,8 @@ import { verifyPasskey, verifyTotp } from '~/components/auth/api'
 import { useFocusHeading } from '~/components/auth/focus-heading'
 import { SessionBoundary } from '~/components/auth/session-boundary'
 import { useSessionStatus } from '~/components/auth/session-gate'
-import { operatorQueryOptions, useCurrentOperator } from '~/components/permission'
+import type { CurrentOperator } from '~/components/permission'
+import { OPERATOR_QUERY_KEY, useCurrentOperator } from '~/components/permission'
 import { Button, Tabs, TextField } from '~/components/primitives'
 
 export const Route = createFileRoute('/connexion/verification')({
@@ -81,14 +82,30 @@ function MfaChallengeScreen() {
    * tient encore pour fraîche — la coquille renverrait alors ici, en boucle.
    */
   async function enterConsole() {
-    try {
-      await queryClient.fetchQuery({ ...operatorQueryOptions(), staleTime: 0 })
-    } catch {
-      // **Le second facteur est franchi côté serveur, et l'écran ne peut pas le montrer.** Avaler
-      // cet échec en silence re-rendait le même formulaire, sans un mot, après une cérémonie qui
-      // avait pourtant réussi : l'opérateur recommençait une vérification déjà acquise.
-      setNotice({ tone: 'refusal', message: CONSOLE_UNREACHABLE_MESSAGE })
-    }
+    // **`refetchQueries` et non `fetchQuery`.** Le second déduplique : si une relecture de fond est
+    // déjà en vol — la fenêtre reprend le focus après la boîte de dialogue système de la passkey,
+    // ou les trente secondes de fraîcheur sont écoulées — il rejoint cette promesse-là et rend la
+    // session **d'avant** la cérémonie. Rien ne lève, l'écran se re-rend identique, et l'opérateur
+    // recommence une vérification déjà acquise. `refetchQueries` annule la requête en vol et en
+    // lance une neuve.
+    await queryClient.refetchQueries({ queryKey: OPERATOR_QUERY_KEY, exact: true })
+
+    // Et l'on décide sur la **valeur obtenue**, pas sur l'absence d'exception : `refetchQueries`
+    // avale les erreurs de chaque requête et ne rejette jamais. Un `try/catch` ici ne voyait donc
+    // rien — c'était la seconde moitié du même défaut.
+    const me = queryClient.getQueryData<CurrentOperator | null>(OPERATOR_QUERY_KEY)
+
+    if (me?.mfaCompleted) return
+
+    // Session perdue entre la vérification et la relecture : `sessionStatus` rend `anonymous` et le
+    // corps de ce composant renvoie au login. Il n'y a rien de mieux à faire — la session n'existe
+    // plus — et poser un message ici ne servirait qu'à le faire disparaître aussitôt.
+    if (me === null) return
+
+    // Reste le cas qui compte : le facteur est acquis côté serveur, et l'écran ne peut pas le
+    // montrer. Le dire, plutôt que de re-rendre le même formulaire sans un mot.
+    setBusy(false)
+    setNotice({ tone: 'refusal', message: CONSOLE_UNREACHABLE_MESSAGE })
   }
 
   async function runPasskey() {
@@ -97,9 +114,13 @@ function MfaChallengeScreen() {
     setNotice(undefined)
 
     const result = await verifyPasskey()
-    setBusy(false)
 
+    // **`busy` tient jusqu'au bout de la relecture.** Le relâcher ici rouvrait le bouton pendant
+    // l'aller-retour `/auth/me` — reprise comprise — sans qu'aucun message n'accompagne l'attente :
+    // l'opérateur cliquait à nouveau sur une cérémonie qui avait déjà abouti.
     if (result.outcome === 'completed') return enterConsole()
+
+    setBusy(false)
 
     if (result.outcome === 'no_passkey') {
       // Bascule et information, pas alerte : l'opérateur n'a rien fait de mal, il lui manque un
@@ -126,9 +147,11 @@ function MfaChallengeScreen() {
     setNotice(undefined)
 
     const result = await verifyTotp(code)
-    setBusy(false)
 
+    // Voir `runPasskey` : `busy` tient jusqu'à la fin de la relecture.
     if (result.outcome === 'completed') return enterConsole()
+
+    setBusy(false)
 
     setNotice({ tone: 'refusal', message: result.message })
   }

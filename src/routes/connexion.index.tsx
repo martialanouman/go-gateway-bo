@@ -71,6 +71,11 @@ function LoginScreen() {
       // que la garde vient d'écrire sans jamais interroger le serveur. Le harnais de test, lui, a un
       // `staleTime` de zéro — le test passait donc pour une raison qui n'existe pas dans le produit,
       // et c'est le parcours de bout en bout qui a fait la différence.
+      //
+      // Cela ne suffit pas à **garantir** une requête neuve : `fetchQuery` rejoint une relecture
+      // déjà en vol, quelle que soit la fraîcheur demandée. La conséquence est bornée ici — l'écran
+      // d'arrivée peint son propre état de session, quel qu'il soit — là où elle ne l'était pas dans
+      // `enterConsole`, qui utilise `refetchQueries` pour cette raison.
       await queryClient
         .fetchQuery({ ...operatorQueryOptions(), staleTime: 0 })
         .catch(() => undefined)
@@ -102,8 +107,10 @@ function LoginScreen() {
       */}
       <div className="ui-auth__heading">
         {/*
-          `tabIndex={-1}` et focus au montage : cet écran remplace l'arbre entier, le focus retombe
-          sinon sur `body` et un opérateur au lecteur d'écran n'entend rien. Voir `focus-heading.ts`.
+          `tabIndex={-1}` et focus posé par une **ref de rappel** : cet écran remplace l'arbre
+          entier, le focus retombe sinon sur `body` et un opérateur au lecteur d'écran n'entend
+          rien. Une ref de rappel et non un effet au montage — le titre peut paraître après le
+          premier rendu. Voir `focus-heading.ts`.
         */}
         <h1 ref={heading} tabIndex={-1}>
           Connexion opérateur

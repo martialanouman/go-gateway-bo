@@ -330,6 +330,20 @@ describe('les issues de bordure', () => {
     expect(result.outcome === 'unreachable' && result.message).not.toMatch(/refus/i)
   })
 
+  it('nomme quand même l’absence d’appareil quand le corps du 409 est illisible', async () => {
+    // Le repli n'est pas décoratif : sans lui, l'écran basculerait sur le TOTP avec un message vide,
+    // et l'opérateur ne saurait pas pourquoi on l'a déplacé.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>409</html>', { status: 409 })),
+    )
+
+    await expect(verifyPasskey()).resolves.toEqual({
+      outcome: 'no_passkey',
+      message: 'Aucun appareil enregistré sur ce compte.',
+    })
+  })
+
   it('signale un serveur injoignable au début de la cérémonie', async () => {
     vi.stubGlobal(
       'fetch',

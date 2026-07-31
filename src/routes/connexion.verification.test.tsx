@@ -131,6 +131,69 @@ describe('le challenge du second facteur', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Aucun appareil enregistré sur ce compte.')
   })
 
+  it('dit quand le facteur est acquis mais la console injoignable', async () => {
+    // **Le chemin muet, et il était réel.** La cérémonie réussit côté serveur, la relecture de
+    // session échoue, et l'écran se re-rendait à l'identique : même formulaire, aucune annonce,
+    // `notice` remis à zéro au début de la tentative. L'opérateur recommençait une vérification déjà
+    // acquise en se demandant pourquoi rien ne changeait.
+    verifyPasskey.mockResolvedValue({ outcome: 'completed' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('nope', { status: 502 })),
+    )
+
+    const screen = await renderRoute('/connexion/verification', { queryClient: pendingSession() })
+
+    await screen.user.click(screen.getByRole('button', { name: /Utiliser la passkey/ }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/Second facteur accepté/)
+    // Et la reprise redevient possible : un bouton laissé en « Vérification en cours » aurait
+    // enfermé l'opérateur sur un écran qu'il ne pouvait plus quitter.
+    expect(screen.getByRole('button', { name: /Utiliser la passkey/ })).toBeInTheDocument()
+  })
+
+  it('relit vraiment la session, sans rejoindre une requête déjà en vol', async () => {
+    // **La déduplication de TanStack Query, et pourquoi `fetchQuery` ne suffisait pas.** Une
+    // relecture de fond partie avant la cérémonie — la fenêtre reprend le focus après la boîte de
+    // dialogue système, ou la fraîcheur de trente secondes est écoulée — était rejointe par
+    // `fetchQuery`, qui rendait alors la session **d'avant** le second facteur. Rien ne levait, et
+    // l'écran se re-rendait à l'identique.
+    verifyTotp.mockResolvedValue({ outcome: 'completed' })
+
+    let inFlight: ((value: Response) => void) | undefined
+    const fetchMock = vi
+      .fn()
+      // Le rafraîchissement du montage : la session est encore partielle, l'écran reste.
+      .mockResolvedValueOnce(Response.json(PARTIAL_OPERATOR))
+      // La requête déjà en vol, qui ne répondra qu'après la cérémonie — et avec l'état d'avant.
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            inFlight = resolve
+          }),
+      )
+      // Celle que la cérémonie doit déclencher, et qui porte la vérité.
+      .mockImplementation(async () => Response.json({ ...PARTIAL_OPERATOR, mfaCompleted: true }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const client = pendingSession()
+    const screen = await renderRoute('/connexion/verification', { queryClient: client })
+
+    await screen.user.click(screen.getByRole('tab', { name: /TOTP/ }))
+
+    // On lance la relecture de fond, puis on la laisse en suspens.
+    void client.refetchQueries({ queryKey: OPERATOR_QUERY_KEY, exact: true })
+    await screen.user.type(screen.getByLabelText(/Code à 6 chiffres/), '123456')
+    await screen.user.click(screen.getByRole('button', { name: /^Vérifier/ }))
+
+    inFlight?.(Response.json(PARTIAL_OPERATOR))
+
+    // La session devient complète : l'écran part. S'il avait rejoint la requête en vol, il serait
+    // resté sur le challenge, sans un mot.
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Tableau de bord')
+  })
+
   it('vérifie le code TOTP', async () => {
     verifyTotp.mockResolvedValue({ outcome: 'completed' })
     const screen = await renderRoute('/connexion/verification', { queryClient: pendingSession() })
@@ -171,6 +234,34 @@ describe('le challenge du second facteur', () => {
     // apprendrait à l'opérateur à ignorer les alertes rouges.
     expect(await screen.findByRole('status')).toHaveTextContent('Vérification interrompue')
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('pose le focus sur le titre même quand il paraît après le squelette', async () => {
+    // **Ce que la ref de rappel corrige.** Un effet au montage s'exécutait au premier rendu — qui
+    // est ici la frontière de session, un squelette sans titre — et le `<h1>` paraissant ensuite ne
+    // recevait jamais le focus. L'opérateur au lecteur d'écran entendait le silence, puis devait
+    // re-tabuler à l'aveugle pour découvrir qu'il avait changé d'écran (WCAG 2.4.3).
+    let respond: ((value: Response) => void) | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            respond = resolve
+          }),
+      ),
+    )
+
+    // Aucun cache : le premier rendu est le squelette, et le titre n'existe pas encore.
+    const screen = await renderRoute('/connexion/verification', {
+      queryClient: createTestQueryClient(),
+    })
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+
+    respond?.(Response.json(PARTIAL_OPERATOR))
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    expect(document.activeElement).toBe(heading)
   })
 
   it('nomme l’opérateur en cours d’authentification', async () => {
