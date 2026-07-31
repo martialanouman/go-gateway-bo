@@ -633,6 +633,14 @@
   flex-direction: column;
   gap: var(--sp-4);
   width: min(520px, calc(100vw - var(--sp-9)));
+  /*
+   * **Sans cette borne, une modale plus haute que l'écran est inutilisable** : centrée par
+   * `translate(-50%, -50%)`, elle déborde en haut *et* en bas, et rien ne défile — ni son contenu,
+   * ni la page, que le voile immobilise. L'éditeur de permissions (step-027) est le premier contenu
+   * assez long pour l'atteindre ; c'est le parcours Playwright qui l'a trouvé, en butant sur une
+   * case « hors du champ » que ni le clic ni le défilement ne ramenaient.
+   */
+  max-height: calc(100vh - var(--sp-9));
   padding: var(--sp-7);
   transform: translate(-50%, -50%);
   border: 1px solid var(--border-default);
@@ -649,6 +657,20 @@
 .ui-dialog__description {
   color: var(--text-muted);
   font: var(--text-body);
+}
+
+/*
+ * Le corps est la seule partie qui défile : le titre dit où l'on est, le pied porte l'action, et
+ * les deux doivent rester visibles pendant qu'on parcourt une longue liste. `min-height: 0` est ce
+ * qui autorise ce rétrécissement — sans lui, un élément de `flex` refuse de descendre sous la
+ * hauteur de son contenu, et le débordement repart vers le pied de page.
+ */
+.ui-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .ui-dialog__footer {

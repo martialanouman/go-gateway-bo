@@ -2,7 +2,7 @@
  * L'écran des rôles, monté à son URL réelle.
  *
  * Même partage que pour l'écran des opérateurs : ce qui n'ouvre pas de surface flottante se teste
- * ici, le reste dans un vrai navigateur (`e2e/annuaire.spec.ts`). La raison est écrite en tête de
+ * ici, le reste dans un vrai navigateur (`e2e/connexion.spec.ts`, qui prolonge le parcours d'entrée dans la console plutôt que d'ouvrir un fichier de plus). La raison est écrite en tête de
  * `_shell.operateurs.test.tsx` — `renderRoute` monte un document à deux racines, et une modale de
  * Base UI y fait boucler le processus.
  */

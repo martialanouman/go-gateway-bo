@@ -57,7 +57,7 @@ test('un mot de passe refusé le dit sans dire si le compte existe', async ({ pa
   expect(page.url()).not.toContain('mot de passe')
 })
 
-test('login puis code TOTP mènent à la console', async ({ page }) => {
+test('login puis code TOTP mènent à la console, où l’annuaire s’administre', async ({ page }) => {
   // ─── Enrôlement par l'API : l'écran d'enrôlement arrive en step-028 ───
   // Le parcours démarre donc là où un opérateur déjà équipé se trouve. Ce que ce test prouve est
   // l'entrée, pas l'équipement.
@@ -104,4 +104,84 @@ test('login puis code TOTP mènent à la console', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(
     'Vérification en deux étapes',
   )
+
+  // ─── L'annuaire (step-027) ─────────────────────────────────────────────────────────────────
+  // Le parcours continue avec la même session plutôt que d'ouvrir un fichier : la règle du dépôt
+  // est « très peu de bout en bout », et un fichier par step donnerait une soixantaine de parcours
+  // à la fin du plan. Ce qui est prouvé ici ne l'est nulle part ailleurs — les modales de Base UI
+  // font boucler `renderRoute`, dont l'arbre monte un document à deux racines (voir
+  // `src/routes/_shell.operateurs.test.tsx`).
+
+  await page.goto('/operateurs')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Opérateurs')
+
+  // ─── Créer un opérateur : le mot de passe initial n'apparaît qu'une fois ───
+  await page.getByRole('button', { name: 'Créer un opérateur' }).click()
+  await page.getByLabel('Adresse email').fill('recrue.e2e@example.test')
+  await page.getByLabel('Nom affiché').fill('Recrue de test')
+  await page.getByRole('checkbox', { name: 'auditor' }).click()
+  await page.getByRole('button', { name: 'Créer le compte' }).click()
+
+  // Vingt caractères de l'alphabet sans ambiguïté : c'est la seule fois où cette valeur existe hors
+  // du BFF. Elle n'est pas recopiée ici — l'asserter par sa forme suffit, et l'écrire dans le test
+  // la ferait entrer dans un rapport d'exécution.
+  const motDePasseInitial = page.getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{20}$/)
+  await expect(motDePasseInitial).toBeVisible()
+
+  await page.getByRole('button', { name: 'J’ai noté le mot de passe' }).click()
+  await page.getByRole('button', { name: 'Créer un opérateur' }).click()
+
+  // **Invariant (b), dans le seul écran du produit qui montre un secret** : rouvrir la modale ne le
+  // réaffiche pas, et aucune action « révéler » n'existe.
+  await expect(page.getByText(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{20}$/)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Annuler' }).click()
+
+  const recrue = page.getByRole('row', { name: /recrue\.e2e@example\.test/ })
+  await expect(recrue).toBeVisible()
+  await expect(recrue).toContainText('auditor')
+  // Un compte neuf n'a pas de second facteur, et l'écran le dit : c'est ce qui permet de repérer
+  // qui ne pourra pas entrer.
+  await expect(recrue).toContainText('aucun')
+
+  // ─── Le garde-fou d'auto-verrouillage, vu depuis l'écran ───
+  const moi = page.getByRole('row', { name: new RegExp(E2E_OPERATOR.email) })
+  await moi.getByRole('button', { name: 'Actions' }).click()
+  await page.getByRole('menuitem', { name: 'Modifier les rôles' }).click()
+  await page.getByRole('checkbox', { name: 'super_admin' }).click()
+  await page.getByRole('button', { name: 'Enregistrer les rôles' }).click()
+
+  // Le refus vient du serveur et s'affiche **en bandeau** : il cite la clé entre guillemets, forme
+  // sur laquelle `assertToastText` lève. Un écran qui l'aurait envoyée en toast aurait planté ici.
+  await expect(page.getByRole('alert')).toContainText('operators:manage')
+
+  // Et le rôle est toujours là : la transaction a été annulée, pas seulement l'affichage.
+  await page.reload()
+  await expect(page.getByRole('row', { name: new RegExp(E2E_OPERATOR.email) })).toContainText(
+    'super_admin',
+  )
+
+  // ─── Les rôles : l'aperçu d'impact, et ce qui ne se supprime pas ───
+  await page.getByRole('link', { name: 'Rôles' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Rôles')
+
+  const auditor = page.getByRole('row', { name: /auditor/ })
+  await expect(auditor).toContainText('Livré avec le produit')
+  await auditor.getByRole('button', { name: 'Actions' }).click()
+  // Interdit, désactivé **et expliqué** — jamais un bouton grisé sans raison.
+  await expect(
+    page.getByRole('menuitem', { name: 'Supprimer — rôle livré avec le produit' }),
+  ).toBeDisabled()
+
+  await page.getByRole('menuitem', { name: 'Modifier le paquet' }).click()
+  // Le nom d'un rôle livré est inerte : le seed le réinsérerait sous son ancien nom au déploiement
+  // suivant.
+  await expect(page.getByLabel('Nom du rôle')).toBeDisabled()
+
+  await page.getByRole('checkbox', { name: 'audit:read' }).click()
+
+  // L'aperçu est calculé par le serveur, sur le nombre réel de porteurs. `auditor` vient d'être
+  // attribué à la recrue : le chiffre annoncé est celui-là, pas zéro.
+  await expect(page.getByRole('status')).toContainText('retire 1 permission(s) à 1 opérateur(s)')
+
+  await page.getByRole('button', { name: 'Annuler' }).click()
 })

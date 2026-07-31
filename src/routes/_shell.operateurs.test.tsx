@@ -17,7 +17,7 @@
  *
  * C'est donc un défaut du harnais, pas du produit — et la conclusion n'est pas d'inventer un test
  * qui contourne : la création d'un opérateur, l'affichage unique du mot de passe initial et le
- * bandeau de refus sont exercés **dans un vrai navigateur** par `e2e/annuaire.spec.ts`, ce que le
+ * bandeau de refus sont exercés **dans un vrai navigateur** par `e2e/connexion.spec.ts`, qui prolonge le parcours d'entrée dans la console plutôt que d'ouvrir un fichier de plus, ce que le
  * critère 1 de la DoD demande de toute façon. Le jour où `renderRoute` montera l'arbre sans
  * imbriquer un document, ces chemins pourront revenir ici.
  */
