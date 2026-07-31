@@ -72,6 +72,23 @@ describe('AppShell — repères', () => {
     expect(getByRole('main')).toHaveTextContent('Clients')
   })
 
+  it('offre un chemin vers ses propres facteurs', async () => {
+    // La step-028 demande que l'écran d'enrôlement soit atteignable pour **ajouter** un facteur à
+    // une session complète. Il ne l'était que depuis le challenge — donc seulement pour qui n'en a
+    // aucun : un opérateur voulant ajouter une passkey à son TOTP devait taper l'URL.
+    //
+    // Le lien vit dans la barre et non dans le rail : le rail se filtre par permission, et gérer ses
+    // propres facteurs n'en demande aucune.
+    const { getByRole } = await renderRoute('/clients', {
+      queryClient: clientWithPermissions(['customers:read']),
+    })
+
+    expect(getByRole('link', { name: 'Second facteur' })).toHaveAttribute(
+      'href',
+      '/connexion/enrolement',
+    )
+  })
+
   it('nomme l’opérateur connecté', async () => {
     const { getByText } = await renderRoute('/clients', {
       queryClient: clientWithPermissions(['customers:read']),
@@ -100,11 +117,15 @@ describe('AppShell — le rail suit les permissions', () => {
       queryClient: clientWithPermissions(NAV_ENTRIES.map((entry) => entry.permission)),
     })
 
-    // Dix-sept entrées plus le lien d'évitement. Le nombre est **figé** : le dériver de
-    // `NAV_ENTRIES.length` rendait le test auto-référentiel — supprimer une entrée déplaçait les
-    // deux côtés de l'égalité, et la suite restait verte.
+    // Dix-sept entrées, plus le lien d'évitement et celui du second facteur. Le nombre est **figé** :
+    // le dériver de `NAV_ENTRIES.length` rendait le test auto-référentiel — supprimer une entrée
+    // déplaçait les deux côtés de l'égalité, et la suite restait verte.
+    //
+    // Il compte **tous** les liens de la coquille et non ceux du rail seul, et c'est délibéré : un
+    // lien ajouté ailleurs dans la barre le fait rougir, ce qui force à décider s'il a sa place —
+    // c'est ce qui vient d'arriver au lien « Second facteur ».
     expect(NAV_ENTRIES).toHaveLength(17)
-    expect(getAllByRole('link')).toHaveLength(18)
+    expect(getAllByRole('link')).toHaveLength(19)
   })
 
   it('fait disparaître un groupe entièrement refusé, intitulé compris', async () => {

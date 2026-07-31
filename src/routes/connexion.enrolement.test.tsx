@@ -16,6 +16,7 @@
  * pourquoi il doit accuser réception avant de partir.
  */
 
+import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OPERATOR_QUERY_KEY } from '~/components/permission'
 import { createTestQueryClient } from '~/test/render'
@@ -47,6 +48,17 @@ const PARTIAL_OPERATOR = {
   mfaCompleted: false,
 } as const
 
+/**
+ * Le message que le BFF rend réellement (`ALREADY_ENROLLED_MESSAGE`, `src/server/auth/http.ts`).
+ *
+ * Recopié et non importé : ce fichier vit sous `src/routes/`, où la règle de l'invariant (d) interdit
+ * de toucher `src/server/`. La copie peut donc dériver — mais elle dérive **moins** qu'une phrase
+ * inventée, ce qu'était la version précédente : elle affirmait couvrir un message que la passerelle
+ * ne produit pas, et masquait que l'écran peignait un refus en information neutre.
+ */
+const ALREADY_ENROLLED_MESSAGE =
+  'Enrôlement refusé : un authentificateur est déjà associé à ce compte. Son remplacement passe par un administrateur.'
+
 const SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP'
 const RECOVERY = ['ABCD-EFGH-1', 'ABCD-EFGH-2', 'ABCD-EFGH-3']
 
@@ -56,12 +68,32 @@ function pendingSession() {
   return client
 }
 
+/**
+ * Une session complète : second facteur déjà franchi, l'opérateur vient **ajouter** un appareil.
+ *
+ * Le stub de `fetch` est remplacé en même temps que le cache, et ce n'est pas une redondance : le
+ * client de test tient tout pour périmé et rafraîchit dès le montage. Amorcer une session complète
+ * en laissant le stub par défaut rendre une session partielle la faisait basculer en pleine
+ * interaction — les boutons de retrait se bloquaient, et trois tests échouaient pour une raison sans
+ * rapport avec ce qu'ils vérifient.
+ */
+function completeSession() {
+  const complete = { ...PARTIAL_OPERATOR, mfaCompleted: true }
+  const client = createTestQueryClient()
+  client.setQueryData(OPERATOR_QUERY_KEY, complete)
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json(complete)),
+  )
+  return client
+}
+
 beforeEach(() => {
   startTotpEnrollment.mockReset()
   confirmTotpEnrollment.mockReset()
   registerPasskey.mockReset()
   revokePasskey.mockReset()
-  listPasskeys.mockReset().mockResolvedValue([])
+  listPasskeys.mockReset().mockResolvedValue({ outcome: 'listed', passkeys: [] })
 
   // Aucun test ne touche le réseau, et le rafraîchissement dit la même chose que le cache : sinon
   // l'écran basculerait en pleine interaction, et le test échouerait pour une raison sans rapport.
@@ -131,7 +163,13 @@ describe('l’écran d’enrôlement', () => {
 
     // **Invariant (b).** Le secret vit dans un état local, il traverse le composant et disparaît
     // avec lui. Le cache Query peut être persisté ou inspecté ; une URL se retrouve dans un
-    // historique, un journal de proxy et une capture d'écran.
+    // historique, un journal de proxy et une capture d'écran ; un stockage de navigateur survit à
+    // la fermeture de l'onglet.
+    //
+    // **Les trois dernières voies manquaient**, et c'étaient les plus probables : une mutation
+    // ajoutant `sessionStorage.setItem(...)` et un attribut `data-*` ne faisait rougir personne. La
+    // step annonce « le secret n'apparaît dans aucune sérialisation persistée » ; il faut donc
+    // regarder les sérialisations, pas seulement l'URL.
     expect(window.location.href).not.toContain(SECRET)
     expect(
       JSON.stringify(
@@ -141,6 +179,16 @@ describe('l’écran d’enrôlement', () => {
           .map((q) => q.state.data),
       ),
     ).not.toContain(SECRET)
+    expect(JSON.stringify({ ...window.sessionStorage })).not.toContain(SECRET)
+    expect(JSON.stringify({ ...window.localStorage })).not.toContain(SECRET)
+
+    // Le secret est **affiché**, donc présent dans le texte : ce qu'on interdit est qu'il vive dans
+    // un attribut, où il survivrait à une capture du DOM ou à un outil de session replay.
+    for (const element of document.querySelectorAll('*')) {
+      for (const attribute of element.attributes) {
+        expect(attribute.value, `${element.tagName}[${attribute.name}]`).not.toContain(SECRET)
+      }
+    }
   })
 
   it('montre les codes de récupération après confirmation, et exige un accusé', async () => {
@@ -170,6 +218,30 @@ describe('l’écran d’enrôlement', () => {
 
     await screen.user.click(screen.getByRole('checkbox', { name: /notés|conservés/i }))
     expect(screen.getByRole('button', { name: /Continuer/ })).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('garde les codes quand l’opérateur passe sur l’autre onglet', async () => {
+    // **Le geste que l'écran invite à faire, et qui détruisait le seul recours.** Base UI démonte le
+    // panneau caché : l'état local qui portait les codes mourait avec lui, et ils ne sont conservés
+    // nulle part ailleurs — le serveur n'en garde que des empreintes, et un second enrôlement est
+    // refusé puisque le facteur est actif. L'accusé de réception ne gardait que la sortie par le
+    // bouton, pas la sortie par l'onglet.
+    startTotpEnrollment.mockResolvedValue({
+      outcome: 'started',
+      secret: SECRET,
+      uri: 'otpauth://x',
+    })
+    confirmTotpEnrollment.mockResolvedValue({ outcome: 'activated', recoveryCodes: RECOVERY })
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
+
+    await screen.user.click(screen.getByRole('button', { name: /Préparer/ }))
+    await screen.user.type(await screen.findByLabelText(/Code à 6 chiffres/), '123456')
+    await screen.user.click(screen.getByRole('button', { name: /^Confirmer/ }))
+    await screen.findByText(RECOVERY[0] as string)
+
+    // Les onglets ont disparu : il n'y a plus de geste qui puisse faire perdre les codes.
+    expect(screen.queryByRole('tab', { name: /Passkey/i })).toBeNull()
+    expect(screen.getByText(RECOVERY[0] as string)).toBeInTheDocument()
   })
 
   it('n’offre aucun moyen de revoir les codes', async () => {
@@ -214,19 +286,21 @@ describe('l’écran d’enrôlement', () => {
     expect(screen.queryByLabelText(/Code à 6 chiffres/)).toBeNull()
   })
 
-  it('dit qu’un facteur existe déjà, sans parler d’échec', async () => {
+  it('rend le refus d’un compte déjà enrôlé, avec le message du serveur', async () => {
+    // **Le message est celui du produit**, pas un texte inventé pour le test. Une version précédente
+    // injectait « Un second facteur est déjà actif sur ce compte. », phrase qui n'existe nulle part,
+    // et concluait que l'écran devait la peindre en information neutre. Le vrai message commence par
+    // « Enrôlement refusé » : l'annoncer en `status` était une contradiction que l'opérateur lit d'un
+    // coup d'œil.
     startTotpEnrollment.mockResolvedValue({
       outcome: 'already_enrolled',
-      message: 'Un second facteur est déjà actif sur ce compte.',
+      message: ALREADY_ENROLLED_MESSAGE,
     })
     const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
 
     await screen.user.click(screen.getByRole('button', { name: /Préparer/ }))
 
-    // Ce n'est pas un refus : le compte est en règle. Le peindre en alerte apprendrait à ignorer les
-    // alertes.
-    expect(await screen.findByRole('status')).toHaveTextContent('déjà actif')
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(await screen.findByRole('alert')).toHaveTextContent(ALREADY_ENROLLED_MESSAGE)
   })
 })
 
@@ -260,16 +334,61 @@ describe('l’enrôlement d’une passkey', () => {
     await screen.user.click(screen.getByRole('button', { name: /Enregistrer cet appareil/ }))
 
     expect(registerPasskey).toHaveBeenCalledWith('Poste de test')
-    expect(await screen.findByText('Poste de test')).toBeInTheDocument()
+    expect(await screen.findByRole('listitem')).toHaveTextContent('Poste de test')
+
+    // **La cérémonie promeut la session côté serveur**, et cet écran vit hors de la coquille : sans
+    // sortie explicite, l'opérateur se retrouvait avec une session complète et aucun moyen d'entrer
+    // — ni rail, ni lien. Le cul-de-sac que cette step supprime se reformait sur cet onglet.
+    expect(screen.getByRole('button', { name: /Continuer vers la console/ })).toBeInTheDocument()
+  })
+
+  it('nomme l’appareil dans le bouton qui le retire', async () => {
+    listPasskeys.mockResolvedValue({
+      outcome: 'listed',
+      passkeys: [
+        { id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' },
+        { id: 'c2', name: 'Portable', createdAt: '2026-07-31T00:00:00Z' },
+      ],
+    })
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
+
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+
+    // Trois boutons « Retirer » identiques ne disent pas lequel on s'apprête à supprimer — et le
+    // geste est irréversible.
+    expect(await screen.findByRole('button', { name: /Retirer Portable/ })).toBeInTheDocument()
+  })
+
+  it('n’offre pas le retrait depuis une session partielle, et dit pourquoi', async () => {
+    listPasskeys.mockResolvedValue({
+      outcome: 'listed',
+      passkeys: [{ id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' }],
+    })
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
+
+    await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
+
+    // **Le point d'entrée de gestion exige une session complète** et répond sinon 401 « Session
+    // absente ou expirée » : offrir le bouton faisait annoncer une expiration à un opérateur dont la
+    // session est parfaitement valide, et il se reconnectait pour rien.
+    const remove = await screen.findByRole('button', { name: /Retirer/ })
+    expect(remove).toHaveAttribute('aria-disabled', 'true')
+
+    await screen.user.click(remove)
+    expect(revokePasskey).not.toHaveBeenCalled()
+    expect(screen.getByText(/demande une session complète/)).toBeInTheDocument()
   })
 
   it('dit pourquoi le dernier facteur ne se retire pas', async () => {
-    listPasskeys.mockResolvedValue([{ id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' }])
+    listPasskeys.mockResolvedValue({
+      outcome: 'listed',
+      passkeys: [{ id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' }],
+    })
     revokePasskey.mockResolvedValue({
       outcome: 'refused',
       message: 'Retrait refusé : cet appareil est votre dernier second facteur.',
     })
-    const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
 
     await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
     await screen.user.click(await screen.findByRole('button', { name: /Retirer/ }))
@@ -280,20 +399,21 @@ describe('l’enrôlement d’une passkey', () => {
   })
 
   it('retire un appareil et le fait disparaître de la liste', async () => {
-    listPasskeys.mockResolvedValue([
-      { id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' },
-      { id: 'c2', name: 'Portable', createdAt: '2026-07-31T00:00:00Z' },
-    ])
+    listPasskeys.mockResolvedValue({
+      outcome: 'listed',
+      passkeys: [
+        { id: 'c1', name: 'Poste', createdAt: '2026-07-31T00:00:00Z' },
+        { id: 'c2', name: 'Portable', createdAt: '2026-07-31T00:00:00Z' },
+      ],
+    })
     revokePasskey.mockResolvedValue({
       outcome: 'updated',
       passkeys: [{ id: 'c2', name: 'Portable', createdAt: '2026-07-31T00:00:00Z' }],
     })
-    const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: completeSession() })
 
     await screen.user.click(screen.getByRole('tab', { name: /Passkey/i }))
-    await screen.user.click(
-      (await screen.findAllByRole('button', { name: /Retirer/ }))[0] as HTMLElement,
-    )
+    await screen.user.click(await screen.findByRole('button', { name: /Retirer Poste/ }))
 
     // La liste vient du serveur, pas d'un retrait local : deux sources finiraient par diverger, et
     // c'est l'affichage qui mentirait sur ce qui protège réellement le compte.
@@ -336,7 +456,16 @@ describe('la sortie vers la console', () => {
       vi.fn(async () => Response.json({ ...PARTIAL_OPERATOR, mfaCompleted: true })),
     )
 
-    const screen = await renderRoute('/connexion/enrolement', { queryClient: pendingSession() })
+    // **Le client reproduit la fraîcheur de production**, et c'est ce qui rend ce test discriminant.
+    // Avec le `staleTime` de zéro du harnais, la requête se rafraîchit d'elle-même à chaque rendu :
+    // le test passait donc même sans la relecture explicite, ce qu'une mutation a établi. Avec
+    // trente secondes, seule une relecture demandée change la réponse.
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
+    })
+    client.setQueryData(OPERATOR_QUERY_KEY, PARTIAL_OPERATOR)
+
+    const screen = await renderRoute('/connexion/enrolement', { queryClient: client })
 
     await screen.user.click(screen.getByRole('button', { name: /Préparer/ }))
     await screen.user.type(await screen.findByLabelText(/Code à 6 chiffres/), '123456')

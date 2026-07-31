@@ -213,17 +213,23 @@ describe('la liste des appareils', () => {
       vi.fn(async () => respond(200, { passkeys: [{ id: 'c1', name: 'Poste', createdAt: 'x' }] })),
     )
 
-    await expect(listPasskeys()).resolves.toEqual([{ id: 'c1', name: 'Poste', createdAt: 'x' }])
+    await expect(listPasskeys()).resolves.toEqual({
+      outcome: 'listed',
+      passkeys: [{ id: 'c1', name: 'Poste', createdAt: 'x' }],
+    })
   })
 
-  it('rend une liste vide plutôt qu’une exception quand le serveur tombe', async () => {
-    // La liste est un confort : une panne ne doit pas empêcher d'enrôler.
+  it('dit qu’elle est indisponible plutôt que de se faire passer pour vide', async () => {
+    // **La distinction qui compte.** Rendre `[]` sur échec peignait exactement la même chose qu'un
+    // compte sans aucun appareil : un opérateur qui en a trois, ouvrant l'onglet pendant un hoquet du
+    // BFF, en concluait que ses facteurs avaient été retirés. Deux des cinq états de contenu rendus
+    // par le même vide muet.
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response('nope', { status: 502 })),
     )
 
-    await expect(listPasskeys()).resolves.toEqual([])
+    await expect(listPasskeys()).resolves.toEqual({ outcome: 'unavailable' })
   })
 
   it('se renomme', async () => {
@@ -300,11 +306,11 @@ describe('quand le réseau tombe', () => {
     expect((await confirmTotpEnrollment('123456')).outcome).toBe('unreachable')
   })
 
-  it('la liste se tait et rend vide', async () => {
-    // Seul appel du module qui ne remonte pas l'échec : la liste est un confort, et une panne
-    // d'affichage ne doit pas fermer la seule porte d'entrée du produit.
+  it('la liste se dit indisponible sans lever', async () => {
+    // Elle ne remonte pas l'échec comme une issue à peindre en alerte : la liste reste un confort, et
+    // une panne d'affichage ne doit pas fermer la seule porte d'entrée du produit. Elle se dit.
     offline()
-    await expect(listPasskeys()).resolves.toEqual([])
+    await expect(listPasskeys()).resolves.toEqual({ outcome: 'unavailable' })
   })
 
   it('la cérémonie interrompue **après** la signature le dit', async () => {
@@ -345,7 +351,7 @@ describe('quand le réseau tombe', () => {
  * absent — et chacun est testé, sans quoi le repli est une intention, pas un comportement.
  */
 describe('les corps incomplets', () => {
-  it('l’enregistrement sans liste rend une liste vide', async () => {
+  it('l’enregistrement sans liste ne prétend pas que la liste est vide', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(respond(200, { options: { challenge: 'abc' } }))
@@ -353,19 +359,24 @@ describe('les corps incomplets', () => {
     vi.stubGlobal('fetch', fetchMock)
     startRegistration.mockResolvedValueOnce({ id: 'c1' })
 
+    // `undefined` et non `[]` : l'écran garde alors la liste qu'il affichait, au lieu de faire
+    // **disparaître** l'appareil qui vient d'être enregistré — un affichage qui mentirait sur ce qui
+    // protège le compte.
     await expect(registerPasskey('Poste')).resolves.toEqual({
       outcome: 'registered',
-      passkeys: [],
+      passkeys: undefined,
     })
   })
 
-  it('la liste sans champ `passkeys` rend une liste vide', async () => {
+  it('un 200 sans champ `passkeys` n’est pas une liste vide', async () => {
+    // C'est un corps qu'on ne comprend pas — probablement un intermédiaire — et le confondre avec
+    // « aucun appareil » ferait la même fausse annonce qu'une panne.
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => respond(200, {})),
     )
 
-    await expect(listPasskeys()).resolves.toEqual([])
+    await expect(listPasskeys()).resolves.toEqual({ outcome: 'unavailable' })
   })
 
   it('la gestion d’un appareil signale une panne du serveur', async () => {

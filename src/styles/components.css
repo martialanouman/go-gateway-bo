@@ -1267,9 +1267,17 @@
 
 /*
  * Le QR code repose sur un fond clair : voir `--qr-paper` dans les tokens pour la raison, qui n'est
- * pas esthétique. Les modules eux-mêmes sont peints ici plutôt que par les propriétés de la
- * bibliothèque — une règle CSS l'emporte sur un attribut de présentation, et cela garde les deux
- * couleurs du QR au même endroit.
+ * pas esthétique.
+ *
+ * **Aucune règle ne peint le SVG lui-même**, et c'est une correction. Une version précédente posait
+ * `.ui-enroll__qr svg path { fill: var(--qr-ink) }` pour garder les deux couleurs au même endroit :
+ * `qrcode.react` émet **deux** chemins — le fond, puis les modules — et la règle peignait les deux
+ * en noir. Le QR devenait un carré uni de 176 pixels, illisible par toute application authenticator,
+ * sur le chemin que cet écran met délibérément en premier. Ni jsdom ni l'assertion de visibilité du
+ * parcours ne pouvaient le voir.
+ *
+ * Les valeurs par défaut de la bibliothèque — noir pur sur blanc pur — sont exactement celles que la
+ * norme de lecture demande : on ne les remplace pas.
  */
 .ui-enroll__qr {
   display: flex;
@@ -1279,8 +1287,15 @@
   background: var(--qr-paper);
 }
 
-.ui-enroll__qr svg path {
-  fill: var(--qr-ink);
+.ui-enroll__step {
+  margin: 0;
+  font: var(--text-section-title);
+  color: var(--text-primary);
+}
+
+.ui-enroll__step:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--sp-2);
 }
 
 .ui-enroll__secret {
@@ -1331,4 +1346,36 @@
   border-radius: var(--r-field);
   font: var(--text-body);
   color: var(--text-primary);
+}
+
+/*
+ * Masqué à l'œil, conservé pour les technologies d'assistance.
+ *
+ * `clip-path` plutôt que `display: none`, qui retirerait aussi le contenu de l'arbre d'accessibilité
+ * — c'est-à-dire sa seule raison d'être. Le motif existait déjà à trois endroits ; il est nommé ici
+ * parce qu'un quatrième usage l'a rendu partageable, sans toucher aux trois autres.
+ */
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * Le lien vers l'enrôlement, dans la barre supérieure. Discret par défaut — ce n'est pas une action
+ * quotidienne — mais jamais masqué : c'est le seul chemin vers ses propres facteurs depuis la
+ * console.
+ */
+.ui-shell__factor {
+  margin-left: var(--sp-5);
+  font: var(--text-data-sm);
+  color: var(--text-muted);
+}
+
+.ui-shell__factor:hover,
+.ui-shell__factor:focus-visible {
+  color: var(--text-link);
 }

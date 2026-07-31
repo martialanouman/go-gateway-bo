@@ -44,6 +44,18 @@ test('un administrateur neuf enrôle son facteur et entre, sans jamais appeler l
   // Le QR est rendu en SVG inline : il porte son titre accessible, et rien ne part sur le réseau.
   await expect(page.getByRole('img', { name: /QR code/i })).toBeVisible()
 
+  // **Et il est réellement lisible.** Une version précédente peignait les modules par CSS pour
+  // garder les couleurs au même endroit : `qrcode.react` émet deux chemins — le fond, puis les
+  // modules — et le sélecteur prenait les deux. Le QR devenait un carré noir uni de 176 pixels,
+  // qu'aucune application authenticator ne pouvait scanner. Ni jsdom, qui n'applique pas la CSS, ni
+  // une assertion de visibilité ne pouvaient le voir : il faut un vrai navigateur et les couleurs
+  // calculées.
+  const fills = await page
+    .locator('.ui-enroll__qr svg path')
+    .evaluateAll((paths) => paths.map((path) => getComputedStyle(path).fill))
+  expect(fills.length, 'le QR doit avoir un fond et des modules').toBeGreaterThan(1)
+  expect(new Set(fills).size, 'fond et modules ne peuvent pas être de la même couleur').toBe(2)
+
   // La clé de secours est affichée en clair, une seule fois — c'est ce qu'un opérateur recopie quand
   // son appareil ne peut pas scanner. Le test la lit au même endroit que lui.
   const secret = (await page.locator('.ui-enroll__secret code').innerText()).trim()
@@ -70,8 +82,14 @@ test('un administrateur neuf enrôle son facteur et entre, sans jamais appeler l
   // ─── La console ───
   await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible()
 
-  // Et le retour arrière ne rend pas les codes : ils n'ont jamais été ailleurs que dans un état
-  // local, détruit avec le composant. C'est l'invariant (b) observé dans un vrai navigateur.
-  await page.goBack()
+  // **Revenir sur l'écran d'enrôlement ne rend pas les codes.** Ils n'ont jamais été ailleurs que
+  // dans un état local, détruit avec le composant.
+  //
+  // On y retourne par l'URL et non par `goBack()` : la sortie navigue avec `replace: true`, donc
+  // l'entrée `/connexion/enrolement` est **effacée** de l'historique et un retour arrière atterrit
+  // sur le challenge. L'assertion précédente était donc vraie par construction, et n'aurait pas
+  // rougi même si l'écran avait réaffiché les codes.
+  await page.goto('/connexion/enrolement')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Second facteur')
   await expect(page.locator('.ui-enroll__codes')).toHaveCount(0)
 })

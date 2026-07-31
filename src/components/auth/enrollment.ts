@@ -51,14 +51,15 @@ export type TotpConfirmation =
   | { readonly outcome: 'unreachable'; readonly message: string }
 
 export type PasskeyRegistration =
-  | { readonly outcome: 'registered'; readonly passkeys: readonly Passkey[] }
+  /** `passkeys` absent quand le serveur n'a pas rendu la liste : garder celle qu'on affichait. */
+  | { readonly outcome: 'registered'; readonly passkeys?: readonly Passkey[] }
   /** Fenêtre système fermée, délai écoulé, biométrie refusée. Pas une panne. */
   | { readonly outcome: 'cancelled'; readonly message: string }
   | { readonly outcome: 'refused'; readonly message: string }
   | { readonly outcome: 'unreachable'; readonly message: string }
 
 export type PasskeyUpdate =
-  | { readonly outcome: 'updated'; readonly passkeys: readonly Passkey[] }
+  | { readonly outcome: 'updated'; readonly passkeys?: readonly Passkey[] }
   | { readonly outcome: 'refused'; readonly message: string }
   | { readonly outcome: 'unreachable'; readonly message: string }
 
@@ -179,24 +180,44 @@ export async function registerPasskey(name: string): Promise<PasskeyRegistration
   }
 
   const body = await readJson<{ passkeys?: readonly Passkey[] }>(finished)
-  return { outcome: 'registered', passkeys: body?.passkeys ?? [] }
+
+  // `undefined` et non `[]` : un corps sans champ `passkeys` ferait **disparaître** de l'écran
+  // l'appareil qui vient d'être enregistré, et l'affichage mentirait sur ce qui protège le compte.
+  // L'appelant garde alors la liste qu'il avait.
+  return { outcome: 'registered', passkeys: body?.passkeys }
 }
+
+export type PasskeyList =
+  | { readonly outcome: 'listed'; readonly passkeys: readonly Passkey[] }
+  /** La liste n'a pas pu être lue. **Ce n'est pas « aucun appareil »** — voir plus bas. */
+  | { readonly outcome: 'unavailable' }
 
 /**
  * La liste des appareils.
  *
- * Rend une liste vide quand le serveur ne répond pas, plutôt qu'une issue à peindre : cette liste est
- * un **confort**, et une panne d'affichage ne doit pas empêcher d'enrôler. C'est le seul appel de ce
- * module qui se tait, et c'est délibéré.
+ * ## Pourquoi une issue, et pas une liste vide
+ *
+ * Une première version rendait `[]` sur échec : l'écran peignait alors **exactement** la même chose
+ * qu'un compte sans aucun appareil. Un opérateur qui a trois passkeys, ouvrant l'onglet pendant un
+ * hoquet du BFF, en concluait que ses facteurs avaient été retirés. Deux des cinq états de contenu —
+ * « vide » et « erreur » — étaient rendus par le même vide muet.
+ *
+ * L'échec ne bloque toujours pas l'enrôlement : la liste reste un **confort**, et une panne
+ * d'affichage ne doit pas fermer la seule porte d'entrée du produit. Elle se dit, simplement.
  */
-export async function listPasskeys(): Promise<readonly Passkey[]> {
+export async function listPasskeys(): Promise<PasskeyList> {
   const response = await fetch('/api/auth/mfa/passkeys', {
     headers: { accept: 'application/json' },
   }).catch(() => undefined)
 
-  if (!response?.ok) return []
+  if (!response?.ok) return { outcome: 'unavailable' }
 
-  return (await readJson<{ passkeys?: readonly Passkey[] }>(response))?.passkeys ?? []
+  const body = await readJson<{ passkeys?: readonly Passkey[] }>(response)
+
+  // Un 200 sans champ `passkeys` n'est pas une liste vide : c'est un corps qu'on ne comprend pas.
+  return body?.passkeys
+    ? { outcome: 'listed', passkeys: body.passkeys }
+    : { outcome: 'unavailable' }
 }
 
 async function manage(body: Record<string, unknown>): Promise<PasskeyUpdate> {
@@ -209,7 +230,7 @@ async function manage(body: Record<string, unknown>): Promise<PasskeyUpdate> {
   }
 
   const payload = await readJson<{ passkeys?: readonly Passkey[] }>(response)
-  return { outcome: 'updated', passkeys: payload?.passkeys ?? [] }
+  return { outcome: 'updated', passkeys: payload?.passkeys }
 }
 
 export function renamePasskey(credentialId: string, name: string): Promise<PasskeyUpdate> {

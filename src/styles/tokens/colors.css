@@ -81,8 +81,9 @@
    * ce n'est pas une exception esthétique. Un lecteur de QR attend un contraste franc entre modules
    * sombres et fond clair : inverser fait échouer la moitié des applications authenticator, et
    * atténuer le blanc les fait échouer sur les téléphones à faible luminosité. Ces deux valeurs sont
-   * dictées par la norme, pas par la charte — d'où leurs propres tokens plutôt qu'un littéral perdu
-   * dans un écran, où personne ne saurait pourquoi il ne suit pas le reste.
+   * Seul le **fond de la vignette** est un token : les modules du QR gardent le noir pur que la
+   * bibliothèque pose elle-même, parce que le peindre par CSS a coûté un carré uni — voir
+   * `.ui-enroll__qr` dans `components.css`.
    *
    * « papier » et « encre » plutôt que « clair » et « sombre » : la garde « aucun thème clair » de
    * `charte.test.ts` cherche `light` dans les noms de tokens, et elle a raison de le faire — un
@@ -90,7 +91,6 @@
    * juste évite d'avoir à assouplir la garde.
    */
   --qr-paper: #ffffff;
-  --qr-ink: #000000;
   --surface-hover: color-mix(in srgb, var(--n-50) 4%, var(--n-800));
   --surface-active: color-mix(in srgb, var(--n-50) 7%, var(--n-800));
   --surface-selected: var(--tint-teal);
