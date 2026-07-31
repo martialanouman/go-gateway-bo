@@ -14,9 +14,11 @@
  * dans un état local, part dans un corps JSON, et disparaît avec le composant.
  */
 
+import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
 import { login } from '~/components/auth/api'
+import { operatorQueryOptions } from '~/components/permission'
 import { Button, TextField } from '~/components/primitives'
 
 export const Route = createFileRoute('/connexion/')({
@@ -25,6 +27,7 @@ export const Route = createFileRoute('/connexion/')({
 
 function LoginScreen() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [pending, setPending] = useState(false)
@@ -47,6 +50,23 @@ function LoginScreen() {
     setPending(false)
 
     if (result.outcome === 'mfa_required') {
+      // **La session est relue, et attendue, avant de partir.** La garde de la coquille vient
+      // d'écrire `null` sur cette clé — c'est ce qui a renvoyé l'opérateur ici — et l'écran de
+      // vérification lit la même : sans relecture, il se croit sans session et repart aussitôt au
+      // login. Une boucle que seul un parcours complet fait apparaître.
+      //
+      // `fetchQuery` et non `invalidateQueries` : invalider ne fait que **marquer périmé**, et ne
+      // relance rien tant qu'aucun composant monté n'observe la clé — ce qui n'est le cas d'aucun
+      // ici. L'écran suivant aurait alors lu le `null` périmé avant que la reprise n'aboutisse, et
+      // aurait redirigé sur cette lecture-là. Vérifié : l'invalidation seule laissait le test rouge.
+      // `staleTime: 0` **explicite**, et ce n'est pas une redondance : le client de production tient
+      // la réponse pour fraîche pendant trente secondes, si bien que `fetchQuery` rendrait le `null`
+      // que la garde vient d'écrire sans jamais interroger le serveur. Le harnais de test, lui, a un
+      // `staleTime` de zéro — le test passait donc pour une raison qui n'existe pas dans le produit,
+      // et c'est le parcours de bout en bout qui a fait la différence.
+      await queryClient
+        .fetchQuery({ ...operatorQueryOptions(), staleTime: 0 })
+        .catch(() => undefined)
       await navigate({ to: '/connexion/verification' })
       return
     }

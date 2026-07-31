@@ -26,7 +26,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { type FormEvent, useState } from 'react'
 import { verifyPasskey, verifyTotp } from '~/components/auth/api'
-import { OPERATOR_QUERY_KEY, useCurrentOperator } from '~/components/permission'
+import { operatorQueryOptions, useCurrentOperator } from '~/components/permission'
 import { Button, Tabs, TextField } from '~/components/primitives'
 import { Loading } from '~/components/states'
 
@@ -60,10 +60,17 @@ function MfaChallengeScreen() {
 
   if (isPending) return <Loading label="Chargement de la session" rows={3} />
 
-  /** La session vient de devenir complète : le cache doit être relu, sinon la coquille garderait
-   * l'opérateur sans permission qu'elle a lu avant la cérémonie. */
+  /**
+   * La session vient de devenir complète : le cache doit être relu **avant** de partir, sinon la
+   * coquille garderait l'opérateur sans permission qu'elle a lu avant la cérémonie — et la garde le
+   * renverrait ici, en boucle.
+   *
+   * `fetchQuery` comme au login, et pour la même raison : invalider ne fait que marquer périmé.
+   */
   async function enterConsole() {
-    await queryClient.invalidateQueries({ queryKey: OPERATOR_QUERY_KEY })
+    // `staleTime: 0` explicite : voir `connexion.index.tsx`. Sans lui, le client de production rend
+    // la session partielle qu'il tient encore pour fraîche, et la coquille renvoie ici en boucle.
+    await queryClient.fetchQuery({ ...operatorQueryOptions(), staleTime: 0 }).catch(() => undefined)
     await navigate({ to: '/', replace: true })
   }
 

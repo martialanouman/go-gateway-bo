@@ -11,6 +11,7 @@
  *    que sa tentative a échoué sans avoir à reparcourir le formulaire.
  */
 
+import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OPERATOR_QUERY_KEY } from '~/components/permission'
 import { createTestQueryClient } from '~/test/render'
@@ -82,6 +83,43 @@ describe('l’écran de connexion', () => {
       identifier: 'operatrice@example.test',
       password: 'un-mot-de-passe',
     })
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+      'Vérification en deux étapes',
+    )
+  })
+
+  it('relit la session avant de partir au second facteur', async () => {
+    // **Le cas réel, et il n'est pas théorique.** L'opérateur arrive ici parce que la garde de la
+    // coquille a lu `null` sur `/auth/me` et l'a écrit dans le cache. Si le login part sans
+    // invalider cette clé, l'écran de vérification lit le même `null`, se croit sans session, et
+    // renvoie au login : une boucle que seul un parcours complet fait apparaître.
+    login.mockResolvedValue({ outcome: 'mfa_required' })
+
+    // **Le client reproduit la fraîcheur de production**, et c'est le cœur de ce test. Avec le
+    // `staleTime` de zéro du harnais, `fetchQuery` interroge toujours le serveur et le test passerait
+    // sans rien garder ; avec celui du produit, il rendrait le `null` qu'il tient pour frais — à
+    // moins que l'écran ne demande explicitement une relecture.
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
+    })
+    client.setQueryData(OPERATOR_QUERY_KEY, null)
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          id: 'op-1',
+          email: 'operatrice@example.test',
+          displayName: 'Opératrice',
+          permissions: [],
+          mfaCompleted: false,
+        }),
+      ),
+    )
+
+    const screen = await renderRoute('/connexion', { queryClient: client })
+    await submitCredentials(screen)
+
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
       'Vérification en deux étapes',
     )
