@@ -1,7 +1,8 @@
+import { execFile } from 'node:child_process'
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { build } from 'vite'
+import { promisify } from 'node:util'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 /**
@@ -29,11 +30,19 @@ describe('chargement à froid', () => {
 
   beforeAll(async () => {
     outDir = await mkdtemp(join(tmpdir(), 'dashboard-build-'))
-    await build({
-      root: projectRoot,
-      logLevel: 'error',
-      build: { outDir, emptyOutDir: true },
-    })
+
+    // Le build passe par la **même commande que la production**, dans son propre process. Appeler
+    // l'API de Vite depuis Vitest héritait de `NODE_ENV=test` : React s'y résolvait en développement
+    // et l'artefact pesait 490 kB d'avertissements au lieu des 276 kB livrés — le test décrivait
+    // alors quelque chose que personne ne sert. Par cette voie, l'octet produit est le même.
+    await promisify(execFile)(
+      'node_modules/.bin/vite',
+      ['build', '--outDir', outDir, '--emptyOutDir'],
+      {
+        cwd: projectRoot,
+        env: { ...process.env, NODE_ENV: 'production' },
+      },
+    )
     html = await readFile(join(outDir, 'index.html'), 'utf8')
 
     // Le document est **attaché** au DOM de test, et non simplement analysé : un arbre détaché n'a
@@ -113,12 +122,15 @@ describe('chargement à froid', () => {
     // bundle par construction ; le risque résiduel est une adresse écrite en dur dans le client.
     // README.md et CLAUDE.md présentent ce test comme le dernier rempart — il n'existait pas, et
     // cette step produit le premier bundle.
-    const emitted = await readdir(join(outDir, 'assets'))
+    // Tout ce qui est servi, et pas seulement `assets/` : Vite recopie `public/` tel quel, et un
+    // fichier de configuration déposé là échapperait à une lecture du seul répertoire des bundles.
+    const emitted = await readdir(outDir, { recursive: true, withFileTypes: true })
     const sources = await Promise.all(
-      emitted.map((file) => readFile(join(outDir, 'assets', file), 'utf8')),
+      emitted
+        .filter((entry) => entry.isFile())
+        .map((entry) => readFile(join(entry.parentPath, entry.name), 'utf8')),
     )
-    // Le document compte autant que les scripts : une adresse peut s'y glisser par une balise.
-    const shipped = [html, ...sources].join('\n')
+    const shipped = sources.join('\n')
 
     // Liste blanche et non liste noire : interdire `:3001` et `:4010` se périmerait le jour où
     // l'API Admin aura une vraie adresse, sans que personne ne s'en aperçoive. Ici, **toute** origine
@@ -127,17 +139,18 @@ describe('chargement à froid', () => {
     // Les préfixes couvrent des familles d'URL documentaires ; `http://localhost` est autorisé **à
     // l'identique** et non en préfixe, sinon `http://localhost:3001` — le BFF en dur, exactement ce
     // que cette garde cherche — passerait par la porte qu'elle tient. Vérifié : il passait.
+    // Seuls les préfixes qui correspondent à quelque chose de réellement livré : une entrée morte
+    // élargit la surface sans que personne ne s'en aperçoive. Vérifié — le bundle n'émet que ces
+    // deux familles, plus le `http://localhost` nu ci-dessous.
     const allowedPrefixes = [
       'http://www.w3.org/', // espaces de noms SVG et XML, émis par React
-      'https://react.dev/', // messages d'erreur de React en production
-      'https://github.com/facebook/react/', // idem, liens de suivi dans les avertissements
-      'https://github.com/tc39/', // texte d'une erreur de syntaxe embarquée par le bundler
-      'https://reactjs.org/link/', // liens d'avertissement de React
-      'https://tanstack.com/router/', // lien de documentation dans un avertissement du routeur
+      'https://react.dev/errors/', // messages d'erreur de React en production
     ]
     const allowedExactly = ['http://localhost'] // repli d'origine de TanStack Router hors navigateur
 
-    const origins = shipped.match(/https?:\/\/[^"'`\s)\\]+/g) ?? []
+    // `wss://` autant que `https://` : la console tient une WebSocket multiplexée, c'est le canal le
+    // plus probable d'une adresse en dur.
+    const origins = shipped.match(/(?:https?|wss?):\/\/[^"'`\s)\\]+/g) ?? []
     const unexpected = origins.filter(
       (url) =>
         !allowedExactly.includes(url) && !allowedPrefixes.some((prefix) => url.startsWith(prefix)),
