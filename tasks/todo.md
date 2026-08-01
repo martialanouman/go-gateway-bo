@@ -105,7 +105,7 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 ## M0 — Fondations & double toolchain
 - [x] step-000 — Socle Go : module, `cmd/dashboard`, chi, configuration validée au démarrage, arrêt propre
 - [x] step-001 — SPA Vite + TanStack Router : squelette d'application, coquille peinte au chargement à froid
-- [ ] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
+- [x] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
 - [ ] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
 - [ ] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS
 - [ ] step-005 — PostgreSQL : `pgx`, migrations, les six tables du §3.1, `audit_log` partitionné

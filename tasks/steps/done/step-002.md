@@ -57,13 +57,26 @@ l'ordre entre le fallback et l'API.
   déploiement de step-186 qui le montrera.
 
 ## Definition of Done
-- [ ] `make build` produit un binaire qui sert l'application seul
-- [ ] `make check` vert
-- [ ] la mutation « **repasser le repli en `r.NotFound()`, garde de `/api` retirée** » fait rougir le
-      scénario — c'est **le** test de cette step, et il reproduit le défaut réel : 200 + HTML, pas une
-      absence de route. *Ni la formulation initiale (« monter le fallback avant les routes `/api` »),
-      ni la première correction (« retirer le `NotFound` de `/api` ») ne le reproduisent — les deux
-      ont été mesurées, voir DN-9.*
+- [x] **`make build` produit un binaire qui sert l'application seul.** Traversé à la main sur le
+      binaire réel — URL profonde → coquille `no-cache`, `/assets/index-BZaM5Pg4.js` → cache immuable,
+      `/api/inconnu` → 404 JSON, `/ws` → 501, `POST` sur une route SPA → 405, asset absent → 404
+      `text/plain`. Rejoué à chaque PR par l'étape « Le binaire sert la sortie de Vite » du job
+      « Build client et déployable », qui `diff` la page servie contre `web/dist/index.html`.
+- [x] **`make check` vert** — les dix portes, `gofmt -l cmd internal` vide, `govulncheck` sans
+      vulnérabilité. Suite : `TestFS` (webassets) · 14 tests `internal/bff` dont
+      `TestNavigationURLServesTheSPAShell`, `TestExistingPublicFileIsServedInsteadOfTheShell`,
+      `TestHashedAssetIsCachedForever`, `TestMissingAssetIsNotFound`, `TestAssetDirectoryIsNotListed`,
+      `TestHeadIsServedLikeGet`, `TestFallbackRefusesWriteMethods`, `TestUnknownAPIRouteIsNotFound`,
+      `TestWebSocketEndpointIsNotImplementedYet` · 3 scénarios d'`assets.feature` contre le binaire ·
+      et 8 tests qui tiennent le harnais lui-même (`TestStagingSparesTheCommittedKeepFile`,
+      `TestBuildingTheBinaryIsBounded`, `TestFailedRestorationFailsTheSuite`, le refus de partir sur
+      un run interrompu, le plancher de scénarios).
+- [x] **La mutation « repasser le repli en `r.NotFound()`, garde de `/api` retirée » fait rougir le
+      scénario** — mesurée : `le serveur a répondu 200 au lieu de 404 : <!doctype html>…`. C'est **le**
+      test de cette step, et il reproduit le défaut réel : 200 + HTML, pas une absence de route.
+      *Ni la formulation initiale (« monter le fallback avant les routes `/api` »), ni la première
+      correction (« retirer le `NotFound` de `/api` », qui rend 404 `text/plain`) ne le reproduisent —
+      les deux ont été mesurées, voir DN-9. C'est une mutation **composée** : deux éditions.*
 
 ## Hors périmètre
 Le nonce CSP par requête → step-186. La rétention d'assets entre versions → step-186. Les sondes de
