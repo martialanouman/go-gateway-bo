@@ -1,7 +1,8 @@
-# Setup partagé par tous les jobs de CI. Les portes tournent en parallèle et chacune part d'un runner
-# vierge : sans cette action, les mêmes quatre étapes seraient recopiées dans chaque job, et une
-# divergence entre deux copies (version de Node, options de cache) produirait des échecs qui ne
-# reproduisent pas en local.
+# Setup partagé par les quatre jobs client de la CI. Les portes tournent en parallèle et chacune part
+# d'un runner vierge : sans cette action, les mêmes quatre étapes seraient recopiées dans chaque job,
+# et une divergence entre deux copies (version de Node, options de cache) produirait des échecs qui ne
+# reproduisent pas en local. Les jobs Go, eux, ne passent pas par ici — ils n'ont besoin ni de Node ni
+# du registre.
 name: Setup Node & pnpm
 description: Installe pnpm, Node à la version de .nvmrc, et les dépendances du lockfile.
 
@@ -25,7 +26,7 @@ runs:
     # `package_json_file` est obligatoire depuis que la moitié client vit sous
     # `web/` : l'action lit `packageManager` depuis `GITHUB_WORKSPACE`, avale
     # l'ENOENT, et lève « No pnpm version is specified ». Sans cette ligne, les
-    # cinq portes client échouent au deuxième pas, avant `pnpm install`.
+    # portes client échouent au deuxième pas, avant `pnpm install`.
     - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
       with:
         package_json_file: web/package.json
@@ -35,8 +36,8 @@ runs:
         # .nvmrc est la source unique de la version de Node ; ne jamais la répéter ici.
         node-version-file: .nvmrc
         cache: pnpm
-        # La moitié client vit sous `web/` depuis step-001 ; sans ce chemin,
-        # setup-node cherche un lockfile à la racine, qui est un module Go.
+        # La moitié client vit sous `web/` ; sans ce chemin, setup-node cherche
+        # un lockfile à la racine, où il n'y a qu'un module Go.
         cache-dependency-path: web/pnpm-lock.yaml
 
     # Les contrats de la passerelle viennent de GitHub Packages, qui exige une authentification même

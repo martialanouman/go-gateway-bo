@@ -10,7 +10,13 @@ export default defineConfig({
   plugins: [
     // Avant le plugin React : c'est lui qui engendre `routeTree.gen.ts` à partir de `src/routes/`,
     // et React doit transformer le fichier une fois écrit.
-    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+      // Sans ce motif, un `écran.test.tsx` posé à côté de sa route deviendrait lui-même une route :
+      // le générateur prend tout ce qu'il trouve sous `routes/`.
+      routeFileIgnorePattern: '\\.test\\.tsx?$',
+    }),
     react(),
   ],
 
