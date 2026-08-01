@@ -27,6 +27,8 @@ describe('chargement à froid', () => {
   // Le document est aussi analysé comme un arbre : chercher une chaîne dans du texte ne dit ni où
   // l'élément se trouve, ni s'il porte quoi que ce soit, ni s'il est visible.
   let painted: HTMLElement
+  // La feuille émise, pour confronter ce que la coquille React consomme à ce que le document déclare.
+  let stylesheet = ''
 
   beforeAll(async () => {
     outDir = await mkdtemp(join(tmpdir(), 'dashboard-build-'))
@@ -44,6 +46,15 @@ describe('chargement à froid', () => {
       },
     )
     html = await readFile(join(outDir, 'index.html'), 'utf8')
+
+    const emitted = (await readdir(outDir, { recursive: true, withFileTypes: true })).filter(
+      (entry) => entry.isFile() && entry.name.endsWith('.css'),
+    )
+    stylesheet = (
+      await Promise.all(
+        emitted.map((entry) => readFile(join(entry.parentPath, entry.name), 'utf8')),
+      )
+    ).join('\n')
 
     // Le document est **attaché** au DOM de test, et non simplement analysé : un arbre détaché n'a
     // aucune feuille de style associée, et `getComputedStyle` y rend les valeurs par défaut. Une
@@ -120,6 +131,24 @@ describe('chargement à froid', () => {
     expect(style.position).toBe('absolute')
     expect(style.width).toBe('1px')
     expect(style.overflow).toBe('hidden')
+  })
+
+  it('fait consommer à la coquille la géométrie que le document déclare', () => {
+    // Partager quatre custom properties rend impossible que les *valeurs* divergent — mais pas que la
+    // *référence* se casse : une faute de frappe dans `app.css`, ou la grille de `.shell` vidée,
+    // laissaient la suite verte pendant que la mise en page sursautait au montage de React.
+    const declared = new Set(html.match(/--[\w-]+(?=\s*:)/g) ?? [])
+    const consumed = new Set(
+      stylesheet.match(/var\((--[\w-]+)\)/g)?.map((v) => v.slice(4, -1)) ?? [],
+    )
+
+    expect(consumed, 'la feuille ne consomme plus la géométrie partagée').toContain(
+      '--shell-rail-width',
+    )
+    expect(consumed).toContain('--shell-topbar-height')
+    for (const name of consumed) {
+      expect(declared, `${name} est consommée sans être déclarée par le document`).toContain(name)
+    }
   })
 
   it("annonce le chargement aux technologies d'assistance", () => {

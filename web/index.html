@@ -22,9 +22,9 @@
     <style>
       /*
         Ces quatre valeurs sont la source unique des dimensions de la coquille : `app.css` les
-        consomme au lieu de les redire. Le bloc `<style>` survit au montage de React, donc les
-        variables restent définies — et le saut de mise en page que la duplication rendait possible
-        ne peut plus arriver, plutôt que d'être surveillé par un test.
+        consomme au lieu de les redire, et le bloc `<style>` survit au montage de React, donc elles
+        restent définies. Les valeurs ne peuvent plus diverger ; la référence, si — un test confronte
+        donc ce que la feuille consomme à ce qui est déclaré ici.
       */
       :root {
         color-scheme: dark;

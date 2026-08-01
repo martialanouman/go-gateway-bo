@@ -4,8 +4,11 @@
 
   Les dimensions de la coquille ne sont pas redites ici : elles viennent des custom properties que le
   `<style>` d'`index.html` déclare — celui-là même qui peint le squelette, et qui reste dans le
-  document après le montage. La grille de React et celle du squelette ne peuvent donc pas diverger,
-  et le saut de mise en page au montage devient impossible plutôt que surveillé.
+  document après le montage. Les *valeurs* ne peuvent donc plus diverger.
+
+  La *référence*, elle, se casse encore : une faute de frappe dans un `var()`, ou cette grille vidée,
+  et la mise en page sursaute au montage de React. C'est un test qui le tient, pas la construction —
+  il confronte ce que cette feuille consomme à ce que le document déclare.
 */
 
 body {
