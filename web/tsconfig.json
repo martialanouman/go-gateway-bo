@@ -23,9 +23,15 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
+    // Déclaré explicitement : TypeScript 7 n'inclut pas `node_modules/@types/*`
+    // automatiquement comme le faisait TS 5 — vérifié, `--listFilesOnly` n'en
+    // remontait aucun fichier. Les tests de la charte lisent les tokens sur
+    // disque, d'où le besoin.
+    "types": ["node"],
+
     "paths": {
       "~/*": ["./src/*"]
     }
   },
-  "include": ["src", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src"]
 }
