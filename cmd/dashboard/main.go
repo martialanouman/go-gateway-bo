@@ -49,8 +49,16 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
-	// Avant d'ouvrir le port : un binaire dont les assets sont inutilisables ne sert à rien, et
-	// l'apprendre au démarrage vaut mieux que de le découvrir sur la première requête d'un opérateur.
+	// Rien ici ne vérifie que les assets sont utilisables, et la branche d'erreur ci-dessous est
+	// inatteignable : `fs.Sub` ne rend une erreur que pour un chemin invalide, or `webassets.FS` lui
+	// passe une constante valide. Elle est propagée quand même plutôt qu'écartée d'un `_`, parce
+	// qu'elle appartient à la signature et qu'un jour cette signature pourra dire autre chose.
+	//
+	// La garde de démarrage qu'on attendrait ici — constater qu'`index.html` est là — n'existe pas
+	// exprès : `make dev` passe par `build-go`, qui ne copie rien dans `dist/` parce que c'est Vite
+	// qui sert le client en développement. Sur un clone neuf, une telle garde empêcherait donc le BFF
+	// de démarrer. Un binaire sans assets rend `404` sur `/` — vérifié — et c'est `make build` qui
+	// répond de leur présence (DN-4).
 	assets, err := webassets.FS()
 	if err != nil {
 		return fmt.Errorf("assets embarqués : %w", err)
