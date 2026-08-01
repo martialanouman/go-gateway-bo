@@ -76,6 +76,7 @@ func initializeScenarios(sc *godog.ScenarioContext) {
 	sc.Step(`^le serveur rend la main sans erreur$`, w.serverReturnedCleanly)
 	sc.Step(`^le corps de la réponse est celui de l'index$`, w.responseBodyIsTheIndex)
 	sc.Step(`^la réponse porte un cache immuable$`, w.responseCacheIsImmutable)
+	sc.Step(`^la réponse ne porte pas de cache immuable$`, w.responseCacheIsNotImmutable)
 	sc.Step(`^la réponse interdit la mise en cache$`, w.responseForbidsCaching)
 }
 
@@ -161,6 +162,13 @@ func (w *world) responseCacheIsImmutable() error {
 	return nil
 }
 
+func (w *world) responseCacheIsNotImmutable() error {
+	if strings.Contains(w.cacheControl, "immutable") {
+		return fmt.Errorf("un 404 est mis en cache pour toujours : %q", w.cacheControl)
+	}
+	return nil
+}
+
 func (w *world) responseForbidsCaching() error {
 	if !strings.Contains(w.cacheControl, "no-cache") {
 		return fmt.Errorf("Cache-Control %q autorise la mise en cache", w.cacheControl)
@@ -175,10 +183,8 @@ func (w *world) responseTypeIs(expected string) error {
 	return nil
 }
 
-// Anticipe le repli SPA de step-002. Il ne discrimine rien aujourd'hui — chi
-// rend déjà 404 text/plain — mais il n'est portant que si le repli est monté
-// **dans NewRouter** ; monté autour du routeur, c'est le parcours Playwright
-// contre le binaire qui le couvrira. La contrainte est notée dans step-002.
+// Le repli SPA est monté depuis step-002 : cette assertion discrimine désormais.
+// Retirer le `NotFound` du sous-routeur `/api` la fait rougir.
 func (w *world) responseIsNotHTML() error {
 	if strings.Contains(w.contentType, "text/html") {
 		return fmt.Errorf("la réponse est du HTML (%s)", w.contentType)

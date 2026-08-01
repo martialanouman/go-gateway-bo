@@ -31,8 +31,15 @@ func serveClient(assets fs.FS) http.HandlerFunc {
 		if strings.HasPrefix(nom, prefixeAssets) {
 			// Un asset absent rend 404 et **pas** l'index : servir l'application
 			// à la place d'un chunk manquant donnerait du HTML là où le
-			// navigateur attend du JavaScript, et l'erreur deviendrait
-			// incompréhensible.
+			// navigateur attend du JavaScript.
+			//
+			// Cette garde n'est pas indépendamment couverte, et c'est vérifié
+			// plutôt que supposé : la retirer laisse la suite verte, parce que
+			// `http.FileServer` rend déjà 404 `text/plain` et que `http.Error`
+			// n'émet aucun `Cache-Control`. Elle reste pour l'explicite — le
+			// chemin du miss est lisible ici plutôt que déduit du comportement
+			// de la bibliothèque — et parce qu'elle porte le seul endroit où
+			// poser une politique différente le jour où il en faudra une.
 			if _, err := fs.Stat(assets, nom); err != nil {
 				http.NotFound(w, r)
 				return

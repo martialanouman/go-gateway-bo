@@ -16,11 +16,13 @@ vers l'API Admin de la passerelle.
 > sonde de vivacité, arrêt propre et CI (**step-000**) ; client React sous `web/`, SPA Vite,
 > squelette de chargement à froid et proxy `/api` (**step-001**). La suite client compte 469 tests en 42 fichiers — 463 unitaires (dont 1 `todo`) et 6 sur l’artefact construit.
 >
-> **Ce qui n'existe pas encore** : les sept steps restantes de M0. Le binaire **ne sert pas encore
-> le client** — `embed.FS` arrive en step-002, et `make dev` lance les deux processus côte à côte en
-> attendant. Pas de contrat généré, pas de base, pas de catalogue de permissions, pas de charte
-> vérifiée. `make migrate`, `make bootstrap` et `make generate` sont décrits ci-dessous comme
-> **cible** et arrivent avec leurs steps.
+> **Le binaire sert le client** depuis step-002 : `go build` produit un exécutable autonome qui
+> embarque la SPA, avec `/api` et `/ws` résolus avant le repli.
+>
+> **Ce qui n'existe pas encore** : les six steps restantes de M0. Pas de contrat généré, pas de base,
+> pas de catalogue de permissions, pas de charte vérifiée, et pas de hub WebSocket — `/ws` rend un
+> 501 explicite jusqu'à step-043. `make migrate`, `make bootstrap` et `make generate` sont décrits
+> ci-dessous comme **cible** et arrivent avec leurs steps.
 
 ## Démarrer
 
@@ -71,7 +73,7 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 
 ```bash
 make dev        # BFF Go (:3001) + Vite (:3000) en parallèle, /api et /ws proxifiés
-make build      # client puis binaire (step-002 embarquera le premier dans le second)
+make build      # client puis binaire, qui embarque les assets
 make check      # tout ce que la CI vérifie — OBLIGATOIRE avant toute PR
 make generate   # code du contrat (Go + TS) et catalogue de permissions (Go → TS)
 make mock       # Prism sur openapi-admin.yaml

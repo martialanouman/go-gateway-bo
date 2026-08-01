@@ -9,6 +9,7 @@ package webassets
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 )
 
@@ -16,12 +17,22 @@ import (
 var embarques embed.FS
 
 // FS rend l'arborescence servie, racinée sur le contenu de `dist/`.
-func FS() fs.FS {
+//
+// Elle échoue quand le client n'a pas été construit — `go build ./cmd/dashboard`
+// sans `make build` compile, puisque le `.gitkeep` suffit au pattern d'embed, et
+// produirait sinon un binaire qui rend 500 sur toute URL d'application sans rien
+// journaliser. Un opérateur y lirait un incident produit là où c'est une erreur
+// de construction.
+func FS() (fs.FS, error) {
 	sous, err := fs.Sub(embarques, "dist")
 	if err != nil {
-		// Impossible : `dist` est embarqué au moment de la compilation.
-		panic(err)
+		return nil, fmt.Errorf("assets embarqués illisibles : %w", err)
 	}
 
-	return sous
+	if _, err := fs.Stat(sous, "index.html"); err != nil {
+		return nil, fmt.Errorf(
+			"assets du client absents du binaire : lancer `make build` et non `go build` seul (%w)", err)
+	}
+
+	return sous, nil
 }

@@ -35,7 +35,7 @@ dev: build-go
 	if [ $$vivant_bff = 1 ]; then echo "→ le client s'est arrêté"; else echo "→ le BFF s'est arrêté"; fi; \
 	exit 1
 
-## build — client puis binaire (step-002 embarquera le premier dans le second)
+## build — client puis binaire, qui embarque les assets
 build: build-web build-go
 
 ## test — les deux suites
@@ -56,9 +56,12 @@ check: fmt-check vet tidy-check lint-workflows lint-go test-go vuln-go build-go 
 # Cibles granulaires : les jobs de CI Go n'ont ni Node ni `web/node_modules`, et
 # une cible composite les ferait échouer sur `pnpm` avant d'atteindre le Go.
 
-# Dépend de `build-web` : le binaire embarque les assets, et compiler sans les
-# avoir construits produirait un binaire qui rend 500 sur toute URL.
-build-go: build-web
+# **Granulaire, sans dépendance vers pnpm.** Le job « Build (Go) » de la CI n'a
+# ni Node ni `web/node_modules` : lui faire construire le client le ferait
+# échouer avant d'atteindre le Go. Il compile contre le `dist/` minimal que le
+# `.gitkeep` garantit — ce qui prouve exactement ce qu'il doit prouver, que la
+# moitié Go compile. C'est `build` qui enchaîne les deux.
+build-go:
 	$(GO) build -o $(BINARY) ./cmd/dashboard
 
 test-go:
@@ -88,7 +91,10 @@ lint-workflows:
 
 # ─── Moitié client ────────────────────────────────────────────────────────────
 
+# Nettoie avant de construire, en épargnant le `.gitkeep` : Vite ne peut pas le
+# faire lui-même sans supprimer la condition de compilation du paquet Go.
 build-web:
+	@find internal/webassets/dist -mindepth 1 ! -name .gitkeep -delete 2>/dev/null || true
 	$(PNPM) build
 
 test-web:

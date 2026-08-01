@@ -1,6 +1,6 @@
 # step-002 — Binaire unique : `embed.FS` et fallback SPA ordonné après `/api`
 
-> **Jalon :** M0 (§1.3, §4.1) · **Statut :** À FAIRE
+> **Jalon :** M0 (§1.3, §4.1) · **Statut :** LIVRÉE
 > **Dépend de :** step-000, step-001 · **Bloque :** step-007, step-186
 
 ## But
@@ -38,9 +38,9 @@ l'ordre entre le fallback et l'API.
 - Le binaire démarre et sert l'application dans un conteneur **sans Node**.
 
 ## Definition of Done
-- [ ] `make build` produit un binaire qui sert l'application seul
-- [ ] `make check` vert
-- [ ] la mutation « monter le fallback avant les routes `/api` » fait rougir le scénario — c'est **le**
+- [x] `make build` produit un binaire qui sert l'application seul
+- [x] `make check` vert
+- [x] la mutation « monter le fallback avant les routes `/api` » fait rougir le scénario — c'est **le**
       test de cette step, et il doit reproduire le défaut réel : 200 + HTML, pas une absence de route
 
 ## Hors périmètre

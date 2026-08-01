@@ -11,10 +11,12 @@ import (
 
 // NewRouter monte la surface du BFF puis le repli SPA.
 //
-// **L'ordre entre les deux est le cœur de step-002.** Un repli monté avant les
-// routes d'API rendrait 200 + HTML sur `/api/inconnu` ; le client lit
-// `response.ok` puis appelle `.json()`, il lève, et l'écran affiche
-// « indisponible » au lieu de « introuvable ».
+// **Ce qui protège l'API n'est pas l'ordre des lignes**, contrairement à ce
+// qu'on croit en écrivant ce code : chi ne propage le `NotFound` du parent que
+// vers les sous-routeurs qui n'en ont pas, et `Route` exécute sa closure avant
+// le montage. Déplacer `router.NotFound` au-dessus du `Route` ne change donc
+// rien — la mutation que le fichier de step désignait est inerte, et c'est la
+// déclaration explicite ci-dessous qui porte l'invariant.
 func NewRouter(assets fs.FS) http.Handler {
 	router := chi.NewRouter()
 
@@ -24,8 +26,20 @@ func NewRouter(assets fs.FS) http.Handler {
 		// le repli SPA attraperait `/api/inconnu` et rendrait l'index.
 		api.NotFound(handleUnknownAPI)
 
+		// Toute méthode non déclarée sur une route existante doit rendre la même
+		// enveloppe : le 405 par défaut de chi a un corps vide et aucun
+		// `Content-Type`, donc un client qui appelle `.json()` lève — le mode
+		// d'échec que cette step ferme, sous un autre statut.
+		api.MethodNotAllowed(handleMethodNotAllowed)
+
 		api.Get("/health", handleHealth)
 	})
+
+	// **Avant le repli, comme `/api`.** Le hub arrive en step-043 ; d'ici là un
+	// `new WebSocket('/ws')` recevrait 200 + HTML et le navigateur lèverait
+	// « Unexpected response code: 200 », diagnostic qui mène vers le proxy Vite
+	// et jamais vers le repli. Un 501 dit la vérité : ce n'est pas encore livré.
+	router.Handle("/ws", http.HandlerFunc(handleWebSocketNotImplemented))
 
 	router.NotFound(serveClient(assets))
 
@@ -37,6 +51,20 @@ func NewRouter(assets fs.FS) http.Handler {
 type errorResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+func handleMethodNotAllowed(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusMethodNotAllowed, errorResponse{
+		Code:    "method_not_allowed",
+		Message: "Cette méthode n'est pas admise sur cette opération.",
+	})
+}
+
+func handleWebSocketNotImplemented(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, errorResponse{
+		Code:    "not_implemented",
+		Message: "Le flux temps réel n'est pas encore livré (step-043).",
+	})
 }
 
 func handleUnknownAPI(w http.ResponseWriter, _ *http.Request) {

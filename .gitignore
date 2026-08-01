@@ -22,7 +22,13 @@ playwright-report/
 *.swp
 .idea/
 
-# Sortie de build du client, embarquée par internal/webassets. Le .gitkeep
-# doit rester : sans lui, //go:embed refuse de compiler sur un clone neuf.
+# Sortie de build du client, embarquée par `internal/webassets`.
+#
+# Les trois lignes comptent, dans cet ordre. `dist/` ci-dessus exclut le
+# **répertoire**, et git ne redescend jamais dans un répertoire exclu : sans la
+# première négation, les deux suivantes sont inertes. C'est ce qui a fait qu'un
+# `.gitkeep` réputé commité ne l'était pas, et que la branche ne compilait pas
+# hors du poste de son auteur.
+!internal/webassets/dist/
 internal/webassets/dist/*
 !internal/webassets/dist/.gitkeep

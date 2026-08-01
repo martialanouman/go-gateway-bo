@@ -57,7 +57,10 @@ export default defineConfig({
     // aucune étape de copie à maintenir, et le test d'artefact lit exactement
     // ce que `//go:embed` prendra.
     outDir: '../internal/webassets/dist',
-    emptyOutDir: true,
+    // **Surtout pas `true`.** `emptyDir` de Vite supprime tout sauf `.git`, donc
+    // le `.gitkeep` sans lequel `//go:embed` refuse de compiler. Le nettoyage
+    // est fait par `make build-web`, qui sait l'épargner.
+    emptyOutDir: false,
   },
 
   server: {

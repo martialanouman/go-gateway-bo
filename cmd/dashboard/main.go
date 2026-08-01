@@ -40,12 +40,17 @@ func run(ctx context.Context, getenv func(string) string) error {
 		return fmt.Errorf("configuration invalide :\n%w", err)
 	}
 
+	assets, err := webassets.FS()
+	if err != nil {
+		return err
+	}
+
 	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", configuration.Addr)
 	if err != nil {
 		return fmt.Errorf("%s : écoute impossible sur %s : %w", config.EnvAddr, configuration.Addr, err)
 	}
 
-	if err := bff.Serve(ctx, listener, bff.NewRouter(webassets.FS()), configuration.ShutdownTimeout); err != nil {
+	if err := bff.Serve(ctx, listener, bff.NewRouter(assets), configuration.ShutdownTimeout); err != nil {
 		return fmt.Errorf("arrêt du serveur (grâce %s) : %w", configuration.ShutdownTimeout, err)
 	}
 
