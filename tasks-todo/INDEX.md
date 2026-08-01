@@ -118,7 +118,7 @@ il vit. Le détail et le pourquoi sont dans `CLAUDE.md` § « Definition of Done
 - [x] step-025 — Moteur de permissions côté serveur + journal d'audit + MFA obligatoire
 - [x] step-026 — Rendu UI par permission + écrans Login & MFA †
 - [x] step-028 — Écran d'enrôlement du second facteur ★
-- [ ] step-027 — Gestion des opérateurs et des rôles (CRUD) †
+- [x] step-027 — Gestion des opérateurs et des rôles (CRUD) †
 
 † **Ces steps s'exécutent après `step-041`, `step-042` et `step-040`**, dans cet ordre :
 
