@@ -1,7 +1,7 @@
-# CLAUDE.md — Tableau de bord Admin (TanStack Start)
+# CLAUDE.md — Tableau de bord Admin (BFF Go + SPA React)
 
-Manuel de travail pour Claude Code sur ce dépôt. Lis-le en entier avant d'écrire du code. Il est
-court volontairement : les détails vivent dans les documents référencés en bas.
+Manuel de travail pour Claude Code sur ce dépôt. Lis-le en entier avant d'écrire du code. Il est court
+volontairement : les détails vivent dans les documents référencés en bas.
 
 ## Ce qu'on construit
 
@@ -9,243 +9,253 @@ Le **cockpit d'exploitation** de la passerelle SMS : un outil interne (100–300
 sombre, desktop-first) qui pilote clients, comptes SMPP, connecteurs, routage, conformité et
 facturation. Ce n'est **pas** un portail client — les clients n'ont aucun accès à la plateforme.
 
-Le navigateur ne parle qu'au serveur TanStack Start (le **BFF**), qui parle à l'**API Admin de la
-passerelle** (dépôt `go-gateway`, séparé) et à son petit schéma PostgreSQL propre.
+Le navigateur ne parle qu'au **BFF Go**, qui parle à l'**API Admin de la passerelle** (dépôt
+`go-gateway`, séparé) et à son petit schéma PostgreSQL propre. Le tout se livre en **un seul binaire** :
+le Go embarque les assets de la SPA.
 
 ## Commandes
 
+> Cible livrée par `step-000` et `step-007`. Tant que M0 n'est pas clos, `make` n'existe pas encore.
+
 ```bash
-pnpm dev          # serveur de développement (:3000)
-pnpm build        # build Vite + Nitro → .output/
-pnpm start        # sert le build en Node (.output/server/index.mjs)
-pnpm typecheck    # tsc --noEmit
-pnpm lint         # biome check
-pnpm format       # biome check --write
-pnpm test         # vitest run       (OBLIGATOIRE avant toute PR)
-pnpm vuln         # pnpm audit — échoue sur tout avis non trié
-pnpm check        # typecheck + lint + test + vuln + build
+make dev          # BFF Go + Vite en parallèle (proxy /api → BFF)
+make build        # build client puis go build → un binaire autonome
+make check        # tout ce que la CI vérifie — OBLIGATOIRE avant toute PR
+make mock         # mock Prism sur openapi-admin.yaml
+make generate     # oapi-codegen + catalogue de permissions Go → TS
+
+go test ./...     # unitaires + scénarios godog
+golangci-lint run
+pnpm -C web test  # Vitest
+pnpm -C web e2e   # Playwright, contre le binaire
 ```
 
-`pnpm check` vert signifie une CI verte, à une garde près : la CI vérifie en plus que
-`src/routeTree.gen.ts` est bien à jour après build.
+`make check` vert signifie une CI verte. Elle vérifie en plus que le code généré est à jour —
+types du contrat **et** catalogue de permissions.
 
 ## Architecture (carte mentale)
 
-**Un seul déployable** : un process Node sert l'application rendue *et* la logique BFF. Deux moitiés
-dans un même dépôt, séparées par une frontière stricte :
+**Un seul déployable** : un binaire Go sert la SPA *et* porte la logique BFF. Deux moitiés dans un
+même dépôt, séparées par une frontière que le langage applique :
 
-- **Client** (`src/routes/`, `src/components/`) — React, TanStack Query, une WebSocket multiplexée.
-- **Serveur / BFF** (`src/server/`) — session et authentification, application des permissions,
-  journal d'audit, proxy vers l'API Admin, hub WebSocket, évaluateur d'alertes métier.
+- **Client** (`web/`) — React, TanStack Router + Query, une WebSocket multiplexée. Aucun secret.
+- **Serveur** (`internal/`) — session et authentification, permissions, journal d'audit, proxy vers
+  l'API Admin, hub WebSocket, évaluateur d'alertes métier.
 
 En production : **≥2 instances** derrière un load balancer avec affinité WS, coordonnées par Redis
-Pub/Sub. Un process unique serait un SPOF et la cible de 99,9 % serait inatteignable.
+Pub/Sub. Un process unique serait un SPOF et la cible de 99,9 % inatteignable.
 
 ## Layout du dépôt
 
 ```
-src/routes/      routage par fichiers (les écrans)
-src/server/      le BFF — seul endroit qui connaît secrets, jeton Admin et base
-src/components/  composants partagés (primitives Base UI + tokens de la charte)
-src/lib/         utilitaires partagés client/serveur, sans secret
-src/styles/      tokens de la charte v1.0
-docs/            spécification et plan d'exécution
-tasks-todo/      steps à faire · tasks-done/ steps livrées
+cmd/dashboard/     le binaire : câblage, embed.FS des assets, arrêt propre
+internal/          le BFF — seul endroit qui connaît secrets, jeton Admin et base
+  bff/ auth/ gateway/ hub/ alerting/ store/ permissions/
+api/               openapi-bff.yaml — engendre les types Go et TS
+web/               le client React (src/routes, src/components, src/lib, src/styles)
+docs/              la spécification technique
+tasks/             plan.md · todo.md · steps/ (à faire) · steps/done/ (livrées)
 ```
 
 ## Règles d'or (toujours / jamais)
 
 - **JAMAIS le corps d'un message hors de l'onglet qui l'affiche.** Ni log, ni toast, ni URL, ni
   message d'erreur, ni export, ni cache persisté, ni attribut de trace. L'affichage exige
-  `content:read` et déclenche un appel **audité**. Invariant testable, pas un réglage.
+  `content:read` et déclenche un appel **audité**.
+- **TOUJOURS un DTO de sortie déclaré.** Une réponse HTTP est un struct Go, jamais une
+  `map[string]any`, jamais un type de domaine marshalé directement. Un champ absent du struct ne peut
+  pas fuir — c'est ainsi que l'invariant (a) tient sans discipline.
 - **JAMAIS un secret réaffiché.** Identifiants de bind, clés API, secrets de webhook et de
   fournisseur : masqués en permanence, montrés exactement une fois à la création ou à la rotation.
   Aucune action « révéler » n'existe nulle part.
-- **TOUJOURS l'autorisation côté serveur.** `requirePermission()` dans la fonction serveur. Le rendu
-  conditionnel de l'UI est un confort ; un contrôle masqué dont la route n'est pas gardée est une
-  faille.
+- **TOUJOURS l'autorisation côté serveur.** `RequirePermission()` en middleware. Le rendu conditionnel
+  de l'UI est un confort ; un contrôle masqué dont la route n'est pas gardée est une faille.
 - **JAMAIS le navigateur en direct sur l'API Admin.** Le jeton machine, le mTLS et la connexion
-  PostgreSQL vivent sous `src/server/` — une règle de lint l'applique, ne la désactive pas.
+  PostgreSQL vivent sous `internal/`, que le langage rend inatteignable. Le risque résiduel n'est plus
+  un import mais une **URL codée en dur** dans le client : un test la cherche dans le bundle.
 - **JAMAIS sur le chemin critique du plan de données.** Une panne du tableau de bord dégrade la
   visualisation, jamais le débit de SMS ni la détection d'incident (Alertmanager est indépendant).
 - **Un contrôle interdit est désactivé et expliqué**, jamais silencieusement masqué.
 - **Les contrats sont la source de vérité** : le dépôt consomme `@martialanouman/gateway-api-contracts`
   et ne copie jamais un YAML. Tout manque se corrige par une PR dans `go-gateway/api/`.
-- **Versions & API de bibliothèques : TOUJOURS via `ctx7`.** Avant d'ajouter, de mettre à jour ou
-  d'utiliser l'API d'une bibliothèque, récupère la doc à jour. Ne devine JAMAIS un numéro de version
-  ni une signature — elles changent entre majeures.
+- **TOUJOURS relever la version du contrat au début d'une step qui le touche.** Il est publié à chaque
+  merge sur `main` de `go-gateway` : dix versions en une semaine, dont une majeure. Consigner l'écart
+  dans la PR, **ne jamais bumper au milieu d'une step**, et **relire le diff du YAML** — une contrainte
+  resserrée (`additionalProperties: false`, un `maximum`, un `enum` réduit) passe le typage et échoue à
+  l'exécution. `tasks/plan.md` §1.12.
+- **Versions & API : jamais devinées.** `ctx7` côté JS, `pkg.go.dev` ou `proxy.golang.org` côté Go,
+  avant tout ajout, bump ou usage d'API. Une signature inventée compile parfois.
 
 ## Les 5 invariants (tests bloquants, verts à vie)
 
-**(a)** le corps ne fuit dans aucune sérialisation et chaque lecture est auditée ; **(b)** aucun
-secret n'est jamais réaffiché ; **(c)** toute route de mutation a une garde de permission et une
-écriture d'audit ; **(d)** aucun composant client n'importe le client Admin ni la base ; **(e)** une
-panne du tableau de bord ne dégrade que la visualisation.
+**(a)** le corps ne fuit dans aucune sérialisation et chaque lecture est auditée ; **(b)** aucun secret
+n'est jamais réaffiché ; **(c)** toute route de mutation a une garde de permission et une écriture
+d'audit ; **(d)** le client ne joint jamais l'API Admin ; **(e)** une panne du tableau de bord ne
+dégrade que la visualisation.
 
-## Copie & langue
+## Code & langue
+
+**Le code est en anglais** — identifiants, packages, types, champs, fonctions. **Le narratif est en
+français** — commentaires, scénarios Gherkin, titres de test, copie produit.
+
+**Commentaires avec parcimonie.** Un commentaire ne redit jamais ce que le code dit. Il ne subsiste
+que là où le code ne peut pas parler : un *pourquoi* contre-intuitif, un arbitrage dont l'alternative
+évidente est fausse, une contrainte externe invérifiable sur place. Partout ailleurs, la réponse est un
+meilleur nom ou une fonction extraite.
+
+> La v1.0 était à **38 % de commentaire** côté serveur. Une part portait un vrai « pourquoi » ; le
+> reste paraphrasait la ligne suivante — et le critère 2 ci-dessous existe parce que **certains de ces
+> commentaires mentaient** sur le code qu'ils surplombaient.
 
 Interface en **français**, troisième personne, **conséquence d'abord**. Les identifiants techniques
 restent en anglais et en mono, verbatim du contrat : `link_status`, `breaker_state`, `max_sessions`,
-`balance_scope`, `half_open`, `query_sm`. Ne jamais traduire un identifiant — un opérateur le grep
-dans les logs. « Sécurisé » n'est jamais une promesse : dire ce que la protection couvre et où
-s'arrête la frontière d'accès.
+`balance_scope`, `half_open`, `query_sm`. Ne jamais traduire un identifiant — un opérateur le grep dans
+les logs. « Sécurisé » n'est jamais une promesse : dire ce que la protection couvre et où s'arrête la
+frontière d'accès.
 
 **Cinq états de contenu, cinq copies distinctes** : chargement (squelette de la vraie mise en page) ·
 vide (rien encore + comment créer) · aucun résultat (filtres trop étroits + comment élargir) · module
 désactivé (dégradation propre, **jamais** une erreur) · erreur (réalité HTTP + « vos données locales
 restent affichées » + Réessayer).
 
-## Tests
+## Tests — BDD
 
-Pyramide : beaucoup d'unitaires (logique BFF, permissions, mappings), des tests de composant
-(Testing Library), très peu de bout en bout (Playwright, une poignée de parcours). Les écrans se
-testent **contre le mock Prism**, jamais contre la vraie passerelle.
+**Le comportement s'écrit en Gherkin avant d'exister.** C'est le « rouge d'abord » de la boucle,
+exprimé dans la langue du domaine.
 
-Le critère 1 de la DoD demande qu'un chemin humain soit traversé de bout en bout, et il **ne
-contredit pas** cette règle : une step étend un parcours existant plutôt que d'en ajouter un. Un
-fichier par step donnerait une soixantaine de parcours à la fin du plan — exactement la suite qu'on
-n'ose plus croire, et que `playwright.config.ts` met en garde contre.
+- **Scénarios `godog`** (`.feature` en français, `# language: fr`) — le comportement observable du BFF.
+  Le fichier vit **à côté du package qu'il décrit**, ses définitions de step dans un `_test.go` du même
+  package. Ils tournent contre le **mock Prism**, jamais contre la vraie passerelle.
+- **Unitaires Go** — les mécanismes aux limites : hachage, curseurs, mappings, sérialisation des DTO.
+  La majorité des tests, en nombre.
+- **Composants (Vitest + Testing Library)** — états, permissions, clavier, copie. Forme Étant donné /
+  Quand / Alors, sans second moteur Cucumber : `describe`/`it` suffit.
+- **Bout en bout (Playwright)** — cinq parcours seulement, **contre le binaire**.
 
-> **71 des 134 opérations du contrat ne sont pas encore implémentées côté passerelle.** Métriques,
-> CDR/trace, sessions, facturation, contenu/RGPD, groupes de clients, webhooks et sender-rewrite
-> n'existent qu'au contrat. Le développement mock-first n'est pas un confort, c'est la condition de
-> faisabilité — voir §15 du plan d'exécution.
+**Le mode d'échec à éviter est nommé** : un scénario par critère d'acceptation fabrique la suite qu'on
+n'ose plus croire. Gherkin l'aggrave, parce que ça se lit bien. Trois symptômes de dérive : un `Alors`
+qui porte sur une structure de données plutôt qu'un effet observable ; un `Plan du scénario` à quinze
+exemples qui teste un mapping ; deux scénarios qui ne diffèrent que par une valeur.
+
+**Un scénario vert ne prouve pas plus qu'un test vert.** La mutation reste obligatoire — voir critère 3.
+
+> **62 des 133 opérations du contrat ne sont pas implémentées côté passerelle.** Métriques, CDR/trace,
+> sessions, facturation, contenu/RGPD, groupes, webhooks et sender-rewrite n'existent qu'au contrat. Le
+> mock-first n'est pas un confort, c'est la condition de faisabilité — `tasks/plan.md` §16.
 
 ## La boucle de travail
 
 **Une step = une session = une PR.** À suivre strictement, dans cet ordre.
 
 **Chaque phase s'ouvre par `using-agent-skills`** — plan, spécification, implémentation, revue,
-débogage. Pas seulement avant d'écrire du code : le méta-skill oriente vers le skill de la phase en
-cours, et chacun porte un cadre que l'improvisation ne reproduit pas. Le mode d'échec est
-silencieux : sans le skill on finit quand même par trouver, plus lentement et sans structure, donc
-rien ne signale l'oubli. C'est arrivé sur les revues (quatre d'affilée par prompt ad hoc) puis sur un
-débogage de la step-027 — une boucle infinie de la suite de tests cherchée au jugé, trois exécutions
-tuées, alors que la cause a cédé à la méthode que `debugging-and-error-recovery` prescrit.
-**L'invocation est la première action de la phase**, avant d'écrire le prompt, le plan ou la première
-ligne — jamais une case cochée après coup.
+débogage. Le méta-skill oriente vers le skill de la phase, et chacun porte un cadre que l'improvisation
+ne reproduit pas. Le mode d'échec est silencieux : sans le skill on finit par trouver, plus lentement et
+sans structure, donc rien ne signale l'oubli. **L'invocation est la première action de la phase**,
+avant d'écrire le prompt, le plan ou la première ligne.
 
-1. Prendre le prochain `tasks-todo/step-NNN.md` — **l'ordre du fichier `INDEX.md` fait foi**, pas le
-   numéro. **Sauf quand la ligne « Dépend de » du fichier de step le contredit : les dépendances
-   déclarées priment toujours.** Les sections de l'INDEX groupent par jalon, donc par thème, et un
-   jalon peut se clore après le début du suivant. Une divergence constatée se corrige *dans le plan*
-   avant d'écrire du code — jamais en la contournant en silence. C'est arrivé une fois (M1 et M2, note
-   † de `INDEX.md`) et l'ordre annoncé était alors littéralement inexécutable.
+1. Prendre le prochain `tasks/steps/step-NNN.md` — **l'ordre de `tasks/todo.md` fait foi**, pas le
+   numéro, **sauf quand la ligne « Dépend de » du fichier le contredit : les dépendances déclarées
+   priment**. Une divergence constatée se corrige *dans le plan* avant d'écrire du code — jamais en la
+   contournant en silence.
 2. Créer la branche : `feat/step-NNN-slug` (ou `fix/`, `docs/`, `chore/`, `test/`).
-3. **Toujours établir un plan avant d'écrire la moindre ligne**, et en dériver la **todo list**
-   d'implémentation — une entrée par unité livrable, tenue à jour au fil de la step.
-4. Implémenter en **TDD strict : le test rouge d'abord**, jamais le code en premier. Périmètre limité
-   à ce que le fichier de step décrit — rien de plus. La règle d'entrée ci-dessus vaut ici aussi, et
-   pour **chaque** reprise de code : correctifs de revue compris, pas seulement au démarrage.
-   **Commits atomiques au fil de l'eau** : une unité cohérente verte = un commit, jamais la step
-   entière d'un bloc.
-5. Après l'implémentation, lancer la **revue dans des sous-agents en lecture seule** : ils remontent
-   des constats, ils ne corrigent rien. La correction revient à la session, via `using-agent-skills`.
-   Si le contexte manque pour corriger un constat, **replanifier avant de toucher au code**. Relancer
-   la revue **tant qu'il reste des constats bloquants**.
+3. **Établir un plan avant la moindre ligne**, et en dériver la **todo list** — une entrée par unité
+   livrable, tenue à jour.
+4. Implémenter en **BDD strict : le scénario rouge d'abord**, jamais le code en premier. Périmètre
+   limité à ce que le fichier de step décrit. La règle d'entrée vaut pour **chaque** reprise de code,
+   correctifs de revue compris. **Commits atomiques au fil de l'eau** : une unité verte = un commit.
+5. Après l'implémentation, **revue en sous-agents lecture seule** : ils remontent des constats, ils ne
+   corrigent rien. La correction revient à la session. Si le contexte manque, **replanifier avant de
+   toucher au code**. Relancer tant qu'il reste un constat bloquant.
    **Un correctif de revue est du code comme un autre** : même DoD, même mutation, même méfiance. En
-   M1, une bonne part des constats des passes 2 à 5 portaient sur les correctifs des passes
-   précédentes —
-   un `busy` réparé d'un côté ouvrait le même trou de l'autre, une copie fausse en remplaçait une
-   autre. Ne jamais annoncer un correctif sans l'avoir vu tenir.
-6. Vérifier la **Definition of Done du fichier de step** : `pnpm check` vert (typecheck · lint · test
-   · vuln · build), invariants (a…e) intacts, et les quatre critères de la DoD ci-dessous.
-7. Dernier commit de la PR : `git mv tasks-todo/step-NNN.md tasks-done/` et cocher la ligne dans
-   `tasks-todo/INDEX.md`.
+   v1.0, une bonne part des constats des passes 2 à 5 portaient sur les correctifs des passes
+   précédentes. Ne jamais annoncer un correctif sans l'avoir vu tenir.
+6. Vérifier la **Definition of Done** ci-dessous et celle du fichier de step.
+7. Dernier commit : `git mv tasks/steps/step-NNN.md tasks/steps/done/` et cocher la ligne dans
+   `tasks/todo.md`.
 8. Ouvrir la PR — titre en conventional commit avec la step : `feat(routing): éditeur de route
    (step-121)` — puis **merger dès que la CI est verte**. Si la CI échoue : **deux relances au
-   maximum**, ensuite on s'arrête et on rend la main plutôt que d'insister.
-9. Un jalon est terminé quand **toutes** ses steps sont dans `tasks-done/`.
+   maximum**, ensuite on rend la main.
+9. Un jalon est terminé quand **toutes** ses steps sont dans `tasks/steps/done/`.
 
-**Arbitrage.** Une décision se tranche d'abord sur le contexte disponible : spec, plan d'exécution,
-contrat, fichier de step. Si elle reste indécidable après ça, consulter le modèle **Fable** plutôt
-que de trancher au hasard.
+**Arbitrage.** Une décision se tranche d'abord sur le contexte disponible : spec, plan, contrat,
+fichier de step. Si elle reste indécidable, consulter le modèle **Fable** plutôt que de trancher au
+hasard.
 
-Ne jamais déborder du périmètre d'une step. Ce qu'elle exclut est listé dans sa section « Hors
-périmètre » et appartient à une autre PR.
+Ne jamais déborder du périmètre d'une step. Ce qu'elle exclut est dans sa section « Hors périmètre ».
 
 ## Definition of Done (chaque PR)
 
-`pnpm check` vert (typecheck · lint · test · vuln · build) • aucun invariant (a…e) violé • copie
-conforme aux fondamentaux de contenu de la charte • clavier et libellés accessibles (WCAG 2.1 AA)
-sur tout écran touché • PR petite et focalisée (une step) — plus les quatre critères ci-dessous.
+`make check` vert • aucun invariant (a…e) violé • copie conforme aux fondamentaux de la charte •
+clavier et libellés accessibles (WCAG 2.1 AA) sur tout écran touché • PR petite et focalisée (une
+step) — plus les quatre critères ci-dessous.
 
-> **Pourquoi quatre critères et non quatre portes de plus.** Les deux bloquants de M1 ont franchi les
-> douze portes de la CI sur des commits de tête de PR : `pnpm check` était vert quand le bandeau de
-> refus s'affichait sans bordure faute de tokens existants (`2886bb4`), et quand le QR code était un
-> carré noir de 176 pixels (`da32549`). Deux lignes de l'ancienne DoD — « copie conforme », « critères
-> couverts par des tests » — se déclaraient vraies sans aucune preuve, et l'ont été pendant qu'on
-> livrait **six affirmations fausses** sur le produit et **neuf correctifs qu'aucun test ne tenait**.
-> Ce qui manquait n'était pas une vérification de plus : c'était de rendre falsifiable ce qu'on
-> affirmait déjà.
+> **Pourquoi quatre critères et non quatre portes de plus.** Les deux bloquants de la v1.0 ont franchi
+> les douze portes de la CI : le bandeau de refus s'affichait sans bordure faute de tokens existants,
+> et le QR code était un carré noir de 176 pixels. Deux lignes de l'ancienne DoD — « copie conforme »,
+> « critères couverts par des tests » — se déclaraient vraies sans aucune preuve. Ce qui manquait
+> n'était pas une vérification de plus : c'était de rendre falsifiable ce qu'on affirmait déjà.
 
-**1. Le chemin qu'un humain traverse est traversé pour de bon.** Toute step qui livre un chemin
-d'écran l'exerce de bout en bout au moins une fois — **en étendant un parcours existant** plutôt qu'en
-ajoutant un fichier : la règle du dépôt reste « très peu de bout en bout » (§Tests,
-`playwright.config.ts`), et une suite qu'on n'ose plus croire est pire qu'une suite absente. « De bout
-en bout » veut dire **rien de simulé dans le produit** : pas de provider fourni par le test, pas de
-client Query injecté, pas de module interne remplacé. Le mock Prism, lui, est la frontière du système
-sous test — le mock-first est la condition de faisabilité du projet, pas une entorse.
+**1. Le chemin qu'un humain traverse est traversé pour de bon.** Toute step qui livre un chemin d'écran
+l'exerce de bout en bout au moins une fois — **en étendant un parcours existant** plutôt qu'en ajoutant
+un fichier. « De bout en bout » veut dire **rien de simulé dans le produit** : pas de provider fourni
+par le test, pas de client Query injecté, pas de module interne remplacé. Le mock Prism, lui, est la
+frontière du système sous test.
 
-> Trois défauts de M1 y ont été trouvés et par rien d'autre : un `QueryClientProvider` absent de
-> l'application, que `renderComponent` fournissait lui-même à tous les tests de composant ; une garde
-> de session qui ne s'exécutait jamais sur une URL collée, pendant que trois tests de route la
-> déclaraient verte ; et une boucle entre le login et le second facteur.
+> Trois défauts de la v1.0 y ont été trouvés et par rien d'autre : un `QueryClientProvider` absent de
+> l'application, que le harnais de test fournissait lui-même ; une garde de session qui ne s'exécutait
+> jamais sur une URL collée, pendant que trois tests la déclaraient verte ; et une boucle entre le
+> login et le second facteur.
 
 **2. Toute affirmation sur le monde extérieur est confrontée à sa source.** Trois formes, et les trois
 ont menti : la **copie** qui décrit le produit se lit contre le code serveur qui l'implémente ; un
 **commentaire** qui décrit un mécanisme se relit contre le code qu'il surplombe ; et ce qu'on écrit
-dans un message de commit ou dans un rapport se vérifie sur la **sortie livrée**, pas sur l'intention
-du diff — un remplacement scripté qui ne trouve pas son motif ne le dit pas, et la ligne fautive
-apparaît alors en contexte, jamais en `+`.
+dans un commit ou un rapport se vérifie sur la **sortie livrée**, pas sur l'intention du diff — un
+remplacement scripté qui ne trouve pas son motif ne le dit pas.
 
-> C'est ce critère, et non le premier, qu'illustre le QR code noir : la règle CSS avait été écrite
-> sans lire ce que `qrcode.react` émet — **deux** chemins, dont le fond. Une revue l'a trouvé en allant
-> lire la bibliothèque ; le parcours qui l'avait introduit, lui, assertait la visibilité du QR et
-> restait vert.
+> C'est ce critère qu'illustre le QR code noir : la règle CSS avait été écrite sans lire ce que la
+> bibliothèque émet. Le parcours qui l'avait introduit assertait la visibilité du QR et restait vert.
 
 **3. Mutation obligatoire partout où le retrait laisserait la suite verte.** Le critère est cette
 propriété, pas une liste : gardes, refus, redirections et verrous en font partie, mais aussi un focus
-posé, un état conservé d'un onglet à l'autre, un succès annoncé. Sur les neuf correctifs de M1 livrés
-sans filet, trois ne rentraient dans aucune énumération écrite d'avance. Un test de rendu, lui, n'a
-pas besoin de mutation : il tombe de lui-même. Et la mutation doit **reproduire le défaut réel** —
-une qui laisse un verrou plus fermé que la version correcte reste verte et ne prouve rien.
+posé, un état conservé d'un onglet à l'autre, un succès annoncé. Sur les neuf correctifs de la v1.0
+livrés sans filet, trois ne rentraient dans aucune énumération écrite d'avance. Un test de rendu n'a
+pas besoin de mutation : il tombe de lui-même. Et la mutation doit **reproduire le défaut réel** — une
+qui laisse un verrou plus fermé que la version correcte reste verte et ne prouve rien.
 
-**4. Ce qui n'est pas testable s'écrit là où il vit.** « Aucun test ne rougit si cette ligne
-disparaît, ce qui a été vérifié plutôt que supposé » (`connexion.index.tsx`) vaut mieux qu'un test qui
-fait semblant. Une DoD qui n'accepte pas « je n'ai pas pu le tester, voici pourquoi » fabrique ce
-test-là.
+**4. Ce qui n'est pas testable s'écrit là où il vit.** « Aucun test ne rougit si cette ligne disparaît,
+ce qui a été vérifié plutôt que supposé » vaut mieux qu'un test qui fait semblant. Une DoD qui n'accepte
+pas « je n'ai pas pu le tester, voici pourquoi » fabrique ce test-là.
 
 **Les tests que réclame la step** sont ceux de sa section « Tests », qui énumère ses risques. Chacun a
-une preuve, **de la forme qui lui convient** — test, mutation, parcours, ou constat écrit sur place.
-Un test par critère d'acceptation n'est pas demandé : c'est ainsi qu'on écrit des tests de complaisance
-sur du code défensif que la passerelle ne produit jamais.
+une preuve, **de la forme qui lui convient** — scénario, test unitaire, mutation, parcours, ou constat
+écrit sur place. Un test par critère d'acceptation n'est pas demandé : c'est ainsi qu'on écrit des
+tests de complaisance sur du code défensif que la passerelle ne produit jamais.
 
-**Un seuil de couverture manqué est une question, jamais un ordre.** Ou bien le code est atteignable
-et mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couvert par un `v8 ignore`
-**commenté** — jamais en abaissant le seuil pour tout le monde, et `vitest.config.ts` porte déjà trois
-exemptions de fichier avec leur justification et leur corollaire. Répondre systématiquement « écrire
-un test » a produit les pires tests de M1.
+**Un seuil de couverture manqué est une question, jamais un ordre.** Ou bien le code est atteignable et
+mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couvert par une exemption
+**commentée** — jamais en abaissant le seuil pour tout le monde.
 
 ## Recettes fréquentes
 
-- **Ajouter une dépendance** : d'abord `ctx7` pour la version et l'API à jour, puis `pnpm add`. Jamais
-  de version devinée. Un paquet qui exige un script d'installation doit être autorisé explicitement
-  dans `pnpm-workspace.yaml` (`allowBuilds`) — avec une justification.
-- **Ajouter une route** : créer le fichier sous `src/routes/`, lancer `pnpm build` pour régénérer
-  `src/routeTree.gen.ts`, et **commiter le fichier généré** (la CI le vérifie).
-- **Ajouter une permission** : trois endroits en même temps — le seed du catalogue, la garde serveur
-  qui l'utilise, et le tableau des rôles par défaut (§6.10 de la spec).
-- **Un endpoint manque au contrat** : ouvrir une PR dans `go-gateway/api/` (YAML + bump de
-  `api/package.json`), puis mettre à jour la dépendance ici. Ne jamais contourner.
+- **Ajouter une dépendance Go** : `pkg.go.dev` ou `proxy.golang.org` pour la version et l'API, puis
+  `go get`. Vérifier les CVE connues avant d'adopter.
+- **Ajouter une dépendance JS** : `ctx7` d'abord, puis `pnpm -C web add`. Jamais de version devinée.
+- **Ajouter une route BFF** : la déclarer dans `api/openapi-bff.yaml`, régénérer, écrire le scénario
+  rouge, puis le handler avec sa garde, son audit et son **DTO de sortie**.
+- **Ajouter une route client** : créer le fichier sous `web/src/routes/`, régénérer l'arbre de routes,
+  **commiter le fichier généré**.
+- **Ajouter une permission** : trois endroits dans la même PR — le catalogue `internal/permissions/`,
+  la garde serveur qui l'exige, et le tableau des rôles par défaut (§6.10 de la spec). Puis
+  `make generate` : le TypeScript en dérive, et la CI échoue s'il diverge.
+- **Un endpoint manque au contrat** : PR dans `go-gateway/api/` (YAML + bump), puis mise à jour ici.
 - **Un écran non encore livré** : route déclarée + état vide explicite nommant le jalon. Jamais une
   page blanche ni un lien mort.
 
 ## Index documentaire (source de vérité)
 
-- Quoi/pourquoi : `docs/specification-technique-tableau-de-bord.md`
-- Comment/dans quel ordre : `docs/plan-execution-tableau-de-bord.md`
-- Découpage en PRs : `tasks-todo/INDEX.md` + `tasks-todo/step-NNN.md`
+- Quoi/pourquoi : `docs/specification-technique-tableau-de-bord.md` (v2.1)
+- Comment/dans quel ordre : `tasks/plan.md`
+- Découpage en PRs : `tasks/todo.md` + `tasks/steps/step-NNN.md`
 - Charte graphique & kit UI : `.claude/skills/sms-gateway-design/README.md`
 - Contrat API : `@martialanouman/gateway-api-contracts` (jamais copié ici)
 - Passerelle (dépôt séparé) : `../go-gateway`
