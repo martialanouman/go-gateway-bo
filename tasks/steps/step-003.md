@@ -52,3 +52,189 @@ condition de faisabilité du projet (`plan.md` §16).
 ## Hors périmètre
 Les trois flux `stream-*` → step-043. Les permissions par opérateur → step-025. Le contrat du BFF
 lui-même → step-004.
+
+## Design arrêté (2026-08-01)
+
+Les faits chiffrés ci-dessous ont été **mesurés** le 01/08/2026, pas déduits ; chaque décision cite
+la mesure qui la fonde. Les arbitrages non tranchés par la spec ont été soumis au modèle Fable.
+
+### DN-1 — Le contrat passe de 1.2.0 à 2.5.0, et l'écart avec 4.0.0 est une dette écrite
+
+Le dépôt consommait **1.2.0**, le plan (§1.2) prescrit **2.5.0**, et la dernière version publiée est
+**4.0.0** (publiée le 01/08 à 17:46 UTC). 4.0.0 est **inatteignable aujourd'hui** : `pnpm-workspace.yaml`
+impose `minimumReleaseAge: 1440` en mode strict, et l'installation est refusée verbatim par
+`ERR_PNPM_NO_MATURE_MATCHING_VERSION` tant qu'une version a moins de 24 h. Impossible même d'en
+produire un lockfile.
+
+2.5.0 est retenue plutôt que 2.4.0 (mûre plus tôt) parce que c'est la version que le plan **écrit
+déjà** : l'adopter ne demande aucune correction de plan, tandis que toute autre version en
+exigerait une avant la première ligne de code. Le diff 2.4.0→2.5.0 ne fait d'ailleurs que 8 lignes,
+toutes des déclarations de réponses d'erreur sur deux opérations RGPD.
+
+`ServiceUnavailable` **n'existe ni en 1.2.0 ni en 2.0.0** — il apparaît en 2.3.0. Rester en 1.2.0
+rendait donc le périmètre écrit de cette step ininstanciable, ce qui exclut le statu quo.
+
+Le diff 1.2.0→2.5.0 fait 82 lignes, relues : scopes déclarés par opération, `additionalProperties:
+false` sur les corps de requête, `idempotency_key` obligatoire sur deux opérations de crédits,
+`direction` restreinte à `enum: [mt]`, plafond `maximum` sur `credits`, réponses 401/403/404/409/422
+déclarées par opération, et le composant `ServiceUnavailable`. Aucune n'appartient au périmètre M0,
+qui porte sur les clients.
+
+Le diff 2.5.0→4.0.0 ne touche que CDR, export, `search-messages` et le scope `msisdn:reveal` — hors
+M0. **Dette consignée** : le bump vers 4.0.0 est du travail à part entière (§1.12), à traiter dans sa
+propre step, jamais au milieu de celle-ci.
+
+### DN-2 — Les deux collisions de noms Go se lèvent par un overlay OpenAPI local, pas par une copie
+
+oapi-codegen v2.8.0 parse ce contrat **OpenAPI 3.1** sans erreur — les 184 `type: [T, "null"]`
+passent. Il échoue sur exactement **deux** collisions de noms Go, trouvées par itération : le schéma
+`ConnectorStatus` (santé runtime) entre en collision avec l'enum inline de la propriété
+`Connector.status`, et `SenderId` de même.
+
+La règle du dépôt veut qu'un **manque au contrat** se corrige par une PR amont. Ce n'en est pas un :
+la collision est propre au générateur **Go** et n'existe pas côté TypeScript, que le même contrat
+sert. Un overlay OpenAPI 1.0.0 (`output-options.overlay.path`) **patche sans copier** — c'est un
+fichier de deux actions qui référence le contrat au lieu de le dupliquer, donc la règle d'or « le
+YAML n'est jamais copié » est tenue.
+
+Mesuré, et c'est ce qui rend l'overlay acceptable : son **mode strict échoue bruyamment** quand une
+action ne s'applique à rien (message verbatim `does nothing`). L'overlay ne peut donc pas pourrir en
+silence le jour où l'amont corrigera — il se périme de lui-même, en rouge.
+
+Mesuré aussi : `x-go-name` posé sur la **propriété inline** ne renomme rien ; seul le **composant**
+répond. Les deux actions ciblent donc les composants.
+
+Une PR amont posant `x-go-name` (inoffensive pour TypeScript) reste souhaitable et se dépose
+**après** cette step : en faire une dépendance bloquerait la step sur un autre dépôt.
+
+### DN-3 — Les 133 opérations sont générées, aucune n'est exclue
+
+oapi-codegen sait filtrer par `exclude-operation-ids`, ce qui permettrait d'écarter les trois
+`stream-*` déclarées hors périmètre. Écarté : ce serait une liste à maintenir dans la configuration
+de génération, qui divergerait silencieusement du contrat au fil des bumps — exactement l'écart
+contrat/client que le dépôt combat. Les trois méthodes générées sont du code mort inoffensif que
+step-043 remplacera ; le contrat reste la source de vérité, et le client le reflète intégralement.
+
+### DN-4 — Le jeton machine s'appuie sur `x/oauth2`, et la mutation porte sur notre assemblage
+
+`golang.org/x/oauth2` v0.36.0, **source lue** : `clientcredentials.Config.TokenSource(ctx)` rend
+`oauth2.ReuseTokenSource(nil, source)`, et `reuseTokenSource.Token()` prend un `sync.Mutex` **sur
+tout le corps, appel réseau compris** — deux appels concurrents trouvant le jeton expiré ne
+déclenchent donc qu'**une seule** requête. `defaultExpiryDelta = 10 * time.Second` donne le
+renouvellement anticipé, réglable par `ReuseTokenSourceWithExpiry`.
+
+Réécrire ce cache pour avoir un mécanisme « à nous » à muter reviendrait à réimplémenter une
+primitive de sécurité pour le confort d'un test. La mutation qu'exige la DoD reste possible et
+**reproduit le défaut réel** : remplacer notre assemblage par une `TokenSource` non réutilisée —
+l'oubli du `ReuseTokenSource`, qui est l'erreur qu'on commet vraiment. Elle vit dans notre code, et
+le test l'observe à la frontière réseau (un faux endpoint de jeton qui **compte** les requêtes
+reçues), pas sur un interne injecté.
+
+### DN-5 — Le mTLS entre par le contexte, ce qui le fait couvrir aussi l'obtention du jeton
+
+**Source lue** : `oauth2.NewClient(ctx, src)` prend comme transport de base celui du `*http.Client`
+placé dans le contexte sous la clé `oauth2.HTTPClient`, et `clientcredentials` emprunte le même
+chemin pour appeler la `tokenUrl`. Un unique `*http.Client` porteur du `tls.Config` (certificat
+client + CA) injecté par le contexte couvre donc **les deux** appels sortants.
+
+L'alternative — deux clients configurés séparément — laisse la porte ouverte à un jeton obtenu hors
+mTLS, c'est-à-dire à une authentification sortante à moitié protégée que rien ne signalerait.
+
+### DN-6 — Le retry ne rejoue que les lectures, une fois, et jamais quand la passerelle demande de reculer
+
+L'invariant (e) fait du tableau de bord un **observateur** : un observateur qui martèle une
+passerelle dégradée devient un amplificateur d'incident.
+
+- Rejeu sur **GET et HEAD uniquement** — une tentative supplémentaire, jamais plus, avec un délai
+  bref et du jitter.
+- **Jamais** sur POST, PATCH ni DELETE. Même pour les verbes idempotents au sens de la RFC : une
+  mutation est déclenchée par un opérateur présent à l'écran, et un rejeu automatique masque les
+  conflits. Le cas réseau ambigu (la requête a peut-être été appliquée) est couvert par là même.
+- **Jamais sur 429** : c'est l'API qui dit explicitement de reculer ; rejouer est une pression
+  directe.
+- **Jamais sur 503** : la description du contrat dit « réessayer *quand elle se rétablit* », pas
+  immédiatement. Le rétablissement se constate par l'opérateur via l'état d'erreur et son bouton
+  Réessayer — pas par une boucle automatique.
+
+### DN-7 — Un seul décodeur d'erreur, sur le couple (statut, corps), et non par opération
+
+**Mesuré sur le code généré** : chaque opération ne matérialise un champ `JSON4xx` que pour les
+statuts qu'elle déclare ; un statut non déclaré laisse tous les champs à `nil` et ne rend que `Body`
+et `HTTPResponse`. S'appuyer sur les champs typés demanderait 133 mappings et laisserait sans
+traitement tout statut non déclaré.
+
+**Mesuré aussi** : `Unauthorized`, `Forbidden`, `NotFound`, `Conflict`, `ValidationError` et
+`ServiceUnavailable` sont tous des **alias du même type `Error`**. Un décodeur unique suffit donc,
+qui lit le statut et le corps brut.
+
+Un corps qui n'est **pas** l'enveloppe attendue est un cas réel et non théorique : mesuré, Prism
+répond aux routes inconnues une erreur RFC 7807 (`type`/`title`/`status`/`detail`), et un proxy
+intermédiaire répondrait du HTML. Le décodeur rend alors une erreur typée portant un code générique
+plutôt que d'inventer un `code` ou de propager du vide.
+
+### DN-8 — `ServiceUnavailable` est une erreur ; « module désactivé » n'a aucun signal au contrat
+
+**Constat mesuré, à contre-courant de ce que le périmètre laissait attendre** : le contrat 2.5.0
+n'exprime **nulle part** un « module désactivé » — ni 501, ni en-tête, ni code d'erreur dédié. Les
+seuls signaux voisins sont des booléens **par ressource** (`billing_enabled` sur un client, etc.),
+qui voyagent dans des réponses 200.
+
+Inventer une convention côté BFF fabriquerait un signal que la passerelle n'émet pas. La step tient
+donc l'exigence par la négative, et c'est testable : **503 n'est jamais interprété comme un module
+désactivé**. En M0, « module désactivé » n'arrive pas par le chemin d'erreur du tout — c'est un état
+de *données*, tandis que 503 est une erreur avec Réessayer (§1.4). La question d'un signal plus riche
+appartient à step-160, qui saura ce que « module » veut dire.
+
+### DN-9 — La bascule réel/mock est explicite, et l'absence de configuration tombe du côté strict
+
+`DASHBOARD_GATEWAY_MODE` vaut `real` ou `mock`, et **son absence vaut `real`**. En `real`, l'URL de
+base, les identifiants OAuth2 et le matériel mTLS sont **tous obligatoires** : une production qui les
+oublie ne démarre pas, et le message nomme chaque manquant (§1.8). En `mock`, seule l'URL est
+utilisée.
+
+La polarité est le cœur de la décision : une production accidentellement en `mock` reste possible,
+mais l'écart est alors **explicite, greppable dans l'environnement** — alors qu'un défaut permissif
+serait invisible.
+
+Toutes les variables restent **lues inconditionnellement** dans le littéral `Config`, contrainte que
+`config.Variables()` impose déjà (une lecture conditionnelle deviendrait invisible et `.env.example`
+pourrait l'omettre sans rougir) ; c'est la **validation** qui dépend du mode, après chargement.
+
+Conséquence assumée : le job CI « Build client et déployable », qui ne fournit que `DASHBOARD_ADDR`,
+reçoit `DASHBOARD_GATEWAY_MODE=mock`.
+
+### DN-10 — Les scénarios lancent Prism eux-mêmes, et le job « Tests Go » reçoit la seconde toolchain
+
+Le `.feature` vit à côté du package qu'il décrit, donc dans `internal/gateway`, et tourne contre le
+**mock Prism** — frontière du système sous test (§17.2).
+
+Le harnais **lance Prism lui-même** depuis `web/node_modules/.bin/prism`, jamais par `npx` : mesuré,
+le binaire local répond en **1,0 s** là où `npx` à froid coûtait 25 s — c'est cette mesure, corrigée
+en cours d'arbitrage, qui a fait basculer la décision. Il réutilise une instance déjà lancée par
+`make mock` si elle est signalée, et **échoue franchement** si le binaire ou le contrat manquent.
+Aucun `t.Skip()`, aucun tag exclu, aucun build tag : un skip est vert.
+
+Le job CI « Tests Go » n'avait ni node ni `node_modules` — donc pas même le YAML, qui ne vit que là.
+Il reçoit l'action de setup existante et `packages: read`, comme les quatre jobs client.
+
+L'alternative examinée — sortir `internal/gateway` dans une cible et un job dédiés — a été écartée :
+elle obligeait à redéfinir `make test-go` en « l'arbre moins un package » par une exclusion sur le
+**nom**, patron dont ce dépôt a déjà été mordu, et coulait dans le béton des décisions de CI qui
+appartiennent à step-007 (« CI à deux toolchains »). Deux lignes dans un job existant laissent
+step-007 libre de restructurer.
+
+L'empiètement nominal sur step-007 se consigne ici et dans la PR ; ni `tasks/plan.md` ni la fiche de
+step-007 ne sont amputés.
+
+### DN-11 — La porte « le généré est à jour » supprime avant de régénérer
+
+Calquée sur `make check-routes`, et pour la même raison écrite là-bas : une comparaison seule reste
+verte quand plus rien ne régénère. Le fichier est **supprimé**, régénéré, puis comparé au commité.
+
+### DN-12 — Ce que cette step ne livre pas, et pourquoi
+
+Le périmètre dit que l'erreur traduite est « réexposée dans la même forme au client ». Aucune route
+du BFF n'appelle encore la passerelle — la première arrive en step-004. Cette step livre donc
+l'**erreur typée** de `internal/gateway` ; l'extension du DTO `errorResponse` de `internal/bff` avec
+`errors[]` attend la route qui la servira, faute de quoi elle serait du code mort qu'aucun test ne
+peut exercer de bout en bout.
