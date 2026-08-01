@@ -7,7 +7,6 @@ settings:
 overrides:
   postman-collection>lodash: ^4.18.1
   postman-collection>uuid: ^11.1.1
-  '@esbuild-kit/core-utils>esbuild': ^0.25.12
 
 importers:
 

@@ -28,18 +28,20 @@ concurrency:
 # `CI` resterait vert, et la fusion passerait. Ajouter un job, c'est l'ajouter
 # aux deux endroits — jusqu'à ce qu'une vérification d'exhaustivité existe.
 jobs:
+  # ─── Moitié Go — aucun de ces jobs n'a Node : ils appellent les cibles
+  # granulaires, jamais les composites, qui enchaînent sur pnpm.
   build:
-    name: Build
+    name: Build (Go)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - run: make build
+      - run: make build-go
 
   format:
-    name: Format
+    name: Format (Go)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,48 +51,46 @@ jobs:
       - run: make fmt-check
       - run: make vet
       - run: make tidy-check
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - run: make lint
-      # Un workflow syntaxiquement invalide n'est pas rouge : il est **absent**,
-      # et la protection de branche n'a alors plus rien à exiger. C'est arrivé
-      # sur cette step même.
       - run: make lint-workflows
 
-  test:
-    name: Test
+  lint:
+    name: Lint (Go)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - run: make test
+      - run: make lint-go
+
+  test:
+    name: Test (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: make test-go
 
   vuln:
-    name: Vulnérabilités
+    name: Vulnérabilités (Go)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - run: make vuln
+      - run: make vuln-go
 
+  # ─── Moitié client
   typecheck:
     name: Typecheck (client)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: pnpm -C web typecheck
+      - run: make typecheck-web
 
   lint-client:
     name: Lint (client)
@@ -98,7 +98,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: pnpm -C web lint
+      - run: make lint-web
 
   test-client:
     name: Test (client)
@@ -106,7 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: pnpm -C web test
+      - run: make test-web
 
   build-client:
     name: Build (client)
@@ -114,14 +114,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: pnpm -C web build
-      # Le squelette de chargement à froid doit survivre au build : Vite réécrit
-      # les balises de `index.html`, et un squelette perdu rouvrirait le `<body>`
-      # vide sur URL collée que step-001 existe pour fermer.
-      # `<div …` et non `data-squelette` nu : les sélecteurs du `<style>` portent
-      # le même texte, et un grep nu resterait vert alors que le balisage aurait
-      # disparu. La mutation l'a montré côté Vitest.
-      - run: grep -qE '<div[^>]+data-squelette="rail"' web/dist/index.html
+      # Le squelette doit survivre au build **et** rester non bloqué : Vite
+      # réécrit `index.html`, et c'est l'artefact qui atteint le navigateur.
+      - run: make verify-squelette
+      # L'arbre de routes commité doit être à jour : Vitest ne charge pas le
+      # plugin de routage et ne peut structurellement pas voir qu'il est périmé.
+      - run: make routetree-check
 
   vuln-client:
     name: Vulnérabilités (client)
@@ -129,7 +127,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - run: pnpm -C web vuln
+      - run: make vuln-web
 
   ci:
     name: CI

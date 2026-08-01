@@ -22,7 +22,13 @@ runs:
     # **v6 au minimum** : c'est la première version qui connaît pnpm 11, celle que déclare
     # `packageManager` dans `package.json`. Aucun `with:` ici, précisément pour que ce champ reste la
     # source unique de la version — l'écrire aussi ici, c'est se préparer à ce que les deux divergent.
+    # `package_json_file` est obligatoire depuis que la moitié client vit sous
+    # `web/` : l'action lit `packageManager` depuis `GITHUB_WORKSPACE`, avale
+    # l'ENOENT, et lève « No pnpm version is specified ». Sans cette ligne, les
+    # cinq portes client échouent au deuxième pas, avant `pnpm install`.
     - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      with:
+        package_json_file: web/package.json
 
     - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:

@@ -10,9 +10,7 @@ vers l'API Admin de la passerelle.
 > amendé dans la spécification (§1.3, §4, §7). **Ce README décrit la cible.**
 >
 > **L'ancienne pile a été supprimée** le 01/08/2026 — 27 000 lignes : le BFF TypeScript, l'enveloppe
-> TanStack Start, Drizzle, les configurations Vite/Vitest/Playwright et la suite de bout en bout. Le
-> **client React** (~16 300 lignes : composants, écrans, tokens de la charte et leurs tests) est
-> conservé sous `src/` et attend son déménagement vers `web/` en **step-001**.
+> TanStack Start, Drizzle, les configurations Vite/Vitest/Playwright et la suite de bout en bout.
 >
 > **`make check` est vert sur les deux moitiés** — socle Go, configuration validée au démarrage,
 > sonde de vivacité, arrêt propre et CI (**step-000**) ; client React sous `web/`, SPA Vite,
@@ -82,8 +80,8 @@ make migrate    # migrations de la base
 make test              # unitaires + scénarios godog, avec -race
 make lint              # golangci-lint
 make lint-workflows    # actionlint — un workflow invalide est absent, pas rouge
-pnpm -C web test       # Vitest
-pnpm -C web e2e        # Playwright, contre le binaire
+make test-web          # Vitest, avec seuils de couverture par fichier
+# `pnpm -C web e2e` — cible, arrive avec le harnais Playwright de step-007
 ```
 
 Les linters passent par `go tool` et sont épinglés dans `go.mod` : rien à installer

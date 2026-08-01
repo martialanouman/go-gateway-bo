@@ -31,6 +31,14 @@ declare module '@tanstack/react-router' {
   }
 }
 
+// La feuille de styles est chargée en `media="print"` pour ne pas bloquer le
+// premier paint du squelette (voir `vite.config.ts`). On la promeut ici, avant
+// de monter React : le squelette est déjà peint, et l'application n'apparaîtra
+// jamais non stylée.
+for (const feuille of document.querySelectorAll<HTMLLinkElement>('link[data-differee]')) {
+  feuille.media = 'all'
+}
+
 const point = document.getElementById('root')
 if (!point) {
   throw new Error('#root est absent du document : index.html et main.tsx ont divergé')

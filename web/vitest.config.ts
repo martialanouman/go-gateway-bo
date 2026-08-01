@@ -15,5 +15,28 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     environment: 'jsdom',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+
+    /**
+     * Les seuils avaient disparu au déménagement, sans un mot — une revue l'a
+     * relevé. `perFile` et non agrégé : une moyenne masque exactement ce qu'on
+     * veut voir, un module neuf à 40 % noyé dans une suite à 95 %.
+     *
+     * `include` explicite : sans lui, le fournisseur v8 ne rapporte que les
+     * fichiers qu'un test a chargés, et un module que personne n'importe est
+     * **absent** du rapport au lieu d'y figurer à zéro.
+     */
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/routeTree.gen.ts',
+        'src/test/**',
+        // Câblage du navigateur : monté par aucun test par nature, couvert par
+        // le parcours de bout en bout de step-007.
+        'src/main.tsx',
+        '**/*.{test,spec}.{ts,tsx}',
+      ],
+      thresholds: { perFile: true, lines: 88, branches: 78, functions: 85, statements: 88 },
+    },
   },
 })

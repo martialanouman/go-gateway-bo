@@ -10,10 +10,13 @@
       pour toutes les URL : s'il ne portait rien, coller un lien profond ouvrirait
       sur un `<body>` vide — un moment que le contrat à cinq états du §1.9 n'a pas.
 
-      Les valeurs sont littérales et non `var(--…)` : la feuille de tokens arrive
-      après, et un squelette qui attend le CSS ne sert à rien. Elles dupliquent
-      `--nav-width`, `--topbar-height`, `--surface-page` et `--border-chrome` ;
-      un écart de quelques pixels décale la silhouette, il ne casse rien.
+      Les valeurs sont littérales et non `var(--…)` : la feuille de tokens est
+      chargée en `media="print"` pour ne pas bloquer ce paint (voir
+      `vite.config.ts`), donc ses variables ne sont pas encore appliquées. Elles
+      dupliquent `--nav-width`, `--topbar-height`, `--surface-page`,
+      `--surface-chrome` et `--border-chrome`. Rien ne les tient synchronisées :
+      un écart décale la silhouette sans rien casser, et le jour où la coquille
+      change de forme, c'est ici qu'il faut revenir.
     -->
     <style>
       html { background: #0c0f14; color-scheme: dark; }
@@ -27,12 +30,18 @@
         min-height: 100vh;
         background: #0c0f14;
       }
+      /* `--surface-chrome`, pas `--surface-page` : la barre et le rail sont
+         plus sombres que le canvas. Les peindre à la couleur du fond donnait un
+         rectangle quasi uniforme qui s'assombrissait à l'hydratation — un saut
+         visuel, exactement ce que « pas de spinner » veut éviter. */
       [data-squelette="barre"] {
         grid-area: barre;
+        background: #0a0d12;
         border-bottom: 1px solid #1c242f;
       }
       [data-squelette="rail"] {
         grid-area: rail;
+        background: #0a0d12;
         border-right: 1px solid #1c242f;
       }
       [data-squelette="contenu"] {

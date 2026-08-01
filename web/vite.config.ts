@@ -1,8 +1,36 @@
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import viteReact from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 
 const BFF = 'http://127.0.0.1:3001'
+
+/**
+ * Vite injecte la feuille de styles en `<link rel="stylesheet">` dans le `<head>`,
+ * où elle **bloque le premier paint** — 31 ko de tokens et de polices. Le
+ * squelette n'apparaissait donc qu'après un aller-retour réseau, ce qui le vide
+ * de son sens : c'est le blanc que step-001 existe pour fermer, déplacé d'un
+ * cran. Une revue l'a trouvé sur l'artefact ; la source, elle, n'a pas de
+ * `<link>` du tout, et le test qui lisait la source ne pouvait pas le voir.
+ *
+ * La feuille est donc chargée en `media="print"` — récupérée sans bloquer — et
+ * `main.tsx` la promeut en `all` avant de monter React. Aucun `onload` inline :
+ * step-186 posera un nonce CSP, et un attribut de gestionnaire d'événement y
+ * échouerait.
+ */
+function feuilleNonBloquante(): Plugin {
+  return {
+    name: 'squelette/feuille-non-bloquante',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler: (html) =>
+        html.replace(
+          /<link rel="stylesheet"([^>]*)>/g,
+          '<link rel="stylesheet"$1 media="print" data-differee>',
+        ),
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
@@ -18,6 +46,7 @@ export default defineConfig({
       routeFileIgnorePattern: '\\.(test|spec)\\.[jt]sx?$',
     }),
     viteReact(),
+    feuilleNonBloquante(),
   ],
 
   resolve: { tsconfigPaths: true },

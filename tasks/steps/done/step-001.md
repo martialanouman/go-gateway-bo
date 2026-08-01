@@ -41,10 +41,10 @@ peint le squelette de la coquille**, jamais un blanc.
 - L'arbre de routes régénéré est identique au fichier commité.
 
 ## Definition of Done
-- [ ] `make check` vert des deux côtés
-- [ ] `make dev` sert l'application et proxifie `/api` vers le BFF
-- [ ] aucune dépendance à l'ancien socle serveur ne subsiste dans `web/package.json`
-- [ ] la mutation « vider le squelette de `index.html` » fait rougir le test de chargement à froid
+- [x] `make check` vert des deux côtés
+- [x] `make dev` sert l'application et proxifie `/api` vers le BFF
+- [x] aucune dépendance à l'ancien socle serveur ne subsiste dans `web/package.json`
+- [x] la mutation « vider le squelette de `index.html` » fait rougir le test de chargement à froid
 
 ## Hors périmètre
 `embed.FS` et le service des assets par le Go → step-002. La charte et `/_design` → step-008. Le

@@ -24,10 +24,10 @@ make check        # tout ce que la CI vérifie — OBLIGATOIRE avant toute PR
 make mock         # mock Prism sur openapi-admin.yaml
 make generate     # oapi-codegen + catalogue de permissions Go → TS
 
-go test ./...     # unitaires + scénarios godog
-golangci-lint run
-pnpm -C web test  # Vitest
-pnpm -C web e2e   # Playwright, contre le binaire
+make test-go      # unitaires Go + scénarios godog, avec -race
+make test-web     # Vitest, seuils de couverture par fichier
+make lint-go      # golangci-lint · make lint-web — Biome
+make lint-workflows  # actionlint : un workflow invalide est absent, pas rouge
 ```
 
 `make check` vert signifie une CI verte. Elle vérifie en plus que le code généré est à jour —

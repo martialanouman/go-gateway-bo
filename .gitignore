@@ -1,13 +1,15 @@
 # Sorties de build.
 /bin/
-/dist/
-web/dist/
+dist/
 
-# Dépendances et caches d'outillage.
+# Dépendances et caches d'outillage. Motifs **non ancrés** : la moitié client vit
+# sous `web/`, et des motifs en `/coverage/` ne l'y couvraient pas — Biome linte
+# alors le HTML généré du rapport de couverture.
 node_modules/
-/coverage/
-/test-results/
-/playwright-report/
+coverage/
+test-results/
+playwright-report/
+.tanstack/
 
 # Variables d'environnement locales. `.env.example` est commité, jamais un `.env` réel :
 # il portera le jeton OAuth2 de l'API Admin, le secret de session et le DSN PostgreSQL (§1.8).

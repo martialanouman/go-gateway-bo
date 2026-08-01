@@ -28,7 +28,7 @@ type Variable struct {
 // relire le corps de Load. Chercher des noms dans le texte source ne garde rien
 // — un renommage passerait, et le test resterait vert.
 var Variables = []Variable{
-	{Name: EnvAddr, Required: true, Example: ":3000"},
+	{Name: EnvAddr, Required: true, Example: ":3001"},
 	{Name: EnvShutdownTimeout, Required: false, Example: "15s"},
 }
 

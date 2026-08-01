@@ -87,3 +87,19 @@ func TestEnvExampleActiveValuesActuallyLoad(t *testing.T) {
 	require.NoError(t, err, ".env.example, tel que le shell le lira, ne suffit pas à démarrer")
 	assert.NotNil(t, loaded)
 }
+
+// Le port du BFF a divergé une fois : `.env.example` disait `:3001`, le
+// catalogue Go proposait encore `:3000` — celui de Vite. Personne ne les
+// comparait, et suivre l'un plutôt que l'autre déclenchait la collision que
+// `strictPort` a été ajouté pour rendre bruyante.
+func TestEnvExampleMatchesTheDeclaredExamples(t *testing.T) {
+	entries := readEnvExample(t)
+
+	for _, variable := range config.Variables {
+		if variable.Example == "" {
+			continue
+		}
+		assert.Equal(t, variable.Example, entries[variable.Name].value,
+			"%s : l'exemple du catalogue et celui de .env.example divergent", variable.Name)
+	}
+}
