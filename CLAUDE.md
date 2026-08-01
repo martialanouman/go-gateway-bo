@@ -22,31 +22,27 @@ le Go embarque les assets de la SPA.
 
 ```bash
 make dev          # BFF Go (:3001) + Vite (:3000), /api et /ws proxifiés vers le BFF
-make build        # go build → bin/dashboard — le client s'y embarque en step-002
-make build-web    # vite build → web/dist
+make build        # go build → bin/dashboard (le client s'y embarque en step-002) · build-web → web/dist
 make check        # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make test         # les deux suites · make lint — les deux linters
 make generate     # oapi-codegen + catalogue de permissions Go → TS      (cible)
 make mock         # mock Prism sur openapi-admin.yaml                    (cible)
 
-make test-go      # unitaires Go + scénarios godog, avec -race
-make lint-go      # golangci-lint · make fmt-go applique le formatage
-make vuln-go      # govulncheck
-make lint-workflows  # actionlint + l'agrégateur CI attend-il tous les jobs ?
-make typecheck-web   # tsc --noEmit
-make test-web     # Vitest
-make lint-web     # Biome · make vuln-web — pnpm audit
-make check-routes # l'arbre de routes commité est-il à jour et régénéré ?
+# Une porte granulaire par job de CI, à lancer seule pendant une boucle rouge → vert :
+#   test-go (godog + -race) · lint-go (+ fmt-go pour appliquer) · vuln-go (govulncheck)
+#   typecheck-web (tsc) · test-web (Vitest) · lint-web (Biome) · vuln-web (pnpm audit)
+#   lint-workflows (actionlint + l'agrégateur CI attend-il tous les jobs ?) · check-routes
 ```
 
 `make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
-égaler. Deux raisons distinctes font qu'un vert local ne garantit pas une PR verte. **Ce que `make
-check` ne rejoue pas du tout** : `pr-title.yml`, et les deux règles du ruleset de `main` — **CodeQL**
-et **code_quality** — qui bloquent une PR sans passer par le check `CI`. **Ce qu'il rejoue sans que le
-verdict soit le même** : `govulncheck`, qui interroge une base vivante et peut changer d'avis sans
-qu'un fichier bouge, et `go test -race`, qui tourne ici sur darwin/arm64 et là-bas sur linux/amd64.
-S'y ajoute le `pnpm install --frozen-lockfile` de la CI, qu'un `node_modules` désynchronisé du
-lockfile masque en local, et `pnpm audit`, qui interroge lui aussi une base vivante.
+égaler. Un vert local ne garantit pas une PR verte, pour deux raisons distinctes :
+
+- **jamais rejoué en local** : `pr-title.yml`, et les deux règles du ruleset de `main` — **CodeQL** et
+  **code_quality** — qui bloquent une PR sans passer par le check `CI` ;
+- **rejoué, verdict pas garanti** : `govulncheck` et `pnpm audit` interrogent des bases vivantes et
+  changent d'avis sans qu'un fichier bouge ; `go test -race` tourne ici sur darwin/arm64 et là-bas sur
+  linux/amd64 ; le `pnpm install --frozen-lockfile` de la CI échoue là où un `node_modules`
+  désynchronisé du lockfile masque l'écart en local.
 
 ## Architecture (carte mentale)
 
@@ -117,11 +113,9 @@ français** — commentaires, scénarios Gherkin, titres de test, copie produit.
 **Commentaires avec parcimonie.** Un commentaire ne redit jamais ce que le code dit. Il ne subsiste
 que là où le code ne peut pas parler : un *pourquoi* contre-intuitif, un arbitrage dont l'alternative
 évidente est fausse, une contrainte externe invérifiable sur place. Partout ailleurs, la réponse est un
-meilleur nom ou une fonction extraite.
-
-> La v1.0 était à **38 % de commentaire** côté serveur. Une part portait un vrai « pourquoi » ; le
-> reste paraphrasait la ligne suivante — et le critère 2 ci-dessous existe parce que **certains de ces
-> commentaires mentaient** sur le code qu'ils surplombaient.
+meilleur nom ou une fonction extraite. La v1.0 était à **38 % de commentaire** côté serveur, et le
+critère 2 ci-dessous existe parce que **certains de ces commentaires mentaient** sur le code qu'ils
+surplombaient.
 
 Interface en **français**, troisième personne, **conséquence d'abord**. Les identifiants techniques
 restent en anglais et en mono, verbatim du contrat : `link_status`, `breaker_state`, `max_sessions`,
@@ -161,37 +155,40 @@ exemples qui teste un mapping ; deux scénarios qui ne diffèrent que par une va
 
 ## La boucle de travail
 
-**Une step = une session = une PR.** À suivre strictement, dans cet ordre.
+**Une step = une session = une PR.** La procédure complète — neuf phases, prompts de sous-agents,
+pièges de terrain — vit dans le skill **`impl-step`** : l'invoquer est la première action dès qu'une
+step est engagée, avant de lire du code et avant d'écrire le moindre plan. Ce qui suit est le
+squelette — ce qu'on exige, pas comment on l'obtient.
 
-**Chaque phase s'ouvre par `using-agent-skills`** — plan, spécification, implémentation, revue,
-débogage. Le méta-skill oriente vers le skill de la phase, et chacun porte un cadre que l'improvisation
-ne reproduit pas. Le mode d'échec est silencieux : sans le skill on finit par trouver, plus lentement et
-sans structure, donc rien ne signale l'oubli. **L'invocation est la première action de la phase**,
-avant d'écrire le prompt, le plan ou la première ligne.
+**Puis chaque phase s'ouvre par `using-agent-skills`** — contexte, plan, spécification,
+implémentation, revue, débogage. Le méta-skill oriente vers le skill de la phase, et chacun porte un
+cadre que l'improvisation ne reproduit pas. Le mode d'échec est silencieux : sans le skill on finit par
+trouver, plus lentement et sans structure, donc rien ne signale l'oubli.
 
-1. Prendre le prochain `tasks/steps/step-NNN.md` — **l'ordre de `tasks/todo.md` fait foi**, pas le
-   numéro, **sauf quand la ligne « Dépend de » du fichier le contredit : les dépendances déclarées
-   priment**. Une divergence constatée se corrige *dans le plan* avant d'écrire du code — jamais en la
-   contournant en silence.
-2. Créer la branche : `feat/step-NNN-slug` (ou `fix/`, `docs/`, `chore/`, `test/`).
-3. **Établir un plan avant la moindre ligne**, et en dériver la **todo list** — une entrée par unité
-   livrable, tenue à jour.
-4. Implémenter en **BDD strict : le scénario rouge d'abord**, jamais le code en premier. Périmètre
-   limité à ce que le fichier de step décrit. La règle d'entrée vaut pour **chaque** reprise de code,
-   correctifs de revue compris. **Commits atomiques au fil de l'eau** : une unité verte = un commit.
-5. Après l'implémentation, **revue en sous-agents lecture seule** : ils remontent des constats, ils ne
-   corrigent rien. La correction revient à la session. Si le contexte manque, **replanifier avant de
-   toucher au code**. Relancer tant qu'il reste un constat bloquant.
-   **Un correctif de revue est du code comme un autre** : même DoD, même mutation, même méfiance. En
-   v1.0, une bonne part des constats des passes 2 à 5 portaient sur les correctifs des passes
-   précédentes. Ne jamais annoncer un correctif sans l'avoir vu tenir.
-6. Vérifier la **Definition of Done** ci-dessous et celle du fichier de step.
-7. Dernier commit : `git mv tasks/steps/step-NNN.md tasks/steps/done/` et cocher la ligne dans
-   `tasks/todo.md`.
-8. Ouvrir la PR — titre en conventional commit avec la step : `feat(routing): éditeur de route
-   (step-121)` — puis **merger dès que la CI est verte**. Si la CI échoue : **deux relances au
-   maximum**, ensuite on rend la main.
-9. Un jalon est terminé quand **toutes** ses steps sont dans `tasks/steps/done/`.
+**Quatre portes**, dans l'ordre, chacune interdisant la suite tant qu'elle n'est pas franchie :
+**design arrêté, écrit dans la fiche et commité** avant la première ligne de code · **rouge lu et
+compris** avant la première ligne d'implémentation · **mutation vue tomber** avant de déclarer une
+unité verte · **revue sans bloquant** avant de cocher la DoD — celle ci-dessous *et* celle de la fiche.
+
+Ce que la boucle exige en propre sur ce dépôt :
+
+- **L'ordre de `tasks/todo.md` fait foi**, pas le numéro — **sauf quand la ligne « Dépend de » de la
+  fiche le contredit : les dépendances déclarées priment**. Une divergence constatée se corrige *dans
+  le plan* avant d'écrire du code, jamais en la contournant en silence.
+- Branche `feat/step-NNN-slug` (ou `fix/`, `docs/`, `chore/`, `test/`). **Commits atomiques au fil de
+  l'eau** : une unité verte = un commit.
+- **BDD strict, le scénario rouge d'abord**, jamais le code en premier — pour **chaque** reprise de
+  code, correctifs de revue compris.
+- La revue se fait en **sous-agents lecture seule** : ils remontent des constats, ils ne corrigent
+  rien ; la correction revient à la session, et si le contexte manque, on **replanifie avant de
+  toucher au code**. **Un correctif de revue est du code comme un autre** : même DoD, même mutation,
+  même méfiance. En v1.0, une bonne part des constats des passes 2 à 5 portaient sur les correctifs
+  des passes précédentes — ne jamais annoncer un correctif sans l'avoir vu tenir.
+- Dernier commit : `git mv tasks/steps/step-NNN.md tasks/steps/done/`, ligne cochée dans
+  `tasks/todo.md`. Puis PR — titre en conventional commit portant la step : `feat(routing): éditeur de
+  route (step-121)` — et **merge dès que la CI est verte**. Si elle échoue : **deux relances au
+  maximum**, ensuite on rend la main.
+- Un jalon est terminé quand **toutes** ses steps sont dans `tasks/steps/done/`.
 
 **Arbitrage.** Une décision se tranche d'abord sur le contexte disponible : spec, plan, contrat,
 fichier de step. Si elle reste indécidable, consulter le modèle **Fable** plutôt que de trancher au
@@ -206,30 +203,27 @@ clavier et libellés accessibles (WCAG 2.1 AA) sur tout écran touché • PR pe
 step) — plus les quatre critères ci-dessous.
 
 > **Pourquoi quatre critères et non quatre portes de plus.** Les deux bloquants de la v1.0 ont franchi
-> les douze portes de la CI : le bandeau de refus s'affichait sans bordure faute de tokens existants,
-> et le QR code était un carré noir de 176 pixels. Deux lignes de l'ancienne DoD — « copie conforme »,
-> « critères couverts par des tests » — se déclaraient vraies sans aucune preuve. Ce qui manquait
-> n'était pas une vérification de plus : c'était de rendre falsifiable ce qu'on affirmait déjà.
+> les douze portes de la CI : un bandeau de refus sans bordure faute de tokens existants, un QR code
+> réduit à un carré noir de 176 pixels. Deux lignes de l'ancienne DoD — « copie conforme », « critères
+> couverts par des tests » — se déclaraient vraies sans aucune preuve. Ce qui manquait n'était pas une
+> vérification de plus : c'était de rendre falsifiable ce qu'on affirmait déjà.
 
 **1. Le chemin qu'un humain traverse est traversé pour de bon.** Toute step qui livre un chemin d'écran
 l'exerce de bout en bout au moins une fois — **en étendant un parcours existant** plutôt qu'en ajoutant
 un fichier. « De bout en bout » veut dire **rien de simulé dans le produit** : pas de provider fourni
 par le test, pas de client Query injecté, pas de module interne remplacé. Le mock Prism, lui, est la
-frontière du système sous test.
-
-> Trois défauts de la v1.0 y ont été trouvés et par rien d'autre : un `QueryClientProvider` absent de
-> l'application, que le harnais de test fournissait lui-même ; une garde de session qui ne s'exécutait
-> jamais sur une URL collée, pendant que trois tests la déclaraient verte ; et une boucle entre le
-> login et le second facteur.
+frontière du système sous test. Trois défauts de la v1.0 ont été trouvés là et nulle part ailleurs : un
+`QueryClientProvider` absent de l'application et que le harnais fournissait lui-même, une garde de
+session qui ne s'exécutait jamais sur une URL collée pendant que trois tests la déclaraient verte, et
+une boucle entre le login et le second facteur.
 
 **2. Toute affirmation sur le monde extérieur est confrontée à sa source.** Trois formes, et les trois
 ont menti : la **copie** qui décrit le produit se lit contre le code serveur qui l'implémente ; un
 **commentaire** qui décrit un mécanisme se relit contre le code qu'il surplombe ; et ce qu'on écrit
 dans un commit ou un rapport se vérifie sur la **sortie livrée**, pas sur l'intention du diff — un
-remplacement scripté qui ne trouve pas son motif ne le dit pas.
-
-> C'est ce critère qu'illustre le QR code noir : la règle CSS avait été écrite sans lire ce que la
-> bibliothèque émet. Le parcours qui l'avait introduit assertait la visibilité du QR et restait vert.
+remplacement scripté qui ne trouve pas son motif ne le dit pas. C'est ce critère qu'illustre le QR code
+noir : la règle CSS avait été écrite sans lire ce que la bibliothèque émet, et le parcours qui
+l'assertait visible restait vert.
 
 **3. Mutation obligatoire partout où le retrait laisserait la suite verte.** Le critère est cette
 propriété, pas une liste : gardes, refus, redirections et verrous en font partie, mais aussi un focus
@@ -272,6 +266,7 @@ mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couver
 - Quoi/pourquoi : `docs/specification-technique-tableau-de-bord.md` (v2.1)
 - Comment/dans quel ordre : `tasks/plan.md`
 - Découpage en PRs : `tasks/todo.md` + `tasks/steps/step-NNN.md`
+- Procédure d'une step, phase par phase : skill `impl-step` (`.claude/skills/impl-step/SKILL.md`)
 - Charte graphique & kit UI : `.claude/skills/sms-gateway-design/README.md`
 - Contrat API : `@martialanouman/gateway-api-contracts` (jamais copié ici)
 - Passerelle (dépôt séparé) : `../go-gateway`
