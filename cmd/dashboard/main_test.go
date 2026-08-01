@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -63,9 +66,13 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	p := &process{}
 
 	ctx.Given(`^une configuration complète dont on retire "([^"]*)"$`, p.configurationWithout)
+	ctx.Given(`^un serveur démarré$`, p.startAndServe)
 	ctx.When(`^le serveur démarre$`, p.start)
+	ctx.When(`^le serveur reçoit SIGTERM$`, p.signalTerm)
 	ctx.Then(`^le serveur ne sert aucune requête$`, p.servesNothing)
 	ctx.Then(`^le message d'erreur nomme "([^"]*)"$`, p.messageNames)
+	ctx.Then(`^le serveur s'arrête sans erreur$`, p.exitsCleanly)
+	ctx.Then(`^il n'accepte plus aucune connexion$`, p.refusesConnections)
 
 	ctx.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
 		p.kill()
@@ -87,6 +94,7 @@ type process struct {
 	cmd    *exec.Cmd
 	output *syncBuffer
 	exited chan error
+	addr   string
 }
 
 func (p *process) configurationWithout(name string) error {
@@ -125,12 +133,91 @@ func (p *process) start() error {
 	return nil
 }
 
+func (p *process) startAndServe() error {
+	if err := p.start(); err != nil {
+		return err
+	}
+
+	addr, err := p.awaitListenAddr(5 * time.Second)
+	if err != nil {
+		return err
+	}
+	p.addr = addr
+
+	resp, err := http.Get(p.healthURL())
+	if err != nil {
+		return fmt.Errorf("le serveur ne répond pas: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("la sonde de vivacité rend %s", resp.Status)
+	}
+
+	return nil
+}
+
+// awaitListenAddr lit l'adresse effectivement obtenue dans le journal de démarrage. C'est ce qui
+// permet au scénario de demander le port 0 : il ne suppose aucun port libre sur la machine de CI.
+func (p *process) awaitListenAddr(timeout time.Duration) (string, error) {
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		for line := range strings.SplitSeq(p.output.String(), "\n") {
+			var entry struct {
+				Addr string `json:"addr"`
+			}
+
+			if json.Unmarshal([]byte(line), &entry) == nil && entry.Addr != "" {
+				return entry.Addr, nil
+			}
+		}
+
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	return "", fmt.Errorf("le serveur n'a pas annoncé son adresse d'écoute :\n%s", p.output.String())
+}
+
+func (p *process) signalTerm() error {
+	return p.cmd.Process.Signal(syscall.SIGTERM)
+}
+
+func (p *process) exitsCleanly() error {
+	select {
+	case err := <-p.exited:
+		if err != nil {
+			return fmt.Errorf("le process s'est arrêté en erreur: %w\n%s", err, p.output.String())
+		}
+
+		return nil
+	case <-time.After(10 * time.Second):
+		return errors.New("le process n'a pas rendu la main : l'orchestrateur devra le tuer")
+	}
+}
+
+func (p *process) refusesConnections() error {
+	client := &http.Client{Timeout: 2 * time.Second}
+
+	resp, err := client.Get(p.healthURL())
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	return fmt.Errorf("le serveur répond encore : %s", resp.Status)
+}
+
+func (p *process) healthURL() string {
+	return "http://" + p.addr + "/api/health"
+}
+
 func (p *process) servesNothing() error {
 	select {
 	case err := <-p.exited:
 		var exit *exec.ExitError
 		if !errors.As(err, &exit) {
-			return fmt.Errorf("le process s'est arrêté sans erreur, il aurait dû refuser: %v", err)
+			return fmt.Errorf("le process s'est arrêté sans erreur, il aurait dû refuser: %w", err)
 		}
 
 		return nil

@@ -20,11 +20,6 @@ linters:
     - usetesting
 
   settings:
-    gosec:
-      excludes:
-        # Les délais d'attente d'un serveur viennent de la configuration, pas d'une constante ; la
-        # règle ne sait pas les voir et signalerait `internal/config` comme un serveur sans timeout.
-        - G112
     revive:
       rules:
         - name: exported
