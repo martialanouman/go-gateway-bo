@@ -75,6 +75,12 @@ Si une bibliothèque est en jeu — ajout, bump, ou simple usage d'une API — c
 ce qui engage la correction. Une signature devinée de mémoire est la panne la plus chère du lot : elle
 compile parfois.
 
+**Même exigence pour un environnement externe** — ce que contient une image de runner, ce qu'un
+service impose, quel quota s'applique : ça se lit à sa source documentaire. En step-002, « le job Go
+n'a pas Node » a été écrit dans **neuf fichiers** avant qu'un relecteur n'ouvre le manifeste
+`actions/runner-images` : `ubuntu-latest` embarque Node et npm, c'est `pnpm` qui manque. Le
+raisonnement tenait, le mot mentait — et rien dans la CI ne pouvait le contredire.
+
 Cette phase se parallélise bien : lancer plusieurs `Explore` (lecture seule) sur des axes disjoints
 — la fiche et son plan, le précédent dans le code, les contrats concernés — coûte moins cher qu'une
 lecture séquentielle et ne risque rien puisque personne n'écrit.
@@ -121,6 +127,12 @@ git commit -m "docs(tasks): arrêter le design de step-NNN (…)"
 construit et pourquoi, elle laisse une trace lisible en revue, et elle empêche l'inversion la plus
 fréquente — écrire le code puis fabriquer la justification qui lui va.
 
+**Arrêté ne veut pas dire figé.** Un DN que la mesure contredit, ou que le code dépasse, se **corrige
+dans la fiche** — avec la mesure qui l'a montré, et sans effacer la version précédente : c'est
+l'enchaînement qui instruit. En step-002, trois DN sur neuf ont bougé, dont une deux fois. Un DN
+périmé est un **bloquant** de revue, pas une note : c'est un document qui affirme du faux sur le code
+qu'il surplombe, et la prochaine session le lira comme la vérité.
+
 ## Phase 4 — Plan et todos
 
 `using-agent-skills` → `planning-and-task-breakdown`.
@@ -162,11 +174,47 @@ une suite qu'on n'ose plus croire, et Gherkin l'aggrave parce que ça se lit bie
 dérive : un `Alors` qui porte sur une structure de données plutôt qu'un effet observable ; un `Plan du
 scénario` à quinze exemples qui teste un mapping ; deux scénarios qui ne diffèrent que par une valeur.
 
+### Un commentaire qui explique un mécanisme se mesure d'abord
+
+**C'est le premier poste de dépense de la revue.** Sur step-002, *huit des dix bloquants* portaient sur
+une **affirmation** — commentaire, ligne de documentation ou message d'erreur — qui décrivait un
+mécanisme faux ou promettait une preuve inexistante. Trois d'entre eux avaient été **écrits par les
+correctifs de la passe précédente**. Le motif ne varie pas : on explique pourquoi le code marche en
+**déduisant** le comportement de la bibliothèque au lieu de l'**observer**. « `ServeFileFS` purge cet
+en-tête » — il n'est jamais appelé sur ce chemin. « Cette garde évite un 500 » — le 500 appartient à
+une autre branche. « Le `-timeout` ne couvre pas `TestMain` » — une borne externe le couvre.
+
+La règle est donc : **un commentaire qui affirme le comportement d'une bibliothèque, d'un outil ou du
+routeur cite ce qui l'établit** — le rouge observé en le mutant, ou le fichier et les lignes lues dans
+la source. Si tu ne l'as ni exécuté ni lu, tu ne l'écris pas : un nom mieux choisi coûte moins cher
+qu'une explication fausse, qu'un lecteur suivra jusqu'au bout parce qu'elle a l'air sûre d'elle.
+
+Le corollaire vaut pour les sub-agents : leur demander la mesure **dans leur rapport**, pas seulement
+la conclusion.
+
+### Le harnais ne doit pas manger le produit
+
+Surveille le rapport entre les lignes de harnais et les lignes de produit. En step-002 il a fini à
+**640 contre 150**, dont 255 pour contourner un répertoire vide sur un clone neuf : chaque ligne était
+justifiée localement, l'ensemble ne l'était plus. Quand le harnais dépasse nettement ce qu'il protège,
+arrête-toi et demande-toi si une porte de CI ne prouverait pas la même chose en dix lignes — c'est ce
+qui s'est passé, et la porte a trouvé un défaut que le harnais ne pouvait pas voir.
+
 ### Paralléliser les unités indépendantes
 
-Les unités qui ne partagent **aucun fichier** partent en sub-agents simultanés (un seul message, un
-`Agent` par unité). Celles qui partagent un fichier restent séquentielles : deux agents qui éditent le
-même fichier produisent un demi-fichier, pas un conflit propre.
+Les unités qui ne partagent **aucun état** partent en sub-agents simultanés (un seul message, un
+`Agent` par unité). Celles qui en partagent un restent séquentielles.
+
+**L'état partagé ne se limite pas aux fichiers édités.** Deux agents sur un même fichier produisent un
+demi-fichier — c'est le cas visible. Le cas coûteux est invisible : un répertoire que l'un remplit et
+que l'autre lit, un port lié, une base, un binaire compilé. En step-002, l'agent du Makefile a lancé
+`make build` pendant que l'agent des scénarios écrivait son test — et **son premier rouge est sorti
+vert**, parce que le répertoire embarqué venait d'être rempli sous ses pieds. Il l'a vu et l'a dit ;
+c'est de la chance, pas une garantie.
+
+D'où une consigne à recopier dans chaque mandat : **un sub-agent ne lance aucune commande qui écrit
+hors de son périmètre** — ni `make build`, ni `make check`, ni `go test ./...` sur tout l'arbre. Il
+teste son paquet, et rien d'autre.
 
 Chaque sub-agent reçoit un mandat complet et autonome — il ne voit pas ta conversation :
 
@@ -213,8 +261,14 @@ Deux pièges qui ont coûté cher :
   celle qu'il annonce — fixture creuse, provider fourni par le harnais et absent du produit, détecteur
   qui cherche un nom dans du texte source et que le moindre commentaire rend toujours vrai.
 
-Tenir le **tableau des mutations** au fil de l'eau (mutation appliquée → test qui tombe) : c'est ce qui
-part dans le corps de PR en phase 9.
+Tenir le **tableau des mutations au fil de l'eau, dans la fiche** — mutation appliquée → ce qui tombe.
+Pas dans ta tête : il est consommé en phase 9, trois passes de revue plus tard, et le reconstituer de
+mémoire à la rédaction de la PR en perd la moitié. Les mutations que les sub-agents rapportent y
+entrent aussi.
+
+Une ligne du tableau vaut aussi quand rien ne tombe : « retrait de X → **aucune porte ne rougit** »
+est un constat de la DoD (critère 4), pas un aveu — à condition d'avoir été vérifié plutôt que
+supposé, et écrit **au-dessus de la ligne concernée** en plus du tableau.
 
 Ce qui n'est pas testable s'écrit là où il vit : « aucun test ne rougit si cette ligne disparaît, ce
 qui a été vérifié plutôt que supposé » vaut mieux qu'un test qui fait semblant.
@@ -243,7 +297,18 @@ Des axes distincts trouvent plus que des relecteurs redondants. Pour ce dépôt 
   en silence, `Alors` qui n'observe qu'une structure de données, assertions qui n'assertent rien ;
 - **Interface** (si la step livre un écran) — copie en français, troisième personne, conséquence
   d'abord ; identifiants techniques verbatim et non traduits ; les cinq états de contenu ; contrôle
-  interdit désactivé **et expliqué**, jamais masqué ; clavier et libellés (WCAG 2.1 AA).
+  interdit désactivé **et expliqué**, jamais masqué ; clavier et libellés (WCAG 2.1 AA) ;
+- **Conformité à la fiche et à la DoD** — un relecteur qui ne lit pas le code ligne à ligne, mais
+  confronte **ce que la step promet à ce qu'elle livre**. Chaque ligne du « Périmètre » est-elle là,
+  chaque ligne du « Hors périmètre » restée dehors ? Chaque point de la section « Tests » a-t-il une
+  preuve, et de la forme qui lui convient ? Les DN décrivent-ils encore le code ? Quel code pourrait
+  disparaître sans qu'une porte bouge ? Les lacunes sont-elles écrites là où elles vivent, ou
+  seulement dans un message de commit que personne ne relira ?
+
+Ce dernier axe n'est pas un supplément de confort : sur step-002, **aucun des quatre relecteurs de
+code n'a vu** la ligne de « Tests » sans preuve, les deux DN que le code avait dépassés, ni les trois
+lignes de Makefile que rien ne tenait. Ce sont des écarts entre deux documents, invisibles depuis le
+diff seul.
 
 Demande à chaque relecteur de classer ses constats : **bloquant** (défaut de correction, invariant
 violé, contrat trahi) · **à corriger** (dette lisible qu'on ne laisse pas passer) · **note** (avis).
@@ -256,10 +321,30 @@ Agent(subagent_type: "Plan",
                et une classification bloquant | à corriger | note.")
 ```
 
+### Calibrer, plutôt que dérouler
+
+Le nombre d'axes se règle sur la **surface**, pas sur l'habitude. Un diff court qui n'ouvre aucune
+frontière : deux axes suffisent. Dès qu'il y a une surface exposée, un fichier servi, une chaîne de
+build ou un contrat qui bouge : quatre ou cinq. La passe de clôture ne se lance que s'il reste des
+correctifs qu'aucun relecteur n'a vus — pas par principe.
+
+Dis à chaque relecteur, en toutes lettres, que **ne rien trouver est une réponse acceptable**. Une
+passe qui invente des constats pour justifier son existence coûte plus qu'elle ne rapporte, et noie
+les vrais.
+
+Dis-lui aussi de **contester la revue précédente** quand sa mesure la contredit. En step-002, deux
+constats ont été réfutés ainsi, dont un qui allait faire retirer une directive `//nolint` nécessaire —
+la mesure qui la disait inutile avait été prise en la laissant en place.
+
 **Boucler tant qu'il reste un bloquant** : tu corriges, tu relances une revue sur le nouveau diff. Un
 correctif de revue est du code comme un autre — même entrée par `test-driven-development`, même
 mutation, même méfiance. En v1.0, une bonne part des constats des passes 2 à 5 portaient sur les
-correctifs des passes précédentes ; ne jamais annoncer un correctif sans l'avoir vu tenir.
+correctifs des passes précédentes ; en step-002, trois des dix bloquants étaient nés dans les
+correctifs de la passe d'avant. Ne jamais annoncer un correctif sans l'avoir vu tenir.
+
+**Commite entre deux passes.** Les correctifs d'une passe forment un ou plusieurs commits `fix(...)`
+lisibles, dont le message dit ce qui était faux et comment ça a été mesuré. La passe suivante relit
+alors des commits, pas un amas de modifications non suivies.
 
 Si le même bloquant survit à trois tours, arrête la boucle et remonte-le à l'utilisateur avec les
 positions en présence : à ce stade ce n'est plus un défaut, c'est un désaccord de conception, et il se
@@ -344,5 +429,10 @@ Un jalon est terminé quand **toutes** ses steps sont dans `tasks/steps/done/`.
 - **Un sub-agent ne voit pas ta conversation.** Le design arrêté, les fichiers autorisés, la procédure
   attendue et l'interdiction de commiter se recopient dans son prompt, sinon il réinvente — et il
   réinvente autrement que ses voisins lancés en même temps.
-- **Deux sub-agents sur un même fichier le cassent.** Le partage de fichier, pas la proximité
-  thématique, est le critère de séquentialité.
+- **Deux sub-agents sur un même état le cassent.** Le partage d'état — fichier, répertoire, port,
+  base, binaire — et non la proximité thématique, est le critère de séquentialité. Le cas visible est
+  le fichier ; le cas coûteux est le répertoire que l'un remplit pendant que l'autre le lit.
+- **Un vert obtenu pendant qu'un autre agent travaille ne prouve rien.** Un rouge attendu qui sort
+  vert est un signal, pas une bonne nouvelle : cherche qui a écrit sous tes pieds avant de conclure.
+- **Attendre la CI se fait par un `Monitor`**, pas par une suite de `sleep` — le harnais les refuse, et
+  une boucle d'attente sans temporisation tourne à vide en une fraction de seconde.
