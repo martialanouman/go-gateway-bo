@@ -115,6 +115,16 @@ n'ose plus croire, et que `playwright.config.ts` met en garde contre.
 
 **Une step = une session = une PR.** À suivre strictement, dans cet ordre.
 
+**Chaque phase s'ouvre par `using-agent-skills`** — plan, spécification, implémentation, revue,
+débogage. Pas seulement avant d'écrire du code : le méta-skill oriente vers le skill de la phase en
+cours, et chacun porte un cadre que l'improvisation ne reproduit pas. Le mode d'échec est
+silencieux : sans le skill on finit quand même par trouver, plus lentement et sans structure, donc
+rien ne signale l'oubli. C'est arrivé sur les revues (quatre d'affilée par prompt ad hoc) puis sur un
+débogage de la step-027 — une boucle infinie de la suite de tests cherchée au jugé, trois exécutions
+tuées, alors que la cause a cédé à la méthode que `debugging-and-error-recovery` prescrit.
+**L'invocation est la première action de la phase**, avant d'écrire le prompt, le plan ou la première
+ligne — jamais une case cochée après coup.
+
 1. Prendre le prochain `tasks-todo/step-NNN.md` — **l'ordre du fichier `INDEX.md` fait foi**, pas le
    numéro. **Sauf quand la ligne « Dépend de » du fichier de step le contredit : les dépendances
    déclarées priment toujours.** Les sections de l'INDEX groupent par jalon, donc par thème, et un
@@ -125,8 +135,8 @@ n'ose plus croire, et que `playwright.config.ts` met en garde contre.
 3. **Toujours établir un plan avant d'écrire la moindre ligne**, et en dériver la **todo list**
    d'implémentation — une entrée par unité livrable, tenue à jour au fil de la step.
 4. Implémenter en **TDD strict : le test rouge d'abord**, jamais le code en premier. Périmètre limité
-   à ce que le fichier de step décrit — rien de plus. Passer par `using-agent-skills` **avant toute
-   modification du code source**, correctifs de revue compris — pas seulement au démarrage.
+   à ce que le fichier de step décrit — rien de plus. La règle d'entrée ci-dessus vaut ici aussi, et
+   pour **chaque** reprise de code : correctifs de revue compris, pas seulement au démarrage.
    **Commits atomiques au fil de l'eau** : une unité cohérente verte = un commit, jamais la step
    entière d'un bloc.
 5. Après l'implémentation, lancer la **revue dans des sous-agents en lecture seule** : ils remontent

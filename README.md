@@ -50,7 +50,7 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 
 | Commande | Rôle |
 |---|---|
-| `pnpm dev` | serveur de développement avec rechargement |
+| `pnpm dev` | serveur de développement avec rechargement — routes du BFF comprises, voir plus bas |
 | `pnpm build` | build client + serveur Nitro dans `.output/` |
 | `pnpm start` | sert le build en Node |
 | `pnpm typecheck` | `tsc --noEmit` |
@@ -72,6 +72,29 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 
 `pnpm check` vert signifie une CI verte, à une garde près : la CI vérifie en plus que
 `src/routeTree.gen.ts` est à jour après build.
+
+### Ce que `pnpm dev` sert, et par quel chemin
+
+Les routes HTTP du BFF sont déclarées une seule fois, dans `src/server/bff-routes.ts`. Deux
+consommateurs les **servent** — Nitro au build, `bffDevPlugin` sous `vite dev`
+(`src/server/dev-bff-plugin.ts`) — et un troisième les **lit** sans les servir : le test
+d'énumération de l'invariant (c), qui est la raison d'être de cette liste. Le plugin de
+développement existe parce que celui de Nitro ne s'active qu'à la commande `build` — sans lui,
+`/api/...` répondait le 404 HTML du routeur applicatif, et la console s'ouvrait sur « la passerelle
+n'a pas répondu ».
+
+Le même plugin verse `.env` dans `process.env`, ce que Vite ne fait pas de lui-même : c'est là que le
+BFF lit `DATABASE_URL`, les secrets de session et l'adresse de la passerelle. Une variable déjà posée
+gagne sur le fichier — `DATABASE_URL=… pnpm dev` vise une autre base sans éditer `.env`. Et il coupe
+le CORS du serveur de développement, que Vite accorde par défaut à toute origine `localhost` : Nitro
+n'en sert aucun, et une porte ouverte en développement seulement est une défense qu'on croit avoir.
+
+Trois écarts à connaître entre ce chemin et le build. Un handler modifié est rechargé à chaud — ce
+qui **réarme les singletons du module**, dont le pool PostgreSQL et le sémaphore de connexion. Une
+route dynamique (`:id`) fait échouer le démarrage plutôt que de disparaître en silence : la
+correspondance du plugin compare des littéraux. Et le bout en bout ne passe **pas** par ici :
+Playwright lance `pnpm start`, donc le build Nitro (`playwright.config.ts`) — c'est délibéré, et
+c'est aussi pourquoi le défaut a vécu.
 
 ## Où sont les choses
 
