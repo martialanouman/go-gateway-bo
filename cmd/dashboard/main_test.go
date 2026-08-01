@@ -114,8 +114,13 @@ func (p *process) start() error {
 		return fmt.Errorf("lancement du binaire: %w", err)
 	}
 
+	// Le canal est refermé après l'envoi : une step lit le code de sortie, et le hook de fin le
+	// relit sans se bloquer sur un canal déjà vidé.
 	p.exited = make(chan error, 1)
-	go func() { p.exited <- p.cmd.Wait() }()
+	go func() {
+		p.exited <- p.cmd.Wait()
+		close(p.exited)
+	}()
 
 	return nil
 }

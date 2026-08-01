@@ -3,24 +3,35 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
+
+	"github.com/martialanouman/go-gateway-bo/internal/config"
 )
 
 func main() {
-	if err := run(context.Background()); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	if err := run(context.Background(), logger); err != nil {
+		logger.Error("le serveur ne démarre pas", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(_ context.Context) error {
-	ln, err := net.Listen("tcp", os.Getenv("DASHBOARD_ADDR"))
+func run(_ context.Context, logger *slog.Logger) error {
+	cfg, err := config.Load(os.LookupEnv)
 	if err != nil {
 		return err
 	}
+
+	ln, err := net.Listen("tcp", cfg.Addr)
+	if err != nil {
+		return err
+	}
+
+	logger.Info("le serveur écoute", "addr", ln.Addr().String())
 
 	return http.Serve(ln, http.NotFoundHandler())
 }
