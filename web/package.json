@@ -9,17 +9,9 @@
   },
   "packageManager": "pnpm@11.13.0",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "coverage": "vitest run --coverage",
-    "mock": "prism mock node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml --port 4010 --errors",
-    "vuln": "pnpm audit --audit-level=low",
-    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm vuln && pnpm build"
+    "vuln": "pnpm audit --audit-level=low"
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",

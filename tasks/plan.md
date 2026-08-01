@@ -34,9 +34,10 @@ flux amont agrégés en une socket descendante par opérateur, §4.2) et d'**év
 de fond** (offset persisté, §6.8). Deux choses qu'un modèle requête/réponse ne modélise pas, et que
 des goroutines à cycle de vie explicite modélisent directement.
 
-> **Ce plan n'est pas une table rase du code.** Le client React — coquille, écrans, primitives,
-> tokens de la charte — est **porté**, pas réécrit : la cible *est* React + TanStack Router + Query
-> + Base UI. Ce qui est réécrit, c'est le BFF. Voir §2.
+> **Table rase du code, décidée le 01/08/2026.** Une première tentative avait porté le client React
+> de la v1.0 ; le dépôt a finalement été remis à neuf, client compris, pour ne plus rien traîner. Tout
+> se réécrit contre la charte. Ce que cette tentative laisse de plus précieux n'est pas du code : ce
+> sont les six défauts d'outillage qu'elle a payés, désormais inscrits dans les steps — §2.
 
 ### 0.1 La boucle par step
 
@@ -299,28 +300,35 @@ pas la compilation. Une contrainte de validation resserrée (`additionalProperti
 
 ---
 
-## 2. Ce qui est porté, ce qui est réécrit
+## 2. Ce que la v1.0 laisse, et ce qu'elle ne laisse pas
 
-La bascule ne détruit pas le travail de la v1.0. Elle en garde la moitié qui ne dépendait pas de la
-pile serveur.
+**Le code de la v1.0 a été entièrement supprimé le 01/08/2026**, client React compris. Une première
+tentative avait porté les ~16 300 lignes de composants et d'écrans ; elles compilaient et passaient
+leurs 463 tests, mais le dépôt a été remis à neuf pour ne plus rien traîner. Tout se réécrit.
 
-| Existant | Volume | Sort |
-|---|---|---|
-| `src/components/` — primitives, coquille, cinq états | ~4 000 lignes | **Porté** vers `web/src/` |
-| `src/routes/*.tsx` — écrans livrés | ~2 300 lignes | **Porté**, rebranché sur le BFF Go |
-| `src/styles/` — tokens de la charte v1.0 | ~2 200 lignes | **Porté** tel quel |
-| `src/server/` — le BFF et ses tests | ~18 000 lignes | **Réécrit** en Go |
-| `src/lib/permissions.ts` | 351 lignes | **Devient généré** depuis `internal/permissions/` |
-| `__root.tsx`, `vite.config.ts`, entrée Start | ~150 lignes | **Remplacés** |
+Ce qui subsiste et qui vaut : la **spécification** amendée, ce plan, le découpage en steps, et la
+**charte graphique** (`.claude/skills/sms-gateway-design/`), qui est la source de vérité visuelle et
+n'a jamais dépendu d'une pile. Plus l'échafaudage de projet — accès au registre, protections de
+dépendances, `docker-compose.yml` — qui ne contient aucune ligne d'architecture.
 
-**« Porté » ne veut pas dire « acquis ».** Un écran porté n'est vert que quand il tourne contre son
-handler Go, avec ses tests de composant et le parcours de bout en bout qui le traverse. C'est pourquoi
-la progression repart à zéro : **rien n'est livré tant que ce n'est pas vert sur la nouvelle pile**,
-y compris ce qui n'a pas changé d'une ligne.
+### 2.1 Les six défauts qui ont coûté cher, et qui ne doivent pas revenir
 
-Le portage n'est jamais une step à lui seul, sauf pour les fondations d'interface (M0, M2) qui n'ont
-pas de moitié serveur. Partout ailleurs il est **la moitié client d'une tranche verticale** : le
-handler Go et l'écran qui le consomme arrivent dans la même step.
+La première tentative a livré trois steps et payé six blocages. **Aucun ne venait du code métier** :
+tous étaient de l'outillage, et tous étaient invisibles en local. Ils sont désormais des exigences
+explicites dans les steps concernées.
+
+| Défaut | Où il est inscrit |
+|---|---|
+| Un motif `.gitignore` **non ancré** exclut le répertoire ; git n'y redescend jamais, et toute négation en-dessous est inerte | step-002 |
+| `emptyOutDir: true` de Vite supprime tout sauf `.git` — donc le fichier qui conditionne `//go:embed` | step-002 |
+| `pnpm/action-setup` lit `packageManager` depuis la racine du dépôt : il lui faut `package_json_file` quand le client vit ailleurs | step-007 |
+| Un `include` Vitest ramasse les tests qui lisent la sortie de build, et la suite exige alors un build | step-007 |
+| `wait -n` n'existe pas dans le `/bin/sh` de macOS (bash 3.2) ; `kill 0` frappe le shell appelant | step-000 |
+| Une cible Make composite invoquée par un job de CI qui n'a pas l'autre toolchain | step-000, step-007 |
+
+**La leçon transverse, et elle vaut plus que la liste** : `make check` vert en local ne dit rien des
+workflows. Trois des six défauts n'étaient observables que dans un run de CI. **Pousser la branche tôt
+et laisser la CI arbitrer coûte une commande ; le découvrir en revue coûte une passe.**
 
 ---
 

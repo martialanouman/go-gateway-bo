@@ -20,6 +20,19 @@ intention.
   développement.
 - CI : deux jobs, Go et client, plus le job de bout en bout qui dépend du build.
 
+## Pièges connus, payés par la première tentative
+- **`pnpm/action-setup` lit `packageManager` depuis la racine du dépôt.** Le client vivant sous
+  `web/`, il faut `package_json_file: web/package.json` — sans quoi l'action avale l'ENOENT et lève
+  « No pnpm version is specified », et **toutes** les portes client échouent avant `pnpm install`.
+- **Un test qui lit la sortie de build ne doit pas être ramassé par la suite unitaire.** L'`include`
+  de Vitest le prend par défaut ; il faut l'exclure, sinon la suite exige un build et échoue sur un
+  clone neuf. Le vert local ne tient alors qu'à un `dist/` résiduel.
+- **Les seuils de couverture doivent être `perFile`** et l'`include` explicite : sans lui, le
+  fournisseur v8 ne rapporte que les fichiers qu'un test a chargés, et un module que personne
+  n'importe est **absent** du rapport au lieu d'y figurer à zéro.
+- **Pousser la branche dès la première step.** Trois des six défauts de la première tentative
+  n'étaient observables que dans un run de CI ; les découvrir en revue coûte une passe chacun.
+
 ## Points d'implémentation clés
 - **Playwright tourne contre le binaire, et c'est la seule façon de vérifier ce qui sera servi.**
   L'ordonnancement `/api` / fallback (step-002), les en-têtes de cache et l'embarquement des assets

@@ -1,6 +1,6 @@
 # step-000 — Socle Go : module, binaire, configuration, arrêt propre
 
-> **Jalon :** M0 (§1.3, §1.8, §4.1) · **Statut :** LIVRÉE
+> **Jalon :** M0 (§1.3, §1.8, §4.1) · **Statut :** À FAIRE
 > **Dépend de :** — · **Bloque :** tout
 
 ## But
@@ -47,9 +47,20 @@ proprement. C'est le squelette dans lequel tout le reste se branche — il ne se
   le `SIGTERM` est refusée. Sans ce test, le déploiement roulant de step-186 n'a aucun filet.
 
 ## Definition of Done
-- [x] `make check` vert (build · vet · lint · test)
-- [x] `.env.example` liste **toutes** les variables lues, et rien de plus — vérifié par un test
-- [x] la mutation « retirer la validation d'une variable obligatoire » fait rougir la suite
+- [ ] `make check` vert (build · vet · lint · test)
+- [ ] `.env.example` liste **toutes** les variables lues, et rien de plus — vérifié par un test
+- [ ] la mutation « retirer la validation d'une variable obligatoire » fait rougir la suite
+
+## Pièges connus, payés par la première tentative
+- **`wait -n` n'existe pas dans le `/bin/sh` de macOS** (bash 3.2) : une cible `dev` qui l'utilise
+  meurt à la seconde. Et `kill 0` frappe tout le groupe de processus, donc le shell appelant hors
+  terminal interactif. Surveiller des PID explicites — et lancer le **binaire**, pas `go run`, qui ne
+  relaie aucun signal à son enfant et laisse un orphelin tenant le port.
+- **Aucune cible Make invoquée par un job de CI Go ne doit dépendre de `pnpm`.** Ces jobs n'ont ni
+  Node ni `node_modules`. Séparer les cibles granulaires (`test-go`, `lint-go`…) des composites.
+- Prévoir `-race` dès la première cible de test : toute la valeur du BFF est concurrente.
+- Poser `actionlint` en porte dès le premier workflow : un workflow invalide n'est pas rouge, il est
+  **absent**, et la protection de branche n'a plus rien à exiger.
 
 ## Hors périmètre
 Le client SPA → step-001. `embed.FS` → step-002. La base → step-005. Toute route métier.

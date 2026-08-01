@@ -1,6 +1,6 @@
 # step-002 — Binaire unique : `embed.FS` et fallback SPA ordonné après `/api`
 
-> **Jalon :** M0 (§1.3, §4.1) · **Statut :** LIVRÉE
+> **Jalon :** M0 (§1.3, §4.1) · **Statut :** À FAIRE
 > **Dépend de :** step-000, step-001 · **Bloque :** step-007, step-186
 
 ## But
@@ -17,6 +17,20 @@ l'ordre entre le fallback et l'API.
 - **Ordonnancement explicite** : `/api/*` et `/ws` sont résolus **avant** le fallback. Une route
   `/api` inconnue rend **404**, jamais du HTML.
 - `make build` enchaîne build client puis `go build`.
+
+## Pièges connus, payés par la première tentative
+- **Un motif `.gitignore` non ancré exclut le répertoire**, et git n'y redescend jamais : toute
+  négation en-dessous est inerte. Un `.gitkeep` réputé commité ne l'était pas, et la branche ne
+  compilait pas hors du poste de son auteur. Il faut dés-exclure le répertoire **avant** ses fichiers.
+- **`emptyOutDir: true` de Vite supprime tout sauf `.git`** — donc le fichier qui conditionne
+  `//go:embed`. Le nettoyage doit passer par `make`, qui sait l'épargner.
+- **Le handler d'assets prend un `fs.FS` en paramètre**, jamais l'`embed.FS` en dur : sinon les tests
+  Go dépendent d'un build client et `go test ./...` échoue sur un clone neuf.
+- **Vérifier sur un vrai `git clone`**, pas sur le poste : c'est le seul endroit où l'absence d'un
+  fichier ignoré se voit.
+- **chi propage le `NotFound` du parent aux sous-routeurs qui n'en ont pas.** L'ordre des lignes ne
+  protège donc rien : c'est la déclaration explicite d'un `NotFound` sur `/api` qui porte l'invariant.
+  `/ws` doit être monté avant le repli lui aussi, même s'il rend un 501 jusqu'à step-043.
 
 ## Points d'implémentation clés
 - **C'est l'ordre qui compte, et il se teste sur le binaire.** Si le fallback attrape `/api/inconnu`,
@@ -38,9 +52,9 @@ l'ordre entre le fallback et l'API.
 - Le binaire démarre et sert l'application dans un conteneur **sans Node**.
 
 ## Definition of Done
-- [x] `make build` produit un binaire qui sert l'application seul
-- [x] `make check` vert
-- [x] la mutation « monter le fallback avant les routes `/api` » fait rougir le scénario — c'est **le**
+- [ ] `make build` produit un binaire qui sert l'application seul
+- [ ] `make check` vert
+- [ ] la mutation « monter le fallback avant les routes `/api` » fait rougir le scénario — c'est **le**
       test de cette step, et il doit reproduire le défaut réel : 200 + HTML, pas une absence de route
 
 ## Hors périmètre

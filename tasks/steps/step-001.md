@@ -1,6 +1,6 @@
 # step-001 — SPA Vite + TanStack Router : portage du client et squelette de chargement
 
-> **Jalon :** M0 (§4.2, §1.9) · **Statut :** LIVRÉE
+> **Jalon :** M0 (§4.2, §1.9) · **Statut :** À FAIRE
 > **Dépend de :** step-000 · **Bloque :** step-002, step-006, step-007, step-008
 
 ## But
@@ -9,11 +9,10 @@ de routage de TanStack, un `index.html`, une entrée client. Et surtout : **un c
 peint le squelette de la coquille**, jamais un blanc.
 
 ## Périmètre (ce que fait CETTE PR)
-- `git mv src web/src` — les ~8 500 lignes de composants, écrans, `lib` et tokens suivent, avec leur
-  historique. `tsconfig.json`, l'alias `~`, Biome et Vitest sont reciblés sur `web/`.
-- **Remplacement de l'enveloppe du framework** : `__root.tsx` cède la place à `web/index.html` + une
-  entrée client qui monte `RouterProvider` ; `@tanstack/router-plugin/vite` remplace le plugin de
-  Start et régénère l'arbre de routes.
+- L'arborescence `web/src/` créée à neuf : `routes/`, `components/`, `lib/`, `styles/`. Une seule
+  route pour commencer — les écrans arrivent avec leurs steps.
+- `web/index.html`, une entrée client qui monte `RouterProvider`, une route racine, et
+  `@tanstack/router-plugin/vite` qui engendre l'arbre de routes.
 - **Squelette de chargement dans `index.html`** : la silhouette de l'AppShell — rail, barre
   supérieure, zone de contenu — peinte en CSS pur, remplacée par React au montage.
 - `vite dev` avec `server.proxy` : `/api` et `/ws` vers le BFF Go de step-000.
@@ -21,10 +20,12 @@ peint le squelette de la coquille**, jamais un blanc.
 - CI : job client (typecheck, lint, test, build).
 
 ## Points d'implémentation clés
-- **Les écrans suivent le déménagement mais ne sont pas acquis pour autant.** Ils compilent — ce sont
-  du React + TanStack Router + Query ordinaires — mais aucun n'a de handler Go en face. Ils rendent
-  donc leur état d'erreur, ce qui est le comportement voulu par la convention §1.9, pas un défaut.
-  Chacun sera *vérifié* dans sa propre step (008, 040 à 042, 027 à 029).
+- **TypeScript 7 n'inclut pas `node_modules/@types/*` automatiquement** comme TS 5 le faisait :
+  vérifié, `tsc --listFilesOnly` n'en remonte aucun fichier. Déclarer `"types": ["node",
+  "vite/client"]` explicitement, sinon les imports CSS et les API Node échouent sans raison lisible.
+- **`strictPort: true`** : sans lui Vite glisse silencieusement sur le port suivant quand le sien est
+  pris — et le port suivant est celui du BFF. Le symptôme observé était un proxy qui se parlait à
+  lui-même. §1.8 proscrit le repli silencieux ; la règle vaut aussi pour le serveur de dev.
 - **Le squelette n'est pas un `spinner`.** §1.9 exige « le squelette de la vraie mise en page ». Un
   rond qui tourne est un blanc décoré : il ne dit pas ce qui arrive et fait sursauter la mise en page
   quand le contenu apparaît.
@@ -41,10 +42,10 @@ peint le squelette de la coquille**, jamais un blanc.
 - L'arbre de routes régénéré est identique au fichier commité.
 
 ## Definition of Done
-- [x] `make check` vert des deux côtés
-- [x] `make dev` sert l'application et proxifie `/api` vers le BFF
-- [x] aucune dépendance à l'ancien socle serveur ne subsiste dans `web/package.json`
-- [x] la mutation « vider le squelette de `index.html` » fait rougir le test de chargement à froid
+- [ ] `make check` vert des deux côtés
+- [ ] `make dev` sert l'application et proxifie `/api` vers le BFF
+- [ ] aucune dépendance à l'ancien socle serveur ne subsiste dans `web/package.json`
+- [ ] la mutation « vider le squelette de `index.html` » fait rougir le test de chargement à froid
 
 ## Hors périmètre
 `embed.FS` et le service des assets par le Go → step-002. La charte et `/_design` → step-008. Le

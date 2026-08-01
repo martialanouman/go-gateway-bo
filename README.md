@@ -4,25 +4,20 @@ Cockpit d'exploitation interne de la passerelle SMS : clients, comptes SMPP, con
 conformité, facturation. **Un binaire Go** qui embarque une **SPA React** et joue le rôle de **BFF**
 vers l'API Admin de la passerelle.
 
-> ## ⚠️ Migration en cours
+> ## ⚠️ Dépôt remis à neuf
 >
 > Le dépôt bascule d'un socle TanStack Start vers un **BFF Go + SPA React**, décidé le 01/08/2026 et
-> amendé dans la spécification (§1.3, §4, §7). **Ce README décrit la cible.**
+> amendé dans la spécification (§1.3, §4, §7). **Tout le code a été supprimé** — le BFF TypeScript,
+> le client React de la v1.0, et les trois premières steps Go d'une première tentative.
 >
-> **L'ancienne pile a été supprimée** le 01/08/2026 — 27 000 lignes : le BFF TypeScript, l'enveloppe
-> TanStack Start, Drizzle, les configurations Vite/Vitest/Playwright et la suite de bout en bout.
+> **Ce qui reste** : la spécification, le plan (`tasks/plan.md`), le découpage en 75 steps
+> (`tasks/todo.md`), les fichiers de step de M0, la charte graphique, et l'échafaudage de projet
+> (accès au registre, protections de dépendances, `docker-compose.yml`). Aucune ligne d'application.
 >
-> **`make check` est vert sur les deux moitiés** — socle Go, configuration validée au démarrage,
-> sonde de vivacité, arrêt propre et CI (**step-000**) ; client React sous `web/`, SPA Vite,
-> squelette de chargement à froid et proxy `/api` (**step-001**). La suite client compte 469 tests en 42 fichiers — 463 unitaires (dont 1 `todo`) et 6 sur l’artefact construit.
->
-> **Le binaire sert le client** depuis step-002 : `go build` produit un exécutable autonome qui
-> embarque la SPA, avec `/api` et `/ws` résolus avant le repli.
->
-> **Ce qui n'existe pas encore** : les six steps restantes de M0. Pas de contrat généré, pas de base,
-> pas de catalogue de permissions, pas de charte vérifiée, et pas de hub WebSocket — `/ws` rend un
-> 501 explicite jusqu'à step-043. `make migrate`, `make bootstrap` et `make generate` sont décrits
-> ci-dessous comme **cible** et arrivent avec leurs steps.
+> **Ce README décrit la cible.** Les commandes ci-dessous arrivent avec leurs steps ; aucune n'existe
+> aujourd'hui. La première tentative a payé six défauts d'outillage, tous invisibles en local : ils
+> sont inscrits dans les steps qui les rencontrent (`tasks/plan.md` §2.1), et la leçon transverse est
+> qu'un vert local ne dit rien des workflows — **pousser tôt vaut mieux que relire**.
 
 ## Démarrer
 

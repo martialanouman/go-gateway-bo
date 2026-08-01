@@ -103,15 +103,15 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 ---
 
 ## M0 — Fondations & double toolchain
-- [x] step-000 — Socle Go : module, `cmd/dashboard`, chi, configuration validée au démarrage, arrêt propre
-- [x] step-001 — SPA Vite + TanStack Router : portage de `web/`, squelette de coquille au chargement à froid
-- [x] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
+- [ ] step-000 — Socle Go : module, `cmd/dashboard`, chi, configuration validée au démarrage, arrêt propre
+- [ ] step-001 — SPA Vite + TanStack Router : squelette d'application, coquille peinte au chargement à froid
+- [ ] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
 - [ ] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
 - [ ] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS
 - [ ] step-005 — PostgreSQL : `pgx`, migrations, les six tables du §3.1, `audit_log` partitionné
 - [ ] step-006 — Catalogue de permissions : source Go, génération TS, test de divergence bloquant
 - [ ] step-007 — Harnais BDD : `godog`, `testify`, testcontainers, Vitest, Playwright, CI à deux toolchains
-- [ ] step-008 — Charte portée : tokens, `/_design`, contraste AA vérifié
+- [ ] step-008 — Charte : tokens depuis le kit UI, `/_design`, contraste AA vérifié
 
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [ ] step-020 — Schéma auth (operators, roles, permissions, jointures) + seed des 44 clés et des 9 rôles
@@ -121,7 +121,7 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - [ ] step-024 — MFA WebAuthn / passkey
 - [ ] step-025 — `RequirePermission` + journal d'audit + MFA obligatoire  *(invariant c)*
 - [ ] step-026 — DTO de sortie déclarés partout + test bloquant  *(invariant a, moitié structurelle)*
-- [ ] step-027 — Écrans Login & MFA portés, branchés sur le BFF Go †
+- [ ] step-027 — Écrans Login & MFA, branchés sur le BFF Go †
 - [ ] step-028 — Écran d'enrôlement du second facteur †
 - [ ] step-029 — Gestion des opérateurs et des rôles †
 
@@ -155,7 +155,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 
 - [ ] step-041 — Primitives lot 1 portées : bouton, champ, select, pilule de statut, tabs, table
 - [ ] step-042 — Primitives lot 2 portées : dialog, menu, tooltip, toast + les cinq états de contenu
-- [ ] step-040 — AppShell porté : rail, barre supérieure, arborescence de routes en états vides
+- [ ] step-040 — AppShell : rail, barre supérieure, arborescence de routes en états vides
 - [ ] step-043 — Hub WebSocket Go : trois flux passerelle agrégés en une socket client
 - [ ] step-044 — HA : bail Redis + Pub/Sub entre instances, bascule automatique
 - [ ] step-045 — Client WS React : abonnement par sujet, reconnexion, `isLive` / `isStale`
@@ -230,16 +230,15 @@ partir sans propriétaire de rétention. Elle est en revanche **indépendante de
 
 ---
 
-## Ce qui est porté plutôt qu'écrit
+## Tout se réécrit
 
-Neuf steps consistent principalement à **porter** du code React de la v1.0, compatible tel quel avec
-la pile cible : `001`, `008`, `027`, `028`, `029`, `040`, `041`, `042`, plus les moitiés client des
-steps de M3 à M8.
+Le code de la v1.0 a été entièrement supprimé le 01/08/2026, client React compris. Aucune step ne
+« porte » quoi que ce soit : la charte (`.claude/skills/sms-gateway-design/`) est la référence
+visuelle, et les écrans se réécrivent contre elle.
 
-**Porté ne veut pas dire acquis.** Un écran porté n'est vert que quand il tourne contre son handler
-Go, avec ses tests de composant et le parcours qui le traverse. C'est pourquoi **toutes les cases de
-cette liste sont vides** : rien n'est livré tant que ce n'est pas vert sur la nouvelle pile, y compris
-ce qui n'a pas changé d'une ligne. Voir `plan.md` §2.
+**Six défauts d'outillage ont coûté trois steps à la première tentative, et sont désormais inscrits
+dans les steps qui les rencontrent** — voir `plan.md` §2.1. Le plus coûteux d'entre eux n'était
+observable que dans un run de CI : pousser tôt vaut mieux que relire.
 
 ---
 
