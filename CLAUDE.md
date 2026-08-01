@@ -22,7 +22,8 @@ le Go embarque les assets de la SPA.
 
 ```bash
 make dev          # BFF Go (:3001) + Vite (:3000), /api et /ws proxifiés vers le BFF
-make build        # go build → bin/dashboard (le client s'y embarque en step-002) · build-web → web/dist
+make build        # le déployable : build-web → copie dans internal/webassets/dist/ → go build
+make build-go     # go build seul — ce que lance le job « Build Go », qui n'a ni Node ni pnpm
 make check        # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make test         # les deux suites · make lint — les deux linters
 make generate     # oapi-codegen + catalogue de permissions Go → TS      (cible)
@@ -37,8 +38,10 @@ make mock         # mock Prism sur openapi-admin.yaml                    (cible)
 `make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
 égaler. Un vert local ne garantit pas une PR verte, pour deux raisons distinctes :
 
-- **jamais rejoué en local** : `pr-title.yml`, et les deux règles du ruleset de `main` — **CodeQL** et
-  **code_quality** — qui bloquent une PR sans passer par le check `CI` ;
+- **jamais rejoué en local** : `pr-title.yml`, les deux règles du ruleset de `main` — **CodeQL** et
+  **code_quality** — qui bloquent une PR sans passer par le check `CI`, et le contrôle du job « Build
+  client et déployable » qui lance le binaire et compare ce qu'il sert à la sortie de Vite (il lie un
+  port, que `make dev` occupe déjà sur un poste) ;
 - **rejoué, verdict pas garanti** : `govulncheck` et `pnpm audit` interrogent des bases vivantes et
   changent d'avis sans qu'un fichier bouge ; `go test -race` tourne ici sur darwin/arm64 et là-bas sur
   linux/amd64 ; le `pnpm install --frozen-lockfile` de la CI échoue là où un `node_modules`

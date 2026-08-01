@@ -36,8 +36,8 @@ jobs:
           # go.mod est la source unique de la version de Go ; ne jamais la répéter ici.
           go-version-file: go.mod
       # `build-go` et non `build` : ce job n'a ni Node ni `node_modules`, et `build` construirait
-      # d'abord le client. Ce qu'on vérifie ici est que le Go compile ; le job « Build client »
-      # couvre l'autre moitié de la chaîne.
+      # d'abord le client. Ce qu'on vérifie ici est que le Go compile ; c'est le job « Build client et
+      # déployable » qui exerce la chaîne complète, assets embarqués compris.
       - run: make build-go
 
   test:
@@ -154,8 +154,20 @@ jobs:
       - uses: ./.github/actions/setup
       - run: make vuln-web
 
+  # Le seul job qui ait les **deux** toolchains, et donc le seul qui puisse exercer `make build` — la
+  # chaîne complète : `build-web` → purge de `internal/webassets/dist/` → copie → `build-go`. Jusqu'ici
+  # aucun runner ne la traversait : aucun des cinq jobs Go n'a Node — « Build Go » appelle `build-go`,
+  # les quatre autres ne compilent rien de destiné à être livré — et ce job-ci s'arrêtait à
+  # `check-routes`. Une copie qui perdrait son `/.` déposerait les assets dans
+  # `internal/webassets/dist/dist/` ; `all:dist` reste satisfait donc « Build Go » compile, le harnais
+  # godog écrase le répertoire avec ses fixtures avant de compiler donc « Tests Go » reste vert — dix
+  # jobs verts et un binaire qui rend 404 sur `/`.
+  #
+  # Une **étape ajoutée ici** plutôt qu'un job dédié : celui-ci a déjà Node, pnpm et l'authentification
+  # au registre, donc `setup-go` suffit à en faire le job du déployable. Un job séparé repaierait
+  # `pnpm install` pour allonger le mur, sans rien prouver de plus.
   build-web:
-    name: Build client
+    name: Build client et déployable
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -166,9 +178,44 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # go.mod est la source unique de la version de Go ; ne jamais la répéter ici.
+          go-version-file: go.mod
       # `check-routes` construit le client puis vérifie que l'arbre de routes commité n'a pas bougé :
       # un arbre périmé ne se voit pas en local, où le plugin le régénère à chaque lancement.
       - run: make check-routes
+      - run: make build
+      # `make build` vert ne dit encore que « la recette n'a pas échoué ». Ce qu'on veut savoir est que
+      # le binaire sert la sortie que Vite vient d'émettre, et la seule façon de le savoir est de le
+      # lancer. La comparaison est un `diff` avec `web/dist/index.html` plutôt qu'une recherche du nom
+      # haché : rien à deviner sur la façon dont Vite nomme son entrée, et un octet de différence
+      # suffit. Le second appel va chercher un asset référencé par cette page — `index.html` copié sans
+      # `assets/` passerait le premier.
+      #
+      # Ce contrôle vit ici et pas dans `make check` : il lie un port, et `make dev` occupe déjà
+      # celui-là sur le poste d'un développeur. La contrepartie est qu'il ne se rejoue pas en local.
+      - name: Le binaire sert la sortie de Vite
+        run: |
+          DASHBOARD_ADDR=127.0.0.1:3001 ./bin/dashboard &
+          bff=$!
+          # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de
+          # sortie d'un script qui avait réussi. Un binaire mort entre le dernier appel et la fin du
+          # script rendrait le job rouge sur un « No such process » que rien n'explique — le profil
+          # exact du job qu'on finit par désactiver. Même forme que la recette `dev` du Makefile.
+          trap 'kill "$bff" 2>/dev/null || true' EXIT
+          # `--max-time` autant que `--retry` : le retry couvre « rien n'écoute », pas « le port est
+          # lié et rien ne répond ». Sans lui, un binaire bloqué après `net.Listen` ferait pendre le
+          # job jusqu'au `timeout-minutes`, sans un mot sur la cause.
+          curl --fail --silent --retry 10 --retry-delay 1 --retry-connrefused --max-time 10 \
+            --output "$RUNNER_TEMP/servi.html" http://127.0.0.1:3001/
+          diff "$RUNNER_TEMP/servi.html" web/dist/index.html
+          asset=$(grep -o '/assets/[A-Za-z0-9._-]*\.js' web/dist/index.html | head -n 1)
+          # Sans ce refus, une page dont le motif ne matche plus laisserait `curl` interroger la racine,
+          # qui répond 200 : la porte resterait verte en n'ayant rien vérifié.
+          test -n "$asset" || { echo "::error::aucun asset JS référencé par index.html"; exit 1; }
+          curl --fail --silent --show-error --max-time 10 \
+            --output /dev/null "http://127.0.0.1:3001$asset"
 
   ci:
     name: CI

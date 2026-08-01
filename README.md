@@ -15,7 +15,9 @@ vers l'API Admin de la passerelle.
 > (accès au registre, protections de dépendances, `docker-compose.yml`). Aucune ligne d'application.
 >
 > **Ce README décrit la cible.** Les commandes qui n'existent pas encore y sont signalées `(cible)` ;
-> le reste du document décrit l'état visé, pas l'état livré. Depuis step-001, les deux moitiés
+> le reste du document décrit l'état visé, pas l'état livré. Depuis step-002, `make build` produit le
+> **déployable** : le client est copié dans `internal/webassets/dist/` puis embarqué, et le binaire
+> sert la SPA seul, sans Node. Depuis step-001, les deux moitiés
 > tournent : `make dev` lance le BFF et Vite, et la CI a ses portes client. Depuis step-000, le
 > socle Go existe : `make dev/build/check` et les portes granulaires tournent.
 > La première tentative a payé six défauts d'outillage, tous invisibles en local : ils
@@ -74,11 +76,12 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 
 ```bash
 make dev        # BFF Go (:3001) + Vite (:3000), /api et /ws proxifiés vers le BFF
-make build      # go build → bin/dashboard ; les assets s'y embarquent en step-002
+make build      # le déployable : client → internal/webassets/dist/ → go build → bin/dashboard
+make build-go   # go build seul, sans reconstruire le client — la cible du job « Build Go », sans Node
 make build-web  # vite build → web/dist
 make check      # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make help       # liste les cibles qui existent — c'est la cible par défaut
-make clean      # supprime bin/ et web/dist
+make clean      # supprime bin/, web/dist et les assets copiés dans internal/webassets/dist/
 make generate   # contrat (Go + TS) et catalogue de permissions (Go → TS)   (cible)
 make mock       # Prism sur openapi-admin.yaml                        (cible, step-003)
 make migrate    # migrations de la base                               (cible, step-005)
@@ -104,9 +107,11 @@ non reproductible.
 égaler. Deux raisons distinctes font qu'un vert local ne garantit pas une PR verte.
 
 **Ce que `make check` ne rejoue pas du tout** : `pr-title.yml`, les deux règles du ruleset de `main` —
-**CodeQL** et **code_quality** — qui bloquent une PR sans passer par le check `CI`, et le
+**CodeQL** et **code_quality** — qui bloquent une PR sans passer par le check `CI`, le
 `pnpm install --frozen-lockfile` de la CI, qu'un `node_modules` désynchronisé du lockfile masque en
-local.
+local, et le contrôle qui lance le binaire produit par `make build` pour comparer ce qu'il sert à la
+sortie de Vite — il lie un port, que `make dev` occupe déjà sur un poste, donc il reste au job « Build
+client et déployable ».
 
 **Ce qu'il rejoue sans que le verdict soit le même** : `govulncheck` et `pnpm audit`, qui interrogent
 des bases vivantes et peuvent changer d'avis sans qu'un fichier bouge ; et `go test -race`, qui tourne
@@ -243,7 +248,8 @@ Une **step = une PR**. Prendre le prochain fichier de `tasks/steps/` — **l'ord
 [`tasks/todo.md`](./tasks/todo.md) fait foi**, pas le numéro —, l'implémenter en **BDD strict,
 scénario rouge d'abord**, puis déplacer le fichier dans `tasks/steps/done/` en dernier commit.
 
-Les portes de qualité tournent en **jobs parallèles** — cinq portes Go, cinq portes client. Une porte
+Les portes de qualité tournent en **jobs parallèles** — cinq portes Go, cinq portes client, dont la
+dernière est aussi la seule à avoir les deux toolchains et à construire le **déployable**. Une porte
 qui échoue n'empêche pas les autres de rendre leur verdict : on voit une erreur de compilation Go *et*
 un test client rouge au même run. La protection de branche
 exige le seul check **`CI`**, qui les agrège et reste valable quand une porte s'ajoute — mais en
