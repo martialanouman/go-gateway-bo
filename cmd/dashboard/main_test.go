@@ -81,7 +81,9 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 }
 
 // Toute attente du harnais est bornée. Sans limite, un serveur qui ne répond pas devient un test qui
-// ne finit pas, et le hook de fin — celui qui tue l'enfant — n'est alors jamais atteint.
+// ne finit pas, et le hook de fin — celui qui tue l'enfant — n'est alors jamais atteint. Le hook a
+// lui aussi sa borne : au-delà, il rend la main sans avoir constaté la mort de l'enfant, ce qui vaut
+// mieux qu'un scénario suspendu, mais reste un abandon.
 var probe = &http.Client{Timeout: 2 * time.Second}
 
 // completeConfiguration est le plus petit environnement avec lequel le binaire démarre. Le port 0

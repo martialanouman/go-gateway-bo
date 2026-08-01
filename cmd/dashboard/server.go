@@ -38,8 +38,8 @@ func serve(
 	}
 
 	// Une postcondition unique quel que soit le chemin : quand serve rend la main, plus rien n'est
-	// servi. Sans lui, un délai de grâce expiré laisserait des connexions actives derrière — un
-	// no-op après un arrêt réussi, l'essentiel après un arrêt forcé.
+	// servi. No-op après un arrêt réussi ; après un délai de grâce expiré, c'est ce qui coupe les
+	// connexions que l'attente n'a pas suffi à libérer.
 	defer func() { _ = srv.Close() }()
 
 	closed := make(chan error, 1)

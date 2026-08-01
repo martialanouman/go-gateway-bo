@@ -109,11 +109,14 @@ func TestServeReportsAnExpiredGracePeriod(t *testing.T) {
 	served := make(chan error, 1)
 	go func() { served <- serve(ctx, ln, handler, 50*time.Millisecond, silentLogger()) }()
 
+	client := make(chan error, 1)
 	go func() {
 		resp, err := http.Get(url)
 		if err == nil {
 			resp.Body.Close()
 		}
+
+		client <- err
 	}()
 
 	<-entered
@@ -126,5 +129,15 @@ func TestServeReportsAnExpiredGracePeriod(t *testing.T) {
 		require.Error(t, err)
 	case <-time.After(3 * time.Second):
 		t.Fatal("serve n'a pas rendu la main après l'expiration du délai de grâce")
+	}
+
+	// Et l'arrêt forcé va jusqu'au bout : la connexion que le délai n'a pas suffi à libérer est
+	// coupée. Sans ça, `serve` rendrait la main en laissant derrière elle des connexions vivantes,
+	// donc deux postconditions selon le chemin emprunté.
+	select {
+	case err := <-client:
+		require.Error(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("la connexion en vol tient toujours après l'expiration du délai de grâce")
 	}
 }
