@@ -75,25 +75,51 @@ describe('chargement à froid', () => {
   })
 
   it('rend cette silhouette visible', () => {
-    // `display: none` laissait tout le reste vert : le document portait alors un squelette que
-    // personne ne voyait, c'est-à-dire un blanc.
-    const style = window.getComputedStyle(painted.querySelector('.skeleton') as Element)
+    // `toBeVisible` remonte la chaîne des ancêtres : n'inspecter que `.skeleton` laissait passer un
+    // `#app { display: none }`, qui produit exactement le blanc que §1.9 interdit.
+    expect(painted.querySelector('.skeleton')).toBeVisible()
 
+    const style = window.getComputedStyle(painted.querySelector('.skeleton') as Element)
     expect(style.display).toBe('grid')
-    expect(style.visibility).not.toBe('hidden')
-    expect(style.opacity).not.toBe('0')
     expect(style.minHeight).not.toMatch(/^0/)
   })
 
   it('lui donne un rail et une barre de dimensions non nulles', () => {
-    // jsdom ne résout pas les `var()` : la géométrie se lit sur les custom properties elles-mêmes,
-    // qui sont la source partagée avec `app.css`. Les replier sur zéro laissait la suite verte tout
-    // en supprimant le rail et la barre — un squelette réduit à deux traits.
+    const style = window.getComputedStyle(painted.querySelector('.skeleton') as Element)
+
+    // jsdom ne résout pas les `var()`, il les rend littéralement — c'est ce qui permet d'asserter sur
+    // l'arbre plutôt que sur le texte source : une piste écrite en dur (`0 1fr`) ne référence plus la
+    // propriété partagée, et un renommage de celle-ci non plus.
+    expect(style.gridTemplateColumns).toContain('var(--shell-rail-width)')
+    expect(style.gridTemplateRows).toContain('var(--shell-topbar-height)')
+
+    // Et les valeurs, elles, se lisent à la déclaration : les replier sur zéro supprime le rail et la
+    // barre sans toucher à la grille.
     const declared = (name: string) =>
       new RegExp(`--${name}:\\s*([^;]+);`).exec(html)?.[1]?.trim() ?? ''
-
     expect(declared('shell-rail-width')).toMatch(/^[1-9]/)
     expect(declared('shell-topbar-height')).toMatch(/^[1-9]/)
+  })
+
+  it('donne à ses blocs une hauteur, faute de quoi la silhouette est un cadre vide', () => {
+    // Compter les blocs ne suffisait pas : à hauteur nulle, le squelette redevient le « blanc décoré »
+    // que la step refuse en propres termes.
+    const blocks = painted.querySelectorAll('#app .skeleton__block')
+
+    expect(blocks.length).toBeGreaterThan(0)
+    for (const block of blocks) {
+      expect(window.getComputedStyle(block).height, block.className).not.toMatch(/^0/)
+    }
+  })
+
+  it("masque son texte d'assistance sans le retirer du document", () => {
+    // La règle remplace un attribut `style=`, que la CSP à nonce de step-186 ferait tomber. Sans
+    // elle, « Chargement du tableau de bord » s'affiche en clair au milieu du squelette.
+    const style = window.getComputedStyle(painted.querySelector('.skeleton__sr-only') as Element)
+
+    expect(style.position).toBe('absolute')
+    expect(style.width).toBe('1px')
+    expect(style.overflow).toBe('hidden')
   })
 
   it("annonce le chargement aux technologies d'assistance", () => {
