@@ -15,28 +15,35 @@ le Go embarque les assets de la SPA.
 
 ## Commandes
 
-> `make dev/build/check/test/lint` existent depuis step-000 et step-001. `make generate`, `make migrate`
-> et `make bootstrap` sont des **cibles** et arrivent avec leurs steps.
+> Existent depuis step-000 : `make dev/build/check/test-go/lint-go/fmt-go/vuln-go/lint-workflows`,
+> plus `make clean` et `make help` — ce dernier est la cible par défaut, et liste ce qui existe.
+> Sont des **cibles**, et arrivent avec les steps qui les habitent : `make test` et `make lint` (les
+> composites des deux toolchains), `make test-web`, `make lint-web`, `make mock`, `make generate`,
+> `make migrate`, `make bootstrap`. Une cible absente rend `No rule to make target`, jamais un vert.
 
 ```bash
-make dev          # BFF Go + Vite en parallèle (proxy /api → BFF)
-make build        # build client puis go build → un binaire autonome
-make check        # tout ce que la CI vérifie — OBLIGATOIRE avant toute PR
-make mock         # mock Prism sur openapi-admin.yaml
-make generate     # oapi-codegen + catalogue de permissions Go → TS
+make dev          # le BFF Go seul, avec les variables de .env — Vite s'y ajoute en step-001
+make build        # go build → bin/dashboard — le client s'y embarque en step-002
+make check        # toutes les portes de la CI — OBLIGATOIRE avant toute PR
+make generate     # oapi-codegen + catalogue de permissions Go → TS      (cible)
+make mock         # mock Prism sur openapi-admin.yaml                    (cible)
 
 make test-go      # unitaires Go + scénarios godog, avec -race
-make test-web     # Vitest, seuils de couverture par fichier
-make lint-go      # golangci-lint · make lint-web — Biome
+make lint-go      # golangci-lint · make fmt-go applique le formatage
+make vuln-go      # govulncheck
 make lint-workflows  # actionlint : un workflow invalide est absent, pas rouge
+make test-web     # Vitest, seuils de couverture par fichier             (cible)
+make lint-web     # Biome                                               (cible)
 ```
 
-`make check` enchaîne toutes les portes de la CI — mais la CI les lance **en parallèle**, il n'y a
-donc pas d'ordre à égaler. Quatre écarts connus, qui font qu'un vert local ne garantit pas une CI
-verte : la CI rejoue `pnpm install --frozen-lockfile` (un `node_modules` désynchronisé du lockfile
-passe en local) ; `pr-title.yml` n'est pas rejouable hors CI ; `govulncheck` et `pnpm audit`
-interrogent des bases vivantes, donc le verdict peut changer sans qu'un fichier bouge ; et la CI
-tourne sur linux/amd64 contre darwin/arm64 en local, ce qui compte pour `go test -race`.
+`make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
+égaler. Deux raisons distinctes font qu'un vert local ne garantit pas une PR verte. **Ce que `make
+check` ne rejoue pas du tout** : `pr-title.yml`, et les deux règles du ruleset de `main` — **CodeQL**
+et **code_quality** — qui bloquent une PR sans passer par le check `CI`. **Ce qu'il rejoue sans que le
+verdict soit le même** : `govulncheck`, qui interroge une base vivante et peut changer d'avis sans
+qu'un fichier bouge, et `go test -race`, qui tourne ici sur darwin/arm64 et là-bas sur linux/amd64.
+Les portes du versant client — `pnpm install --frozen-lockfile` rejoué, `pnpm audit` — s'ajouteront
+quand la CI aura ses jobs client.
 
 ## Architecture (carte mentale)
 

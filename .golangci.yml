@@ -1,0 +1,56 @@
+# Configuration de golangci-lint. L'outil lui-même est épinglé dans `go.mod` (`tool`), donc un clone
+# frais lance exactement la même version que la CI, sans rien installer.
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    # Une réponse HTTP dont le corps n'est pas fermé fuit une connexion — et le BFF passe son temps à
+    # relayer l'API Admin.
+    - bodyclose
+    # Une comparaison d'erreur par `==` ou par message casse dès qu'un appelant enveloppe : tout le
+    # modèle d'erreur du §1.4 repose sur `errors.Is` / `errors.As`.
+    - errorlint
+    # `internal/config` affirme être le seul à lire l'environnement. Sans cette porte, c'était une
+    # phrase de documentation : une lecture ailleurs se découvre manquante à la première requête qui
+    # l'emprunte, c'est-à-dire en production.
+    - forbidigo
+    - gocritic
+    - gosec
+    # Une erreur avalée dans une branche de garde est le défaut que l'invariant (c) ne pardonne pas.
+    - nilerr
+    - revive
+    - testifylint
+    - usetesting
+
+  settings:
+    forbidigo:
+      forbid:
+        # Lecture **et** écriture : un test qui pose une variable dans le process se contamine
+        # lui-même, et une lecture ailleurs se découvre manquante en production.
+        #
+        # Les rares usages légitimes — propager PATH à un process enfant — se lèvent par un
+        # `//nolint:forbidigo` **sur la ligne**, avec sa raison. Jamais par une exemption de fichier,
+        # qui rouvrirait la porte à tout ce que ce fichier contiendra un jour.
+        - pattern: ^os\.(Getenv|LookupEnv|Environ|Setenv|Unsetenv|Clearenv)$
+          msg: l'environnement se lit dans internal/config, une seule fois, au démarrage (§1.8)
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+
+  exclusions:
+    generated: lax
+    rules:
+      # L'échafaudage d'un test n'est exposé à personne : y exiger la rigueur du code de production
+      # ajouterait du bruit sans rien garder. Ce que ces deux linters signalent ici — retours ignorés,
+      # sous-process et URL calculées — appartient au harnais, pas au produit.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
