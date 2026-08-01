@@ -268,7 +268,15 @@ export function OperateursScreen() {
         onConfirm={() => confirming && void applyMfaReset(confirming.operator)}
       />
 
-      {busy ? <span className="ui-directory__busy">Action en cours…</span> : null}
+      {/*
+        `role="status"` : la modale de confirmation se ferme dès le clic, et sans cette annonce un
+        opérateur au lecteur d'écran n'a plus rien à quoi se raccrocher entre le clic et le toast.
+      */}
+      {busy ? (
+        <span className="ui-directory__busy" role="status">
+          Action en cours…
+        </span>
+      ) : null}
     </Page>
   )
 }
@@ -498,6 +506,10 @@ function EditRolesForm({
     setBusy(false)
 
     if (!outcome.ok) {
+      // **Le refus sort de la modale**, contrairement à celui de la création — et l'asymétrie est
+      // voulue. Une création se corrige dans son formulaire : l'adresse était prise, on la change.
+      // Ici, le refus qui arrive en pratique est l'auto-verrouillage, que recocher une case ne
+      // corrige pas : ce qu'il faut est relire ce qu'on allait faire, sur la liste, en entier.
       onOpenChange(false)
       onRefused(outcome.message)
       return

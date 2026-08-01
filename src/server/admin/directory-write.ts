@@ -181,9 +181,14 @@ async function attachRoles(
   operatorId: string,
   roleIds: readonly string[],
 ): Promise<void> {
-  if (roleIds.length === 0) return
+  // **Dédoublonné ici, et pas seulement dans le parseur HTTP.** La clé primaire de `operator_roles`
+  // est le couple (opérateur, rôle) : un même identifiant deux fois avorte la transaction sur une
+  // violation de contrainte, avec un message de PostgreSQL là où l'écran attend un refus du
+  // produit. Le parseur le fait déjà pour les requêtes ; cette fonction ne peut pas en dépendre.
+  const unique = [...new Set(roleIds)]
+  if (unique.length === 0) return
 
-  await tx.insert(operatorRoles).values(roleIds.map((roleId) => ({ operatorId, roleId })))
+  await tx.insert(operatorRoles).values(unique.map((roleId) => ({ operatorId, roleId })))
 }
 
 export type NewOperator = {
