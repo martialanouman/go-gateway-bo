@@ -446,6 +446,54 @@ describe('les rôles', () => {
   })
 })
 
+describe('une cible qui a disparu pendant que l’écran était ouvert', () => {
+  const ABSENT = '00000000-0000-7000-8000-000000000000'
+
+  it('se dit, plutôt que de laisser une mise à jour ne toucher aucune ligne', async () => {
+    const actor = await insertOperator('admin@example.test', ['super_admin'])
+
+    // Sans ces contrôles, l'`UPDATE` réussirait en ne touchant rien : l'écran annoncerait un succès
+    // et le journal d'audit porterait une ligne pour une action qui n'a rien fait.
+    const status = await refusalOf(() =>
+      db.transaction((tx) =>
+        setOperatorStatus(tx, actor, { operatorId: ABSENT, status: 'disabled' }),
+      ),
+    )
+    const roles = await refusalOf(() =>
+      db.transaction((tx) => setOperatorRoles(tx, actor, { operatorId: ABSENT, roleIds: [] })),
+    )
+    const mfa = await refusalOf(() =>
+      db.transaction((tx) => resetOperatorMfa(tx, actor, { operatorId: ABSENT })),
+    )
+
+    expect([status?.code, roles?.code, mfa?.code]).toEqual([
+      'unknown_operator',
+      'unknown_operator',
+      'unknown_operator',
+    ])
+  })
+
+  it('vaut aussi pour un rôle supprimé par quelqu’un d’autre', async () => {
+    const actor = await insertOperator('admin@example.test', ['super_admin'])
+
+    const edition = await refusalOf(() =>
+      db.transaction((tx) =>
+        updateRole(tx, actor, {
+          roleId: ABSENT,
+          name: 'disparu',
+          description: 'Disparu',
+          permissions: [],
+        }),
+      ),
+    )
+    const suppression = await refusalOf(() =>
+      db.transaction((tx) => deleteRole(tx, actor, { roleId: ABSENT })),
+    )
+
+    expect([edition?.code, suppression?.code]).toEqual(['unknown_role', 'unknown_role'])
+  })
+})
+
 describe('deux administrateurs qui agissent en même temps', () => {
   it('ne peuvent pas retirer chacun un super_admin et n’en laisser aucun', async () => {
     const adminRole = await insertAdminRole('administration')
