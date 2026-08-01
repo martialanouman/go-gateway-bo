@@ -42,11 +42,11 @@
  * 1. Seules les **routes HTTP** sont énumérées. Les fonctions serveur TanStack (`createServerFn`,
  *    zéro occurrence à ce jour) et les commandes du hub WebSocket (step-043) obtiennent leur point
  *    d'entrée autrement. À couvrir quand la première apparaîtra.
- * 2. **Aujourd'hui, aucune route réelle n'est éprouvée par ce test.** Les sept routes de mutation du
- *    BFF sont les sept points d'entrée de l'authentification, donc les sept exemptions : les deux
- *    assertions centrales portent sur une liste vide. Le détecteur n'est exercé que par les fixtures
- *    de `src/test/fixtures/`. C'est un filet posé au-dessus d'un sol encore vide — il fonctionne, il
- *    ne travaille pas encore. La première route métier (step-061) le mettra en service.
+ * 2. **Le filet travaille depuis la step-027.** Il a été écrit au-dessus d'un sol vide — les sept
+ *    routes de mutation d'alors étaient les sept exemptions de l'authentification, et les deux
+ *    assertions centrales portaient sur une liste vide. Les six routes de l'annuaire sont les
+ *    premières qu'il éprouve réellement : retirer l'import de `mutate` d'un seul de leurs handlers
+ *    le fait rougir, ce qui a été vérifié plutôt que supposé.
  */
 
 import { readFileSync } from 'node:fs'

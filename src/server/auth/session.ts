@@ -26,7 +26,7 @@
  */
 
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
-import type { Database } from '../db/index'
+import type { Database, Querier } from '../db/index'
 import { operators } from '../db/schema/auth'
 import { operatorSessions } from '../db/schema/session'
 
@@ -254,8 +254,12 @@ export async function endSession(db: Database, session: SessionState): Promise<v
  * Le geste qui compte le jour où l'on désactive quelqu'un, où l'on soupçonne un vol de cookie, ou où
  * l'on retire un rôle sensible. Rend le nombre de sessions fermées, pour que l'appelant puisse
  * l'écrire au journal d'audit.
+ *
+ * Prend un `Querier` et non un `Database` : la désactivation d'un opérateur (step-027) l'appelle
+ * **dans** sa transaction. Un compte fermé dont les sessions survivraient à l'annulation de cette
+ * transaction — ou l'inverse — serait le pire des deux états.
  */
-export async function revokeAllSessionsOf(db: Database, operatorId: string): Promise<number> {
+export async function revokeAllSessionsOf(db: Querier, operatorId: string): Promise<number> {
   const closed = await db
     .update(operatorSessions)
     .set({ revokedAt: sql`now()` })

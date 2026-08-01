@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { nitroV2Plugin } from '@tanstack/nitro-v2-vite-plugin'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
@@ -41,6 +42,16 @@ export default defineConfig({
       // l'invariant (c) doit pouvoir la lire comme une **valeur**, pas en regexper le texte de ce
       // fichier. Voir l'en-tête de ce module pour ce que la lecture textuelle ratait.
       handlers: [...BFF_ROUTES],
+      // **Le bundle de Nitro ne connaît pas les chemins de `tsconfig.json`.** Il ne l'a pas montré
+      // jusqu'ici par chance : les seuls `~/lib/...` atteignables depuis un handler étaient des
+      // `import type`, effacés à la compilation. La première valeur importée ainsi — le catalogue de
+      // permissions, dans les parseurs de l'annuaire — a fait échouer le build sur un
+      // `/lib/permissions` cherché à la racine du dépôt.
+      //
+      // Déclaré ici plutôt que corrigé en imports relatifs : la règle « `~/` désigne `src/` » vaut
+      // dans tout le dépôt, et une moitié qui l'appliquerait sans l'autre se serait payée au
+      // prochain import de valeur, sur un build et non sur un test.
+      alias: { '~': fileURLToPath(new URL('./src', import.meta.url)) },
     }),
     // Le plugin React doit venir APRÈS celui de Start.
     viteReact(),

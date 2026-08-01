@@ -94,6 +94,27 @@ describe('câblage de la transaction', () => {
     expect(recordAuditSpy.mock.calls[0]?.[0]).toBe(TRANSACTION)
   })
 
+  it('passe au bloc l’opérateur que la garde a reconnu, pas celui que la requête annonce', async () => {
+    granted()
+    const db = databaseHandingOut(TRANSACTION)
+
+    let actor: unknown
+    await mutate(
+      // Une session qui prétend être quelqu'un d'autre : c'est la décision de `requirePermission`
+      // qui fait autorité, jamais le corps de la session reçue.
+      db,
+      { ...REQUEST, session: { ...REQUEST.session, operatorId: 'quelqu’un-d’autre' } },
+      async (_tx, received) => {
+        actor = received
+        return { result: 'peu importe' }
+      },
+    )
+
+    // La garde d'auto-verrouillage de l'annuaire (step-027) compare les permissions **de cet
+    // identifiant** avant et après : le prendre ailleurs la ferait porter sur le mauvais compte.
+    expect(actor).toEqual({ operatorId: OPERATOR_ID, sessionId: 'session' })
+  })
+
   it('n’ouvre aucune transaction quand la permission est refusée', async () => {
     requirePermissionSpy.mockResolvedValue({
       granted: false,

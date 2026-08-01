@@ -32,20 +32,32 @@ function omniscientClient(): QueryClient {
   return client
 }
 
+/**
+ * Les écrans **livrés**, qui ne doivent plus annoncer leur jalon.
+ *
+ * Cette liste grandit d'une step à l'autre, et c'est son intérêt : elle rend la livraison d'un écran
+ * visible dans un diff, et elle refuse les deux régressions symétriques — un écran livré qui
+ * retomberait sur son placeholder, et un écran non livré qui n'annoncerait plus rien.
+ */
+const LIVRES: ReadonlySet<string> = new Set(['/operateurs', '/roles'])
+
 describe('les écrans déclarés', () => {
   it.each(NAV_ENTRIES.map((entry) => [entry.to, entry.label]))(
-    '%s rend un titre et un état vide qui nomme son jalon',
+    '%s rend un titre, et dit s’il est construit ou non',
     async (to, label) => {
-      const { getByRole, getByText } = await renderRoute(to, {
+      const { getByRole, queryByText } = await renderRoute(to, {
         queryClient: omniscientClient(),
       })
 
       // Un titre, donc un repère de niveau 1 : c'est ce qui dit à un lecteur d'écran où il arrive.
       expect(getByRole('heading', { level: 1 })).toHaveTextContent(label)
 
-      // Et l'état vide, qui **nomme le jalon** : « pas encore construit » se dit, il ne se devine
-      // pas devant un écran nu.
-      expect(getByText(/Écran à venir — jalon M\d/)).toBeInTheDocument()
+      // L'état vide **nomme le jalon** tant que l'écran n'existe pas : « pas encore construit » se
+      // dit, il ne se devine pas devant un écran nu. Et il disparaît quand l'écran arrive.
+      const aVenir = queryByText(/Écran à venir — jalon M\d/)
+
+      if (LIVRES.has(to)) expect(aVenir).toBeNull()
+      else expect(aVenir).toBeInTheDocument()
     },
   )
 

@@ -1,6 +1,6 @@
 # step-027 — Gestion des opérateurs et des rôles (CRUD)
 
-> **Jalon :** M1 (§6.10, §5.1) · **Statut :** À FAIRE
+> **Jalon :** M1 (§6.10, §5.1) · **Statut :** FAIT
 > **Dépend de :** step-026 (donc `041`, `042`, `040`) · **Bloque :** —
 
 > Dernière step de M1, et elle se joue **après** les trois premières de M2 : ce sont deux écrans, et
@@ -33,8 +33,8 @@ toucher au code.
 - Désactiver un opérateur connecté met fin à sa session.
 
 ## Definition of Done
-- [ ] `pnpm check` vert (typecheck · lint · test · vuln · build)
-- [ ] garde-fous d'auto-verrouillage testés · actions auditées
+- [x] `pnpm check` vert (typecheck · lint · test · vuln · build)
+- [x] garde-fous d'auto-verrouillage testés · actions auditées
 
 ## Hors périmètre
 L'écran de consultation du journal d'audit → step-184.

@@ -75,6 +75,16 @@ export type Mutation<T> = {
   readonly after?: AuditPayload
 }
 
+/**
+ * Qui agit, tel que la garde vient de le décider.
+ *
+ * Passé au bloc plutôt que relu depuis `request.session` : la session porte bien le même
+ * identifiant, mais s'en servir demanderait à chaque appelant d'écarter d'abord les états qui n'en
+ * ont pas — donc, un jour, d'écrire `session.operatorId ?? ''`. Une chaîne vide passée à une garde
+ * d'auto-verrouillage (step-027) la désactiverait en silence.
+ */
+export type MutationActor = { readonly operatorId: string; readonly sessionId: string }
+
 export type MutationOutcome<T> =
   | { readonly granted: true; readonly result: T }
   | { readonly granted: false; readonly refusal: Refusal }
@@ -93,7 +103,7 @@ export type MutationOutcome<T> =
 export async function mutate<T>(
   db: Database,
   request: MutationRequest,
-  run: (tx: Transaction) => Promise<Mutation<T>>,
+  run: (tx: Transaction, actor: MutationActor) => Promise<Mutation<T>>,
 ): Promise<MutationOutcome<T>> {
   const decision = await requirePermission(db, request.session, request.permission)
   if (!decision.granted) return decision
@@ -105,7 +115,10 @@ export async function mutate<T>(
   checkAuditPayload('before', request.before)
 
   const result = await db.transaction(async (tx) => {
-    const mutation = await run(tx)
+    const mutation = await run(tx, {
+      operatorId: decision.operatorId,
+      sessionId: decision.sessionId,
+    })
 
     await recordAudit(tx, {
       operatorId: decision.operatorId,

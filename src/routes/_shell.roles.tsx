@@ -1,27 +1,15 @@
 /**
- * `/roles` — **route déclarée, écran non encore livré (M1)**.
+ * `/roles` — les paquets de permissions, et qui les porte.
  *
- * Elle existe dès maintenant pour que la navigation soit complète et qu'aucune entrée du rail ne
- * mène à un lien mort. L'état vide nomme le jalon : « rien ici » et « pas encore construit » sont
- * deux choses différentes, et un opérateur qui tombe sur une page blanche ne peut pas les
- * distinguer.
+ * **La route déclare, le composant fait.** L’écran vit dans `~/components/admin/roles-screen.tsx` :
+ * monté hors du routeur, il se teste avec ses modales, ce que `renderRoute` ne permet pas — son
+ * arbre monte un document à deux racines, où une surface flottante de Base UI fait boucler le
+ * processus. Ce fichier ne garde que ce qui donne son URL à l’écran.
  */
 
 import { createFileRoute } from '@tanstack/react-router'
-import { Page } from '~/components/shell'
-import { Empty } from '~/components/states'
+import { RolesScreen } from '~/components/admin/roles-screen'
 
 export const Route = createFileRoute('/_shell/roles')({
   component: RolesScreen,
 })
-
-function RolesScreen() {
-  return (
-    <Page title="Rôles">
-      <Empty
-        title="Écran à venir — jalon M1"
-        description="Les rôles et le paquet de permissions de chacun. Cette route est déclarée pour que la navigation soit complète ; son contenu arrive au jalon M1."
-      />
-    </Page>
-  )
-}

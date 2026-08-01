@@ -79,4 +79,48 @@ export const BFF_ROUTES = [
   // `post` et non `get` : une déconnexion est une mutation, et un `get` se déclenche depuis une
   // image ou un lien préchargé — un tiers déconnecterait un opérateur à son insu.
   { route: '/api/auth/logout', handler: './src/server/auth/http/logout.ts', method: 'post' },
+
+  // ─── L'annuaire (step-027) ────────────────────────────────────────────────────────────────────
+  // Les six premières routes de mutation **métier** du produit, donc les premières que le test
+  // d'énumération de l'invariant (c) éprouve réellement : jusqu'ici, les sept routes de mutation
+  // étaient les sept exemptions de l'authentification, et les assertions portaient sur une liste
+  // vide.
+  { route: '/api/admin/operators', handler: './src/server/admin/http/operators.ts', method: 'get' },
+  {
+    route: '/api/admin/operators/create',
+    handler: './src/server/admin/http/operator-create.ts',
+    method: 'post',
+  },
+  {
+    route: '/api/admin/operators/update',
+    handler: './src/server/admin/http/operator-update.ts',
+    method: 'post',
+  },
+  {
+    route: '/api/admin/operators/mfa-reset',
+    handler: './src/server/admin/http/operator-mfa-reset.ts',
+    method: 'post',
+  },
+  { route: '/api/admin/roles', handler: './src/server/admin/http/roles.ts', method: 'get' },
+  // L'aperçu d'impact est une **lecture** : voir `parseImpactQuery` pour la raison du `get`.
+  {
+    route: '/api/admin/roles/impact',
+    handler: './src/server/admin/http/role-impact.ts',
+    method: 'get',
+  },
+  {
+    route: '/api/admin/roles/create',
+    handler: './src/server/admin/http/role-create.ts',
+    method: 'post',
+  },
+  {
+    route: '/api/admin/roles/update',
+    handler: './src/server/admin/http/role-update.ts',
+    method: 'post',
+  },
+  {
+    route: '/api/admin/roles/delete',
+    handler: './src/server/admin/http/role-delete.ts',
+    method: 'post',
+  },
 ] as const satisfies readonly BffRoute[]
