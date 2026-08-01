@@ -101,7 +101,10 @@ describe('chargement à froid', () => {
 
     expect(scripts.length).toBeGreaterThan(0)
     for (const tag of scripts) {
-      expect(tag).toMatch(/\btype="module"|\sdefer[\s>=]/)
+      expect(tag, tag).toMatch(/\btype="module"|\sdefer[\s>=]/)
+      // Vérifié séparément : un `type="module" async` satisfaisait l'alternative ci-dessus tout en
+      // reprenant le comportement que ce test refuse.
+      expect(tag, tag).not.toMatch(/\basync[\s>=]/)
     }
   })
 
