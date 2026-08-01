@@ -3,8 +3,8 @@
 # n'a donc pas à être rouverte chaque fois qu'une porte s'ajoute.
 #
 # En contrepartie, la liste vit ici, dans le `needs:` de ce job — et un job ajouté sans y être inscrit
-# laisserait `CI` vert pendant qu'il est rouge. Rien ne détecte cet oubli aujourd'hui : ni actionlint,
-# ni `make check`.
+# laisserait `CI` vert pendant qu'il est rouge. `make lint-workflows` compare les deux et refuse
+# l'écart, dans les deux sens.
 name: CI
 
 on:
@@ -93,12 +93,86 @@ jobs:
           go-version-file: go.mod
       - run: make lint-workflows
 
+  typecheck-web:
+    name: Typecheck client
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Les contrats de la passerelle viennent de GitHub Packages, dont la lecture est authentifiée :
+    # sans cette permission, `pnpm install` échoue en 401 avant même la première porte.
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: make typecheck-web
+
+  lint-web:
+    name: Lint client
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: make lint-web
+
+  test-web:
+    name: Tests client
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: make test-web
+
+  vuln-web:
+    name: Vulnérabilités client
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: make vuln-web
+
+  build-web:
+    name: Build client
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # `check-routes` construit le client puis vérifie que l'arbre de routes commité n'a pas bougé :
+      # un arbre périmé ne se voit pas en local, où le plugin le régénère à chaque lancement.
+      - run: make check-routes
+
   ci:
     name: CI
     # `always()` fait tourner l'agrégation même quand une porte a échoué : sans lui, le check reste
     # « skipped », état qu'une protection de branche accepte.
     if: always()
-    needs: [build, test, lint, vuln, workflows]
+    needs: [build, test, lint, vuln, workflows, typecheck-web, lint-web, test-web, vuln-web, build-web]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

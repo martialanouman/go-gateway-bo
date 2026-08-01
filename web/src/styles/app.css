@@ -1,0 +1,67 @@
+/*
+  Styles de structure, provisoires : les tokens de la charte, les polices auto-hébergées et la page
+  `/_design` arrivent en step-008. Ce qui est ici tient l'application debout, rien de plus.
+
+  Les dimensions de la coquille ne sont pas redites ici : elles viennent des custom properties que le
+  `<style>` d'`index.html` déclare — celui-là même qui peint le squelette, et qui reste dans le
+  document après le montage. Les *valeurs* ne peuvent donc plus diverger.
+
+  La *référence*, elle, se casse encore : une faute de frappe dans un `var()`, ou cette grille vidée,
+  et la mise en page sursaute au montage de React. C'est un test qui le tient, pas la construction —
+  il confronte ce que cette feuille consomme à ce que le document déclare.
+*/
+
+body {
+  margin: 0;
+  background: var(--skeleton-surface);
+  color: #e6e9ef;
+  font-family: system-ui, sans-serif;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--shell-rail-width) 1fr;
+  grid-template-rows: var(--shell-topbar-height) 1fr;
+  min-height: 100vh;
+}
+
+.shell__rail {
+  grid-row: 1 / 3;
+  border-right: 1px solid var(--skeleton-shape);
+  padding: 1rem;
+}
+
+.shell__topbar {
+  border-bottom: 1px solid var(--skeleton-shape);
+}
+
+.shell__content {
+  padding: 1.5rem;
+}
+
+.shell__placeholder {
+  margin: 0;
+  color: #8b93a5;
+  font-size: 0.8125rem;
+}
+
+.empty {
+  max-width: 42rem;
+}
+
+.empty__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+.empty__body {
+  margin: 0 0 0.75rem;
+  color: #b6bdcc;
+  line-height: 1.6;
+}
+
+code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.875em;
+}

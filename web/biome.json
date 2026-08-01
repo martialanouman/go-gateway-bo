@@ -50,7 +50,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/**", "!src/server/**", "!src/test/**"],
+      "includes": ["src/**", "!**/*.test.ts", "!**/*.test.tsx"],
       "linter": {
         "rules": {
           "style": {
@@ -59,27 +59,8 @@
               "options": {
                 "patterns": [
                   {
-                    "group": [
-                      "~/server",
-                      "~/server/**",
-                      "**/server/**",
-                      "../server",
-                      "../../server",
-                      "../../../server"
-                    ],
-                    "message": "Invariant (d) : le navigateur ne parle jamais directement à l'API Admin. Le jeton machine, le mTLS et la connexion PostgreSQL restent sous src/server/. Passer par une fonction serveur, qui applique la permission (requirePermission) et écrit l'audit."
-                  },
-                  {
-                    "group": [
-                      "undici",
-                      "openapi-fetch",
-                      "postgres",
-                      "drizzle-orm",
-                      "drizzle-orm/**",
-                      "node:*",
-                      "node:*/*"
-                    ],
-                    "message": "Invariant (d) : ce module est réservé au BFF. Un composant client qui l'importe fait entrer du code serveur — et parfois un secret — dans le bundle navigateur."
+                    "group": ["node:*", "node:*/*"],
+                    "message": "Invariant (d) : ce module n'existe pas dans un navigateur. Le serveur est en Go sous internal/, hors d'atteinte du bundle ; ce qui a besoin du système de fichiers, du réseau brut ou d'un secret y appartient. Les tests, eux, tournent sous Node et en sont exemptés."
                   }
                 ]
               }

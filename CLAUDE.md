@@ -15,25 +15,28 @@ le Go embarque les assets de la SPA.
 
 ## Commandes
 
-> Existent depuis step-000 : `make dev/build/check/test-go/lint-go/fmt-go/vuln-go/lint-workflows`,
-> plus `make clean` et `make help` — ce dernier est la cible par défaut, et liste ce qui existe.
-> Sont des **cibles**, et arrivent avec les steps qui les habitent : `make test` et `make lint` (les
-> composites des deux toolchains), `make test-web`, `make lint-web`, `make mock`, `make generate`,
-> `make migrate`, `make bootstrap`. Une cible absente rend `No rule to make target`, jamais un vert.
+> `make help` liste ce qui existe, et c'est la cible par défaut — préférer la lancer à croire ce
+> bloc. Sont encore des **cibles**, et arrivent avec les steps qui les habitent : `make generate`,
+> `make mock`, `make migrate`, `make bootstrap`. Une cible absente rend `No rule to make target`,
+> jamais un vert silencieux.
 
 ```bash
-make dev          # le BFF Go seul, avec les variables de .env — Vite s'y ajoute en step-001
+make dev          # BFF Go (:3001) + Vite (:3000), /api et /ws proxifiés vers le BFF
 make build        # go build → bin/dashboard — le client s'y embarque en step-002
+make build-web    # vite build → web/dist
 make check        # toutes les portes de la CI — OBLIGATOIRE avant toute PR
+make test         # les deux suites · make lint — les deux linters
 make generate     # oapi-codegen + catalogue de permissions Go → TS      (cible)
 make mock         # mock Prism sur openapi-admin.yaml                    (cible)
 
 make test-go      # unitaires Go + scénarios godog, avec -race
 make lint-go      # golangci-lint · make fmt-go applique le formatage
 make vuln-go      # govulncheck
-make lint-workflows  # actionlint : un workflow invalide est absent, pas rouge
-make test-web     # Vitest, seuils de couverture par fichier             (cible)
-make lint-web     # Biome                                               (cible)
+make lint-workflows  # actionlint + l'agrégateur CI attend-il tous les jobs ?
+make typecheck-web   # tsc --noEmit
+make test-web     # Vitest
+make lint-web     # Biome · make vuln-web — pnpm audit
+make check-routes # l'arbre de routes commité est-il à jour et régénéré ?
 ```
 
 `make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
@@ -42,8 +45,8 @@ check` ne rejoue pas du tout** : `pr-title.yml`, et les deux règles du ruleset 
 et **code_quality** — qui bloquent une PR sans passer par le check `CI`. **Ce qu'il rejoue sans que le
 verdict soit le même** : `govulncheck`, qui interroge une base vivante et peut changer d'avis sans
 qu'un fichier bouge, et `go test -race`, qui tourne ici sur darwin/arm64 et là-bas sur linux/amd64.
-Les portes du versant client — `pnpm install --frozen-lockfile` rejoué, `pnpm audit` — s'ajouteront
-quand la CI aura ses jobs client.
+S'y ajoute le `pnpm install --frozen-lockfile` de la CI, qu'un `node_modules` désynchronisé du
+lockfile masque en local, et `pnpm audit`, qui interroge lui aussi une base vivante.
 
 ## Architecture (carte mentale)
 
