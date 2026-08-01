@@ -39,6 +39,9 @@ func start(logger *slog.Logger) error {
 }
 
 func run(ctx context.Context, logger *slog.Logger) error {
+	//nolint:forbidigo // La seule lecture d'environnement du dépôt, et elle ne fait que la passer au
+	// chargeur. L'exemption est posée sur la ligne, pas sur le fichier : sinon toute lecture ajoutée
+	// plus tard dans main passerait avec elle.
 	cfg, err := config.Load(os.LookupEnv)
 	if err != nil {
 		return err

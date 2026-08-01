@@ -26,8 +26,14 @@ linters:
   settings:
     forbidigo:
       forbid:
+        # Lecture **et** écriture : un test qui pose une variable dans le process se contamine
+        # lui-même, et une lecture ailleurs se découvre manquante en production.
+        #
+        # Les rares usages légitimes — propager PATH à un process enfant — se lèvent par un
+        # `//nolint:forbidigo` **sur la ligne**, avec sa raison. Jamais par une exemption de fichier,
+        # qui rouvrirait la porte à tout ce que ce fichier contiendra un jour.
         - pattern: ^os\.(Getenv|LookupEnv|Environ|Setenv|Unsetenv|Clearenv)$
-          msg: la configuration se lit dans internal/config, une seule fois, au démarrage (§1.8)
+          msg: l'environnement se lit dans internal/config, une seule fois, au démarrage (§1.8)
     revive:
       rules:
         - name: exported
@@ -36,12 +42,6 @@ linters:
   exclusions:
     generated: lax
     rules:
-      # La seule ligne du dépôt qui lit l'environnement, et qui le passe au chargeur. `internal/config`
-      # n'a pas d'exemption parce qu'il n'en a pas besoin : sa source d'environnement lui est injectée,
-      # il n'importe pas `os`.
-      - path: cmd/dashboard/main\.go
-        linters:
-          - forbidigo
       # Les tests ont le droit de paniquer sur une erreur d'échafaudage : c'est leur façon d'échouer.
       - path: _test\.go
         linters:

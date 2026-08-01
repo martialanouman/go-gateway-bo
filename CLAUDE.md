@@ -15,7 +15,8 @@ le Go embarque les assets de la SPA.
 
 ## Commandes
 
-> Existent depuis step-000 : `make dev/build/check/test-go/lint-go/fmt-go/vuln-go/lint-workflows`.
+> Existent depuis step-000 : `make dev/build/check/test-go/lint-go/fmt-go/vuln-go/lint-workflows`,
+> plus `make clean` et `make help` — ce dernier est la cible par défaut, et liste ce qui existe.
 > Sont des **cibles**, et arrivent avec les steps qui les habitent : `make test` et `make lint` (les
 > composites des deux toolchains), `make test-web`, `make lint-web`, `make mock`, `make generate`,
 > `make migrate`, `make bootstrap`. Une cible absente rend `No rule to make target`, jamais un vert.
@@ -35,12 +36,13 @@ make test-web     # Vitest, seuils de couverture par fichier             (cible)
 make lint-web     # Biome                                               (cible)
 ```
 
-`make check` enchaîne toutes les portes de la CI — mais la CI les lance **en parallèle**, il n'y a
-donc pas d'ordre à égaler. Trois écarts connus, qui font qu'un vert local ne garantit pas une CI
-verte : `pr-title.yml` n'est pas rejouable hors CI ; `govulncheck` interroge une base vivante, donc
-le verdict peut changer sans qu'un fichier bouge ; et la CI tourne sur linux/amd64 contre
-darwin/arm64 en local, ce qui compte pour `go test -race`. Les écarts du versant client — `pnpm
-install --frozen-lockfile` rejoué, `pnpm audit` — s'ajouteront quand la CI aura ses jobs client.
+`make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
+égaler. Ce qu'il ne rejoue pas, et qui fait qu'un vert local ne garantit pas une PR verte :
+`pr-title.yml` ; les règles du ruleset de `main` — **CodeQL** et **code_quality** — qui bloquent une
+PR sans passer par le check `CI` ; `govulncheck`, qui interroge une base vivante, donc dont le verdict
+change sans qu'un fichier bouge ; et la plateforme, linux/amd64 en CI contre darwin/arm64 en local, ce
+qui compte pour `go test -race`. Les portes du versant client — `pnpm install --frozen-lockfile`
+rejoué, `pnpm audit` — s'ajouteront quand la CI aura ses jobs client.
 
 ## Architecture (carte mentale)
 

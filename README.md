@@ -14,8 +14,9 @@ vers l'API Admin de la passerelle.
 > (`tasks/todo.md`), les fichiers de step de M0, la charte graphique, et l'échafaudage de projet
 > (accès au registre, protections de dépendances, `docker-compose.yml`). Aucune ligne d'application.
 >
-> **Ce README décrit la cible.** Les commandes ci-dessous arrivent avec leurs steps ; aucune n'existe
-> aujourd'hui. La première tentative a payé six défauts d'outillage, tous invisibles en local : ils
+> **Ce README décrit la cible**, et signale `(cible)` ce qui n'existe pas encore. Depuis step-000, le
+> socle Go existe : `make dev/build/check` et les portes granulaires tournent.
+> La première tentative a payé six défauts d'outillage, tous invisibles en local : ils
 > sont inscrits dans les steps qui les rencontrent (`tasks/plan.md` §2.1), et la leçon transverse est
 > qu'un vert local ne dit rien des workflows — **pousser tôt vaut mieux que relire**.
 
@@ -31,11 +32,14 @@ pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"
 pnpm -C web install
 cp .env.example .env       # puis remplir les secrets — voir plus bas
 docker compose up -d       # PostgreSQL 18 + Redis
-make migrate               # applique les migrations
-make bootstrap             # sème les permissions et crée le premier compte
-make mock                  # Prism sert le contrat sur :4010 — dans un autre terminal
-make dev                   # http://localhost:3000
+make migrate               # applique les migrations                        (cible, step-005)
+make bootstrap             # sème les permissions et crée le premier compte (cible, step-020)
+make mock                  # Prism sert le contrat sur :4010, autre terminal (cible, step-003)
+make dev                   # aujourd'hui : le BFF seul sur :3001
 ```
+
+Les lignes marquées `(cible)` arrivent avec leur step et rendent `No rule to make target` d'ici là —
+jamais un vert silencieux.
 
 Go et Node sont tous deux requis **en développement**. En production, ni l'un ni l'autre : le binaire
 embarque les assets et se suffit à lui-même.
@@ -67,8 +71,8 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 ## Commandes
 
 ```bash
-make dev        # BFF Go (:3001) + Vite (:3000) en parallèle, /api et /ws proxifiés
-make build      # client puis binaire, qui embarque les assets
+make dev        # aujourd'hui le BFF Go seul (:3001) ; Vite (:3000) s'y ajoute en step-001
+make build      # go build → bin/dashboard ; les assets s'y embarquent en step-002
 make check      # tout ce que la CI vérifie — OBLIGATOIRE avant toute PR
 make generate   # code du contrat (Go + TS) et catalogue de permissions (Go → TS)
 make mock       # Prism sur openapi-admin.yaml
@@ -86,16 +90,18 @@ Les linters passent par `go tool` et sont épinglés dans `go.mod` : rien à ins
 sur un clone frais, et un scanner qui change sous les pieds ne rend pas un run
 non reproductible.
 
-`make check` enchaîne toutes les portes de la CI — mais la CI les lance **en parallèle**, il n'y a
-donc pas d'ordre à égaler. Quatre écarts connus, qui font qu'un vert local ne garantit pas une CI
-verte : la CI rejoue `pnpm install --frozen-lockfile` (un `node_modules` désynchronisé du lockfile
-passe en local) ; `pr-title.yml` n'est pas rejouable hors CI ; `govulncheck` et `pnpm audit`
-interrogent des bases vivantes, donc le verdict peut changer sans qu'un fichier bouge ; et la CI
-tourne sur linux/amd64 contre darwin/arm64 en local, ce qui compte pour `go test -race`.
+`make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
+égaler. Ce qu'il ne rejoue pas, et qui fait qu'un vert local ne garantit pas une PR verte :
+`pr-title.yml` ; les règles du ruleset de `main` — **CodeQL** et **code_quality** — qui bloquent une PR
+sans passer par le check `CI` ; `govulncheck`, qui interroge une base vivante, donc dont le verdict
+change sans qu'un fichier bouge ; et la plateforme, linux/amd64 en CI contre darwin/arm64 en local, ce
+qui compte pour `go test -race`. Les portes du versant client — `pnpm install --frozen-lockfile`
+rejoué, `pnpm audit` — s'ajouteront quand la CI aura ses jobs client.
 
 ### Deux processus en développement, un seul en production
 
-`make dev` lance le BFF Go et le serveur Vite côte à côte ; Vite proxifie `/api` et `/ws` vers le Go.
+`make dev` lancera le BFF Go et le serveur Vite côte à côte, Vite proxifiant `/api` et `/ws` vers le Go
+— aujourd'hui il ne lance que le BFF, le client arrivant en step-001.
 Ce n'est pas un compromis mais le point : le développement emprunte **le même chemin** que la
 production, à ceci près que les assets viennent de Vite au lieu du binaire. La seule chose que `dev`
 ne rejoue pas est l'embarquement des assets et l'ordre du fallback SPA — d'où les tests de bout en
