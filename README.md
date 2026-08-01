@@ -72,17 +72,22 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 
 ```bash
 make dev        # BFF Go + Vite en parallèle, /api et /ws proxifiés vers le Go
-make build      # build client puis go build → un binaire autonome
+make build      # go build → binaire (le build client arrive en step-002)
 make check      # tout ce que la CI vérifie — OBLIGATOIRE avant toute PR
 make generate   # code du contrat (Go + TS) et catalogue de permissions (Go → TS)
 make mock       # Prism sur openapi-admin.yaml
 make migrate    # migrations de la base
 
-go test ./...          # unitaires + scénarios godog
-golangci-lint run
+make test              # unitaires + scénarios godog, avec -race
+make lint              # golangci-lint
+make lint-workflows    # actionlint — un workflow invalide est absent, pas rouge
 pnpm -C web test       # Vitest
 pnpm -C web e2e        # Playwright, contre le binaire
 ```
+
+Les linters passent par `go tool` et sont épinglés dans `go.mod` : rien à installer
+sur un clone frais, et un scanner qui change sous les pieds ne rend pas un run
+non reproductible.
 
 `make check` vert signifie une CI verte. Elle vérifie en plus que **le code généré est à jour** —
 types du contrat et catalogue de permissions.
@@ -101,7 +106,7 @@ bout qui tournent **contre le binaire**, jamais contre `dev`.
 cmd/dashboard/     le binaire : câblage, embed.FS des assets, arrêt propre
 internal/          le BFF — seul endroit qui connaît secrets, jeton Admin et base
   bff/             handlers HTTP, gardes de permission, écriture d'audit
-  config/           configuration validée au démarrage
+  config/          configuration validée au démarrage
   auth/            session, argon2id, TOTP, WebAuthn
   gateway/         client généré vers l'API Admin (OAuth2 + mTLS)
   hub/             hub WebSocket : 3 flux amont → 1 socket par opérateur

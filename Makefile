@@ -1,7 +1,7 @@
 GO             ?= go
 BINARY         ?= bin/dashboard
-GOLANGCI_LINT  ?= go tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
-ACTIONLINT     ?= go tool github.com/rhysd/actionlint/cmd/actionlint
+GOLANGCI_LINT  ?= $(GO) tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+ACTIONLINT     ?= $(GO) tool github.com/rhysd/actionlint/cmd/actionlint
 
 .DEFAULT_GOAL := help
 

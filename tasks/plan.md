@@ -76,7 +76,7 @@ Deux moitiés, un seul déployable. Le layout est celui d'un projet Go qui embar
 cmd/dashboard/          le binaire : câblage, embed.FS des assets, arrêt propre
 internal/
   bff/                  handlers HTTP, gardes de permission, écriture d'audit
-  config/           configuration validée au démarrage
+  config/               configuration validée au démarrage
   auth/                 session, argon2id, TOTP, WebAuthn
   gateway/              client généré vers l'API Admin (OAuth2 + mTLS)
   hub/                  hub WebSocket : 3 flux amont → 1 socket par opérateur

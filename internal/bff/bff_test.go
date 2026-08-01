@@ -146,13 +146,17 @@ func (w *world) responseIsNotHTML() error {
 
 func (w *world) stopServer() error {
 	w.stop()
+	// Nettoyé ici et non dans la branche réussie de `serverReturnedCleanly` :
+	// sinon un serveur qui ne rend pas la main fait attendre le hook `After` sur
+	// un canal que personne ne remplira, et l'échec se manifeste par le timeout
+	// de 10 minutes de `go test` au lieu du message du scénario.
+	w.stop = nil
 	return nil
 }
 
 func (w *world) serverReturnedCleanly() error {
 	select {
 	case err := <-w.served:
-		w.stop = nil
 		return err
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("le serveur n'a pas rendu la main")

@@ -32,6 +32,46 @@ func freeAddr(t *testing.T) string {
 	return addr
 }
 
+// Le câblage des signaux n'était couvert par rien, alors que le commentaire de
+// ce fichier affirmait le contraire : remplacer SIGTERM par un autre signal
+// laissait la suite verte. C'est ce que step-186 suppose acquis pour son
+// déploiement roulant.
+func TestBinaryStopsCleanlyOnSigterm(t *testing.T) {
+	if os.Getenv("DASHBOARD_TEST_SERVE") == "1" {
+		main()
+		return
+	}
+
+	addr := freeAddr(t)
+	//nolint:gosec // G204 : ré-exécution du binaire de test lui-même
+	command := exec.CommandContext(t.Context(), os.Args[0], "-test.run=TestBinaryStopsCleanlyOnSigterm")
+	command.Env = []string{"DASHBOARD_TEST_SERVE=1", config.EnvAddr + "=" + addr}
+	require.NoError(t, command.Start())
+
+	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}, Timeout: time.Second}
+	require.Eventually(t, func() bool {
+		response, err := client.Get("http://" + addr + "/api/health") //nolint:noctx // sondage de démarrage
+		if err != nil {
+			return false
+		}
+		_ = response.Body.Close()
+		return response.StatusCode == http.StatusOK
+	}, 10*time.Second, 20*time.Millisecond, "le sous-processus n'a jamais servi")
+
+	require.NoError(t, command.Process.Signal(syscall.SIGTERM))
+
+	waited := make(chan error, 1)
+	go func() { waited <- command.Wait() }()
+
+	select {
+	case err := <-waited:
+		require.NoError(t, err, "SIGTERM doit produire un arrêt propre et une sortie 0")
+	case <-time.After(15 * time.Second):
+		_ = command.Process.Kill()
+		t.Fatal("le binaire n'a pas réagi à SIGTERM")
+	}
+}
+
 // Le code de sortie ne se teste qu'en relançant le binaire : `os.Exit` coupe le
 // process de test. Sans lui, remplacer `os.Exit(1)` par `os.Exit(0)` laissait la
 // suite verte — un ordonnanceur croirait l'installation bonne.

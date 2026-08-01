@@ -17,7 +17,12 @@ concurrency:
 
 # Les portes tournent en parallèle : une erreur de compilation et un test rouge
 # se voient au même run. La protection de branche exige le seul check `CI`, qui
-# les agrège — lister les jobs nommément se périmerait au premier ajout.
+# les agrège : elle n'a ainsi qu'un nom à connaître.
+#
+# **Le `needs` de `ci` est une liste nominale, et rien ne la maintient.** Une
+# porte ajoutée sans y être inscrite rougirait sous son propre nom pendant que
+# `CI` resterait vert, et la fusion passerait. Ajouter un job, c'est l'ajouter
+# aux deux endroits — jusqu'à ce qu'une vérification d'exhaustivité existe.
 jobs:
   build:
     name: Build

@@ -14,7 +14,6 @@ linters:
     - revive
     - gosec
 
-
 formatters:
   enable:
     - gofmt
