@@ -103,7 +103,7 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 ---
 
 ## M0 — Fondations & double toolchain
-- [ ] step-000 — Socle Go : module, `cmd/dashboard`, chi, configuration validée au démarrage, arrêt propre
+- [x] step-000 — Socle Go : module, `cmd/dashboard`, chi, configuration validée au démarrage, arrêt propre
 - [ ] step-001 — SPA Vite + TanStack Router : portage de `web/`, squelette de coquille au chargement à froid
 - [ ] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
 - [ ] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
