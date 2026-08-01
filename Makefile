@@ -1,5 +1,7 @@
-GO     ?= go
-BINARY ?= bin/dashboard
+GO             ?= go
+BINARY         ?= bin/dashboard
+GOLANGCI_LINT  ?= go tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+ACTIONLINT     ?= go tool github.com/rhysd/actionlint/cmd/actionlint
 
 .DEFAULT_GOAL := help
 
@@ -7,32 +9,36 @@ BINARY ?= bin/dashboard
 help:
 	@grep -hE '^## ' $(MAKEFILE_LIST) | sed 's/^## /  /'
 
-## dev — lance le BFF (step-001 y ajoutera Vite et le proxy /api)
+## dev — lance le BFF en chargeant .env (step-001 y ajoutera Vite et le proxy /api)
 dev:
-	$(GO) run ./cmd/dashboard
+	@set -a; [ -f .env ] && . ./.env; set +a; $(GO) run ./cmd/dashboard
 
 ## build — produit le binaire (step-002 y ajoutera les assets embarqués)
 build:
 	$(GO) build -o $(BINARY) ./cmd/dashboard
 
-## test — unitaires et scénarios godog
+## test — unitaires et scénarios godog, avec le détecteur de courses
 test:
-	$(GO) test ./...
+	$(GO) test -race ./...
 
 ## lint — golangci-lint
 lint:
-	golangci-lint run
+	$(GOLANGCI_LINT) run
+
+## lint-workflows — actionlint : un workflow invalide est absent, pas rouge
+lint-workflows:
+	$(ACTIONLINT)
 
 ## fmt — formate le code
 fmt:
 	$(GO) fmt ./...
 
-## vuln — govulncheck, épinglé par la directive `tool` de go.mod
+## vuln — govulncheck
 vuln:
 	$(GO) tool govulncheck ./...
 
 ## check — tout ce que la CI vérifie
-check: fmt-check vet lint test vuln build
+check: fmt-check vet tidy-check lint lint-workflows test vuln build
 
 vet:
 	$(GO) vet ./...
@@ -43,4 +49,7 @@ fmt-check:
 	@unformatted="$$(gofmt -l cmd internal)"; \
 	if [ -n "$$unformatted" ]; then echo "non formaté :"; echo "$$unformatted"; exit 1; fi
 
-.PHONY: help dev build test lint fmt vuln check vet fmt-check
+tidy-check:
+	$(GO) mod tidy -diff
+
+.PHONY: help dev build test lint lint-workflows fmt vuln check vet fmt-check tidy-check

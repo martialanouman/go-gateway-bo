@@ -11,6 +11,8 @@ Fonctionnalité: Le serveur sert sa sonde et s'arrête proprement
   Scénario: la sonde de vivacité répond
     Quand "/api/health" est demandé
     Alors le statut de la réponse est 200
+    Et le corps de la réponse est le JSON {"status":"ok"}
+    Et le type de la réponse est "application/json"
 
   Scénario: une route inconnue sous /api n'est pas servie
     Quand "/api/inconnu" est demandé

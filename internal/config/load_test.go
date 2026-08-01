@@ -79,10 +79,12 @@ func TestLoadAppliesDefaultShutdownTimeout(t *testing.T) {
 	assert.Equal(t, 15*time.Second, loaded.ShutdownTimeout)
 }
 
-// Ferme la boucle entre la liste déclarée et le code qui lit : sans ce test,
-// `Variables` pourrait annoncer une variable que Load ignore, et `.env.example`
-// documenterait un réglage sans effet.
-func TestLoadReadsEveryDeclaredVariable(t *testing.T) {
+// Ferme la boucle **dans les deux sens** entre la liste déclarée et le code qui
+// lit. Le premier jet n'assérait que `déclarées ⊆ lues` : une lecture non
+// déclarée passait, et `.env.example` cessait de lister toutes les variables
+// lues sans qu'aucun test ne rougisse — le trou exact que ce mécanisme existe
+// pour fermer.
+func TestLoadReadsExactlyTheDeclaredVariables(t *testing.T) {
 	read := map[string]bool{}
 	base := envFrom(nil)
 
@@ -92,7 +94,13 @@ func TestLoadReadsEveryDeclaredVariable(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	declared := map[string]bool{}
 	for _, variable := range config.Variables {
+		declared[variable.Name] = true
 		assert.True(t, read[variable.Name], "%s est déclarée mais Load ne la lit pas", variable.Name)
+	}
+
+	for name := range read {
+		assert.True(t, declared[name], "Load lit %s sans qu'elle soit déclarée dans Variables", name)
 	}
 }

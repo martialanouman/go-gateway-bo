@@ -50,7 +50,8 @@ Pub/Sub. Un process unique serait un SPOF et la cible de 99,9 % inatteignable.
 ```
 cmd/dashboard/     le binaire : câblage, embed.FS des assets, arrêt propre
 internal/          le BFF — seul endroit qui connaît secrets, jeton Admin et base
-  bff/ auth/ gateway/ hub/ alerting/ store/ permissions/
+  bff/ config/ auth/ gateway/ hub/ alerting/ store/ permissions/
+                   chaque package naît avec le code qui l'habite, jamais vide
 api/               openapi-bff.yaml — engendre les types Go et TS
 web/               le client React (src/routes, src/components, src/lib, src/styles)
 docs/              la spécification technique

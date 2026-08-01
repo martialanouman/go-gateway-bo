@@ -35,3 +35,12 @@ updates:
         patterns: ['*']
     commit-message:
       prefix: chore(ci)
+
+  # Ajouté avec le module Go (step-000). Sans cette entrée, chi, godog, testify,
+  # govulncheck et actionlint n'auraient eu aucun mécanisme de mise à jour, alors
+  # que le README promet que Dependabot fait avancer les dépendances.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

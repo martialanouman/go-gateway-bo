@@ -9,18 +9,19 @@ vers l'API Admin de la passerelle.
 > Le dépôt bascule d'un socle TanStack Start vers un **BFF Go + SPA React**, décidé le 01/08/2026 et
 > amendé dans la spécification (§1.3, §4, §7). **Ce README décrit la cible.**
 >
-> **Ce qui existe aujourd'hui** : la spécification amendée, le plan (`tasks/plan.md`), le découpage en
-> 75 steps (`tasks/todo.md`) et les neuf fichiers de step de M0.
->
 > **L'ancienne pile a été supprimée** le 01/08/2026 — 27 000 lignes : le BFF TypeScript, l'enveloppe
-> TanStack Start, Drizzle, les configurations Vite/Vitest/Playwright, la suite de bout en bout et la
-> CI. Le **client React** (~16 300 lignes : composants, écrans, tokens de la charte et leurs tests)
-> est conservé sous `src/` et attend son déménagement vers `web/` en **step-001**.
+> TanStack Start, Drizzle, les configurations Vite/Vitest/Playwright et la suite de bout en bout. Le
+> **client React** (~16 300 lignes : composants, écrans, tokens de la charte et leurs tests) est
+> conservé sous `src/` et attend son déménagement vers `web/` en **step-001**.
 >
-> **Le dépôt ne construit pas, et c'est l'état attendu.** Aucune ligne de Go n'est écrite ; les
-> commandes `make` ci-dessous arrivent avec **step-000** et **step-007** ; `package.json` porte encore
-> les dépendances de l'ancien socle, que step-001 retire ; **il n'y a plus de CI** jusqu'à step-000.
-> Tout cela se referme à la clôture de M0.
+> **`make check` est vert** — le socle Go, la configuration validée au démarrage, la sonde de
+> vivacité, l'arrêt propre et la CI sont livrés (**step-000**).
+>
+> **Ce qui n'existe pas encore** : les huit steps restantes de M0. Donc pas de client servi
+> (`make dev` ne lance que le BFF), pas d'`embed.FS`, pas de contrat généré, pas de base, pas de
+> catalogue de permissions, pas de charte. `make migrate`, `make bootstrap`, `make mock` et
+> `make generate` sont décrits ci-dessous comme **cible** et arrivent avec leurs steps. La moitié
+> client garde les dépendances de l'ancien socle jusqu'à step-001.
 
 ## Démarrer
 
@@ -100,6 +101,7 @@ bout qui tournent **contre le binaire**, jamais contre `dev`.
 cmd/dashboard/     le binaire : câblage, embed.FS des assets, arrêt propre
 internal/          le BFF — seul endroit qui connaît secrets, jeton Admin et base
   bff/             handlers HTTP, gardes de permission, écriture d'audit
+  config/           configuration validée au démarrage
   auth/            session, argon2id, TOTP, WebAuthn
   gateway/         client généré vers l'API Admin (OAuth2 + mTLS)
   hub/             hub WebSocket : 3 flux amont → 1 socket par opérateur

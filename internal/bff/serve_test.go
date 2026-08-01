@@ -2,9 +2,12 @@ package bff_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -19,8 +22,14 @@ func TestServeFinishesInFlightRequestAndRefusesNewOnes(t *testing.T) {
 	handlerStarted := make(chan struct{})
 	releaseHandler := make(chan struct{})
 
+	// `sync.Once` et non `close` direct : une seconde requête atteignant le
+	// handler paniquerait, `net/http` récupérerait la panique, et le client
+	// verrait une erreur — que la sonde d'arrêt lirait comme « le serveur
+	// n'accepte plus ». Le test passerait pour la mauvaise raison.
+	var started sync.Once
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		close(handlerStarted)
+		started.Do(func() { close(handlerStarted) })
 		<-releaseHandler
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("réponse complète"))
@@ -57,11 +66,14 @@ func TestServeFinishesInFlightRequestAndRefusesNewOnes(t *testing.T) {
 
 	// Shutdown est asynchrone : on attend que l'écoute cesse réellement plutôt
 	// que de dormir un délai arbitraire.
+	// La condition porte sur ECONNREFUSED et non sur « une erreur quelconque » :
+	// un timeout client, un RST ou une panique du handler satisferaient un
+	// `err != nil`, et le test conclurait à l'arrêt sans l'avoir observé.
 	refusing := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}, Timeout: time.Second}
 	require.Eventually(t, func() bool {
 		response, err := refusing.Get(baseURL + "/health") //nolint:noctx // idem
 		if err != nil {
-			return true
+			return errors.Is(err, syscall.ECONNREFUSED)
 		}
 		_ = response.Body.Close()
 		return false

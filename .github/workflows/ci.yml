@@ -10,7 +10,10 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Jamais sur `main` : deux fusions rapprochées laisseraient le commit
+  # intermédiaire annulé, donc sans verdict — et c'est précisément l'historique
+  # dont on veut pouvoir dire qu'il est vert.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Les portes tournent en parallèle : une erreur de compilation et un test rouge
 # se voient au même run. La protection de branche exige le seul check `CI`, qui
@@ -36,6 +39,7 @@ jobs:
           go-version-file: go.mod
       - run: make fmt-check
       - run: make vet
+      - run: make tidy-check
 
   lint:
     name: Lint
@@ -45,8 +49,11 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
       - run: make lint
+      # Un workflow syntaxiquement invalide n'est pas rouge : il est **absent**,
+      # et la protection de branche n'a alors plus rien à exiger. C'est arrivé
+      # sur cette step même.
+      - run: make lint-workflows
 
   test:
     name: Test
@@ -74,14 +81,15 @@ jobs:
     needs: [build, format, lint, test, vuln]
     if: always()
     steps:
-      # `tr` est porteur : sans lui, les résultats forment une seule ligne, et
-      # `grep -vw success` n'y trouve rien dès qu'une porte a réussi — un échec
-      # parmi des succès passerait inaperçu.
+      # `contains` sur `needs.*.result` plutôt qu'une agrégation en shell : les
+      # expressions GitHub n'admettent que l'apostrophe comme délimiteur, et une
+      # agrégation maison se teste mal — celle qu'elle remplace était fausse.
       - name: Agréger le verdict des portes
         run: |
-          results='${{ join(needs.*.result, " ") }}'
-          if printf '%s' "$results" | tr ' ' '\n' | grep -qvw success; then
-            echo "une porte a échoué : $results"
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] \
+            || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ] \
+            || [ "${{ contains(needs.*.result, 'skipped') }}" = "true" ]; then
+            echo "une porte n'est pas verte : ${{ join(needs.*.result, ', ') }}"
             exit 1
           fi
-          echo "toutes les portes sont vertes : $results"
+          echo "toutes les portes sont vertes : ${{ join(needs.*.result, ', ') }}"

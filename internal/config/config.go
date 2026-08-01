@@ -80,9 +80,15 @@ func validateAddr(addr string) error {
 		return fmt.Errorf("%q n'est pas une adresse de la forme hôte:port", addr)
 	}
 
+	// Deux diagnostics distincts, comme pour « absente » et « invalide » :
+	// replier « pas un nombre » sur « hors des bornes » ferait dire à l'erreur
+	// que ":http" est un port trop grand.
 	number, err := strconv.Atoi(port)
-	if err != nil || number < 1 || number > 65535 {
-		return fmt.Errorf("le port %q est hors des bornes 1–65535", port)
+	if err != nil {
+		return fmt.Errorf("le port %q n'est pas un nombre", port)
+	}
+	if number < 1 || number > 65535 {
+		return fmt.Errorf("le port %d est hors des bornes 1–65535", number)
 	}
 
 	return nil

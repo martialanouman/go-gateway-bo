@@ -1,6 +1,6 @@
 # step-000 — Socle Go : module, binaire, configuration, arrêt propre
 
-> **Jalon :** M0 (§1.3, §1.8, §4.1) · **Statut :** À FAIRE
+> **Jalon :** M0 (§1.3, §1.8, §4.1) · **Statut :** LIVRÉE
 > **Dépend de :** — · **Bloque :** tout
 
 ## But
@@ -8,8 +8,12 @@ Un module Go qui compile, démarre, refuse bruyamment une configuration incompl�
 proprement. C'est le squelette dans lequel tout le reste se branche — il ne sert encore aucune page.
 
 ## Périmètre (ce que fait CETTE PR)
-- `go.mod` avec la version de Go figée, `cmd/dashboard/main.go`, et l'arborescence `internal/` vide
-  mais créée : `bff/ auth/ gateway/ hub/ alerting/ store/ permissions/`.
+- `go.mod` avec la version de Go figée, `cmd/dashboard/main.go`, et les packages `internal/` dont
+  cette step a besoin. *(Amendement 01/08/2026 : la rédaction initiale demandait l'arborescence
+  `internal/` complète « vide mais créée ». Elle est **inexécutable** — git ne versionne pas un
+  répertoire vide, et sept packages sans code auraient été sept `doc.go` de cérémonie que §1.7
+  proscrit. Chaque package naît avec le code qui l'habite ; le layout cible reste celui de
+  `plan.md` §1.1.)*
 - Routeur `chi` monté sur `/api`, avec pour l'instant une seule route : `GET /api/health`.
 - **Configuration par variables d'environnement, validée au démarrage** (§1.8). Un secret manquant
   arrête le process avec un message qui nomme la variable — jamais une valeur par défaut silencieuse.
@@ -43,9 +47,9 @@ proprement. C'est le squelette dans lequel tout le reste se branche — il ne se
   le `SIGTERM` est refusée. Sans ce test, le déploiement roulant de step-186 n'a aucun filet.
 
 ## Definition of Done
-- [ ] `make check` vert (build · vet · lint · test)
-- [ ] `.env.example` liste **toutes** les variables lues, et rien de plus — vérifié par un test
-- [ ] la mutation « retirer la validation d'une variable obligatoire » fait rougir la suite
+- [x] `make check` vert (build · vet · lint · test)
+- [x] `.env.example` liste **toutes** les variables lues, et rien de plus — vérifié par un test
+- [x] la mutation « retirer la validation d'une variable obligatoire » fait rougir la suite
 
 ## Hors périmètre
 Le client SPA → step-001. `embed.FS` → step-002. La base → step-005. Toute route métier.

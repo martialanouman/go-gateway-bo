@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/cucumber/godog"
@@ -14,8 +15,16 @@ import (
 // `Strict` fait échouer une step non définie : ignorée par défaut, une feature
 // oubliée serait pire qu'absente puisqu'elle se lirait comme une garantie.
 func TestFeatures(t *testing.T) {
+	// godog rend `exitSuccess` quand il ne trouve aucun `.feature` : sans ce
+	// compteur, supprimer le fichier laisserait le lanceur vert. `Strict` ne
+	// couvre que les steps non définies, pas une feature absente.
+	var executed atomic.Int64
+
 	suite := godog.TestSuite{
-		ScenarioInitializer: initializeScenarios,
+		ScenarioInitializer: func(sc *godog.ScenarioContext) {
+			executed.Add(1)
+			initializeScenarios(sc)
+		},
 		Options: &godog.Options{
 			Format:   "pretty",
 			Paths:    []string{"."},
@@ -26,6 +35,9 @@ func TestFeatures(t *testing.T) {
 
 	if suite.Run() != 0 {
 		t.Fatal("des scénarios ont échoué")
+	}
+	if executed.Load() == 0 {
+		t.Fatal("aucun scénario n'a été exécuté : le fichier .feature est-il présent ?")
 	}
 }
 

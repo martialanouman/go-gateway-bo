@@ -14,13 +14,6 @@ linters:
     - revive
     - gosec
 
-  exclusions:
-    rules:
-      # gosec signale les credentials codés en dur sur des noms de variables de
-      # test ; le vrai filet est ailleurs (§1.8, aucun secret dans le dépôt).
-      - path: _test\.go
-        linters:
-          - gosec
 
 formatters:
   enable:
