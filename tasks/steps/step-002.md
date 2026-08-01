@@ -54,10 +54,11 @@ l'ordre entre le fallback et l'API.
 ## Definition of Done
 - [ ] `make build` produit un binaire qui sert l'application seul
 - [ ] `make check` vert
-- [ ] la mutation « **retirer le `NotFound` explicite de `/api`** » fait rougir le scénario — c'est **le**
-      test de cette step, et il reproduit le défaut réel : 200 + HTML, pas une absence de route.
-      *La formulation initiale, « monter le fallback avant les routes `/api` », ne reproduit rien —
-      voir DN-9.*
+- [ ] la mutation « **repasser le repli en `r.NotFound()`, garde de `/api` retirée** » fait rougir le
+      scénario — c'est **le** test de cette step, et il reproduit le défaut réel : 200 + HTML, pas une
+      absence de route. *Ni la formulation initiale (« monter le fallback avant les routes `/api` »),
+      ni la première correction (« retirer le `NotFound` de `/api` ») ne le reproduisent — les deux
+      ont été mesurées, voir DN-9.*
 
 ## Hors périmètre
 Le nonce CSP par requête → step-186. La rétention d'assets entre versions → step-186. Les sondes de
@@ -149,12 +150,24 @@ Le 404 de `/api` rend un **DTO déclaré** `{code, message}` — la forme d'erre
 maintenant et rend **501** jusqu'à step-043 : une route déclarée qui ne mène nulle part vaut mieux
 qu'une URL qui tombe dans le repli et rend du HTML à un client WebSocket.
 
-### DN-9 — La mutation de la DoD est corrigée
+### DN-9 — La mutation de la DoD est corrigée (deux fois)
 
 La fiche demandait de muter en « montant le fallback avant les routes `/api` ». **Cette mutation
 resterait verte** : dans chi v5.3.1, `NotFound` déclaré sur le parent est propagé à tout sous-routeur
-qui n'en a pas — au moment de l'appel (`mux.go:214-218`, `updateSubRoutes`) **et** au montage
+qui n'en a pas — au moment de l'appel (`mux.go:212-216`, `updateSubRoutes`) **et** au montage
 (`mux.go:308-309`). L'ordre des lignes ne protège donc rien, et l'inverser ne casse rien.
 
-Ce qui porte l'invariant est la **déclaration explicite** d'un `NotFound` sur `/api` ; la mutation qui
-reproduit le défaut réel est donc son **retrait**, qui rend bien 200 + HTML sur `/api/inconnu`.
+La première correction de cette DN désignait le **retrait du `NotFound` de `/api`** comme la mutation
+juste. **Mesurée, elle ne l'est pas non plus** — parce que l'implémentation retenue monte le repli en
+**routes** (`r.Get("/*")` + `r.Head("/*")`, exigé par DN-7 : c'est chi qui rend alors 405 sur les
+autres méthodes) et non en `r.NotFound()`. Or chi fait gagner le segment statique `/api` sur le
+wildcard `/*` : `/api/inconnu` n'atteint jamais le repli, et le retrait de la garde rend **404
+`text/plain`**, pas la coquille.
+
+Ce qui porte l'invariant est donc le **montage** ; le `NotFound` explicite de `/api` porte la **forme**
+de l'erreur, plus un filet pour le jour où quelqu'un repasserait le repli en `r.NotFound()`. La
+mutation qui reproduit le défaut réel — vérifiée, `200` + `<!doctype html` sur `/api/inconnu` — est
+donc **le passage du repli de routes à `r.NotFound()`, garde de `/api` retirée**.
+
+Les deux mutations sont conservées au tableau de la PR : celle qui produit le défaut réel, et celle
+qui prouve que la garde porte bien la forme.

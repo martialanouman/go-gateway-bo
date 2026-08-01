@@ -2,15 +2,35 @@ package bff_test
 
 import (
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
 )
+
+const (
+	// La coquille porte les références aux noms hachés : c'est elle qui interdit de la mettre en
+	// cache, et c'est son doctype qu'on cherche là où du HTML n'a rien à faire.
+	indexHTML = `<!doctype html><html lang="fr"><body>` +
+		`<script src="/assets/app-abc123.js"></script></body></html>`
+	appJS = "console.log('spa')"
+)
+
+// testAssets reproduit la racine du site telle que Vite la produit : la coquille à la racine, tout
+// ce qui est haché sous `assets/`.
+func testAssets() fs.FS {
+	return fstest.MapFS{
+		"index.html":                    {Data: []byte(indexHTML)},
+		"assets/app-abc123.js":          {Data: []byte(appJS)},
+		"assets/vendor/chunk-def456.js": {Data: []byte("console.log('vendor')")},
+	}
+}
 
 // call rend la réponse composée, et non l'enregistreur : `rec.Header()` est la map vivante que le
 // handler a modifiée, où un en-tête posé après `WriteHeader` — qui n'atteindra jamais personne —
@@ -19,7 +39,7 @@ func call(t *testing.T, method, target string) *http.Response {
 	t.Helper()
 
 	rec := httptest.NewRecorder()
-	bff.NewRouter().ServeHTTP(rec, httptest.NewRequest(method, target, nil))
+	bff.NewRouter(testAssets()).ServeHTTP(rec, httptest.NewRequest(method, target, nil))
 
 	return rec.Result()
 }
@@ -44,8 +64,11 @@ func TestHealthProbe(t *testing.T) {
 	assert.JSONEq(t, `{"status":"ok"}`, bodyOf(t, resp))
 }
 
-// Un `/api/*` inconnu rend 404 et jamais du HTML : c'est ce que step-002 vérifiera sur le binaire
-// une fois la SPA embarquée, et l'ordonnancement qui le garantit commence ici.
+// Un `/api/*` inconnu rend 404 et jamais du HTML. Ce qui le garantit est le **montage** : le repli
+// est une route `/*`, et chi fait gagner le segment statique `/api` sur elle — retirer le
+// `api.NotFound` ci-dessous rend d'ailleurs 404 `text/plain`, pas la coquille. Ce que le `NotFound`
+// explicite porte, c'est la **forme** de l'erreur, plus un filet le jour où le repli repasserait en
+// `r.NotFound()` : cette variante-là, mesurée, rend bien 200 + `<!doctype html`.
 func TestUnknownAPIRouteIsNotFound(t *testing.T) {
 	t.Parallel()
 
@@ -53,6 +76,22 @@ func TestUnknownAPIRouteIsNotFound(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	payload := bodyOf(t, resp)
+	assert.NotContains(t, payload, "<!doctype html")
+	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+	assert.JSONEq(t, `{"code":"not_found","message":"Cette route n'existe pas sur ce serveur."}`, payload)
+}
+
+// `/ws` est déclarée avant d'exister (step-043) : sans elle, la requête tomberait dans le repli et
+// un client WebSocket recevrait 200 + du HTML au lieu d'un refus lisible.
+func TestWebSocketEndpointIsNotImplementedYet(t *testing.T) {
+	t.Parallel()
+
+	resp := call(t, http.MethodGet, "/ws")
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusNotImplemented, resp.StatusCode)
 	assert.NotContains(t, bodyOf(t, resp), "<!doctype html")
 }
 

@@ -1,4 +1,5 @@
-// Command dashboard sert le tableau de bord Admin : le BFF et, à terme, les assets de la SPA.
+// Command dashboard sert le tableau de bord Admin : le BFF et les assets de la SPA, embarqués dans
+// le binaire.
 package main
 
 import (
@@ -12,6 +13,7 @@ import (
 
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
 	"github.com/martialanouman/go-gateway-bo/internal/config"
+	"github.com/martialanouman/go-gateway-bo/internal/webassets"
 )
 
 func main() {
@@ -47,6 +49,13 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
+	// Avant d'ouvrir le port : un binaire dont les assets sont inutilisables ne sert à rien, et
+	// l'apprendre au démarrage vaut mieux que de le découvrir sur la première requête d'un opérateur.
+	assets, err := webassets.FS()
+	if err != nil {
+		return fmt.Errorf("assets embarqués : %w", err)
+	}
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", cfg.Addr, err)
@@ -54,5 +63,5 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 	logger.Info("le serveur écoute", "addr", ln.Addr().String())
 
-	return serve(ctx, ln, bff.NewRouter(), cfg.ShutdownTimeout, logger)
+	return serve(ctx, ln, bff.NewRouter(assets), cfg.ShutdownTimeout, logger)
 }
