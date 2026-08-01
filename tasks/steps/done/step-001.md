@@ -1,6 +1,6 @@
 # step-001 — SPA Vite + TanStack Router : portage du client et squelette de chargement
 
-> **Jalon :** M0 (§4.2, §1.9) · **Statut :** À FAIRE
+> **Jalon :** M0 (§4.2, §1.9) · **Statut :** LIVRÉE
 > **Dépend de :** step-000 · **Bloque :** step-002, step-006, step-007, step-008
 
 ## But
