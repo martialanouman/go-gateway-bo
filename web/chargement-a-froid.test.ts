@@ -142,10 +142,10 @@ describe('chargement à froid', () => {
     //
     // Ce que cela **n'**achète **pas**, contrairement à ce qui était écrit ici : Vite émet en
     // production un `<link rel="stylesheet">` dans le `<head>`, et une feuille liée bloque le rendu
-    // du document entier — squelette compris. Mesuré : 598 octets, un aller-terour, 1,0 à 1,4 ms en
-    // local, soit 3 à 7 % de la fenêtre que le squelette comble. Le remède (inliner au build) rendrait
-    // la feuille non cacheable entre deux déploiements, ce qui coûte plus qu'il ne rapporte tant
-    // qu'elle est petite. **À rouvrir en step-008**, qui y versera les tokens et les polices.
+    // du document entier — squelette compris. Mesuré sur le livré : 680 octets, 379 compressés, 0,6 à
+    // 0,8 ms sur une boucle locale. Le remède (inliner au build) rendrait la feuille non cacheable
+    // entre deux déploiements, ce qui coûte plus qu'il ne rapporte tant qu'elle est petite.
+    // **À rouvrir en step-008**, qui y versera les tokens et les polices.
     const inlineStyle = html.slice(html.indexOf('<style>'), html.indexOf('</style>'))
 
     expect(inlineStyle).toContain('.skeleton')

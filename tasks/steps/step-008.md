@@ -42,8 +42,9 @@ Rendre la charte utilisable : les tokens portés sous `web/src/styles/`, la page
 ## Hérité de step-001, à traiter ici
 - **La feuille de style de l'application bloque la première peinture.** Vite émet un
   `<link rel="stylesheet">` dans le `<head>` : le squelette de chargement à froid attend cet
-  aller-retour, malgré son style inline. Mesuré à 598 octets et 1,0–1,4 ms en local — négligeable
-  tant que la feuille est petite, ce que cette step change en y versant les tokens.
+  aller-retour, malgré son style inline. Mesuré au moment de step-001 : 680 octets, 379 compressés,
+  0,6 à 0,8 ms sur une boucle locale — négligeable tant que la feuille est petite, ce que cette step
+  change en y versant les tokens. **Remesurer avant de décider.**
 - **Les polices auto-hébergées s'y ajouteront**, et leurs `@font-face` ne seront découverts qu'après
   l'analyse du CSS : deux allers-retours sérialisés avant que le moindre texte peigne, plus le FOIT.
   La parade (`<link rel="preload" as="font" crossorigin>` et `font-display: swap`) vit dans

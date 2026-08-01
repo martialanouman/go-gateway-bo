@@ -12,10 +12,10 @@
 
       Ce qu'il ne faut pas croire pour autant : en production, Vite émet un `<link rel="stylesheet">`
       dans ce `<head>`, et une feuille liée bloque le rendu du document entier — squelette compris. La
-      première peinture attend donc cet aller-retour. Mesuré à 598 octets et 1,0–1,4 ms en local, soit
-      3 à 7 % de la fenêtre que le squelette comble ; inliner la feuille la rendrait non cacheable
-      entre deux déploiements. L'arbitrage se rouvre en step-008, qui y versera les tokens et les
-      polices auto-hébergées.
+      première peinture attend donc cet aller-retour. Mesuré sur le document livré : 680 octets, 379
+      compressés, 0,6 à 0,8 ms sur une boucle locale — le coût est l'aller-retour, pas le volume, et
+      inliner la feuille la rendrait non cacheable entre deux déploiements. L'arbitrage se rouvre en
+      step-008, qui y versera les tokens et les polices auto-hébergées.
 
       Les couleurs sont provisoires et délibérément sobres — la charte arrive avec cette même step.
     -->
