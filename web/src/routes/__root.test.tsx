@@ -1,17 +1,14 @@
-import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
+import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { routeTree } from '../routeTree.gen'
+import { createAppRouter } from '~/router'
 
 /**
  * Le comportement de la coquille est décrit ici, à côté d'elle : quand M2 la remplacera par l'AppShell,
  * le test se déplacera avec le code plutôt que d'être cherché sous la route qui l'a exercé.
  */
 async function visit(path: string) {
-  const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({ initialEntries: [path] }),
-  })
+  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }))
 
   render(<RouterProvider router={router} />)
 

@@ -1,7 +1,7 @@
-import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
+import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { routeTree } from '../routeTree.gen'
+import { createAppRouter } from '~/router'
 
 /**
  * Le test monte le vrai arbre de routes derrière le RouterProvider de l'application : un composant
@@ -9,10 +9,7 @@ import { routeTree } from '../routeTree.gen'
  * montage réel, lui, est exercé par `main.test.tsx`.
  */
 async function visitAndAwaitHeading(path: string) {
-  const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({ initialEntries: [path] }),
-  })
+  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }))
 
   render(<RouterProvider router={router} />)
 
