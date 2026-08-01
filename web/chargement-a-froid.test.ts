@@ -121,17 +121,24 @@ describe('chargement à froid', () => {
     // l'API Admin aura une vraie adresse, sans que personne ne s'en aperçoive. Ici, **toute** origine
     // absolue doit être justifiée — en production le client parle en relatif, à l'origine qui l'a
     // servi.
-    const allowed = [
+    // Les préfixes couvrent des familles d'URL documentaires ; `http://localhost` est autorisé **à
+    // l'identique** et non en préfixe, sinon `http://localhost:3001` — le BFF en dur, exactement ce
+    // que cette garde cherche — passerait par la porte qu'elle tient. Vérifié : il passait.
+    const allowedPrefixes = [
       'http://www.w3.org/', // espaces de noms SVG et XML, émis par React
       'https://react.dev/', // messages d'erreur de React en production
       'https://github.com/facebook/react/', // idem, liens de suivi dans les avertissements
       'https://github.com/tc39/', // texte d'une erreur de syntaxe embarquée par le bundler
       'https://reactjs.org/link/', // liens d'avertissement de React
       'https://tanstack.com/router/', // lien de documentation dans un avertissement du routeur
-      'http://localhost', // repli d'origine de TanStack Router hors navigateur
     ]
+    const allowedExactly = ['http://localhost'] // repli d'origine de TanStack Router hors navigateur
+
     const origins = shipped.match(/https?:\/\/[^"'`\s)\\]+/g) ?? []
-    const unexpected = origins.filter((url) => !allowed.some((prefix) => url.startsWith(prefix)))
+    const unexpected = origins.filter(
+      (url) =>
+        !allowedExactly.includes(url) && !allowedPrefixes.some((prefix) => url.startsWith(prefix)),
+    )
 
     expect(new Set(unexpected)).toEqual(new Set())
   })
