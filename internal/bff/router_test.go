@@ -20,13 +20,23 @@ const (
 	indexHTML = `<!doctype html><html lang="fr"><body>` +
 		`<script src="/assets/app-abc123.js"></script></body></html>`
 	appJS = "console.log('spa')"
+	// Vite recopie `web/public/` à la racine du site sans hacher les noms, et **récursivement** :
+	// step-008 y versera `fonts/`, d'où le fichier imbriqué ci-dessous.
+	faviconSVG = `<svg xmlns="http://www.w3.org/2000/svg"></svg>`
+	// `wOF2` est la signature d'un WOFF2 : le `Content-Type` de ce fichier vaut `font/woff2` que
+	// la table MIME du système connaisse l'extension ou non — sinon `DetectContentType` la retrouve
+	// (`net/http/sniff.go:178`). Sans ces quatre octets, l'assertion dépendrait de la machine.
+	interWOFF2 = "wOF2\x00\x01\x00\x00fausse police"
 )
 
-// testAssets reproduit la racine du site telle que Vite la produit : la coquille à la racine, tout
-// ce qui est haché sous `assets/`.
+// testAssets reproduit la racine du site telle que Vite la produit : la coquille et les fichiers
+// publics recopiés depuis `web/public/`, à la racine comme en sous-répertoire, tout ce qui est haché
+// sous `assets/`.
 func testAssets() fs.FS {
 	return fstest.MapFS{
 		"index.html":                    {Data: []byte(indexHTML)},
+		"favicon.svg":                   {Data: []byte(faviconSVG)},
+		"fonts/inter.woff2":             {Data: []byte(interWOFF2)},
 		"assets/app-abc123.js":          {Data: []byte(appJS)},
 		"assets/vendor/chunk-def456.js": {Data: []byte("console.log('vendor')")},
 	}

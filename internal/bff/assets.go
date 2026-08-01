@@ -32,19 +32,47 @@ func serveAsset(assets fs.FS) http.HandlerFunc {
 		}
 
 		w.Header().Set("Cache-Control", immutableCacheControl)
-		// gosec suit la teinture de l'URL jusqu'ici sans voir ce que le `fs.Stat` ci-dessus a déjà
-		// tranché : un `fs.FS` refuse tout nom que `fs.ValidPath` rejette — dont le moindre `..` —
-		// donc `name` désigne un fichier existant *dans* l'arborescence, et il n'y a pas de parent
-		// à remonter. Vérifié sur `fs.Stat`, pas déduit de la doc.
-		http.ServeFileFS(w, r, assets, name) //nolint:gosec // chemin déjà validé par fs.Stat
+		// G703 suit la teinture de l'URL jusqu'ici. Ce qui la rend inoffensive n'est pas le `fs.Stat`
+		// ci-dessus — `io/fs.Stat` ne valide rien, il délègue à `Open` — mais le contrat de `fs.FS`,
+		// dont l'`Open` doit rejeter tout nom que `fs.ValidPath` refuse, et l'implémentation
+		// réellement injectée : `fs.Sub` rend un `subFS`, qui les rejette dans `fullName`
+		// (`io/fs/sub.go:60-65`). Un `..` n'a donc aucun parent où remonter.
+		//
+		// Aucun test ne descend jusqu'à `fullName`, et ce n'est pas un manque :
+		// `TestAssetPathCannotEscapeItsDirectory` mesure le résultat — un `..` ne sort pas — et
+		// s'arrête au `fs.Stat` ci-dessus. Même sans lui, `ServeFileFS` refuse `..` sur
+		// `r.URL.Path` par 400 (`net/http/fs.go:849-857`) sans jamais atteindre `fullName`.
+		http.ServeFileFS(w, r, assets, name) //nolint:gosec // G703 : voir juste au-dessus
 	}
 }
 
-// serveShell rend la coquille de la SPA pour toute URL qui n'est pas une route du serveur : elles
-// n'existent que côté client, et c'est le routeur du navigateur qui les tranche.
+// serveShell tranche entre un fichier et une URL de navigation sur la seule question qui décide :
+// le chemin demandé désigne-t-il un fichier existant ? Si oui il est servi ; sinon c'est la
+// coquille, car les URL de navigation n'existent que côté client et c'est le routeur du navigateur
+// qui les tranche. La profondeur n'entre pas dans la règle : Vite recopie `web/public/` sans hacher
+// les noms et **récursivement**, donc `fonts/inter.woff2` est un fichier public autant que
+// `favicon.svg`. Rendre la coquille à la place de l'un ou de l'autre le servirait en `text/html`
+// avec 200 — le défaut de DN-6 hors de `/assets/`, silencieux jusqu'au `@font-face` sans effet.
+//
+// La réciproque est assumée : un fichier du bundle masque la route SPA homonyme, à n'importe quelle
+// profondeur. C'est déjà vrai en production sans que personne l'ait choisi — `//go:embed all:dist`
+// embarque le `.gitkeep` du dépôt, et `GET /.gitkeep` rend donc 200 avec un corps vide.
 func serveShell(assets fs.FS) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		name := shellName
+		if requested := strings.TrimPrefix(r.URL.Path, "/"); isFile(assets, requested) {
+			name = requested
+		}
+
 		w.Header().Set("Cache-Control", shellCacheControl)
-		http.ServeFileFS(w, r, assets, shellName)
+		http.ServeFileFS(w, r, assets, name) //nolint:gosec // G703 : même garantie que serveAsset
 	}
+}
+
+// isFile écarte l'inexistant — un nom que `fs.ValidPath` refuse, `/` compris, y tombe aussi — et les
+// répertoires. Sans `!IsDir`, `/assets` rendrait 301 vers `assets/` au lieu de la coquille.
+func isFile(assets fs.FS, name string) bool {
+	info, err := fs.Stat(assets, name)
+
+	return err == nil && !info.IsDir()
 }
