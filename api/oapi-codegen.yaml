@@ -1,0 +1,32 @@
+# Génération du client Go de l'API Admin. Le contrat n'est pas ici : il est lu sous
+# `web/node_modules/@martialanouman/gateway-api-contracts/`, où `make generate` va le chercher, et
+# `internal/gateway/contrat_test.go` refuse qu'une copie entre dans le dépôt.
+#
+# Les chemins sont relatifs au répertoire de travail, jamais à ce fichier — `Overlay.Path` et
+# `output` sont passés tels quels à `os.Open` / `os.WriteFile` par `cmd/oapi-codegen`. Toutes les
+# recettes qui l'invoquent partent donc de la racine.
+
+package: gateway
+output: internal/gateway/client.gen.go
+
+# Le client et les modèles, rien d'autre : ce dépôt *appelle* l'API Admin, il ne la sert pas. Pas
+# d'`embedded-spec` non plus — il embarquerait le contrat dans le binaire, c'est-à-dire une copie de
+# plus, figée à la date de la dernière génération.
+#
+# Les 133 opérations sont engendrées, aucune n'est exclue, y compris les trois `stream-*` hors
+# périmètre : une liste d'exclusion vivrait ici et divergerait en silence du contrat au fil des
+# bumps. Le contrat est la source de vérité, le client le reflète intégralement.
+generate:
+  client: true
+  models: true
+
+output-options:
+  # Deux noms Go entrent en collision et arrêtent la génération ; l'overlay les lève sans toucher au
+  # contrat. Il dit lui-même lesquels et ce qui le rendra caduc.
+  #
+  # `strict` n'est pas posé : son défaut est `true` (`OutputOptionsOverlay.Strict`, un `*bool` que
+  # `cmd/oapi-codegen` ne lit que s'il est non nul), et c'est cette valeur-là qu'on veut. Une action
+  # dont le sélecteur ne matche plus rien fait alors échouer la génération au lieu de pourrir en
+  # silence. La portée exacte de cette garantie est écrite dans l'overlay.
+  overlay:
+    path: api/overlay-admin.yaml

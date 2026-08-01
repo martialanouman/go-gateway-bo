@@ -87,9 +87,19 @@ propre step, jamais au milieu de celle-ci.
 ### DN-2 — Les deux collisions de noms Go se lèvent par un overlay OpenAPI local, pas par une copie
 
 oapi-codegen v2.8.0 parse ce contrat **OpenAPI 3.1** sans erreur — les 184 `type: [T, "null"]`
-passent. Il échoue sur exactement **deux** collisions de noms Go, trouvées par itération : le schéma
-`ConnectorStatus` (santé runtime) entre en collision avec l'enum inline de la propriété
-`Connector.status`, et `SenderId` de même.
+passent. Il échoue sur exactement **deux** collisions de noms Go, trouvées par itération.
+
+> **Correction du 01/08, mesurée pendant l'implémentation.** Cette décision affirmait d'abord que les
+> deux collisions avaient la même cause — un enum inline. C'est vrai de la première seulement :
+> `Connector.status` est un enum inline dont oapi-codegen tire `ConnectorStatus`, nom que porte déjà
+> le schéma de santé runtime. La seconde est d'une autre nature : `SenderId` est déclaré **deux fois
+> en composants**, une fois sous `components.parameters` (l. 1517, un UUID de chemin) et une fois
+> sous `components.schemas` (l. 1713, la ressource) — vérifié par `grep -n "SenderId"` sur le YAML.
+> C'est le **paramètre** que l'overlay renomme, le schéma gardant son nom, parce que tout le versant
+> sender ids référence ce dernier.
+>
+> La conclusion ne change pas — l'overlay cible des composants dans les deux cas — mais la raison
+> écrite était fausse, et une raison fausse se transmet à la prochaine session comme une vérité.
 
 La règle du dépôt veut qu'un **manque au contrat** se corrige par une PR amont. Ce n'en est pas un :
 la collision est propre au générateur **Go** et n'existe pas côté TypeScript, que le même contrat

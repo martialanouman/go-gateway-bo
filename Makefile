@@ -3,11 +3,20 @@
 # composite l'y enverrait chercher un `pnpm` absent.
 #
 # Ce que ce fichier ne porte pas encore : `mock` (Prism) et les cibles du versant Go qui n'ont pas
-# encore leur code (`generate`, `migrate`, `bootstrap`). Aucune cible vide ici : une cible qui ne fait
-# rien passe pour verte.
+# encore leur code (`migrate`, `bootstrap`). Aucune cible vide ici : une cible qui ne fait rien passe
+# pour verte.
 
 BIN := bin/dashboard
 WEBASSETS := internal/webassets/dist
+
+# Le contrat de l'API Admin est consommé depuis GitHub Packages et **jamais copié ici** : la
+# génération le lit là où pnpm l'a installé. `internal/gateway/contrat_test.go` en fait une porte.
+#
+# C'est ce chemin qui range `generate` — et la porte qui la rejoue — du côté qui a les deux
+# toolchains : le versant Go n'a ni pnpm ni `node_modules`, et une cible de génération invoquée par un
+# job Go ne trouverait pas le contrat. Même raison que `build-go` face à `build`.
+CONTRACT_ADMIN := web/node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml
+ADMIN_CLIENT := internal/gateway/client.gen.go
 
 # Purge ce que la copie précédente a déposé, en épargnant `.gitkeep`.
 #
@@ -39,7 +48,7 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 
 .DEFAULT_GOAL := help
 .PHONY: help build build-go build-web dev check test test-go test-web lint lint-go lint-web fmt-go \
-        typecheck-web vuln-go vuln-web lint-workflows check-routes clean
+        typecheck-web vuln-go vuln-web lint-workflows check-routes generate check-generated clean
 
 # Deux courses vivent entre les prérequis de `check`, et la seconde ne se voit pas :
 #
@@ -139,7 +148,7 @@ dev: build-go ## Lance le BFF (:3001) et Vite (:3000) côte à côte
 #
 # La sérialisation des prérequis est portée par le `.NOTPARALLEL:` du haut de fichier, qui dit
 # pourquoi.
-check: build lint-go test-go vuln-go lint-workflows typecheck-web lint-web test-web vuln-web check-routes ## Toutes les portes de la CI
+check: build lint-go test-go vuln-go lint-workflows typecheck-web lint-web test-web vuln-web check-routes check-generated ## Toutes les portes de la CI
 
 test: test-go test-web ## Les deux suites
 
@@ -195,6 +204,40 @@ check-routes: ## Vérifie que l'arbre de routes commité est à jour et régén�
 	@git diff --quiet HEAD -- web/src/routeTree.gen.ts || { \
 		echo "l'arbre de routes régénéré diffère du fichier commité — commiter web/src/routeTree.gen.ts"; \
 		git --no-pager diff --stat HEAD -- web/src/routeTree.gen.ts; \
+		exit 1; \
+	}
+
+# Le contrat est absent d'un arbre où `pnpm install` n'a pas tourné, et `oapi-codegen` dirait alors
+# seulement qu'il n'a pas su ouvrir un chemin. Ce que la recette annonce à la place est la sortie de
+# secours.
+generate: ## Engendre le client Go de l'API Admin depuis le contrat installé
+	@test -f $(CONTRACT_ADMIN) || { \
+		echo "$(CONTRACT_ADMIN) est absent — le contrat vient de GitHub Packages : pnpm -C web install"; \
+		exit 1; \
+	}
+	go tool oapi-codegen --config api/oapi-codegen.yaml $(CONTRACT_ADMIN)
+
+# Le client de l'API Admin est engendré et **commité** : les jobs Go de la CI n'ont pas
+# `node_modules`, donc pas le contrat, et sans le fichier commité ils ne compileraient plus.
+# Le régénérer et constater qu'il n'a pas bougé est la seule façon de savoir que ce qui est commité
+# correspond au contrat installé — un bump du paquet npm sans régénération passerait sinon inaperçu.
+#
+# Même forme que `check-routes`, et pour la même raison : le fichier est **supprimé** avant d'être
+# reconstruit, jamais seulement comparé. Une comparaison seule reste verte quand plus rien ne
+# régénère — configuration renommée, overlay retiré, outil disparu de la directive `tool` — le
+# fichier commité faisant illusion. Sans génération, il ne réapparaît pas, et son absence rougit.
+#
+# Le verdict se lit dans `git status` et non dans `git diff HEAD`, seule différence de forme avec
+# `check-routes` : `git diff` ne connaît que les fichiers suivis, donc un client engendré mais jamais
+# ajouté à l'index le laisse muet — la porte serait verte sur un fichier que la CI ne clonera pas.
+# `git status --porcelain` le rend en `??`, au même titre qu'une modification ou une suppression.
+check-generated: ## Vérifie que le client de l'API Admin commité est à jour et régénéré
+	@rm -f $(ADMIN_CLIENT)
+	@$(MAKE) --no-print-directory generate \
+		|| { git checkout -- $(ADMIN_CLIENT) 2>/dev/null; exit 1; }
+	@test -z "$$(git status --porcelain -- $(ADMIN_CLIENT))" || { \
+		echo "le client régénéré diffère du fichier commité — lancer make generate et commiter $(ADMIN_CLIENT)"; \
+		git --no-pager status --short -- $(ADMIN_CLIENT); \
 		exit 1; \
 	}
 
