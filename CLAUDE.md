@@ -37,12 +37,13 @@ make lint-web     # Biome                                               (cible)
 ```
 
 `make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
-égaler. Ce qu'il ne rejoue pas, et qui fait qu'un vert local ne garantit pas une PR verte :
-`pr-title.yml` ; les règles du ruleset de `main` — **CodeQL** et **code_quality** — qui bloquent une
-PR sans passer par le check `CI` ; `govulncheck`, qui interroge une base vivante, donc dont le verdict
-change sans qu'un fichier bouge ; et la plateforme, linux/amd64 en CI contre darwin/arm64 en local, ce
-qui compte pour `go test -race`. Les portes du versant client — `pnpm install --frozen-lockfile`
-rejoué, `pnpm audit` — s'ajouteront quand la CI aura ses jobs client.
+égaler. Deux raisons distinctes font qu'un vert local ne garantit pas une PR verte. **Ce que `make
+check` ne rejoue pas du tout** : `pr-title.yml`, et les deux règles du ruleset de `main` — **CodeQL**
+et **code_quality** — qui bloquent une PR sans passer par le check `CI`. **Ce qu'il rejoue sans que le
+verdict soit le même** : `govulncheck`, qui interroge une base vivante et peut changer d'avis sans
+qu'un fichier bouge, et `go test -race`, qui tourne ici sur darwin/arm64 et là-bas sur linux/amd64.
+Les portes du versant client — `pnpm install --frozen-lockfile` rejoué, `pnpm audit` — s'ajouteront
+quand la CI aura ses jobs client.
 
 ## Architecture (carte mentale)
 

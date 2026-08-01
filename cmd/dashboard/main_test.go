@@ -208,9 +208,15 @@ func (p *process) healthURL() string {
 func (p *process) refusesToStart() error {
 	select {
 	case err := <-p.exited:
+		// Les deux échecs sont distingués : sans ça, le cas le plus fréquent — une sortie en succès,
+		// donc une erreur nulle — se présenterait comme une erreur vide.
+		if err == nil {
+			return errors.New("le process a rendu un code 0 : il aurait dû refuser de démarrer")
+		}
+
 		var exit *exec.ExitError
 		if !errors.As(err, &exit) {
-			return fmt.Errorf("le process s'est arrêté sans erreur, il aurait dû refuser: %w", err)
+			return fmt.Errorf("le process ne s'est pas arrêté normalement: %w", err)
 		}
 
 		return nil

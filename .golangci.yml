@@ -42,7 +42,9 @@ linters:
   exclusions:
     generated: lax
     rules:
-      # Les tests ont le droit de paniquer sur une erreur d'échafaudage : c'est leur façon d'échouer.
+      # Un test qui ignore le retour d'un `Close()` ou qui lance un sous-process avec un chemin calculé
+      # fait son travail : son échafaudage n'est pas exposé, et l'y contraindre ajouterait du bruit
+      # sans rien garder.
       - path: _test\.go
         linters:
           - errcheck

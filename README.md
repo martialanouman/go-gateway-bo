@@ -14,7 +14,8 @@ vers l'API Admin de la passerelle.
 > (`tasks/todo.md`), les fichiers de step de M0, la charte graphique, et l'échafaudage de projet
 > (accès au registre, protections de dépendances, `docker-compose.yml`). Aucune ligne d'application.
 >
-> **Ce README décrit la cible**, et signale `(cible)` ce qui n'existe pas encore. Depuis step-000, le
+> **Ce README décrit la cible.** Les commandes qui n'existent pas encore y sont signalées `(cible)` ;
+> le reste du document décrit l'état visé, pas l'état livré. Depuis step-000, le
 > socle Go existe : `make dev/build/check` et les portes granulaires tournent.
 > La première tentative a payé six défauts d'outillage, tous invisibles en local : ils
 > sont inscrits dans les steps qui les rencontrent (`tasks/plan.md` §2.1), et la leçon transverse est
@@ -33,7 +34,7 @@ pnpm -C web install
 cp .env.example .env       # puis remplir les secrets — voir plus bas
 docker compose up -d       # PostgreSQL 18 + Redis
 make migrate               # applique les migrations                        (cible, step-005)
-make bootstrap             # sème les permissions et crée le premier compte (cible, step-020)
+make bootstrap             # sème les permissions et crée le premier compte (cible)
 make mock                  # Prism sert le contrat sur :4010, autre terminal (cible, step-003)
 make dev                   # aujourd'hui : le BFF seul sur :3001
 ```
@@ -73,16 +74,20 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 ```bash
 make dev        # aujourd'hui le BFF Go seul (:3001) ; Vite (:3000) s'y ajoute en step-001
 make build      # go build → bin/dashboard ; les assets s'y embarquent en step-002
-make check      # tout ce que la CI vérifie — OBLIGATOIRE avant toute PR
-make generate   # code du contrat (Go + TS) et catalogue de permissions (Go → TS)
-make mock       # Prism sur openapi-admin.yaml
-make migrate    # migrations de la base
+make check      # toutes les portes de la CI — OBLIGATOIRE avant toute PR
+make help       # liste les cibles qui existent — c'est la cible par défaut
+make clean      # supprime bin/
+make generate   # contrat (Go + TS) et catalogue de permissions (Go → TS)   (cible)
+make mock       # Prism sur openapi-admin.yaml                        (cible, step-003)
+make migrate    # migrations de la base                               (cible, step-005)
 
-make test              # les deux suites — test-go puis test-web
 make test-go           # unitaires Go + scénarios godog, avec -race
-make test-web          # Vitest, seuils de couverture par fichier
-make lint              # les deux linters — lint-go puis lint-web
+make lint-go           # golangci-lint · make fmt-go applique le formatage
+make vuln-go           # govulncheck
 make lint-workflows    # actionlint — un workflow invalide est absent, pas rouge
+make test-web          # Vitest, seuils de couverture par fichier            (cible)
+make lint-web          # Biome                                               (cible)
+make test / make lint  # les composites des deux toolchains                  (cible)
 # `pnpm -C web e2e` — cible, arrive avec le harnais Playwright de step-007
 ```
 
@@ -91,12 +96,17 @@ sur un clone frais, et un scanner qui change sous les pieds ne rend pas un run
 non reproductible.
 
 `make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
-égaler. Ce qu'il ne rejoue pas, et qui fait qu'un vert local ne garantit pas une PR verte :
-`pr-title.yml` ; les règles du ruleset de `main` — **CodeQL** et **code_quality** — qui bloquent une PR
-sans passer par le check `CI` ; `govulncheck`, qui interroge une base vivante, donc dont le verdict
-change sans qu'un fichier bouge ; et la plateforme, linux/amd64 en CI contre darwin/arm64 en local, ce
-qui compte pour `go test -race`. Les portes du versant client — `pnpm install --frozen-lockfile`
-rejoué, `pnpm audit` — s'ajouteront quand la CI aura ses jobs client.
+égaler. Deux raisons distinctes font qu'un vert local ne garantit pas une PR verte.
+
+**Ce que `make check` ne rejoue pas du tout** : `pr-title.yml`, et les deux règles du ruleset de `main`
+— **CodeQL** et **code_quality** — qui bloquent une PR sans passer par le check `CI`.
+
+**Ce qu'il rejoue sans que le verdict soit le même** : `govulncheck`, qui interroge une base vivante et
+peut changer d'avis sans qu'un fichier bouge ; et `go test -race`, qui tourne ici sur darwin/arm64 et
+là-bas sur linux/amd64.
+
+Les portes du versant client — `pnpm install --frozen-lockfile` rejoué, `pnpm audit` — s'ajouteront
+quand la CI aura ses jobs client.
 
 ### Deux processus en développement, un seul en production
 
@@ -226,9 +236,9 @@ Une **step = une PR**. Prendre le prochain fichier de `tasks/steps/` — **l'ord
 [`tasks/todo.md`](./tasks/todo.md) fait foi**, pas le numéro —, l'implémenter en **BDD strict,
 scénario rouge d'abord**, puis déplacer le fichier dans `tasks/steps/done/` en dernier commit.
 
-Les portes de qualité tournent en **jobs parallèles**, sur les deux toolchains. Une porte qui échoue
-n'empêche pas les autres de rendre leur verdict — on voit une erreur de compilation Go *et* un test
-client rouge au même run. La protection de branche doit exiger le seul check **`CI`** : il les agrège
+Les portes de qualité tournent en **jobs parallèles** — aujourd'hui les cinq portes Go, les portes
+client s'y ajoutant avec leurs steps. Une porte qui échoue n'empêche pas les autres de rendre leur
+verdict : on voit une erreur de compilation *et* un test rouge au même run. La protection de branche doit exiger le seul check **`CI`** : il les agrège
 et reste valable quand une porte s'ajoute, alors que lister les jobs nommément se périmerait au premier
 ajout.
 
