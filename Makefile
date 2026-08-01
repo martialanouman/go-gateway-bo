@@ -85,8 +85,12 @@ vuln-go: ## Vulnérabilités connues des dépendances Go
 
 # Un workflow invalide n'est pas rouge, il est **absent** : la protection de branche n'a alors plus
 # rien à exiger, et une PR passe sans qu'aucune porte n'ait tourné.
-lint-workflows: ## actionlint sur .github/workflows
+#
+# La seconde vérification est de la même famille : la protection de branche n'exige que le check `CI`,
+# qui agrège les autres par son `needs:`. Un job absent de cette liste échouerait sans bloquer la PR.
+lint-workflows: ## actionlint, et l'agrégateur CI attend-il tous les jobs ?
 	go tool actionlint
+	python3 scripts/check-ci-aggregator.py
 
 # L'arbre de routes est engendré par le plugin TanStack et **commité** : sans lui, un clone frais ne
 # compile pas. Le régénérer et constater qu'il n'a pas bougé est la seule façon de savoir que le

@@ -3,8 +3,8 @@
 # n'a donc pas à être rouverte chaque fois qu'une porte s'ajoute.
 #
 # En contrepartie, la liste vit ici, dans le `needs:` de ce job — et un job ajouté sans y être inscrit
-# laisserait `CI` vert pendant qu'il est rouge. Rien ne détecte cet oubli aujourd'hui : ni actionlint,
-# ni `make check`.
+# laisserait `CI` vert pendant qu'il est rouge. `make lint-workflows` compare les deux et refuse
+# l'écart, dans les deux sens.
 name: CI
 
 on:

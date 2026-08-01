@@ -32,7 +32,7 @@ make mock         # mock Prism sur openapi-admin.yaml                    (cible)
 make test-go      # unitaires Go + scénarios godog, avec -race
 make lint-go      # golangci-lint · make fmt-go applique le formatage
 make vuln-go      # govulncheck
-make lint-workflows  # actionlint : un workflow invalide est absent, pas rouge
+make lint-workflows  # actionlint + l'agrégateur CI attend-il tous les jobs ?
 make typecheck-web   # tsc --noEmit
 make test-web     # Vitest
 make lint-web     # Biome · make vuln-web — pnpm audit

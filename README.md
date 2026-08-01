@@ -86,7 +86,7 @@ make migrate    # migrations de la base                               (cible, st
 make test-go           # unitaires Go + scénarios godog, avec -race
 make lint-go           # golangci-lint · make fmt-go applique le formatage
 make vuln-go           # govulncheck
-make lint-workflows    # actionlint — un workflow invalide est absent, pas rouge
+make lint-workflows    # actionlint, et l'agrégateur CI attend-il tous les jobs ?
 make typecheck-web     # tsc --noEmit
 make test-web          # Vitest
 make lint-web          # Biome
