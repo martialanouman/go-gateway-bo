@@ -7,15 +7,39 @@
 # rien passe pour verte.
 
 BIN := bin/dashboard
+WEBASSETS := internal/webassets/dist
+
+# Purge ce que la copie précédente a déposé, en épargnant `.gitkeep`.
+#
+# Rien ne vide `$(WEBASSETS)` — contrairement à `web/dist`, que Vite vide à chaque build. Les noms
+# d'assets portent un hash du contenu, donc une nouvelle version n'écrase pas l'ancienne : sans
+# purge, les assets de tous les builds précédents s'accumuleraient dans le binaire.
+#
+# `.gitkeep` est épargné plutôt que supprimé puis recréé : c'est lui qui rend `//go:embed all:dist`
+# satisfiable sur un clone neuf, et le défaut a déjà été payé une fois — les trois lignes du
+# `.gitignore` et `internal/webassets/webassets_test.go` existent pour ça. Si le répertoire manque,
+# `find` échoue et la recette s'arrête : c'est exactement le cas qu'on veut voir bruyamment.
+PURGE_WEBASSETS := find $(WEBASSETS) -mindepth 1 ! -name .gitkeep -delete
 
 .DEFAULT_GOAL := help
-.PHONY: help build build-web dev check test test-go test-web lint lint-go lint-web fmt-go \
+.PHONY: help build build-go build-web dev check test test-go test-web lint lint-go lint-web fmt-go \
         typecheck-web vuln-go vuln-web lint-workflows check-routes clean
 
 help: ## Liste les cibles disponibles
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-build: ## Compile le binaire dans bin/ (le client s'y embarque en step-002)
+# `build-go` est appelé par récursion et non déclaré en prérequis : sous `make -j`, les prérequis
+# tournent en parallèle, et le `go build` embarquerait alors un `$(WEBASSETS)` en cours de copie.
+build: build-web ## Construit le client, l'installe dans le binaire, et compile
+	$(PURGE_WEBASSETS)
+	cp -R web/dist/. $(WEBASSETS)/
+	@$(MAKE) --no-print-directory build-go
+
+# Compiler sans le client est une cible à part parce que les cinq jobs Go de la CI n'ont ni Node ni
+# `node_modules` : ils appellent `build-go`, jamais `build`, qui les enverrait chercher un `pnpm`
+# absent. Le binaire qui en sort n'a pas d'interface — le `.gitkeep` commité suffit à `//go:embed`,
+# et c'est la compilation qu'on vérifie là-bas, pas le déployable.
+build-go: ## Compile le binaire dans bin/, sans reconstruire le client
 	go build -o $(BIN) ./cmd/dashboard
 
 build-web: ## Construit le client dans web/dist
@@ -36,7 +60,11 @@ build-web: ## Construit le client dans web/dist
 # Elle rend aussi le `trap` utile : un shell POSIX n'exécute un gestionnaire de signal qu'entre deux
 # commandes, donc attendre `pnpm` en avant-plan avalait le signal jusqu'à ce que Vite s'arrête de
 # lui-même — vérifié, les deux processus survivaient à un `kill`.
-dev: build ## Lance le BFF (:3001) et Vite (:3000) côte à côte
+#
+# `build-go` et non `build` : en développement, c'est Vite qui sert le client sur :3000. Construire un
+# bundle de production pour l'embarquer dans un binaire qui ne le servira pas coûte deux secondes à
+# chaque lancement et ne change rien à ce que l'opérateur voit.
+dev: build-go ## Lance le BFF (:3001) et Vite (:3000) côte à côte
 	@set -a; if [ -f .env ]; then . ./.env; fi; set +a; \
 	./$(BIN) & bff=$$!; \
 	pnpm -C web dev & vite=$$!; \
@@ -50,6 +78,13 @@ dev: build ## Lance le BFF (:3001) et Vite (:3000) côte à côte
 		|| echo 'le BFF s'\''est arrêté : Vite aurait servi un proxy sans destination.'; \
 	exit 1
 
+# `build` est ici, et pas `build-go`, pour qu'un vert local dise que le **déployable** se construit —
+# la CI, elle, ne l'exerce nulle part (ses jobs Go n'ont pas Node). Le client s'y construit deux fois,
+# une pour `build` et une pour `check-routes` : ~100 ms, et les deux sorties sont identiques.
+#
+# À lancer séquentiellement : sous `make -j`, `build` et `check-routes` lanceraient deux `vite build`
+# concurrents sur le même `web/dist`, que Vite vide avant d'écrire. `.NOTPARALLEL: check` fermerait la
+# porte, mais il n'accepte de prérequis qu'à partir de GNU make 4.4 et macOS livre encore la 3.81.
 check: build lint-go test-go vuln-go lint-workflows typecheck-web lint-web test-web vuln-web check-routes ## Toutes les portes de la CI
 
 test: test-go test-web ## Les deux suites
@@ -111,3 +146,4 @@ check-routes: ## Vérifie que l'arbre de routes commité est à jour et régén�
 
 clean: ## Supprime les artefacts de build
 	rm -rf bin web/dist
+	$(PURGE_WEBASSETS)

@@ -35,7 +35,10 @@ jobs:
         with:
           # go.mod est la source unique de la version de Go ; ne jamais la répéter ici.
           go-version-file: go.mod
-      - run: make build
+      # `build-go` et non `build` : ce job n'a ni Node ni `node_modules`, et `build` construirait
+      # d'abord le client. Ce qu'on vérifie ici est que le Go compile ; le job « Build client »
+      # couvre l'autre moitié de la chaîne.
+      - run: make build-go
 
   test:
     name: Tests Go
