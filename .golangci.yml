@@ -1,0 +1,27 @@
+version: "2"
+
+linters:
+  enable:
+    # Une réponse HTTP non fermée fuit une connexion — le hub WS de step-043 en
+    # tiendra des centaines par instance.
+    - bodyclose
+    # Impose %w et errors.Is/As : le modèle d'erreur du §1.4 repose sur des
+    # erreurs typées qui traversent les couches.
+    - errorlint
+    # Une requête sortante sans contexte ignore l'annulation : le tableau de bord
+    # ne doit jamais faire pression sur l'API Admin (invariant e).
+    - noctx
+    - revive
+    - gosec
+
+  exclusions:
+    rules:
+      # gosec signale les credentials codés en dur sur des noms de variables de
+      # test ; le vrai filet est ailleurs (§1.8, aucun secret dans le dépôt).
+      - path: _test\.go
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofmt

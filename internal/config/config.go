@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// Noms des variables d'environnement lues par Load.
 const (
 	EnvAddr            = "DASHBOARD_ADDR"
 	EnvShutdownTimeout = "DASHBOARD_SHUTDOWN_TIMEOUT"
@@ -47,13 +48,10 @@ func Load(getenv func(string) string) (*Config, error) {
 	var problems []error
 
 	addr := getenv(EnvAddr)
-	switch {
-	case addr == "":
+	if addr == "" {
 		problems = append(problems, fmt.Errorf("%s est obligatoire et n'a pas de valeur par défaut", EnvAddr))
-	default:
-		if err := validateAddr(addr); err != nil {
-			problems = append(problems, fmt.Errorf("%s : %w", EnvAddr, err))
-		}
+	} else if err := validateAddr(addr); err != nil {
+		problems = append(problems, fmt.Errorf("%s : %w", EnvAddr, err))
 	}
 
 	shutdownTimeout := defaultShutdownTimeout

@@ -31,7 +31,7 @@ func run(ctx context.Context, getenv func(string) string) error {
 		return fmt.Errorf("configuration invalide :\n%w", err)
 	}
 
-	listener, err := net.Listen("tcp", configuration.Addr)
+	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", configuration.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", configuration.Addr, err)
 	}

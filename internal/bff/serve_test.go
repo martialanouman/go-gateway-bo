@@ -26,11 +26,12 @@ func TestServeFinishesInFlightRequestAndRefusesNewOnes(t *testing.T) {
 		_, _ = w.Write([]byte("réponse complète"))
 	})
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	ctx, stop := context.WithCancel(t.Context())
+
+	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	baseURL := "http://" + listener.Addr().String()
 
-	ctx, stop := context.WithCancel(context.Background())
 	served := make(chan error, 1)
 	go func() { served <- bff.Serve(ctx, listener, handler, 5*time.Second) }()
 

@@ -44,9 +44,6 @@ func initializeScenarios(sc *godog.ScenarioContext) {
 			w.stop()
 			<-w.served
 		}
-		if w.response != nil {
-			_ = w.response.Body.Close()
-		}
 		*w = world{}
 		return ctx, nil
 	})
@@ -59,13 +56,13 @@ func initializeScenarios(sc *godog.ScenarioContext) {
 	sc.Step(`^le serveur rend la main sans erreur$`, w.serverReturnedCleanly)
 }
 
-func (w *world) startServer() error {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+func (w *world) startServer(scenarioCtx context.Context) error {
+	listener, err := new(net.ListenConfig).Listen(scenarioCtx, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.WithoutCancel(scenarioCtx))
 	w.stop = cancel
 	w.baseURL = "http://" + listener.Addr().String()
 	w.served = make(chan error, 1)
@@ -75,11 +72,20 @@ func (w *world) startServer() error {
 	return nil
 }
 
-func (w *world) request(path string) error {
-	response, err := http.Get(w.baseURL + path) //nolint:noctx // requête de test, sans annulation utile
+// Le corps est fermé tout de suite : les scénarios n'assertent que le statut et
+// les en-têtes, qui survivent à la fermeture.
+func (w *world) request(ctx context.Context, path string) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, w.baseURL+path, nil)
 	if err != nil {
 		return err
 	}
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = response.Body.Close() }()
+
 	w.response = response
 	return nil
 }

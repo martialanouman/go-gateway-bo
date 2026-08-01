@@ -70,7 +70,7 @@ func (w *world) messageSaysRequired(name string) error {
 
 func (w *world) messageAvoidsRequired() error {
 	if w.err != nil && strings.Contains(w.err.Error(), "obligatoire") {
-		return fmt.Errorf("une valeur invalide est diagnostiquée comme absente : %s", w.err)
+		return fmt.Errorf("une valeur invalide est diagnostiquée comme absente : %w", w.err)
 	}
 	return nil
 }
@@ -87,7 +87,7 @@ func (w *world) problemNaming(name string) (string, error) {
 			return line, nil
 		}
 	}
-	return "", fmt.Errorf("aucune ligne ne nomme %q : %s", name, w.err)
+	return "", fmt.Errorf("aucune ligne ne nomme %q : %w", name, w.err)
 }
 
 func (w *world) completeEnvironment() error {
@@ -131,7 +131,7 @@ func (w *world) messageNames(name string) error {
 		return fmt.Errorf("aucune erreur, donc aucun message où chercher %q", name)
 	}
 	if !strings.Contains(w.err.Error(), name) {
-		return fmt.Errorf("le message ne nomme pas %q : %s", name, w.err)
+		return fmt.Errorf("le message ne nomme pas %q : %w", name, w.err)
 	}
 	return nil
 }
