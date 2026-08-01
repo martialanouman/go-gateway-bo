@@ -17,7 +17,7 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ConfirmDialog, Dialog, DropdownMenu, useToast } from '~/components/overlays'
 import { usePermission } from '~/components/permission'
 import { Button, Table, type TableColumn, TextField } from '~/components/primitives'
@@ -251,11 +251,14 @@ function RoleDialog({
     enabled: role !== undefined,
   })
 
-  function toggle(key: PermissionKey): void {
+  // `useCallback` : c'est ce qui rend la mémoïsation de `PermissionEditor` effective. Une fonction
+  // recréée à chaque rendu ferait échouer sa comparaison de props, et les quarante-quatre cases se
+  // re-rendraient à chaque frappe dans les champs de texte.
+  const toggle = useCallback((key: PermissionKey) => {
     setSelected((current) =>
       current.includes(key) ? current.filter((entry) => entry !== key) : [...current, key],
     )
-  }
+  }, [])
 
   async function submit(): Promise<void> {
     setBusy(true)

@@ -63,6 +63,23 @@ async function menuDeLaLigne(
   return menu
 }
 
+/**
+ * Remplit un champ **d'un coup**, plutôt que frappe par frappe.
+ *
+ * `user.type` émet un événement par caractère, et chacun re-rend la modale : dix-sept caractères
+ * dans une machine de CI dépassaient les cinq secondes du délai par défaut. Un collage est un geste
+ * réel — c'est ce qu'un administrateur fait d'un nom qu'on vient de lui donner — et il vaut mieux
+ * que d'allonger le délai, qui n'aurait fait que masquer le coût.
+ */
+async function saisir(
+  screen: ReturnType<typeof renderComponent>,
+  label: RegExp,
+  valeur: string,
+): Promise<void> {
+  await screen.user.click(screen.getByLabelText(label))
+  await screen.user.paste(valeur)
+}
+
 function renderScreen() {
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(OPERATOR_QUERY_KEY, ADMIN)
@@ -178,8 +195,8 @@ describe('la création à partir de rien', () => {
     // afficher « 0 permission retirée » ferait chercher un sens à un chiffre qui n'en a pas.
     expect(screen.queryByText(/Aperçu d’impact/)).not.toBeInTheDocument()
 
-    await screen.user.type(screen.getByLabelText(/Nom du rôle/), 'astreinte_nuit')
-    await screen.user.type(screen.getByLabelText(/Description/), 'Astreinte de nuit')
+    await saisir(screen, /Nom du rôle/, 'astreinte_nuit')
+    await saisir(screen, /Description/, 'Astreinte de nuit')
     await screen.user.click(screen.getByRole('checkbox', { name: 'sessions:read' }))
     await screen.user.click(screen.getByRole('button', { name: 'Créer le rôle' }))
 
@@ -198,8 +215,8 @@ describe('la création à partir de rien', () => {
     const screen = renderScreen()
 
     await screen.user.click(await screen.findByRole('button', { name: 'Créer un rôle' }))
-    await screen.user.type(screen.getByLabelText(/Nom du rôle/), 'ops')
-    await screen.user.type(screen.getByLabelText(/Description/), 'Doublon')
+    await saisir(screen, /Nom du rôle/, 'ops')
+    await saisir(screen, /Description/, 'Doublon')
     await screen.user.click(screen.getByRole('button', { name: 'Créer le rôle' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(refus)

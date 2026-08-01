@@ -15,6 +15,7 @@
  * parle.
  */
 
+import { memo } from 'react'
 import { Checkbox } from '~/components/primitives'
 import {
   PERMISSION_CATALOG,
@@ -49,7 +50,16 @@ export type PermissionEditorProps = {
   readonly onToggle: (key: PermissionKey) => void
 }
 
-export function PermissionEditor({ selected, onToggle }: PermissionEditorProps) {
+/**
+ * **Mémoïsé, et ce n'est pas une optimisation spéculative.** Le catalogue rend quarante-quatre cases
+ * Base UI ; sans cette barrière, chaque frappe dans le champ « nom » ou « description » de la modale
+ * les re-rendait toutes. Le symptôme est un champ qui traîne sous les doigts sur une machine
+ * modeste — mesuré en CI, où deux tests de saisie dépassaient les cinq secondes.
+ *
+ * Elle ne tient que si `onToggle` garde son identité : l'appelant le mémoïse (`useCallback`), sans
+ * quoi la comparaison de props échoue à chaque rendu et la barrière ne sert plus à rien.
+ */
+function PermissionCatalog({ selected, onToggle }: PermissionEditorProps) {
   const chosen = new Set<string>(selected)
 
   return (
@@ -81,3 +91,5 @@ export function PermissionEditor({ selected, onToggle }: PermissionEditorProps) 
     </div>
   )
 }
+
+export const PermissionEditor = memo(PermissionCatalog)
