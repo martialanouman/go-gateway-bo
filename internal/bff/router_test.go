@@ -12,9 +12,9 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
 )
 
-// call rend la réponse telle qu'elle part sur le fil, et non l'enregistreur : `rec.Header()` est la
-// map vivante que le handler a modifiée, pas ce que le client reçoit. Un en-tête posé après
-// `WriteHeader` — qui n'atteint donc jamais personne — y apparaît quand même.
+// call rend la réponse composée, et non l'enregistreur : `rec.Header()` est la map vivante que le
+// handler a modifiée, où un en-tête posé après `WriteHeader` — qui n'atteindra jamais personne —
+// apparaît quand même.
 func call(t *testing.T, method, target string) *http.Response {
 	t.Helper()
 

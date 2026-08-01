@@ -2,9 +2,10 @@
 # une cible qui dépend de l'autre toolchain : le job Go n'a ni Node ni `node_modules`, et une cible
 # composite l'y enverrait chercher un `pnpm` absent.
 #
-# Ce que ce fichier ne porte pas encore : les composites `test` et `lint`, les cibles client
-# (`test-web`, `lint-web`) et celles du versant Go qui n'ont pas encore leur code (`generate`, `mock`,
-# `migrate`, `bootstrap`). Aucune cible vide ici : une cible qui ne fait rien passe pour verte.
+# Ce que ce fichier ne porte pas encore : les composites `test` et `lint` ; les cibles qui passent par
+# Node (`test-web`, `lint-web`, et `mock`, qui lance Prism) ; et celles du versant Go qui n'ont pas
+# encore leur code (`generate`, `migrate`, `bootstrap`). Aucune cible vide ici : une cible qui ne fait
+# rien passe pour verte.
 
 BIN := bin/dashboard
 
