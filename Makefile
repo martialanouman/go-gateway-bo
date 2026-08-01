@@ -21,7 +21,7 @@ build: ## Compile le binaire dans bin/
 dev: build ## Lance le BFF avec les variables de .env
 	@set -a; if [ -f .env ]; then . ./.env; fi; set +a; exec ./$(BIN)
 
-check: lint-go test-go vuln-go lint-workflows ## Toutes les portes de la CI (moitié Go)
+check: build lint-go test-go vuln-go lint-workflows ## Toutes les portes de la CI (moitié Go)
 
 test-go: ## Tests Go et scénarios godog, avec -race
 	go test -race ./...

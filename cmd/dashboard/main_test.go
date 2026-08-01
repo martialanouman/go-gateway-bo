@@ -69,10 +69,9 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Given(`^un serveur démarré$`, p.startAndServe)
 	ctx.When(`^le serveur démarre$`, p.start)
 	ctx.When(`^le serveur reçoit SIGTERM$`, p.signalTerm)
-	ctx.Then(`^le serveur ne sert aucune requête$`, p.servesNothing)
+	ctx.Then(`^le serveur refuse de démarrer$`, p.refusesToStart)
 	ctx.Then(`^le message d'erreur nomme "([^"]*)"$`, p.messageNames)
 	ctx.Then(`^le serveur s'arrête sans erreur$`, p.exitsCleanly)
-	ctx.Then(`^il n'accepte plus aucune connexion$`, p.refusesConnections)
 
 	ctx.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
 		p.kill()
@@ -80,6 +79,10 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 		return ctx, err
 	})
 }
+
+// Toute attente du harnais est bornée. Sans limite, un serveur qui ne répond pas devient un test qui
+// ne finit pas, et le hook de fin — celui qui tue l'enfant — n'est alors jamais atteint.
+var probe = &http.Client{Timeout: 2 * time.Second}
 
 // completeConfiguration est le plus petit environnement avec lequel le binaire démarre. Le port 0
 // laisse le système en choisir un libre.
@@ -144,7 +147,7 @@ func (p *process) startAndServe() error {
 	}
 	p.addr = addr
 
-	resp, err := http.Get(p.healthURL())
+	resp, err := probe.Get(p.healthURL())
 	if err != nil {
 		return fmt.Errorf("le serveur ne répond pas: %w", err)
 	}
@@ -196,23 +199,11 @@ func (p *process) exitsCleanly() error {
 	}
 }
 
-func (p *process) refusesConnections() error {
-	client := &http.Client{Timeout: 2 * time.Second}
-
-	resp, err := client.Get(p.healthURL())
-	if err != nil {
-		return nil
-	}
-	defer resp.Body.Close()
-
-	return fmt.Errorf("le serveur répond encore : %s", resp.Status)
-}
-
 func (p *process) healthURL() string {
 	return "http://" + p.addr + "/api/health"
 }
 
-func (p *process) servesNothing() error {
+func (p *process) refusesToStart() error {
 	select {
 	case err := <-p.exited:
 		var exit *exec.ExitError
@@ -240,13 +231,20 @@ func (p *process) kill() {
 	}
 
 	_ = p.cmd.Process.Kill()
-	<-p.exited
+
+	select {
+	case <-p.exited:
+	case <-time.After(5 * time.Second):
+	}
 }
 
 func environment(vars map[string]string) []string {
 	// Un environnement construit de zéro : hériter de celui du test laisserait un DASHBOARD_ADDR
 	// posé dans le shell rendre le scénario vert sans que le code y soit pour rien.
 	env := make([]string, 0, len(vars)+1)
+	//nolint:forbidigo // PATH n'est pas une configuration du produit : c'est ce qui permet à l'enfant
+	// de trouver un exécutable. L'exemption est nommée ici plutôt que posée sur tous les `_test.go`,
+	// qui laisserait un test lire la vraie configuration depuis l'environnement.
 	env = append(env, "PATH="+os.Getenv("PATH"))
 	for name, value := range vars {
 		env = append(env, name+"="+value)

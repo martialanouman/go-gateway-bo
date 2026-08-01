@@ -56,9 +56,14 @@ func Load(lookup Lookup) (Config, error) {
 	return cfg, nil
 }
 
-// Variables énumère les variables que lit Load. La liste est produite par Load elle-même : une
-// variable ajoutée au chargeur y apparaît sans qu'il faille tenir une seconde liste — laquelle
-// finirait par diverger, et c'est de cette liste que dépend le test de `.env.example`.
+// Variables énumère les variables que lit Load, en la sondant avec un environnement vide plutôt
+// qu'en tenant une seconde liste — laquelle finirait par diverger du chargeur, et c'est d'elle que
+// dépend le test de `.env.example`.
+//
+// La contrainte que cela impose au chargeur : **toute lecture est inconditionnelle**, faite dans le
+// littéral Config ci-dessus. Une variable lue seulement quand une autre est renseignée resterait
+// invisible ici, et `.env.example` pourrait alors l'omettre sans que rien ne rougisse. Les secrets
+// que le §1.8 annonce (DSN, Redis, mTLS, OAuth2) s'ajoutent donc à cette forme, pas à côté d'elle.
 func Variables() []string {
 	var (
 		names []string
@@ -127,12 +132,16 @@ func (r *reader) listenAddr(name string) string {
 		return ""
 	}
 
-	return net.JoinHostPort(host, port)
+	// Le port est recomposé depuis le nombre analysé, et non repris verbatim : sinon `:+80` et
+	// `:00000000080` traverseraient la validation et seraient stockés tels quels.
+	return net.JoinHostPort(host, strconv.Itoa(number))
 }
 
+// positiveDuration traite une valeur blanche comme une absence : une variable facultative laissée
+// vide dans un `.env` dit « je n'ai pas d'avis », pas « zéro ».
 func (r *reader) positiveDuration(name string, fallback time.Duration) time.Duration {
-	raw, found := r.lookup(name)
-	if raw = strings.TrimSpace(raw); !found || raw == "" {
+	raw, _ := r.lookup(name)
+	if raw = strings.TrimSpace(raw); raw == "" {
 		return fallback
 	}
 

@@ -6,5 +6,5 @@ Fonctionnalité: Configuration validée au démarrage
   Scénario: une variable obligatoire absente empêche le démarrage
     Étant donné une configuration complète dont on retire "DASHBOARD_ADDR"
     Quand le serveur démarre
-    Alors le serveur ne sert aucune requête
+    Alors le serveur refuse de démarrer
     Et le message d'erreur nomme "DASHBOARD_ADDR"

@@ -17,8 +17,7 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	// os.Exit reste seul dans main : appelé plus bas, il court-circuiterait le `defer stop()` qui
-	// rend le process à nouveau tuable par un second signal.
+	// os.Exit reste seul dans main : appelé depuis start, il court-circuiterait son `defer`.
 	if err := start(logger); err != nil {
 		logger.Error("le serveur s'arrête", "error", err)
 		os.Exit(1)
@@ -28,6 +27,11 @@ func main() {
 func start(logger *slog.Logger) error {
 	// Le contexte racine naît ici et descend partout : toute goroutine ajoutée au BFF s'arrêtera sur
 	// son annulation, et c'est cette convention qui rendra le hub WebSocket testable.
+	//
+	// Le `defer` ne fait que désarmer le gestionnaire au retour ; pendant le délai de grâce, un second
+	// signal reste avalé et seul SIGKILL sort. C'est acceptable pour quinze secondes, et le rendre
+	// interruptible demanderait de désarmer dès le premier signal — sans qu'aucun test ne puisse
+	// l'observer, faute d'une requête assez lente pour ouvrir la fenêtre.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

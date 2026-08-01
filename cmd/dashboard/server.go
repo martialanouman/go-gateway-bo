@@ -12,6 +12,12 @@ import (
 
 // readHeaderTimeout borne le temps qu'une connexion peut passer à n'envoyer que des en-têtes. Sans
 // lui, quelques dizaines de connexions ouvertes et muettes suffisent à saturer le serveur.
+//
+// `ReadTimeout` et `WriteTimeout` restent délibérément à zéro : ils couperaient la WebSocket que le
+// hub ouvrira en M2, dont c'est le métier de rester ouverte. Un corps de requête lent n'est donc pas
+// borné aujourd'hui — c'est un report assumé, pas un oubli. Aucun test ne rougit si cette constante
+// disparaît : le vérifier demanderait de tenir une connexion muette assez longtemps pour que le
+// test dure plus que la porte qu'il garde.
 const readHeaderTimeout = 10 * time.Second
 
 // serve sert jusqu'à l'annulation de ctx, puis laisse aux requêtes en vol le délai de grâce pour se
@@ -30,6 +36,11 @@ func serve(
 		Handler:           handler,
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
+
+	// Une postcondition unique quel que soit le chemin : quand serve rend la main, plus rien n'est
+	// servi. Sans lui, un délai de grâce expiré laisserait des connexions actives derrière — un
+	// no-op après un arrêt réussi, l'essentiel après un arrêt forcé.
+	defer func() { _ = srv.Close() }()
 
 	closed := make(chan error, 1)
 	go func() {

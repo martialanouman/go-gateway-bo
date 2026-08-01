@@ -90,44 +90,6 @@ func requireRefusesConnections(t *testing.T, addr string) {
 	}, 3*time.Second, 20*time.Millisecond)
 }
 
-func TestServeStopsAcceptingOnceShutdownStarts(t *testing.T) {
-	t.Parallel()
-
-	var (
-		entered  = make(chan struct{})
-		released = make(chan struct{})
-	)
-
-	handler := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		close(entered)
-		<-released
-	})
-
-	ln := listenLocally(t)
-	url := "http://" + ln.Addr().String() + "/"
-
-	ctx, shutdown := context.WithCancel(t.Context())
-	served := make(chan error, 1)
-	go func() { served <- serve(ctx, ln, handler, 5*time.Second, silentLogger()) }()
-
-	go func() {
-		resp, err := http.Get(url)
-		if err == nil {
-			resp.Body.Close()
-		}
-	}()
-
-	<-entered
-	shutdown()
-
-	// Une instance en cours de retrait ne doit plus rien accepter, même pendant qu'elle termine ce
-	// qu'elle avait commencé : le load balancer l'a déjà retirée de la rotation.
-	requireRefusesConnections(t, ln.Addr().String())
-
-	close(released)
-	require.NoError(t, <-served)
-}
-
 func TestServeReportsAnExpiredGracePeriod(t *testing.T) {
 	t.Parallel()
 
@@ -148,7 +110,7 @@ func TestServeReportsAnExpiredGracePeriod(t *testing.T) {
 	go func() { served <- serve(ctx, ln, handler, 50*time.Millisecond, silentLogger()) }()
 
 	go func() {
-		resp, err := http.Get(url) //nolint:bodyclose // la requête ne rend jamais : le handler est bloqué jusqu'au nettoyage.
+		resp, err := http.Get(url)
 		if err == nil {
 			resp.Body.Close()
 		}

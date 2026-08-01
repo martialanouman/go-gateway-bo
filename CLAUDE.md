@@ -15,8 +15,10 @@ le Go embarque les assets de la SPA.
 
 ## Commandes
 
-> `make dev/build/check/test/lint` existent depuis step-000 et step-001. `make generate`, `make migrate`
-> et `make bootstrap` sont des **cibles** et arrivent avec leurs steps.
+> Existent depuis step-000 : `make dev/build/check/test-go/lint-go/fmt-go/vuln-go/lint-workflows`.
+> Sont des **cibles**, et arrivent avec les steps qui les habitent : `make test` et `make lint` (les
+> composites des deux toolchains), `make test-web`, `make lint-web`, `make mock`, `make generate`,
+> `make migrate`, `make bootstrap`. Une cible absente rend `No rule to make target`, jamais un vert.
 
 ```bash
 make dev          # BFF Go + Vite en parallèle (proxy /api → BFF)

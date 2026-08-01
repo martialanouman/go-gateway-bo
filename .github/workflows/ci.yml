@@ -1,6 +1,10 @@
 # Les portes tournent en jobs parallèles : une compilation Go rouge n'empêche pas de voir en même
-# temps un test rouge. La protection de branche exige le seul check `CI`, qui les agrège — lister les
-# jobs nommément se périmerait au premier ajout.
+# temps un test rouge. La protection de branche n'exige qu'un seul check, `CI`, qui les agrège : elle
+# n'a donc pas à être rouverte chaque fois qu'une porte s'ajoute.
+#
+# En contrepartie, la liste vit ici, dans le `needs:` de ce job — et un job ajouté sans y être inscrit
+# laisserait `CI` vert pendant qu'il est rouge. Rien ne détecte cet oubli aujourd'hui : ni actionlint,
+# ni `make check`.
 name: CI
 
 on:
@@ -13,14 +17,20 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Sur une PR, seule la dernière version compte. Sur `main`, non : l'agrégateur compte un run annulé
+  # comme un échec, et deux merges rapprochés laisseraient un commit rouge derrière eux.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     name: Build Go
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Le jeton du run n'a rien à faire dans `.git/config` une fois le dépôt cloné.
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           # go.mod est la source unique de la version de Go ; ne jamais la répéter ici.
@@ -30,8 +40,12 @@ jobs:
   test:
     name: Tests Go
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Le jeton du run n'a rien à faire dans `.git/config` une fois le dépôt cloné.
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -40,8 +54,12 @@ jobs:
   lint:
     name: Lint Go
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Le jeton du run n'a rien à faire dans `.git/config` une fois le dépôt cloné.
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -50,8 +68,12 @@ jobs:
   vuln:
     name: Vulnérabilités Go
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Le jeton du run n'a rien à faire dans `.git/config` une fois le dépôt cloné.
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -60,8 +82,12 @@ jobs:
   workflows:
     name: Lint des workflows
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Le jeton du run n'a rien à faire dans `.git/config` une fois le dépôt cloné.
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -74,6 +100,7 @@ jobs:
     if: always()
     needs: [build, test, lint, vuln, workflows]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       # La step ne s'exécute que si une porte a échoué, a été annulée ou sautée — et le job échoue
       # alors avec elle. Tout vert, elle est sautée, et le check passe.

@@ -43,22 +43,59 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, 15*time.Second, cfg.ShutdownTimeout)
 	})
 
+	t.Run("normalise le port plutôt que de le reprendre verbatim", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(map[string]string{config.EnvAddr: "127.0.0.1:0080"}))
+
+		require.NoError(t, err)
+		assert.Equal(t, "127.0.0.1:80", cfg.Addr)
+	})
+
+	t.Run("ignore les espaces autour d'une valeur", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(map[string]string{
+			config.EnvAddr:            " :3001 ",
+			config.EnvShutdownTimeout: " 30s ",
+		}))
+
+		require.NoError(t, err)
+		assert.Equal(t, ":3001", cfg.Addr)
+		assert.Equal(t, 30*time.Second, cfg.ShutdownTimeout)
+	})
+
+	t.Run("traite une variable facultative blanche comme absente", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(map[string]string{
+			config.EnvAddr:            ":3001",
+			config.EnvShutdownTimeout: "   ",
+		}))
+
+		require.NoError(t, err)
+		assert.Equal(t, 15*time.Second, cfg.ShutdownTimeout)
+	})
+
 	t.Run("nomme chaque variable obligatoire absente", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := config.Load(lookupFrom(map[string]string{}))
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), config.EnvAddr)
+		assert.Contains(t, err.Error(), config.EnvAddr+" : variable obligatoire absente")
 	})
 
-	t.Run("refuse une variable obligatoire vide", func(t *testing.T) {
+	// Le motif est assez précis pour distinguer « absente » de « malformée » : sans lui, une valeur
+	// blanche traverserait et échouerait plus loin sur la validation d'adresse, avec un message qui
+	// nomme la même variable — le test resterait vert pour la mauvaise raison.
+	t.Run("refuse une variable obligatoire blanche", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := config.Load(lookupFrom(map[string]string{config.EnvAddr: "   "}))
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), config.EnvAddr)
+		assert.Contains(t, err.Error(), config.EnvAddr+" : variable obligatoire absente")
 	})
 }
 
@@ -75,6 +112,10 @@ func TestLoadRejectsMalformedValues(t *testing.T) {
 		},
 		"un port hors bornes": {
 			vars:    map[string]string{config.EnvAddr: ":65536"},
+			mention: config.EnvAddr,
+		},
+		"un port négatif": {
+			vars:    map[string]string{config.EnvAddr: ":-1"},
 			mention: config.EnvAddr,
 		},
 		"un port qui n'est pas un nombre": {

@@ -11,6 +11,10 @@ linters:
     # Une comparaison d'erreur par `==` ou par message casse dès qu'un appelant enveloppe : tout le
     # modèle d'erreur du §1.4 repose sur `errors.Is` / `errors.As`.
     - errorlint
+    # `internal/config` affirme être le seul à lire l'environnement. Sans cette porte, c'était une
+    # phrase de documentation : une lecture ailleurs se découvre manquante à la première requête qui
+    # l'emprunte, c'est-à-dire en production.
+    - forbidigo
     - gocritic
     - gosec
     # Une erreur avalée dans une branche de garde est le défaut que l'invariant (c) ne pardonne pas.
@@ -20,6 +24,10 @@ linters:
     - usetesting
 
   settings:
+    forbidigo:
+      forbid:
+        - pattern: ^os\.(Getenv|LookupEnv)$
+          msg: la configuration se lit dans internal/config, une seule fois, au démarrage (§1.8)
     revive:
       rules:
         - name: exported
@@ -28,6 +36,13 @@ linters:
   exclusions:
     generated: lax
     rules:
+      # Le chargeur, et la seule ligne qui le lui passe.
+      - path: internal/config/config\.go
+        linters:
+          - forbidigo
+      - path: cmd/dashboard/main\.go
+        linters:
+          - forbidigo
       # Les tests ont le droit de paniquer sur une erreur d'échafaudage : c'est leur façon d'échouer.
       - path: _test\.go
         linters:
