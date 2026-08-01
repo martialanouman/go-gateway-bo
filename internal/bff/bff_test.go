@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -43,12 +45,13 @@ func TestFeatures(t *testing.T) {
 }
 
 type world struct {
-	baseURL     string
-	stop        context.CancelFunc
-	served      chan error
-	statusCode  int
-	contentType string
-	body        string
+	baseURL      string
+	stop         context.CancelFunc
+	served       chan error
+	statusCode   int
+	contentType  string
+	cacheControl string
+	body         string
 }
 
 func initializeScenarios(sc *godog.ScenarioContext) {
@@ -63,6 +66,7 @@ func initializeScenarios(sc *godog.ScenarioContext) {
 	})
 
 	sc.Step(`^un serveur démarré$`, w.startServer)
+	sc.Step(`^un serveur démarré avec des assets embarqués$`, w.startServer)
 	sc.Step(`^"([^"]*)" est demandé$`, w.request)
 	sc.Step(`^le statut de la réponse est (\d+)$`, w.responseStatusIs)
 	sc.Step(`^le corps de la réponse est le JSON (.+)$`, w.responseBodyIs)
@@ -70,6 +74,9 @@ func initializeScenarios(sc *godog.ScenarioContext) {
 	sc.Step(`^la réponse n'est pas du HTML$`, w.responseIsNotHTML)
 	sc.Step(`^le serveur reçoit l'ordre de s'arrêter$`, w.stopServer)
 	sc.Step(`^le serveur rend la main sans erreur$`, w.serverReturnedCleanly)
+	sc.Step(`^le corps de la réponse est celui de l'index$`, w.responseBodyIsTheIndex)
+	sc.Step(`^la réponse porte un cache immuable$`, w.responseCacheIsImmutable)
+	sc.Step(`^la réponse interdit la mise en cache$`, w.responseForbidsCaching)
 }
 
 func (w *world) startServer(scenarioCtx context.Context) error {
@@ -83,7 +90,7 @@ func (w *world) startServer(scenarioCtx context.Context) error {
 	w.baseURL = "http://" + listener.Addr().String()
 	w.served = make(chan error, 1)
 
-	go func() { w.served <- bff.Serve(ctx, listener, bff.NewRouter(), time.Second) }()
+	go func() { w.served <- bff.Serve(ctx, listener, bff.NewRouter(assetsDeTest()), time.Second) }()
 
 	return nil
 }
@@ -107,6 +114,7 @@ func (w *world) request(ctx context.Context, path string) error {
 
 	w.statusCode = response.StatusCode
 	w.contentType = response.Header.Get("Content-Type")
+	w.cacheControl = response.Header.Get("Cache-Control")
 	w.body = strings.TrimSpace(string(body))
 
 	return nil
@@ -122,6 +130,40 @@ func (w *world) responseStatusIs(expected int) error {
 func (w *world) responseBodyIs(expected string) error {
 	if w.body != strings.TrimSpace(expected) {
 		return fmt.Errorf("corps %q au lieu de %q", w.body, expected)
+	}
+	return nil
+}
+
+// Une arborescence en mémoire plutôt que la sortie de Vite : les tests Go ne
+// doivent pas dépendre d'un build client, sinon `go test ./...` échoue sur un
+// clone neuf — le faux vert que step-001 a payé une fois.
+func assetsDeTest() fs.FS {
+	return fstest.MapFS{
+		"index.html":              {Data: []byte(indexDeTest)},
+		"assets/index-abc123.js":  {Data: []byte("console.log('bundle')")},
+		"assets/index-abc123.css": {Data: []byte("body{}")},
+	}
+}
+
+const indexDeTest = `<!doctype html><html lang="fr"><body><div id="squelette"></div></body></html>`
+
+func (w *world) responseBodyIsTheIndex() error {
+	if w.body != indexDeTest {
+		return fmt.Errorf("le corps n'est pas l'index : %q", w.body)
+	}
+	return nil
+}
+
+func (w *world) responseCacheIsImmutable() error {
+	if !strings.Contains(w.cacheControl, "immutable") {
+		return fmt.Errorf("Cache-Control %q n'est pas immuable", w.cacheControl)
+	}
+	return nil
+}
+
+func (w *world) responseForbidsCaching() error {
+	if !strings.Contains(w.cacheControl, "no-cache") {
+		return fmt.Errorf("Cache-Control %q autorise la mise en cache", w.cacheControl)
 	}
 	return nil
 }

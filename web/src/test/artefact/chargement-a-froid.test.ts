@@ -12,7 +12,10 @@ import { ATTRIBUT_DIFFEREE } from '../../lib/feuilles-differees'
  * script ni feuille : il est resté vert pendant que l'artefact faisait attendre
  * le squelette derrière 31 ko de CSS bloquant.
  */
-const artefact = resolve(dirname(fileURLToPath(import.meta.url)), '../../../dist/index.html')
+const artefact = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../internal/webassets/dist/index.html',
+)
 
 /** Les commentaires HTML survivent au build : sans ça, encadrer le squelette
  *  dans `<!-- -->` laisserait toutes les assertions vertes. */

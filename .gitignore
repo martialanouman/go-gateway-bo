@@ -21,3 +21,8 @@ playwright-report/
 .DS_Store
 *.swp
 .idea/
+
+# Sortie de build du client, embarquée par internal/webassets. Le .gitkeep
+# doit rester : sans lui, //go:embed refuse de compiler sur un clone neuf.
+internal/webassets/dist/*
+!internal/webassets/dist/.gitkeep

@@ -56,7 +56,9 @@ check: fmt-check vet tidy-check lint-workflows lint-go test-go vuln-go build-go 
 # Cibles granulaires : les jobs de CI Go n'ont ni Node ni `web/node_modules`, et
 # une cible composite les ferait échouer sur `pnpm` avant d'atteindre le Go.
 
-build-go:
+# Dépend de `build-web` : le binaire embarque les assets, et compiler sans les
+# avoir construits produirait un binaire qui rend 500 sur toute URL.
+build-go: build-web
 	$(GO) build -o $(BINARY) ./cmd/dashboard
 
 test-go:

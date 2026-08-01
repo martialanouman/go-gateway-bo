@@ -3,22 +3,47 @@ package bff
 
 import (
 	"encoding/json"
+	"io/fs"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
 
-// NewRouter monte la surface du BFF. Tout vit sous /api : step-002 posera le
-// repli SPA, et l'ordre entre les deux est ce qui empêche un /api inconnu de
-// rendre du HTML.
-func NewRouter() http.Handler {
+// NewRouter monte la surface du BFF puis le repli SPA.
+//
+// **L'ordre entre les deux est le cœur de step-002.** Un repli monté avant les
+// routes d'API rendrait 200 + HTML sur `/api/inconnu` ; le client lit
+// `response.ok` puis appelle `.json()`, il lève, et l'écran affiche
+// « indisponible » au lieu de « introuvable ».
+func NewRouter(assets fs.FS) http.Handler {
 	router := chi.NewRouter()
 
 	router.Route("/api", func(api chi.Router) {
+		// **Déclaration indispensable, pas défensive.** chi propage le
+		// `NotFound` du routeur parent à ses sous-routeurs : sans cette ligne,
+		// le repli SPA attraperait `/api/inconnu` et rendrait l'index.
+		api.NotFound(handleUnknownAPI)
+
 		api.Get("/health", handleHealth)
 	})
 
+	router.NotFound(serveClient(assets))
+
 	return router
+}
+
+// errorResponse reprend l'enveloppe plate de l'API Admin (§1.4) : une seule
+// forme d'erreur dans tout le produit.
+type errorResponse struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func handleUnknownAPI(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusNotFound, errorResponse{
+		Code:    "not_found",
+		Message: "Cette opération n'existe pas.",
+	})
 }
 
 // healthResponse est un struct déclaré et non un littéral JSON : c'est la

@@ -52,6 +52,14 @@ export default defineConfig({
 
   resolve: { tsconfigPaths: true },
 
+  build: {
+    // Écrit directement dans le paquet Go qui l'embarque : un seul artefact,
+    // aucune étape de copie à maintenir, et le test d'artefact lit exactement
+    // ce que `//go:embed` prendra.
+    outDir: '../internal/webassets/dist',
+    emptyOutDir: true,
+  },
+
   server: {
     port: 3000,
     // Échec bruyant plutôt que repli silencieux : sans cela Vite glisse sur le
