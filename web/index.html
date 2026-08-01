@@ -4,9 +4,121 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tableau de bord — Passerelle SMS</title>
+
+    <!--
+      Le style du squelette est inline, et non dans une feuille liée : une feuille externe est une
+      requête bloquante de plus avant la première peinture, c'est-à-dire le blanc que ce squelette
+      existe pour supprimer.
+
+      Les couleurs sont provisoires et délibérément sobres — les tokens de la charte arrivent en
+      step-008. Ce qui compte ici est la silhouette, pas la teinte.
+    -->
+    <style>
+      :root {
+        color-scheme: dark;
+        --skeleton-surface: #12151c;
+        --skeleton-shape: #1c212b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--skeleton-surface);
+        font-family: system-ui, sans-serif;
+      }
+
+      #app {
+        min-height: 100vh;
+      }
+
+      /*
+        La silhouette de l'AppShell : un rail de navigation à gauche, une barre supérieure, une zone
+        de contenu. Ce n'est pas un rond qui tourne — un spinner est un blanc décoré : il ne dit pas
+        ce qui arrive, et la mise en page sursaute quand le contenu le remplace (§1.9).
+      */
+      .skeleton {
+        display: grid;
+        grid-template-columns: 15rem 1fr;
+        grid-template-rows: 3.5rem 1fr;
+        min-height: 100vh;
+      }
+
+      .skeleton__rail {
+        grid-row: 1 / 3;
+        border-right: 1px solid var(--skeleton-shape);
+      }
+
+      .skeleton__topbar {
+        border-bottom: 1px solid var(--skeleton-shape);
+      }
+
+      .skeleton__content {
+        padding: 1.5rem;
+      }
+
+      .skeleton__block {
+        background: var(--skeleton-shape);
+        border-radius: 0.375rem;
+      }
+
+      .skeleton__rail .skeleton__block {
+        height: 1.25rem;
+        margin: 1rem;
+      }
+
+      .skeleton__topbar .skeleton__block {
+        height: 1.25rem;
+        margin: 1.125rem 1.5rem;
+        max-width: 18rem;
+      }
+
+      .skeleton__content .skeleton__block {
+        height: 5rem;
+        margin-bottom: 1rem;
+      }
+
+      /*
+        Le squelette ne pulse pas pour les personnes qui ont demandé moins de mouvement : l'animation
+        est un indice de chargement, jamais l'information elle-même — celle-ci est portée par
+        `aria-busy` et par le texte annoncé.
+      */
+      @media (prefers-reduced-motion: no-preference) {
+        .skeleton__block {
+          animation: skeleton-pulse 1.6s ease-in-out infinite;
+        }
+      }
+
+      @keyframes skeleton-pulse {
+        50% {
+          opacity: 0.55;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="skeleton" aria-busy="true" aria-live="polite">
+        <span class="skeleton__sr-only" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%)">
+          Chargement du tableau de bord
+        </span>
+        <div class="skeleton__rail" data-skeleton="rail">
+          <div class="skeleton__block"></div>
+          <div class="skeleton__block"></div>
+          <div class="skeleton__block"></div>
+          <div class="skeleton__block"></div>
+        </div>
+        <div class="skeleton__topbar" data-skeleton="topbar">
+          <div class="skeleton__block"></div>
+        </div>
+        <div class="skeleton__content" data-skeleton="content">
+          <div class="skeleton__block"></div>
+          <div class="skeleton__block"></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
