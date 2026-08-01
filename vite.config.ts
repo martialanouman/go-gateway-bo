@@ -4,6 +4,7 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { BFF_ROUTES } from './src/server/bff-routes'
+import { bffDevPlugin } from './src/server/dev-bff-plugin'
 
 export default defineConfig({
   server: {
@@ -55,5 +56,10 @@ export default defineConfig({
     }),
     // Le plugin React doit venir APRÈS celui de Start.
     viteReact(),
+    // `nitroV2Plugin` ne s'active qu'au build : sans ce plugin-ci, `pnpm dev` ne sert **aucune** des
+    // routes ci-dessus, et la console s'ouvre sur une passerelle qui n'a pas répondu. Il lit la même
+    // liste, ne s'applique qu'en `serve`, et charge chaque handler par `ssrLoadModule` — donc avec le
+    // rechargement à chaud que le build n'a pas.
+    bffDevPlugin(),
   ],
 })
