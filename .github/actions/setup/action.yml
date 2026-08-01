@@ -1,4 +1,4 @@
-# Setup partagé par les quatre jobs client de la CI. Les portes tournent en parallèle et chacune part
+# Setup partagé par les jobs client de la CI. Les portes tournent en parallèle et chacune part
 # d'un runner vierge : sans cette action, les mêmes quatre étapes seraient recopiées dans chaque job,
 # et une divergence entre deux copies (version de Node, options de cache) produirait des échecs qui ne
 # reproduisent pas en local. Les jobs Go, eux, ne passent pas par ici — ils n'ont besoin ni de Node ni
