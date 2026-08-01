@@ -70,6 +70,9 @@ func Variables() []string {
 		seen  = map[string]bool{}
 	)
 
+	// Le dédoublonnage ne sert encore à rien — aucune variable n'est lue deux fois, et le retirer
+	// laisse la suite verte. Il est là pour le jour où ce sera le cas : un doublon ferait échouer le
+	// test de `.env.example` sur une divergence qui n'existe pas.
 	_, _ = Load(func(name string) (string, bool) {
 		if !seen[name] {
 			seen[name] = true

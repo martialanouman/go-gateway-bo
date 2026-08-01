@@ -42,9 +42,9 @@ linters:
   exclusions:
     generated: lax
     rules:
-      # Un test qui ignore le retour d'un `Close()` ou qui lance un sous-process avec un chemin calculé
-      # fait son travail : son échafaudage n'est pas exposé, et l'y contraindre ajouterait du bruit
-      # sans rien garder.
+      # L'échafaudage d'un test n'est exposé à personne : y exiger la rigueur du code de production
+      # ajouterait du bruit sans rien garder. Ce que ces deux linters signalent ici — retours ignorés,
+      # sous-process et URL calculées — appartient au harnais, pas au produit.
       - path: _test\.go
         linters:
           - errcheck

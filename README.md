@@ -201,7 +201,9 @@ Le package est publié sur GitHub Packages, qui exige une authentification même
   puisque ce fichier suit le dépôt jusque dans ses forks.
 - **En CI**, le `GITHUB_TOKEN` du run, auquel le package accorde la lecture (*Package settings →
   Manage Actions access → `go-gateway-bo`*). Aucun PAT stocké en secret : un secret long-vécu expire un
-  matin sans prévenir et se révoque mal. Le workflow accorde `packages: read`.
+  matin sans prévenir et se révoque mal. Le workflow devra accorder `packages: read` — `ci.yml` n'a
+  aujourd'hui aucun job qui installe les dépendances client, donc aucune permission à élargir ; c'est
+  la première chose que step-001 y ajoutera, faute de quoi son job échoue en 401 sur le registre.
 
 ## Dépendances
 
@@ -238,9 +240,10 @@ scénario rouge d'abord**, puis déplacer le fichier dans `tasks/steps/done/` en
 
 Les portes de qualité tournent en **jobs parallèles** — aujourd'hui les cinq portes Go, les portes
 client s'y ajoutant avec leurs steps. Une porte qui échoue n'empêche pas les autres de rendre leur
-verdict : on voit une erreur de compilation *et* un test rouge au même run. La protection de branche doit exiger le seul check **`CI`** : il les agrège
-et reste valable quand une porte s'ajoute, alors que lister les jobs nommément se périmerait au premier
-ajout.
+verdict : on voit une erreur de compilation *et* un test rouge au même run. La protection de branche
+exige le seul check **`CI`**, qui les agrège et reste valable quand une porte s'ajoute — mais en
+contrepartie, un job absent du `needs:` de l'agrégateur le laisserait vert : la liste se tient dans
+`ci.yml`, à côté des jobs.
 
 Les conventions, invariants et la Definition of Done sont dans [`CLAUDE.md`](./CLAUDE.md) ; le cadre et
 l'ordre dans [`tasks/plan.md`](./tasks/plan.md) ; le quoi et le pourquoi dans
