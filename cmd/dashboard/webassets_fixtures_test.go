@@ -1,7 +1,7 @@
 package main
 
 // Le binaire embarque `internal/webassets/dist/` au moment de la compilation, et ce répertoire ne
-// contient qu'un `.gitkeep` sur un clone neuf — comme dans le job de CI « Tests Go », qui n'a ni Node
+// contient qu'un `.gitkeep` sur un clone neuf — comme dans le job de CI « Tests Go », qui n'a ni pnpm
 // ni pnpm. Ce fichier y met donc en scène une sortie de client minimale avant que le harnais ne
 // compile, puis remet en place ce qu'il y a trouvé.
 //
@@ -19,6 +19,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -128,39 +129,76 @@ func claimStash(dist, stash string) error {
 	}
 }
 
-// refuseClaimedStash regarde ce que la mise à l'écart contient avant d'en parler. Rien ne signale
-// l'état où le refus laisse le poste — le répertoire embarqué est ignoré par git, donc l'arbre reste
-// propre — et ce message est la seule documentation du chemin : ni le README, ni le CLAUDE.md, ni le
-// Makefile n'en disent un mot.
+// refuseClaimedStash regarde les deux répertoires avant d'en parler, et n'affirme que ce qu'il y a
+// lu. Le compte de la mise à l'écart ne décide pas de l'état du répertoire embarqué : sur un clone
+// neuf — et dans le job de CI « Tests Go » — la mise à l'écart ne reçoit que `.gitkeep`, donc elle
+// paraît vide alors que les fixtures, elles, sont restées dans `dist`. C'est l'état le plus courant
+// qu'un run interrompu laisse, et le message l'a affirmé « intact » deux versions durant.
+//
+// Rien d'autre ne signale l'état où le refus laisse le poste — le répertoire embarqué est ignoré par
+// git, donc l'arbre reste propre — et ce message est la seule documentation du chemin : ni le README,
+// ni le CLAUDE.md, ni le Makefile n'en disent un mot.
 func refuseClaimedStash(dist, stash string) error {
-	entries, err := os.ReadDir(stash)
+	stashed, err := entriesBesidesKeepFile(stash)
 	if err != nil {
 		return fmt.Errorf("%s existe déjà et sa lecture échoue: %w", stash, err)
 	}
 
-	kept := 0
-	for _, entry := range entries {
-		if entry.Name() != committedKeepFile {
-			kept++
-		}
-	}
-
-	if kept == 0 {
-		return fmt.Errorf(
-			"%s existe déjà mais ne garde aucun asset : soit une autre suite le tient en ce moment, soit "+
-				"un run a été interrompu avant d'y ranger quoi que ce soit — %s est alors intact.\n"+
-				"Attendez la fin de l'autre suite ; s'il n'y en a pas, supprimez %s",
-			stash, dist, stash)
+	leftInDist, err := entriesBesidesKeepFile(dist)
+	if err != nil {
+		return fmt.Errorf("%s existe déjà et la lecture de %s échoue: %w", stash, dist, err)
 	}
 
 	return fmt.Errorf(
-		"%s existe déjà et garde %d entrée(s) : une autre suite le tient en ce moment, ou un run "+
-			"interrompu y a rangé ce que %s contenait — en y laissant les fixtures de test, que le "+
-			"prochain `make build-go` embarquerait.\n"+
-			"S'il n'y a pas d'autre suite : remettez ces entrées dans %s, ou relancez `make build`, "+
-			"seule cible qui recopie le client dans %s (`make build-web` n'écrit que dans web/dist). "+
-			"Puis supprimez %s",
-		stash, kept, dist, dist, dist, stash)
+		"%s existe déjà : soit une autre suite le tient en ce moment, soit un run a été interrompu.\n"+
+			"%s\n%s\n"+
+			"Attendez la fin de l'autre suite ; s'il n'y en a pas, suivez les deux lignes ci-dessus, "+
+			"puis supprimez %s",
+		stash, describeStash(stashed, dist), describeDist(leftInDist, dist), stash)
+}
+
+// describeStash dit s'il y a quelque chose à remettre dans le répertoire embarqué, et combien.
+func describeStash(stashed []string, dist string) string {
+	if len(stashed) == 0 {
+		return fmt.Sprintf("La mise à l'écart ne garde aucun asset : rien à remettre dans %s.", dist)
+	}
+
+	return fmt.Sprintf(
+		"La mise à l'écart garde %d entrée(s) (%s) : c'est ce que %s contenait, à y remettre.",
+		len(stashed), strings.Join(stashed, ", "), dist)
+}
+
+// describeDist dit ce que le répertoire embarqué contient vraiment. Tout ce qui y traîne hors
+// `.gitkeep` pendant qu'une mise à l'écart est prise vient d'un harnais : les vrais assets, eux, sont
+// dans la mise à l'écart. Les laisser là est le défaut coûteux — la coquille du harnais porte le même
+// `<title>` que la vraie, donc un binaire qui l'embarque ne se dénonce pas au premier coup d'œil.
+func describeDist(leftInDist []string, dist string) string {
+	if len(leftInDist) == 0 {
+		return fmt.Sprintf("%s ne contient que %s : il est intact.", dist, committedKeepFile)
+	}
+
+	return fmt.Sprintf(
+		"%s contient les fixtures du run interrompu (%s), que le prochain `make build-go` embarquerait : "+
+			"retirez-les, puis rendez-lui le vrai client avec `make build`, seule cible qui l'y recopie "+
+			"(`make build-web` n'écrit que dans web/dist).",
+		dist, strings.Join(leftInDist, ", "))
+}
+
+func entriesBesidesKeepFile(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(entries))
+
+	for _, entry := range entries {
+		if entry.Name() != committedKeepFile {
+			names = append(names, entry.Name())
+		}
+	}
+
+	return names, nil
 }
 
 // restoreOrFail rend le code de sortie de la suite une fois la restauration tentée. Une restauration
@@ -331,6 +369,48 @@ func TestTheRefusalNamesTheTargetThatRefillsTheEmbeddedDirectory(t *testing.T) {
 			"%s. Qui suit cette parenthèse laisse les fixtures en place", distDir)
 }
 
+// intactDist reproduit le répertoire embarqué d'un clone neuf — et celui du job de CI « Tests Go » :
+// `.gitkeep` et rien d'autre.
+func intactDist(t *testing.T) string {
+	t.Helper()
+
+	dist := filepath.Join(t.TempDir(), "dist")
+
+	require.NoError(t, os.MkdirAll(dist, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dist, committedKeepFile), nil, 0o644))
+
+	return dist
+}
+
+// L'état le plus courant qui soit, et celui dont le message ne disait rien : sur un clone neuf, la
+// mise à l'écart ne reçoit que `.gitkeep` — elle est donc vide au sens du compte — pendant que les
+// fixtures, elles, restent dans le répertoire embarqué. Décider sur le seul compte de la mise à
+// l'écart fait alors dire « intact » d'un répertoire plein, et conseiller la seule suppression de la
+// mise à l'écart y laisse les fixtures : le `make build-go` suivant les embarque, et le binaire sert
+// une coquille qui porte le même `<title>` que la vraie.
+func TestTheRefusalNamesTheFixturesLeftInTheEmbeddedDirectory(t *testing.T) {
+	t.Parallel()
+
+	dist := intactDist(t)
+	stash := filepath.Join(t.TempDir(), "assets")
+
+	_, err := stageAssetFixturesIn(dist, stash)
+	require.NoError(t, err)
+	// Pas de restauration : c'est précisément ce que laissent un Ctrl-C, un panic ou un `-timeout`.
+
+	err = claimStash(dist, stash)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "index.html",
+		"le message doit nommer ce qu'il trouve dans %s : sans ça, rien ne dit que les fixtures y sont "+
+			"restées et que le prochain `make build-go` les embarquerait", dist)
+	assert.Contains(t, err.Error(), "`make build`",
+		"les fixtures sont dans %s : la seule cible qui y remet le vrai client est `make build`. Sans "+
+			"elle, on supprime la mise à l'écart et on croit le poste réparé", dist)
+	assert.NotContains(t, err.Error(), "intact",
+		"%s est plein des fixtures du run interrompu : le dire intact est faux", dist)
+}
+
 // Le message affirmait « le stash garde les vrais assets » sans jamais l'avoir regardé. Deux fois sur
 // trois c'est faux : un run interrompu entre la création de la mise à l'écart et la purge la laisse
 // vide, et sur un poste où `make build` n'a jamais tourné il n'y a aucun vrai asset à sauver.
@@ -340,12 +420,13 @@ func TestTheRefusalDescribesTheStashItActuallyFound(t *testing.T) {
 	t.Run("elle garde des assets : le message les compte", func(t *testing.T) {
 		t.Parallel()
 
+		dist := intactDist(t)
 		stash := filepath.Join(t.TempDir(), "assets")
-		require.NoError(t, claimStash(distDir, stash))
+		require.NoError(t, claimStash(dist, stash))
 		require.NoError(t, os.WriteFile(filepath.Join(stash, "index.html"), []byte(realShell), 0o644))
 		require.NoError(t, os.Mkdir(filepath.Join(stash, "assets"), 0o755))
 
-		err := claimStash(distDir, stash)
+		err := claimStash(dist, stash)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "2 entrée(s)",
@@ -356,17 +437,19 @@ func TestTheRefusalDescribesTheStashItActuallyFound(t *testing.T) {
 	t.Run("elle est vide : le message ne promet aucun asset", func(t *testing.T) {
 		t.Parallel()
 
+		dist := intactDist(t)
 		stash := filepath.Join(t.TempDir(), "assets")
-		require.NoError(t, claimStash(distDir, stash))
+		require.NoError(t, claimStash(dist, stash))
 
-		err := claimStash(distDir, stash)
+		err := claimStash(dist, stash)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "aucun asset",
 			"une mise à l'écart vide ne garde rien : promettre les vrais assets envoie chercher ce qui "+
-				"n'existe pas, alors que la seule action utile est de la supprimer")
+				"n'existe pas")
 		assert.NotContains(t, err.Error(), "`make build`",
-			"il n'y a rien à reconstruire : %s est intact", distDir)
+			"%s a été lu et ne contient que %s : conseiller de le reconstruire envoie effacer un "+
+				"répertoire déjà en état", dist, committedKeepFile)
 	})
 }
 

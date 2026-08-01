@@ -35,8 +35,9 @@ jobs:
         with:
           # go.mod est la source unique de la version de Go ; ne jamais la répéter ici.
           go-version-file: go.mod
-      # `build-go` et non `build` : ce job n'a ni Node ni `node_modules`, et `build` construirait
-      # d'abord le client. Ce qu'on vérifie ici est que le Go compile ; c'est le job « Build client et
+      # `build-go` et non `build` : ce job n'a ni pnpm ni `node_modules`, et `build` construirait
+      # d'abord le client. (Le runner a bien Node et npm préinstallés — c'est pnpm, et lui seul, qui
+      # manque.) Ce qu'on vérifie ici est que le Go compile ; c'est le job « Build client et
       # déployable » qui exerce la chaîne complète, assets embarqués compris.
       - run: make build-go
 
@@ -156,7 +157,7 @@ jobs:
 
   # Le seul job qui ait les **deux** toolchains, et donc le seul qui puisse exercer `make build` — la
   # chaîne complète : `build-web` → purge de `internal/webassets/dist/` → copie → `build-go`. Jusqu'ici
-  # aucun runner ne la traversait : aucun des cinq jobs Go n'a Node — « Build Go » appelle `build-go`,
+  # aucun runner ne la traversait : aucun des cinq jobs Go n'a pnpm — « Build Go » appelle `build-go`,
   # les quatre autres ne compilent rien de destiné à être livré — et ce job-ci s'arrêtait à
   # `check-routes`. Une copie qui perdrait son `/.` déposerait les assets dans
   # `internal/webassets/dist/dist/` ; `all:dist` reste satisfait donc « Build Go » compile, le harnais
@@ -207,7 +208,7 @@ jobs:
           # `--max-time` autant que `--retry` : le retry couvre « rien n'écoute », pas « le port est
           # lié et rien ne répond ». Sans lui, un binaire bloqué après `net.Listen` ferait pendre le
           # job jusqu'au `timeout-minutes`, sans un mot sur la cause.
-          curl --fail --silent --retry 10 --retry-delay 1 --retry-connrefused --max-time 10 \
+          curl --fail --silent --show-error --retry 10 --retry-delay 1 --retry-connrefused --max-time 10 \
             --output "$RUNNER_TEMP/servi.html" http://127.0.0.1:3001/
           diff "$RUNNER_TEMP/servi.html" web/dist/index.html
           asset=$(grep -o '/assets/[A-Za-z0-9._-]*\.js' web/dist/index.html | head -n 1)

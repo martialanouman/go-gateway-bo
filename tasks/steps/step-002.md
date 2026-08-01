@@ -49,7 +49,12 @@ l'ordre entre le fallback et l'API.
   - *Quand* `/api/inconnu` est demandé, *Alors* la réponse est **404** et son type n'est pas `text/html` ;
   - *Quand* un asset hashé est demandé, *Alors* il porte un cache immuable ;
   - *Quand* `index.html` est demandé, *Alors* il porte `no-cache`.
-- Le binaire démarre et sert l'application dans un conteneur **sans Node**.
+- ~~Le binaire démarre et sert l'application dans un conteneur **sans Node**.~~ **Non livré, et dit
+  ici plutôt qu'ailleurs** : aucun conteneur n'entre dans cette PR. Ce qui est prouvé est plus étroit
+  et suffit à la promesse « un seul déployable » — le job CI « Build client et déployable » lance
+  `./bin/dashboard` **seul**, sans aucun processus Node en vie, et compare ce qu'il sert à la sortie
+  de Vite. Un conteneur nu prouverait en plus l'absence de dépendance système ; c'est l'image de
+  déploiement de step-186 qui le montrera.
 
 ## Definition of Done
 - [ ] `make build` produit un binaire qui sert l'application seul
@@ -103,34 +108,52 @@ et passe le résultat au routeur.
    `cmd/dashboard/assets.feature`. Le harnais met en scène des **fixtures d'assets** dans
    `internal/webassets/dist/` avant de compiler, et restaure l'état d'origine ensuite : le répertoire
    est ignoré par git, donc rien ne salit l'arbre, et les quatre `Alors` s'exécutent **toujours**, sur
-   clone neuf comme dans le job CI sans Node. Rien n'est simulé *dans le produit* — les assets sont
+   clone neuf comme dans le job CI sans pnpm. Rien n'est simulé *dans le produit* — les assets sont
    une **entrée** du système sous test, comme le mock Prism l'est côté passerelle.
-3. **Lacune assumée, écrite ici parce qu'elle n'est pas testable ici** : aucun test de cette step ne
-   prouve que la **vraie** sortie de Vite atterrit dans le binaire. Cette affirmation appartient à
-   `make build` (DN-4) et sera traversée par les parcours Playwright contre le binaire de step-007.
+3. **Lacune assumée, écrite ici parce qu'elle n'est pas testable ici** : aucun test de `make check` ne
+   prouve que la **vraie** sortie de Vite atterrit dans le binaire — les fixtures du niveau 2 sont
+   posées par le harnais. Le job CI « Build client et déployable » le prouve, lui, en lançant le
+   binaire de `make build` ; mais il lie un port, donc il ne se rejoue pas en local, et **il n'aura
+   jamais tourné avant la première PR**. Fermeture définitive : les parcours Playwright contre le
+   binaire de step-007.
 
 ### DN-4 — `make build` enchaîne, `build-go` reste granulaire
 
 `make build` = `build-web` → copie vers `internal/webassets/dist/` → `build-go`. Le job CI « Build Go »
-appelle désormais `build-go`, parce qu'il n'a **ni Node ni pnpm** et que l'en-tête du Makefile pose la
+appelle désormais `build-go`, parce qu'il n'a **ni pnpm ni `node_modules`** et que l'en-tête du Makefile pose la
 règle : un job de CI n'invoque jamais une cible qui dépend de l'autre toolchain. Les deux exigences —
-« `make build` enchaîne » et « le job Go reste sans Node » — redeviennent vraies ensemble.
+« `make build` enchaîne » et « le job Go reste sans pnpm » — redeviennent vraies ensemble.
 
 La copie **purge les fichiers obsolètes en épargnant `.gitkeep`** : rien ne vide
 `internal/webassets/dist/` (contrairement à `web/dist`, que Vite vide à chaque build), et sans purge
 les assets hachés d'un build précédent s'accumuleraient dans le binaire. Supprimer le `.gitkeep`
 rendrait l'arbre sale et recréerait le défaut de DN-1.
 
-**Coût assumé** : plus aucun job de CI ne compile le binaire *complet*. « Build Go » compile un binaire
-qui n'embarque que `.gitkeep` — c'est une porte de compilation, pas un artefact livrable.
+**Coût assumé, puis fermé en revue** : la première version de cette décision laissait *aucun* job de
+CI compiler le binaire complet. Un relecteur a montré ce que ça coûtait — une copie qui perdrait son
+`/.` déposerait les assets un répertoire trop bas, « Build Go » compilerait quand même, le harnais
+godog de « Tests Go » écraserait le répertoire avec ses fixtures, et la CI serait **verte à dix jobs
+sur dix** avec un binaire qui rend 404 sur `/`. Le job « Build client et déployable » — le seul à
+avoir les deux toolchains — lance donc désormais `make build` puis le binaire, et compare ce qu'il
+sert à la sortie de Vite. « Build Go » reste ce qu'il était : une porte de compilation, sur un binaire
+qui n'embarque que `.gitkeep`.
 
 ### DN-5 — `/assets/*` immuable, tout le reste `no-cache`
 
 `Cache-Control: public, max-age=31536000, immutable` pour ce qui est servi sous `/assets/`, `no-cache`
-pour `index.html` et tout autre fichier racine. La frontière est le **chemin**, pas une reconnaissance
-de hachage dans le nom : Vite place sous `assets/` tout ce qu'il hache — vérifié sur la sortie réelle
-(`assets/index-BZaM5Pg4.js`, `assets/index-BM7VFVhX.css`, `assets/routes-Bm97Ugzo.js`) — et
-`index.html`, qui porte les références à ces noms hachés, reste à la racine.
+pour `index.html` et pour tout autre fichier du bundle. La frontière est le **chemin**, pas une
+reconnaissance de hachage dans le nom : Vite place sous `assets/` tout ce qu'il hache — vérifié sur la
+sortie réelle (`assets/index-BZaM5Pg4.js`, `assets/index-BM7VFVhX.css`, `assets/routes-Bm97Ugzo.js`) —
+et `index.html`, qui porte les références à ces noms hachés, reste à la racine.
+
+**Élargi en revue** : cette décision disait « tout autre fichier **racine** », et le code la suivait à
+la lettre. Un relecteur a montré qu'un fichier public **imbriqué** — `fonts/inter.woff2`, précisément
+ce que step-008 va poser, puisque Vite recopie `web/public/` récursivement — recevait alors la coquille
+en `text/html` 200, le défaut de DN-6 transposé. La règle est donc devenue plus simple : **le repli
+sert tout fichier existant du bundle, à n'importe quelle profondeur, et la coquille sinon.**
+
+Contrepartie, vraie dès aujourd'hui : un fichier du bundle **masque la route SPA homonyme** —
+`GET /.gitkeep` rend 200 avec un corps vide, puisque `all:dist` l'embarque.
 
 ### DN-6 — Un asset absent sous `/assets/` rend 404, jamais `index.html`
 

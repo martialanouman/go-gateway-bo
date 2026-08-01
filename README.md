@@ -77,7 +77,7 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 ```bash
 make dev        # BFF Go (:3001) + Vite (:3000), /api et /ws proxifiés vers le BFF
 make build      # le déployable : client → internal/webassets/dist/ → go build → bin/dashboard
-make build-go   # go build seul, sans reconstruire le client — la cible du job « Build Go », sans Node
+make build-go   # go build seul, sans reconstruire le client — la cible du job « Build Go », sans pnpm
 make build-web  # vite build → web/dist
 make check      # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make help       # liste les cibles qui existent — c'est la cible par défaut

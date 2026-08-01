@@ -23,16 +23,17 @@ le Go embarque les assets de la SPA.
 ```bash
 make dev          # BFF Go (:3001) + Vite (:3000), /api et /ws proxifiés vers le BFF
 make build        # le déployable : build-web → copie dans internal/webassets/dist/ → go build
-make build-go     # go build seul — ce que lance le job « Build Go », qui n'a ni Node ni pnpm
+make build-go     # go build seul — ce que lance le job « Build Go », qui n'a ni pnpm ni node_modules
 make check        # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make test         # les deux suites · make lint — les deux linters
 make generate     # oapi-codegen + catalogue de permissions Go → TS      (cible)
 make mock         # mock Prism sur openapi-admin.yaml                    (cible)
 
 # Une porte granulaire par job de CI, à lancer seule pendant une boucle rouge → vert :
-#   test-go (godog + -race) · lint-go (+ fmt-go pour appliquer) · vuln-go (govulncheck)
+#   build-go (Build Go) · test-go (godog + -race) · lint-go (+ fmt-go pour appliquer)
+#   vuln-go (govulncheck) · lint-workflows (actionlint + l'agrégateur attend-il tous les jobs ?)
 #   typecheck-web (tsc) · test-web (Vitest) · lint-web (Biome) · vuln-web (pnpm audit)
-#   lint-workflows (actionlint + l'agrégateur CI attend-il tous les jobs ?) · check-routes
+#   check-routes + build + le contrôle du binaire → job « Build client et déployable »
 ```
 
 `make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à

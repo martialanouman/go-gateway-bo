@@ -1,5 +1,5 @@
 # Les cibles granulaires (`test-go`, `lint-go`…) existent pour que les jobs de CI n'invoquent jamais
-# une cible qui dépend de l'autre toolchain : le job Go n'a ni Node ni `node_modules`, et une cible
+# une cible qui dépend de l'autre toolchain : le job Go n'a ni pnpm ni `node_modules`, et une cible
 # composite l'y enverrait chercher un `pnpm` absent.
 #
 # Ce que ce fichier ne porte pas encore : `mock` (Prism) et les cibles du versant Go qui n'ont pas
@@ -24,6 +24,12 @@ WEBASSETS := internal/webassets/dist
 # s'appelle pas `.gitkeep`, en rendant 0 ; le `find` de macOS, lui, refuse. Aucune surcharge légitime
 # ne vide cette variable, mais la recette est destructrice et tourne à la racine : la garde coûte
 # quatre mots et couvre le `make clean WEBASSETS=` que personne n'a voulu taper.
+#
+# **Aucune porte ne rougit si cette ligne disparaît** — ni la garde, ni la purge elle-même : le binaire
+# continue de se compiler et de servir les bons assets, simplement accompagnés des périmés, et le
+# contrôle CI ne regarde que la coquille et un asset qu'elle référence. Vérifié plutôt que supposé, en
+# retirant chacune des deux et en relançant `make check`. La preuve est manuelle : déposer un
+# `assets/perime-000000.js`, lancer `make build`, constater qu'il a disparu.
 PURGE_WEBASSETS := test -n "$(WEBASSETS)" && find $(WEBASSETS) -mindepth 1 ! -name .gitkeep -delete
 
 # Le répertoire absent est un arbre de travail abîmé, pas un état de départ : `.gitkeep` est commité,
@@ -54,6 +60,10 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 # seul mur que `-j` raccourcissait est celui des dix portes de `check`, et la CI les lance déjà en
 # jobs parallèles — c'est là que le temps se gagne, pas ici. Un `make -j` qui produit un binaire faux
 # une fois sur dix coûte plus cher que la minute qu'il fait gagner.
+#
+# **Aucune porte ne rougit si cette ligne disparaît** : la course qu'elle ferme est intermittente par
+# nature, et un test qui la déclencherait à coup sûr serait un test de `make -j`, pas du produit.
+# Vérifié en la retirant — `make check` reste vert.
 .NOTPARALLEL:
 
 help: ## Liste les cibles disponibles
@@ -69,10 +79,13 @@ build: build-web ## Construit le client, l'installe dans le binaire, et compile
 	cp -R web/dist/. $(WEBASSETS)/
 	@$(MAKE) --no-print-directory build-go
 
-# Compiler sans le client est une cible à part parce qu'aucun des cinq jobs Go de la CI n'a Node ni
+# Compiler sans le client est une cible à part parce qu'aucun des cinq jobs Go de la CI n'a pnpm ni
 # `node_modules` : celui qui compile appelle `build-go`, jamais `build`, qui l'enverrait chercher un
-# `pnpm` absent. Le binaire qui en sort n'a pas d'interface — le `.gitkeep` commité suffit à `//go:embed`,
-# et c'est la compilation qu'on vérifie là-bas, pas le déployable.
+# `pnpm` absent. (`ubuntu-latest` a Node et npm préinstallés — vérifié au manifeste des images
+# `actions/runner-images` ; c'est bien pnpm, et lui seul, qui manque.)
+#
+# Le binaire qui en sort n'a pas d'interface — le `.gitkeep` commité suffit à `//go:embed`, et c'est
+# la compilation qu'on vérifie là-bas, pas le déployable.
 build-go: ## Compile le binaire dans bin/, sans reconstruire le client
 	go build -o $(BIN) ./cmd/dashboard
 

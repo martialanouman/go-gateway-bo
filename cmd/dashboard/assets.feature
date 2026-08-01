@@ -7,7 +7,7 @@ Fonctionnalité: Le binaire sert l'application qu'il embarque
 
   Ce que ces scénarios n'observent pas : que la sortie réelle de Vite atterrit dans le binaire. Les
   fichiers embarqués ici sont posés par le harnais, faute de quoi le scénario se tairait partout où
-  le client n'a jamais été construit — un clone neuf, le job de CI sans Node — c'est-à-dire qu'il
+  le client n'a jamais été construit — un clone neuf, le job de CI sans pnpm — c'est-à-dire qu'il
   serait vert sans rien prouver. Cette affirmation-là appartient à `make build`, et les parcours de
   bout en bout de step-007 la traverseront.
 
