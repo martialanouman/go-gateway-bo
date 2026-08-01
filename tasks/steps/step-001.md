@@ -42,6 +42,9 @@ peint le squelette de la coquille**, jamais un blanc.
 - L'arbre de routes régénéré est identique au fichier commité.
 
 ## Definition of Done
+- **Réactiver `javascript-typescript` dans CodeQL** (*Settings → Code security → Default setup*) : la
+  langue en a été retirée quand le dépôt a été remis à neuf, parce que CodeQL échoue
+  fatalement sur un dépôt sans code à analyser. Cette step livre le premier code client.
 - [ ] `make check` vert des deux côtés
 - [ ] `make dev` sert l'application et proxifie `/api` vers le BFF
 - [ ] aucune dépendance à l'ancien socle serveur ne subsiste dans `web/package.json`

@@ -47,6 +47,9 @@ proprement. C'est le squelette dans lequel tout le reste se branche — il ne se
   le `SIGTERM` est refusée. Sans ce test, le déploiement roulant de step-186 n'a aucun filet.
 
 ## Definition of Done
+- **Réactiver `go` dans CodeQL** (*Settings → Code security → Default setup*) : la
+  langue en a été retirée quand le dépôt a été remis à neuf, parce que CodeQL échoue
+  fatalement sur un dépôt sans code à analyser. Cette step livre le premier code Go.
 - [ ] `make check` vert (build · vet · lint · test)
 - [ ] `.env.example` liste **toutes** les variables lues, et rien de plus — vérifié par un test
 - [ ] la mutation « retirer la validation d'une variable obligatoire » fait rougir la suite
