@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { dirname, dirname as parentOf, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { ATTRIBUT_DIFFEREE } from '../../lib/feuilles-differees'
@@ -52,6 +52,25 @@ describe("l'artefact servi au chargement à froid", () => {
         ATTRIBUT_DIFFEREE,
       )
     }
+  })
+
+  it("embarque la promotion de la feuille dans le bundle d'entrée", () => {
+    // Le contrat était refermé sur le **nom** de l'attribut (constante partagée)
+    // mais pas sur l'**appel** : supprimer `promouvoirFeuillesDifferees(document)`
+    // de `main.tsx` laissait toutes les portes vertes et livrait une console
+    // dont l'unique feuille restait en `media="print"` — entièrement non stylée.
+    // `main.tsx` n'est chargé par aucun test et sort de la couverture ; c'est
+    // l'artefact qui doit en témoigner.
+    const html = document()
+    const entree = html.match(/<script[^>]+src="([^"]+)"/)?.[1]
+    expect(entree, "aucun bundle d'entrée dans l'artefact").toBeTruthy()
+
+    const bundle = readFileSync(parentOf(artefact) + entree, 'utf8')
+
+    expect(
+      bundle,
+      'le bundle ne promeut pas la feuille : la console resterait non stylée',
+    ).toContain(ATTRIBUT_DIFFEREE)
   })
 
   it('place le squelette avant le point de montage', () => {

@@ -10,9 +10,13 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 function RootComponent() {
-  // **Le provider vit dans l'application, pas dans le harnais.** La v1.0 a livré
-  // une application sans lui pendant que tous les tests de composant passaient,
-  // parce que `renderComponent` le fournissait lui-même.
+  // ⚠ **Cette garde est annulée aujourd'hui, et c'est su.** L'intention est que
+  // le provider vive dans l'application et non dans le harnais — la v1.0 a livré
+  // une application sans lui pendant que tous les tests passaient, parce que
+  // `renderComponent` le fournissait. Mais `main.tsx` en monte un aussi, et
+  // `render.tsx` également : retirer celui-ci laisse la suite verte **et** la
+  // production fonctionnelle. Trancher où vit le provider appartient à step-040,
+  // qui livre la coquille ; d'ici là, ne pas lire ces lignes comme un filet.
   const { queryClient } = Route.useRouteContext()
 
   return (

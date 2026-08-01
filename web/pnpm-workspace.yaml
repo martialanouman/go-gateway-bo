@@ -14,10 +14,6 @@ allowBuilds:
   # sont conservés comme garde-fous — ils ne coûtent rien et redeviendraient
   # pertinents si un paquet les réintroduisait — mais la justification d'origine
   # ne s'applique plus à rien.
-  # suite de base de données (passée en Go avec testcontainers, step-005) prouve que rien n'en dépend : Testcontainers parle au socket Docker local,
-  # jamais à un démon distant par SSH (`ssh2`, et `cpu-features` qui n'accélère que son chiffrement),
-  # et aucun de nos échanges n'est en protobuf. Ce sont trois compilations natives en moins à chaque
-  # installation, sur toutes les machines qui n'en tireront jamais rien.
   cpu-features: false
   protobufjs: false
   ssh2: false

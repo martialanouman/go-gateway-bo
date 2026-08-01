@@ -31,8 +31,9 @@ make lint-go      # golangci-lint · make lint-web — Biome
 make lint-workflows  # actionlint : un workflow invalide est absent, pas rouge
 ```
 
-`make check` vert signifie une CI verte. Elle vérifie en plus que le code généré est à jour —
-types du contrat **et** catalogue de permissions.
+`make check` enchaîne exactement les portes de la CI, dans le même ordre. Un écart connu subsiste :
+la CI lance `pnpm install --frozen-lockfile`, que `make check` ne rejoue pas — modifier
+`web/package.json` sans commiter le lockfile donne un vert local et une CI rouge.
 
 ## Architecture (carte mentale)
 

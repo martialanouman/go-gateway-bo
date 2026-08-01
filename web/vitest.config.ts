@@ -1,5 +1,5 @@
 import viteReact from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 // Séparée de `vite.config.ts` : les tests n'ont pas besoin du plugin de routage,
 // et le charger rendrait chaque run plus lent pour rien.
@@ -18,7 +18,7 @@ export default defineConfig({
     // `src/test/artefact/**` lit `dist/` : le ramasser ici ferait échouer la
     // suite unitaire sur un clone jamais construit. L'exclusion manquait, et
     // seul un `dist/` résiduel masquait le défaut en local.
-    exclude: ['node_modules/**', 'src/test/artefact/**'],
+    exclude: [...configDefaults.exclude, 'src/test/artefact/**'],
 
     /**
      * Les seuils avaient disparu au déménagement, sans un mot — une revue l'a

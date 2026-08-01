@@ -12,19 +12,25 @@ help:
 
 ## dev — BFF Go (:3001) et client Vite (:3000) en parallèle, /api proxifié
 #
-# Surveillance à PID explicites plutôt que `wait -n` ou `kill 0` : le premier
-# n'existe pas dans le `/bin/sh` de macOS (bash 3.2) et faisait mourir la cible
-# à la seconde ; le second frappe tout le groupe de processus, donc le shell
-# appelant hors terminal interactif. Ici, dès qu'une moitié sort, la boucle
-# rend la main et le `trap` arrête l'autre — un Vite qui refuse le port ne
-# laisse plus un BFF vivant sans client.
-dev:
+# **Le binaire, pas `go run`.** `go run` compile puis lance un enfant et ne lui
+# relaie aucun signal : tuer son PID laissait le serveur orphelin, PPID 1, en
+# écoute sur :3001 — le `make dev` suivant échouait sur « address already in
+# use ». `kill 0` couvrait ce cas en frappant le groupe de processus, mais
+# frappe aussi le shell appelant hors terminal interactif. Lancer le binaire
+# construit fait du PID surveillé celui du serveur, et le problème disparaît au
+# lieu d'être contourné.
+#
+# La boucle rend la main dès qu'une moitié sort, et le `trap` arrête l'autre :
+# un Vite qui refuse son port ne laisse plus un BFF vivant sans client.
+dev: build-go
 	@echo "→ BFF sur :3001, client sur http://localhost:3000"
 	@set -a; [ -f .env ] && . ./.env; set +a; \
-	$(GO) run ./cmd/dashboard & bff=$$!; \
+	./$(BINARY) & bff=$$!; \
 	$(PNPM) dev & web=$$!; \
 	trap 'kill $$bff $$web 2>/dev/null' EXIT INT TERM; \
-	while kill -0 $$bff 2>/dev/null && kill -0 $$web 2>/dev/null; do sleep 1; done
+	while kill -0 $$bff 2>/dev/null && kill -0 $$web 2>/dev/null; do sleep 1; done; \
+	if kill -0 $$bff 2>/dev/null; then echo "→ le client s'est arrêté"; else echo "→ le BFF s'est arrêté"; fi; \
+	exit 1
 
 ## build — client puis binaire (step-002 embarquera le premier dans le second)
 build: build-web build-go
@@ -36,9 +42,10 @@ test: test-go test-web
 lint: lint-go lint-web
 
 ## check — tout ce que la CI vérifie, sur les deux moitiés
-# `build-web` **avant** `test-web` : le test d'artefact lit `dist/`, et l'ordre
-# inverse échouait sur un clone frais. Le vert local ne tenait qu'à un `dist/`
-# résiduel — le faux vert exact que la passe de revue reprochait ailleurs.
+# `verify-squelette` et `routetree-check` déclarent `build-web` en prérequis :
+# make ne le refait qu'une fois. `test-web` ne dépend plus de `dist/` depuis que
+# `vitest.config.ts` exclut les tests d'artefact — l'ordre ci-dessous est donc
+# une commodité de lecture, pas une contrainte, et `make -j` reste libre.
 check: fmt-check vet tidy-check lint-workflows lint-go test-go vuln-go build-go \
        typecheck-web lint-web build-web test-web verify-squelette routetree-check vuln-web
 
@@ -98,7 +105,7 @@ verify-squelette: build-web
 
 ## routetree-check — l'arbre de routes commité est-il à jour ?
 routetree-check: build-web
-	@git diff --exit-code -- web/src/routeTree.gen.ts \
+	@git diff --exit-code HEAD -- web/src/routeTree.gen.ts \
 	  || { echo "routeTree.gen.ts est périmé : lancer 'pnpm -C web build' et commiter le fichier"; exit 1; }
 
 ## fmt — formate les deux moitiés

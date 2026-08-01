@@ -14,7 +14,7 @@ vers l'API Admin de la passerelle.
 >
 > **`make check` est vert sur les deux moitiés** — socle Go, configuration validée au démarrage,
 > sonde de vivacité, arrêt propre et CI (**step-000**) ; client React sous `web/`, SPA Vite,
-> squelette de chargement à froid et proxy `/api` (**step-001**). La suite client compte 463 tests (41 fichiers).
+> squelette de chargement à froid et proxy `/api` (**step-001**). La suite client compte 468 tests en 42 fichiers — 463 unitaires, 5 sur l'artefact construit.
 >
 > **Ce qui n'existe pas encore** : les sept steps restantes de M0. Le binaire **ne sert pas encore
 > le client** — `embed.FS` arrive en step-002, et `make dev` lance les deux processus côte à côte en
@@ -89,8 +89,9 @@ Les linters passent par `go tool` et sont épinglés dans `go.mod` : rien à ins
 sur un clone frais, et un scanner qui change sous les pieds ne rend pas un run
 non reproductible.
 
-`make check` vert signifie une CI verte. Elle vérifie en plus que **le code généré est à jour** —
-types du contrat et catalogue de permissions.
+`make check` enchaîne exactement les portes de la CI, dans le même ordre. Un écart connu subsiste :
+la CI lance `pnpm install --frozen-lockfile`, que `make check` ne rejoue pas — modifier
+`web/package.json` sans commiter le lockfile donne un vert local et une CI rouge.
 
 ### Deux processus en développement, un seul en production
 
