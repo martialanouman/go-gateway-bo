@@ -14,7 +14,7 @@ vers l'API Admin de la passerelle.
 >
 > **`make check` est vert sur les deux moitiés** — socle Go, configuration validée au démarrage,
 > sonde de vivacité, arrêt propre et CI (**step-000**) ; client React sous `web/`, SPA Vite,
-> squelette de chargement à froid et proxy `/api` (**step-001**). 461 tests client passent.
+> squelette de chargement à froid et proxy `/api` (**step-001**). La suite client compte 463 tests (41 fichiers).
 >
 > **Ce qui n'existe pas encore** : les sept steps restantes de M0. Le binaire **ne sert pas encore
 > le client** — `embed.FS` arrive en step-002, et `make dev` lance les deux processus côte à côte en
@@ -77,10 +77,11 @@ make generate   # code du contrat (Go + TS) et catalogue de permissions (Go → 
 make mock       # Prism sur openapi-admin.yaml
 make migrate    # migrations de la base
 
-make test              # unitaires + scénarios godog, avec -race
-make lint              # golangci-lint
+make test              # les deux suites — test-go puis test-web
+make test-go           # unitaires Go + scénarios godog, avec -race
+make test-web          # Vitest, seuils de couverture par fichier
+make lint              # les deux linters — lint-go puis lint-web
 make lint-workflows    # actionlint — un workflow invalide est absent, pas rouge
-make test-web          # Vitest, avec seuils de couverture par fichier
 # `pnpm -C web e2e` — cible, arrive avec le harnais Playwright de step-007
 ```
 

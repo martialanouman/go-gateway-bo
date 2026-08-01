@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { ATTRIBUT_DIFFEREE } from '../../lib/feuilles-differees'
 
 /**
  * Ces assertions portent sur **l'artefact**, jamais sur la source. Vite réécrit
@@ -45,7 +46,22 @@ describe("l'artefact servi au chargement à froid", () => {
       expect(feuille, 'une feuille sans media="print" bloque le paint du squelette').toMatch(
         /media="print"/,
       )
+      // Sans la marque, `promouvoirFeuillesDifferees` ne la trouve pas et la
+      // feuille reste en `print` pour toujours : console non stylée.
+      expect(feuille, "une feuille reportée sans marque n'est jamais promue").toContain(
+        ATTRIBUT_DIFFEREE,
+      )
     }
+  })
+
+  it('place le squelette avant le point de montage', () => {
+    const html = document()
+
+    // L'ancienne assertion d'ordre portait sur le bundle ; Vite hisse le script
+    // dans le `<head>`, elle ne pouvait pas être portée telle quelle. Celle-ci
+    // dit ce qui compte : React se monte **sous** le squelette, donc hors écran
+    // tant que le squelette occupe 100vh.
+    expect(html.indexOf('id="squelette"')).toBeLessThan(html.indexOf('id="root"'))
   })
 
   it('peint réellement le squelette plutôt que de le déclarer', () => {

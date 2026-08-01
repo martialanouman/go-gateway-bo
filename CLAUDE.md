@@ -15,7 +15,8 @@ le Go embarque les assets de la SPA.
 
 ## Commandes
 
-> Cible livrée par `step-000` et `step-007`. Tant que M0 n'est pas clos, `make` n'existe pas encore.
+> `make dev/build/check/test/lint` existent depuis step-000 et step-001. `make generate`, `make migrate`
+> et `make bootstrap` sont des **cibles** et arrivent avec leurs steps.
 
 ```bash
 make dev          # BFF Go + Vite en parallèle (proxy /api → BFF)

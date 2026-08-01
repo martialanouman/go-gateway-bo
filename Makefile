@@ -12,15 +12,19 @@ help:
 
 ## dev — BFF Go (:3001) et client Vite (:3000) en parallèle, /api proxifié
 #
-# `wait -n` et non `wait` : si l'une des deux moitiés sort, la cible s'arrête et
-# rend son code. Avec `wait` nu, un Vite qui refuse de démarrer — ce que
-# `strictPort` rend justement bruyant — laissait `make dev` attendre le BFF
-# indéfiniment, et l'opérateur voyait un serveur vivant sans client.
+# Surveillance à PID explicites plutôt que `wait -n` ou `kill 0` : le premier
+# n'existe pas dans le `/bin/sh` de macOS (bash 3.2) et faisait mourir la cible
+# à la seconde ; le second frappe tout le groupe de processus, donc le shell
+# appelant hors terminal interactif. Ici, dès qu'une moitié sort, la boucle
+# rend la main et le `trap` arrête l'autre — un Vite qui refuse le port ne
+# laisse plus un BFF vivant sans client.
 dev:
 	@echo "→ BFF sur :3001, client sur http://localhost:3000"
 	@set -a; [ -f .env ] && . ./.env; set +a; \
-	trap 'kill 0' EXIT INT TERM; \
-	$(GO) run ./cmd/dashboard & $(PNPM) dev & wait -n
+	$(GO) run ./cmd/dashboard & bff=$$!; \
+	$(PNPM) dev & web=$$!; \
+	trap 'kill $$bff $$web 2>/dev/null' EXIT INT TERM; \
+	while kill -0 $$bff 2>/dev/null && kill -0 $$web 2>/dev/null; do sleep 1; done
 
 ## build — client puis binaire (step-002 embarquera le premier dans le second)
 build: build-web build-go
@@ -32,8 +36,11 @@ test: test-go test-web
 lint: lint-go lint-web
 
 ## check — tout ce que la CI vérifie, sur les deux moitiés
+# `build-web` **avant** `test-web` : le test d'artefact lit `dist/`, et l'ordre
+# inverse échouait sur un clone frais. Le vert local ne tenait qu'à un `dist/`
+# résiduel — le faux vert exact que la passe de revue reprochait ailleurs.
 check: fmt-check vet tidy-check lint-workflows lint-go test-go vuln-go build-go \
-       typecheck-web lint-web test-web vuln-web build-web verify-squelette
+       typecheck-web lint-web build-web test-web verify-squelette routetree-check vuln-web
 
 # ─── Moitié Go ────────────────────────────────────────────────────────────────
 # Cibles granulaires : les jobs de CI Go n'ont ni Node ni `web/node_modules`, et

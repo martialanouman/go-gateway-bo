@@ -1,6 +1,7 @@
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
+import { ATTRIBUT_DIFFEREE } from './src/lib/feuilles-differees'
 
 const BFF = 'http://127.0.0.1:3001'
 
@@ -26,7 +27,7 @@ function feuilleNonBloquante(): Plugin {
       handler: (html) =>
         html.replace(
           /<link rel="stylesheet"([^>]*)>/g,
-          '<link rel="stylesheet"$1 media="print" data-differee>',
+          `<link rel="stylesheet"$1 media="print" ${ATTRIBUT_DIFFEREE}>`,
         ),
     },
   }

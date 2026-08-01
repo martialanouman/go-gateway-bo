@@ -9,7 +9,11 @@ allowBuilds:
   # fonctionnalité n'en dépend. Le laisser à `false` plutôt que de le taire : une entrée absente
   # redevient une question à chaque `pnpm install`, et fait échouer la commande.
   '@scarf/scarf': false
-  # Les trois arrivent en transitif de `@testcontainers/postgresql`, par `dockerode`. Refusés, et la
+  # ⚠ Chaîne disparue : `@testcontainers/postgresql` et `dockerode` ont été retirés
+  # en step-001, et aucun des trois paquets n'est plus dans le lockfile. Les refus
+  # sont conservés comme garde-fous — ils ne coûtent rien et redeviendraient
+  # pertinents si un paquet les réintroduisait — mais la justification d'origine
+  # ne s'applique plus à rien.
   # suite de base de données (passée en Go avec testcontainers, step-005) prouve que rien n'en dépend : Testcontainers parle au socket Docker local,
   # jamais à un démon distant par SSH (`ssh2`, et `cpu-features` qui n'accélère que son chiffrement),
   # et aucun de nos échanges n'est en protobuf. Ce sont trois compilations natives en moins à chaque

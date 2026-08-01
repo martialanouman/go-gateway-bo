@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { promouvoirFeuillesDifferees } from './lib/feuilles-differees'
 import { routeTree } from './routeTree.gen'
 import './styles/app.css'
 
@@ -32,12 +33,17 @@ declare module '@tanstack/react-router' {
 }
 
 // La feuille de styles est chargée en `media="print"` pour ne pas bloquer le
-// premier paint du squelette (voir `vite.config.ts`). On la promeut ici, avant
-// de monter React : le squelette est déjà peint, et l'application n'apparaîtra
-// jamais non stylée.
-for (const feuille of document.querySelectorAll<HTMLLinkElement>('link[data-differee]')) {
-  feuille.media = 'all'
-}
+// premier paint du squelette (voir `vite.config.ts`). On la promeut avant de
+// monter React.
+//
+// Risque résiduel assumé, faute de pouvoir le mesurer avant step-007 : la
+// promotion ne fait pas *attendre* la feuille. Si le bundle arrive avant elle
+// — plausible, une feuille `media="print"` est récupérée en priorité basse —
+// la console peut apparaître non stylée le temps d'un aller-retour. Le motif
+// canonique bascule `media` dans `onload`, que le nonce CSP de step-186
+// interdit. Le parcours de bout en bout devra asserter « premier rendu déjà
+// stylé ».
+promouvoirFeuillesDifferees(document)
 
 const point = document.getElementById('root')
 if (!point) {

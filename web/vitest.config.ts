@@ -15,6 +15,10 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     environment: 'jsdom',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // `src/test/artefact/**` lit `dist/` : le ramasser ici ferait échouer la
+    // suite unitaire sur un clone jamais construit. L'exclusion manquait, et
+    // seul un `dist/` résiduel masquait le défaut en local.
+    exclude: ['node_modules/**', 'src/test/artefact/**'],
 
     /**
      * Les seuils avaient disparu au déménagement, sans un mot — une revue l'a
