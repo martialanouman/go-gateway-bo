@@ -10,7 +10,11 @@ peint le squelette de la coquille**, jamais un blanc.
 
 ## Périmètre (ce que fait CETTE PR)
 - L'arborescence `web/src/` créée à neuf : `routes/`, `components/`, `lib/`, `styles/`. Une seule
-  route pour commencer — les écrans arrivent avec leurs steps.
+  route pour commencer — les écrans arrivent avec leurs steps. *(Amendement 01/08/2026 : `components/`
+  et `lib/` ne sont pas créés. Git ne versionne pas un répertoire vide, et CLAUDE.md pose que chaque
+  package naît avec le code qui l'habite — c'est le même arbitrage qu'en step-000 pour les paquets
+  `internal/`. `components/` naît en step-041 avec les primitives, `lib/` en step-004 avec les types
+  client engendrés par le contrat du BFF.)*
 - `web/index.html`, une entrée client qui monte `RouterProvider`, une route racine, et
   `@tanstack/router-plugin/vite` qui engendre l'arbre de routes.
 - **Squelette de chargement dans `index.html`** : la silhouette de l'AppShell — rail, barre
