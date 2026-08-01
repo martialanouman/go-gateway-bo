@@ -15,8 +15,11 @@ function RootComponent() {
   // une application sans lui pendant que tous les tests passaient, parce que
   // `renderComponent` le fournissait. Mais `main.tsx` en monte un aussi, et
   // `render.tsx` également : retirer celui-ci laisse la suite verte **et** la
-  // production fonctionnelle. Trancher où vit le provider appartient à step-040,
-  // qui livre la coquille ; d'ici là, ne pas lire ces lignes comme un filet.
+  // production fonctionnelle. Pire : **c'est ce provider-ci qui rend indétectable
+  // la suppression de celui de `main.tsx`**, le seul des deux qui soit hors
+  // couverture et chargé par aucun test. Trancher où vit le provider appartient
+  // à step-040, qui livre la coquille ; d'ici là, ne pas lire ces trois lignes
+  // comme un filet. `RetraitDuSquelette`, juste en dessous, en est un.
   const { queryClient } = Route.useRouteContext()
 
   return (

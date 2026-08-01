@@ -29,7 +29,10 @@ dev: build-go
 	$(PNPM) dev & web=$$!; \
 	trap 'kill $$bff $$web 2>/dev/null' EXIT INT TERM; \
 	while kill -0 $$bff 2>/dev/null && kill -0 $$web 2>/dev/null; do sleep 1; done; \
-	if kill -0 $$bff 2>/dev/null; then echo "→ le client s'est arrêté"; else echo "→ le BFF s'est arrêté"; fi; \
+	vivant_bff=0; kill -0 $$bff 2>/dev/null && vivant_bff=1; \
+	vivant_web=0; kill -0 $$web 2>/dev/null && vivant_web=1; \
+	if [ $$vivant_bff = 0 ] && [ $$vivant_web = 0 ]; then echo "→ arrêt des deux moitiés"; exit 0; fi; \
+	if [ $$vivant_bff = 1 ]; then echo "→ le client s'est arrêté"; else echo "→ le BFF s'est arrêté"; fi; \
 	exit 1
 
 ## build — client puis binaire (step-002 embarquera le premier dans le second)
@@ -105,7 +108,7 @@ verify-squelette: build-web
 
 ## routetree-check — l'arbre de routes commité est-il à jour ?
 routetree-check: build-web
-	@git diff --exit-code HEAD -- web/src/routeTree.gen.ts \
+	@git diff --quiet HEAD -- web/src/routeTree.gen.ts \
 	  || { echo "routeTree.gen.ts est périmé : lancer 'pnpm -C web build' et commiter le fichier"; exit 1; }
 
 ## fmt — formate les deux moitiés

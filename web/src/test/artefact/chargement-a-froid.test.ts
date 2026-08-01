@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { dirname, dirname as parentOf, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { ATTRIBUT_DIFFEREE } from '../../lib/feuilles-differees'
@@ -63,9 +63,11 @@ describe("l'artefact servi au chargement à froid", () => {
     // l'artefact qui doit en témoigner.
     const html = document()
     const entree = html.match(/<script[^>]+src="([^"]+)"/)?.[1]
-    expect(entree, "aucun bundle d'entrée dans l'artefact").toBeTruthy()
+    if (!entree) {
+      throw new Error("aucun bundle d'entrée dans l'artefact")
+    }
 
-    const bundle = readFileSync(parentOf(artefact) + entree, 'utf8')
+    const bundle = readFileSync(join(dirname(artefact), entree), 'utf8')
 
     expect(
       bundle,

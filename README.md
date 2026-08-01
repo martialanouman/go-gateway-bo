@@ -14,7 +14,7 @@ vers l'API Admin de la passerelle.
 >
 > **`make check` est vert sur les deux moitiés** — socle Go, configuration validée au démarrage,
 > sonde de vivacité, arrêt propre et CI (**step-000**) ; client React sous `web/`, SPA Vite,
-> squelette de chargement à froid et proxy `/api` (**step-001**). La suite client compte 468 tests en 42 fichiers — 463 unitaires, 5 sur l'artefact construit.
+> squelette de chargement à froid et proxy `/api` (**step-001**). La suite client compte 469 tests en 42 fichiers — 463 unitaires (dont 1 `todo`) et 6 sur l’artefact construit.
 >
 > **Ce qui n'existe pas encore** : les sept steps restantes de M0. Le binaire **ne sert pas encore
 > le client** — `embed.FS` arrive en step-002, et `make dev` lance les deux processus côte à côte en
@@ -89,9 +89,12 @@ Les linters passent par `go tool` et sont épinglés dans `go.mod` : rien à ins
 sur un clone frais, et un scanner qui change sous les pieds ne rend pas un run
 non reproductible.
 
-`make check` enchaîne exactement les portes de la CI, dans le même ordre. Un écart connu subsiste :
-la CI lance `pnpm install --frozen-lockfile`, que `make check` ne rejoue pas — modifier
-`web/package.json` sans commiter le lockfile donne un vert local et une CI rouge.
+`make check` enchaîne toutes les portes de la CI — mais la CI les lance **en parallèle**, il n'y a
+donc pas d'ordre à égaler. Quatre écarts connus, qui font qu'un vert local ne garantit pas une CI
+verte : la CI rejoue `pnpm install --frozen-lockfile` (un `node_modules` désynchronisé du lockfile
+passe en local) ; `pr-title.yml` n'est pas rejouable hors CI ; `govulncheck` et `pnpm audit`
+interrogent des bases vivantes, donc le verdict peut changer sans qu'un fichier bouge ; et la CI
+tourne sur linux/amd64 contre darwin/arm64 en local, ce qui compte pour `go test -race`.
 
 ### Deux processus en développement, un seul en production
 

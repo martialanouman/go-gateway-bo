@@ -31,9 +31,12 @@ make lint-go      # golangci-lint · make lint-web — Biome
 make lint-workflows  # actionlint : un workflow invalide est absent, pas rouge
 ```
 
-`make check` enchaîne exactement les portes de la CI, dans le même ordre. Un écart connu subsiste :
-la CI lance `pnpm install --frozen-lockfile`, que `make check` ne rejoue pas — modifier
-`web/package.json` sans commiter le lockfile donne un vert local et une CI rouge.
+`make check` enchaîne toutes les portes de la CI — mais la CI les lance **en parallèle**, il n'y a
+donc pas d'ordre à égaler. Quatre écarts connus, qui font qu'un vert local ne garantit pas une CI
+verte : la CI rejoue `pnpm install --frozen-lockfile` (un `node_modules` désynchronisé du lockfile
+passe en local) ; `pr-title.yml` n'est pas rejouable hors CI ; `govulncheck` et `pnpm audit`
+interrogent des bases vivantes, donc le verdict peut changer sans qu'un fichier bouge ; et la CI
+tourne sur linux/amd64 contre darwin/arm64 en local, ce qui compte pour `go test -race`.
 
 ## Architecture (carte mentale)
 
