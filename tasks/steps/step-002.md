@@ -54,9 +54,107 @@ l'ordre entre le fallback et l'API.
 ## Definition of Done
 - [ ] `make build` produit un binaire qui sert l'application seul
 - [ ] `make check` vert
-- [ ] la mutation « monter le fallback avant les routes `/api` » fait rougir le scénario — c'est **le**
-      test de cette step, et il doit reproduire le défaut réel : 200 + HTML, pas une absence de route
+- [ ] la mutation « **retirer le `NotFound` explicite de `/api`** » fait rougir le scénario — c'est **le**
+      test de cette step, et il reproduit le défaut réel : 200 + HTML, pas une absence de route.
+      *La formulation initiale, « monter le fallback avant les routes `/api` », ne reproduit rien —
+      voir DN-9.*
 
 ## Hors périmètre
 Le nonce CSP par requête → step-186. La rétention d'assets entre versions → step-186. Les sondes de
 disponibilité → step-186.
+
+## Design arrêté (2026-08-01)
+
+Les trois premières décisions se tiennent en bloc : elles reposent toutes sur le même trio
+`.gitkeep` + `all:` + répertoire ignoré par git. Arbitrées avec le modèle Fable, la spécification ne
+tranchant pas.
+
+### DN-1 — L'`embed.FS` vit dans `internal/webassets`, motif `all:dist`
+
+`//go:embed` interprète ses motifs relativement au répertoire du fichier source et **ne peut pas
+remonter** : `web/dist` doit donc être **copié** dans le répertoire du package qui embarque. Ce
+répertoire est `internal/webassets/dist/`, parce que le `.gitignore` commité l'anticipe déjà
+(lignes 25-34) avec le trio ordonné qui rend un `.gitkeep` réellement commitable — décision prise et
+**payée par un défaut réel** lors d'une step précédente, qu'on ne rejoue pas pour respecter la lettre
+d'une ligne de layout.
+
+Le motif est `all:dist` et pas `dist` : `//go:embed dist` **exclut** les fichiers commençant par `.`
+(doc du paquet `embed` : « the difference is that `image/*` embeds `image/.tempfile` while `image`
+does not »), et un motif qui ne matche **aucun** fichier est une **erreur de compilation**. Sur un
+clone neuf, `dist/` ne contient que `.gitkeep` : sans `all:`, `go build` casse partout sauf sur le
+poste qui vient de construire le client — exactement la panne que le trio du `.gitignore` existe pour
+empêcher.
+
+**Conséquence assumée** : `tasks/plan.md` §1.1 et `CLAUDE.md` placent l'`embed.FS` dans
+`cmd/dashboard/`. La divergence se corrige **dans le plan**, dans cette PR, pas en la contournant.
+
+### DN-2 — `NewRouter(assets fs.FS)` : le handler d'assets reçoit un `fs.FS`, jamais l'`embed.FS`
+
+Imposé par la fiche. La conséquence pratique est que `internal/bff` ne dépend pas d'un build client :
+ses tests montent un `fstest.MapFS` et `go test ./...` passe sur un clone neuf.
+`internal/webassets` expose `FS() (fs.FS, error)` qui fait `fs.Sub(embedded, "dist")` ; `main` l'appelle
+et passe le résultat au routeur.
+
+### DN-3 — Trois niveaux de preuve, et une lacune nommée
+
+1. **Logique** (ordonnancement, en-têtes, repli, méthodes) — tests `internal/bff` sur `fstest.MapFS`.
+2. **Câblage réel** (embed, `fs.Sub`, routeur, dans le binaire compilé) — scénario godog
+   `cmd/dashboard/assets.feature`. Le harnais met en scène des **fixtures d'assets** dans
+   `internal/webassets/dist/` avant de compiler, et restaure l'état d'origine ensuite : le répertoire
+   est ignoré par git, donc rien ne salit l'arbre, et les quatre `Alors` s'exécutent **toujours**, sur
+   clone neuf comme dans le job CI sans Node. Rien n'est simulé *dans le produit* — les assets sont
+   une **entrée** du système sous test, comme le mock Prism l'est côté passerelle.
+3. **Lacune assumée, écrite ici parce qu'elle n'est pas testable ici** : aucun test de cette step ne
+   prouve que la **vraie** sortie de Vite atterrit dans le binaire. Cette affirmation appartient à
+   `make build` (DN-4) et sera traversée par les parcours Playwright contre le binaire de step-007.
+
+### DN-4 — `make build` enchaîne, `build-go` reste granulaire
+
+`make build` = `build-web` → copie vers `internal/webassets/dist/` → `build-go`. Le job CI « Build Go »
+appelle désormais `build-go`, parce qu'il n'a **ni Node ni pnpm** et que l'en-tête du Makefile pose la
+règle : un job de CI n'invoque jamais une cible qui dépend de l'autre toolchain. Les deux exigences —
+« `make build` enchaîne » et « le job Go reste sans Node » — redeviennent vraies ensemble.
+
+La copie **purge les fichiers obsolètes en épargnant `.gitkeep`** : rien ne vide
+`internal/webassets/dist/` (contrairement à `web/dist`, que Vite vide à chaque build), et sans purge
+les assets hachés d'un build précédent s'accumuleraient dans le binaire. Supprimer le `.gitkeep`
+rendrait l'arbre sale et recréerait le défaut de DN-1.
+
+**Coût assumé** : plus aucun job de CI ne compile le binaire *complet*. « Build Go » compile un binaire
+qui n'embarque que `.gitkeep` — c'est une porte de compilation, pas un artefact livrable.
+
+### DN-5 — `/assets/*` immuable, tout le reste `no-cache`
+
+`Cache-Control: public, max-age=31536000, immutable` pour ce qui est servi sous `/assets/`, `no-cache`
+pour `index.html` et tout autre fichier racine. La frontière est le **chemin**, pas une reconnaissance
+de hachage dans le nom : Vite place sous `assets/` tout ce qu'il hache — vérifié sur la sortie réelle
+(`assets/index-BZaM5Pg4.js`, `assets/index-BM7VFVhX.css`, `assets/routes-Bm97Ugzo.js`) — et
+`index.html`, qui porte les références à ces noms hachés, reste à la racine.
+
+### DN-6 — Un asset absent sous `/assets/` rend 404, jamais `index.html`
+
+C'est le même défaut trompeur que sur `/api`, transposé : un `<script src="/assets/…">` qui reçoit du
+HTML en 200 échoue avec une erreur de syntaxe illisible, très loin de sa cause. Le repli ne s'applique
+donc pas sous `/assets/`.
+
+### DN-7 — Le repli ne répond qu'en `GET` et `HEAD`
+
+Un `POST /clients` sur une route non montée doit dire « cette méthode n'est pas là », pas rendre la
+coquille de la SPA en 200. Les autres méthodes rendent **405**.
+
+### DN-8 — `/api` porte un `NotFound` explicite ; `/ws` est monté avant le repli
+
+Le 404 de `/api` rend un **DTO déclaré** `{code, message}` — la forme d'erreur unique du produit
+(§1.4), dont la traduction complète depuis l'API Admin arrive en step-003. `/ws` est monté dès
+maintenant et rend **501** jusqu'à step-043 : une route déclarée qui ne mène nulle part vaut mieux
+qu'une URL qui tombe dans le repli et rend du HTML à un client WebSocket.
+
+### DN-9 — La mutation de la DoD est corrigée
+
+La fiche demandait de muter en « montant le fallback avant les routes `/api` ». **Cette mutation
+resterait verte** : dans chi v5.3.1, `NotFound` déclaré sur le parent est propagé à tout sous-routeur
+qui n'en a pas — au moment de l'appel (`mux.go:214-218`, `updateSubRoutes`) **et** au montage
+(`mux.go:308-309`). L'ordre des lignes ne protège donc rien, et l'inverser ne casse rien.
+
+Ce qui porte l'invariant est la **déclaration explicite** d'un `NotFound` sur `/api` ; la mutation qui
+reproduit le défaut réel est donc son **retrait**, qui rend bien 200 + HTML sur `/api/inconnu`.

@@ -59,10 +59,12 @@ Pub/Sub. Un process unique serait un SPOF et la cible de 99,9 % inatteignable.
 ## Layout du dépôt
 
 ```
-cmd/dashboard/     le binaire : câblage, embed.FS des assets, arrêt propre
+cmd/dashboard/     le binaire : câblage, arrêt propre
 internal/          le BFF — seul endroit qui connaît secrets, jeton Admin et base
-  bff/ config/ auth/ gateway/ hub/ alerting/ store/ permissions/
+  bff/ config/ webassets/ auth/ gateway/ hub/ alerting/ store/ permissions/
                    chaque package naît avec le code qui l'habite, jamais vide
+                   webassets/ porte l'embed.FS des assets — `//go:embed` ne remonte pas au-dessus
+                   de son répertoire, et le .gitignore n'y rend commitable que ce chemin
 api/               openapi-bff.yaml — engendre les types Go et TS
 web/               le client React (src/routes, src/components, src/lib, src/styles)
 docs/              la spécification technique

@@ -74,10 +74,11 @@ Ces choix sont fixés une fois ; tous les jalons s'y conforment.
 Deux moitiés, un seul déployable. Le layout est celui d'un projet Go qui embarque un client web.
 
 ```
-cmd/dashboard/          le binaire : câblage, embed.FS des assets, arrêt propre
+cmd/dashboard/          le binaire : câblage, arrêt propre
 internal/
   bff/                  handlers HTTP, gardes de permission, écriture d'audit
   config/               configuration validée au démarrage
+  webassets/            l'embed.FS des assets du client (step-002)
   auth/                 session, argon2id, TOTP, WebAuthn
   gateway/              client généré vers l'API Admin (OAuth2 + mTLS)
   hub/                  hub WebSocket : 3 flux amont → 1 socket par opérateur
