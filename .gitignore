@@ -1,6 +1,7 @@
 # Sorties de build.
 /bin/
 /dist/
+web/dist/
 
 # Dépendances et caches d'outillage.
 node_modules/

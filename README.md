@@ -14,14 +14,15 @@ vers l'API Admin de la passerelle.
 > **client React** (~16 300 lignes : composants, écrans, tokens de la charte et leurs tests) est
 > conservé sous `src/` et attend son déménagement vers `web/` en **step-001**.
 >
-> **`make check` est vert** — le socle Go, la configuration validée au démarrage, la sonde de
-> vivacité, l'arrêt propre et la CI sont livrés (**step-000**).
+> **`make check` est vert sur les deux moitiés** — socle Go, configuration validée au démarrage,
+> sonde de vivacité, arrêt propre et CI (**step-000**) ; client React sous `web/`, SPA Vite,
+> squelette de chargement à froid et proxy `/api` (**step-001**). 461 tests client passent.
 >
-> **Ce qui n'existe pas encore** : les huit steps restantes de M0. Donc pas de client servi
-> (`make dev` ne lance que le BFF), pas d'`embed.FS`, pas de contrat généré, pas de base, pas de
-> catalogue de permissions, pas de charte. `make migrate`, `make bootstrap`, `make mock` et
-> `make generate` sont décrits ci-dessous comme **cible** et arrivent avec leurs steps. La moitié
-> client garde les dépendances de l'ancien socle jusqu'à step-001.
+> **Ce qui n'existe pas encore** : les sept steps restantes de M0. Le binaire **ne sert pas encore
+> le client** — `embed.FS` arrive en step-002, et `make dev` lance les deux processus côte à côte en
+> attendant. Pas de contrat généré, pas de base, pas de catalogue de permissions, pas de charte
+> vérifiée. `make migrate`, `make bootstrap` et `make generate` sont décrits ci-dessous comme
+> **cible** et arrivent avec leurs steps.
 
 ## Démarrer
 
@@ -71,8 +72,8 @@ dépôt. La réponse n'est jamais d'ajouter un PAT en secret — voir « Contrat
 ## Commandes
 
 ```bash
-make dev        # BFF Go + Vite en parallèle, /api et /ws proxifiés vers le Go
-make build      # go build → binaire (le build client arrive en step-002)
+make dev        # BFF Go (:3001) + Vite (:3000) en parallèle, /api et /ws proxifiés
+make build      # client puis binaire (step-002 embarquera le premier dans le second)
 make check      # tout ce que la CI vérifie — OBLIGATOIRE avant toute PR
 make generate   # code du contrat (Go + TS) et catalogue de permissions (Go → TS)
 make mock       # Prism sur openapi-admin.yaml

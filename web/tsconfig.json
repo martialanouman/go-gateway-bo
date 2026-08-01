@@ -27,11 +27,11 @@
     // automatiquement comme le faisait TS 5 — vérifié, `--listFilesOnly` n'en
     // remontait aucun fichier. Les tests de la charte lisent les tokens sur
     // disque, d'où le besoin.
-    "types": ["node"],
+    "types": ["node", "vite/client"],
 
     "paths": {
       "~/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts", "vitest.config.ts"]
 }

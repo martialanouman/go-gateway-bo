@@ -29,6 +29,9 @@ runs:
         # .nvmrc est la source unique de la version de Node ; ne jamais la répéter ici.
         node-version-file: .nvmrc
         cache: pnpm
+        # La moitié client vit sous `web/` depuis step-001 ; sans ce chemin,
+        # setup-node cherche un lockfile à la racine, qui est un module Go.
+        cache-dependency-path: web/pnpm-lock.yaml
 
     # Les contrats de la passerelle viennent de GitHub Packages, qui exige une authentification même
     # en lecture. Le credential va dans la config *utilisateur* du runner et pas dans le `.npmrc` du
@@ -54,3 +57,4 @@ runs:
     # que d'installer silencieusement autre chose que ce qui a été testé en local.
     - run: pnpm install --frozen-lockfile
       shell: bash
+      working-directory: web

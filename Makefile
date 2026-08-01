@@ -1,4 +1,5 @@
 GO             ?= go
+PNPM           ?= pnpm -C web
 BINARY         ?= bin/dashboard
 GOLANGCI_LINT  ?= $(GO) tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 ACTIONLINT     ?= $(GO) tool github.com/rhysd/actionlint/cmd/actionlint
@@ -9,36 +10,52 @@ ACTIONLINT     ?= $(GO) tool github.com/rhysd/actionlint/cmd/actionlint
 help:
 	@grep -hE '^## ' $(MAKEFILE_LIST) | sed 's/^## /  /'
 
-## dev — lance le BFF en chargeant .env (step-001 y ajoutera Vite et le proxy /api)
+## dev — BFF Go (:3001) et client Vite (:3000) en parallèle, /api proxifié
 dev:
-	@set -a; [ -f .env ] && . ./.env; set +a; $(GO) run ./cmd/dashboard
+	@echo "→ BFF sur :3001, client sur http://localhost:3000"
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	trap 'kill 0' EXIT INT TERM; \
+	$(GO) run ./cmd/dashboard & $(PNPM) dev & wait
 
-## build — produit le binaire (step-002 y ajoutera les assets embarqués)
+## build — client puis binaire (step-002 embarquera le premier dans le second)
 build:
+	$(PNPM) build
 	$(GO) build -o $(BINARY) ./cmd/dashboard
 
-## test — unitaires et scénarios godog, avec le détecteur de courses
+## test — Go (unitaires + godog, avec -race) puis client (Vitest)
 test:
 	$(GO) test -race ./...
+	$(PNPM) test
 
-## lint — golangci-lint
+## lint — golangci-lint puis Biome
 lint:
 	$(GOLANGCI_LINT) run
+	$(PNPM) lint
 
 ## lint-workflows — actionlint : un workflow invalide est absent, pas rouge
 lint-workflows:
 	$(ACTIONLINT)
 
-## fmt — formate le code
+## fmt — formate les deux moitiés
 fmt:
 	$(GO) fmt ./...
+	$(PNPM) format
 
-## vuln — govulncheck
+## typecheck — tsc sur la moitié client
+typecheck:
+	$(PNPM) typecheck
+
+## vuln — govulncheck et pnpm audit
 vuln:
 	$(GO) tool govulncheck ./...
+	$(PNPM) vuln
 
-## check — tout ce que la CI vérifie
-check: fmt-check vet tidy-check lint lint-workflows test vuln build
+## mock — Prism sert le contrat de la passerelle sur :4010
+mock:
+	$(PNPM) mock
+
+## check — tout ce que la CI vérifie, sur les deux moitiés
+check: fmt-check vet tidy-check typecheck lint lint-workflows test vuln build
 
 vet:
 	$(GO) vet ./...
@@ -52,4 +69,4 @@ fmt-check:
 tidy-check:
 	$(GO) mod tidy -diff
 
-.PHONY: help dev build test lint lint-workflows fmt vuln check vet fmt-check tidy-check
+.PHONY: help dev build test lint lint-workflows fmt typecheck vuln mock check vet fmt-check tidy-check
