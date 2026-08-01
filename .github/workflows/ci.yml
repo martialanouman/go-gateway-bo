@@ -137,6 +137,20 @@ jobs:
       - uses: ./.github/actions/setup
       - run: make test-web
 
+  vuln-web:
+    name: Vulnérabilités client
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: make vuln-web
+
   build-web:
     name: Build client
     runs-on: ubuntu-latest
@@ -158,7 +172,7 @@ jobs:
     # `always()` fait tourner l'agrégation même quand une porte a échoué : sans lui, le check reste
     # « skipped », état qu'une protection de branche accepte.
     if: always()
-    needs: [build, test, lint, vuln, workflows, typecheck-web, lint-web, test-web, build-web]
+    needs: [build, test, lint, vuln, workflows, typecheck-web, lint-web, test-web, vuln-web, build-web]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -39,6 +39,20 @@ Rendre la charte utilisable : les tokens portés sous `web/src/styles/`, la page
 - [ ] aucune police ni feuille de style chargée depuis un domaine tiers, **vérifié sur le binaire**
 - [ ] les deux mutations ci-dessus ont été jouées
 
+## Hérité de step-001, à traiter ici
+- **La feuille de style de l'application bloque la première peinture.** Vite émet un
+  `<link rel="stylesheet">` dans le `<head>` : le squelette de chargement à froid attend cet
+  aller-retour, malgré son style inline. Mesuré à 598 octets et 1,0–1,4 ms en local — négligeable
+  tant que la feuille est petite, ce que cette step change en y versant les tokens.
+- **Les polices auto-hébergées s'y ajouteront**, et leurs `@font-face` ne seront découverts qu'après
+  l'analyse du CSS : deux allers-retours sérialisés avant que le moindre texte peigne, plus le FOIT.
+  La parade (`<link rel="preload" as="font" crossorigin>` et `font-display: swap`) vit dans
+  `web/index.html`.
+- **Quatre valeurs de géométrie vivent dans le `<style>` inline d'`index.html`** —
+  `--shell-rail-width`, `--shell-topbar-height`, `--skeleton-surface`, `--skeleton-shape` — parce que
+  le squelette doit être peint sans requête. Elles sont la source unique que consomme `app.css` ; les
+  absorber dans le pipeline de tokens sans rouvrir le blanc fait partie de cette step.
+
 ## Hors périmètre
 Les primitives habillées → step-041 et step-042. La coquille → step-040. L'audit d'accessibilité
 complet → step-185.

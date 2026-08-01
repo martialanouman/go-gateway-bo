@@ -6,16 +6,30 @@
     <title>Tableau de bord — Passerelle SMS</title>
 
     <!--
-      Le style du squelette est inline, et non dans une feuille liée : une feuille externe est une
-      requête bloquante de plus avant la première peinture, c'est-à-dire le blanc que ce squelette
-      existe pour supprimer.
+      Le style du squelette est inline : la silhouette garde sa forme même si la feuille de
+      l'application échoue, et elle est peinte sans attendre le CSS en développement, où Vite l'injecte
+      par JavaScript.
 
-      Les couleurs sont provisoires et délibérément sobres — les tokens de la charte arrivent en
-      step-008. Ce qui compte ici est la silhouette, pas la teinte.
+      Ce qu'il ne faut pas croire pour autant : en production, Vite émet un `<link rel="stylesheet">`
+      dans ce `<head>`, et une feuille liée bloque le rendu du document entier — squelette compris. La
+      première peinture attend donc cet aller-retour. Mesuré à 598 octets et 1,0–1,4 ms en local, soit
+      3 à 7 % de la fenêtre que le squelette comble ; inliner la feuille la rendrait non cacheable
+      entre deux déploiements. L'arbitrage se rouvre en step-008, qui y versera les tokens et les
+      polices auto-hébergées.
+
+      Les couleurs sont provisoires et délibérément sobres — la charte arrive avec cette même step.
     -->
     <style>
+      /*
+        Ces quatre valeurs sont la source unique des dimensions de la coquille : `app.css` les
+        consomme au lieu de les redire. Le bloc `<style>` survit au montage de React, donc les
+        variables restent définies — et le saut de mise en page que la duplication rendait possible
+        ne peut plus arriver, plutôt que d'être surveillé par un test.
+      */
       :root {
         color-scheme: dark;
+        --shell-rail-width: 15rem;
+        --shell-topbar-height: 3.5rem;
         --skeleton-surface: #12151c;
         --skeleton-shape: #1c212b;
       }
@@ -41,8 +55,8 @@
       */
       .skeleton {
         display: grid;
-        grid-template-columns: 15rem 1fr;
-        grid-template-rows: 3.5rem 1fr;
+        grid-template-columns: var(--shell-rail-width) 1fr;
+        grid-template-rows: var(--shell-topbar-height) 1fr;
         min-height: 100vh;
       }
 
@@ -64,6 +78,19 @@
         border-radius: 0.375rem;
       }
 
+      /*
+        Règle, et non attribut `style=` : un nonce CSP couvre les éléments `<style>`, jamais les
+        attributs, qui exigeraient `'unsafe-inline'`. La politique à nonce de step-186 ferait tomber
+        cette déclaration et le texte s'afficherait en clair au milieu du squelette.
+      */
+      .skeleton__sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+      }
+
       .skeleton__rail .skeleton__block {
         height: 1.25rem;
         margin: 1rem;
@@ -74,6 +101,7 @@
         margin: 1.125rem 1.5rem;
         max-width: 18rem;
       }
+
 
       .skeleton__content .skeleton__block {
         height: 5rem;
@@ -101,9 +129,7 @@
   <body>
     <div id="app">
       <div class="skeleton" aria-busy="true" aria-live="polite">
-        <span class="skeleton__sr-only" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%)">
-          Chargement du tableau de bord
-        </span>
+        <span class="skeleton__sr-only">Chargement du tableau de bord</span>
         <div class="skeleton__rail" data-skeleton="rail">
           <div class="skeleton__block"></div>
           <div class="skeleton__block"></div>

@@ -4,11 +4,11 @@ import { describe, expect, it } from 'vitest'
 import { routeTree } from '../routeTree.gen'
 
 /**
- * Le test monte le **vrai** routeur sur le **vrai** arbre de routes, avec le RouterProvider de
- * l'application. Un composant importé directement et rendu seul prouverait qu'il sait s'afficher,
- * pas qu'une URL y mène.
+ * Le test monte le vrai arbre de routes derrière le RouterProvider de l'application : un composant
+ * importé directement et rendu seul prouverait qu'il sait s'afficher, pas qu'une URL y mène. Le
+ * montage réel, lui, est exercé par `main.test.tsx`.
  */
-async function visit(path: string) {
+async function visitAndAwaitHeading(path: string) {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [path] }),
@@ -21,23 +21,17 @@ async function visit(path: string) {
 
 describe("l'écran d'accueil", () => {
   it('annonce que le cockpit se construit, sous un titre de premier niveau', async () => {
-    const heading = await visit('/')
+    const heading = await visitAndAwaitHeading('/')
 
     expect(heading).toHaveTextContent("Le cockpit d'exploitation se construit")
   })
 
   it('nomme les jalons qui apporteront les écrans plutôt que de laisser un blanc', async () => {
-    await visit('/')
+    await visitAndAwaitHeading('/')
 
     // §1.9 : une surface non encore livrée dit ce qui arrive et quand — jamais une page vide, jamais
     // un écran inventé.
     expect(screen.getByText(/jalon M4/)).toBeInTheDocument()
     expect(screen.getByText(/jalon M1/)).toBeInTheDocument()
-  })
-
-  it('rend la coquille avec sa navigation nommée', async () => {
-    await visit('/')
-
-    expect(screen.getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument()
   })
 })

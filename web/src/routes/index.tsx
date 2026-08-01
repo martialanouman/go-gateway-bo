@@ -15,8 +15,8 @@ function HomeScreen() {
         SMPP ouvrent le jalon M4 ; l'authentification et les rôles, le jalon M1.
       </p>
       <p className="empty__body">
-        Cette page confirme que le client démarre et qu'il parle au BFF : la sonde de vivacité
-        répond sur <code>/api/health</code>.
+        Chaque écran arrive avec sa route, son état vide et le jalon qui le porte : aucun lien ne
+        mène nulle part.
       </p>
     </section>
   )
