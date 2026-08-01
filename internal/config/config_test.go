@@ -18,16 +18,53 @@ func lookupFrom(vars map[string]string) config.Lookup {
 	}
 }
 
+// minimalEnv est le plus petit environnement que Load accepte : le mode `mock` n'exige de la
+// passerelle que son adresse. Les cas qui portent sur une autre variable partent de là et surchargent
+// ce qu'ils exercent, pour qu'ajouter une obligation demain ne demande pas de retoucher vingt cas.
+func minimalEnv() map[string]string {
+	return map[string]string{
+		config.EnvAddr:           ":3001",
+		config.EnvGatewayMode:    string(config.GatewayModeMock),
+		config.EnvGatewayBaseURL: "http://127.0.0.1:4010",
+	}
+}
+
+// realGatewayEnv est un environnement complet en mode `real` : tout ce qu'exige une passerelle
+// jointe pour de vrai, sans aucune valeur qui ressemble à un secret d'installation.
+func realGatewayEnv() map[string]string {
+	return map[string]string{
+		config.EnvAddr:                ":3001",
+		config.EnvGatewayMode:         string(config.GatewayModeReal),
+		config.EnvGatewayBaseURL:      "https://admin.gateway.internal/v1",
+		config.EnvGatewayTokenURL:     "https://auth.gateway.internal/oauth2/token",
+		config.EnvGatewayClientID:     "dashboard",
+		config.EnvGatewayClientSecret: "un-secret-de-test",
+		config.EnvGatewayClientCert:   "/etc/dashboard/tls/client.crt",
+		config.EnvGatewayClientKey:    "/etc/dashboard/tls/client.key",
+		config.EnvGatewayCACert:       "/etc/dashboard/tls/ca.crt",
+		config.EnvGatewayTimeout:      "5s",
+		config.EnvShutdownTimeout:     "30s",
+	}
+}
+
+func envWith(base map[string]string, overrides map[string]string) map[string]string {
+	for name, value := range overrides {
+		base[name] = value
+	}
+
+	return base
+}
+
 func TestLoad(t *testing.T) {
 	t.Parallel()
 
 	t.Run("charge une configuration complète", func(t *testing.T) {
 		t.Parallel()
 
-		cfg, err := config.Load(lookupFrom(map[string]string{
+		cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
 			config.EnvAddr:            "127.0.0.1:3001",
 			config.EnvShutdownTimeout: "30s",
-		}))
+		})))
 
 		require.NoError(t, err)
 		assert.Equal(t, "127.0.0.1:3001", cfg.Addr)
@@ -37,7 +74,7 @@ func TestLoad(t *testing.T) {
 	t.Run("applique le délai de grâce par défaut quand il est absent", func(t *testing.T) {
 		t.Parallel()
 
-		cfg, err := config.Load(lookupFrom(map[string]string{config.EnvAddr: ":3001"}))
+		cfg, err := config.Load(lookupFrom(minimalEnv()))
 
 		require.NoError(t, err)
 		assert.Equal(t, 15*time.Second, cfg.ShutdownTimeout)
@@ -46,7 +83,9 @@ func TestLoad(t *testing.T) {
 	t.Run("normalise le port plutôt que de le reprendre verbatim", func(t *testing.T) {
 		t.Parallel()
 
-		cfg, err := config.Load(lookupFrom(map[string]string{config.EnvAddr: "127.0.0.1:0080"}))
+		cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+			config.EnvAddr: "127.0.0.1:0080",
+		})))
 
 		require.NoError(t, err)
 		assert.Equal(t, "127.0.0.1:80", cfg.Addr)
@@ -55,23 +94,26 @@ func TestLoad(t *testing.T) {
 	t.Run("ignore les espaces autour d'une valeur", func(t *testing.T) {
 		t.Parallel()
 
-		cfg, err := config.Load(lookupFrom(map[string]string{
+		cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
 			config.EnvAddr:            " :3001 ",
 			config.EnvShutdownTimeout: " 30s ",
-		}))
+			config.EnvGatewayMode:     " mock ",
+			config.EnvGatewayBaseURL:  " http://127.0.0.1:4010 ",
+		})))
 
 		require.NoError(t, err)
 		assert.Equal(t, ":3001", cfg.Addr)
 		assert.Equal(t, 30*time.Second, cfg.ShutdownTimeout)
+		assert.Equal(t, config.GatewayModeMock, cfg.Gateway.Mode)
+		assert.Equal(t, "http://127.0.0.1:4010", cfg.Gateway.BaseURL)
 	})
 
 	t.Run("traite une variable facultative blanche comme absente", func(t *testing.T) {
 		t.Parallel()
 
-		cfg, err := config.Load(lookupFrom(map[string]string{
-			config.EnvAddr:            ":3001",
+		cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
 			config.EnvShutdownTimeout: "   ",
-		}))
+		})))
 
 		require.NoError(t, err)
 		assert.Equal(t, 15*time.Second, cfg.ShutdownTimeout)
@@ -92,10 +134,145 @@ func TestLoad(t *testing.T) {
 	t.Run("refuse une variable obligatoire blanche", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := config.Load(lookupFrom(map[string]string{config.EnvAddr: "   "}))
+		_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+			config.EnvAddr: "   ",
+		})))
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), config.EnvAddr+" : variable obligatoire absente")
+	})
+}
+
+func TestLoadGateway(t *testing.T) {
+	t.Parallel()
+
+	t.Run("charge une passerelle réelle", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(realGatewayEnv()))
+
+		require.NoError(t, err)
+		assert.Equal(t, config.GatewayModeReal, cfg.Gateway.Mode)
+		assert.Equal(t, "https://admin.gateway.internal/v1", cfg.Gateway.BaseURL)
+		assert.Equal(t, "https://auth.gateway.internal/oauth2/token", cfg.Gateway.TokenURL)
+		assert.Equal(t, "dashboard", cfg.Gateway.ClientID)
+		assert.Equal(t, "un-secret-de-test", cfg.Gateway.ClientSecret)
+		assert.Equal(t, "/etc/dashboard/tls/client.crt", cfg.Gateway.ClientCert)
+		assert.Equal(t, "/etc/dashboard/tls/client.key", cfg.Gateway.ClientKey)
+		assert.Equal(t, "/etc/dashboard/tls/ca.crt", cfg.Gateway.CACert)
+		assert.Equal(t, 5*time.Second, cfg.Gateway.Timeout)
+	})
+
+	// La vraie API porte le préfixe `/v1` (servers[0].url du contrat) là où le mock Prism sert sans
+	// préfixe : le chemin appartient donc à l'URL configurée, et rien ici n'a le droit de le raboter.
+	t.Run("conserve le préfixe de chemin de l'URL de base", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(envWith(realGatewayEnv(), map[string]string{
+			config.EnvGatewayBaseURL: "https://admin.gateway.internal/v1",
+		})))
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://admin.gateway.internal/v1", cfg.Gateway.BaseURL)
+	})
+
+	// La polarité de DN-9 : une production qui oublie la variable tombe du côté strict. Le défaut
+	// inverse rendrait une passerelle jointe en mock invisible dans l'environnement.
+	t.Run("un mode absent vaut real", func(t *testing.T) {
+		t.Parallel()
+
+		env := realGatewayEnv()
+		delete(env, config.EnvGatewayMode)
+
+		cfg, err := config.Load(lookupFrom(env))
+
+		require.NoError(t, err)
+		assert.Equal(t, config.GatewayModeReal, cfg.Gateway.Mode)
+	})
+
+	t.Run("applique le délai d'appel par défaut quand il est absent", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(minimalEnv()))
+
+		require.NoError(t, err)
+		assert.Equal(t, 10*time.Second, cfg.Gateway.Timeout)
+	})
+
+	t.Run("n'exige que l'adresse du mock en mode mock", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(minimalEnv()))
+
+		require.NoError(t, err)
+		assert.Equal(t, config.GatewayModeMock, cfg.Gateway.Mode)
+		assert.Equal(t, "http://127.0.0.1:4010", cfg.Gateway.BaseURL)
+	})
+
+	// L'adresse du mock reste obligatoire : sans elle, le BFF n'a personne à joindre dans aucun mode.
+	t.Run("exige l'URL de base même en mode mock", func(t *testing.T) {
+		t.Parallel()
+
+		env := minimalEnv()
+		delete(env, config.EnvGatewayBaseURL)
+
+		_, err := config.Load(lookupFrom(env))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), config.EnvGatewayBaseURL+" : variable obligatoire absente")
+	})
+
+	// Découvrir un identifiant manquant par redémarrage successif coûte un cycle par variable, sur
+	// une mise en service où l'exploitant les a justement toutes sous la main.
+	t.Run("nomme chaque variable que le mode real exige et qui manque", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := config.Load(lookupFrom(map[string]string{
+			config.EnvAddr:           ":3001",
+			config.EnvGatewayMode:    string(config.GatewayModeReal),
+			config.EnvGatewayBaseURL: "https://admin.gateway.internal/v1",
+		}))
+
+		require.Error(t, err)
+		for _, name := range []string{
+			config.EnvGatewayTokenURL,
+			config.EnvGatewayClientID,
+			config.EnvGatewayClientSecret,
+			config.EnvGatewayClientCert,
+			config.EnvGatewayClientKey,
+			config.EnvGatewayCACert,
+		} {
+			assert.Contains(t, err.Error(), name)
+		}
+	})
+
+	t.Run("refuse un mode inconnu en nommant les valeurs admises", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+			config.EnvGatewayMode: "prod",
+		})))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), config.EnvGatewayMode)
+		assert.Contains(t, err.Error(), string(config.GatewayModeReal))
+		assert.Contains(t, err.Error(), string(config.GatewayModeMock))
+	})
+
+	// Un secret nommé dans un message d'erreur finit dans le journal de l'orchestrateur, que bien plus
+	// de monde peut lire que le fichier d'environnement.
+	t.Run("ne recopie jamais le secret client dans le message", func(t *testing.T) {
+		t.Parallel()
+
+		const secret = "s3cr3t-qui-ne-doit-pas-fuiter"
+
+		_, err := config.Load(lookupFrom(envWith(realGatewayEnv(), map[string]string{
+			config.EnvGatewayClientSecret: secret,
+			config.EnvGatewayTokenURL:     "pas-une-url",
+		})))
+
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), secret)
 	})
 }
 
@@ -103,45 +280,70 @@ func TestLoadRejectsMalformedValues(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		vars    map[string]string
-		mention string
+		base      map[string]string
+		overrides map[string]string
+		mention   string
 	}{
 		"une adresse sans port": {
-			vars:    map[string]string{config.EnvAddr: "127.0.0.1"},
-			mention: config.EnvAddr,
+			overrides: map[string]string{config.EnvAddr: "127.0.0.1"},
+			mention:   config.EnvAddr,
 		},
 		"un port hors bornes": {
-			vars:    map[string]string{config.EnvAddr: ":65536"},
-			mention: config.EnvAddr,
+			overrides: map[string]string{config.EnvAddr: ":65536"},
+			mention:   config.EnvAddr,
 		},
 		"un port négatif": {
-			vars:    map[string]string{config.EnvAddr: ":-1"},
-			mention: config.EnvAddr,
+			overrides: map[string]string{config.EnvAddr: ":-1"},
+			mention:   config.EnvAddr,
 		},
 		"un port qui n'est pas un nombre": {
-			vars:    map[string]string{config.EnvAddr: "127.0.0.1:http"},
-			mention: config.EnvAddr,
+			overrides: map[string]string{config.EnvAddr: "127.0.0.1:http"},
+			mention:   config.EnvAddr,
 		},
 		"un délai négatif": {
-			vars: map[string]string{
-				config.EnvAddr:            ":3001",
-				config.EnvShutdownTimeout: "-1s",
-			},
-			mention: config.EnvShutdownTimeout,
+			overrides: map[string]string{config.EnvShutdownTimeout: "-1s"},
+			mention:   config.EnvShutdownTimeout,
 		},
 		"un délai nul": {
-			vars: map[string]string{
-				config.EnvAddr:            ":3001",
-				config.EnvShutdownTimeout: "0s",
-			},
-			mention: config.EnvShutdownTimeout,
+			overrides: map[string]string{config.EnvShutdownTimeout: "0s"},
+			mention:   config.EnvShutdownTimeout,
 		},
 		"un délai illisible": {
-			vars: map[string]string{
-				config.EnvAddr:            ":3001",
-				config.EnvShutdownTimeout: "quinze secondes",
-			},
-			mention: config.EnvShutdownTimeout,
+			overrides: map[string]string{config.EnvShutdownTimeout: "quinze secondes"},
+			mention:   config.EnvShutdownTimeout,
+		},
+		"un délai d'appel illisible": {
+			overrides: map[string]string{config.EnvGatewayTimeout: "cinq secondes"},
+			mention:   config.EnvGatewayTimeout,
+		},
+		// `host:port` est ce qu'on tape par réflexe après DASHBOARD_ADDR, et une URL sans schéma
+		// traverserait pour échouer au premier appel sortant.
+		"une URL de base sans schéma": {
+			overrides: map[string]string{config.EnvGatewayBaseURL: "127.0.0.1:4010"},
+			mention:   config.EnvGatewayBaseURL,
+		},
+		"une URL de base relative": {
+			overrides: map[string]string{config.EnvGatewayBaseURL: "/v1"},
+			mention:   config.EnvGatewayBaseURL,
+		},
+		"une URL de base sans hôte": {
+			overrides: map[string]string{config.EnvGatewayBaseURL: "https:///v1"},
+			mention:   config.EnvGatewayBaseURL,
+		},
+		"une URL de base dans un autre protocole": {
+			overrides: map[string]string{config.EnvGatewayBaseURL: "ftp://admin.gateway.internal/v1"},
+			mention:   config.EnvGatewayBaseURL,
+		},
+		"une URL de jeton sans schéma": {
+			base:      realGatewayEnv(),
+			overrides: map[string]string{config.EnvGatewayTokenURL: "auth.gateway.internal/token"},
+			mention:   config.EnvGatewayTokenURL,
+		},
+		// Le jeton machine traverse le réseau : l'obtenir en clair le donne à qui écoute.
+		"une URL de jeton en clair": {
+			base:      realGatewayEnv(),
+			overrides: map[string]string{config.EnvGatewayTokenURL: "http://auth.gateway.internal/token"},
+			mention:   config.EnvGatewayTokenURL,
 		},
 	}
 
@@ -149,7 +351,12 @@ func TestLoadRejectsMalformedValues(t *testing.T) {
 		t.Run("refuse "+name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := config.Load(lookupFrom(tc.vars))
+			base := tc.base
+			if base == nil {
+				base = minimalEnv()
+			}
+
+			_, err := config.Load(lookupFrom(envWith(base, tc.overrides)))
 
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.mention)
@@ -167,10 +374,23 @@ func TestLoadReportsEveryProblemAtOnce(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), config.EnvAddr)
 	assert.Contains(t, err.Error(), config.EnvShutdownTimeout)
+	assert.Contains(t, err.Error(), config.EnvGatewayBaseURL)
 }
 
 func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 	t.Parallel()
 
-	assert.ElementsMatch(t, []string{config.EnvAddr, config.EnvShutdownTimeout}, config.Variables())
+	assert.ElementsMatch(t, []string{
+		config.EnvAddr,
+		config.EnvShutdownTimeout,
+		config.EnvGatewayMode,
+		config.EnvGatewayBaseURL,
+		config.EnvGatewayTokenURL,
+		config.EnvGatewayClientID,
+		config.EnvGatewayClientSecret,
+		config.EnvGatewayClientCert,
+		config.EnvGatewayClientKey,
+		config.EnvGatewayCACert,
+		config.EnvGatewayTimeout,
+	}, config.Variables())
 }

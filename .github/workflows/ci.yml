@@ -198,7 +198,13 @@ jobs:
       # celui-là sur le poste d'un développeur. La contrepartie est qu'il ne se rejoue pas en local.
       - name: Le binaire sert la sortie de Vite
         run: |
-          DASHBOARD_ADDR=127.0.0.1:3001 ./bin/dashboard &
+          # Le mode `mock` est explicite parce que le défaut est `real`, qui exigerait ici les
+          # identifiants OAuth2 et le matériel mTLS d'une passerelle que ce job ne joint jamais : ce
+          # qu'il vérifie est le service des assets. L'adresse est celle du mock, jamais interrogée.
+          DASHBOARD_ADDR=127.0.0.1:3001 \
+          DASHBOARD_GATEWAY_MODE=mock \
+          DASHBOARD_GATEWAY_BASE_URL=http://127.0.0.1:4010 \
+            ./bin/dashboard &
           bff=$!
           # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de
           # sortie d'un script qui avait réussi. Un binaire mort entre le dernier appel et la fin du
