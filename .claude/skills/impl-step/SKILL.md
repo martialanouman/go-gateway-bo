@@ -13,6 +13,12 @@ par phase** : c'est ce qui rend une phase sautée visible au lieu de la laisser 
 Quatre phases sont des **PORTES** : tant qu'une porte n'est pas franchie, l'étape suivante est
 interdite, même si le travail semble évident.
 
+**Les portes 2 et 3 ne se franchissent pas une fois pour toutes.** Elles se rejouent sur *chaque*
+reprise de code — y compris, et surtout, sur les **correctifs de revue**. Un correctif écrit après un
+constat est du code que personne n'a jamais vu échouer : il n'a ni son rouge, ni sa mutation, et il
+arrive au moment précis où l'on se croit en train de finir. Sur step-002, trois des dix bloquants
+étaient nés dans les correctifs de la passe d'avant.
+
 ---
 
 ## Règle transverse — passer par `using-agent-skills`
@@ -336,15 +342,58 @@ Dis-lui aussi de **contester la revue précédente** quand sa mesure la contredi
 constats ont été réfutés ainsi, dont un qui allait faire retirer une directive `//nolint` nécessaire —
 la mesure qui la disait inutile avait été prise en la laissant en place.
 
-**Boucler tant qu'il reste un bloquant** : tu corriges, tu relances une revue sur le nouveau diff. Un
-correctif de revue est du code comme un autre — même entrée par `test-driven-development`, même
-mutation, même méfiance. En v1.0, une bonne part des constats des passes 2 à 5 portaient sur les
-correctifs des passes précédentes ; en step-002, trois des dix bloquants étaient nés dans les
-correctifs de la passe d'avant. Ne jamais annoncer un correctif sans l'avoir vu tenir.
+### Un correctif repasse par les portes 2 et 3
+
+**Boucler tant qu'il reste un bloquant** : tu corriges, tu relances une revue sur le nouveau diff. Et
+le correctif traverse les mêmes portes que le code qu'il répare, sans exception ni raccourci :
+
+- **Porte 2 — le rouge d'abord.** Le test qui manquait s'écrit *avant* la correction, et son échec se
+  lit. Un constat de revue est une spécification : « ce comportement n'est tenu par rien » se traduit
+  en un test qui rougit, puis en un code qui le fait passer. Corriger d'abord et tester ensuite
+  produit un test taillé sur la correction, qui ne prouve que sa propre existence.
+- **Porte 3 — la mutation.** Remets le défaut que le relecteur a décrit et regarde le nouveau test
+  tomber. C'est la seule preuve que le constat a été compris et pas seulement contourné. Exemple vécu
+  sur step-002 : le premier correctif du plancher de scénarios neutralisait la garde dès qu'un filtre
+  `-run` était actif — la mutation a montré qu'elle ne mordait alors plus du tout sous
+  `go test -run TestScenarios`, la commande de tous les jours. Le correctif visait à côté ; seule la
+  mutation l'a dit.
+
+**Quand le correctif n'est pas du code exécutable — et ce sera souvent le cas.** Sur step-002, huit
+bloquants sur dix portaient sur une affirmation : un commentaire, une ligne de documentation, un
+message d'erreur. Ni rouge ni mutation possibles. La porte ne disparaît pas pour autant, elle change
+de forme : **la correction cite la mesure qui l'établit** — la commande lancée et sa sortie, ou le
+fichier et les lignes lues. Sans quoi on remplace une affirmation non vérifiée par une autre, ce qui
+est exactement ce qui a produit trois bloquants de passe N+1.
+
+Le test de cette règle est simple : si tu ne peux montrer **ni un rouge, ni une mutation, ni une
+mesure**, le correctif n'est pas prêt — quelle que soit sa taille, et même si c'est « juste un
+commentaire ».
+
+En v1.0, une bonne part des constats des passes 2 à 5 portaient sur les correctifs des passes
+précédentes. Ne jamais annoncer un correctif sans l'avoir vu tenir.
 
 **Commite entre deux passes.** Les correctifs d'une passe forment un ou plusieurs commits `fix(...)`
 lisibles, dont le message dit ce qui était faux et comment ça a été mesuré. La passe suivante relit
 alors des commits, pas un amas de modifications non suivies.
+
+Si tu délègues les correctifs — utile quand ils touchent des zones disjointes — le mandat recopie les
+portes, puisque le sub-agent ne les connaît pas :
+
+```
+Agent(subagent_type: "general-purpose",
+      prompt: "Correctifs de revue sur <zone>. Fichiers dont tu es le SEUL propriétaire : <liste>.
+               Constat 1 : <le constat recopié, avec la mesure du relecteur>. …
+               Rouge d'abord, comme pour n'importe quel code : écris ou ajuste le test AVANT la
+               correction, lance-le, cite son échec verbatim. Puis remets le défaut et vérifie que
+               ton test tombe.
+               Pour un constat qui porte sur un commentaire, une doc ou un message : pas de rouge
+               possible — reproduis la mesure toi-même et cite-la, ne recopie pas ma formulation.
+               NE COMMITE RIEN. Rends : le rouge, ce que tu as changé, la mutation qui prouve que
+               ça tient, et tout constat que tu juges FAUX avec ta mesure.")
+```
+
+La dernière ligne n'est pas une politesse : elle a produit deux réfutations utiles sur step-002, dont
+une qui allait faire retirer une directive `//nolint` nécessaire.
 
 Si le même bloquant survit à trois tours, arrête la boucle et remonte-le à l'utilisateur avec les
 positions en présence : à ce stade ce n'est plus un défaut, c'est un désaccord de conception, et il se
