@@ -1,0 +1,62 @@
+# pnpm refuse par défaut d'exécuter les scripts d'installation d'une dépendance : un postinstall est
+# l'un des vecteurs d'attaque les plus courts de l'écosystème npm. Chaque entrée ci-dessous est une
+# autorisation explicite, à justifier.
+allowBuilds:
+  # esbuild place son binaire natif à l'installation ; sans ce script, aucun build ne fonctionne.
+  esbuild: true
+  # Refus explicite. `@scarf/scarf` arrive en transitif de `@stoplight/prism-cli` ; son script
+  # d'installation n'installe rien — il émet une télémétrie d'installation vers un tiers. Aucune
+  # fonctionnalité n'en dépend. Le laisser à `false` plutôt que de le taire : une entrée absente
+  # redevient une question à chaque `pnpm install`, et fait échouer la commande.
+  '@scarf/scarf': false
+  # ⚠ Chaîne disparue : `@testcontainers/postgresql` et `dockerode` ont été retirés
+  # en step-001, et aucun des trois paquets n'est plus dans le lockfile. Les refus
+  # sont conservés comme garde-fous — ils ne coûtent rien et redeviendraient
+  # pertinents si un paquet les réintroduisait — mais la justification d'origine
+  # ne s'applique plus à rien.
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
+
+# Corrections de versions transitives. Un avis qu'on peut réellement résoudre ne s'ignore pas : ces
+# deux entrées suppriment quatre avis de l'arbre au lieu de les inscrire dans `ignoreGhsas`.
+#
+# Les deux viennent du même endroit : `@stoplight/prism-cli > @stoplight/http-spec >
+# postman-collection`, qui épingle des versions anciennes. Le sélecteur `parent>enfant` limite
+# volontairement la portée à ce chemin — rien d'autre du dépôt ne dépend de ces paquets, et une
+# correction globale masquerait le jour où quelque chose d'autre en dépendrait.
+overrides:
+  # lodash <=4.17.23 : injection de code via `_.template` (GHSA-r5fr-rjxr-66jc, élevée) et deux
+  # pollutions de prototype. Aucun correctif en 4.17.x — la première version saine est 4.18.
+  'postman-collection>lodash': '^4.18.1'
+  # uuid <11.1.1 : lecture hors bornes quand un buffer est fourni à v3/v5/v6
+  # (GHSA-w5hq-g745-h8pq). `postman-collection` épingle 8.3.2, dépréciée par ailleurs.
+  'postman-collection>uuid': '^11.1.1'
+
+# Avis `pnpm audit` triés explicitement. Un avis n'entre ici qu'avec sa justification écrite, et
+# `pnpm vuln` échoue sur tout ce qui n'y figure pas — c'est ce qui rend le triage conscient plutôt
+# qu'un seuil de sévérité relevé en silence. Détail du raisonnement : section « Dépendances » du
+# README.
+auditConfig:
+  # `ignoreGhsas` est vide : l'unique entrée était justifiée par la chaîne
+  # `@tanstack/nitro-v2-vite-plugin > nitropack > archiver > minimatch`, que
+  # step-001 a supprimée. Un ignore dont la justification est morte couvre
+  # désormais n'importe quelle chaîne qui réintroduirait l'avis — c'est une
+  # porte de sécurité qui ment.
+  ignoreGhsas: []
+
+# Quarantaine des versions fraîchement publiées. Les compromissions de paquets npm sont détectées et
+# dépubliées en quelques heures ; attendre 24 h avant d'installer une version fait porter le risque
+# par l'écosystème plutôt que par ce dépôt. Le réglage n'a aucun défaut — sans cette ligne, il n'y a
+# pas de quarantaine du tout.
+minimumReleaseAge: 1440
+
+# En mode strict, une résolution qui ne trouve aucune version assez ancienne échoue au lieu
+# d'installer quand même la version fraîche. Une protection qui se contourne en silence n'en est pas
+# une : mieux vaut un `pnpm install` rouge et une décision consciente.
+minimumReleaseAgeStrict: true
+
+# `minimumReleaseAgeExclude` est volontairement absent. Y ajouter une entrée revient à installer un
+# paquet publié il y a quelques heures — le scénario même que la quarantaine couvre. La seule raison
+# valable est un correctif de sécurité qui ne peut pas attendre (`pnpm audit --fix` l'ajoute alors
+# lui-même) ; le justifier ici, avec la version.

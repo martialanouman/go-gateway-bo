@@ -22,13 +22,22 @@ runs:
     # **v6 au minimum** : c'est la première version qui connaît pnpm 11, celle que déclare
     # `packageManager` dans `package.json`. Aucun `with:` ici, précisément pour que ce champ reste la
     # source unique de la version — l'écrire aussi ici, c'est se préparer à ce que les deux divergent.
+    # `package_json_file` est obligatoire depuis que la moitié client vit sous
+    # `web/` : l'action lit `packageManager` depuis `GITHUB_WORKSPACE`, avale
+    # l'ENOENT, et lève « No pnpm version is specified ». Sans cette ligne, les
+    # cinq portes client échouent au deuxième pas, avant `pnpm install`.
     - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      with:
+        package_json_file: web/package.json
 
     - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         # .nvmrc est la source unique de la version de Node ; ne jamais la répéter ici.
         node-version-file: .nvmrc
         cache: pnpm
+        # La moitié client vit sous `web/` depuis step-001 ; sans ce chemin,
+        # setup-node cherche un lockfile à la racine, qui est un module Go.
+        cache-dependency-path: web/pnpm-lock.yaml
 
     # Les contrats de la passerelle viennent de GitHub Packages, qui exige une authentification même
     # en lecture. Le credential va dans la config *utilisateur* du runner et pas dans le `.npmrc` du
@@ -54,3 +63,4 @@ runs:
     # que d'installer silencieusement autre chose que ce qui a été testé en local.
     - run: pnpm install --frozen-lockfile
       shell: bash
+      working-directory: web
