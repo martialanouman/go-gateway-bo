@@ -16,8 +16,11 @@ interdite, même si le travail semble évident.
 **Les portes 2 et 3 ne se franchissent pas une fois pour toutes.** Elles se rejouent sur *chaque*
 reprise de code — y compris, et surtout, sur les **correctifs de revue**. Un correctif écrit après un
 constat est du code que personne n'a jamais vu échouer : il n'a ni son rouge, ni sa mutation, et il
-arrive au moment précis où l'on se croit en train de finir. Sur step-002, trois des dix bloquants
-étaient nés dans les correctifs de la passe d'avant.
+arrive au moment précis où l'on se croit en train de finir.
+
+> Chaque règle de ce document vient d'un défaut qui l'a payée. Les cas sont dans
+> `references/terrain.md` — à ouvrir quand une règle paraît chère ou facile à contourner, pas pour
+> exécuter une step.
 
 ---
 
@@ -82,10 +85,9 @@ ce qui engage la correction. Une signature devinée de mémoire est la panne la 
 compile parfois.
 
 **Même exigence pour un environnement externe** — ce que contient une image de runner, ce qu'un
-service impose, quel quota s'applique : ça se lit à sa source documentaire. En step-002, « le job Go
-n'a pas Node » a été écrit dans **neuf fichiers** avant qu'un relecteur n'ouvre le manifeste
-`actions/runner-images` : `ubuntu-latest` embarque Node et npm, c'est `pnpm` qui manque. Le
-raisonnement tenait, le mot mentait — et rien dans la CI ne pouvait le contredire.
+service impose, quel quota s'applique : ça se lit à sa source documentaire, jamais de mémoire. Un
+raisonnement juste posé sur un fait faux ne se fait contredire par aucune porte, puisque sa conclusion
+tient.
 
 Cette phase se parallélise bien : lancer plusieurs `Explore` (lecture seule) sur des axes disjoints
 — la fiche et son plan, le précédent dans le code, les contrats concernés — coûte moins cher qu'une
@@ -135,9 +137,9 @@ fréquente — écrire le code puis fabriquer la justification qui lui va.
 
 **Arrêté ne veut pas dire figé.** Un DN que la mesure contredit, ou que le code dépasse, se **corrige
 dans la fiche** — avec la mesure qui l'a montré, et sans effacer la version précédente : c'est
-l'enchaînement qui instruit. En step-002, trois DN sur neuf ont bougé, dont une deux fois. Un DN
-périmé est un **bloquant** de revue, pas une note : c'est un document qui affirme du faux sur le code
-qu'il surplombe, et la prochaine session le lira comme la vérité.
+l'enchaînement qui instruit. Un DN périmé est un **bloquant** de revue, pas une note : c'est un
+document qui affirme du faux sur le code qu'il surplombe, et la prochaine session le lira comme la
+vérité.
 
 ## Phase 4 — Plan et todos
 
@@ -182,13 +184,12 @@ scénario` à quinze exemples qui teste un mapping ; deux scénarios qui ne diff
 
 ### Un commentaire qui explique un mécanisme se mesure d'abord
 
-**C'est le premier poste de dépense de la revue.** Sur step-002, *huit des dix bloquants* portaient sur
-une **affirmation** — commentaire, ligne de documentation ou message d'erreur — qui décrivait un
-mécanisme faux ou promettait une preuve inexistante. Trois d'entre eux avaient été **écrits par les
-correctifs de la passe précédente**. Le motif ne varie pas : on explique pourquoi le code marche en
-**déduisant** le comportement de la bibliothèque au lieu de l'**observer**. « `ServeFileFS` purge cet
-en-tête » — il n'est jamais appelé sur ce chemin. « Cette garde évite un 500 » — le 500 appartient à
-une autre branche. « Le `-timeout` ne couvre pas `TestMain` » — une borne externe le couvre.
+**C'est le premier poste de dépense de la revue** — la majorité des constats bloquants portent sur une
+**affirmation** (commentaire, ligne de documentation, message d'erreur) qui décrit un mécanisme faux
+ou promet une preuve inexistante. Le motif ne varie pas : on explique pourquoi le code marche en
+**déduisant** le comportement de la bibliothèque au lieu de l'**observer**. « Cet appel purge
+l'en-tête » — il n'est jamais atteint sur ce chemin. « Cette garde évite un 500 » — le 500 appartient
+à une autre branche.
 
 La règle est donc : **un commentaire qui affirme le comportement d'une bibliothèque, d'un outil ou du
 routeur cite ce qui l'établit** — le rouge observé en le mutant, ou le fichier et les lignes lues dans
@@ -200,11 +201,10 @@ la conclusion.
 
 ### Le harnais ne doit pas manger le produit
 
-Surveille le rapport entre les lignes de harnais et les lignes de produit. En step-002 il a fini à
-**640 contre 150**, dont 255 pour contourner un répertoire vide sur un clone neuf : chaque ligne était
-justifiée localement, l'ensemble ne l'était plus. Quand le harnais dépasse nettement ce qu'il protège,
-arrête-toi et demande-toi si une porte de CI ne prouverait pas la même chose en dix lignes — c'est ce
-qui s'est passé, et la porte a trouvé un défaut que le harnais ne pouvait pas voir.
+Surveille le rapport entre les lignes de harnais et les lignes de produit. Il dérive une ligne à la
+fois, chacune justifiée localement, jusqu'à ce que l'ensemble ne le soit plus. Quand le harnais dépasse
+nettement ce qu'il protège, arrête-toi et demande-toi si une porte de CI ne prouverait pas la même
+chose en dix lignes — elle voit souvent ce que le harnais, par construction, ne peut pas voir.
 
 ### Paralléliser les unités indépendantes
 
@@ -213,10 +213,8 @@ Les unités qui ne partagent **aucun état** partent en sub-agents simultanés (
 
 **L'état partagé ne se limite pas aux fichiers édités.** Deux agents sur un même fichier produisent un
 demi-fichier — c'est le cas visible. Le cas coûteux est invisible : un répertoire que l'un remplit et
-que l'autre lit, un port lié, une base, un binaire compilé. En step-002, l'agent du Makefile a lancé
-`make build` pendant que l'agent des scénarios écrivait son test — et **son premier rouge est sorti
-vert**, parce que le répertoire embarqué venait d'être rempli sous ses pieds. Il l'a vu et l'a dit ;
-c'est de la chance, pas une garantie.
+que l'autre lit, un port lié, une base, un binaire compilé. Le symptôme est un **rouge attendu qui
+sort vert**, parce qu'un voisin a écrit sous tes pieds — et rien ne garantit qu'on le remarque.
 
 D'où une consigne à recopier dans chaque mandat : **un sub-agent ne lance aucune commande qui écrit
 hors de son périmètre** — ni `make build`, ni `make check`, ni `go test ./...` sur tout l'arbre. Il
@@ -311,10 +309,9 @@ Des axes distincts trouvent plus que des relecteurs redondants. Pour ce dépôt 
   disparaître sans qu'une porte bouge ? Les lacunes sont-elles écrites là où elles vivent, ou
   seulement dans un message de commit que personne ne relira ?
 
-Ce dernier axe n'est pas un supplément de confort : sur step-002, **aucun des quatre relecteurs de
-code n'a vu** la ligne de « Tests » sans preuve, les deux DN que le code avait dépassés, ni les trois
-lignes de Makefile que rien ne tenait. Ce sont des écarts entre deux documents, invisibles depuis le
-diff seul.
+Ce dernier axe n'est pas un supplément de confort. Un relecteur de code ne verra jamais une ligne de
+« Tests » restée sans preuve, un DN que le code a dépassé, ni une garde que rien ne tient : ce sont
+des écarts **entre deux documents**, invisibles depuis le diff seul.
 
 Demande à chaque relecteur de classer ses constats : **bloquant** (défaut de correction, invariant
 violé, contrat trahi) · **à corriger** (dette lisible qu'on ne laisse pas passer) · **note** (avis).
@@ -338,9 +335,9 @@ Dis à chaque relecteur, en toutes lettres, que **ne rien trouver est une répon
 passe qui invente des constats pour justifier son existence coûte plus qu'elle ne rapporte, et noie
 les vrais.
 
-Dis-lui aussi de **contester la revue précédente** quand sa mesure la contredit. En step-002, deux
-constats ont été réfutés ainsi, dont un qui allait faire retirer une directive `//nolint` nécessaire —
-la mesure qui la disait inutile avait été prise en la laissant en place.
+Dis-lui aussi de **contester la revue précédente** quand sa mesure la contredit. Un relecteur se
+trompe comme n'importe qui, et une mesure mal prise — l'outil lancé avec la directive qu'on prétend
+inutile encore en place — produit un constat qui ferait supprimer une protection réelle.
 
 ### Un correctif repasse par les portes 2 et 3
 
@@ -352,25 +349,20 @@ le correctif traverse les mêmes portes que le code qu'il répare, sans exceptio
   en un test qui rougit, puis en un code qui le fait passer. Corriger d'abord et tester ensuite
   produit un test taillé sur la correction, qui ne prouve que sa propre existence.
 - **Porte 3 — la mutation.** Remets le défaut que le relecteur a décrit et regarde le nouveau test
-  tomber. C'est la seule preuve que le constat a été compris et pas seulement contourné. Exemple vécu
-  sur step-002 : le premier correctif du plancher de scénarios neutralisait la garde dès qu'un filtre
-  `-run` était actif — la mutation a montré qu'elle ne mordait alors plus du tout sous
-  `go test -run TestScenarios`, la commande de tous les jours. Le correctif visait à côté ; seule la
-  mutation l'a dit.
+  tomber. C'est la seule preuve que le constat a été compris et pas seulement contourné : un correctif
+  qui neutralise la garde au lieu de la réparer laisse la suite verte, et rien d'autre ne le dira.
 
-**Quand le correctif n'est pas du code exécutable — et ce sera souvent le cas.** Sur step-002, huit
-bloquants sur dix portaient sur une affirmation : un commentaire, une ligne de documentation, un
-message d'erreur. Ni rouge ni mutation possibles. La porte ne disparaît pas pour autant, elle change
-de forme : **la correction cite la mesure qui l'établit** — la commande lancée et sa sortie, ou le
-fichier et les lignes lues. Sans quoi on remplace une affirmation non vérifiée par une autre, ce qui
-est exactement ce qui a produit trois bloquants de passe N+1.
+**Quand le correctif n'est pas du code exécutable** — et ce sera souvent le cas, puisque la plupart des
+constats portent sur une affirmation — ni rouge ni mutation ne sont possibles. La porte ne disparaît
+pas pour autant, elle change de forme : **la correction cite la mesure qui l'établit** — la commande
+lancée et sa sortie, ou le fichier et les lignes lues. Sans quoi on remplace une affirmation non
+vérifiée par une autre, et c'est ainsi qu'un correctif engendre le bloquant de la passe suivante.
 
 Le test de cette règle est simple : si tu ne peux montrer **ni un rouge, ni une mutation, ni une
 mesure**, le correctif n'est pas prêt — quelle que soit sa taille, et même si c'est « juste un
 commentaire ».
 
-En v1.0, une bonne part des constats des passes 2 à 5 portaient sur les correctifs des passes
-précédentes. Ne jamais annoncer un correctif sans l'avoir vu tenir.
+Ne jamais annoncer un correctif sans l'avoir vu tenir.
 
 **Commite entre deux passes.** Les correctifs d'une passe forment un ou plusieurs commits `fix(...)`
 lisibles, dont le message dit ce qui était faux et comment ça a été mesuré. La passe suivante relit
@@ -392,8 +384,8 @@ Agent(subagent_type: "general-purpose",
                ça tient, et tout constat que tu juges FAUX avec ta mesure.")
 ```
 
-La dernière ligne n'est pas une politesse : elle a produit deux réfutations utiles sur step-002, dont
-une qui allait faire retirer une directive `//nolint` nécessaire.
+La dernière ligne n'est pas une politesse : c'est elle qui rattrape les constats mal mesurés avant
+qu'ils ne deviennent des correctifs.
 
 Si le même bloquant survit à trois tours, arrête la boucle et remonte-le à l'utilisateur avec les
 positions en présence : à ce stade ce n'est plus un défaut, c'est un désaccord de conception, et il se
@@ -471,8 +463,7 @@ Un jalon est terminé quand **toutes** ses steps sont dans `tasks/steps/done/`.
 - **Un détecteur statique par recherche de nom ne garde rien** : commentaires et homonymes le rendent
   toujours vrai. Chercher l'import, ou l'URL dans le bundle produit.
 - **Une garde trop large finit retirée.** La confronter à l'inventaire réel du contrat avant de la
-  poser : 62 des 133 opérations n'existent qu'au contrat, une garde qui refuse du légitime se fera
-  désactiver plutôt que corriger.
+  poser : une garde qui refuse du légitime se fait désactiver, pas corriger.
 - **Une cible `make` absente rend `No rule to make target`, jamais un vert silencieux** — mais une
   cible *vide* passe pour verte. `make help` fait foi sur ce qui existe.
 - **Un sub-agent ne voit pas ta conversation.** Le design arrêté, les fichiers autorisés, la procédure
