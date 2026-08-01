@@ -18,6 +18,11 @@ proprement. C'est le squelette dans lequel tout le reste se branche — il ne se
 - `Makefile` : `dev`, `build`, `check`, plus les cibles que les steps suivantes complèteront.
 - `.env.example` documenté, `.gitignore`, `golangci-lint` configuré.
 - CI GitHub Actions : job Go (build, vet, lint, test).
+- **Le lanceur `godog` minimal** — juste de quoi exécuter un `.feature` en français et échouer sur une
+  step non définie. *(Amendement 01/08/2026 : cette ligne appartenait à step-007, ce qui était
+  inexécutable. La boucle impose le scénario rouge **avant** le code ; step-000 ne pouvait donc pas
+  attendre step-007 pour avoir de quoi écrire son premier scénario. step-007 garde tout le reste du
+  harnais — testcontainers, Vitest, Playwright, CI à deux toolchains.)*
 
 ## Points d'implémentation clés
 - **`internal/` porte l'invariant (d) par construction** : le langage interdit qu'un module extérieur

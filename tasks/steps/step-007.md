@@ -9,11 +9,10 @@ on ne sait pas qu'il tourne — et le « scénario rouge d'abord » de la boucle
 intention.
 
 ## Périmètre (ce que fait CETTE PR)
-- **`godog` + `testify`** : le lanceur, la convention d'emplacement (`.feature` à côté du package qu'il
-  décrit, définitions de step dans un `_test.go` du même package), et le français activé
-  (`# language: fr`).
-- **Un premier `.feature` réel** qui traverse tout le harnais — celui de `/api/health` suffit, à
-  condition qu'il échoue quand on casse le handler.
+- **Extension du lanceur `godog`** posé par step-000 : partage des définitions de step entre packages,
+  contexte de scénario, et fabriques alimentées par les types du contrat. *(Le lanceur lui-même et sa
+  convention d'emplacement sont livrés par **step-000** — voir l'amendement qui y est noté : la boucle
+  impose le scénario rouge d'abord, donc step-000 ne pouvait pas attendre celle-ci.)*
 - **testcontainers** pour la base jetable, réutilisée entre suites plutôt que recréée à chaque test.
 - **Vitest + Testing Library** reciblés sur `web/`, avec la forme Étant donné / Quand / Alors dans la
   structure des tests — sans second moteur Cucumber.
