@@ -4,8 +4,9 @@
 > **Dépend de :** step-000, step-001, step-004 · **Bloque :** step-020, step-040
 
 ## But
-Le vocabulaire de l'autorisation — ~44 clés fixes, versionnées avec les releases, non éditables depuis
-l'interface. Il vit en Go, et le TypeScript que consomme le client en est **généré**.
+Le vocabulaire de l'autorisation — **44** clés fixes, versionnées avec les releases, non éditables
+depuis l'interface. *(Le « ~44 » d'origine est retiré : la spec écrit « 44 clés » au caractère près,
+`todo.md` aussi, et je les ai comptées. Le tilde ne survivait que dans cette fiche et `plan.md`.)* Il vit en Go, et le TypeScript que consomme le client en est **généré**.
 
 ## Périmètre (ce que fait CETTE PR)
 - `internal/permissions/` : les clés, leur catégorie et leur description en français, dans une
@@ -54,7 +55,17 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| *(à remplir en phase 6)* | |
+| `RoutesRead = "routes:Read"` (majuscule) | `TestEveryKeyFollowsTheAdmittedShape` |
+| Forme resserrée à `^[a-z]+:[a-z]+$` — celle que la fiche annonçait | `TestTheAtypicalKeysAreAdmitted` **et** `TestEveryKeyFollowsTheAdmittedShape` |
+| Forme élargie à `.*` | `TestTheShapeRejectsWhatNoKeyCarries` |
+| Forme ramenée à celle de DN-2 d'origine (`[a-z0-9]*` au domaine) | `TestTheShapeRejectsWhatNoKeyCarries`, 2 assertions — `routes2:read` et `routes:read2` |
+| `RoutesRead` déclarée une seconde fois | `TestNoKeyIsDeclaredTwice` |
+| Sonde DN-9 : `{Key: "orpheline:x", Category: "inexistante"}` | **compile** (`go build` vert), puis `TestEveryCatalogCategoryIsAcceptedBySQL` — le constat « test mort-né » est réfuté |
+| `"routing"` → `"routting"` sur les 8 clés de la famille | `TestEveryCatalogCategoryIsAcceptedBySQL` **et** `…CarriesAtLeastOneKey` |
+| Les 3 entrées `connectors:*` retirées *(le défaut réel de la v1.0)* | `TestEveryCategoryAcceptedBySQLCarriesAtLeastOneKey`, **seul** |
+| `Categories()` triée au lieu de l'ordre d'affichage | `TestCategoriesListsExactlyWhatTheKeysCarry` |
+| Une description vidée | `TestEveryEntryCarriesADescription` |
+| `categoryCheck` ne reconnaît plus le `CHECK` (`categorie`) | les deux cas SQL, via le `require.Len(constraints, 1)` — le filet du test lui-même |
 
 ## Design arrêté (2026-08-02)
 
@@ -95,10 +106,18 @@ légitimes :
 - `billing:provider:write` — **trois** segments, deux `:`. Seule clé de sa forme.
 - `billing:scope_change`, `cdr:read_pii`, `cdr:export_bulk` — underscore dans l'action.
 
-La règle testée est donc `^[a-z][a-z0-9]*(:[a-z][a-z0-9_]*)+$` : un ou plusieurs segments après le
-domaine, underscore admis dans l'action et **pas** dans le domaine — `senderrewrite` est écrit d'un
-seul mot dans le catalogue, jamais `sender_rewrite`. Aucune clé ne porte de chiffre, de majuscule ni
-de tiret ; la règle les refuse toutes les trois, et c'est délibéré.
+La règle testée est `^[a-z]+(:[a-z][a-z_]*)+$` : un ou plusieurs segments après le domaine,
+underscore admis dans l'action et **pas** dans le domaine — `senderrewrite` est écrit d'un seul mot
+dans le catalogue, jamais `sender_rewrite`. Aucune clé ne porte de chiffre, de majuscule ni de
+tiret ; la règle les refuse toutes les trois, et c'est délibéré.
+
+**Corrigé en unité 1 — la première version de ce DN se contredisait.** Elle arrêtait
+`^[a-z][a-z0-9]*(:[a-z][a-z0-9_]*)+$` *tout en affirmant* que la règle refusait le chiffre : son
+`[a-z0-9]*` l'admettait partout sauf en tête de segment, et `routes2:read` la satisfaisait. Le
+sub-agent l'a relevé sur un rouge qu'il n'attendait pas, et j'ai remesuré les trois formulations
+possibles avant de trancher : **les 44 clés passent la version stricte**, donc c'est la règle qui a
+bougé plutôt que l'affirmation qui a été affaiblie. Mutation vers la version arrêtée d'origine :
+deux assertions tombent.
 
 La clé n'est pas renommée pour entrer dans la règle : elle est au contrat et à la spec.
 
@@ -107,6 +126,10 @@ La clé n'est pas renommée pour entrer dans la règle : elle est au contrat et 
 La génération va de **Go vers TS**. Les constantes Go ne peuvent donc pas être « engendrées à coût
 nul » — c'est une prémisse fausse que l'arbitrage a corrigée. Elles s'écrivent à la main, et la façon
 de les écrire décide s'il y a un ou deux artefacts à tenir cohérents.
+
+*(Orthographe corrigée en unité 1 : le type Go s'appelle `Key`, pas `PermissionKey` — ce dernier
+donnerait `permissions.PermissionKey`, un bégaiement que la convention Go proscrit. Le TypeScript
+engendré garde `PermissionKey`, où le nom ne bégaie pas.)*
 
 Retenu : le bloc `const` est **l'unique déclaration des 44 chaînes**, et les entrées du catalogue les
 référencent (`{Key: RoutesRead, …}`) plutôt que de répéter les littéraux. Il n'y a alors pas deux
@@ -148,8 +171,16 @@ vocabulaire. Et la fiche demande déjà que chaque clé appartienne à une caté
 définition de « connue » extérieure au Go est ce `CHECK`. C'est cette step qui crée la troisième
 copie, donc la preuve lui appartient.
 
-Le test lit la migration par l'`//go:embed` déjà en place — pas de chemin relatif au disque — et
-compare les deux ensembles **dans les deux sens**. Le sens « catégorie sans aucune clé » n'est pas
+Le test compare les deux ensembles **dans les deux sens**.
+
+**Corrigé en unité 1 — ce DN prescrivait un mécanisme qui ne compile pas.** Il disait « par
+l'`//go:embed` déjà en place ». Mesuré : `//go:embed ../store/migrations/00001_….sql` rend
+`invalid pattern syntax` — un motif `go:embed` ne remonte pas au-dessus de son répertoire, ce que
+`CLAUDE.md` dit d'ailleurs à propos de `internal/webassets/` — et l'`embed.FS` de `internal/store`
+est privé. Le test lit donc le fichier par `os.ReadFile` sur un chemin relatif au package. Ce que
+l'embed achetait — voyager avec le binaire — n'a aucune valeur pour du code de test, et un
+`testdata/` copié aurait créé une **quatrième** copie du `CHECK`, c'est-à-dire l'inverse de ce que ce
+DN cherche. Le sens « catégorie sans aucune clé » n'est pas
 décoratif : c'est le défaut réellement survenu en v1.0, où `connectors` a existé dans l'enum
 PostgreSQL sans qu'aucune clé ne s'y rattache.
 
