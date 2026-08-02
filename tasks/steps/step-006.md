@@ -40,9 +40,19 @@ depuis l'interface. *(Le « ~44 » d'origine est retiré : la spec écrit « 44 
   est ajouté : voir DN-5.)*
 
 ## Definition of Done
-- [ ] `make check` vert · `make generate` idempotent
-- [ ] le fichier TypeScript porte un en-tête « généré — ne pas éditer » et le lint le respecte
-- [ ] la mutation « éditer le TypeScript généré à la main » est détectée par la CI
+- [x] `make check` vert · `make generate` idempotent — trois exécutions du générateur et le fichier
+      commité au même sha256 (`4265302c…`), et `check-generated` vert sur l'arbre régénéré
+- [x] le fichier TypeScript porte un en-tête « généré — ne pas éditer » **et le lint le respecte** —
+      il est **inclus** dans le périmètre de Biome (`biome check .` : 19 fichiers, aucune
+      réécriture), ce qui est plus fort que l'exclusion posée puis retirée : `lint-web` est la porte
+      qui relie `lineWidth` entre `web/biome.json` et le générateur. Vérifié mordante — largeur
+      comptée en octets, régénérée, `biome check` rend 1
+- [x] la mutation « éditer le TypeScript généré à la main » est détectée par la CI — **par trois
+      portes indépendantes**, et deux de plus que cette ligne n'en nommait :
+      `TestTheCommittedFileIsWhatTheGeneratorProduces` (job « Tests Go », attrape l'édition
+      **indexée ou non**), `check-generated` (job « Build client et déployable », édition indexée),
+      et `tsc` — `TS2820: Type '"audit:raed"' is not assignable to type 'PermissionKey'`, le tableau
+      engendré étant typé contre l'union engendrée
 
 ## Hors périmètre
 Les neuf rôles par défaut et le seed → step-020. `RequirePermission` → step-025. `usePermission` et
@@ -72,6 +82,7 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | **Revue** · `render` court-circuité à `nil, nil` | `TestTwoRunsProduceTheSameBytes` — il était vert sur ce stub avant le correctif |
 | **Revue** · `len(args) != 1` relâché en `< 1` | `TestTheCommandRefusesToGuessItsOutputPath`, **sans** déposer de fichier dans l'arbre |
 | **Revue** · `forbiddenInLiteral` réduit au seul `'` | 3 sous-cas sur 4 |
+| **DoD** · une constante `Key` déclarée sans entrée au catalogue | **aucune porte ne rougit** — compile, deux suites vertes, absente du TS engendré. Go ne signale pas une constante exportée inutilisée. Vérifié plutôt que supposé ; le constat est écrit au-dessus de `catalog` |
 | **U2** · largeur de ligne comptée en octets au lieu de points de code | `TestADescriptionIsWrappedExactlyWhereBiomeWouldWrapIt`, `TestTheCommittedFileIsWhatTheGeneratorProduces`, **et `biome check` rend 1** — remesuré après le correctif de revue, générateur muté puis régénéré |
 | **U2** · l'indentation de continuation passe de 6 à 4 espaces | trois cas, **et Biome réécrit** |
 | **U2** · les catégories passent par une `map` (ordre non déterministe) | `TestTwoRunsProduceTheSameBytes` et deux autres |
