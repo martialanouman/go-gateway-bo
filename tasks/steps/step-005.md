@@ -59,6 +59,50 @@ spécifiera (voir l'amendement du périmètre). Le choix `sqlc` contre `pgx` nu 
 écrire une requête. La **vérification de version du schéma au démarrage** → step-020 également, voir
 DN-6.
 
+## Tableau des mutations
+
+Tenu au fil de l'eau. Une ligne « aucune porte ne rougit » est un constat de la DoD (critère 4), pas
+un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dessus de la ligne concernée.
+
+### La configuration
+
+| Mutation appliquée (le défaut réel qu'elle rejoue) | Ce qui tombe |
+|---|---|
+| Le DSN rendu facultatif | `exige_le_DSN_de_la_base` |
+| La validation de forme retirée | trois cas de DSN malformé, le test de non-fuite, **et** le scénario du binaire |
+| La ligne retirée de `.env.example` | la porte `dotenv` |
+| Le message reformé en `"DSN attendu : %s", err` | `ne_recopie_jamais_le_mot_de_passe`, qui rend la fuite verbatim |
+| L'en-tête de `docker-compose.yml` *(constat manuel)* | **aucune porte ne rougit** — vérifié : aucun `.go`, aucun workflow, aucune recette ne lit ce fichier. Sa vérité est confrontée à sa source : `make migrate` existe |
+| La variable ajoutée à l'étape CI *(constat manuel)* | **aucune porte ne rougit** — ce job ne se rejoue pas en local, il lie un port |
+
+### Les migrations, contre un PostgreSQL 18 réel
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| Les migrations rejouées | rien — `schéma déjà à jour, version 3`, aucune table modifiée |
+| `ensure_audit_log_partitions()` amputée du mois suivant | `no partition of relation "audit_log" found for row` — et l'inventaire ne rend qu'une partition |
+| `PRIMARY KEY (id)` seul sur `audit_log` | PostgreSQL refuse : « unique constraint on partitioned table must include all partitioning columns » |
+| Une clé étrangère vers `audit_log (id)` | « there is no unique constraint matching given keys » — la conséquence écrite dans la migration |
+| Le bloc PL/pgSQL sans `-- +goose StatementBegin/End` | « unterminated dollar-quoted string » — le piège du format |
+| Les migrations `Down` jouées jusqu'à zéro | il ne reste que la table de version, la fonction a disparu |
+
+### Le pool et la base jetable
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| La partition du mois suivant retirée *(la mutation que la DoD nomme)* | `base.feature`, sur un **effet** : le journal refuse un événement daté du mois prochain |
+| La fermeture sur annulation du contexte retirée | `TestThePoolClosesWithTheRootContext…` |
+| `MinConns` porté à 5 | les deux tests de paresse |
+| `MaxConns`, `MinConns`, `MinIdleConns` retirés un à un | « le pool a ouvert une 11ᵉ connexion », « le DSN a obtenu ses 5 connexions oisives » |
+| Durée de vie, jitter, temps d'inactivité, délai de connexion — les quatre retirés | **aucune porte ne rougit** — leur effet n'apparaît qu'avec le temps ou sur une base injoignable ; écrit au-dessus des lignes |
+| `WithSessionLocker` retiré | **aucune porte ne rougit** — trois migrations concurrentes sur base vierge donnent le même résultat, la transaction par migration suffisant à sérialiser localement |
+| Image du conteneur pointée sur un tag inexistant | la suite **échoue** — aucun test exécuté, jamais un skip |
+| `%w` remis sur l'erreur de `ParseConfig` dans les migrations | `TestMigrateNeverEchoesTheDatabasePassword` — le mot de passe verbatim dans le message |
+
+Une mutation a d'abord **pendu au lieu de rougir** : le retrait de `MaxConns` faisait acquérir une
+onzième connexion qui n'était pas rendue, et `Close` attend le retour des connexions. Corrigée, et la
+raison écrite sur place.
+
 ## Design arrêté (2026-08-02)
 
 Chaque décision cite la mesure qui la fonde. Les points que la spec ne tranchait pas ont été soumis
