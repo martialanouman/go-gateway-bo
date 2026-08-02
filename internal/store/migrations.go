@@ -82,10 +82,16 @@ func Migrate(ctx context.Context, dsn string) (MigrationOutcome, error) {
 func openSQL(dsn string) (*sql.DB, error) {
 	config, err := pgx.ParseConfig(dsn)
 	if err != nil {
-		// Le DSN n'est pas rajouté au message : pgx l'y a déjà mis, mot de passe **masqué** en
-		// `xxxxx` — vérifié sur les deux formes, URL et clé/valeur. Le remettre ici le remettrait
-		// en clair.
-		return nil, fmt.Errorf("DSN PostgreSQL invalide : %w", err)
+		// L'erreur de pgx n'est **pas** propagée : elle recopie le DSN, et sa rédaction n'est pas
+		// hermétique. Mesuré sur v5.10.0 — ses deux expressions rationnelles (`pgconn/errors.go`)
+		// masquent `postgres://u:xxxxx@…` et `password=xxxxx`, mais laissent passer
+		// `password = 'secret'` avec espaces, une forme que PostgreSQL accepte. Cette erreur
+		// remonte jusqu'à `cmd/migrate`, qui l'imprime sur stderr — donc dans les journaux de CI.
+		//
+		// Ce qu'on perd — la raison exacte du refus — se retrouve au démarrage du serveur, où
+		// `internal/config` valide le même DSN et fait le même choix.
+		return nil, errors.New(
+			"DSN PostgreSQL invalide ; la valeur n'est pas citée, elle porte le mot de passe de la base")
 	}
 
 	return stdlib.OpenDB(*config), nil

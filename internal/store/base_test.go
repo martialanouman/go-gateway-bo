@@ -1,0 +1,331 @@
+package store_test
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"testing"
+
+	"github.com/cucumber/godog"
+	"github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/martialanouman/go-gateway-bo/internal/store"
+)
+
+// `godog` ne pose aucun plancher : `Paths` qui ne trouve rien rend une suite **vide et réussie**, et
+// `Strict` ne couvre que les steps non définies d'un scénario lu — mesuré dans `internal/gateway` le
+// 02/08/2026. Le compteur ci-dessous ferme le trou : une suite qui n'a exercé aucun scénario ne peut
+// pas passer pour verte.
+const minimumScenarios = 2
+
+func TestScenarios(t *testing.T) {
+	ran := &scenarioCounter{}
+
+	suite := godog.TestSuite{
+		Name: "store",
+		ScenarioInitializer: func(ctx *godog.ScenarioContext) {
+			ran.watch(ctx)
+			initializeScenario(ctx)
+		},
+		Options: &godog.Options{
+			Format:   "pretty",
+			Paths:    []string{"."},
+			TestingT: t,
+			// Une step non définie est un échec : sans ça, un scénario dont personne n'a écrit
+			// l'implémentation passe pour vert.
+			Strict: true,
+		},
+	}
+
+	if suite.Run() != 0 {
+		t.Fatal("des scénarios ont échoué")
+	}
+
+	ran.requireFloor(t)
+}
+
+// scenarioCounter note ce que la suite a réellement exécuté. Le verrou n'est pas décoratif : godog
+// exécute les scénarios en parallèle dès que `Concurrency` dépasse 1, et ce jour-là le compteur se
+// tairait sous `-race` plutôt que de compter faux.
+type scenarioCounter struct {
+	mu    sync.Mutex
+	total int
+}
+
+func (c *scenarioCounter) watch(ctx *godog.ScenarioContext) {
+	ctx.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		c.total++
+
+		return ctx, nil
+	})
+}
+
+func (c *scenarioCounter) requireFloor(t *testing.T) {
+	t.Helper()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	assert.GreaterOrEqualf(t, c.total, minimumScenarios,
+		"%d scénario(s) exécuté(s) pour un plancher de %d : le corpus a fondu, ou la suite ne trouve "+
+			"plus `base.feature` — dans les deux cas elle ne prouve plus rien du schéma", c.total,
+		minimumScenarios)
+}
+
+func initializeScenario(ctx *godog.ScenarioContext) {
+	schema := &schemaWorld{}
+
+	ctx.Given(`^une base PostgreSQL vierge$`, schema.freshDatabase)
+	ctx.Given(`^les migrations déjà jouées$`, schema.migrateThenRecordSchema)
+	ctx.When(`^les migrations sont jouées$`, schema.migrate)
+	ctx.When(`^les migrations sont rejouées$`, schema.migrate)
+	ctx.Then(`^les neuf tables du schéma existent$`, schema.everyTableExists)
+	ctx.Then(`^le journal d'audit accepte un événement daté du (mois courant|mois suivant)$`,
+		schema.auditLogAcceptsEventDated)
+	ctx.Then(`^la seconde exécution n'a rien appliqué$`, schema.lastRunAppliedNothing)
+	ctx.Then(`^le schéma est inchangé$`, schema.schemaIsUnchanged)
+}
+
+// schemaWorld porte l'état d'un scénario — la base qu'il s'est taillée et ce que la dernière
+// exécution des migrations a rapporté. Une struct par scénario : godog en construit une neuve à
+// chaque fois, donc rien ne fuit de l'un à l'autre.
+type schemaWorld struct {
+	dsn          string
+	lastOutcome  store.MigrationOutcome
+	schemaBefore string
+}
+
+func (w *schemaWorld) freshDatabase(ctx context.Context) error {
+	dsn, err := createDatabase(ctx)
+	if err != nil {
+		return err
+	}
+
+	w.dsn = dsn
+
+	return nil
+}
+
+func (w *schemaWorld) migrate(ctx context.Context) error {
+	outcome, err := store.Migrate(ctx, w.dsn)
+	if err != nil {
+		return fmt.Errorf("jouer les migrations : %w", err)
+	}
+
+	w.lastOutcome = outcome
+
+	return nil
+}
+
+func (w *schemaWorld) migrateThenRecordSchema(ctx context.Context) error {
+	if err := w.migrate(ctx); err != nil {
+		return err
+	}
+
+	fingerprint, err := w.schemaFingerprint(ctx)
+	if err != nil {
+		return err
+	}
+
+	w.schemaBefore = fingerprint
+
+	return nil
+}
+
+// dashboardTables est l'inventaire du §3.1 — neuf tables, ni plus ni moins. Il est écrit ici en
+// toutes lettres plutôt que dérivé des fichiers de migration : une liste dérivée du SQL dirait
+// seulement que le SQL fait ce que le SQL dit.
+var dashboardTables = []string{
+	"operators",
+	"permissions",
+	"roles",
+	"role_permissions",
+	"operator_roles",
+	"audit_log",
+	"alert_rules",
+	"notifications",
+	"saved_views",
+}
+
+func (w *schemaWorld) everyTableExists(ctx context.Context) error {
+	conn, err := w.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = conn.Close(ctx) }()
+
+	var missing []string
+
+	for _, table := range dashboardTables {
+		var exists bool
+
+		// `to_regclass` rend NULL plutôt que d'échouer sur une table absente, et voit aussi bien une
+		// table ordinaire qu'une table partitionnée — ce que `information_schema.tables` fait aussi,
+		// mais en trois jointures.
+		err = conn.QueryRow(ctx, "SELECT to_regclass($1) IS NOT NULL", "public."+table).Scan(&exists)
+		if err != nil {
+			return fmt.Errorf("chercher la table %s : %w", table, err)
+		}
+
+		if !exists {
+			missing = append(missing, table)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("le schéma du tableau de bord n'a pas %v : une installation neuve n'aurait "+
+			"nulle part où écrire", missing)
+	}
+
+	return nil
+}
+
+// auditLogAcceptsEventDated écrit un événement daté du mois demandé, et observe **où il atterrit**.
+//
+// C'est la forme retenue pour la partition, contre l'inventaire des partitions dans le catalogue :
+// ce qu'une partition sert à faire est d'accueillir une écriture, et c'est cela que la mutation
+// « ne pas créer la partition du mois suivant » casse — PostgreSQL rend alors
+// `no partition of relation "audit_log" found for row`. Un inventaire de `pg_class`, lui, aurait
+// décrit une structure sans jamais tenter l'écriture qui compte.
+//
+// Les bornes sont calculées **en UTC**, comme celles de `ensure_audit_log_partitions()` : dans un
+// autre fuseau, la première seconde du mois prochain appartient encore au mois courant, et le
+// scénario n'observerait pas la partition qu'il croit observer.
+func (w *schemaWorld) auditLogAcceptsEventDated(ctx context.Context, month string) error {
+	months := map[string]int{"mois courant": 0, "mois suivant": 1}
+
+	offset, known := months[month]
+	if !known {
+		return fmt.Errorf("mois inconnu : %q", month)
+	}
+
+	conn, err := w.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = conn.Close(ctx) }()
+
+	const insertDatedEvent = `
+		INSERT INTO audit_log (action, created_at)
+		VALUES ('test.partition', date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+			+ make_interval(months => $1))
+		RETURNING tableoid::regclass::text,
+			to_char(created_at AT TIME ZONE 'UTC', 'YYYY_MM')`
+
+	var landedIn, eventMonth string
+
+	err = conn.QueryRow(ctx, insertDatedEvent, offset).Scan(&landedIn, &eventMonth)
+	if err != nil {
+		return fmt.Errorf("écrire un événement d'audit daté du %s : %w", month, err)
+	}
+
+	// L'écriture a réussi : reste à vérifier qu'elle n'a pas atterri n'importe où. Une partition
+	// `DEFAULT` ajoutée un jour accepterait tout et laisserait le contrôle ci-dessus vert en ayant
+	// perdu l'élagage par période que §6.14 attend.
+	if expected := "audit_log_" + eventMonth; landedIn != expected {
+		return fmt.Errorf("l'événement du %s est rangé dans %q et non dans %q : la partition du mois "+
+			"n'a pas reçu son écriture", month, landedIn, expected)
+	}
+
+	return nil
+}
+
+// lastRunAppliedNothing observe ce que `make migrate` **imprime** à l'exploitant : la liste des
+// migrations appliquées, vide quand le schéma était déjà à jour. C'est le seul endroit où la
+// rejouabilité est visible depuis l'extérieur — le schéma, lui, est contrôlé par l'empreinte.
+func (w *schemaWorld) lastRunAppliedNothing() error {
+	if len(w.lastOutcome.Applied) > 0 {
+		return fmt.Errorf("la seconde exécution a appliqué %v : une migration déjà jouée l'a été deux "+
+			"fois", w.lastOutcome.Applied)
+	}
+
+	return nil
+}
+
+func (w *schemaWorld) schemaIsUnchanged(ctx context.Context) error {
+	if w.schemaBefore == "" {
+		return errors.New("aucune empreinte de schéma n'a été relevée avant la seconde exécution : le " +
+			"scénario ne compare rien")
+	}
+
+	after, err := w.schemaFingerprint(ctx)
+	if err != nil {
+		return err
+	}
+
+	if after != w.schemaBefore {
+		return fmt.Errorf("le schéma a changé en rejouant les migrations.\navant :\n%s\naprès :\n%s",
+			w.schemaBefore, after)
+	}
+
+	return nil
+}
+
+// schemaCatalog rend une empreinte textuelle et ordonnée de tout ce que les migrations posent :
+// colonnes avec leur type et leur nullabilité, index avec leur définition, et l'attachement de
+// chaque partition à sa mère avec ses bornes.
+//
+// L'ordre est imposé dans le `string_agg` : PostgreSQL ne promet aucun ordre de lecture, et une
+// empreinte qui dépendrait de l'ordre physique des lignes changerait toute seule.
+const schemaCatalog = `
+	SELECT coalesce(string_agg(entry, E'\n' ORDER BY entry), '')
+	FROM (
+		SELECT format('colonne %s.%s %s %s', table_name, column_name, data_type, is_nullable) AS entry
+		FROM information_schema.columns
+		WHERE table_schema = 'public'
+		UNION ALL
+		SELECT format('index %s %s', indexname, indexdef)
+		FROM pg_indexes
+		WHERE schemaname = 'public'
+		UNION ALL
+		SELECT format('partition %s DE %s %s', child.relname, parent.relname,
+			pg_get_expr(child.relpartbound, child.oid))
+		FROM pg_inherits
+		JOIN pg_class AS child ON child.oid = pg_inherits.inhrelid
+		JOIN pg_class AS parent ON parent.oid = pg_inherits.inhparent
+	) AS catalogue`
+
+func (w *schemaWorld) schemaFingerprint(ctx context.Context) (string, error) {
+	conn, err := w.connect(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	defer func() { _ = conn.Close(ctx) }()
+
+	var fingerprint string
+
+	if err = conn.QueryRow(ctx, schemaCatalog).Scan(&fingerprint); err != nil {
+		return "", fmt.Errorf("relever l'empreinte du schéma : %w", err)
+	}
+
+	if fingerprint == "" {
+		return "", errors.New("l'empreinte du schéma est vide : la base n'a aucune colonne, donc la " +
+			"comparaison « avant/après » serait vraie sans rien observer")
+	}
+
+	return fingerprint, nil
+}
+
+// connect ouvre une connexion nue sur la base du scénario — jamais le pool du produit : ce que ces
+// scénarios observent est ce que les migrations ont posé, et une connexion de contrôle indépendante
+// est ce qui le rend lisible même quand le pool est fermé.
+func (w *schemaWorld) connect(ctx context.Context) (*pgx.Conn, error) {
+	if w.dsn == "" {
+		return nil, errors.New("aucune base n'a été taillée pour ce scénario")
+	}
+
+	conn, err := pgx.Connect(ctx, w.dsn)
+	if err != nil {
+		return nil, fmt.Errorf("se connecter à la base du scénario : %w", err)
+	}
+
+	return conn, nil
+}
