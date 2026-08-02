@@ -27,7 +27,7 @@ func NewRouter(assets fs.FS) http.Handler {
 		// type de la réponse viennent tous du YAML, aucun n'est réécrit ici. La valeur de retour est
 		// sans usage — c'est le routeur passé qu'elle garnit (`bff.gen.go`, `HandlerWithOptions`), et
 		// le préfixe `/api` vient de ce `Route`, pas de `servers.url`.
-		HandlerFromMux(NewStrictHandler(API{}, nil), api)
+		HandlerFromMux(newContractHandler(API{}), api)
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
@@ -51,6 +51,40 @@ func NewRouter(assets fs.FS) http.Handler {
 	r.Head("/*", shell)
 
 	return r
+}
+
+// newContractHandler enveloppe l'implémentation stricte, et remplace les deux gestionnaires d'erreur
+// qu'oapi-codegen installe par défaut. Ceux-là écrivent `http.Error(w, err.Error(), …)`
+// (`bff.gen.go`, `NewStrictHandler`) : le message Go **brut**, en `text/plain`. Une route future qui
+// enveloppe son erreur — `fmt.Errorf("appel de %s: %w", cfg.Gateway.BaseURL, err)` — servirait alors
+// l'adresse interne de l'API Admin au navigateur, dans un corps dont le client n'a aucun type.
+//
+// L'erreur n'est ni journalisée ni propagée, et c'est un manque assumé plutôt qu'un oubli : aucun
+// journal n'atteint ce paquet aujourd'hui — `NewRouter` ne prend que les assets, et le `*slog.Logger`
+// s'arrête à `cmd/dashboard`. Un 500 servi ici ne laisse donc **aucune trace côté serveur**. Le
+// premier appel réel à la passerelle (step-060) devra apporter les deux à la fois.
+func newContractHandler(impl StrictServerInterface) ServerInterface {
+	return NewStrictHandlerWithOptions(impl, nil, StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  rejectRequest,
+		ResponseErrorHandlerFunc: reportFailedResponse,
+	})
+}
+
+// rejectRequest répond à une requête que le code engendré n'a pas su lier au contrat — un paramètre
+// requis absent, un format illisible. Le message d'origine est écarté plutôt que rendu : il nomme des
+// champs internes, et il part avec, faute de journal ici (voir `newContractHandler`).
+func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
+	writeJSON(w, http.StatusBadRequest, errorResponse{
+		Code:    "bad_request",
+		Message: "Cette requête a été refusée : sa forme ne correspond pas à ce que la route attend.",
+	})
+}
+
+func reportFailedResponse(w http.ResponseWriter, _ *http.Request, _ error) {
+	writeJSON(w, http.StatusInternalServerError, errorResponse{
+		Code:    "internal_error",
+		Message: "Le serveur n'a pas pu produire cette réponse. Réessayez ; si elle persiste, la panne est côté serveur.",
+	})
 }
 
 func handleUnknownAPIRoute(w http.ResponseWriter, _ *http.Request) {

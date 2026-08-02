@@ -166,7 +166,11 @@ func filtersScenarios(runFilter string) bool {
 
 // minimumScenarios est un plancher, pas un compte : en ajouter un n'oblige à rien ici, en retirer un
 // demande de le dire — c'est exactement la relecture qu'on veut provoquer.
-const minimumScenarios = 5
+//
+// Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
+// mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
+// entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
+const minimumScenarios = 7
 
 // scenarioLedger note ce que la suite a réellement exécuté. Le verrou n'est pas décoratif : `godog`
 // exécute les scénarios en parallèle dès que `Concurrency` dépasse 1, et ce jour-là le compteur se
@@ -418,6 +422,12 @@ type process struct {
 // l'opération que celui-ci destine à la requête, et une réponse orpheline ne dit plus à quoi la
 // comparer.
 type response struct {
+	// Aucun test ne rougit si ce champ disparaît, ce qui a été vérifié plutôt que supposé : toutes les
+	// steps qui interrogent le serveur passent par `fetch`, donc en GET, et le remplacer par un
+	// `http.MethodGet` codé en dur au site de validation laisse la suite verte. Il reste parce que
+	// c'est lui qui laissera passer un HEAD sans corps le jour où un scénario en demandera un
+	// (`openapi3filter/validate_response.go:23`) — codé en dur, ce scénario-là échouerait sur une
+	// comparaison qui ment plutôt que sur ce qu'il décrit.
 	method string
 	path   string
 	status int
@@ -678,8 +688,13 @@ func (p *process) responseIsNeverCached() error {
 const contractPath = "../../api/openapi-bff.yaml"
 
 // contractRouter lie une requête HTTP à l'opération que le contrat lui destine. Le routeur `legacy`
-// plutôt que `gorillamux` : ce dernier ajouterait `gorilla/mux` au graphe de dépendances du dépôt,
-// et le premier rapproche la requête du contrat par son seul chemin
+// plutôt que `gorillamux`, et ce que ce choix évite est plus étroit que « ajouter `gorilla/mux` au
+// graphe de dépendances » : mesuré le 02/08/2026, `gorilla/mux v1.8.0` est **déjà** dans le `go.sum`
+// de cette branche, tiré par le graphe de modules de `kin-openapi`
+// (`go mod why -m` : `cmd/dashboard.test → openapi3filter.test → routers/gorillamux → gorilla/mux`).
+// Ce que `legacy` évite est de le faire entrer dans les `require` de `go.mod` et dans le graphe de
+// **compilation** — mesuré, `go list -deps ./cmd/... ./internal/...` n'en rapporte aucune occurrence.
+// Le premier rapproche par ailleurs la requête du contrat par son seul chemin
 // (`routers/legacy/router.go:121` → `openapi3.Servers.MatchURL`), ce qu'un `servers.url` relatif
 // comme `/api` demande. Il valide au passage le document lui-même (`routers/legacy/router.go:62`).
 func contractRouter(ctx context.Context) (routers.Router, error) {

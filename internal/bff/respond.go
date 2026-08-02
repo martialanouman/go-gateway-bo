@@ -7,7 +7,9 @@ import (
 
 // errorResponse est la forme d'erreur unique du produit : `code` se grep dans les logs et ne se
 // traduit pas, `message` s'affiche à l'opérateur. La traduction des erreurs de l'API Admin vers ce
-// DTO arrive en step-003.
+// DTO — et le champ `errors[]` qui l'accompagne — arrive avec la première route du BFF qui **appelle**
+// la passerelle, soit **step-060**. Step-003 a livré le client et le mapping typé, et a explicitement
+// refusé de porter la réexposition, faute d'une route à servir (fiche step-003, DN-12).
 type errorResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
