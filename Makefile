@@ -30,9 +30,15 @@ BFF_SERVER := internal/bff/bff.gen.go
 BFF_TYPES := web/src/lib/api.gen.ts
 OPENAPI_TS := web/node_modules/.bin/openapi-typescript
 
+# Le catalogue de permissions est la seule sortie engendrée qui ne dérive **pas** d'un contrat
+# OpenAPI : sa source est du Go, sous `internal/permissions/`. Elle n'exige donc ni `node_modules` ni
+# le contrat, d'où sa propre cible plus bas — mais elle entre dans la même liste, parce que ce qui
+# tient ce front est `check-generated` et rien d'autre.
+PERMISSIONS_TS := web/src/lib/permissions.gen.ts
+
 # Ce que `check-generated` supprime, régénère et compare. Une liste plutôt qu'un fichier : le jour où
 # une step en ajoute un, l'oublier ici le laisserait diverger sans que rien ne rougisse.
-GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER) $(BFF_TYPES)
+GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER) $(BFF_TYPES) $(PERMISSIONS_TS)
 
 # Le mock de l'API Admin, et le port que `.env.example` vise avec `DASHBOARD_GATEWAY_BASE_URL`.
 #
@@ -73,7 +79,7 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 .DEFAULT_GOAL := help
 .PHONY: help build build-go build-web dev check test test-go test-web lint lint-go lint-web fmt-go \
         typecheck-web vuln-go vuln-web lint-workflows check-routes generate check-generated mock \
-        migrate clean
+        migrate clean generate-permissions
 
 # Trois courses vivent entre les prérequis de `check` ; la deuxième ne se voit pas, la troisième est
 # la seule à rougir d'elle-même :
@@ -110,7 +116,7 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 .NOTPARALLEL:
 
 help: ## Liste les cibles disponibles
-	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # `build-go` est appelé par récursion et non déclaré en prérequis, et ce n'est pas qu'une affaire de
 # `-j` : un prérequis tourne **avant** la recette, dans tous les cas. Déclaré en prérequis, le
@@ -251,7 +257,7 @@ check-routes: ## Vérifie que l'arbre de routes commité est à jour et régén�
 # `generate` et `check-generated` n'apparaissent nulle part ailleurs que dans « Build client et
 # déployable », qui a Go, pnpm et `node_modules` — vérifié, `grep -rn 'make generate\|check-generated'
 # .github` ne rend que la ligne `- run: make check-generated` de ce job.
-generate: ## Engendre le client Go de l'API Admin, et le serveur Go comme les types TS du BFF
+generate: ## Engendre tout ce qui dérive d'une source du dépôt : les deux contrats, le catalogue
 	@for required in $(CONTRACT_ADMIN) $(OPENAPI_TS); do \
 		test -f "$$required" || { \
 			echo "$$required est absent — il vient de pnpm : pnpm -C web install"; \
@@ -261,6 +267,23 @@ generate: ## Engendre le client Go de l'API Admin, et le serveur Go comme les ty
 	go tool oapi-codegen --config api/oapi-codegen.yaml $(CONTRACT_ADMIN)
 	go tool oapi-codegen --config api/oapi-codegen-bff.yaml $(CONTRACT_BFF)
 	$(OPENAPI_TS) $(CONTRACT_BFF) -o $(BFF_TYPES)
+	@$(MAKE) --no-print-directory generate-permissions
+
+# Une cible à part, et non trois lignes de plus dans `generate` : celle-ci est du **Go pur**, quand
+# la recette ci-dessus s'ouvre sur une garde qui refuse de démarrer sans `pnpm install`. L'y fondre
+# coupleraient à `node_modules` une commande qui n'en a aucun besoin — un développeur qui ajoute une
+# clé au catalogue devrait installer la toolchain JS pour régénérer.
+#
+# Ce qui tient réellement le front Go↔TS n'est ni l'une ni l'autre : c'est `check-generated`, qui
+# supprime puis régénère et lit `git status`. La cible séparée ne coûte donc aucune garantie, et
+# `$(PERMISSIONS_TS)` est dans `$(GENERATED)`.
+#
+# Le chemin est passé en **argument** plutôt que codé dans le générateur : il existerait sinon aux
+# deux endroits, qui se croiraient d'accord. Et pas par une redirection — `>` tronque la cible avant
+# que la commande démarre, donc un générateur qui échoue laisserait un fichier vide après avoir
+# détruit l'état précédent.
+generate-permissions: ## Engendre les types TS du catalogue de permissions (Go pur, sans pnpm)
+	go run ./cmd/permissionsgen $(PERMISSIONS_TS)
 
 # Le client de l'API Admin est engendré et **commité** : quatre des cinq jobs Go de la CI n'ont pas
 # `node_modules`, donc pas le contrat, et sans le fichier commité ils ne compileraient plus.
@@ -281,6 +304,14 @@ generate: ## Engendre le client Go de l'API Admin, et le serveur Go comme les ty
 # Mesuré, `- url: /api` remplacé par `- url: /v1` → porte **verte**, sorties identiques, et le
 # scénario godog rouge sur « le contrat ne décrit pas GET /api/health ». C'est lui, pas cette porte,
 # qui tient le lien entre le préfixe du contrat et le `r.Route("/api", …)` du routeur.
+#
+# Troisième limite, du même ordre et découverte en mesurant : cette porte ne voit pas une sortie
+# engendrée **éditée à la main sans être indexée**. Elle supprime et régénère avant de comparer,
+# donc elle rétablit l'édition avant de pouvoir la constater. Ce n'est pas un trou — la CI ne
+# regarde que ce qui est commité, et une édition commitée la fait rougir — mais qui mesure la porte
+# comme on la mesure d'instinct la verra verte et conclura de travers. Ce qui attrape l'édition non
+# indexée est ailleurs : `cmd/permissionsgen`, dont un cas compare le fichier **du disque** au rendu
+# du générateur, et `tsc`, pour qui le tableau engendré est typé contre l'union engendrée.
 #
 # Même forme que `check-routes`, et pour la même raison : le fichier est **supprimé** avant d'être
 # reconstruit, jamais seulement comparé. Une comparaison seule reste verte quand plus rien ne
@@ -304,7 +335,7 @@ generate: ## Engendre le client Go de l'API Admin, et le serveur Go comme les ty
 # illisible : `error: pathspec … did not match any file(s) known to git` avalé par le `2>/dev/null`,
 # `bff.gen.go` resté supprimé, et `go build ./...` sur `undefined: HealthRequestObject`. La boucle
 # rétablit les autres et laisse git nommer celui qu'il ne peut pas rétablir.
-check-generated: ## Vérifie que ce qui dérive des contrats OpenAPI est à jour et régénéré
+check-generated: ## Vérifie que tout le code engendré et commité est à jour et régénéré
 	@rm -f $(GENERATED)
 	@$(MAKE) --no-print-directory generate || { \
 		for generated in $(GENERATED); do git checkout -- $$generated; done; \

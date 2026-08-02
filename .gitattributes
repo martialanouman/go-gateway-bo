@@ -12,4 +12,5 @@
 internal/gateway/client.gen.go linguist-generated=true
 internal/bff/bff.gen.go linguist-generated=true
 web/src/lib/api.gen.ts linguist-generated=true
+web/src/lib/permissions.gen.ts linguist-generated=true
 web/src/routeTree.gen.ts linguist-generated=true
