@@ -63,8 +63,9 @@ décrivait un RPC typé que le code n'a jamais implémenté.
       `make check` **et** en CI.
 - [x] **les types client et serveur viennent du même fichier, et rien ne les recopie à la main** —
       `api/oapi-codegen-bff.yaml` et la recette `generate` lisent tous deux `$(CONTRACT_BFF)` ; les
-      trois sorties sont dans `$(GENERATED)`, et trois mutations montrent que retirer l'une d'elles
-      de la liste laisse passer sa divergence. *La moitié TypeScript n'a pour l'instant qu'un
+      trois sorties sont dans `$(GENERATED)`, et **deux** mutations montrent que retirer l'une d'elles
+      de la liste laisse passer sa divergence — le serveur Go et les types TS ; le client de l'API
+      Admin n'a pas la sienne. *La moitié TypeScript n'a pour l'instant qu'un
       consommateur de test — c'est DN-6, et c'est dit.*
 - [x] **la mutation « introduire une `map[string]any` dans un DTO de réponse » fait rougir le test** —
       `TestResponseTypesDeclareTheirFields`. *Elle ne le faisait **pas** rougir dans la première
@@ -74,7 +75,7 @@ décrivait un RPC typé que le code n'a jamais implémenté.
 ### Les quatre critères transverses de `CLAUDE.md`
 
 1. **Le chemin qu'un humain traverse est traversé pour de bon.** Ici, c'est le load balancer — ou
-   l'exploitant — qui sonde `/api/health` : `cmd/dashboard/contrat.feature` lance le **binaire
+   le load balancer qui sonde `/api/health` : `cmd/dashboard/contrat.feature` lance le **binaire
    compilé**, l'interroge par HTTP, et confronte les octets rendus au YAML du dépôt. Rien de simulé.
    **Ce qui n'est pas traversé et doit se dire** : la moitié TypeScript n'a aucun consommateur
    produit — seul un fichier d'assertions de typage lit les types engendrés.
@@ -83,8 +84,10 @@ décrivait un RPC typé que le code n'a jamais implémenté.
    coûté cher malgré tout : la revue a trouvé **neuf** affirmations fausses, dont cinq documents qui
    décrivaient un `make generate` que cette step venait de rendre faux, et un commentaire qui
    promettait une garantie du compilateur qui n'existe pas.
-3. **Mutation partout où le retrait laisserait la suite verte.** Le tableau ci-dessus, en cinq
-   parties, dont treize mutations de correctifs et une ligne « trou mesuré » assumée.
+3. **Mutation partout où le retrait laisserait la suite verte.** Le tableau **ci-dessous**, dont les
+   mutations de correctifs et plusieurs lignes « trou mesuré » assumées. Les lignes marquées
+   *(constat manuel)* n'ont **aucune porte** qui les rejoue : une CI verte ne revalide pas le tableau
+   entier.
 4. **Ce qui n'est pas testable est écrit là où il vit.** Le trou du montage de l'interface simple,
    l'absence de journal sur un 500 (DN-12), et les gardes que rien n'exerce portent chacune leur
    constat au-dessus de la ligne concernée.
@@ -103,12 +106,12 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 
 | Mutation appliquée (le défaut réel qu'elle rejoue) | Ce qui tombe |
 |---|---|
-| Le contrat gagne un champ, personne ne régénère | `check-generated` → **exit 2**, en nommant `internal/bff/bff.gen.go` **et** `web/src/lib/api.gen.ts` |
-| Une divergence qui ne touche **que** la sortie TypeScript | `check-generated`, en nommant le seul fichier TS |
-| Le serveur BFF retiré de la liste surveillée | **rien** — la divergence passe : c'est le défaut que la liste ferme |
-| Les types TS retirés de la liste surveillée | **rien** — idem |
-| La ligne de génération TypeScript retirée de `make generate` | `check-generated` (` D`) |
-| Le fichier engendré jamais ajouté à l'index | `check-generated` (`??`) |
+| Le contrat gagne un champ, personne ne régénère *(constat manuel)* | `check-generated` → **exit 2**, en nommant `internal/bff/bff.gen.go` **et** `web/src/lib/api.gen.ts` |
+| Une divergence qui ne touche **que** la sortie TypeScript *(constat manuel)* | `check-generated`, en nommant le seul fichier TS |
+| Le serveur BFF retiré de la liste surveillée *(constat manuel)* | **rien** — la divergence passe : c'est le défaut que la liste ferme |
+| Les types TS retirés de la liste surveillée *(constat manuel)* | **rien** — idem |
+| La ligne de génération TypeScript retirée de `make generate` *(constat manuel)* | `check-generated` (` D`) |
+| Le fichier engendré jamais ajouté à l'index *(constat manuel)* | `check-generated` (`??`) |
 
 ### Le handler et le scénario
 
@@ -129,8 +132,8 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | Le fixture divergent est rendu **compilable** | « le fixture divergent a compilé, la garantie du contrat ne tient plus » |
 | Le fixture divergent échoue pour une **autre raison** (mauvais import) | l'assertion de message : `…no required module provides package… does not contain does not implement` |
 | Le **témoin positif** est cassé | « le témoin positif ne compile pas » |
-| Un type de réponse à sous-jacent `map` | `Object expected to be of type *types.Struct, but was *types.Map` |
-| Un type de réponse avec un champ anonyme | « embarque Secrets : les champs ajoutés au type embarqué fuiraient sans relecture » |
+| Un type de réponse à sous-jacent `map` | la porte de DTO — *le message cité était celui d'avant le correctif ; la version livrée nomme le champ fautif* |
+| Un type de réponse avec un champ anonyme | la porte de DTO — *vrai d'un type embarqué que le générateur n'écrit pas ; l'embarquement d'un `$ref` de réponse est désormais toléré* |
 | La population d'interfaces vidée | « aucune interface `ResponseObject…` » — un analyseur qui ne trouve rien est cassé, pas vert |
 | La population de types concrets vidée | `"0" is not positive` |
 | `Unimplemented` embarqué à la profondeur 1, puis 2 | la garde de réflexion, aux deux profondeurs — **de la forme *valeur* uniquement** : la forme *pointeur* passait, et c'est un correctif de revue qui l'a fermée |
@@ -153,7 +156,14 @@ Un correctif est du code comme un autre : il repasse par le rouge et par la muta
 | Les gestionnaires d'erreur laissés à leur défaut | « le message Go brut atteint le navigateur » : `text/plain` au lieu du DTO, et l'URL interne de la passerelle dans le corps |
 | Le message d'erreur recopié dans le DTO | idem — la fuite sous la bonne forme |
 | `contrat.feature` désactivé | `TestScenarios`, une fois le plancher relevé de 5 à 7 |
-| La restauration atomique de `check-generated` remise | une sortie désindexée + une génération en échec laissent l'arbre non compilable, sans un mot |
+| La restauration atomique de `check-generated` remise *(constat manuel)* | une sortie désindexée + une génération en échec laissent l'arbre non compilable, sans un mot — **aucun test n'exerce `check-generated`**, cette ligne se lit à la main |
+| Le montage repasse par `HandlerFromMux` (le défaut d'oapi-codegen) | la porte de montage : « laisse le défaut répondre en `text/plain` avec le message Go brut » |
+| `HandlerWithOptions` gardé mais son `ErrorHandlerFunc` retiré | idem |
+| `mountContract` ne monte plus rien | idem : `"0" is not positive · aucun montage du contrat : la porte est inerte, pas verte` |
+| `Unimplemented` monté à la place de l'implémentation | le test de corps exact + 5 scénarios — **aucune** porte structurelle |
+| Un type de réponse **sans champ** dont le `Visit…` écrit un blob arbitraire | le test de corps exact + le scénario — **aucune** porte structurelle |
+| Un champ `map[string]any` sur ce même type | la porte de DTO — il **est** donc dans sa population, elle ne regarde que les champs déclarés |
+| Le fichier d'assertions de typage : champ ajouté, `enum` élargi, `required` retiré | `tsc --noEmit`, sur trois formes distinctes |
 
 Les treize ont été **rejouées sur l'arbre livré** : un `git checkout` accidenté avait effacé un
 correctif en cours de route sans qu'aucun remplacement suivant ne le dise — le piège que le dépôt
@@ -287,6 +297,17 @@ analyseur qui ne trouve rien est cassé, pas vert — et la mutation se prouve e
 fautif au paquet. La population n'est pas vide aujourd'hui : `Health200JSONResponse` en fait partie.
 Le filet est tendu, pas décoratif.
 
+> **Corrigé le 02/08 après revue — les deux lignes ci-dessus décrivent la version d'avant le
+> correctif.** Le test livré refuse `map` ou `any` **à n'importe quelle profondeur de champ**, ce que
+> « un sous-jacent de type `map` » laissait passer alors que c'est exactement la mutation que la DoD
+> exige. Et il **tolère** un champ anonyme dont le type est déclaré par le générateur : un `$ref` vers
+> `components/responses/*` engendre précisément cette forme, et une garde qui la refuse se fait
+> désactiver le jour où le contrat factorise son DTO d'erreur.
+>
+> Sa population reste **tous** les types qui implémentent une interface de réponse, engendrés
+> compris — c'est d'ailleurs ce qui la fait mordre, `Health200JSONResponse` étant engendré. Une step
+> qui « optimiserait » le test en excluant le fichier engendré le rendrait inerte.
+
 ### DN-6 — Les types TypeScript sont livrés, le client instancié ne l'est pas
 
 Voir l'amendement du périmètre. Ce qui exerce les types sans rien simuler : un test de **typage** qui
@@ -300,8 +321,12 @@ Mesuré : la surface spécifiée du BFF va de `POST /auth/login` à `/roles` et 
 endpoint de santé. `/api/health` vient de step-000, écrit à la main, sans ligne de spec derrière lui.
 La spec porte elle-même la consigne « toute évolution du contrat doit être répercutée ici » : l'y
 inscrire est la règle, pas une faveur. Une entrée d'une ligne, qui dit ce que step-000 disait déjà —
-sonde de **vivacité**, hors surface métier, sans authentification, la **disponibilité** arrivant en
-step-186.
+sonde de **vivacité**, hors surface métier, la **disponibilité** arrivant avec les livrables de M9.
+
+> **Corrigé le 02/08 après revue.** Ce DN disait aussi « sans authentification ». Rien ne le porte —
+> ni step-000, ni §4.1 — et §4.2 dit au contraire que la console est entièrement derrière un login.
+> L'amendement livré dit donc que la question de la protection de la sonde se pose avec
+> l'authentification, en M1, plutôt que d'affirmer qu'elle est tranchée.
 
 ### DN-8 — `always-prefix-enum-values` plutôt qu'un enum sans nom
 
@@ -326,18 +351,16 @@ dans le test et non dans le binaire : mesuré, le code engendré ne valide pas l
 et le middleware qui le ferait exigerait `embedded-spec: true`, c'est-à-dire une copie du contrat
 figée dans le binaire — ce que la règle d'or interdit.
 
-### DN-12 — Un 500 servi par le BFF ne laisse aucune trace côté serveur
+### DN-10 — Les deux dettes de step-003 sont reportées sur leur vrai porteur
 
-*(Constat de revue, consigné plutôt que corrigé.)*
+step-003 écrit que « l'extension du DTO d'erreur avec `errors[]` attend la route qui la servira » et
+que « la première route du BFF vers la passerelle arrive en step-004 ». Or le périmètre de step-004
+est `GET /health`, sonde de vivacité qui par définition ne touche pas la passerelle : **ces deux
+dettes n'ont pas de porteur ici**.
 
-Les gestionnaires d'erreur du serveur strict rendent désormais le DTO d'erreur du produit au lieu du
-message Go brut — c'était un correctif de revue. Mais **rien n'est journalisé** : `NewRouter` ne
-reçoit que les assets, aucun journal n'atteint `internal/bff`, et l'erreur d'origine disparaît avec
-la réponse.
-
-Non traité ici parce qu'aucune route ne peut encore échouer : la première qui le pourra est celle qui
-appelle la passerelle, en step-060, et c'est elle qui dira quelle forme de journal lui sert. Le
-constat est écrit là où il vit, au-dessus du gestionnaire.
+Laisser un pointeur faux dans une fiche archivée, c'est la divergence contournée en silence que la
+règle nomme. Une ligne datée corrige le pointeur — corriger un renvoi n'est pas réécrire l'histoire —
+et la dette est inscrite là où la prochaine session la lira.
 
 ### DN-11 — `openapi-typescript` reçoit sa propre copie de TypeScript 5
 
@@ -363,13 +386,15 @@ rien du produit ne traverse le 5.9.3. L'oubli du fichier est impossible en silen
 porte un `pnpmfileChecksum`, et `pnpm install --frozen-lockfile` échoue sur
 `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` si le hook disparaît.
 
-### DN-10 — Les deux dettes de step-003 sont reportées sur leur vrai porteur
+### DN-12 — Un 500 servi par le BFF ne laisse aucune trace côté serveur
 
-step-003 écrit que « l'extension du DTO d'erreur avec `errors[]` attend la route qui la servira » et
-que « la première route du BFF vers la passerelle arrive en step-004 ». Or le périmètre de step-004
-est `GET /health`, sonde de vivacité qui par définition ne touche pas la passerelle : **ces deux
-dettes n'ont pas de porteur ici**.
+*(Constat de revue, consigné plutôt que corrigé.)*
 
-Laisser un pointeur faux dans une fiche archivée, c'est la divergence contournée en silence que la
-règle nomme. Une ligne datée corrige le pointeur — corriger un renvoi n'est pas réécrire l'histoire —
-et la dette est inscrite là où la prochaine session la lira.
+Les gestionnaires d'erreur du serveur strict rendent désormais le DTO d'erreur du produit au lieu du
+message Go brut — c'était un correctif de revue. Mais **rien n'est journalisé** : `NewRouter` ne
+reçoit que les assets, aucun journal n'atteint `internal/bff`, et l'erreur d'origine disparaît avec
+la réponse.
+
+Non traité ici parce qu'aucune route ne peut encore échouer : la première qui le pourra est celle qui
+appelle la passerelle, en step-060, et c'est elle qui dira quelle forme de journal lui sert. Le
+constat est écrit là où il vit, au-dessus du gestionnaire.

@@ -8,11 +8,20 @@
 # masque. Là où les deux formes divergeront, ce fichier le commentera.
 #
 # Les clés de chemin sont **relatives à `servers.url`**, qui porte le préfixe `/api`. C'est la forme
-# normale d'un document OpenAPI — et c'est précisément ce qui **fait ressembler** ce fichier au
-# contrat public de la passerelle, dont les cinq opérations portent les mêmes chemins génériques.
-# Ce qui l'en distingue devant la porte anti-copie de `internal/gateway` est son **identité** : il
-# ne porte ni le titre ni l'URL de serveur de ce contrat-là. Mesuré le 02/08/2026 en neutralisant
-# `identifiedIn` : un contrat du BFF à chemins relatifs rend 5 signatures sur 5, verdict « copie ».
+# normale d'un document OpenAPI.
+#
+# Ce qui l'acquitte devant la porte anti-copie de `internal/gateway` est le **compte d'opérations
+# qu'il déclare en commun avec les contrats de la passerelle**, et rien d'autre. Sondé le 02/08/2026
+# sur ce fichier, avec la logique de la porte :
+#
+#   openapi-admin.yaml   0 signature sur 28  → sous le seuil
+#   openapi-public.yaml  1 signature sur 5   → sous le seuil
+#
+# Le seuil est la moitié. Deux versions successives de ce commentaire ont désigné une autre cause —
+# les chemins relatifs, puis l'absence de marque d'identité — et les deux étaient fausses : la marque
+# d'identité du contrat Admin est d'ailleurs tenue pour présente par défaut, ce contrat-là n'en
+# déclarant aucune. **La conséquence pratique est là** : c'est en ajoutant des opérations que ce
+# fichier s'approchera du seuil, pas en changeant son titre.
 openapi: 3.1.0
 
 info:
