@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 
@@ -84,6 +85,7 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Given(`^les migrations déjà jouées$`, schema.migrateThenRecordSchema)
 	ctx.When(`^les migrations sont jouées$`, schema.migrate)
 	ctx.When(`^les migrations sont rejouées$`, schema.migrate)
+	ctx.Then(`^les trois migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
 	ctx.Then(`^les neuf tables du schéma existent$`, schema.everyTableExists)
 	ctx.Then(`^le journal d'audit accepte un événement daté du (mois courant|mois suivant)$`,
 		schema.auditLogAcceptsEventDated)
@@ -137,6 +139,36 @@ func (w *schemaWorld) migrateThenRecordSchema(ctx context.Context) error {
 	return nil
 }
 
+// initialMigrations est ce qu'une base vierge doit voir appliquer, dans l'ordre, et la version que
+// le schéma atteint alors.
+//
+// Sans cette assertion, `MigrationOutcome.Applied` n'était tenu qu'**en négatif** — « la seconde
+// exécution n'a rien appliqué » — et la boucle qui remplit la liste pouvait disparaître sans qu'une
+// suite rougisse : `make migrate` aurait alors annoncé « schéma déjà à jour » sur une base qu'il
+// venait d'ériger. Mesuré le 02/08/2026.
+var initialMigrations = []string{
+	"00001_operators_roles_permissions.sql",
+	"00002_audit_log.sql",
+	"00003_alerts_notifications_saved_views.sql",
+}
+
+const latestSchemaVersion = 3
+
+func (w *schemaWorld) everyMigrationWasReported() error {
+	if !slices.Equal(w.lastOutcome.Applied, initialMigrations) {
+		return fmt.Errorf("la première exécution rapporte %v et non %v : ce que `make migrate` "+
+			"imprime à l'exploitant ne décrit pas ce qu'il vient de faire", w.lastOutcome.Applied,
+			initialMigrations)
+	}
+
+	if w.lastOutcome.Version != latestSchemaVersion {
+		return fmt.Errorf("le schéma est rapporté en version %d et non %d", w.lastOutcome.Version,
+			latestSchemaVersion)
+	}
+
+	return nil
+}
+
 // dashboardTables est l'inventaire du §3.1 — neuf tables, ni plus ni moins. Il est écrit ici en
 // toutes lettres plutôt que dérivé des fichiers de migration : une liste dérivée du SQL dirait
 // seulement que le SQL fait ce que le SQL dit.
@@ -152,7 +184,17 @@ var dashboardTables = []string{
 	"saved_views",
 }
 
+// dashboardTableCount est le plancher de l'inventaire ci-dessus. Il n'est pas décoratif : mesuré le
+// 02/08/2026, `dashboardTables = []string{}` laissait cette suite **verte** — le scénario « les neuf
+// tables existent » passait en n'ayant cherché aucune table.
+const dashboardTableCount = 9
+
 func (w *schemaWorld) everyTableExists(ctx context.Context) error {
+	if len(dashboardTables) != dashboardTableCount {
+		return fmt.Errorf("l'inventaire du §3.1 porte %d table(s) pour %d attendues : ce contrôle ne "+
+			"regarde plus le schéma que le §3.1 décrit", len(dashboardTables), dashboardTableCount)
+	}
+
 	conn, err := w.connect(ctx)
 	if err != nil {
 		return err
@@ -194,9 +236,16 @@ func (w *schemaWorld) everyTableExists(ctx context.Context) error {
 // `no partition of relation "audit_log" found for row`. Un inventaire de `pg_class`, lui, aurait
 // décrit une structure sans jamais tenter l'écriture qui compte.
 //
-// Les bornes sont calculées **en UTC**, comme celles de `ensure_audit_log_partitions()` : dans un
-// autre fuseau, la première seconde du mois prochain appartient encore au mois courant, et le
-// scénario n'observerait pas la partition qu'il croit observer.
+// La date de la sonde se calcule **en `timestamp`**, comme les bornes de
+// `ensure_audit_log_partitions()`, et ne devient un instant qu'à la sortie : la version précédente
+// ajoutait les mois à un `timestamptz`, donc dans le fuseau de la session, et ce scénario aurait
+// visé lui-même la mauvaise date sur un schéma décalé.
+//
+// **Aucun test ne rougit si cette correction disparaît, et c'est mesuré** (02/08/2026, la sonde
+// remise sur `timestamptz` : suite verte) : la session de ce scénario tourne en UTC, où les deux
+// formes coïncident. Ce qui tient le fuseau est `partitions_test.go`, qui le pose lui-même et ancre
+// son mois ; ici, il s'agit de ne pas rejouer la faute qu'on vient de corriger, pour le jour où un
+// runner tournera sous un autre fuseau.
 func (w *schemaWorld) auditLogAcceptsEventDated(ctx context.Context, month string) error {
 	months := map[string]int{"mois courant": 0, "mois suivant": 1}
 
@@ -214,8 +263,8 @@ func (w *schemaWorld) auditLogAcceptsEventDated(ctx context.Context, month strin
 
 	const insertDatedEvent = `
 		INSERT INTO audit_log (action, created_at)
-		VALUES ('test.partition', date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
-			+ make_interval(months => $1))
+		VALUES ('test.partition', (date_trunc('month', now() AT TIME ZONE 'UTC')
+			+ make_interval(months => $1)) AT TIME ZONE 'UTC')
 		RETURNING tableoid::regclass::text,
 			to_char(created_at AT TIME ZONE 'UTC', 'YYYY_MM')`
 
@@ -274,6 +323,16 @@ func (w *schemaWorld) schemaIsUnchanged(ctx context.Context) error {
 //
 // L'ordre est imposé dans le `string_agg` : PostgreSQL ne promet aucun ordre de lecture, et une
 // empreinte qui dépendrait de l'ordre physique des lignes changerait toute seule.
+//
+// **Ce qu'elle ne prouve pas, et ne peut pas prouver** : elle se compare à elle-même, avant et après
+// rejeu. Elle tient donc l'idempotence et rien d'autre — y ajouter `pg_constraint` ne ferait pas
+// rougir un `CHECK` retiré, puisque les deux côtés de la comparaison bougeraient ensemble. Le
+// contenu du schéma est tenu ailleurs : `constraints_test.go` observe chaque refus et chaque
+// `ON DELETE` sur leur effet. Restent hors de portée de tout test le type et la nullabilité de
+// chaque colonne — aucune suite ne rougit si `notifications.message` devient nullable, ce qui a été
+// vérifié le 02/08/2026 plutôt que supposé. Les tenir demanderait une empreinte de référence
+// commitée, donc un fichier à mettre à jour à chaque migration ; ce qu'elle attraperait — un type
+// changé sans qu'on le veuille — n'est pas encore arrivé une fois.
 const schemaCatalog = `
 	SELECT coalesce(string_agg(entry, E'\n' ORDER BY entry), '')
 	FROM (

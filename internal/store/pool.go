@@ -68,7 +68,10 @@ const (
 // Le pool se ferme à l'annulation de ctx. `pgxpool` ne l'attache pas de lui-même : le `ctx` de `New`
 // ne sert qu'à la création des oisives, et `Close` est le seul chemin qui ferme le pool
 // (pgxpool/pool.go:456-461). Fermer reste possible directement — `Close` est protégé par un
-// `sync.Once` (pool.go:457), donc les deux chemins peuvent se produire sans dommage.
+// `sync.Once` (pool.go:457) — et ce second chemin ne laisse rien derrière lui **parce que le lien
+// est posé par `context.AfterFunc` et non par une goroutine**. Une goroutine bloquée sur
+// `<-ctx.Done()` ne se réveille pas d'un `Close` direct : mesurée le 02/08/2026, elle retenait le
+// pool entier pour la vie du binaire, à raison d'une par pool construit.
 //
 // # Ce que ce package ne câble pas, et pourquoi
 //
@@ -124,17 +127,15 @@ func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("construire le pool de connexions : %w", err)
 	}
 
-	go closeOnShutdown(ctx, pool)
+	// `context.AfterFunc` et non `go func() { <-ctx.Done(); … }()` : il s'inscrit auprès du contexte
+	// au lieu de parquer une goroutine, donc un pool fermé directement ne retient plus rien — et un
+	// `ctx` que rien n'annulera jamais (`context.Background()`) ne fait même pas naître d'inscription.
+	//
+	// `Close` bloque jusqu'à ce que les connexions empruntées soient rendues et fermées : c'est ce qui
+	// fait de l'arrêt un arrêt *propre*, et non un abandon de backends que PostgreSQL compterait
+	// encore dans `max_connections`. Il est appelé ici depuis la goroutine que le contexte réveille à
+	// son annulation, jamais depuis l'appelant de `NewPool`.
+	context.AfterFunc(ctx, pool.Close)
 
 	return pool, nil
-}
-
-// closeOnShutdown rend les connexions au serveur quand le contexte racine est annulé.
-//
-// `Close` bloque jusqu'à ce que les connexions empruntées soient rendues et fermées : c'est ce qui
-// fait de l'arrêt un arrêt *propre*, et non un abandon de backends que PostgreSQL compterait encore
-// dans `max_connections`.
-func closeOnShutdown(ctx context.Context, pool *pgxpool.Pool) {
-	<-ctx.Done()
-	pool.Close()
 }

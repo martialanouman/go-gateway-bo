@@ -4,7 +4,7 @@
 > **Dépend de :** step-000 · **Bloque :** step-006, M1 entier
 
 ## But
-Le petit schéma dont le BFF est propriétaire — opérateurs, rôles, sessions, audit, alertes,
+Le petit schéma dont le BFF est propriétaire — opérateurs, rôles et permissions, audit, alertes,
 notifications, vues sauvegardées — avec ses migrations et une base jetable pour les tests. Le tableau
 de bord ne lit **jamais** la base de la passerelle (§1.3).
 
@@ -45,6 +45,12 @@ de bord ne lit **jamais** la base de la passerelle (§1.3).
   n'échoue.
 - Une partition d'`audit_log` est créée pour le mois courant et pour le suivant.
 - Le pool se ferme sur annulation du `context` et aucune connexion ne reste ouverte.
+- *Ajoutés en revue* : les bornes de partition sont justes **sous un fuseau de session non-UTC** et
+  sur un mois où l'arithmétique fautive mordait ; les **refus** du schéma sont observés
+  (`constraints_test.go` — chaque `CHECK`, chaque `UNIQUE`, l'index `lower(email)`, les trois
+  `RESTRICT`, et l'effet des `CASCADE`/`SET NULL`), un `seedSQL` légitime jouant avant chaque cas pour
+  qu'une contrainte **trop serrée** tombe là aussi ; `make migrate` respecte le DSN de l'appelant et
+  ne le passe pas par `argv`.
 
 ## Definition of Done
 - [ ] `make check` vert, base jetable comprise
@@ -95,7 +101,17 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | `MinConns` porté à 5 | les deux tests de paresse |
 | `MaxConns`, `MinConns`, `MinIdleConns` retirés un à un | « le pool a ouvert une 11ᵉ connexion », « le DSN a obtenu ses 5 connexions oisives » |
 | Durée de vie, jitter, temps d'inactivité, délai de connexion — les quatre retirés | **aucune porte ne rougit** — leur effet n'apparaît qu'avec le temps ou sur une base injoignable ; écrit au-dessus des lignes |
-| `WithSessionLocker` retiré | **aucune porte ne rougit** — trois migrations concurrentes sur base vierge donnent le même résultat, la transaction par migration suffisant à sérialiser localement |
+| `WithSessionLocker` retiré | **aucune porte ne rougit, mais le défaut est réel** — *corrigé après revue* : deux relecteurs ont mesuré indépendamment **2 échecs sur 12** sans le verrou (`duplicate key value violates unique constraint "pg_type_typname_nsp_index"`), contre 0 sur 12 avec. La première version de cette ligne affirmait que « la transaction par migration suffit à sérialiser » — c'est **faux** : deux `CREATE TYPE` concurrents entrent en collision dans le catalogue avant tout `COMMIT`. La porte reste à écrire ; l'affirmation qui aurait autorisé à retirer le verrou est retirée |
+| **Revue** — la fonction de partition de step-005, mot pour mot | `TestPartitionBounds…` : `no partition of relation "audit_log" found for row` pour un événement du 31 mars, sous `America/New_York` **et** `Europe/Paris`. `TestScenarios` reste **vert** : nous sommes en août, l'un des six mois où l'arithmétique fautive tombe juste |
+| **Revue** — `dashboardTables = []string{}` | `l'inventaire du §3.1 porte 0 table(s) pour 9 attendues` |
+| **Revue** — la boucle qui remplit `Applied` retirée | `la première exécution rapporte [] et non [00001… 00002… 00003…]` |
+| **Revue** — `closeOnShutdown` remise sur `<-ctx.Done()` nu | `4 goroutines avant, 54 après` |
+| **Revue** — `CHECK` sur `notifications.severity` retiré | « une notification porte une des trois sévérités », **seul** |
+| **Revue** — `ON DELETE RESTRICT` → `SET NULL` sur `audit_log.operator_id` | « le journal ne perd jamais son auteur », **seul** |
+| **Revue** — index unique sur `email` au lieu de `lower(email)` | « deux adresses qui ne diffèrent que par la casse », **seul** |
+| **Revue** — `.env` reprend la main sur le DSN de l'appelant | `entrée standard: …/depuis-le-fichier/local` au lieu de `/staging` |
+| **Revue** — le DSN repasse en argument | `argv: run ./cmd/migrate postgres://…/staging` |
+| **Revue** — `notifications.message` rendue nullable | **aucune porte ne rougit** — type et nullabilité de chaque colonne restent hors de portée ; écrit à côté de l'empreinte, avec le prix d'une empreinte de référence commitée |
 | Image du conteneur pointée sur un tag inexistant | la suite **échoue** — aucun test exécuté, jamais un skip |
 | `%w` remis sur l'erreur de `ParseConfig` dans les migrations | `TestMigrateNeverEchoesTheDatabasePassword` — le mot de passe verbatim dans le message |
 
@@ -176,6 +192,26 @@ où il tourne, et la mutation reste falsifiable.
 Piège du format retenu en DN-1 : `goose` découpe ses instructions sur les `;`, donc un bloc PL/pgSQL
 **exige** `-- +goose StatementBegin` / `StatementEnd`. Sans eux, la fonction est coupée en morceaux.
 
+**Corrigé après revue — ce DN était incomplet sur deux points, et la migration est modifiée sur
+place** (elle n'est pas fusionnée ; « une migration ne se réécrit jamais » vaut à partir du merge) :
+
+1. **« dérivés de `now()` » ne suffisait pas — l'arithmétique doit être en `timestamp`.**
+   `timestamptz + interval` est calculé par PostgreSQL dans le fuseau de la **session**, que ce dépôt
+   ne contrôle pas. Mesuré sous `America/New_York` : la borne de mars tombait le **28 à 23:00 UTC** au
+   lieu du 1er avril. Compté sur les douze mois de 2026 — ma propre sonde, après en avoir cassé une
+   première qui laissait `generate_series` dériver ses pas dans le fuseau de session : **6 faux sur
+   12** sous `America/New_York` (03, 05, 07, 10, 11, 12), **2 sur 12** sous `Europe/Paris` (03 et 10,
+   les deux bascules), **0** sous UTC. Le second tour de boucle retrouvait alors le même nom
+   de partition, `IF NOT EXISTS` l'avalait sans bruit, et toute écriture du 29 mars était refusée. Le
+   calcul se fait désormais en heure murale UTC et ne devient un instant qu'à la sortie.
+2. **La falsifiabilité que ce DN réclame n'était pas atteinte** : en s'en remettant à `now()`, la
+   suite disait quelque chose de **différent selon le mois où elle tournait** — verte en août, rouge
+   en mars. La fonction prend un `anchor timestamptz DEFAULT now()` : la migration ne le renseigne
+   pas, la suite l'ancre sur un mois où le défaut mord, et les deux fuseaux sont tenus.
+
+Ce que ce DN **ne dit toujours pas**, et qui appartient à une autre step : personne ne rappelle cette
+fonction. Voir DN-11.
+
 ### DN-5 — Le pool est paresseux, et le DSN est exigé au démarrage
 
 Le périmètre veut un pool « attaché au `context` racine ». Mais **aucune route n'utilise la base** —
@@ -249,10 +285,51 @@ Server au manifeste. La note du skill reste vraie ailleurs ; elle ne l'est pas i
 - **Quatre réglages du pool ne sont tenus par aucun test** — durée de vie maximale, son jitter,
   temps d'inactivité, délai de connexion. Leur effet n'apparaît qu'avec le temps ou sur une base
   injoignable, cas que DN-7 laisse à la step lectrice. Le constat est écrit au-dessus d'eux.
-- **Le verrou de migration n'est tenu par rien non plus** : trois migrations concurrentes sur une
-  base vierge donnent le même résultat avec et sans `WithSessionLocker`, la transaction par
-  migration suffisant à sérialiser localement. Il est posé parce que le produit tourne en ≥2
-  instances, mais rien ne rougirait à son retrait.
+- **Le verrou de migration n'est couvert par aucun test** — mais, *corrigé après revue*, le défaut
+  qu'il empêche est **réel et mesuré** : deux relecteurs ont trouvé indépendamment 2 échecs sur 12
+  sans le verrou, contre 0 sur 12 avec. La première version de ce constat disait que « la
+  transaction par migration suffit à sérialiser » ; elle ne suffit pas, deux `CREATE TYPE`
+  concurrents se disputant l'index unique du catalogue avant tout `COMMIT`. C'est la nuance qui
+  compte : « aucune porte ne rougit » n'autorise pas à retirer la ligne.
+
+### DN-11 — La création glissante des partitions est une dette écrite, pas un mécanisme
+
+Constaté en revue, mesuré deux fois : `ensure_audit_log_partitions()` n'est appelée **qu'au moment où
+goose applique la migration**. goose ne rejoue jamais une migration appliquée — `make migrate` sur une
+base à jour rend « schéma déjà à jour » sans la rappeler — et aucun appelant récurrent n'existe dans
+le dépôt (recherché sur tout l'arbre : ni `pg_cron`, ni ordonnanceur, ni appel au démarrage).
+
+Conséquence, sur `postgres:18` : une base migrée le 2 août porte `audit_log_2026_08` et
+`audit_log_2026_09`, et une écriture datée du mois+2 échoue **déjà**. Donc **le 1ᵉʳ octobre, toute
+écriture d'audit est refusée** — et avec elle toute action tracée du BFF, le jour où l'écriture
+d'audit partage la transaction de l'action qu'elle trace.
+
+Un commentaire de cette step annonçait l'inverse (« les partitions s'accumulent indéfiniment ») : il
+est corrigé. `step-187` (« Rétention : partitions **détachées** ») ne porte que l'autre moitié.
+
+**Ce qui n'est pas fait, et pourquoi.** Aucun ordonnanceur n'existe encore ici : le mécanisme est hors
+périmètre. Élargir `ARRAY[0, 1]` à douze mois achèterait un an sans rien construire — **écarté**,
+parce que cela déplacerait la date de la panne au lieu de créer ce qui manque, et rendrait la dette
+moins visible en la rendant moins urgente. Elle est écrite en tête de `00002_audit_log.sql`, là où la
+prochaine session la lira.
+
+### DN-12 — Le DSN de l'appelant l'emporte sur `.env`, et passe par stdin
+
+Deux défauts trouvés en revue sur la même recette, corrigés ensemble.
+
+**Précédence.** `set -a; . ./.env` **écrasait** l'environnement de l'appelant. Donc
+`DASHBOARD_DATABASE_URL=…/staging make migrate` — la forme naturelle, puisque la cible s'annonce avec
+cette variable — jouait les migrations **sur la base locale** en affichant `appliquée : …` comme si
+tout allait bien. C'est le seul endroit du dépôt où un ordre de précédence décide de *quelle base* on
+modifie. La valeur de l'appelant est relevée avant le sourcing et reprend la main après.
+
+**Transport.** Le DSN passait par `argv`, que `ps aux` affiche — alors que le dépôt a dépensé trois
+commentaires et un test à empêcher ce mot de passe de sortir dans un message d'erreur. Il se lit
+désormais sur **stdin**, et un argument est refusé en disant pourquoi. La troisième voie, lire
+l'environnement dans `cmd/migrate`, reste fermée par `forbidigo` (§1.8 : `internal/config` est le seul
+package qui lit l'environnement).
+
+`make dev` garde le motif de précédence — sans risque là-bas, et hors du périmètre de cette step.
 
 ### DN-9 — `docker-compose.yml` cesse de renvoyer à une commande qui n'existe pas
 

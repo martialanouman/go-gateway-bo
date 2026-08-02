@@ -345,20 +345,29 @@ mock: ## Mock Prism de l'API Admin sur :4010
 # Du Go pur, sans le moindre détour par pnpm : c'est ce qui la rend lançable depuis n'importe quel
 # job Go de la CI, dont quatre des cinq n'ont ni pnpm ni `node_modules`.
 #
-# Le DSN est lu ici — `.env` d'abord, comme `dev` — puis **passé en argument**. `internal/config` est
-# le seul package qui lit l'environnement (§1.8), et un `os.Getenv` dans `cmd/migrate` contournerait
-# la règle que `forbidigo` tient. Le Makefile, lui, n'est pas du Go.
+# Le DSN est lu ici, et `.env` ne fait que **compléter** l'environnement de l'appelant — il ne
+# l'écrase pas. C'est le seul endroit du dépôt où l'ordre de précédence décide de *quelle base* on
+# modifie : la cible s'annonçant avec `DASHBOARD_DATABASE_URL`, `DASHBOARD_DATABASE_URL=…/staging
+# make migrate` est la forme naturelle, et un `set -a; . ./.env` seul la retournait en silence contre
+# la base locale, en affichant « appliquée : … » comme si tout allait bien (mesuré le 02/08/2026).
+#
+# Le DSN part ensuite dans un **tube**, jamais en argument : `ps aux` affiche la ligne de commande de
+# tout processus de la machine, et `go run` la duplique dans le processus fils. `internal/config`
+# reste le seul package qui lit l'environnement (§1.8), et un `os.Getenv` dans `cmd/migrate`
+# contournerait la règle que `forbidigo` tient. Le Makefile, lui, n'est pas du Go.
 #
 # `go run` et non le binaire compilé : les migrations ne sont pas sur le chemin de `make dev`, et un
 # `bin/` de plus à purger dans `clean` coûterait plus que la seconde de compilation qu'il épargne.
 migrate: ## Applique les migrations du schéma du BFF (DASHBOARD_DATABASE_URL)
-	@set -a; if [ -f .env ]; then . ./.env; fi; set +a; \
-	test -n "$$DASHBOARD_DATABASE_URL" || { \
+	@dsn="$$DASHBOARD_DATABASE_URL"; \
+	set -a; if [ -f .env ]; then . ./.env; fi; set +a; \
+	dsn="$${dsn:-$$DASHBOARD_DATABASE_URL}"; \
+	test -n "$$dsn" || { \
 		echo "DASHBOARD_DATABASE_URL est vide — sur un poste local, après docker compose up -d :"; \
 		echo "  DASHBOARD_DATABASE_URL=postgres://dashboard:dashboard@localhost:5432/dashboard?sslmode=disable"; \
 		exit 1; \
 	}; \
-	go run ./cmd/migrate "$$DASHBOARD_DATABASE_URL"
+	printf '%s' "$$dsn" | go run ./cmd/migrate
 
 # Idempotent jusqu'au bout. La version précédente supprimait `bin` et `web/dist`, puis échouait sur
 # un `find: … No such file or directory` quand `$(WEBASSETS)` avait disparu : un nettoyage à moitié

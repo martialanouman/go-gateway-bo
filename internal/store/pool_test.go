@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -151,6 +152,45 @@ func TestTheDSNCannotLoosenThePoolBounds(t *testing.T) {
 	assert.Errorf(t, err, "le pool a ouvert une %dᵉ connexion : deux instances en prendraient %d, "+
 		"et le DSN déciderait seul de la part que le tableau de bord prend dans max_connections",
 		maxConnectionsPerInstance+1, 2*maxConnectionsPerInstance)
+}
+
+// L'autre chemin d'arrêt : `pool.Close()` appelé directement, ce que la step suivante écrira par
+// réflexe Go en `defer pool.Close()`. Ce que le `sync.Once` de `pgxpool` protège est la double
+// fermeture ; il ne dit rien du chemin qui **n'aboutit pas** — celui qui attend une annulation qui
+// ne viendra jamais.
+//
+// Le contexte est `context.Background()` et non celui du test : un contexte que le test annule en
+// sortant ferait disparaître la fuite au moment précis où on la mesure.
+//
+// Ce test ne prend pas `t.Parallel()` : il compte les goroutines du processus, et une suite qui en
+// crée à côté ferait dire n'importe quoi à ce compteur.
+func TestClosingThePoolDirectlyLeavesNoGoroutineBehind(t *testing.T) {
+	const (
+		pools = 50
+		// Marge pour le bruit de fond du processus — testcontainers, `database/sql`, le ramasse-miettes.
+		// La fuite, elle, se compte en dizaines : un chemin d'arrêt par pool construit.
+		tolerance = 5
+	)
+
+	ctx := context.Background()
+	dsn := freshDatabase(t.Context(), t)
+
+	before := runtime.NumGoroutine()
+
+	for range pools {
+		pool, err := store.NewPool(ctx, dsn)
+		require.NoError(t, err, "construire le pool")
+
+		pool.Close()
+	}
+
+	runtime.GC()
+
+	assert.Eventuallyf(t, func() bool { return runtime.NumGoroutine() <= before+tolerance },
+		10*time.Second, 100*time.Millisecond,
+		"%d goroutines avant, %d après avoir construit puis fermé %d pools : chaque pool fermé "+
+			"directement retient une goroutine — et le pool entier avec elle — pour la vie du binaire",
+		before, runtime.NumGoroutine(), pools)
 }
 
 // maxConnectionsPerInstance duplique la borne de `pool.go` plutôt que de l'exporter : une constante
