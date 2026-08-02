@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +21,10 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers/legacy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -161,7 +166,11 @@ func filtersScenarios(runFilter string) bool {
 
 // minimumScenarios est un plancher, pas un compte : en ajouter un n'oblige à rien ici, en retirer un
 // demande de le dire — c'est exactement la relecture qu'on veut provoquer.
-const minimumScenarios = 5
+//
+// Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
+// mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
+// entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
+const minimumScenarios = 7
 
 // scenarioLedger note ce que la suite a réellement exécuté. Le verrou n'est pas décoratif : `godog`
 // exécute les scénarios en parallèle dès que `Concurrency` dépasse 1, et ce jour-là le compteur se
@@ -370,6 +379,8 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Then(`^la réponse n'est pas une page HTML$`, p.responseIsNotHTML)
 	ctx.Then(`^le navigateur garde la réponse en cache un an$`, p.responseIsCachedForAYear)
 	ctx.Then(`^le navigateur ne garde pas la réponse en cache$`, p.responseIsNeverCached)
+	ctx.Then(`^la réponse valide le contrat du BFF$`, p.responseMatchesTheContract)
+	ctx.Then(`^le service se déclare "([^"]*)"$`, p.reportsStatus)
 
 	ctx.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
 		p.kill()
@@ -407,7 +418,18 @@ type process struct {
 // response est ce qu'un navigateur voit d'une réponse : son code, ses en-têtes et son corps. Le
 // harnais le garde parce qu'un scénario enchaîne — il lit la coquille, puis demande le fichier
 // qu'elle référence.
+// La méthode et le chemin sont gardés avec la réponse : les confronter au contrat demande de retrouver
+// l'opération que celui-ci destine à la requête, et une réponse orpheline ne dit plus à quoi la
+// comparer.
 type response struct {
+	// Aucun test ne rougit si ce champ disparaît, ce qui a été vérifié plutôt que supposé : toutes les
+	// steps qui interrogent le serveur passent par `fetch`, donc en GET, et le remplacer par un
+	// `http.MethodGet` codé en dur au site de validation laisse la suite verte. Il reste parce que
+	// c'est lui qui laissera passer un HEAD sans corps le jour où un scénario en demandera un
+	// (`openapi3filter/validate_response.go:23`) — codé en dur, ce scénario-là échouerait sur une
+	// comparaison qui ment plutôt que sur ce qu'il décrit.
+	method string
+	path   string
 	status int
 	header http.Header
 	body   string
@@ -548,7 +570,13 @@ func (p *process) fetch(path string) error {
 		return fmt.Errorf("lecture de la réponse de %s: %w", path, err)
 	}
 
-	p.received = &response{status: resp.StatusCode, header: resp.Header, body: string(body)}
+	p.received = &response{
+		method: http.MethodGet,
+		path:   path,
+		status: resp.StatusCode,
+		header: resp.Header,
+		body:   string(body),
+	}
 
 	return nil
 }
@@ -648,6 +676,105 @@ func (p *process) responseIsNeverCached() error {
 	if !strings.Contains(directives, "no-cache") {
 		return fmt.Errorf("la réponse annonce %q : un onglet ouvert après un déploiement demanderait des fichiers disparus",
 			directives)
+	}
+
+	return nil
+}
+
+// contractPath désigne le contrat du dépôt lui-même, jamais une copie : une copie divergerait du
+// fichier dont les deux moitiés du produit dérivent, et la validation se mettrait à répondre d'un
+// document que plus personne ne relit. Le chemin est relatif au répertoire du paquet, celui d'où
+// `go test` lance le binaire de test.
+const contractPath = "../../api/openapi-bff.yaml"
+
+// contractRouter lie une requête HTTP à l'opération que le contrat lui destine. Le routeur `legacy`
+// plutôt que `gorillamux`, et ce que ce choix évite est plus étroit que « ajouter `gorilla/mux` au
+// graphe de dépendances » : mesuré le 02/08/2026, `gorilla/mux v1.8.0` est **déjà** dans le `go.sum`
+// de cette branche, tiré par le graphe de modules de `kin-openapi`
+// (`go mod why -m` : `cmd/dashboard.test → openapi3filter.test → routers/gorillamux → gorilla/mux`).
+// Ce que `legacy` évite est de le faire entrer dans les `require` de `go.mod` et dans le graphe de
+// **compilation** — mesuré, `go list -deps ./cmd/... ./internal/...` n'en rapporte aucune occurrence.
+// Le premier rapproche par ailleurs la requête du contrat par son seul chemin
+// (`routers/legacy/router.go:121` → `openapi3.Servers.MatchURL`), ce qu'un `servers.url` relatif
+// comme `/api` demande. Il valide au passage le document lui-même (`routers/legacy/router.go:62`).
+func contractRouter(ctx context.Context) (routers.Router, error) {
+	doc, err := (&openapi3.Loader{Context: ctx}).LoadFromFile(contractPath)
+	if err != nil {
+		return nil, fmt.Errorf("lecture du contrat %s: %w", contractPath, err)
+	}
+
+	router, err := legacy.NewRouter(doc)
+	if err != nil {
+		return nil, fmt.Errorf("le contrat %s ne décrit aucune route exploitable: %w", contractPath, err)
+	}
+
+	return router, nil
+}
+
+func (p *process) responseMatchesTheContract() error {
+	if p.received == nil {
+		return errors.New("aucune réponse à examiner : rien n'a été demandé au serveur")
+	}
+
+	ctx := context.Background()
+
+	router, err := contractRouter(ctx)
+	if err != nil {
+		return err
+	}
+
+	// La requête est rejouée sous la forme que le routeur compare au contrat — une méthode, un
+	// chemin. La validation n'en lit rien d'autre : la méthode, pour laisser passer un HEAD sans
+	// corps (`openapi3filter/validate_response.go:23`), et la route trouvée ici.
+	request := httptest.NewRequest(p.received.method, p.received.path, nil)
+
+	route, pathParams, err := router.FindRoute(request)
+	if err != nil {
+		return fmt.Errorf("le contrat ne décrit pas %s %s: %w", p.received.method, p.received.path, err)
+	}
+
+	err = openapi3filter.ValidateResponse(ctx, &openapi3filter.ResponseValidationInput{
+		RequestValidationInput: &openapi3filter.RequestValidationInput{
+			Request:    request,
+			PathParams: pathParams,
+			Route:      route,
+		},
+		Status: p.received.status,
+		Header: p.received.header,
+		Body:   io.NopCloser(strings.NewReader(p.received.body)),
+		// Sans cette option, un statut que le contrat ne documente pas est tenu pour valide
+		// (`openapi3filter/validate_response.go:52-57`) — or c'est justement une réponse dont le
+		// client n'a aucun type. Mesuré : un 201 simulé échoue « status is not supported » avec
+		// l'option, et passe sans elle.
+		Options: &openapi3filter.Options{IncludeResponseStatus: true},
+	})
+	if err != nil {
+		return fmt.Errorf("la réponse servie ne valide pas le contrat: %w\n%s", err, p.received.body)
+	}
+
+	return nil
+}
+
+// reportsStatus lit le corps sans passer par le validateur. Aucune mutation du produit ne le fait
+// tomber seul — l'enum du contrat n'a qu'un membre, donc toute valeur qui le contredit casse d'abord
+// la validation. Ce qu'il couvre est l'autre panne : un validateur devenu inerte, qui rendrait le
+// scénario vert sans rien lire. Mesuré : validation neutralisée **et** statut `vivant`, c'est ce
+// step-ci qui rougit.
+func (p *process) reportsStatus(expected string) error {
+	if p.received == nil {
+		return errors.New("aucune réponse à examiner : rien n'a été demandé au serveur")
+	}
+
+	var probe struct {
+		Status string `json:"status"`
+	}
+
+	if err := json.Unmarshal([]byte(p.received.body), &probe); err != nil {
+		return fmt.Errorf("la réponse n'est pas du JSON: %w\n%s", err, p.received.body)
+	}
+
+	if probe.Status != expected {
+		return fmt.Errorf("le service se déclare %q et non %q", probe.Status, expected)
 	}
 
 	return nil

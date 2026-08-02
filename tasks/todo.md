@@ -109,7 +109,7 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - [x] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
 - [x] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
 - [ ] step-009 — Contrat Admin en **4.0.0** : deux majeures depuis 2.5.0, diff du YAML relu §
-- [ ] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS
+- [x] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS ‡
 - [ ] step-005 — PostgreSQL : `pgx`, migrations, les six tables du §3.1, `audit_log` partitionné
 - [ ] step-006 — Catalogue de permissions : source Go, génération TS, test de divergence bloquant
 - [ ] step-007 — Harnais BDD : `godog`, `testify`, testcontainers, Vitest, Playwright, CI à deux toolchains
@@ -120,6 +120,12 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 juste après, avant que M0 et M1 n'engendrent du code contre 2.5.0 : un bump payé sur le seul
 `internal/gateway/client.gen.go` coûte moins cher que le même bump payé sur tout ce qui l'appellera.
 Son fichier `steps/step-009.md` reste à écrire, comme ceux de M1 et au-delà.
+
+‡ **step-004 est passée devant step-009, et la position ci-dessus reste la bonne.** Mesuré le 02/08 à
+09:26 UTC : la quarantaine de 4.0.0 courait jusqu'à 17:46 UTC et `pnpm` la refusait encore — step-009
+était matériellement infaisable. step-004 ne dépend pas d'elle et n'engendre aucun code contre le
+contrat Admin, donc l'argument du renvoi § n'est pas entamé : ce qui reste à payer au bump n'a pas
+grossi. step-009 garde sa place, en tête de ce qui reste.
 
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [ ] step-020 — Schéma auth (operators, roles, permissions, jointures) + seed des 44 clés et des 9 rôles
@@ -171,7 +177,9 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [ ] step-047 — Arrêt propre : drain des sockets, déploiement roulant sans session perdue
 
 ## M3 — Clients, comptes SMPP & identifiants  (§6.14, §6.15)
-- [ ] step-060 — Groupes de clients : CRUD + filtre transverse
+- [ ] step-060 — Groupes de clients : CRUD + filtre transverse ← **première route du BFF qui appelle
+      la passerelle** : elle porte l'extension du DTO `errorResponse` avec `errors[]` (§1.4), que
+      step-003 avait laissée « en attente de la route qui la servira » en pointant à tort step-004
 - [ ] step-061 — Clients : liste, filtres, création  ← **la tranche verticale est acquise ici**
 - [ ] step-062 — Fiche client : identité, statut, suspension en cascade, sender IDs
 - [ ] step-063 — Comptes SMPP : liste + création rattachée au client

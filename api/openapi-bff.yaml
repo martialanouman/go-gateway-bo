@@ -1,0 +1,72 @@
+# Le contrat du BFF : **la** frontière entre les deux moitiés du produit. Il est écrit à la main, et
+# les deux côtés en dérivent — les types serveur Go par `oapi-codegen`, les types client TypeScript
+# par `openapi-typescript`. L'inverse — dériver le contrat du code Go — ferait du serveur la source
+# de vérité et rendrait toute rupture invisible au client jusqu'à l'exécution.
+#
+# **Ce n'est pas le contrat de la passerelle.** Il en reprendra le vocabulaire (`link_status`,
+# `breaker_state`, §1.5) mais sa forme est celle dont l'écran a besoin : le BFF compose, filtre et
+# masque. Là où les deux formes divergeront, ce fichier le commentera.
+#
+# Les clés de chemin sont **relatives à `servers.url`**, qui porte le préfixe `/api`. C'est la forme
+# normale d'un document OpenAPI.
+#
+# Ce qui l'acquitte devant la porte anti-copie de `internal/gateway` est le **compte d'opérations
+# qu'il déclare en commun avec les contrats de la passerelle**, et rien d'autre. Sondé le 02/08/2026
+# sur ce fichier, avec la logique de la porte :
+#
+#   openapi-admin.yaml   0 signature sur 28  → sous le seuil
+#   openapi-public.yaml  1 signature sur 5   → sous le seuil
+#
+# Le seuil est la moitié. Deux versions successives de ce commentaire ont désigné une autre cause —
+# les chemins relatifs, puis l'absence de marque d'identité — et les deux étaient fausses : la marque
+# d'identité du contrat Admin est d'ailleurs tenue pour présente par défaut, ce contrat-là n'en
+# déclarant aucune. **La conséquence pratique est là** : c'est en ajoutant des opérations que ce
+# fichier s'approchera du seuil, pas en changeant son titre.
+openapi: 3.1.0
+
+info:
+  title: Tableau de bord Admin — API du BFF
+  version: 0.1.0
+  description: |
+    Surface servie au navigateur. Le client ne parle qu'à elle : le jeton machine, le mTLS et la base
+    vivent sous `internal/`, hors d'atteinte du bundle (invariant d).
+
+# Le seul consommateur de `servers` dans le dépôt est `kin-openapi`, dans le scénario godog de
+# `cmd/dashboard` : c'est lui, et lui seul, qui lie ce préfixe au `r.Route("/api", …)` du routeur.
+# Ni `oapi-codegen` ni `openapi-typescript` ne le lisent — mesuré, `/api` remplacé par `/v1` laisse
+# `make check-generated` vert et les trois sorties identiques, et fait tomber le scénario.
+servers:
+  - url: /api
+    description: Relatif à l'origine qui a servi la SPA — le client n'écrit jamais d'adresse absolue.
+
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: Sonde de vivacité
+      description: |
+        Répond « le process est en vie », pas « le service est disponible ». Ne touche ni la base ni
+        la passerelle : y brancher une dépendance ferait redémarrer un serveur sain parce qu'une
+        autre brique est tombée. La sonde de disponibilité arrive en step-186.
+      responses:
+        '200':
+          description: Le process répond.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+components:
+  schemas:
+    Health:
+      type: object
+      description: Réponse de la sonde de vivacité.
+      additionalProperties: false
+      properties:
+        status:
+          # Un enum plutôt qu'une chaîne libre : il contraint la **valeur** et pas seulement la forme,
+          # ce qui donne du mordant à la validation de la réponse contre ce fichier. Les constantes
+          # engendrées sont préfixées de leur type (`always-prefix-enum-values`), sans quoi celle-ci
+          # s'appellerait `Ok` dans le paquet qui portera toutes les routes du produit.
+          type: string
+          enum: [ok]
+      required: [status]

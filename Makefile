@@ -18,6 +18,22 @@ WEBASSETS := internal/webassets/dist
 CONTRACT_ADMIN := web/node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml
 ADMIN_CLIENT := internal/gateway/client.gen.go
 
+# Le contrat du BFF, lui, est **écrit ici** et versionné : c'est nous qui le possédons, et les deux
+# moitiés du produit en dérivent. Il n'a donc aucune garde de présence — un arbre où il manque est un
+# arbre abîmé, pas un arbre où `pnpm install` n'a pas tourné.
+CONTRACT_BFF := api/openapi-bff.yaml
+BFF_SERVER := internal/bff/bff.gen.go
+
+# L'autre moitié qui dérive du même fichier. Le binaire installé, jamais `npx` — même raison que
+# `$(PRISM)` plus bas. Il vit sous `web/node_modules/`, ce qui range la génération des types client
+# du même côté que celle du client Go de l'API Admin : les deux exigent `pnpm install`.
+BFF_TYPES := web/src/lib/api.gen.ts
+OPENAPI_TS := web/node_modules/.bin/openapi-typescript
+
+# Ce que `check-generated` supprime, régénère et compare. Une liste plutôt qu'un fichier : le jour où
+# une step en ajoute un, l'oublier ici le laisserait diverger sans que rien ne rougisse.
+GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER) $(BFF_TYPES)
+
 # Le mock de l'API Admin, et le port que `.env.example` vise avec `DASHBOARD_GATEWAY_BASE_URL`.
 #
 # Le binaire installé, jamais `npx` : celui-ci est prêt en ~1,0 s (mesuré le 02/08/2026) là où `npx`
@@ -67,11 +83,13 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 #    propres fixtures d'assets, puis les retire. La copie peut se terminer dans cette fenêtre, et le
 #    `go build` embarque alors la coquille du harnais — qui porte le même titre que la vraie. Rien ne
 #    distingue les deux à l'œil, et toutes les portes restent vertes.
-# 3. `check-generated` supprime `$(ADMIN_CLIENT)` avant de le régénérer — absent le temps d'un
-#    `make generate`, 0,67 s mesuré — pendant que `test-go`, `lint-go` et `vuln-go` compilent `./...`,
-#    `internal/gateway` compris.
+# 3. `check-generated` supprime `$(GENERATED)` avant de le régénérer — absent le temps d'un
+#    `make generate` — pendant que `test-go`, `lint-go` et `vuln-go` compilent `./...`.
 #    Celle-ci est **bruyante** : fichier retiré, `go build ./...` rend `undefined: ClientWithResponses`
-#    (mesuré). `build` n'est pas concerné, `./cmd/dashboard` n'important pas `internal/gateway`.
+#    (mesuré). Et depuis que `$(BFF_SERVER)` est de la partie, `build` en fait partie aussi :
+#    `./cmd/dashboard` importe `internal/bff`, contrairement à `internal/gateway` qu'il n'importe pas.
+#    `$(BFF_TYPES)` étend la même course au versant client — `typecheck-web` rend alors
+#    `error TS2307: Cannot find module './api.gen'` (mesuré). Bruyante aussi, donc.
 #
 # Le prérequis est **omis**. `.NOTPARALLEL: check` n'honore ses prérequis qu'à partir de GNU make 4.4 ;
 # la 3.81 que livre macOS l'accepte sans rien dire et sérialise le run entier de toute façon. La forme
@@ -223,20 +241,45 @@ check-routes: ## Vérifie que l'arbre de routes commité est à jour et régén�
 		exit 1; \
 	}
 
-# Le contrat est absent d'un arbre où `pnpm install` n'a pas tourné, et `oapi-codegen` dirait alors
-# seulement qu'il n'a pas su ouvrir un chemin. Ce que la recette annonce à la place est la sortie de
-# secours.
-generate: ## Engendre le client Go de l'API Admin depuis le contrat installé
-	@test -f $(CONTRACT_ADMIN) || { \
-		echo "$(CONTRACT_ADMIN) est absent — le contrat vient de GitHub Packages : pnpm -C web install"; \
-		exit 1; \
-	}
+# Le contrat de l'API Admin comme le générateur de types TypeScript sont absents d'un arbre où
+# `pnpm install` n'a pas tourné, et `oapi-codegen` comme le shell diraient alors seulement qu'ils
+# n'ont pas su ouvrir un chemin. Ce que la recette annonce à la place est la sortie de secours.
+#
+# Cette cible dépend donc des **deux** toolchains, et depuis les types client de `$(BFF_TYPES)` elle
+# en dépend même pour la moitié BFF du contrat. Ça ne change rien à la répartition des jobs :
+# `generate` et `check-generated` n'apparaissent nulle part ailleurs que dans « Build client et
+# déployable », qui a Go, pnpm et `node_modules` — vérifié, `grep -rn 'make generate\|check-generated'
+# .github` ne rend que la ligne `- run: make check-generated` de ce job.
+generate: ## Engendre le client Go de l'API Admin, et le serveur Go comme les types TS du BFF
+	@for required in $(CONTRACT_ADMIN) $(OPENAPI_TS); do \
+		test -f "$$required" || { \
+			echo "$$required est absent — il vient de pnpm : pnpm -C web install"; \
+			exit 1; \
+		}; \
+	done
 	go tool oapi-codegen --config api/oapi-codegen.yaml $(CONTRACT_ADMIN)
+	go tool oapi-codegen --config api/oapi-codegen-bff.yaml $(CONTRACT_BFF)
+	$(OPENAPI_TS) $(CONTRACT_BFF) -o $(BFF_TYPES)
 
 # Le client de l'API Admin est engendré et **commité** : quatre des cinq jobs Go de la CI n'ont pas
 # `node_modules`, donc pas le contrat, et sans le fichier commité ils ne compileraient plus.
 # Le régénérer et constater qu'il n'a pas bougé est la seule façon de savoir que ce qui est commité
 # correspond au contrat installé — un bump du paquet npm sans régénération passerait sinon inaperçu.
+#
+# Le serveur Go et les types TypeScript du BFF sont dans la même liste, pour une raison voisine et
+# non identique : le contrat du BFF est écrit ici, donc rien ne bouge sous les pieds du dépôt —
+# mais les fichiers engendrés le sont par une **commande** qu'il faut penser à relancer.
+#
+# Ce que cette porte tient, et ce qu'elle ne tient pas. Elle rend rouge un `api/openapi-bff.yaml`
+# modifié sans régénération — mais pas seule : le scénario godog de `cmd/dashboard` charge le
+# contrat directement, et un champ ajouté que le serveur ne rend pas le fait tomber tout seul
+# (mesuré, `required: [status, uptime_seconds]` → « missing property 'uptime_seconds' »).
+# À l'inverse,
+# une classe de modification lui échappe entièrement : ni l'un ni l'autre générateur ne lit l'URL de
+# `servers`, dont dépend pourtant le préfixe sous lequel tout le contrat est servi.
+# Mesuré, `- url: /api` remplacé par `- url: /v1` → porte **verte**, sorties identiques, et le
+# scénario godog rouge sur « le contrat ne décrit pas GET /api/health ». C'est lui, pas cette porte,
+# qui tient le lien entre le préfixe du contrat et le `r.Route("/api", …)` du routeur.
 #
 # Même forme que `check-routes`, et pour la même raison : le fichier est **supprimé** avant d'être
 # reconstruit, jamais seulement comparé. Une comparaison seule reste verte quand plus rien ne
@@ -252,16 +295,26 @@ generate: ## Engendre le client Go de l'API Admin depuis le contrat installé
 # retour. Mesuré hors dépôt : `git diff --quiet HEAD` rend 1, `git status --porcelain` rend 128 avec un
 # stdout vide. D'où le code de retour capturé à part du contenu : un `test -z` sur la seule
 # substitution rendait la porte **verte** sur un client divergent, l'arbre restant régénéré à tort.
-check-generated: ## Vérifie que le client de l'API Admin commité est à jour et régénéré
-	@rm -f $(ADMIN_CLIENT)
-	@$(MAKE) --no-print-directory generate \
-		|| { git checkout -- $(ADMIN_CLIENT) 2>/dev/null; exit 1; }
-	@state=$$(git status --porcelain -- $(ADMIN_CLIENT)) || { \
-		echo "git n'a pas rendu l'état de $(ADMIN_CLIENT) — verdict inconnu, pas vert"; \
+#
+# Le rétablissement après un échec de génération se fait **fichier par fichier**, et sans étouffer
+# ce que git écrit. `git checkout -- <a> <b> <c>` est atomique sur le pathspec : un seul chemin
+# inconnu de l'index — la sortie qu'une step vient d'ajouter à `$(GENERATED)` sans l'avoir encore
+# commitée — et git refuse le lot entier. Mesuré, `api.gen.ts` désindexé et le contrat rendu
+# illisible : `error: pathspec … did not match any file(s) known to git` avalé par le `2>/dev/null`,
+# `bff.gen.go` resté supprimé, et `go build ./...` sur `undefined: HealthRequestObject`. La boucle
+# rétablit les autres et laisse git nommer celui qu'il ne peut pas rétablir.
+check-generated: ## Vérifie que ce qui dérive des contrats OpenAPI est à jour et régénéré
+	@rm -f $(GENERATED)
+	@$(MAKE) --no-print-directory generate || { \
+		for generated in $(GENERATED); do git checkout -- $$generated; done; \
+		exit 1; \
+	}
+	@state=$$(git status --porcelain -- $(GENERATED)) || { \
+		echo "git n'a pas rendu l'état de $(GENERATED) — verdict inconnu, pas vert"; \
 		exit 1; \
 	}; \
 	test -z "$$state" || { \
-		echo "le client régénéré diffère du fichier commité — lancer make generate et commiter $(ADMIN_CLIENT)"; \
+		echo "du code engendré diffère de ce qui est commité — lancer make generate et commiter"; \
 		echo "$$state"; \
 		exit 1; \
 	}

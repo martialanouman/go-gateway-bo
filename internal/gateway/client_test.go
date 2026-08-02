@@ -96,8 +96,9 @@ func TestAdminClientAuthenticatesWithoutTokenEndpointInMockMode(t *testing.T) {
 // Le mode est ce qui décide du mTLS et du jeton : la valeur zéro doit tomber du côté strict.
 //
 // `config.Load` replie l'absence sur `real` et refuse tout autre littéral, mais cette polarité ne
-// traverse pas la frontière du package — NewAdminClient prend une struct nue, que les tests
-// construisent déjà à la main et qu'un helper de step-004 construira partiellement. Un `Mode` vide
+// traverse pas la frontière du package — NewAdminClient prend une struct nue, que rien n'oblige à
+// venir de `config.Load`. Mesuré le 02/08/2026 : seuls les tests de ce package la construisent, et
+// `internal/gateway` n'a toujours aucun importeur hors de lui-même. Un `Mode` vide
 // qui prendrait le chemin `mock` joindrait une passerelle de production sans certificat client et
 // avec le jeton factice en en-tête.
 func TestAdminClientRefusesAnUnknownGatewayMode(t *testing.T) {
@@ -205,7 +206,7 @@ func TestAdminClientRefusesAPlaintextGatewayInRealMode(t *testing.T) {
 //
 // Conséquence à ce jour : un déploiement en `real` dont `DASHBOARD_GATEWAY_CLIENT_CERT` pointe sur
 // un chemin inexistant démarre sans un mot. Le manque est un **appelant**, pas une garde — la
-// première route qui joint la passerelle arrive en step-004, et c'est son câblage qui donnera à ce
+// première route qui joint la passerelle arrive en step-060, et c'est son câblage qui donnera à ce
 // refus un moment de démarrage où s'exercer. Construire le client dans `main` avant qu'une route ne
 // l'utilise serait du code mort.
 func TestAdminClientRefusesIncompleteMutualTLSMaterial(t *testing.T) {

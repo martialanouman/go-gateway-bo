@@ -265,6 +265,17 @@ Conséquences :
 - Le corps d'un message n'a de champ que dans le seul DTO de l'écran qui l'affiche.
 - La règle est vérifiable mécaniquement : un test refuse `map[string]any` et l'embedding de struct
   dans un type de réponse.
+
+  > **Amendement du 02/08/2026, par step-004 qui a posé ce test.** La règle livrée est plus large sur
+  > un point et plus étroite sur l'autre. Plus large : elle refuse `map` ou `any` **à n'importe quelle
+  > profondeur de champ**, là où la formulation ci-dessus laisse lire « un type de réponse qui *est*
+  > une map ». Plus étroite : elle **tolère** l'embarquement d'un type que le générateur écrit —
+  > mesuré, un `$ref` vers `components/responses/*` engendre exactement cette forme, et une garde qui
+  > la refuse obligerait à dé-factoriser le contrat ou serait désactivée.
+  >
+  > Ce que le test ne couvre pas, et qu'aucune porte ne couvre : un type de réponse **sans champ**
+  > dont la méthode de sérialisation écrit ce qu'elle veut sur le fil. Le mode strict retire le
+  > `ResponseWriter` de la signature du *handler*, pas de celle du *type de réponse*.
 - Ce qui était une discipline à tenir sur 133 endpoints devient une propriété que le compilateur et
   un test unique garantissent.
 
