@@ -7,7 +7,7 @@
     "root": ".."
   },
   "files": {
-    "includes": ["**", "!**/routeTree.gen.ts", "!src/lib/api.gen.ts", "!.claude"]
+    "includes": ["**", "!**/*.gen.ts", "!.claude"]
   },
   "formatter": {
     "enabled": true,

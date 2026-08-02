@@ -30,9 +30,15 @@ BFF_SERVER := internal/bff/bff.gen.go
 BFF_TYPES := web/src/lib/api.gen.ts
 OPENAPI_TS := web/node_modules/.bin/openapi-typescript
 
+# Le catalogue de permissions est la seule sortie engendrée qui ne dérive **pas** d'un contrat
+# OpenAPI : sa source est du Go, sous `internal/permissions/`. Elle n'exige donc ni `node_modules` ni
+# le contrat, d'où sa propre cible plus bas — mais elle entre dans la même liste, parce que ce qui
+# tient ce front est `check-generated` et rien d'autre.
+PERMISSIONS_TS := web/src/lib/permissions.gen.ts
+
 # Ce que `check-generated` supprime, régénère et compare. Une liste plutôt qu'un fichier : le jour où
 # une step en ajoute un, l'oublier ici le laisserait diverger sans que rien ne rougisse.
-GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER) $(BFF_TYPES)
+GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER) $(BFF_TYPES) $(PERMISSIONS_TS)
 
 # Le mock de l'API Admin, et le port que `.env.example` vise avec `DASHBOARD_GATEWAY_BASE_URL`.
 #
@@ -261,6 +267,23 @@ generate: ## Engendre le client Go de l'API Admin, et le serveur Go comme les ty
 	go tool oapi-codegen --config api/oapi-codegen.yaml $(CONTRACT_ADMIN)
 	go tool oapi-codegen --config api/oapi-codegen-bff.yaml $(CONTRACT_BFF)
 	$(OPENAPI_TS) $(CONTRACT_BFF) -o $(BFF_TYPES)
+	@$(MAKE) --no-print-directory generate-permissions
+
+# Une cible à part, et non trois lignes de plus dans `generate` : celle-ci est du **Go pur**, quand
+# la recette ci-dessus s'ouvre sur une garde qui refuse de démarrer sans `pnpm install`. L'y fondre
+# coupleraient à `node_modules` une commande qui n'en a aucun besoin — un développeur qui ajoute une
+# clé au catalogue devrait installer la toolchain JS pour régénérer.
+#
+# Ce qui tient réellement le front Go↔TS n'est ni l'une ni l'autre : c'est `check-generated`, qui
+# supprime puis régénère et lit `git status`. La cible séparée ne coûte donc aucune garantie, et
+# `$(PERMISSIONS_TS)` est dans `$(GENERATED)`.
+#
+# Le chemin est passé en **argument** plutôt que codé dans le générateur : il existerait sinon aux
+# deux endroits, qui se croiraient d'accord. Et pas par une redirection — `>` tronque la cible avant
+# que la commande démarre, donc un générateur qui échoue laisserait un fichier vide après avoir
+# détruit l'état précédent.
+generate-permissions: ## Engendre les types TS du catalogue de permissions (Go pur, sans pnpm)
+	go run ./cmd/permissionsgen $(PERMISSIONS_TS)
 
 # Le client de l'API Admin est engendré et **commité** : quatre des cinq jobs Go de la CI n'ont pas
 # `node_modules`, donc pas le contrat, et sans le fichier commité ils ne compileraient plus.

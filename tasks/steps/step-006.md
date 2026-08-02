@@ -66,6 +66,20 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | `Categories()` triée au lieu de l'ordre d'affichage | `TestCategoriesListsExactlyWhatTheKeysCarry` |
 | Une description vidée | `TestEveryEntryCarriesADescription` |
 | `categoryCheck` ne reconnaît plus le `CHECK` (`categorie`) | les deux cas SQL, via le `require.Len(constraints, 1)` — le filet du test lui-même |
+| **U2** · largeur de ligne comptée en octets au lieu de points de code | `TestADescriptionIsWrappedExactlyWhereBiomeWouldWrapIt`, `TestTheCommittedFileIsWhatTheGeneratorProduces`, **et Biome réécrit la sortie** |
+| **U2** · l'indentation de continuation passe de 6 à 4 espaces | trois cas, **et Biome réécrit** |
+| **U2** · les catégories passent par une `map` (ordre non déterministe) | `TestTwoRunsProduceTheSameBytes` et deux autres |
+| **U2** · le refus du guillemet droit retiré | `TestAStraightApostropheInADescriptionIsRefused` |
+| **U2** · la garde sur le nombre d'arguments retirée | `TestTheCommandRefusesToGuessItsOutputPath`, plus le `panic: index out of range` que son commentaire annonçait |
+| **U3** · *(avant câblage)* catalogue Go modifié, TS non régénéré | **`check-generated` rend 0** — le défaut que cette step existe pour fermer, constaté avant de le corriger |
+| **U3** · *(après câblage)* la même | `check-generated` rend 2 : « du code engendré diffère de ce qui est commité » |
+| **U3** · le TS engendré édité à la main **et indexé** *(le scénario réel — la CI ne voit que ce qui est commité)* | `check-generated` rend 2, **et** `tsc` rend `TS2820: Type '"audit:raed"' is not assignable to type 'PermissionKey'` — deux portes indépendantes |
+
+**Une mutation d'abord mal construite, et ce qu'elle a appris.** Éditer le TS engendré **sans**
+l'indexer laisse `check-generated` **vert** : la porte supprime et régénère avant de comparer, donc
+elle rétablit l'édition avant de la voir. Ce n'est pas un trou — la CI ne voit que ce qui est
+commité, et le scénario réel rougit — mais la première mutation ne reproduisait pas le défaut réel,
+et elle se lisait comme un succès de la porte. Refaite avec `git add`, elle mord.
 
 ## Design arrêté (2026-08-02)
 
