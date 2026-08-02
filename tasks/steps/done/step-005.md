@@ -53,10 +53,13 @@ de bord ne lit **jamais** la base de la passerelle (§1.3).
   ne le passe pas par `argv`.
 
 ## Definition of Done
-- [ ] `make check` vert, base jetable comprise
-- [ ] `docker compose up` + migrations suffit sur un poste neuf, et la procédure est dans le README
-- [ ] le choix d'outil de migration est **écrit** avec sa raison, pas seulement fait
-- [ ] la mutation « ne pas créer la partition du mois suivant » fait rougir la suite
+- [x] `make check` vert, base jetable comprise — `internal/store` 44,6 s, `cmd/migrate` 4,5 s, arbre
+      propre après `check-generated`
+- [x] `docker compose up` + migrations suffit sur un poste neuf, et la procédure est dans le README
+- [x] le choix d'outil de migration est **écrit** avec sa raison, pas seulement fait — DN-1, et
+      `tasks/plan.md` §19 ne le donne plus pour ouvert
+- [x] la mutation « ne pas créer la partition du mois suivant » fait rougir la suite — et, ajoutée en
+      revue, celle qui remet l'arithmétique en `timestamptz` la fait rougir **sous les deux fuseaux**
 
 ## Hors périmètre
 Le seed des permissions et des rôles → step-020. La rétention et le détachement des partitions →
