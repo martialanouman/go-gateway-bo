@@ -164,16 +164,33 @@ func TestLoadGateway(t *testing.T) {
 	})
 
 	// La vraie API porte le préfixe `/v1` (servers[0].url du contrat) là où le mock Prism sert sans
-	// préfixe : le chemin appartient donc à l'URL configurée, et rien ici n'a le droit de le raboter.
-	t.Run("conserve le préfixe de chemin de l'URL de base", func(t *testing.T) {
+	// préfixe : l'URL de base est rendue telle qu'elle est écrite, et rien ici ne la réécrit. Le
+	// schéma en capitales est la seule entrée qui distingue ce rendu de `parsed.String()` : net/url
+	// minuscule le schéma ($GOROOT/src/net/url/url.go:454, mesuré en go1.26.5), et laisse tout le
+	// reste identique sur une URL bien formée.
+	t.Run("rend l'URL de base verbatim plutôt que la forme reconstruite", func(t *testing.T) {
 		t.Parallel()
 
-		cfg, err := config.Load(lookupFrom(envWith(realGatewayEnv(), map[string]string{
-			config.EnvGatewayBaseURL: "https://admin.gateway.internal/v1",
+		cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+			config.EnvGatewayBaseURL: "HTTP://127.0.0.1:4010/v1",
 		})))
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://admin.gateway.internal/v1", cfg.Gateway.BaseURL)
+		assert.Equal(t, "HTTP://127.0.0.1:4010/v1", cfg.Gateway.BaseURL)
+	})
+
+	// Le pendant du refus de `http://` en mode `real` : la garde compare le schéma comme le fait
+	// net/url, sans casse. Plus stricte, elle refuserait une URL que le reste du programme joint
+	// parfaitement — et une garde qui refuse du légitime finit par être retirée.
+	t.Run("accepte une URL de base en https quelle qu'en soit la casse", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(envWith(realGatewayEnv(), map[string]string{
+			config.EnvGatewayBaseURL: "HTTPS://admin.gateway.internal/v1",
+		})))
+
+		require.NoError(t, err)
+		assert.Equal(t, "HTTPS://admin.gateway.internal/v1", cfg.Gateway.BaseURL)
 	})
 
 	// La polarité de DN-9 : une production qui oublie la variable tombe du côté strict. Le défaut
@@ -332,6 +349,14 @@ func TestLoadRejectsMalformedValues(t *testing.T) {
 		},
 		"une URL de base dans un autre protocole": {
 			overrides: map[string]string{config.EnvGatewayBaseURL: "ftp://admin.gateway.internal/v1"},
+			mention:   config.EnvGatewayBaseURL,
+		},
+		// http.Transport ne consulte pas son tls.Config quand le schéma est `http` : le mTLS
+		// disparaîtrait sans un mot, et le jeton machine partirait en clair sur chaque appel à l'API
+		// Admin — le même jeton que la ligne ci-dessous protège à son obtention.
+		"une URL de base en clair en mode real": {
+			base:      realGatewayEnv(),
+			overrides: map[string]string{config.EnvGatewayBaseURL: "http://admin.gateway.internal/v1"},
 			mention:   config.EnvGatewayBaseURL,
 		},
 		"une URL de jeton sans schéma": {

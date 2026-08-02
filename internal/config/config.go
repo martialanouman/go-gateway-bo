@@ -106,6 +106,7 @@ func Load(lookup Lookup) (Config, error) {
 	}
 
 	r.requireRealGatewayMaterial(cfg.Gateway.Mode)
+	r.requireEncryptedGatewayBaseURL(cfg.Gateway.Mode, cfg.Gateway.BaseURL)
 
 	if err := errors.Join(r.problems...); err != nil {
 		return Config{}, fmt.Errorf("configuration invalide :\n%w", err)
@@ -187,6 +188,26 @@ func (r *reader) requireRealGatewayMaterial(mode GatewayMode) {
 		if r.optional(name) == "" {
 			r.reject(name, "variable obligatoire absente en mode %s", GatewayModeReal)
 		}
+	}
+}
+
+// requireEncryptedGatewayBaseURL refuse une passerelle réelle jointe en clair. Le schéma est admis
+// inconditionnellement plus haut — `http` reste la normale du mock Prism — et c'est ici, le mode
+// connu, qu'il se restreint : http.Transport ne consulte pas son tls.Config quand l'URL est en
+// `http`, si bien que le matériel mTLS serait chargé, posé, et jamais présenté, pendant que le jeton
+// machine et ses cinq scopes partiraient en clair à chaque appel. Rien ne tomberait.
+func (r *reader) requireEncryptedGatewayBaseURL(mode GatewayMode, baseURL string) {
+	// Une URL absente ou déjà refusée est rendue vide : la redire ferait deux lignes pour un problème.
+	if mode != GatewayModeReal || baseURL == "" {
+		return
+	}
+
+	// Le schéma est ce qui précède le premier `:` — la valeur a déjà traversé absoluteURL, donc elle
+	// s'analyse. La comparaison ignore la casse comme le fait net/url, qui minuscule le schéma
+	// ($GOROOT/src/net/url/url.go:454) : `HTTPS://` a passé la garde ci-dessus, refuser ici serait
+	// refuser une URL que le programme joint parfaitement.
+	if scheme, _, _ := strings.Cut(baseURL, ":"); !strings.EqualFold(scheme, "https") {
+		r.reject(EnvGatewayBaseURL, "URL absolue en https attendue en mode %s, reçu %q", GatewayModeReal, baseURL)
 	}
 }
 
