@@ -1,0 +1,56 @@
+# Le contrat du BFF : **la** frontière entre les deux moitiés du produit. Il est écrit à la main, et
+# les deux côtés en dérivent — les types serveur Go par `oapi-codegen`, les types client TypeScript
+# par `openapi-typescript`. L'inverse — dériver le contrat du code Go — ferait du serveur la source
+# de vérité et rendrait toute rupture invisible au client jusqu'à l'exécution.
+#
+# **Ce n'est pas le contrat de la passerelle.** Il en reprendra le vocabulaire (`link_status`,
+# `breaker_state`, §1.5) mais sa forme est celle dont l'écran a besoin : le BFF compose, filtre et
+# masque. Là où les deux formes divergeront, ce fichier le commentera.
+#
+# Les clés de chemin sont **relatives à `servers.url`**, qui porte le préfixe `/api`. C'est la forme
+# normale d'un document OpenAPI, et c'est aussi ce que la porte anti-copie de `internal/gateway`
+# reconnaît comme un contrat écrit ici plutôt qu'une copie de celui de la passerelle.
+openapi: 3.1.0
+
+info:
+  title: Tableau de bord Admin — API du BFF
+  version: 0.1.0
+  description: |
+    Surface servie au navigateur. Le client ne parle qu'à elle : le jeton machine, le mTLS et la base
+    vivent sous `internal/`, hors d'atteinte du bundle (invariant d).
+
+servers:
+  - url: /api
+    description: Relatif à l'origine qui a servi la SPA — le client n'écrit jamais d'adresse absolue.
+
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: Sonde de vivacité
+      description: |
+        Répond « le process est en vie », pas « le service est disponible ». Ne touche ni la base ni
+        la passerelle : y brancher une dépendance ferait redémarrer un serveur sain parce qu'une
+        autre brique est tombée. La sonde de disponibilité arrive en step-186.
+      responses:
+        '200':
+          description: Le process répond.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+components:
+  schemas:
+    Health:
+      type: object
+      description: Réponse de la sonde de vivacité.
+      additionalProperties: false
+      properties:
+        status:
+          # Un enum plutôt qu'une chaîne libre : il contraint la **valeur** et pas seulement la forme,
+          # ce qui donne du mordant à la validation de la réponse contre ce fichier. Les constantes
+          # engendrées sont préfixées de leur type (`always-prefix-enum-values`), sans quoi celle-ci
+          # s'appellerait `Ok` dans le paquet qui portera toutes les routes du produit.
+          type: string
+          enum: [ok]
+      required: [status]

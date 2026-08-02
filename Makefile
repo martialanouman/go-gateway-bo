@@ -18,6 +18,16 @@ WEBASSETS := internal/webassets/dist
 CONTRACT_ADMIN := web/node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml
 ADMIN_CLIENT := internal/gateway/client.gen.go
 
+# Le contrat du BFF, lui, est **écrit ici** et versionné : c'est nous qui le possédons, et les deux
+# moitiés du produit en dérivent. Il n'a donc aucune garde de présence — un arbre où il manque est un
+# arbre abîmé, pas un arbre où `pnpm install` n'a pas tourné.
+CONTRACT_BFF := api/openapi-bff.yaml
+BFF_SERVER := internal/bff/bff.gen.go
+
+# Ce que `check-generated` supprime, régénère et compare. Une liste plutôt qu'un fichier : le jour où
+# une step en ajoute un, l'oublier ici le laisserait diverger sans que rien ne rougisse.
+GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER)
+
 # Le mock de l'API Admin, et le port que `.env.example` vise avec `DASHBOARD_GATEWAY_BASE_URL`.
 #
 # Le binaire installé, jamais `npx` : celui-ci est prêt en ~1,0 s (mesuré le 02/08/2026) là où `npx`
@@ -67,11 +77,11 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 #    propres fixtures d'assets, puis les retire. La copie peut se terminer dans cette fenêtre, et le
 #    `go build` embarque alors la coquille du harnais — qui porte le même titre que la vraie. Rien ne
 #    distingue les deux à l'œil, et toutes les portes restent vertes.
-# 3. `check-generated` supprime `$(ADMIN_CLIENT)` avant de le régénérer — absent le temps d'un
-#    `make generate`, 0,67 s mesuré — pendant que `test-go`, `lint-go` et `vuln-go` compilent `./...`,
-#    `internal/gateway` compris.
+# 3. `check-generated` supprime `$(GENERATED)` avant de le régénérer — absent le temps d'un
+#    `make generate` — pendant que `test-go`, `lint-go` et `vuln-go` compilent `./...`.
 #    Celle-ci est **bruyante** : fichier retiré, `go build ./...` rend `undefined: ClientWithResponses`
-#    (mesuré). `build` n'est pas concerné, `./cmd/dashboard` n'important pas `internal/gateway`.
+#    (mesuré). Et depuis que `$(BFF_SERVER)` est de la partie, `build` en fait partie aussi :
+#    `./cmd/dashboard` importe `internal/bff`, contrairement à `internal/gateway` qu'il n'importe pas.
 #
 # Le prérequis est **omis**. `.NOTPARALLEL: check` n'honore ses prérequis qu'à partir de GNU make 4.4 ;
 # la 3.81 que livre macOS l'accepte sans rien dire et sérialise le run entier de toute façon. La forme
@@ -226,12 +236,13 @@ check-routes: ## Vérifie que l'arbre de routes commité est à jour et régén�
 # Le contrat est absent d'un arbre où `pnpm install` n'a pas tourné, et `oapi-codegen` dirait alors
 # seulement qu'il n'a pas su ouvrir un chemin. Ce que la recette annonce à la place est la sortie de
 # secours.
-generate: ## Engendre le client Go de l'API Admin depuis le contrat installé
+generate: ## Engendre le client Go de l'API Admin et le serveur Go du BFF
 	@test -f $(CONTRACT_ADMIN) || { \
 		echo "$(CONTRACT_ADMIN) est absent — le contrat vient de GitHub Packages : pnpm -C web install"; \
 		exit 1; \
 	}
 	go tool oapi-codegen --config api/oapi-codegen.yaml $(CONTRACT_ADMIN)
+	go tool oapi-codegen --config api/oapi-codegen-bff.yaml $(CONTRACT_BFF)
 
 # Le client de l'API Admin est engendré et **commité** : quatre des cinq jobs Go de la CI n'ont pas
 # `node_modules`, donc pas le contrat, et sans le fichier commité ils ne compileraient plus.
@@ -252,16 +263,16 @@ generate: ## Engendre le client Go de l'API Admin depuis le contrat installé
 # retour. Mesuré hors dépôt : `git diff --quiet HEAD` rend 1, `git status --porcelain` rend 128 avec un
 # stdout vide. D'où le code de retour capturé à part du contenu : un `test -z` sur la seule
 # substitution rendait la porte **verte** sur un client divergent, l'arbre restant régénéré à tort.
-check-generated: ## Vérifie que le client de l'API Admin commité est à jour et régénéré
-	@rm -f $(ADMIN_CLIENT)
+check-generated: ## Vérifie que le code Go engendré et commité est à jour et régénéré
+	@rm -f $(GENERATED)
 	@$(MAKE) --no-print-directory generate \
-		|| { git checkout -- $(ADMIN_CLIENT) 2>/dev/null; exit 1; }
-	@state=$$(git status --porcelain -- $(ADMIN_CLIENT)) || { \
-		echo "git n'a pas rendu l'état de $(ADMIN_CLIENT) — verdict inconnu, pas vert"; \
+		|| { git checkout -- $(GENERATED) 2>/dev/null; exit 1; }
+	@state=$$(git status --porcelain -- $(GENERATED)) || { \
+		echo "git n'a pas rendu l'état de $(GENERATED) — verdict inconnu, pas vert"; \
 		exit 1; \
 	}; \
 	test -z "$$state" || { \
-		echo "le client régénéré diffère du fichier commité — lancer make generate et commiter $(ADMIN_CLIENT)"; \
+		echo "du code engendré diffère de ce qui est commité — lancer make generate et commiter"; \
 		echo "$$state"; \
 		exit 1; \
 	}

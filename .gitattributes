@@ -1,12 +1,14 @@
-# Les deux fichiers engendrés et commités du dépôt, chacun gardé par sa porte de régénération
-# (`check-generated`, `check-routes`). Ce n'est pas leur présence qui est corrigée ici, c'est ce qu'un
-# relecteur voit : `client.gen.go` fait 32 009 lignes et ouvre le diff d'une PR qui le touche.
+# Les fichiers engendrés et commités du dépôt, chacun gardé par sa porte de régénération
+# (`check-generated` pour les deux sorties d'oapi-codegen, `check-routes` pour l'arbre de routes). Ce
+# n'est pas leur présence qui est corrigée ici, c'est ce qu'un relecteur voit : `client.gen.go` fait
+# 32 009 lignes et ouvre le diff d'une PR qui le touche.
 #
 # `linguist-generated=true` fait deux choses, et deux seulement — github-linguist/linguist,
 # `docs/overrides.md` : « Excluded from stats, hidden in diffs ». Le fichier sort des statistiques de
 # langage, et son diff est **replié** par défaut sur github.com, derrière le bouton « Load diff » :
 # replié parce qu'engendré, et non parce que gros — GitHub replie aussi les gros diffs, mais de sa
 # propre initiative et sans le dire. Rien ne change hors de l'affichage : ni `git diff`, ni les
-# portes, ni le suivi des deux fichiers.
+# portes, ni le suivi de ces fichiers.
 internal/gateway/client.gen.go linguist-generated=true
+internal/bff/bff.gen.go linguist-generated=true
 web/src/routeTree.gen.ts linguist-generated=true

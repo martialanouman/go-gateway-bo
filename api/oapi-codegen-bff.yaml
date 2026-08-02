@@ -1,0 +1,29 @@
+# Génération du serveur Go depuis le contrat du BFF. Un second fichier de configuration, et non une
+# clé de plus dans `oapi-codegen.yaml` : `output` y est scalaire, une configuration ne peut donc
+# décrire qu'une seule sortie.
+#
+# Les chemins sont relatifs au répertoire de travail, jamais à ce fichier — même remarque que pour la
+# configuration du client Admin, et même conséquence : les recettes partent de la racine.
+
+package: bff
+output: internal/bff/bff.gen.go
+
+# `chi-server` **et** `strict-server`. Le premier seul rend `Health(w http.ResponseWriter, r
+# *http.Request)` : un ResponseWriter nu, où rien n'empêche d'écrire ce qu'on veut. Le second rend
+# `Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)`, où le
+# type de réponse est celui qu'engendre le contrat — c'est la convention du DTO de sortie (§1.11)
+# tenue par le compilateur plutôt que par la discipline, et c'est l'objet de cette step.
+#
+# Mesuré : les deux ensemble n'ajoutent aucune dépendance, `chi/v5` et `oapi-codegen/runtime` étant
+# déjà directes. Pas d'`embedded-spec` : il figerait une copie du contrat dans le binaire.
+generate:
+  chi-server: true
+  strict-server: true
+  models: true
+
+compatibility:
+  # Sans cette option, `status: {enum: [ok]}` engendre une constante exportée nommée `Ok` — deux
+  # lettres, générique, dans le paquet qui portera à terme toutes les routes du produit. Mesuré : avec
+  # elle, c'est `HealthStatusOk`. Le préfixe est systématique et non « seulement en cas de conflit »,
+  # pour qu'un nom n'ait pas à changer le jour où un second enum entre en collision avec lui.
+  always-prefix-enum-values: true
