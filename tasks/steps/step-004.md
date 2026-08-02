@@ -174,6 +174,30 @@ dans le test et non dans le binaire : mesuré, le code engendré ne valide pas l
 et le middleware qui le ferait exigerait `embedded-spec: true`, c'est-à-dire une copie du contrat
 figée dans le binaire — ce que la règle d'or interdit.
 
+### DN-11 — `openapi-typescript` reçoit sa propre copie de TypeScript 5
+
+*(Décision prise pendant l'implémentation : le design supposait que le générateur tournerait, et
+c'est faux. Le fait n'avait pas été mesuré en phase 1 — la version, la quarantaine et l'audit
+l'avaient été, la compatibilité non.)*
+
+Mesuré sur l'arbre installé : `openapi-typescript@7.13.0` construit son AST avec **l'API du
+compilateur** TypeScript, qu'il déclare en `peerDependencies: { typescript: "^5.x" }`. Le dépôt est
+en **TypeScript 7.0.2**, le portage natif, dont le point d'entrée npm n'expose plus cette API —
+`Object.keys(require('typescript'))` rend `['version', 'versionMajorMinor']`, et le générateur meurt
+sur `Cannot read properties of undefined (reading 'createKeywordTypeNode')`. Aucune version publiée
+ne lève la contrainte.
+
+Le générateur reçoit donc sa **propre** copie de TypeScript 5.9.3, par un hook `readPackage` dans
+`web/.pnpmfile.cjs`. Deux voies plus légères ont été essayées et **mesurées inertes** — `overrides`
+et `packageExtensions` : une résolution de pair part du paquet importateur et ne consulte ni l'une ni
+l'autre. Le répertoire du store le dit, qui restait `openapi-typescript@7.13.0_typescript@7.0.2` et
+devient `openapi-typescript@7.13.0` avec le hook.
+
+Ce compilateur ne sert qu'à écrire le fichier de types : `pnpm typecheck` reste `tsc` en 7.0.2, et
+rien du produit ne traverse le 5.9.3. L'oubli du fichier est impossible en silence — le lockfile
+porte un `pnpmfileChecksum`, et `pnpm install --frozen-lockfile` échoue sur
+`ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` si le hook disparaît.
+
 ### DN-10 — Les deux dettes de step-003 sont reportées sur leur vrai porteur
 
 step-003 écrit que « l'extension du DTO d'erreur avec `errors[]` attend la route qui la servira » et

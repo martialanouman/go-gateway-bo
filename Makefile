@@ -24,9 +24,15 @@ ADMIN_CLIENT := internal/gateway/client.gen.go
 CONTRACT_BFF := api/openapi-bff.yaml
 BFF_SERVER := internal/bff/bff.gen.go
 
+# L'autre moitié qui dérive du même fichier. Le binaire installé, jamais `npx` — même raison que
+# `$(PRISM)` plus bas. Il vit sous `web/node_modules/`, ce qui range la génération des types client
+# du même côté que celle du client Go de l'API Admin : les deux exigent `pnpm install`.
+BFF_TYPES := web/src/lib/api.gen.ts
+OPENAPI_TS := web/node_modules/.bin/openapi-typescript
+
 # Ce que `check-generated` supprime, régénère et compare. Une liste plutôt qu'un fichier : le jour où
 # une step en ajoute un, l'oublier ici le laisserait diverger sans que rien ne rougisse.
-GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER)
+GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER) $(BFF_TYPES)
 
 # Le mock de l'API Admin, et le port que `.env.example` vise avec `DASHBOARD_GATEWAY_BASE_URL`.
 #
@@ -82,6 +88,8 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 #    Celle-ci est **bruyante** : fichier retiré, `go build ./...` rend `undefined: ClientWithResponses`
 #    (mesuré). Et depuis que `$(BFF_SERVER)` est de la partie, `build` en fait partie aussi :
 #    `./cmd/dashboard` importe `internal/bff`, contrairement à `internal/gateway` qu'il n'importe pas.
+#    `$(BFF_TYPES)` étend la même course au versant client — `typecheck-web` rend alors
+#    `error TS2307: Cannot find module './api.gen'` (mesuré). Bruyante aussi, donc.
 #
 # Le prérequis est **omis**. `.NOTPARALLEL: check` n'honore ses prérequis qu'à partir de GNU make 4.4 ;
 # la 3.81 que livre macOS l'accepte sans rien dire et sérialise le run entier de toute façon. La forme
@@ -233,21 +241,37 @@ check-routes: ## Vérifie que l'arbre de routes commité est à jour et régén�
 		exit 1; \
 	}
 
-# Le contrat est absent d'un arbre où `pnpm install` n'a pas tourné, et `oapi-codegen` dirait alors
-# seulement qu'il n'a pas su ouvrir un chemin. Ce que la recette annonce à la place est la sortie de
-# secours.
-generate: ## Engendre le client Go de l'API Admin et le serveur Go du BFF
-	@test -f $(CONTRACT_ADMIN) || { \
-		echo "$(CONTRACT_ADMIN) est absent — le contrat vient de GitHub Packages : pnpm -C web install"; \
-		exit 1; \
-	}
+# Le contrat de l'API Admin comme le générateur de types TypeScript sont absents d'un arbre où
+# `pnpm install` n'a pas tourné, et `oapi-codegen` comme le shell diraient alors seulement qu'ils
+# n'ont pas su ouvrir un chemin. Ce que la recette annonce à la place est la sortie de secours.
+#
+# Cette cible dépend donc des **deux** toolchains, et depuis les types client de `$(BFF_TYPES)` elle
+# en dépend même pour la moitié BFF du contrat. Ça ne change rien à la répartition des jobs :
+# `generate` et `check-generated` n'apparaissent nulle part ailleurs que dans « Build client et
+# déployable », qui a Go, pnpm et `node_modules` — vérifié, `grep -rn 'make generate\|check-generated'
+# .github` ne rend que la ligne `- run: make check-generated` de ce job.
+generate: ## Engendre les deux sorties Go du contrat et les types TypeScript du BFF
+	@for required in $(CONTRACT_ADMIN) $(OPENAPI_TS); do \
+		test -f "$$required" || { \
+			echo "$$required est absent — il vient de pnpm : pnpm -C web install"; \
+			exit 1; \
+		}; \
+	done
 	go tool oapi-codegen --config api/oapi-codegen.yaml $(CONTRACT_ADMIN)
 	go tool oapi-codegen --config api/oapi-codegen-bff.yaml $(CONTRACT_BFF)
+	$(OPENAPI_TS) $(CONTRACT_BFF) -o $(BFF_TYPES)
 
 # Le client de l'API Admin est engendré et **commité** : quatre des cinq jobs Go de la CI n'ont pas
 # `node_modules`, donc pas le contrat, et sans le fichier commité ils ne compileraient plus.
 # Le régénérer et constater qu'il n'a pas bougé est la seule façon de savoir que ce qui est commité
 # correspond au contrat installé — un bump du paquet npm sans régénération passerait sinon inaperçu.
+#
+# Les types TypeScript du BFF sont dans la même liste, pour une raison voisine et non identique : le
+# contrat du BFF, lui, est écrit ici, donc rien ne bouge sous les pieds du dépôt — mais le fichier
+# engendré est édité par une **commande** qu'il faut penser à relancer. C'est cette porte, et elle
+# seule, qui rend rouge un `api/openapi-bff.yaml` modifié sans régénération. Mesuré : le versant Go
+# ne suffit pas à l'attraper, `oapi-codegen` et `openapi-typescript` lisant le même fichier mais
+# écrivant dans deux arbres que rien ne relie.
 #
 # Même forme que `check-routes`, et pour la même raison : le fichier est **supprimé** avant d'être
 # reconstruit, jamais seulement comparé. Une comparaison seule reste verte quand plus rien ne
@@ -263,7 +287,7 @@ generate: ## Engendre le client Go de l'API Admin et le serveur Go du BFF
 # retour. Mesuré hors dépôt : `git diff --quiet HEAD` rend 1, `git status --porcelain` rend 128 avec un
 # stdout vide. D'où le code de retour capturé à part du contenu : un `test -z` sur la seule
 # substitution rendait la porte **verte** sur un client divergent, l'arbre restant régénéré à tort.
-check-generated: ## Vérifie que le code Go engendré et commité est à jour et régénéré
+check-generated: ## Vérifie que tout ce qui est engendré et commité est à jour et régénéré
 	@rm -f $(GENERATED)
 	@$(MAKE) --no-print-directory generate \
 		|| { git checkout -- $(GENERATED) 2>/dev/null; exit 1; }
