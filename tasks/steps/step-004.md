@@ -56,6 +56,71 @@ Les routes métier — chacune arrive avec sa step. L'authentification → M1. L
 instancié → la première step qui livre un écran appelant le BFF (voir l'amendement du périmètre et
 DN-6). La validation des **requêtes** entrantes contre le schéma, à l'exécution → DN-9.
 
+## Tableau des mutations
+
+Tenu au fil de l'eau. Une ligne « aucune porte ne rougit » est un constat de la DoD (critère 4), pas
+un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dessus de la ligne concernée.
+
+### La chaîne de génération
+
+| Mutation appliquée (le défaut réel qu'elle rejoue) | Ce qui tombe |
+|---|---|
+| Le contrat gagne un champ, personne ne régénère | `check-generated` → **exit 2**, en nommant `internal/bff/bff.gen.go` **et** `web/src/lib/api.gen.ts` |
+| Une divergence qui ne touche **que** la sortie TypeScript | `check-generated`, en nommant le seul fichier TS |
+| Le serveur BFF retiré de la liste surveillée | **rien** — la divergence passe : c'est le défaut que la liste ferme |
+| Les types TS retirés de la liste surveillée | **rien** — idem |
+| La ligne de génération TypeScript retirée de `make generate` | `check-generated` (` D`) |
+| Le fichier engendré jamais ajouté à l'index | `check-generated` (`??`) |
+
+### Le handler et le scénario
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| Le handler rend un statut **hors de l'enum** | le scénario, **sur la validation** : `at '/status': value must be 'ok'` |
+| Un champ en trop dans le corps | `additional properties 'leak' not allowed` — `additionalProperties: false` mord |
+| Le handler monté **à la racine** au lieu de sous `/api` | 2 tests unitaires **et les 7 scénarios** |
+| `IncludeResponseStatus` retiré du validateur | un statut non documenté passe — c'est l'option qui l'empêche |
+| Le validateur neutralisé **et** le statut changé | le second `Alors`, témoin indépendant d'un validateur devenu inerte |
+| `api.NotFound(handleUnknownAPIRoute)` retiré | `TestUnknownAPIRouteIsNotFound` seul — **aucun scénario ne rougit**, vérifié : `la réponse n'est pas une page HTML` reste vraie du 404 nu de chi |
+| Le `; charset=utf-8` remis | un test unitaire seul — **aucun scénario ne rougit**, vérifié : `kin-openapi` ampute les paramètres du media type avant de chercher le schéma |
+
+### Les trois portes structurelles
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| Le fixture divergent est rendu **compilable** | « le fixture divergent a compilé, la garantie du contrat ne tient plus » |
+| Le fixture divergent échoue pour une **autre raison** (mauvais import) | l'assertion de message : `…no required module provides package… does not contain does not implement` |
+| Le **témoin positif** est cassé | « le témoin positif ne compile pas » |
+| Un type de réponse à sous-jacent `map` | `Object expected to be of type *types.Struct, but was *types.Map` |
+| Un type de réponse avec un champ anonyme | « embarque Secrets : les champs ajoutés au type embarqué fuiraient sans relecture » |
+| La population d'interfaces vidée | « aucune interface `ResponseObject…` » — un analyseur qui ne trouve rien est cassé, pas vert |
+| La population de types concrets vidée | `"0" is not positive` |
+| `Unimplemented` embarqué à la profondeur 1, puis 2 | la garde de réflexion, aux deux profondeurs |
+
+### Les trois mesures qui ont corrigé DN-2
+
+Deux agents s'étaient contredits ; aucun n'avait entièrement raison.
+
+| Cas mesuré | Résultat |
+|---|---|
+| Deux types embarqués au même niveau | `ambiguous selector` — **ne compile pas** |
+| `Unimplemented` seul contre `StrictServerInterface` | **ne compile pas** : `wrong type for method Health`, signatures non-strict |
+| Un type qui embarque `Unimplemented` **et** déclare la méthode | **compile** — le membre de profondeur 0 masque le promu. C'est le seul cas que la garde attrape |
+| `HandlerFromMux(Unimplemented{}, api)` — le danger réel | `TestHealthProbe` (`actual : 501`) **et** les scénarios (« la sonde de vivacité rend 501 ») |
+
+### Mutations rejetées comme invalides
+
+Quatre, plutôt que comptées :
+
+- **muter le fichier engendré** ne prouve rien — la porte le supprime et le régénère, écrasant la
+  mutation ;
+- **ajouter un schéma non référencé** au contrat ne prouve rien non plus — oapi-codegen l'élague, la
+  sortie ne bouge pas. La mutation doit changer ce que la génération **produit** ;
+- `false && A || B` est équivalent à `B` par précédence : la mutation était un no-op, et le rouge
+  attendu est sorti vert ;
+- une assertion de typage a été **retirée** plutôt que gardée : aucune mutation ne la faisait tomber
+  seule, et le commentaire qui la justifiait affirmait le contraire.
+
 ## Design arrêté (2026-08-02)
 
 Chaque décision cite la mesure qui la fonde. Les points que la spec ne tranchait pas ont été soumis
