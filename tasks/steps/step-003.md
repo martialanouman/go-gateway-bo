@@ -1,6 +1,6 @@
 # step-003 — Contrat Admin : client Go généré, OAuth2 + mTLS, mock Prism
 
-> **Jalon :** M0 (§3.2, §5.1) · **Statut :** À FAIRE
+> **Jalon :** M0 (§3.2, §5.1) · **Statut :** LIVRÉE (02/08/2026)
 > **Dépend de :** step-000 · **Bloque :** toute step appelant la passerelle
 
 ## But
@@ -16,9 +16,10 @@ condition de faisabilité du projet (`plan.md` §16).
   avant expiration, renouvellement non concurrent) + **mTLS**. Base URL, identifiants et CA par
   configuration (§1.8).
 - Traduction de l'enveloppe plate `{ code, message, errors[] }` vers une erreur typée du BFF (§1.4),
-  réexposée dans la **même forme** au client. Le contrat 2.x **déclare les réponses d'erreur par
-  opération** — 401, 403, 404, 409, 422 — plus `ServiceUnavailable` : le mapping les couvre toutes, et
-  **distingue `ServiceUnavailable` d'un module désactivé** (§1.4), qui n'est pas une erreur.
+  réexposée dans la **même forme** au client — *la réexposition elle-même attend step-004, faute de
+  route à servir : voir DN-12*. Le contrat 2.x **déclare les réponses d'erreur par opération** — 401,
+  403, 404, 409, 422 — plus `ServiceUnavailable` : le mapping les couvre toutes, et **distingue
+  `ServiceUnavailable` d'un module désactivé** (§1.4), qui n'est pas une erreur.
 - Timeouts courts, retry **seulement** sur les méthodes idempotentes.
 - `make mock` : Prism sur le même YAML ; bascule réel/mock par configuration.
 
@@ -44,10 +45,46 @@ condition de faisabilité du projet (`plan.md` §16).
 - Un test échoue si un YAML de contrat est copié dans le dépôt.
 
 ## Definition of Done
-- [ ] `make check` vert · `make mock` sert les 133 opérations
-- [ ] aucun secret dans le dépôt ; identifiants et CA par configuration
-- [ ] le code généré est à jour, vérifié en CI
-- [ ] la mutation « rendre le renouvellement concurrent » fait rougir le test de jeton
+- [x] **`make check` vert** (02/08, onze portes) · **`make mock` sert les 133 opérations** —
+      `TestTheMockServesEveryOperationTheContractDeclares` confronte deux sources (les routes que
+      Prism annonce au démarrage, les `operationId:` que le contrat déclare : **133 = 133**) puis
+      **interroge** chacune : aucun refus de routage. *Ce que la sonde ne prouve pas est écrit dans le
+      test : elle établit le routage, pas la validité de chaque réponse. Et elle lance le binaire de
+      Prism sur un port libre, pas la cible `make mock` elle-même — même contrat, même binaire.*
+- [x] **aucun secret dans le dépôt ; identifiants et CA par configuration** —
+      `TestVariablesListsEveryNameLoadReads`, `TestDotenvExampleListsExactlyWhatLoadReads`,
+      `TestLoadGateway/nomme_chaque_variable_que_le_mode_real_exige_et_qui_manque`,
+      `TestLoadGateway/ne_recopie_jamais_le_secret_client_dans_le_message`, et le scénario godog
+      « la passerelle réelle sans identifiants empêche le démarrage », qui exerce le **binaire
+      compilé**. *La première moitié — « aucun secret dans le dépôt » — n'a pas de porte : rien ne
+      cherche un secret dans l'arbre. Elle est tenue par `.gitignore` et par des valeurs vides dans
+      `.env.example`, ce qui est un état, pas une garde. Dit plutôt que coché en silence.*
+- [x] **le code généré est à jour, vérifié en CI** — `make check-generated`, qui **supprime avant de
+      régénérer** et lit son verdict dans `git status` ; câblée au job « Build client et déployable ».
+      Quatre mutations la tiennent, dont celle où `git` échoue.
+- [x] **la mutation « rendre le renouvellement concurrent » fait rougir le test de jeton** —
+      `TestAdminClientFetchesASingleTokenWhenConcurrentCallsFindItExpired` et
+      `TestAdminClientRenewsTheMachineTokenBeforeItExpires` : le compteur du faux endpoint passe de
+      2 à **9** sous concurrence, et de 1 à **3** hors concurrence.
+
+### Les quatre critères transverses de `CLAUDE.md`
+
+1. **Le chemin qu'un humain traverse est traversé pour de bon.** Cette step ne livre pas d'écran ; le
+   chemin humain qu'elle livre est celui de l'exploitant qui démarre le binaire mal configuré, et il
+   est exercé sur le **binaire compilé**, lancé par le harnais avec un environnement réel — rien de
+   simulé. Côté sortant, le mock Prism est la frontière autorisée. **À dire dans la PR** :
+   `cmd/dashboard` n'appelle jamais `NewAdminClient` ; la couture configuration → client n'a pas
+   encore de chemin produit, et c'est DN-12.
+2. **Toute affirmation sur le monde extérieur confrontée à sa source.** C'est ce qui a coûté le plus
+   cher ici : le bump du contrat est arrivé au huitième commit et n'a fait relire aucun texte qui
+   parlait du contrat. Cinq DN, quatre commentaires de code et six passages de documentation
+   affirmaient du faux ; tous ont été remesurés et corrigés, chacun citant sa mesure.
+3. **Mutation partout où le retrait laisserait la suite verte.** Le tableau ci-dessus, en deux
+   parties, avec trois lignes « aucune porte ne rougit » vérifiées et deux mutations rejetées comme
+   invalides.
+4. **Ce qui n'est pas testable est écrit là où il vit.** DN-14 recense quatre constats latents ; ils
+   sont dans le code, et non seulement dans cette fiche — parce qu'elle part dans `steps/done/` et
+   que la step qui appellera `add-credits` ne la lira pas.
 
 ## Hors périmètre
 Les trois flux `stream-*` → step-043. Les permissions par opérateur → step-025. Le contrat du BFF
@@ -78,7 +115,7 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | Mode absent replié sur `mock` (le défaut permissif que DN-9 écarte) | `un_mode_absent_vaut_real` |
 | Clémence du mode `mock` retirée (garde *trop large*) | 7 tests, dont `n'exige_que_l'adresse_du_mock_en_mode_mock` |
 | Une validation du secret qui cite sa valeur | `ne_recopie_jamais_le_secret_client…` |
-| Copie du contrat déposée dans le dépôt, puis **renommée**, puis ré-extensionnée | la porte anti-copie, 8/8 et 5/5 signatures — le nom n'y est pour rien |
+| Copie du contrat déposée dans le dépôt, puis **renommée**, puis ré-extensionnée | la porte anti-copie, sur **toutes** les signatures de l'échantillon — le nom n'y est pour rien. *(L'échantillon comptait 8 et 5 signatures au moment de cette mutation ; il en compte 28 et 7 depuis le correctif de revue trois lignes plus bas — la valeur d'alors est laissée, la mutation n'a pas été rejouée sur l'échantillon élargi.)* |
 | Contrat du BFF légitime + overlay déposés | la porte **passe** — le légitime n'est pas refusé |
 | Génération cassée (overlay retiré, configuration renommée, outil retiré de `tool`) | `check-generated`, qui régénère au lieu de comparer |
 | Une action de l'overlay ne cible plus rien | `does nothing` — le mode strict |
@@ -91,7 +128,7 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | Dédoublonnage de `config.Variables()` retiré | la porte `.env.example` — le commentaire qui le disait sans effet a été corrigé |
 | Drainage de la réponse abandonnée au rejeu (`discard`) retiré | **aucune porte ne rougit** — ce qu'il empêche s'observe sous charge ; écrit au-dessus de la fonction |
 | Branche `HEAD` du filtre de rejeu retirée | **aucune porte ne rougit** — le contrat ne déclare aucune opération HEAD ; écrit au-dessus de la fonction |
-| Garde de faute de frappe du harnais godog retirée | **aucune porte ne rougit** — elle protège l'auteur d'un futur scénario, pas un comportement du produit |
+| Garde de faute de frappe du harnais godog retirée | **aucune porte ne rougit** — elle protège l'auteur d'un futur scénario, pas un comportement du produit. Seule des trois lignes de ce genre à n'avoir pas son constat écrit au-dessus d'elle : il est ici, faute d'un endroit où il servirait mieux |
 
 ### Mutations des correctifs de revue
 
@@ -113,6 +150,25 @@ Un correctif est du code comme un autre : il repasse par le rouge et par la muta
 | Échantillon de signatures anti-copie ramené à 8 | `laisse passer une fiche de step` |
 | Seuil anti-copie relevé à « toutes les signatures » | `copie dont le contrat a bougé en amont` |
 | Capture du code de retour de `git` retirée de `check-generated` | la porte redevient **verte** sur un client divergent quand `git` échoue — le défaut revient |
+
+| `encryptedEndpoints` comparant `scheme != "https"`, sensible à la casse (garde *trop stricte*) | `RefusesAPlaintextGatewayInRealMode/accepte_un_schéma_en_majuscules` |
+| La même garde ne sortant plus tôt hors du mode `real` (garde *trop large*) | 5 tests du mode mock **et** les deux scénarios godog |
+| Seul `BaseURL` gardé, `TokenURL` laissé libre | `…/refuse_un_tokenUrl_joint_en_clair` — c'est par là que passe le secret client |
+| `encryptedEndpoints` jamais appelée (le défaut d'origine, côté client) | `…/refuse_une_API_jointe_en_clair` et `…/refuse_un_tokenUrl_joint_en_clair` |
+| `APIError.As` retirée (le défaut d'origine) | `TestErrorAsCatchesBothSpellings/la_cible_valeur` et `…/sous_une_erreur_enveloppée` |
+| `APIError.As` rendant `true` quel que soit le type de la cible | `…/ne_détourne_pas_la_cible_d'un_autre_type` |
+| `GoString` reprenant les seuls noms de champs sous forme de chaînes | `TestGoStringStaysGoSyntax` |
+| `redactedFields` recopiant le `FieldError` entier, message amont compris | `TestGoStringStaysGoSyntax`, `TestErrorRendersNoUpstreamFreeText/%#v` et `/la_valeur,_%#v` |
+| Branche `req.Context().Done()` de l'attente avant rejeu retirée | `TestAdminClientStopsWaitingWhenTheCallerGivesUp` |
+| Marque d'identité retirée du verdict anti-copie (le défaut d'origine) | `laisse_passer_un_contrat_du_BFF_à_chemins_relatifs` |
+| Marque d'identité rendant toujours `true` | idem |
+| Marque d'identité rendant toujours `false` | `reconnaît_une_copie_du_contrat_public/title` et `/url` |
+| Identité exigée en entier au lieu d'une marque (garde *trop stricte*) | `reconnaît_une_copie_du_contrat_public/title` et `/url` |
+| Moitié chemin de la signature anti-copie retirée | **aucune porte ne rougit** — annotation existante, re-vérifiée le 02/08 |
+
+Deux de ces mutations ont d'abord **survécu** — la cible d'un autre type, et l'identité exigée en
+entier. Les deux tests ont été renforcés, puis les mutations rejouées : c'est le tour de plus qui
+sépare une garde d'une garde prouvée.
 
 Une mutation de plus a été **rejetée** en cours de route : retirer `MarshalJSON` ne fait pas rougir
 le rendu `slog` JSON, qui est couvert **deux fois** (le marshaler s'il existe, `Error()` sinon). Le
@@ -153,7 +209,7 @@ propre step, jamais au milieu de celle-ci.
 
 ### DN-2 — Les deux collisions de noms Go se lèvent par un overlay OpenAPI local, pas par une copie
 
-oapi-codegen v2.8.0 parse ce contrat **OpenAPI 3.1** sans erreur — les 184 `type: [T, "null"]`
+oapi-codegen v2.8.0 parse ce contrat **OpenAPI 3.1** sans erreur — ses 181 `type: [T, "null"]`
 passent. Il échoue sur exactement **deux** collisions de noms Go, trouvées par itération.
 
 > **Correction du 01/08, mesurée pendant l'implémentation.** Cette décision affirmait d'abord que les
@@ -341,6 +397,14 @@ step-007 ne sont amputés.
 Calquée sur `make check-routes`, et pour la même raison écrite là-bas : une comparaison seule reste
 verte quand plus rien ne régénère. Le fichier est **supprimé**, régénéré, puis comparé au commité.
 
+### DN-12 — Ce que cette step ne livre pas, et pourquoi
+
+Le périmètre dit que l'erreur traduite est « réexposée dans la même forme au client ». Aucune route
+du BFF n'appelle encore la passerelle — la première arrive en step-004. Cette step livre donc
+l'**erreur typée** de `internal/gateway` ; l'extension du DTO `errorResponse` de `internal/bff` avec
+`errors[]` attend la route qui la servira, faute de quoi elle serait du code mort qu'aucun test ne
+peut exercer de bout en bout.
+
 ### DN-13 — En mode `mock`, le jeton est statique et visiblement factice
 
 *(Décision prise pendant l'implémentation ; elle vivait dans le code sans être consignée ici, ce
@@ -372,11 +436,3 @@ aussi **au-dessus de la ligne concernée** dans le code :
 - **`idempotency_key` est engendré non-pointeur et sans `omitempty`** sur les deux opérations de
   crédits que 2.5.0 a durcies : l'oublier compile et envoie l'UUID zéro, qui *a l'air valide*. Aucune
   de ces opérations n'est appelée en M0, mais la step qui les appellera doit le savoir.
-
-### DN-12 — Ce que cette step ne livre pas, et pourquoi
-
-Le périmètre dit que l'erreur traduite est « réexposée dans la même forme au client ». Aucune route
-du BFF n'appelle encore la passerelle — la première arrive en step-004. Cette step livre donc
-l'**erreur typée** de `internal/gateway` ; l'extension du DTO `errorResponse` de `internal/bff` avec
-`errors[]` attend la route qui la servira, faute de quoi elle serait du code mort qu'aucun test ne
-peut exercer de bout en bout.
