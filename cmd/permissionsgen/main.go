@@ -64,19 +64,28 @@ func start(args []string) error {
 
 // La largeur de `web/biome.json`, et les deux indentations que Biome pose autour d'une propriété
 // d'objet à cette largeur. Mesuré le 02/08/2026 avec Biome 2.5.5 : une ligne de propriété de 100
-// colonnes reste en place, une de 101 est reportée sur la ligne suivante avec six espaces. Émettre
-// l'une là où Biome émettrait l'autre rendrait `lint-web` et `check-generated` contradictoires,
-// chacune exigeant l'inverse de l'autre.
+// colonnes reste en place, une de 101 est reportée sur la ligne suivante avec six espaces.
+//
+// **Ce que ces trois constantes doivent à `lint-web`.** `web/src/lib/permissions.gen.ts` est
+// **inclus** dans le périmètre de Biome, là où `api.gen.ts` et `routeTree.gen.ts` en sont exclus —
+// c'est ce qui fait de `lint-web` la porte qui relie `lineWidth` ici à `formatter.lineWidth` là-bas.
+// L'inclusion tient à une mesure : reformaté par Biome, ce que ce générateur émet est
+// **byte-identique** au fichier commité (zéro ligne d'écart sur 310, mesuré le 02/08/2026), quand
+// `api.gen.ts` en diffère sur 112 lignes. Émettre l'une de ces deux formes là où Biome émettrait
+// l'autre rendrait `lint-web` et `check-generated` contradictoires, chacune exigeant l'inverse de
+// l'autre.
 const (
 	lineWidth       = 100
 	propertyIndent  = "    "
 	continuedIndent = "      "
 )
 
-// Les runes qu'un littéral TypeScript entre guillemets simples ne porte pas telles quelles. Le
-// guillemet droit est le cas réel : échappé, Biome réécrit le littéral entier en guillemets doubles
-// — mesuré le 02/08/2026, `'Voir l\'écran'` devient `"Voir l'écran"`. La copie du dépôt écrit
-// l'apostrophe typographique `’`, que la même mesure laisse intacte.
+// Les runes qu'un littéral TypeScript entre guillemets simples ne porte pas telles quelles. Elles
+// sont quatre, et chacune casse quelque chose de **différent** :
+// le guillemet droit fait réécrire le littéral entier en guillemets doubles par Biome ; l'antislash
+// laisse un fichier valide dont la valeur a changé en silence ; le saut de ligne et le retour
+// chariot rendent le fichier inanalysable. Les quatre mesures qui l'établissent, et les quatre cas
+// qui les exercent, sont dans `TestEveryRuneASingleQuotedLiteralCannotCarryIsRefused`.
 const forbiddenInLiteral = "'\\\n\r"
 
 const header = `/**
@@ -140,10 +149,12 @@ func render(entries []permissions.Entry, categories []permissions.Category) ([]b
 // Un membre par ligne, toujours — c'est ce qui fait d'une clé perdue une ligne supprimée nommée
 // dans le diff de la PR (DN-7), et c'est aussi ce que Biome émet aux tailles réelles du catalogue.
 //
-// **Aux tailles réelles seulement.** Mesuré : Biome replie sur une seule ligne une union qui tient
-// dans les 100 colonnes ; il faudrait descendre sous cinq catégories pour y arriver, et l'exclusion
-// `.gen.ts` de `web/biome.json` retire de toute façon ce fichier au formateur. Le générateur
-// n'implémente donc pas le repli — une branche que rien n'atteint et que personne ne relit.
+// **Aux tailles réelles seulement.** Biome replie sur une seule ligne toute union qui tient dans les
+// 100 colonnes. Mesuré le 02/08/2026 sur les vrais noms de catégories : cinq membres sont repliés,
+// six ne le sont plus — c'est la largeur qui décide, pas un nombre de membres. Le catalogue porte
+// onze catégories et quarante-quatre clés, donc les deux unions sont loin au-delà du seuil. Le
+// générateur n'implémente pas le repli : ce serait une branche que rien n'atteint et que personne
+// ne relit.
 func writeUnion(out *strings.Builder, name string, members []string) {
 	fmt.Fprintf(out, "export type %s =\n", name)
 

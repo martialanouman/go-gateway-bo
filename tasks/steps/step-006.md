@@ -66,7 +66,7 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | `Categories()` triée au lieu de l'ordre d'affichage | `TestCategoriesListsExactlyWhatTheKeysCarry` |
 | Une description vidée | `TestEveryEntryCarriesADescription` |
 | `categoryCheck` ne reconnaît plus le `CHECK` (`categorie`) | les deux cas SQL, via le `require.Len(constraints, 1)` — le filet du test lui-même |
-| **U2** · largeur de ligne comptée en octets au lieu de points de code | `TestADescriptionIsWrappedExactlyWhereBiomeWouldWrapIt`, `TestTheCommittedFileIsWhatTheGeneratorProduces`, **et Biome réécrit la sortie** |
+| **U2** · largeur de ligne comptée en octets au lieu de points de code | `TestADescriptionIsWrappedExactlyWhereBiomeWouldWrapIt`, `TestTheCommittedFileIsWhatTheGeneratorProduces`, **et `biome check` rend 1** — remesuré après le correctif de revue, générateur muté puis régénéré |
 | **U2** · l'indentation de continuation passe de 6 à 4 espaces | trois cas, **et Biome réécrit** |
 | **U2** · les catégories passent par une `map` (ordre non déterministe) | `TestTwoRunsProduceTheSameBytes` et deux autres |
 | **U2** · le refus du guillemet droit retiré | `TestAStraightApostropheInADescriptionIsRefused` |
@@ -77,9 +77,16 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 
 **Une mutation d'abord mal construite, et ce qu'elle a appris.** Éditer le TS engendré **sans**
 l'indexer laisse `check-generated` **vert** : la porte supprime et régénère avant de comparer, donc
-elle rétablit l'édition avant de la voir. Ce n'est pas un trou — la CI ne voit que ce qui est
-commité, et le scénario réel rougit — mais la première mutation ne reproduisait pas le défaut réel,
-et elle se lisait comme un succès de la porte. Refaite avec `git add`, elle mord.
+elle rétablit l'édition avant de la voir. La première mutation ne reproduisait donc pas le défaut
+réel, et elle se lisait comme un succès de la porte. Refaite avec `git add`, elle mord.
+
+*Corrigé après revue — mon argument était plus faible que la réalité.* J'écrivais « ce n'est pas un
+trou, la CI ne voit que ce qui est commité ». Un relecteur a fait remarquer, et j'ai mesuré, qu'un
+simple `make check` **local** rougit sur l'édition non indexée :
+`TestTheCommittedFileIsWhatTheGeneratorProduces` lit le fichier **sur le disque** et le compare au
+rendu. La conclusion tenait, la raison invoquée était la plus faible des trois disponibles. La
+limite de `check-generated` est désormais écrite dans le Makefile, à côté des deux autres qu'il
+documentait déjà — c'est là qu'elle vit, la fiche partant sous `done/`.
 
 ## Design arrêté (2026-08-02)
 
@@ -243,9 +250,25 @@ est **porteuse** : c'est lui qui range le fichier avec `api.gen.ts` et `routeTre
 trois endroits qui traitent l'engendré — l'exclusion `files.includes` de Biome, le
 `linguist-generated=true` du `.gitattributes` qui replie le diff, et la liste `GENERATED` du Makefile.
 
-Un `permissions.ts` sans suffixe serait linté et formaté par Biome comme du code écrit à la main, et
-c'est précisément le piège relevé en arbitrage : si Biome reformate ce que le générateur émet,
-`check-generated` et `lint-web` se contredisent en boucle, chacune exigeant l'inverse de l'autre.
+Un `permissions.ts` sans suffixe serait rangé avec le code écrit à la main, et c'est précisément le
+piège relevé en arbitrage : si Biome reformate ce que le générateur émet, `check-generated` et
+`lint-web` se contredisent en boucle, chacune exigeant l'inverse de l'autre.
+
+**Corrigé après revue — j'avais exclu de Biome un fichier qu'il ne fallait pas.** U3 a élargi
+l'exclusion à `!**/*.gen.ts`, par analogie avec `api.gen.ts`. Deux relecteurs ont montré que
+l'analogie est **fausse**, et je l'ai remesuré : `api.gen.ts` **diffère de 112 lignes** de ce que
+Biome émettrait — son exclusion est portante, parce qu'un générateur tiers ne se plie pas — quand
+`permissions.gen.ts` en est **byte-identique**, notre générateur ayant été écrit pour ça.
+
+L'exclusion ne l'exemptait donc de rien : elle retirait la seule porte qui reliait
+`lineWidth = 100` entre `web/biome.json` et le générateur, laissant la valeur vivre à deux endroits
+que plus rien n'accordait. Elle avait aussi, sans que personne le note, rendu **fausses** deux
+lignes du tableau des mutations ci-dessus, écrites dans le commit qui les invalidait.
+
+`permissions.gen.ts` est réinclus ; `api.gen.ts` et `routeTree.gen.ts` restent exclus. Vérifié sur
+le livré : `biome check .` passe de 18 à 19 fichiers sans réécriture, et la porte **mord** — la
+largeur comptée en octets, régénérée, rend `biome check` à 1. Le `.gitattributes` reste inchangé :
+replier le diff est cosmétique et vaut pour les quatre.
 
 ### DN-9 — Ce que la mesure a corrigé d'un constat de relecture
 

@@ -1,7 +1,6 @@
 package permissions_test
 
 import (
-	"os"
 	"regexp"
 	"slices"
 	"testing"
@@ -12,74 +11,37 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 )
 
-// Les onze catégories vivent à trois endroits : ce package, le TypeScript qu'il engendre, et le
-// `CHECK (category IN (…))` de la migration. `check-generated` tient le front Go↔TS ; ces deux cas
-// sont tout ce qui tient le front Go↔SQL. Sans eux, une catégorie mal orthographiée en Go passe
-// toutes les portes et n'échoue qu'à l'`INSERT` du seed, en step-020.
+// Le front Go↔SQL — les onze catégories d'ici contre le `CHECK` sur `permissions.category` — est
+// tenu par `internal/store/permissions_catalog_test.go`, et non ici. Il y a d'abord vécu sous la
+// forme d'un `os.ReadFile` de la migration et d'une expression rationnelle sur son texte ; mesuré le
+// 02/08/2026, la contrainte mise en commentaire d'historique laissait les deux cas **verts**. Un
+// détecteur textuel n'a aucune notion de commentaire SQL, et ne voit pas non plus un `ALTER` posé
+// par une migration ultérieure. Le remplaçant observe la contrainte que PostgreSQL applique, où ces
+// deux angles n'existent plus — au prix du conteneur que `internal/store` monte déjà.
+
+// `catalog` est un `var` de package : sans la copie de `All()`, chaque appelant recevrait la tranche
+// elle-même, et écrire dedans réécrirait le catalogue **pour tout le process**. Le scénario n'est pas
+// théorique : l'écran d'édition de rôle (step-027) trie et filtre ce qu'on lui donne, et
+// `RequirePermission` (step-025) lirait ensuite un catalogue réordonné sans qu'aucun log ne le dise.
 //
-// **Mise à jour, le jour d'une douzième catégorie.** Elle arrivera par une **nouvelle** migration
-// qui `ALTER` la contrainte, et ce cas, qui ne lit que `00001`, mentira. Ce qu'il faudra faire est
-// lire la **dernière** définition de la contrainte — jamais élargir une liste en dur écrite ici.
-//
-// **Le fichier est lu sur le disque et non par `//go:embed`**, contre l'intention initiale du
-// design. Mesuré le 02/08/2026 : `//go:embed ../store/migrations/00001_…sql` ne compile pas —
-// `pattern ../store/migrations/00001_operators_roles_permissions.sql: invalid pattern syntax`. Un
-// motif `go:embed` ne remonte pas au-dessus de son répertoire, et l'`embed.FS` de `internal/store`
-// est privé (`migrationsFS`, `internal/store/migrations.go`). Le chemin relatif tient parce que
-// `go test` lance le binaire de test dans le répertoire du package — et si un jour ce n'était plus
-// vrai, `require.NoError` sur la lecture le dirait immédiatement.
-const migrationPath = "../store/migrations/00001_operators_roles_permissions.sql"
+// Ce cas existe parce que la propriété n'était tenue par rien : mesuré le 02/08/2026, remplacer
+// `slices.Clone(catalog)` par `return catalog` laissait `internal/permissions` et
+// `cmd/permissionsgen` verts et `golangci-lint` à 0 issue — la couverture était pourtant à 100 %,
+// mais c'est une couverture d'instructions, et aucun cas n'écrivait dans la tranche rendue.
+// L'entrée témoin est copiée **par valeur** (`Entry` n'a que des champs valeur), et non gardée sous
+// la forme d'une tranche : une première version de ce cas comparait `permissions.All()` d'avant à
+// celui d'après et restait verte défaut posé, les deux « tranches » étant la même quand `All()` rend
+// le catalogue lui-même.
+func TestAllHandsOutACopyAndNotTheCatalogItself(t *testing.T) {
+	handed := permissions.All()
+	require.NotEmpty(t, handed)
 
-var (
-	categoryCheck   = regexp.MustCompile(`(?s)CHECK\s*\(category IN \((.*?)\)\)`)
-	quotedSQLString = regexp.MustCompile(`'([^']*)'`)
-)
+	witness := handed[0]
+	handed[0] = permissions.Entry{Key: "saccage:tout", Category: "saccage", Description: "saccage"}
 
-// categoriesAllowedBySQL rend les catégories que la contrainte accepte, dans son ordre.
-func categoriesAllowedBySQL(t *testing.T) []permissions.Category {
-	t.Helper()
-
-	migration, err := os.ReadFile(migrationPath)
-	require.NoError(t, err)
-
-	constraints := categoryCheck.FindAllStringSubmatch(string(migration), -1)
-	// Une seule contrainte porte sur `category`. Zéro voudrait dire que la migration a changé de
-	// forme et que la comparaison ne compare plus rien ; deux, qu'on ne sait plus laquelle fait foi.
-	require.Len(t, constraints, 1, "le CHECK sur `category` n'a pas été reconnu dans %s", migrationPath)
-
-	var allowed []permissions.Category
-	for _, literal := range quotedSQLString.FindAllStringSubmatch(constraints[0][1], -1) {
-		allowed = append(allowed, permissions.Category(literal[1]))
-	}
-
-	require.NotEmpty(t, allowed)
-
-	return allowed
-}
-
-func TestEveryCatalogCategoryIsAcceptedBySQL(t *testing.T) {
-	allowed := categoriesAllowedBySQL(t)
-
-	for _, entry := range permissions.All() {
-		assert.Containsf(t, allowed, entry.Category,
-			"la clé %q porte la catégorie %q, que le CHECK de %s refuse",
-			entry.Key, entry.Category, migrationPath)
-	}
-}
-
-// Le sens inverse n'est pas décoratif : en v1.0, `connectors` a existé dans l'enum PostgreSQL sans
-// qu'aucune clé ne s'y rattache, et l'écran d'édition de rôle présentait une famille vide.
-func TestEveryCategoryAcceptedBySQLCarriesAtLeastOneKey(t *testing.T) {
-	carried := make(map[permissions.Category]int)
-	for _, entry := range permissions.All() {
-		carried[entry.Category]++
-	}
-
-	for _, category := range categoriesAllowedBySQL(t) {
-		assert.Positivef(t, carried[category],
-			"la catégorie %q est acceptée par le CHECK de %s et aucune clé ne s'y rattache",
-			category, migrationPath)
-	}
+	assert.Equal(t, witness, permissions.All()[0],
+		"écrire dans ce que rend All() a modifié le catalogue : la tranche de package a été rendue "+
+			"telle quelle")
 }
 
 // `Categories` est ce dont le TypeScript engendré tire son union `PermissionCategory` : une

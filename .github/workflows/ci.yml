@@ -199,8 +199,10 @@ jobs:
       # `check-routes` construit le client puis vérifie que l'arbre de routes commité n'a pas bougé :
       # un arbre périmé ne se voit pas en local, où le plugin le régénère à chaque lancement.
       - run: make check-routes
-      # Même raison que `check-routes`, sur les trois autres fichiers engendrés et commités : le
-      # client Go de l'API Admin, et le serveur Go comme les types TypeScript du contrat du BFF.
+      # Même raison que `check-routes`, sur les quatre autres fichiers engendrés et commités : le
+      # client Go de l'API Admin, le serveur Go et les types TypeScript du contrat du BFF, et le
+      # catalogue de permissions — seul des quatre à ne dériver d'aucun contrat OpenAPI, sa source
+      # étant `internal/permissions/`.
       # Elle a besoin de `node_modules`, que seuls ce job et « Tests Go » ont, pour deux raisons
       # distinctes — le contrat de l'API Admin y est installé, et `openapi-typescript` en vient.
       # La porte vit ici, auprès de l'autre porte de régénération, plutôt que dispersée. Un contrat

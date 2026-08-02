@@ -74,11 +74,18 @@ const (
 // `credentials:write`, `scripts:publish` n'est pas dans `scripts:write`. C'est ce qui permet à un
 // rôle de corriger une configuration sans pouvoir déclencher l'acte visible en production.
 //
-// **La perte accidentelle d'une clé n'est gardée par aucun test** — c'est un constat vérifié, pas
-// un oubli. Un `len(catalog) == 44` exigerait une seconde déclaration tenue à la main, dont
-// l'incrément 44 → 45 ne porte aucune information relisible. Le golden existe déjà ailleurs : une
-// clé disparue ici devient une **ligne supprimée nommée** dans le diff de `permissions.gen.ts`, que
+// **Aucun test n'affirme le nombre de clés**, et c'est délibéré : un `len(catalog) == 44` exigerait
+// une seconde déclaration tenue à la main, dont l'incrément 44 → 45 ne porte aucune information
+// relisible — on le met à jour sans le lire. Le golden existe déjà ailleurs : une clé disparue ici
+// devient une **ligne supprimée nommée** dans le diff de `permissions.gen.ts`, que
 // `check-generated` force à régénérer.
+//
+// Une version antérieure de ce commentaire disait « la perte accidentelle d'une clé n'est gardée
+// par aucun test ». C'était **faux-pessimiste**, et un relecteur l'a mesuré : retirer `audit:read`,
+// seule clé de sa famille, fait tomber `TestEveryCategoryAcceptedBySQLCarriesAtLeastOneKey` ; et
+// **toute** clé retirée sans régénération fait tomber `TestTheCommittedFileIsWhatTheGeneratorProduces`,
+// qui est précisément le golden que la phrase suivante invoquait. Ce qui n'est gardé par rien est
+// plus étroit : une clé retirée **et** régénérée dans le même geste ne laisse qu'un diff à relire.
 var catalog = []Entry{
 	// ─── routing ───
 	{

@@ -7,8 +7,8 @@ import "slices"
 type Key string
 
 // Category est la famille dont relève une clé. Les valeurs admises sont exactement celles que le
-// `CHECK (category IN (…))` de `internal/store/migrations/00001_operators_roles_permissions.sql`
-// accepte — un cas de `catalog_test.go` compare les deux ensembles dans les deux sens, parce que
+// `CHECK` sur `permissions.category` accepte — `internal/store/permissions_catalog_test.go` compare
+// les deux ensembles dans les deux sens contre la contrainte **appliquée** par PostgreSQL, parce que
 // rien d'autre ne tient ce front.
 type Category string
 
