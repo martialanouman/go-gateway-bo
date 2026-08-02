@@ -160,10 +160,16 @@ Deux preuves, à deux niveaux, et c'est ce qui décide que DN-5 ne livre pas un 
   puis rejouées, les partitions vérifiées, et le cycle de vie exercé pour de bon — ouverture, un
   `Acquire` réel, annulation du contexte racine, puis « aucune connexion restante » **lue depuis une
   connexion de contrôle séparée**, jamais depuis le pool qu'on vient de fermer.
-- **Le câblage dans `cmd/dashboard`, falsifiable sans Docker** : un scénario lance le binaire avec un
-  DSN **malformé** et observe qu'il refuse de démarrer. La mutation qui décide : retirer le câblage
-  du store, et le binaire démarre malgré le DSN malformé — le scénario rougit. Sans lui, rien ne
-  rougirait au retrait du câblage.
+- ~~**Le câblage dans `cmd/dashboard`, falsifiable sans Docker**~~ — **cette seconde preuve est
+  morte, mesurée pendant l'implémentation.** Elle supposait que la validation du DSN vive dans le
+  store ; elle vit dans `internal/config`, comme toute la configuration du dépôt. Le scénario « un
+  DSN mal formé empêche le démarrage » est donc **vert sans qu'aucun store soit câblé**, et retirer
+  un câblage ne ferait rougir aucune porte.
+  **Conséquence tranchée** : le pool **n'est pas câblé dans `cmd/dashboard`**. Un pool paresseux n'a
+  aucun effet qu'un scénario sans Docker puisse observer, et le câbler livrerait l'artefact
+  qu'aucun appelant n'atteint — refusé deux fois dans ce dépôt. Le site d'appel arrive avec la
+  première route qui lit la base. Ce que la fiche demande — pool, cycle de vie, arrêt propre — est
+  livré par `internal/store` et exercé contre un PostgreSQL réel.
 
 **Ce qui n'est couvert ni par l'un ni par l'autre**, et qui s'écrit là où il vit : le cas « DSN bien
 formé, base injoignable ». C'est le comportement documenté d'un pool paresseux — il ne devient
@@ -180,10 +186,29 @@ ligne « Dépend de » a été corrigée avant le code.
 ne skippe pas. Le skip existe (`SkipIfProviderIsNotHealthy`) mais il est opt-in explicite, et **il ne
 sera pas appelé** : un skip est vert.
 
-Mesuré aussi, contre la note du skill qui prescrit de préfixer `DOCKER_HOST` : sur ce poste, une
-sonde a démarré un PostgreSQL 18 réel **sans** cette variable, en 5,8 s — le contexte Docker courant
-est `orbstack`, et testcontainers le consulte en troisième stratégie. Les runners `ubuntu-latest`
-ont Docker Server 28.0.4 au manifeste.
+Mesuré aussi, contre la note du skill qui prescrit de préfixer `DOCKER_HOST` : la suite tourne
+**sans** cette variable — le contexte Docker courant est `orbstack`, et testcontainers le consulte.
+Plus net encore, vérifié pendant l'implémentation : **`DOCKER_HOST` pointé sur une socket
+inexistante est ignoré** et la suite passe quand même. C'est le contexte qui décide ici, pas la
+variable — donc rien à exporter, ni sur un poste ni sur `ubuntu-latest`, dont les runners ont Docker
+Server au manifeste. La note du skill reste vraie ailleurs ; elle ne l'est pas ici.
+
+### DN-10 — Ce que la mesure a corrigé du périmètre lui-même
+
+- **Le « délai d'acquisition » que le périmètre demande n'existe pas** en `pgx v5.10.0` : ni champ
+  `AcquireTimeout`, ni paramètre de DSN. `Acquire` s'en remet au contexte de l'appelant. Ce qui est
+  posé à la place est `ConnectTimeout`, dont le défaut non renseigné vaut **deux minutes** — c'est
+  ce qu'une première requête paierait sur une base injoignable.
+- **`pgxpool` n'attache rien au contexte** : `Close` est le seul chemin qui ferme, et le `ctx` de
+  `New` ne sert qu'aux connexions oisives. « Cycle de vie attaché au contexte racine » est donc du
+  code à écrire, et il l'est.
+- **Quatre réglages du pool ne sont tenus par aucun test** — durée de vie maximale, son jitter,
+  temps d'inactivité, délai de connexion. Leur effet n'apparaît qu'avec le temps ou sur une base
+  injoignable, cas que DN-7 laisse à la step lectrice. Le constat est écrit au-dessus d'eux.
+- **Le verrou de migration n'est tenu par rien non plus** : trois migrations concurrentes sur une
+  base vierge donnent le même résultat avec et sans `WithSessionLocker`, la transaction par
+  migration suffisant à sérialiser localement. Il est posé parce que le produit tourne en ≥2
+  instances, mais rien ne rougirait à son retrait.
 
 ### DN-9 — `docker-compose.yml` cesse de renvoyer à une commande qui n'existe pas
 
