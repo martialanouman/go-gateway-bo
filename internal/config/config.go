@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Noms des variables d'environnement. Chaque step ajoute les siennes ici, en même temps que le code
@@ -32,6 +34,8 @@ const (
 	EnvGatewayClientKey    = "DASHBOARD_GATEWAY_CLIENT_KEY"
 	EnvGatewayCACert       = "DASHBOARD_GATEWAY_CA_CERT"
 	EnvGatewayTimeout      = "DASHBOARD_GATEWAY_TIMEOUT"
+
+	EnvDatabaseURL = "DASHBOARD_DATABASE_URL"
 )
 
 // defaultShutdownTimeout laisse aux requêtes en vol de quoi se terminer pendant un déploiement
@@ -60,6 +64,9 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	// Gateway est la connexion sortante vers l'API Admin de la passerelle.
 	Gateway GatewayConfig
+	// DatabaseURL est le DSN du schéma propre au BFF. Il porte un mot de passe : il ne sort ni dans un
+	// message d'erreur, ni dans un journal.
+	DatabaseURL string
 }
 
 // GatewayConfig décrit la connexion sortante vers l'API Admin. Hors du mode `real`, seule BaseURL
@@ -103,6 +110,7 @@ func Load(lookup Lookup) (Config, error) {
 			CACert:       r.optional(EnvGatewayCACert),
 			Timeout:      r.positiveDuration(EnvGatewayTimeout, defaultGatewayTimeout),
 		},
+		DatabaseURL: r.requiredDatabaseURL(EnvDatabaseURL),
 	}
 
 	r.requireRealGatewayMaterial(cfg.Gateway.Mode)
@@ -209,6 +217,38 @@ func (r *reader) requireEncryptedGatewayBaseURL(mode GatewayMode, baseURL string
 	if scheme, _, _ := strings.Cut(baseURL, ":"); !strings.EqualFold(scheme, "https") {
 		r.reject(EnvGatewayBaseURL, "URL absolue en https attendue en mode %s, reçu %q", GatewayModeReal, baseURL)
 	}
+}
+
+// requiredDatabaseURL valide le DSN sans ouvrir de connexion : `pgxpool.ParseConfig` analyse et rend
+// une configuration, il ne compose rien (DN-5). C'est le parseur du pool lui-même, et non `net/url` :
+// un DSN PostgreSQL s'écrit aussi en `clé=valeur` (`host=… user=…`), que `net/url` ne reconnaît pas ;
+// et `pgxpool` lit en plus les réglages `pool_*` que le DSN transporte (pgxpool/pool.go:370-…), que
+// `pgx.ParseConfig` laisse passer — validé par ce dernier, un `pool_max_conns` illisible passerait ici
+// pour échouer à la création du pool.
+//
+// Ce parseur n'est pas hermétique, et c'est voulu : il lit aussi les `PG*` du process et le fichier
+// de service qu'ils désignent. Mesuré sur v5.10.0 — `PGSSLMODE=n-importe-quoi` fait refuser un DSN
+// par ailleurs valide. Le pool lira le même environnement à sa création : un verdict qui l'ignorerait
+// serait plus permissif que ce que le produit fera ensuite.
+//
+// Le message ne cite ni la valeur ni l'erreur de la bibliothèque, parce que le DSN porte le mot de
+// passe de la base : mesuré sur pgx v5.10.0, la rédaction de `pgconn` (`pgconn/errors.go:230`) repose
+// sur deux expressions rationnelles ancrées sur `password=` et ne couvre pas `password = '…'` — son
+// message rend alors le mot de passe en clair.
+func (r *reader) requiredDatabaseURL(name string) string {
+	value, ok := r.required(name)
+	if !ok {
+		return ""
+	}
+
+	if _, err := pgxpool.ParseConfig(value); err != nil {
+		r.reject(name, "DSN PostgreSQL attendu, en URL `postgres://…` ou en `clé=valeur` ; "+
+			"la valeur n'est pas citée, elle porte le mot de passe de la base")
+
+		return ""
+	}
+
+	return value
 }
 
 func (r *reader) requiredAbsoluteURL(name string, schemes ...string) string {

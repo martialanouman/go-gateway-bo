@@ -170,7 +170,7 @@ func filtersScenarios(runFilter string) bool {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 7
+const minimumScenarios = 8
 
 // scenarioLedger note ce que la suite a réellement exécuté. Le verrou n'est pas décoratif : `godog`
 // exécute les scénarios en parallèle dès que `Concurrency` dépasse 1, et ce jour-là le compteur se
@@ -398,11 +398,14 @@ var browser = &http.Client{Timeout: 2 * time.Second}
 // completeConfiguration est le plus petit environnement avec lequel le binaire démarre. Le port 0
 // laisse le système en choisir un libre, et le mode `mock` n'exige de la passerelle que son adresse —
 // aucun scénario d'ici ne la joint, mais la configuration se valide au démarrage, avant tout appel.
+// Le DSN est du même ordre : exigé et validé au démarrage, jamais composé — aucun scénario d'ici n'a
+// de PostgreSQL en face, et le pool ne se connecte qu'à la première requête qui le demande (DN-5).
 func completeConfiguration() map[string]string {
 	return map[string]string{
 		"DASHBOARD_ADDR":             "127.0.0.1:0",
 		"DASHBOARD_GATEWAY_MODE":     "mock",
 		"DASHBOARD_GATEWAY_BASE_URL": "http://127.0.0.1:4010",
+		"DASHBOARD_DATABASE_URL":     "postgres://dashboard:dashboard@127.0.0.1:5432/dashboard",
 	}
 }
 

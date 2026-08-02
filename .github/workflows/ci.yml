@@ -222,9 +222,13 @@ jobs:
           # Le mode `mock` est explicite parce que le défaut est `real`, qui exigerait ici les
           # identifiants OAuth2 et le matériel mTLS d'une passerelle que ce job ne joint jamais : ce
           # qu'il vérifie est le service des assets. L'adresse est celle du mock, jamais interrogée.
+          # Le DSN est du même ordre : la configuration l'exige et le valide au démarrage, mais aucune
+          # connexion n'est ouverte tant qu'aucune requête ne demande la base — ce job n'a pas de
+          # PostgreSQL, et n'en a pas besoin.
           DASHBOARD_ADDR=127.0.0.1:3001 \
           DASHBOARD_GATEWAY_MODE=mock \
           DASHBOARD_GATEWAY_BASE_URL=http://127.0.0.1:4010 \
+          DASHBOARD_DATABASE_URL=postgres://dashboard:dashboard@127.0.0.1:5432/dashboard \
             ./bin/dashboard &
           bff=$!
           # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de
