@@ -65,11 +65,17 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | Les 3 entrées `connectors:*` retirées *(le défaut réel de la v1.0)* | `TestEveryCategoryAcceptedBySQLCarriesAtLeastOneKey`, **seul** |
 | `Categories()` triée au lieu de l'ordre d'affichage | `TestCategoriesListsExactlyWhatTheKeysCarry` |
 | Une description vidée | `TestEveryEntryCarriesADescription` |
-| `categoryCheck` ne reconnaît plus le `CHECK` (`categorie`) | les deux cas SQL, via le `require.Len(constraints, 1)` — le filet du test lui-même |
+| ~~`categoryCheck` ne reconnaît plus le `CHECK`~~ | *Ligne périmée par le correctif de revue : `categoryCheck` et `require.Len(constraints, 1)` n'existent plus (`grep` vide). Le filet équivalent du remplaçant est **double** — `require.Lenf(definitions, 1)` sur les lignes de `pg_constraint`, et `require.NotEmptyf` sur les littéraux extraits* |
+| **Revue** · la contrainte `CHECK` entièrement mise en commentaire | `TestEveryCategoryAcceptedBySQLCarriesAtLeastOneKey`, via `require.Lenf` — **0 contrainte appliquée**. L'ancien détecteur textuel restait vert. Le sens Go→SQL, lui, reste vert : contrainte partie, tous les `INSERT` passent |
+| **Revue** · un `00004` qui `DROP CONSTRAINT` | `…CarriesAtLeastOneKey` — l'angle que la lecture de `00001` seule ne pouvait pas voir |
+| **Revue** · `slices.Clone(catalog)` → `catalog` | `TestAllHandsOutACopyAndNotTheCatalogItself` |
+| **Revue** · `render` court-circuité à `nil, nil` | `TestTwoRunsProduceTheSameBytes` — il était vert sur ce stub avant le correctif |
+| **Revue** · `len(args) != 1` relâché en `< 1` | `TestTheCommandRefusesToGuessItsOutputPath`, **sans** déposer de fichier dans l'arbre |
+| **Revue** · `forbiddenInLiteral` réduit au seul `'` | 3 sous-cas sur 4 |
 | **U2** · largeur de ligne comptée en octets au lieu de points de code | `TestADescriptionIsWrappedExactlyWhereBiomeWouldWrapIt`, `TestTheCommittedFileIsWhatTheGeneratorProduces`, **et `biome check` rend 1** — remesuré après le correctif de revue, générateur muté puis régénéré |
 | **U2** · l'indentation de continuation passe de 6 à 4 espaces | trois cas, **et Biome réécrit** |
 | **U2** · les catégories passent par une `map` (ordre non déterministe) | `TestTwoRunsProduceTheSameBytes` et deux autres |
-| **U2** · le refus du guillemet droit retiré | `TestAStraightApostropheInADescriptionIsRefused` |
+| **U2** · le refus du guillemet droit retiré | `TestEveryRuneASingleQuotedLiteralCannotCarryIsRefused` *(renommé par le correctif de revue, qui exerce désormais les quatre runes ; sous l'ancien nom, `go test -run` rend `[no tests to run]` et **rc=0** — un faux vert, mesuré)* |
 | **U2** · la garde sur le nombre d'arguments retirée | `TestTheCommandRefusesToGuessItsOutputPath`, plus le `panic: index out of range` que son commentaire annonçait |
 | **U3** · *(avant câblage)* catalogue Go modifié, TS non régénéré | **`check-generated` rend 0** — le défaut que cette step existe pour fermer, constaté avant de le corriger |
 | **U3** · *(après câblage)* la même | `check-generated` rend 2 : « du code engendré diffère de ce qui est commité » |
@@ -205,7 +211,18 @@ DN cherche. Le sens « catégorie sans aucune clé » n'est pas
 décoratif : c'est le défaut réellement survenu en v1.0, où `connectors` a existé dans l'enum
 PostgreSQL sans qu'aucune clé ne s'y rattache.
 
-**Ce que ce test fige, et comment le mettre à jour.** Il fait de `00001` la vérité. Le jour où une
+**Corrigé après la passe de clôture — tout ce qui suit décrit un mécanisme qui n'existe plus, et
+c'est ce DN qui décide ce front.** Le test ne lit plus aucun fichier : il vit dans
+`internal/store/permissions_catalog_test.go` et interroge la contrainte **que PostgreSQL applique**
+après les trois migrations, par `pg_get_constraintdef` et des `INSERT` réels. Motif : le détecteur
+textuel restait **vert** quand la contrainte était mise en commentaire d'historique, `os.ReadFile`
+et `regexp` n'ayant aucune notion de commentaire SQL. Le paragraphe ci-dessous est donc **sans
+objet** : il n'y a plus de mise à jour à prévoir le jour d'une douzième catégorie, un `ALTER` d'une
+migration ultérieure étant déjà observé — vérifié en posant un `00004` qui `DROP` la contrainte, que
+la lecture de `00001` seule laissait verte. Il est conservé parce que c'est l'enchaînement qui
+instruit.
+
+~~**Ce que ce test fige, et comment le mettre à jour.** Il fait de `00001` la vérité.~~ Le jour où une
 douzième catégorie arrivera légitimement, ce sera par une **nouvelle** migration qui `ALTER` la
 contrainte, et un test qui ne lit que `00001` mentirait. Sa mise à jour consiste alors à lire la
 **dernière** définition de la contrainte — jamais à élargir une liste en dur dans le test.

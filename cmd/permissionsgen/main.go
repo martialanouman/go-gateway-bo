@@ -71,7 +71,12 @@ func start(args []string) error {
 // c'est ce qui fait de `lint-web` la porte qui relie `lineWidth` ici à `formatter.lineWidth` là-bas.
 // L'inclusion tient à une mesure : reformaté par Biome, ce que ce générateur émet est
 // **byte-identique** au fichier commité (zéro ligne d'écart sur 310, mesuré le 02/08/2026), quand
-// `api.gen.ts` en diffère sur 112 lignes. Émettre l'une de ces deux formes là où Biome émettrait
+// `api.gen.ts` en diffère de 112 lignes de `diff` — 56 retirées et 56 ajoutées, sur un fichier qui
+// en compte 67. La mesure ne se refait pas par la commande évidente : Biome **honore l'exclusion en
+// silence** jusque sur `--stdin-file-path`, si bien qu'un `--stdin-file-path=src/lib/api.gen.ts`
+// rend l'entrée inchangée et laisse croire à zéro écart. Il faut lui donner un chemin sonde
+// non exclu — `--stdin-file-path=src/lib/sonde.ts` — pour qu'il formate pour de bon.
+// Émettre l'une de ces deux formes là où Biome émettrait
 // l'autre rendrait `lint-web` et `check-generated` contradictoires, chacune exigeant l'inverse de
 // l'autre.
 const (
@@ -179,10 +184,16 @@ func writeEntry(out *strings.Builder, entry permissions.Entry) error {
 		if index := strings.IndexAny(field.value, forbiddenInLiteral); index >= 0 {
 			offending, _ := utf8.DecodeRuneInString(field.value[index:])
 
+			// Le message ne nomme pas une cause unique : les quatre runes cassent des choses
+			// différentes, et en conseiller une seule envoie chercher le mauvais coupable. Mesuré :
+			// le guillemet droit, échappé, fait réécrire le littéral en guillemets doubles par
+			// Biome ; `\n` et `\r` rendent le fichier inanalysable (« unterminated string
+			// literal ») ; et l'antislash **change la valeur en silence** — `'C:\nouveau'` vaut 19
+			// caractères côté JS dont un vrai saut de ligne, là où le catalogue Go en porte 20.
 			return fmt.Errorf("la clé %q porte dans sa %s le caractère %q, qu'un littéral TypeScript "+
-				"entre guillemets simples ne peut pas porter tel quel. Échappé, Biome réécrit le "+
-				"littéral en guillemets doubles et la sortie engendrée cesse d'être stable : écrire "+
-				"l'apostrophe typographique ’ plutôt que le guillemet droit",
+				"entre guillemets simples ne peut pas porter tel quel. Selon le caractère, la sortie "+
+				"cesse d'être stable, devient inanalysable, ou porte une valeur différente de celle "+
+				"du catalogue. Pour une apostrophe, écrire la typographique ’",
 				entry.Key, field.name, offending)
 		}
 	}
