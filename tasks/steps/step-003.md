@@ -93,6 +93,31 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | Branche `HEAD` du filtre de rejeu retirée | **aucune porte ne rougit** — le contrat ne déclare aucune opération HEAD ; écrit au-dessus de la fonction |
 | Garde de faute de frappe du harnais godog retirée | **aucune porte ne rougit** — elle protège l'auteur d'un futur scénario, pas un comportement du produit |
 
+### Mutations des correctifs de revue
+
+Un correctif est du code comme un autre : il repasse par le rouge et par la mutation.
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| Garde du schéma de l'URL de base retirée (le bloquant : passerelle réelle jointe en clair) | `refuse_une_URL_de_base_en_clair_en_mode_real` |
+| Même garde rendue **plus stricte** — insensible au mode | 9 tests, dont `n'exige_que_l'adresse_du_mock_en_mode_mock` : elle ne déborde pas sur le mock |
+| Même garde rendue sensible à la casse | `accepte_une_URL_de_base_en_https_quelle_qu'en_soit_la_casse` |
+| `return value` → `return parsed.String()` dans la lecture d'URL | les deux tests de rendu — là où cette mutation laissait **toute la suite verte** avant le correctif |
+| `Error()` remis sur récepteur pointeur | les 4 sous-tests « la valeur » (`%v`, `%s`, `%+v`, slog texte) |
+| `MarshalJSON` retiré | `json.Marshal`, pointeur **et** valeur |
+| `GoString` retiré | `%#v`, pointeur **et** valeur |
+| Garde de méthode déplacée **après** la branche réseau du rejeu | `NeverReplaysAMutationWhoseConnectionDropped` : 2 requêtes au lieu d'1 |
+| Refus du mode inconnu retiré (retour au `!= real`) | les 4 modes inconnus |
+| Refus laissant passer la seule valeur zéro | le cas `""` |
+| `Certificates` vidé du `tls.Config` sortant | `PresentsItsCertificateOnBothOutboundCalls`, **désormais sur l'assertion** de certificat pair et non sur la poignée de main |
+| Échantillon de signatures anti-copie ramené à 8 | `laisse passer une fiche de step` |
+| Seuil anti-copie relevé à « toutes les signatures » | `copie dont le contrat a bougé en amont` |
+| Capture du code de retour de `git` retirée de `check-generated` | la porte redevient **verte** sur un client divergent quand `git` échoue — le défaut revient |
+
+Une mutation de plus a été **rejetée** en cours de route : retirer `MarshalJSON` ne fait pas rougir
+le rendu `slog` JSON, qui est couvert **deux fois** (le marshaler s'il existe, `Error()` sinon). Le
+commentaire qui allait l'affirmer a été corrigé avant d'être écrit.
+
 Deux mutations ont été **rejetées comme invalides** plutôt que comptées : `ReuseTokenSourceWithExpiry(…, 0)`, où `0` signifie « prends le défaut » et ne reproduit donc aucun défaut ; et la suppression du bloc de succès du décodeur d'erreur, qui casse la compilation au lieu de rejouer une faute. Toutes deux ont été refaites sous une forme qui reproduit l'erreur qu'on commet vraiment.
 
 ## Design arrêté (2026-08-01)
@@ -135,13 +160,19 @@ passent. Il échoue sur exactement **deux** collisions de noms Go, trouvées par
 > deux collisions avaient la même cause — un enum inline. C'est vrai de la première seulement :
 > `Connector.status` est un enum inline dont oapi-codegen tire `ConnectorStatus`, nom que porte déjà
 > le schéma de santé runtime. La seconde est d'une autre nature : `SenderId` est déclaré **deux fois
-> en composants**, une fois sous `components.parameters` (l. 1517, un UUID de chemin) et une fois
-> sous `components.schemas` (l. 1713, la ressource) — vérifié par `grep -n "SenderId"` sur le YAML.
-> C'est le **paramètre** que l'overlay renomme, le schéma gardant son nom, parce que tout le versant
-> sender ids référence ce dernier.
+> en composants**, une fois sous `components.parameters` (un UUID de chemin) et une fois sous
+> `components.schemas` (la ressource). C'est le **paramètre** que l'overlay renomme, le schéma gardant
+> son nom, parce que tout le versant sender ids référence ce dernier.
 >
 > La conclusion ne change pas — l'overlay cible des composants dans les deux cas — mais la raison
 > écrite était fausse, et une raison fausse se transmet à la prochaine session comme une vérité.
+>
+> **Seconde correction, 02/08, après revue.** Les numéros de ligne que cette correction citait
+> (1517 et 1713) étaient ceux de **1.2.0**, relevés avant le bump. Sur le 2.5.0 réellement consommé :
+> `grep -n "^    SenderId:"` rend **1586** et **1785**, et les `type: [T, "null"]` sont **181**, non
+> 184. Le défaut est le même que celui que la première correction dénonçait, à un niveau de plus : une
+> mesure juste au moment où on l'écrit devient fausse quand ce qu'elle mesure bouge, et le bump du
+> contrat est arrivé au huitième commit sans faire relire un seul texte qui parlait du contrat.
 
 La règle du dépôt veut qu'un **manque au contrat** se corrige par une PR amont. Ce n'en est pas un :
 la collision est propre au générateur **Go** et n'existe pas côté TypeScript, que le même contrat
@@ -207,6 +238,17 @@ passerelle dégradée devient un amplificateur d'incident.
 - **Jamais sur 503** : la description du contrat dit « réessayer *quand elle se rétablit* », pas
   immédiatement. Le rétablissement se constate par l'opérateur via l'état d'erreur et son bouton
   Réessayer — pas par une boucle automatique.
+- Rejeu, en revanche, sur une **erreur de transport** — connexion refusée ou coupée avant toute
+  réponse, l'accident d'une instance retirée du load balancer pendant un déploiement roulant. Cette
+  branche manquait au texte d'origine de ce DN alors que le code la portait.
+
+> **Correction du 02/08, après revue.** Ce DN affirmait que le cas réseau ambigu — la mutation dont la
+> connexion tombe avant la réponse, et qui a peut-être été appliquée — était « couvert par là même ».
+> Il ne l'était par **aucun test** : déplacer la garde de méthode *après* la branche réseau, qui est
+> le défaut qu'on commet vraiment (« une connexion tombée, ça se rejoue »), laissait toute la suite
+> verte, alors qu'un `POST` de suspension partait deux fois. Le comportement du produit était juste,
+> la preuve manquait — les deux tests existants n'exerçaient que les croisements *mutation × 502* et
+> *lecture × connexion tombée*, jamais celui qui compte.
 
 ### DN-7 — Un seul décodeur d'erreur, sur le couple (statut, corps), et non par opération
 
@@ -224,10 +266,26 @@ répond aux routes inconnues une erreur RFC 7807 (`type`/`title`/`status`/`detai
 intermédiaire répondrait du HTML. Le décodeur rend alors une erreur typée portant un code générique
 plutôt que d'inventer un `code` ou de propager du vide.
 
+> **Précision du 02/08, après revue.** L'argument ci-dessus a d'abord été écrit et illustré contre le
+> contrat **1.2.0**, qui ne déclarait aucun 503. Sur le **2.5.0** consommé, `ServiceUnavailable`
+> existe et **3 opérations sur 133** le déclarent (contenu et RGPD) — le généré porte donc trois
+> champs `JSON503 *ServiceUnavailable`. L'argument tient d'autant mieux : les 130 autres opérations
+> n'en déclarent pas, et c'est précisément ce que seul un décodeur sur (statut, corps) rattrape.
+> Seul l'exemple choisi pour l'illustrer était mort.
+
+**Invariant (a), corrigé après revue.** `Error()` était déclaré sur récepteur **pointeur**, si bien
+que la *valeur* `APIError` n'implémentait ni `error` ni `fmt.Stringer` : `slog` la sérialisait par
+réflexion, `Message` compris — le texte écrit par la passerelle, dont rien ne garantit qu'il ne
+recopie pas un corps de SMS. Un `slog.Error("…", "err", *apiErr)`, forme qu'aucune règle n'interdit
+puisque `errors.As` rend un pointeur qu'on déréférence machinalement, suffisait à le publier. Le
+récepteur est désormais une valeur, et `MarshalJSON` et `GoString` ferment les deux échappatoires que
+le commentaire d'origine se contentait de **nommer**.
+
 ### DN-8 — `ServiceUnavailable` est une erreur ; « module désactivé » n'a aucun signal au contrat
 
-**Constat mesuré, à contre-courant de ce que le périmètre laissait attendre** : le contrat 2.5.0
-n'exprime **nulle part** un « module désactivé » — ni 501, ni en-tête, ni code d'erreur dédié. Les
+**Constat mesuré, à contre-courant de ce que le périmètre laissait attendre** — refait sur le 2.5.0
+consommé après le bump, et non seulement sur le 1.2.0 de départ : le contrat n'exprime **nulle part**
+un « module désactivé » — ni 501, ni en-tête, ni code d'erreur dédié. Les
 seuls signaux voisins sont des booléens **par ressource** (`billing_enabled` sur un client, etc.),
 qui voyagent dans des réponses 200.
 
@@ -282,6 +340,38 @@ step-007 ne sont amputés.
 
 Calquée sur `make check-routes`, et pour la même raison écrite là-bas : une comparaison seule reste
 verte quand plus rien ne régénère. Le fichier est **supprimé**, régénéré, puis comparé au commité.
+
+### DN-13 — En mode `mock`, le jeton est statique et visiblement factice
+
+*(Décision prise pendant l'implémentation ; elle vivait dans le code sans être consignée ici, ce
+qu'une revue a relevé.)*
+
+Mesuré : Prism applique le `security` global du contrat et répond **401 sans en-tête
+`Authorization`**, mais accepte **n'importe quel** `Bearer`. Il n'y a pas de `tokenUrl` en face. Le
+mode `mock` pose donc une `oauth2.StaticTokenSource` portant une valeur qui se lit comme ce qu'elle
+est, et **n'appelle aucun endpoint de jeton** — c'est l'inverse d'un identifiant en dur : une valeur
+qui n'ouvre rien.
+
+### DN-14 — Ce qui est connu, latent, et volontairement non traité ici
+
+Quatre constats de revue portent sur du code qu'**aucun appelant n'atteint encore** — la première
+route du BFF vers la passerelle arrive en step-004. Les corriger à l'aveugle, sans le trafic qui
+dirait le bon réglage, coûterait plus que de les écrire. Ils sont donc consignés, et chacun l'est
+aussi **au-dessus de la ligne concernée** dans le code :
+
+- **Le contexte de l'appelant n'atteint pas l'obtention du jeton.** `oauth2.Transport` appelle
+  `Source.Token()` sans `ctx`, et `reuseTokenSource` tient son mutex pendant l'appel réseau. Si le
+  `tokenUrl` part en trou noir, les appels concurrents s'y sérialisent, chacun pour la durée du
+  `Timeout`, sans qu'un contexte d'appelant annulé ne les libère. La voie propre est un
+  `TokenSource` qui prenne le contexte de la requête.
+- **`MaxConnsPerHost` n'est pas posé** : le pool borne les connexions *inactives*, rien ne borne les
+  connexions ouvertes. C'est le seul cadran qui limiterait la pression de l'invariant (e), et il se
+  règle sur une concurrence réelle qui n'existe pas encore.
+- **`Proxy` n'est pas posé**, là où `http.DefaultTransport` pose `ProxyFromEnvironment` : divergence
+  silencieuse d'avec le défaut, à trancher quand un déploiement dira s'il a un proxy d'egress.
+- **`idempotency_key` est engendré non-pointeur et sans `omitempty`** sur les deux opérations de
+  crédits que 2.5.0 a durcies : l'oublier compile et envoie l'UUID zéro, qui *a l'air valide*. Aucune
+  de ces opérations n'est appelée en M0, mais la step qui les appellera doit le savoir.
 
 ### DN-12 — Ce que cette step ne livre pas, et pourquoi
 
