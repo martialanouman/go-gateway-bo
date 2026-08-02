@@ -171,7 +171,9 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [ ] step-047 — Arrêt propre : drain des sockets, déploiement roulant sans session perdue
 
 ## M3 — Clients, comptes SMPP & identifiants  (§6.14, §6.15)
-- [ ] step-060 — Groupes de clients : CRUD + filtre transverse
+- [ ] step-060 — Groupes de clients : CRUD + filtre transverse ← **première route du BFF qui appelle
+      la passerelle** : elle porte l'extension du DTO `errorResponse` avec `errors[]` (§1.4), que
+      step-003 avait laissée « en attente de la route qui la servira » en pointant à tort step-004
 - [ ] step-061 — Clients : liste, filtres, création  ← **la tranche verticale est acquise ici**
 - [ ] step-062 — Fiche client : identité, statut, suspension en cascade, sender IDs
 - [ ] step-063 — Comptes SMPP : liste + création rattachée au client

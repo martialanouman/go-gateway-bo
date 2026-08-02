@@ -405,6 +405,12 @@ l'**erreur typée** de `internal/gateway` ; l'extension du DTO `errorResponse` d
 `errors[]` attend la route qui la servira, faute de quoi elle serait du code mort qu'aucun test ne
 peut exercer de bout en bout.
 
+> **Correction du pointeur, 02/08/2026, depuis step-004.** « La première arrive en step-004 » est
+> faux : le périmètre de step-004 est `GET /health`, une sonde de vivacité qui ne touche ni la base ni
+> la passerelle. La première route du BFF qui **appelle la passerelle** est **step-060** (groupes de
+> clients, M3) — c'est elle qui portera l'extension d'`errorResponse` avec `errors[]`. Le raisonnement
+> de ce DN est intact ; seule sa cible était erronée.
+
 ### DN-13 — En mode `mock`, le jeton est statique et visiblement factice
 
 *(Décision prise pendant l'implémentation ; elle vivait dans le code sans être consignée ici, ce
@@ -419,9 +425,10 @@ qui n'ouvre rien.
 ### DN-14 — Ce qui est connu, latent, et volontairement non traité ici
 
 Quatre constats de revue portent sur du code qu'**aucun appelant n'atteint encore** — la première
-route du BFF vers la passerelle arrive en step-004. Les corriger à l'aveugle, sans le trafic qui
-dirait le bon réglage, coûterait plus que de les écrire. Ils sont donc consignés, et chacun l'est
-aussi **au-dessus de la ligne concernée** dans le code :
+route du BFF vers la passerelle arrive en **step-060** (corrigé le 02/08/2026 : ce DN disait
+step-004, dont le périmètre est une sonde de vivacité qui ne joint pas la passerelle). Les corriger à
+l'aveugle, sans le trafic qui dirait le bon réglage, coûterait plus que de les écrire. Ils sont donc
+consignés, et chacun l'est aussi **au-dessus de la ligne concernée** dans le code :
 
 - **Le contexte de l'appelant n'atteint pas l'obtention du jeton.** `oauth2.Transport` appelle
   `Source.Token()` sans `ctx`, et `reuseTokenSource` tient son mutex pendant l'appel réseau. Si le

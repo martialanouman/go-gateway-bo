@@ -226,6 +226,13 @@ Le client parle uniquement à son propre **BFF Go**, qui parle à l'API Admin de
 > et la forme passerelle diffèrent. Toute évolution du contrat doit être répercutée ici.
 
 ```
+# Exploitation — hors surface métier, sans authentification (§4.1)
+GET    /health                         # sonde de VIVACITÉ : le process répond, rien de plus.
+                                       # Ne touche ni la base ni la passerelle : y brancher une
+                                       # dépendance ferait redémarrer un serveur sain parce qu'une
+                                       # autre brique est tombée. La sonde de DISPONIBILITÉ, qui
+                                       # interroge ses dépendances, arrive en §6.20 (step-186).
+
 # Auth (email/password + MFA — TOTP + WebAuthn/passkey; §6.9)
 POST   /auth/login                     # email + password -> MFA challenge
 POST   /auth/mfa/verify                # TOTP code or WebAuthn assertion
