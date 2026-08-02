@@ -90,7 +90,45 @@ func (e APIError) MarshalJSON() ([]byte, error) {
 }
 
 func (e APIError) GoString() string {
-	return fmt.Sprintf("gateway.APIError{Status:%d, Code:%q, Fields:%q}", e.Status, e.Code, e.fieldNames())
+	return fmt.Sprintf("gateway.APIError{Status:%d, Code:%q, Fields:%#v}",
+		e.Status, e.Code, e.redactedFields())
+}
+
+// redactedFields rend `errors[]` privé de ses messages. Le verbe `%#v` promet une représentation en
+// **syntaxe Go**, et `Fields:["phone"]` n'en était pas une : elle donnait à `Fields` l'air d'un
+// `[]string` là où il porte des FieldError, et ne se recompilait pas. Les noms suffisent au
+// débogage ; le message qui les accompagne est du texte libre amont, que l'invariant (a) exclut.
+func (e APIError) redactedFields() []FieldError {
+	if len(e.Fields) == 0 {
+		return nil
+	}
+
+	redacted := make([]FieldError, 0, len(e.Fields))
+	for _, field := range e.Fields {
+		redacted = append(redacted, FieldError{Field: field.Field})
+	}
+
+	return redacted
+}
+
+// As attrape aussi la cible **valeur**. ErrorFrom range un `*APIError` dans la chaîne, donc
+// `errors.As` n'y assigne d'office qu'une cible `*APIError` ; une cible `APIError` rendrait `false`
+// avec une struct nulle, et un 422 tomberait dans la branche générique de l'appelant — les messages
+// ne se placeraient plus sous les champs du formulaire.
+//
+// Cette cible-là n'est pas une faute qu'on remarque : depuis que les rendus sont à récepteur valeur,
+// la valeur implémente `error`, et `go vet` a cessé de refuser l'appel. Elle compile, se lit
+// correcte, et se tait. `errors.As` consulte cette méthode juste après avoir essayé l'assignabilité
+// ($GOROOT/src/errors/wrap.go:123-129), donc la cible pointeur garde le chemin normal.
+func (e APIError) As(target any) bool {
+	into, ok := target.(*APIError)
+	if !ok {
+		return false
+	}
+
+	*into = e
+
+	return true
 }
 
 // fieldNames rend nil sur une erreur sans `errors[]`, ce qui fait disparaître la clé de la forme JSON

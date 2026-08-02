@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -34,6 +35,10 @@ func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
 		return nil, err
 	}
 
+	if err := encryptedEndpoints(cfg); err != nil {
+		return nil, err
+	}
+
 	transport, err := outboundTransport(cfg)
 	if err != nil {
 		return nil, err
@@ -48,6 +53,16 @@ func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
 	// Le Timeout est posé ici et nulle part ailleurs, et c'est ce qui le fait borner **aussi**
 	// l'obtention du jeton : oauth2.NewClient recopie le Timeout du client du contexte dans celui
 	// qu'il rend (oauth2.go:365).
+	//
+	// Ce qu'il ne fait pas — et les deux se lisent ensemble sans se contredire : l'attente est
+	// bornée, elle n'est pas **annulable**. Le contexte de l'appelant n'atteint pas l'obtention du
+	// jeton, parce que `oauth2.Transport.RoundTrip` appelle `Source.Token()` sans lui en passer aucun
+	// (transport.go:45) et que la source porte celui construit ici, sur context.Background
+	// (clientcredentials.go:79-84). Comme `reuseTokenSource.Token()` garde son mutex pendant l'appel
+	// réseau (oauth2.go:308-320), un tokenUrl parti en trou noir sérialise les appels concurrents,
+	// chacun pour la durée du Timeout, et un appelant qui a renoncé n'en libère aucun. Rien n'est
+	// fait de ce constat tant qu'aucune route n'appelle la passerelle : la première arrive en
+	// step-004, et c'est elle qui dira si ce plafond se voit.
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, &http.Client{
 		Transport: transport,
 		Timeout:   cfg.Timeout,
@@ -83,6 +98,38 @@ func knownMode(mode config.GatewayMode) error {
 		return fmt.Errorf("mode de passerelle %q inconnu, %s ou %s attendu",
 			mode, config.GatewayModeReal, config.GatewayModeMock)
 	}
+}
+
+// encryptedEndpoints refuse une passerelle réelle jointe en clair, des **deux** côtés. C'est la même
+// frontière que knownMode : `config.Load` pose déjà ce refus sur DASHBOARD_GATEWAY_BASE_URL, et sa
+// polarité s'arrête à l'environnement — NewAdminClient reçoit une struct nue, que les tests
+// construisent à la main et qu'un helper de route construira partiellement.
+//
+// Un `http://` qui traverse ne casse rien de visible : http.Transport ne consulte pas son tls.Config
+// quand l'URL est en clair, si bien que le matériel mTLS est chargé, posé et jamais présenté.
+// Mesuré le 02/08/2026 avec un matériel valide et les deux bouts en clair : l'API reçoit
+// `Bearer …` et zéro certificat pair, le tokenUrl reçoit le secret client en `Basic` — et les cinq
+// scopes, `gdpr:erase` compris, partent avec.
+//
+// La comparaison ignore la casse, comme net/url qui minuscule le schéma à l'analyse
+// ($GOROOT/src/net/url/url.go:454) : `HTTPS://` désigne une passerelle parfaitement joignable, et
+// une garde qui refuse du légitime finit par être retirée.
+func encryptedEndpoints(cfg config.GatewayConfig) error {
+	if cfg.Mode != config.GatewayModeReal {
+		return nil
+	}
+
+	for _, endpoint := range []struct{ name, rawURL string }{
+		{name: "URL de base", rawURL: cfg.BaseURL},
+		{name: "tokenUrl", rawURL: cfg.TokenURL},
+	} {
+		if scheme, _, _ := strings.Cut(endpoint.rawURL, ":"); !strings.EqualFold(scheme, "https") {
+			return fmt.Errorf("%s de la passerelle : https attendu en mode %s, reçu %q",
+				endpoint.name, config.GatewayModeReal, endpoint.rawURL)
+		}
+	}
+
+	return nil
 }
 
 // machineToken rend la source du jeton machine.
@@ -130,6 +177,16 @@ func outboundTransport(cfg config.GatewayConfig) (http.RoundTripper, error) {
 		// Le BFF ne parle qu'à un seul hôte, et le défaut de net/http (2) y ferait rouvrir une
 		// connexion sur trois requêtes concurrentes — poignée de main TLS comprise.
 		MaxIdleConnsPerHost: 32,
+
+		// `MaxConnsPerHost` n'est pas posé, et c'est le seul cadran qui bornerait les connexions
+		// **ouvertes** : celui du dessus ne borne que les inactives. C'est par lui que passerait la
+		// pression du tableau de bord sur la passerelle, donc l'invariant (e). Il se règle sur une
+		// concurrence réelle, et aucune route n'appelle encore la passerelle.
+		//
+		// `Proxy` n'est pas posé non plus, là où http.DefaultTransport pose `ProxyFromEnvironment`
+		// ($GOROOT/src/net/http/transport.go:47) : ce transport-ci ignore donc HTTPS_PROXY et
+		// NO_PROXY, en silence et à rebours du défaut de net/http. À trancher quand un déploiement
+		// dira s'il passe par un proxy d'egress.
 	}}, nil
 }
 

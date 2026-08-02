@@ -3,6 +3,7 @@ package gateway_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -154,6 +155,101 @@ func TestErrorRendersNoUpstreamFreeText(t *testing.T) {
 
 	assert.Equal(t, smsBody, apiErr.Message,
 		"le texte reste accessible à l'onglet qui l'affichera ; c'est le rendu qui l'exclut")
+}
+
+// `%#v` promet une représentation en **syntaxe Go**, et la rédaction ne dispense pas de la tenir :
+// `Fields:["phone"]` — ce que rendait un `%q` sur les seuls noms — ne se recompile pas et donne à
+// `Fields` l'air d'un `[]string` alors qu'il porte des FieldError. Le message, lui, reste hors du
+// rendu : c'est du texte libre amont.
+func TestGoStringStaysGoSyntax(t *testing.T) {
+	t.Parallel()
+
+	err := gateway.ErrorFrom(http.StatusUnprocessableEntity,
+		[]byte(`{"code":"validation_error","message":"`+smsBody+`",`+
+			`"errors":[{"field":"phone","message":"`+smsBody+`"}]}`))
+
+	assert.Equal(t,
+		`gateway.APIError{Status:422, Code:"validation_error", `+
+			`Fields:[]gateway.FieldError{gateway.FieldError{Field:"phone", Message:""}}}`,
+		fmt.Sprintf("%#v", err))
+}
+
+// `errors.As` accepte deux cibles ici, et **une seule** attrapait : `ErrorFrom` range un
+// `*APIError` dans la chaîne, donc une cible `var apiErr APIError` — la valeur — ne lui est pas
+// assignable et rend `false` avec une struct nulle.
+//
+// Ce n'est pas une faute théorique : c'est la forme qu'invite le passage des trois rendus au
+// récepteur valeur. Avant lui, la valeur n'implémentait pas `error`, et `go vet` — que `go test`
+// lance par défaut — refusait de compiler l'appel : *« second argument to errors.As must be a
+// non-nil pointer to either a type that implements error »*. Depuis, l'appel compile, vet se tait,
+// et le refus 422 tombe dans la branche générique : les messages ne se placent plus sous les champs.
+// Mesuré le 02/08/2026 dans les deux états.
+//
+// La réponse est un `As` explicite plutôt qu'une phrase de doc : la phrase suppose qu'on la lise
+// avant d'écrire l'appel, et l'appel se lit correct.
+func TestErrorAsCatchesBothSpellings(t *testing.T) {
+	t.Parallel()
+
+	err := gateway.ErrorFrom(http.StatusUnprocessableEntity,
+		[]byte(`{"code":"validation_error","message":"la requête est invalide",`+
+			`"errors":[{"field":"phone","message":"format E.164 attendu"}]}`))
+
+	expected := gateway.APIError{
+		Status:  http.StatusUnprocessableEntity,
+		Code:    "validation_error",
+		Message: "la requête est invalide",
+		Fields:  []gateway.FieldError{{Field: "phone", Message: "format E.164 attendu"}},
+	}
+
+	t.Run("la cible pointeur", func(t *testing.T) {
+		t.Parallel()
+
+		var apiErr *gateway.APIError
+
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, expected, *apiErr)
+	})
+
+	t.Run("la cible valeur", func(t *testing.T) {
+		t.Parallel()
+
+		var apiErr gateway.APIError
+
+		require.ErrorAs(t, err, &apiErr,
+			"la cible valeur compile et se lit correcte : si elle n'attrape pas, un 422 tombe dans la "+
+				"branche générique et le formulaire perd ses erreurs par champ")
+		assert.Equal(t, expected, apiErr)
+	})
+
+	t.Run("la cible valeur, sous une erreur enveloppée", func(t *testing.T) {
+		t.Parallel()
+
+		var apiErr gateway.APIError
+
+		require.ErrorAs(t, fmt.Errorf("lecture des clients : %w", err), &apiErr)
+		assert.Equal(t, expected, apiErr)
+	})
+
+	t.Run("ne rend pas vrai sur une erreur étrangère", func(t *testing.T) {
+		t.Parallel()
+
+		var apiErr gateway.APIError
+
+		assert.NotErrorAs(t, errors.New("une panne réseau"), &apiErr,
+			"un As qui attrape tout ferait passer n'importe quelle panne pour un refus de la passerelle")
+	})
+
+	// L'autre moitié : la chaîne porte bien une APIError, et la cible vise autre chose. Un As qui
+	// rendrait vrai sans rien écrire remplirait la cible de l'appelant de zéros et arrêterait la
+	// remontée de la chaîne — un `*json.SyntaxError` nul, qu'il déréférencerait.
+	t.Run("ne détourne pas la cible d'un autre type", func(t *testing.T) {
+		t.Parallel()
+
+		var syntaxErr *json.SyntaxError
+
+		assert.NotErrorAs(t, err, &syntaxErr)
+		assert.Nil(t, syntaxErr)
+	})
 }
 
 func marshaled(t *testing.T, value any) string {

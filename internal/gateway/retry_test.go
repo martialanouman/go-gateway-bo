@@ -178,6 +178,54 @@ func TestAdminClientReplaysADroppedConnection(t *testing.T) {
 	assert.Equal(t, 2, api.count())
 }
 
+// Le rejeu attend cent à deux cents millisecondes avant de repartir, et cette attente est la seule
+// portion du trajet qui ne consulte rien. Un opérateur qui quitte l'écran, ou un arrêt propre qui
+// annule les requêtes en vol, doit rendre la main tout de suite : l'attendre, c'est retenir une
+// goroutine et une connexion pour une tentative dont on sait déjà qu'elle échouera sur le contexte.
+//
+// Ce que ce test observe est le **délai**, et non le nombre de requêtes : celui-ci vaut 1 dans les
+// deux cas, parce que net/http refuse d'émettre sur un contexte annulé, avec ou sans attente. Le
+// chronomètre part de l'annulation, posée dans le handler, et non du début de l'appel : ce qui est
+// mesuré est ce qui vient après elle. Sans la garde, le minuteur impose au moins replayDelay ; avec
+// elle, il ne reste qu'un aller-retour de goroutines.
+func TestAdminClientStopsWaitingWhenTheCallerGivesUp(t *testing.T) {
+	t.Parallel()
+
+	var (
+		api        recorder
+		cancelled  = make(chan time.Time, 1)
+		ctx, renow = context.WithCancel(t.Context())
+	)
+	defer renow()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		api.record(req)
+
+		// L'opérateur ferme l'onglet pendant que la passerelle répond : le rejeu est décidé, et
+		// l'attente qui le précède commence après cette annulation.
+		renow()
+		cancelled <- time.Now()
+
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	t.Cleanup(server.Close)
+
+	client, err := gateway.NewAdminClient(config.GatewayConfig{
+		Mode:    config.GatewayModeMock,
+		BaseURL: server.URL,
+		Timeout: 5 * time.Second,
+	})
+	require.NoError(t, err)
+
+	require.Error(t, listCustomers(ctx, client),
+		"l'appelant a renoncé : l'appel remonte l'annulation, pas une réponse")
+
+	assert.Less(t, time.Since(<-cancelled), 100*time.Millisecond,
+		"le rejeu a purgé son délai d'attente alors que l'appelant avait déjà renoncé ; la requête "+
+			"suivante ne partira pourtant jamais")
+	assert.Equal(t, 1, api.count())
+}
+
 // Le croisement que les deux tests voisins laissent ouvert : une **mutation** dont la connexion
 // tombe. Chacun n'exerce qu'une moitié — « ne rejoue jamais un POST » sur un 502 de réponse, le
 // rejeu d'une connexion coupée sur une lecture — et le défaut qu'on commet vraiment vit précisément

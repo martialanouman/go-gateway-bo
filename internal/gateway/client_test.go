@@ -122,6 +122,75 @@ func TestAdminClientRefusesAnUnknownGatewayMode(t *testing.T) {
 	}
 }
 
+// La même frontière que le test voisin, sur l'autre moitié de la configuration : `config.Load`
+// refuse déjà une passerelle réelle jointe en clair, mais cette polarité s'arrête à l'environnement.
+// NewAdminClient prend une struct nue, et un `http://` qui la traverse ne casse rien de visible —
+// http.Transport ne consulte pas son tls.Config, le matériel mTLS est chargé, posé, jamais présenté.
+//
+// Mesuré le 02/08/2026 avant cette garde, en mode `real` avec un matériel mTLS valide et les deux
+// bouts en clair : `NewAdminClient` rend nil, l'API reçoit `Bearer jeton-machine-1` et
+// `clientCerts:0`, et le tokenUrl reçoit `Basic ZGFzaGJvYXJkOnNlY3JldA==` — le secret client en
+// Base64 sur le fil, avec les cinq scopes dont `gdpr:erase`.
+func TestAdminClientRefusesAPlaintextGatewayInRealMode(t *testing.T) {
+	t.Parallel()
+
+	pki := newTestPKI(t)
+
+	withGateway := func(baseURL, tokenURL string) config.GatewayConfig {
+		return config.GatewayConfig{
+			Mode:         config.GatewayModeReal,
+			BaseURL:      baseURL,
+			TokenURL:     tokenURL,
+			ClientID:     "tableau-de-bord",
+			ClientSecret: "secret-de-test",
+			ClientCert:   pki.clientCertFile,
+			ClientKey:    pki.clientKeyFile,
+			CACert:       pki.caFile,
+			Timeout:      time.Second,
+		}
+	}
+
+	t.Run("refuse une API jointe en clair", func(t *testing.T) {
+		t.Parallel()
+
+		client, err := gateway.NewAdminClient(
+			withGateway("http://passerelle.test/v1", "https://passerelle.test/token"))
+
+		require.Error(t, err,
+			"le jeton machine et ses cinq scopes partiraient en clair, mTLS chargé et jamais présenté")
+		assert.Nil(t, client)
+		assert.Contains(t, err.Error(), "http://passerelle.test/v1",
+			"le message doit nommer l'URL fautive : sinon l'exploitant relit les deux")
+		assert.NotContains(t, err.Error(), "secret-de-test", "un secret ne sort pas dans une erreur")
+	})
+
+	t.Run("refuse un tokenUrl joint en clair", func(t *testing.T) {
+		t.Parallel()
+
+		client, err := gateway.NewAdminClient(
+			withGateway("https://passerelle.test/v1", "http://passerelle.test/token"))
+
+		require.Error(t, err,
+			"c'est là que part le secret client en Basic ; en clair, il est lisible sur le fil")
+		assert.Nil(t, client)
+		assert.Contains(t, err.Error(), "http://passerelle.test/token")
+		assert.NotContains(t, err.Error(), "secret-de-test", "un secret ne sort pas dans une erreur")
+	})
+
+	// Le schéma d'une URL est insensible à la casse, et net/url le minuscule à l'analyse
+	// ($GOROOT/src/net/url/url.go:454). Refuser `HTTPS://` refuserait une passerelle parfaitement
+	// joignable, et une garde qui refuse du légitime finit par être retirée.
+	t.Run("accepte un schéma en majuscules", func(t *testing.T) {
+		t.Parallel()
+
+		client, err := gateway.NewAdminClient(
+			withGateway("HTTPS://passerelle.test/v1", "HTTPS://passerelle.test/token"))
+
+		require.NoError(t, err)
+		assert.NotNil(t, client)
+	})
+}
+
 // NewAdminClient lit le matériel mTLS à la construction et refuse en nommant le fichier fautif
 // (§1.8), plutôt que de rendre un client qui échouera à sa première requête. Aucune de ces erreurs
 // ne porte le secret client, qui n'entre pas ici.

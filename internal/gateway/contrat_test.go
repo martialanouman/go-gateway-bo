@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -23,7 +24,10 @@ import (
 // décrit les routes du BFF, et l'overlay OpenAPI déposé sous `api/` ne contient que des actions de
 // patch. Ni l'un ni l'autre ne déclare les opérations du plan de contrôle de la passerelle.
 type contract struct {
-	npmFile    string
+	npmFile string
+	// identity nomme le **document**, là où les signatures nomment ses opérations : son titre, l'URL
+	// de son serveur. Elle n'entre pas dans le décompte, elle le conditionne — voir copiedIn.
+	identity   []signature
 	signatures []signature
 }
 
@@ -35,10 +39,15 @@ type declaration struct{ key, value string }
 // nommera ses opérations dans la même langue — `list-customers` figurera dans son contrat, sous ses
 // chemins à lui. Le couple chemin + operationId, lui, n'appartient qu'à la passerelle.
 //
-// La moitié chemin de la signature, elle, n'est pas falsifiable : aucun document légitime ne déclare
-// un chemin `/admin/…`, donc aucun test ne rougit si on la retire — vérifié en la retirant. Elle
-// reste parce qu'elle ne coûte rien et que le jour où elle servira — un contrat du BFF qui reprendrait
-// les chemins de la passerelle — personne ne pensera à la rajouter.
+// La moitié chemin de la signature ne discrimine que du côté Admin : aucun document légitime ne
+// déclare un chemin `/admin/…`, et aucun test ne rougit si on la retire — re-vérifié le 02/08/2026
+// en la retirant, suite du package entièrement verte. Elle reste parce qu'elle ne coûte rien et que
+// le jour où elle servira — un contrat du BFF qui reprendrait les chemins de la passerelle —
+// personne ne pensera à la rajouter.
+//
+// Du côté public elle ne discrimine **rien** : `/messages` et `/account` sont les chemins de
+// n'importe quel document dont les clés sont relatives à un `servers.url`. C'est `identity` qui y
+// porte le verdict.
 type signature []declaration
 
 func operation(path, operationID string) signature {
@@ -55,10 +64,17 @@ func operation(path, operationID string) signature {
 // qu'une copie fait par construction. Elles couvrent les dix domaines du plan de contrôle : un
 // contrat amputé d'un domaine reste très au-dessus du seuil.
 //
-// La limite s'énonce et ne se corrige pas : le contrat public n'a que cinq opérations liées à un
-// chemin, donc son échantillon plafonne à sept signatures et son seuil à quatre. Ce dépôt ne relaie
-// pas l'API publique et n'a aucune raison d'en documenter les chemins nus ; le jour où il en aurait
-// une, c'est ce commentaire qu'il faudra relire.
+// Ce raisonnement tient pour le contrat Admin et **pas** pour le contrat public, parce qu'il repose
+// sur la moitié chemin de la signature : aucun document que nous écrivons ne déclare un chemin
+// `/admin/…`. Le contrat public, lui, n'a que cinq opérations, et leurs chemins sont ceux que prend
+// n'importe quel document OpenAPI dont les clés sont relatives à son `servers.url` — `/health`,
+// `/messages`, `/messages/{id}`, `/account`. Mesuré le 02/08/2026 : un `api/openapi-bff.yaml`
+// plausible, servi sous `servers: [{url: /api}]`, rendait 5 signatures sur 7 et le verdict « copie ».
+// La porte accusait donc le contrat du BFF de copier celui de la passerelle.
+//
+// D'où `identity` sur le contrat public : ses opérations ne le désignent pas, son titre et l'URL de
+// son serveur si. Une copie les porte par construction — on copie un fichier, pas une liste
+// d'opérations — et aucun document que nous écrivons ne les porte.
 var gatewayContracts = []contract{
 	{
 		npmFile: "openapi-admin.yaml",
@@ -95,14 +111,16 @@ var gatewayContracts = []contract{
 	},
 	{
 		npmFile: "openapi-public.yaml",
+		identity: []signature{
+			{{key: "title", value: "SMS Gateway — Public API"}},
+			{{key: "url", value: "https://api.gateway.example.com/v1"}},
+		},
 		signatures: []signature{
 			operation("/messages", "submit-messages"),
 			operation("/messages", "list-messages"),
 			operation("/messages/{id}", "get-message"),
 			operation("/account", "get-account"),
 			operation("/health", "health"),
-			{{key: "title", value: "SMS Gateway — Public API"}},
-			{{key: "url", value: "https://api.gateway.example.com/v1"}},
 		},
 	},
 }
@@ -120,7 +138,19 @@ func (c contract) copiedIn(declarations map[declaration]bool) (int, bool) {
 		}
 	}
 
-	return matched, matched > 0 && 2*matched >= len(c.signatures)
+	return matched, matched > 0 && 2*matched >= len(c.signatures) && c.identifiedIn(declarations)
+}
+
+// identifiedIn dit si le document se présente **comme** le contrat. Sans identité déclarée, tout
+// document l'est : c'est le cas du contrat Admin, que ses chemins `/admin/…` désignent à eux seuls.
+// Une seule marque suffit — un contrat republié peut changer l'URL de son serveur sans changer de
+// titre, et l'inverse.
+func (c contract) identifiedIn(declarations map[declaration]bool) bool {
+	if len(c.identity) == 0 {
+		return true
+	}
+
+	return slices.ContainsFunc(c.identity, func(s signature) bool { return s.declaredIn(declarations) })
 }
 
 func (s signature) declaredIn(declarations map[declaration]bool) bool {
@@ -248,10 +278,10 @@ func repositoryRoot(t *testing.T) string {
 
 // Ces cas prouvent le discriminant, pas la fidélité des signatures au contrat publié : celle-là ne
 // se vérifie qu'en passant les vrais YAML du paquet npm dans `copiedIn`. Fait à la main le
-// 02/08/2026 sur le contrat 2.5.0 : `openapi-admin.yaml` rend 28 signatures sur 28,
-// `openapi-public.yaml` 7 sur 7, les deux verdicts à « copie ». C'est à refaire quand le contrat
-// change de version majeure — un échantillon qui aurait dérivé rendrait cette porte verte sur une
-// vraie copie.
+// 02/08/2026 sur le contrat 2.5.0, chacun recopié sous un autre nom et une autre extension :
+// `openapi-admin.yaml` rend 28 signatures sur 28, `openapi-public.yaml` 5 sur 5 et son identité,
+// les deux verdicts à « copie ». C'est à refaire quand le contrat change de version majeure — un
+// échantillon qui aurait dérivé rendrait cette porte verte sur une vraie copie.
 //
 // Les documents sont rendus à partir du même tableau plutôt qu'écrits en clair : un YAML de contrat
 // recopié dans un littéral de ce fichier ferait tomber la porte ci-dessus sur ce fichier-ci, et
@@ -312,6 +342,64 @@ func TestACopyIsRecognizedByWhatItDeclares(t *testing.T) {
 			assert.Falsef(t, copied, "le contrat du BFF est refusé (%d/%d contre %s) : la porte "+
 				"interdit d'écrire le contrat qu'elle est censée protéger",
 				matched, len(gatewayContract.signatures), gatewayContract.npmFile)
+		}
+	})
+
+	// Le contrat du BFF n'a aucune raison de préfixer ses chemins : `servers.url` porte le préfixe, et
+	// les clés de chemin sont **relatives** à lui. C'est la forme normale d'un document OpenAPI, et
+	// c'est celle que prendra `api/openapi-bff.yaml` — un `/health` que step-004 prévoit, un
+	// explorateur de messages, une page « mon compte ». Les cinq opérations du contrat public portent
+	// exactement ces chemins-là.
+	//
+	// Mesuré le 02/08/2026, sur l'échantillon d'alors — sept signatures, titre et URL comptés avec les
+	// opérations : 5 sur 7, verdict « copie », et 4 sur 7 en retirant `/account`, verdict « copie »
+	// encore. La porte accusait donc le contrat du BFF de copier celui de la passerelle, et la sortie
+	// qu'on prend sous pression est l'exemption par chemin.
+	t.Run("laisse passer un contrat du BFF à chemins relatifs", func(t *testing.T) {
+		t.Parallel()
+
+		bff := yamlDeclaring(
+			signature{{key: "title", value: "Tableau de bord — BFF"}},
+			signature{{key: "url", value: "/api"}},
+			operation("/health", "health"),
+			operation("/messages", "list-messages"),
+			operation("/messages", "submit-messages"),
+			operation("/messages/{id}", "get-message"),
+			operation("/account", "get-account"),
+		)
+
+		for _, gatewayContract := range gatewayContracts {
+			matched, copied := gatewayContract.copiedIn(declarationsIn(bff))
+
+			assert.Falsef(t, copied, "le contrat du BFF est refusé (%d/%d contre %s) : ses chemins sont "+
+				"relatifs à son propre servers.url, et ses opérations s'écrivent comme celles de l'API "+
+				"publique — /health, /messages, /account. Aucun document que nous écrivons ne porte "+
+				"l'identité du contrat de la passerelle, et c'est elle qui doit faire le verdict",
+				matched, len(gatewayContract.signatures), gatewayContract.npmFile)
+		}
+	})
+
+	// L'autre moitié : le contrat public reste reconnu, chemins génériques compris. Une copie porte
+	// l'identité du document copié — son titre, l'URL de son serveur — parce qu'on copie un fichier,
+	// pas une liste d'opérations. **Une seule marque suffit**, et chacune est exercée seule : un
+	// contrat republié peut changer l'URL de son serveur sans changer de titre, et l'inverse. Les
+	// exiger toutes rendrait la porte verte sur une copie du lendemain.
+	t.Run("reconnaît une copie du contrat public", func(t *testing.T) {
+		t.Parallel()
+
+		public := gatewayContracts[1]
+
+		for _, marker := range public.identity {
+			t.Run(marker[0].key, func(t *testing.T) {
+				t.Parallel()
+
+				document := yamlDeclaring(slices.Concat([]signature{marker}, public.signatures)...)
+
+				matched, copied := public.copiedIn(declarationsIn(document))
+
+				assert.Truef(t, copied, "%d signatures sur %d et la marque %q n'ont pas suffi à "+
+					"reconnaître le contrat public", matched, len(public.signatures), marker[0].key)
+			})
 		}
 	})
 
