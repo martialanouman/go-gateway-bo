@@ -16,8 +16,8 @@ le Go embarque les assets de la SPA.
 ## Commandes
 
 > `make help` liste ce qui existe, et c'est la cible par défaut — préférer la lancer à croire ce
-> bloc. Sont encore des **cibles**, et arrivent avec les steps qui les habitent : `make migrate`,
-> `make bootstrap`. Une cible absente rend `No rule to make target`, jamais un vert silencieux.
+> bloc. Est encore une **cible**, et arrive avec la step qui l'habite : `make bootstrap`. Une cible
+> absente rend `No rule to make target`, jamais un vert silencieux.
 
 ```bash
 make dev          # BFF Go (:3001) + Vite (:3000), /api et /ws proxifiés vers le BFF
@@ -29,6 +29,8 @@ make generate     # oapi-codegen → client Go de l'API Admin, serveur Go du BFF
                   # openapi-typescript → types TS du BFF ; le catalogue de permissions en step-006
 make mock         # mock Prism sur openapi-admin.yaml, sur :4010
 make check-generated  # ce qui dérive des deux contrats OpenAPI est-il à jour ?
+make migrate      # migrations goose sur DASHBOARD_DATABASE_URL — celle de l'appelant l'emporte
+                  # sur .env, et le DSN passe par stdin plutôt que par argv, que `ps` afficherait
 
 # Une porte granulaire par job de CI, à lancer seule pendant une boucle rouge → vert :
 #   build-go (Build Go) · lint-go (+ fmt-go pour appliquer) · vuln-go (govulncheck)

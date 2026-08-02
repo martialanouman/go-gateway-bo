@@ -9,6 +9,15 @@ Fonctionnalité: Configuration validée au démarrage
     Alors le serveur refuse de démarrer
     Et le message d'erreur nomme "DASHBOARD_ADDR"
 
+  # Le DSN est exigé alors qu'aucune route ne lit encore la base : le pool est paresseux et rien ne
+  # se connecte au démarrage, mais une installation dont le DSN ne veut rien dire s'arrête ici plutôt
+  # qu'au premier écran qui demandera la base.
+  Scénario: un DSN de base mal formé empêche le démarrage
+    Étant donné une configuration complète dont on passe "DASHBOARD_DATABASE_URL" à "pas-un-dsn"
+    Quand le serveur démarre
+    Alors le serveur refuse de démarrer
+    Et le message d'erreur nomme "DASHBOARD_DATABASE_URL"
+
   # La passerelle réelle est le défaut : c'est l'installation qui croit être en production, mais à
   # qui personne n'a donné de quoi s'authentifier, qui doit s'arrêter là plutôt qu'au premier écran.
   Scénario: la passerelle réelle sans identifiants empêche le démarrage

@@ -26,8 +26,13 @@ func minimalEnv() map[string]string {
 		config.EnvAddr:           ":3001",
 		config.EnvGatewayMode:    string(config.GatewayModeMock),
 		config.EnvGatewayBaseURL: "http://127.0.0.1:4010",
+		config.EnvDatabaseURL:    localDatabaseURL,
 	}
 }
+
+// localDatabaseURL est le DSN du `docker-compose.yml` de développement : ni un secret d'installation,
+// ni une base que ces tests joignent — rien ici n'ouvre de connexion.
+const localDatabaseURL = "postgres://dashboard:dashboard@127.0.0.1:5432/dashboard"
 
 // realGatewayEnv est un environnement complet en mode `real` : tout ce qu'exige une passerelle
 // jointe pour de vrai, sans aucune valeur qui ressemble à un secret d'installation.
@@ -44,6 +49,7 @@ func realGatewayEnv() map[string]string {
 		config.EnvGatewayCACert:       "/etc/dashboard/tls/ca.crt",
 		config.EnvGatewayTimeout:      "5s",
 		config.EnvShutdownTimeout:     "30s",
+		config.EnvDatabaseURL:         localDatabaseURL,
 	}
 }
 
@@ -293,6 +299,65 @@ func TestLoadGateway(t *testing.T) {
 	})
 }
 
+func TestLoadDatabase(t *testing.T) {
+	t.Parallel()
+
+	t.Run("charge le DSN verbatim", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(minimalEnv()))
+
+		require.NoError(t, err)
+		assert.Equal(t, localDatabaseURL, cfg.DatabaseURL)
+	})
+
+	// Le DSN est exigé alors qu'aucune route ne lit encore la base (DN-5) : une installation à qui
+	// personne n'a donné de base doit s'arrêter au démarrage, pas au premier écran qui la demande.
+	t.Run("exige le DSN de la base", func(t *testing.T) {
+		t.Parallel()
+
+		env := minimalEnv()
+		delete(env, config.EnvDatabaseURL)
+
+		_, err := config.Load(lookupFrom(env))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), config.EnvDatabaseURL+" : variable obligatoire absente")
+	})
+
+	// Un DSN PostgreSQL s'écrit aussi en `clé=valeur` (`host=… user=…`), forme que la validation d'URL
+	// du reste du fichier refuserait — et une garde qui refuse du légitime finit par être retirée.
+	t.Run("accepte la forme clé=valeur", func(t *testing.T) {
+		t.Parallel()
+
+		const keywordValue = "host=127.0.0.1 port=5432 user=dashboard dbname=dashboard sslmode=disable"
+
+		cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+			config.EnvDatabaseURL: keywordValue,
+		})))
+
+		require.NoError(t, err)
+		assert.Equal(t, keywordValue, cfg.DatabaseURL)
+	})
+
+	// Le mot de passe de la base vit dans le DSN. Mesuré sur pgx v5.10.0 : la rédaction de la
+	// bibliothèque (`pgconn/errors.go:230`, deux expressions rationnelles sur `password=`) ne couvre
+	// pas `password = '…'` avec espaces — son propre message d'erreur rend alors le mot de passe en
+	// clair. C'est pourquoi le nôtre ne cite ni la valeur, ni le message de la bibliothèque.
+	t.Run("ne recopie jamais le mot de passe de la base dans le message", func(t *testing.T) {
+		t.Parallel()
+
+		const password = "s3cr3t-de-la-base"
+
+		_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+			config.EnvDatabaseURL: "password = '" + password + "' host",
+		})))
+
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), password)
+	})
+}
+
 func TestLoadRejectsMalformedValues(t *testing.T) {
 	t.Parallel()
 
@@ -370,6 +435,26 @@ func TestLoadRejectsMalformedValues(t *testing.T) {
 			overrides: map[string]string{config.EnvGatewayTokenURL: "http://auth.gateway.internal/token"},
 			mention:   config.EnvGatewayTokenURL,
 		},
+		// Ni une URL `postgres://`, ni une forme `clé=valeur` : c'est l'adresse de la passerelle
+		// recopiée d'une ligne à l'autre du `.env`, et rien ne la refuserait avant la première requête.
+		"un DSN qui n'est pas un DSN": {
+			overrides: map[string]string{config.EnvDatabaseURL: "http://127.0.0.1:4010"},
+			mention:   config.EnvDatabaseURL,
+		},
+		"un DSN dont l'hôte est illisible": {
+			overrides: map[string]string{
+				config.EnvDatabaseURL: "postgres://dashboard@127.0.0.1:5432:9/dashboard",
+			},
+			mention: config.EnvDatabaseURL,
+		},
+		// Les réglages de pool voyagent dans le DSN, et seul le parseur du pool les lit : validé par
+		// celui de la connexion seule, ce DSN passerait ici pour échouer à la création du pool.
+		"un DSN dont un réglage de pool est illisible": {
+			overrides: map[string]string{
+				config.EnvDatabaseURL: localDatabaseURL + "?pool_max_conns=beaucoup",
+			},
+			mention: config.EnvDatabaseURL,
+		},
 	}
 
 	for name, tc := range cases {
@@ -417,5 +502,6 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvGatewayClientKey,
 		config.EnvGatewayCACert,
 		config.EnvGatewayTimeout,
+		config.EnvDatabaseURL,
 	}, config.Variables())
 }

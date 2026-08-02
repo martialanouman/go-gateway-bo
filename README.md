@@ -36,7 +36,7 @@ pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"
 pnpm -C web install
 cp .env.example .env       # puis remplir les secrets — voir plus bas
 docker compose up -d       # PostgreSQL 18 + Redis
-make migrate               # applique les migrations                        (cible, step-005)
+make migrate               # applique les migrations
 make bootstrap             # sème les permissions et crée le premier compte (cible)
 make mock                  # Prism sert le contrat sur :4010, autre terminal
 make dev                   # BFF (:3001) + Vite (:3000) — l'application est sur :3000
@@ -89,7 +89,9 @@ make clean      # supprime bin/, web/dist et les assets copiés dans internal/we
 make generate   # client Go de l'API Admin depuis le contrat installé ; serveur Go et types TS du
                 # BFF depuis api/openapi-bff.yaml — le catalogue de permissions en step-006
 make mock       # Prism sur openapi-admin.yaml, sur :4010
-make migrate    # migrations de la base                               (cible, step-005)
+make migrate    # migrations goose. Le DSN de l'appelant l'emporte sur .env — c'est ce qui rend
+                # DASHBOARD_DATABASE_URL=…/staging make migrate sûr — et passe par stdin, jamais
+                # par argv : `ps aux` afficherait le mot de passe de la base
 
 make test-go           # unitaires Go + scénarios godog, avec -race
 make lint-go           # golangci-lint · make fmt-go applique le formatage
@@ -159,7 +161,7 @@ le client — un test la cherche dans le bundle.
 
 ## Base de données
 
-Le BFF est propriétaire d'un petit schéma PostgreSQL : opérateurs, rôles et permissions, sessions,
+Le BFF est propriétaire d'un petit schéma PostgreSQL : opérateurs, rôles et permissions,
 journal d'audit, règles d'alerte, notifications, vues sauvegardées. **Il ne lit jamais la base de la
 passerelle** : tout ce qui vient d'elle passe par l'API Admin.
 

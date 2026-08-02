@@ -110,7 +110,7 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - [x] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
 - [ ] step-009 — Contrat Admin en **4.0.0** : deux majeures depuis 2.5.0, diff du YAML relu §
 - [x] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS ‡
-- [ ] step-005 — PostgreSQL : `pgx`, migrations, les six tables du §3.1, `audit_log` partitionné
+- [x] step-005 — PostgreSQL : `pgx`, migrations, les tables du §3.1, `audit_log` partitionné
 - [ ] step-006 — Catalogue de permissions : source Go, génération TS, test de divergence bloquant
 - [ ] step-007 — Harnais BDD : `godog`, `testify`, testcontainers, Vitest, Playwright, CI à deux toolchains
 - [ ] step-008 — Charte : tokens depuis le kit UI, `/_design`, contraste AA vérifié
@@ -128,7 +128,7 @@ contrat Admin, donc l'argument du renvoi § n'est pas entamé : ce qui reste à 
 grossi. step-009 garde sa place, en tête de ce qui reste.
 
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
-- [ ] step-020 — Schéma auth (operators, roles, permissions, jointures) + seed des 44 clés et des 9 rôles
+- [ ] step-020 — Seed auth : les 44 clés de permission et les 9 rôles par défaut, idempotent ¶
 - [ ] step-021 — Login email/mot de passe (**argon2id**) + anti-brute-force partagé entre instances
 - [ ] step-022 — Session BFF (cookie signé) + `/auth/me` + `/auth/logout`
 - [ ] step-023 — MFA TOTP : enrôlement, vérification, codes de récupération
@@ -160,6 +160,14 @@ n'aurait eu aucun moyen d'en sortir. **Administrer des opérateurs suppose d'abo
 `usePermission` / `PermissionGate` sont livrés par **`step-040`** et non par `step-027` : le rail de
 navigation filtre ses entrées par permission dès qu'il existe. La `step-027` les **consomme** et porte
 la règle de la charte : un contrôle interdit est désactivé et expliqué, jamais masqué.
+
+¶ **Les `CREATE TABLE` appartiennent à step-005, pas à celle-ci.** Cette ligne s'intitulait « Schéma
+auth » et revendiquait les mêmes tables que la fiche de step-005, qui ne lui cédait que le seed. Le
+partage est tranché dans ce sens parce que le test exigé par step-005 — « base vierge, migrations
+jouées, le schéma attendu existe » — est infalsifiable si les tables d'authentification n'y sont pas.
+step-020 hérite donc d'un schéma déjà en place, et porte en plus la **vérification de version du
+schéma au démarrage** : c'est la première step qui lit la base, donc la première où refuser de servir
+sur un schéma en retard protège quelque chose. *(Arbitré le 02/08/2026, au début de step-005.)*
 
 ## M2 — Coquille applicative & temps réel  (§4.1, §4.2, §5.2)
 

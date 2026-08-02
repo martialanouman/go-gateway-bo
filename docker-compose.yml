@@ -3,7 +3,7 @@
 # passerelle — clients, comptes SMPP, connecteurs, CDR et soldes se lisent à travers l'API Admin, à
 # chaque requête, et ne sont jamais recopiés ici (§3.2).
 #
-# Un poste neuf : `docker compose up -d` puis `pnpm db:migrate`.
+# Un poste neuf : `docker compose up -d` puis `make migrate`.
 
 services:
   postgres:
@@ -26,7 +26,7 @@ services:
       - postgres-18-data:/var/lib/postgresql
     healthcheck:
       # `pg_isready` répond avant que la base accepte réellement les connexions applicatives ;
-      # préciser l'utilisateur et la base évite un `pnpm db:migrate` lancé une seconde trop tôt.
+      # préciser l'utilisateur et la base évite un `make migrate` lancé une seconde trop tôt.
       test: ['CMD-SHELL', 'pg_isready -U dashboard -d dashboard']
       interval: 2s
       timeout: 3s
