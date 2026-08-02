@@ -115,6 +115,7 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | **Revue** — `.env` reprend la main sur le DSN de l'appelant | `entrée standard: …/depuis-le-fichier/local` au lieu de `/staging` |
 | **Revue** — le DSN repasse en argument | `argv: run ./cmd/migrate postgres://…/staging` |
 | **Revue** — `notifications.message` rendue nullable | **aucune porte ne rougit** — type et nullabilité de chaque colonne restent hors de portée ; écrit à côté de l'empreinte, avec le prix d'une empreinte de référence commitée |
+| **CI** — `--no-print-directory` retiré de la lecture de recette | rien **ici** — GNU Make 3.81 (macOS) n'imprime pas `Entering directory`. `make test-go` sur le runner : `sh: 1: make[1]:: not found`, `exit status 127`. Reproduit sur `golang:1.25` (Make 4.4.1) avant de corriger |
 | Image du conteneur pointée sur un tag inexistant | la suite **échoue** — aucun test exécuté, jamais un skip |
 | `%w` remis sur l'erreur de `ParseConfig` dans les migrations | `TestMigrateNeverEchoesTheDatabasePassword` — le mot de passe verbatim dans le message |
 
