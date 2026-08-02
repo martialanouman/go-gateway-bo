@@ -1258,10 +1258,12 @@ func (e InboundNumberUpdateStatus) Valid() bool {
 const (
 	Adjustment LedgerEntryEntryType = "adjustment"
 	Capture    LedgerEntryEntryType = "capture"
+	MoCharge   LedgerEntryEntryType = "mo_charge"
 	Refund     LedgerEntryEntryType = "refund"
 	Release    LedgerEntryEntryType = "release"
 	Reserve    LedgerEntryEntryType = "reserve"
 	Topup      LedgerEntryEntryType = "topup"
+	Transfer   LedgerEntryEntryType = "transfer"
 )
 
 // Valid indicates whether the value is a known member of the LedgerEntryEntryType enum.
@@ -1271,6 +1273,8 @@ func (e LedgerEntryEntryType) Valid() bool {
 		return true
 	case Capture:
 		return true
+	case MoCharge:
+		return true
 	case Refund:
 		return true
 	case Release:
@@ -1278,6 +1282,8 @@ func (e LedgerEntryEntryType) Valid() bool {
 	case Reserve:
 		return true
 	case Topup:
+		return true
+	case Transfer:
 		return true
 	default:
 		return false
@@ -2223,6 +2229,36 @@ func (e WebhookUpdateStatus) Valid() bool {
 	case WebhookUpdateStatusActive:
 		return true
 	case WebhookUpdateStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TopupBalanceJSONBodyDirection.
+const (
+	TopupBalanceJSONBodyDirectionMt TopupBalanceJSONBodyDirection = "mt"
+)
+
+// Valid indicates whether the value is a known member of the TopupBalanceJSONBodyDirection enum.
+func (e TopupBalanceJSONBodyDirection) Valid() bool {
+	switch e {
+	case TopupBalanceJSONBodyDirectionMt:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TransferBalanceJSONBodyDirection.
+const (
+	TransferBalanceJSONBodyDirectionMt TransferBalanceJSONBodyDirection = "mt"
+)
+
+// Valid indicates whether the value is a known member of the TransferBalanceJSONBodyDirection enum.
+func (e TransferBalanceJSONBodyDirection) Valid() bool {
+	switch e {
+	case TransferBalanceJSONBodyDirectionMt:
 		return true
 	default:
 		return false
@@ -3177,7 +3213,7 @@ type RatePlan struct {
 	CreatedAt               *time.Time             `json:"created_at,omitempty"`
 	CreditsPerSegmentMoJson map[string]interface{} `json:"credits_per_segment_mo_json"`
 
-	// CreditsPerSegmentMtJson Integer credits per MT segment
+	// CreditsPerSegmentMtJson Integer credits per MT segment, by MCC-MNC/country + sender type.
 	CreditsPerSegmentMtJson map[string]interface{} `json:"credits_per_segment_mt_json"`
 	Id                      openapi_types.UUID     `json:"id"`
 	Name                    string                 `json:"name"`
@@ -3727,6 +3763,12 @@ type Forbidden = Error
 // status is on the status line, not duplicated in the body.
 type NotFound = Error
 
+// ServiceUnavailable Flat error model (application/json). `code` is the stable machine-readable error code — the
+// cross-protocol contract also carried by SMPP command_status (engineering guide §11). `message`
+// is human-readable. `errors[]` carries per-field detail on validation failures. The numeric HTTP
+// status is on the status line, not duplicated in the body.
+type ServiceUnavailable = Error
+
 // Unauthorized Flat error model (application/json). `code` is the stable machine-readable error code — the
 // cross-protocol contract also carried by SMPP command_status (engineering guide §11). `message`
 // is human-readable. `errors[]` carries per-field detail on validation failures. The numeric HTTP
@@ -3779,19 +3821,27 @@ type ChangeBalanceScopeJSONBody struct {
 
 // TopupBalanceJSONBody defines parameters for TopupBalance.
 type TopupBalanceJSONBody struct {
-	AccountId *openapi_types.UUID `json:"account_id,omitempty"`
-	Credits   int                 `json:"credits"`
-	Direction Direction           `json:"direction"`
-	Reference *string             `json:"reference,omitempty"`
+	AccountId      *openapi_types.UUID           `json:"account_id,omitempty"`
+	Credits        int                           `json:"credits"`
+	Direction      TopupBalanceJSONBodyDirection `json:"direction"`
+	IdempotencyKey openapi_types.UUID            `json:"idempotency_key"`
+	Reference      *string                       `json:"reference,omitempty"`
 }
+
+// TopupBalanceJSONBodyDirection defines parameters for TopupBalance.
+type TopupBalanceJSONBodyDirection string
 
 // TransferBalanceJSONBody defines parameters for TransferBalance.
 type TransferBalanceJSONBody struct {
-	Credits     int                `json:"credits"`
-	Direction   Direction          `json:"direction"`
-	FromOwnerId openapi_types.UUID `json:"from_owner_id"`
-	ToOwnerId   openapi_types.UUID `json:"to_owner_id"`
+	Credits        int                              `json:"credits"`
+	Direction      TransferBalanceJSONBodyDirection `json:"direction"`
+	FromOwnerId    openapi_types.UUID               `json:"from_owner_id"`
+	IdempotencyKey openapi_types.UUID               `json:"idempotency_key"`
+	ToOwnerId      openapi_types.UUID               `json:"to_owner_id"`
 }
+
+// TransferBalanceJSONBodyDirection defines parameters for TransferBalance.
+type TransferBalanceJSONBodyDirection string
 
 // SetCustomerGroupJSONBody defines parameters for SetCustomerGroup.
 type SetCustomerGroupJSONBody struct {
@@ -16018,11 +16068,25 @@ type ListBillingProvidersResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]ExternalBillingProvider
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListBillingProvidersResponse) GetJSON200() *[]ExternalBillingProvider {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListBillingProvidersResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListBillingProvidersResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetBody returns the raw response body bytes
@@ -16059,11 +16123,32 @@ type CreateBillingProviderResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *ExternalBillingProvider
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
 func (r CreateBillingProviderResponse) GetJSON201() *ExternalBillingProvider {
 	return r.JSON201
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CreateBillingProviderResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r CreateBillingProviderResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r CreateBillingProviderResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -16098,6 +16183,27 @@ func (r CreateBillingProviderResponse) ContentType() string {
 type DeleteBillingProviderResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteBillingProviderResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteBillingProviderResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteBillingProviderResponse) GetJSON404() *NotFound {
+	return r.JSON404
 }
 
 // GetBody returns the raw response body bytes
@@ -16134,8 +16240,14 @@ type UpdateBillingProviderResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ExternalBillingProvider
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -16143,9 +16255,24 @@ func (r UpdateBillingProviderResponse) GetJSON200() *ExternalBillingProvider {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateBillingProviderResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdateBillingProviderResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r UpdateBillingProviderResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r UpdateBillingProviderResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -16186,6 +16313,12 @@ type TestBillingProviderResponse struct {
 		LatencyMs *int    `json:"latency_ms,omitempty"`
 		Ok        bool    `json:"ok"`
 	}
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -16195,6 +16328,21 @@ func (r TestBillingProviderResponse) GetJSON200() *struct {
 	Ok        bool    `json:"ok"`
 } {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r TestBillingProviderResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r TestBillingProviderResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r TestBillingProviderResponse) GetJSON404() *NotFound {
+	return r.JSON404
 }
 
 // GetBody returns the raw response body bytes
@@ -17457,8 +17605,14 @@ type GetCustomerBalancesResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]Balance
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -17466,9 +17620,24 @@ func (r GetCustomerBalancesResponse) GetJSON200() *[]Balance {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetCustomerBalancesResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetCustomerBalancesResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r GetCustomerBalancesResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetCustomerBalancesResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -17505,8 +17674,14 @@ type GetCustomerBillingResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *BillingCustomer
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -17514,9 +17689,24 @@ func (r GetCustomerBillingResponse) GetJSON200() *BillingCustomer {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetCustomerBillingResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetCustomerBillingResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r GetCustomerBillingResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetCustomerBillingResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -17553,6 +17743,12 @@ type UpdateCustomerBillingResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *BillingCustomer
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *ValidationError
 }
@@ -17560,6 +17756,21 @@ type UpdateCustomerBillingResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r UpdateCustomerBillingResponse) GetJSON200() *BillingCustomer {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateCustomerBillingResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdateCustomerBillingResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r UpdateCustomerBillingResponse) GetJSON404() *NotFound {
+	return r.JSON404
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -17601,11 +17812,39 @@ type GetBillingLedgerResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *LedgerPage
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetBillingLedgerResponse) GetJSON200() *LedgerPage {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetBillingLedgerResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetBillingLedgerResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetBillingLedgerResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetBillingLedgerResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -17642,8 +17881,16 @@ type ChangeBalanceScopeResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Customer
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
 	// JSON409 the response for an HTTP 409 `application/json` response
 	JSON409 *Conflict
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -17651,9 +17898,29 @@ func (r ChangeBalanceScopeResponse) GetJSON200() *Customer {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ChangeBalanceScopeResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ChangeBalanceScopeResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ChangeBalanceScopeResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
 // GetJSON409 returns the response for an HTTP 409 `application/json` response
 func (r ChangeBalanceScopeResponse) GetJSON409() *Conflict {
 	return r.JSON409
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ChangeBalanceScopeResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -17690,6 +17957,14 @@ type TopupBalanceResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *LedgerEntry
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *ValidationError
 }
@@ -17697,6 +17972,26 @@ type TopupBalanceResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r TopupBalanceResponse) GetJSON200() *LedgerEntry {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r TopupBalanceResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r TopupBalanceResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r TopupBalanceResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r TopupBalanceResponse) GetJSON409() *Conflict {
+	return r.JSON409
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -17738,6 +18033,14 @@ type TransferBalanceResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]LedgerEntry
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *ValidationError
 }
@@ -17745,6 +18048,26 @@ type TransferBalanceResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r TransferBalanceResponse) GetJSON200() *[]LedgerEntry {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r TransferBalanceResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r TransferBalanceResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r TransferBalanceResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r TransferBalanceResponse) GetJSON409() *Conflict {
+	return r.JSON409
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -17875,8 +18198,12 @@ type EraseCustomerContentResponse struct {
 	HTTPResponse *http.Response
 	// JSON202 the response for an HTTP 202 `application/json` response
 	JSON202 *AsyncJob
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *Forbidden
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
 }
 
 // GetJSON202 returns the response for an HTTP 202 `application/json` response
@@ -17884,9 +18211,19 @@ func (r EraseCustomerContentResponse) GetJSON202() *AsyncJob {
 	return r.JSON202
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r EraseCustomerContentResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r EraseCustomerContentResponse) GetJSON403() *Forbidden {
 	return r.JSON403
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r EraseCustomerContentResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -17923,11 +18260,39 @@ type RotateContentKeyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ContentKey
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r RotateContentKeyResponse) GetJSON200() *ContentKey {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r RotateContentKeyResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r RotateContentKeyResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r RotateContentKeyResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r RotateContentKeyResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -18777,8 +19142,14 @@ type GdprEraseResponse struct {
 	HTTPResponse *http.Response
 	// JSON202 the response for an HTTP 202 `application/json` response
 	JSON202 *GdprEraseJob
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
 }
 
 // GetJSON202 returns the response for an HTTP 202 `application/json` response
@@ -18786,9 +19157,24 @@ func (r GdprEraseResponse) GetJSON202() *GdprEraseJob {
 	return r.JSON202
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GdprEraseResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r GdprEraseResponse) GetJSON403() *Forbidden {
 	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GdprEraseResponse) GetJSON422() *ValidationError {
+	return r.JSON422
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GdprEraseResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -18825,6 +19211,10 @@ type GetGdprEraseJobResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *GdprEraseJob
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
 }
@@ -18832,6 +19222,16 @@ type GetGdprEraseJobResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetGdprEraseJobResponse) GetJSON200() *GdprEraseJob {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetGdprEraseJobResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetGdprEraseJobResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -19491,6 +19891,8 @@ type GetMessageContentResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *MessageContent
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
@@ -19500,6 +19902,11 @@ type GetMessageContentResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetMessageContentResponse) GetJSON200() *MessageContent {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetMessageContentResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
 }
 
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
@@ -20047,11 +20454,25 @@ type ListRatePlansResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]RatePlan
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListRatePlansResponse) GetJSON200() *[]RatePlan {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListRatePlansResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListRatePlansResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetBody returns the raw response body bytes
@@ -20088,6 +20509,10 @@ type CreateRatePlanResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *RatePlan
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *ValidationError
 }
@@ -20095,6 +20520,16 @@ type CreateRatePlanResponse struct {
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
 func (r CreateRatePlanResponse) GetJSON201() *RatePlan {
 	return r.JSON201
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CreateRatePlanResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r CreateRatePlanResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -20134,8 +20569,29 @@ func (r CreateRatePlanResponse) ContentType() string {
 type DeleteRatePlanResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
 	// JSON409 the response for an HTTP 409 `application/json` response
 	JSON409 *Conflict
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteRatePlanResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteRatePlanResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteRatePlanResponse) GetJSON404() *NotFound {
+	return r.JSON404
 }
 
 // GetJSON409 returns the response for an HTTP 409 `application/json` response
@@ -20177,8 +20633,14 @@ type UpdateRatePlanResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *RatePlan
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -20186,9 +20648,24 @@ func (r UpdateRatePlanResponse) GetJSON200() *RatePlan {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateRatePlanResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdateRatePlanResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r UpdateRatePlanResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r UpdateRatePlanResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -25863,6 +26340,20 @@ func ParseListBillingProvidersResponse(rsp *http.Response) (*ListBillingProvider
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	}
 
 	return response, nil
@@ -25889,6 +26380,27 @@ func ParseCreateBillingProviderResponse(rsp *http.Response) (*CreateBillingProvi
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -25905,6 +26417,33 @@ func ParseDeleteBillingProviderResponse(rsp *http.Response) (*DeleteBillingProvi
 	response := &DeleteBillingProviderResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	}
 
 	return response, nil
@@ -25931,12 +26470,33 @@ func ParseUpdateBillingProviderResponse(rsp *http.Response) (*UpdateBillingProvi
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -25967,6 +26527,27 @@ func ParseTestBillingProviderResponse(rsp *http.Response) (*TestBillingProviderR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	}
 
@@ -26929,12 +27510,33 @@ func ParseGetCustomerBalancesResponse(rsp *http.Response) (*GetCustomerBalancesR
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -26962,12 +27564,33 @@ func ParseGetCustomerBillingResponse(rsp *http.Response) (*GetCustomerBillingRes
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -26994,6 +27617,27 @@ func ParseUpdateCustomerBillingResponse(rsp *http.Response) (*UpdateCustomerBill
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError
@@ -27028,6 +27672,34 @@ func ParseGetBillingLedgerResponse(rsp *http.Response) (*GetBillingLedgerRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -27054,12 +27726,40 @@ func ParseChangeBalanceScopeResponse(rsp *http.Response) (*ChangeBalanceScopeRes
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Conflict
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -27086,6 +27786,34 @@ func ParseTopupBalanceResponse(rsp *http.Response) (*TopupBalanceResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError
@@ -27119,6 +27847,34 @@ func ParseTransferBalanceResponse(rsp *http.Response) (*TransferBalanceResponse,
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError
@@ -27212,12 +27968,26 @@ func ParseEraseCustomerContentResponse(rsp *http.Response) (*EraseCustomerConten
 		}
 		response.JSON202 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
 		var dest Forbidden
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -27244,6 +28014,34 @@ func ParseRotateContentKeyResponse(rsp *http.Response) (*RotateContentKeyRespons
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -27895,12 +28693,33 @@ func ParseGdprEraseResponse(rsp *http.Response) (*GdprEraseResponse, error) {
 		}
 		response.JSON202 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
 		var dest Forbidden
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -27927,6 +28746,20 @@ func ParseGetGdprEraseJobResponse(rsp *http.Response) (*GetGdprEraseJobResponse,
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
@@ -28405,6 +29238,13 @@ func ParseGetMessageContentResponse(rsp *http.Response) (*GetMessageContentRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
 		var dest Forbidden
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -28799,6 +29639,20 @@ func ParseListRatePlansResponse(rsp *http.Response) (*ListRatePlansResponse, err
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	}
 
 	return response, nil
@@ -28824,6 +29678,20 @@ func ParseCreateRatePlanResponse(rsp *http.Response) (*CreateRatePlanResponse, e
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError
@@ -28853,6 +29721,27 @@ func ParseDeleteRatePlanResponse(rsp *http.Response) (*DeleteRatePlanResponse, e
 	switch {
 	case rsp.StatusCode == 204:
 		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Conflict
@@ -28887,12 +29776,33 @@ func ParseUpdateRatePlanResponse(rsp *http.Response) (*UpdateRatePlanResponse, e
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
