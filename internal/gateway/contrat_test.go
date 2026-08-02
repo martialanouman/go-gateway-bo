@@ -46,18 +46,50 @@ func operation(path, operationID string) signature {
 }
 
 // Signatures relevées dans le paquet npm (`web/node_modules/@martialanouman/gateway-api-contracts`,
-// contrat 1.2.0).
+// contrat **2.5.0**), le 02/08/2026, en extrayant les couples chemin + operationId des deux YAML.
+//
+// L'échantillon est large parce que c'est **lui** qui sépare les deux populations, et non le seuil.
+// Mesuré : à sept opérations, une fiche de step qui en citait quatre dans un bloc clôturé était
+// refusée par la porte (4 sur 8, soit la moitié). À vingt-sept, il faut en citer quatorze, avec leur
+// chemin exact, pour être accusé de copier — ce qu'aucun document de conception ne fait, et ce
+// qu'une copie fait par construction. Elles couvrent les dix domaines du plan de contrôle : un
+// contrat amputé d'un domaine reste très au-dessus du seuil.
+//
+// La limite s'énonce et ne se corrige pas : le contrat public n'a que cinq opérations liées à un
+// chemin, donc son échantillon plafonne à sept signatures et son seuil à quatre. Ce dépôt ne relaie
+// pas l'API publique et n'a aucune raison d'en documenter les chemins nus ; le jour où il en aurait
+// une, c'est ce commentaire qu'il faudra relire.
 var gatewayContracts = []contract{
 	{
 		npmFile: "openapi-admin.yaml",
 		signatures: []signature{
 			operation("/admin/customers", "list-customers"),
 			operation("/admin/customers/{id}/suspend", "suspend-customer"),
+			operation("/admin/customer-groups/{id}/customers", "list-group-customers"),
+			operation("/admin/customers/{id}/sender-ids/{senderId}", "update-sender-id"),
 			operation("/admin/smpp-accounts", "list-smpp-accounts"),
 			operation("/admin/smpp-accounts/{id}/credentials/{credId}/rotate", "rotate-credential"),
+			operation("/admin/smpp-accounts/{id}/session-limits", "set-account-session-limits"),
+			operation("/admin/smpp-accounts/{id}/sender-id-policy", "set-account-sender-id-policy"),
+			operation("/admin/smpp-accounts/{id}/webhooks/{webhookId}", "update-webhook"),
 			operation("/admin/connectors/{id}/rebind", "rebind-connector"),
+			operation("/admin/connectors/{id}/reconnect-policy", "set-connector-reconnect-policy"),
+			operation("/admin/connectors/{id}/bind-pool", "set-connector-bind-pool"),
 			operation("/admin/routes/reorder", "reorder-routes"),
 			operation("/admin/exact-routes/lookup", "lookup-exact-route"),
+			operation("/admin/routing-scripts/{id}/publish", "publish-routing-script"),
+			operation("/admin/routing-scripts/{id}/versions", "list-routing-script-versions"),
+			operation("/admin/sessions/{id}", "disconnect-session"),
+			operation("/admin/suppressions/check", "check-suppression"),
+			operation("/admin/opt-out-keywords/{id}", "update-opt-out-keyword"),
+			operation("/admin/inbound-numbers/{id}/keywords/{keywordId}", "update-inbound-keyword"),
+			operation("/admin/sender-rewrite-rules/{id}/test", "test-sender-rewrite-rule"),
+			operation("/admin/customers/{id}/billing/scope", "change-balance-scope"),
+			operation("/admin/billing-providers/{id}/test-connection", "test-billing-provider"),
+			operation("/admin/messages/{id}/content", "get-message-content"),
+			operation("/admin/gdpr/erase/{jobId}", "get-gdpr-erase-job"),
+			operation("/admin/messages/export/{jobId}", "get-message-export"),
+			operation("/admin/stream/billing-alerts", "stream-billing-alerts"),
 			{{key: "title", value: "SMS Gateway — Admin API"}},
 		},
 	},
@@ -65,8 +97,10 @@ var gatewayContracts = []contract{
 		npmFile: "openapi-public.yaml",
 		signatures: []signature{
 			operation("/messages", "submit-messages"),
+			operation("/messages", "list-messages"),
 			operation("/messages/{id}", "get-message"),
 			operation("/account", "get-account"),
+			operation("/health", "health"),
 			{{key: "title", value: "SMS Gateway — Public API"}},
 			{{key: "url", value: "https://api.gateway.example.com/v1"}},
 		},
@@ -74,10 +108,9 @@ var gatewayContracts = []contract{
 }
 
 // copiedIn rend le nombre de signatures trouvées, et dit si le fichier reproduit le contrat. Le
-// seuil est la moitié parce que les deux populations sont séparées par un fossé : une copie porte
-// toutes les signatures, un document écrit ici n'en porte aucune. Il laisse le contrat évoluer —
-// quelques opérations renommées en amont ne suffisent pas à faire passer une copie pour un document
-// neuf.
+// seuil est la moitié de l'échantillon : il absorbe l'évolution du contrat — quelques opérations
+// renommées en amont ne suffisent pas à faire passer une copie pour un document neuf — et c'est la
+// taille de l'échantillon qui règle le reste, voir gatewayContracts.
 func (c contract) copiedIn(declarations map[declaration]bool) (int, bool) {
 	matched := 0
 
@@ -214,8 +247,11 @@ func repositoryRoot(t *testing.T) string {
 }
 
 // Ces cas prouvent le discriminant, pas la fidélité des signatures au contrat publié : celle-là ne
-// se vérifie qu'en déposant une copie réelle du paquet npm dans le dépôt et en regardant la porte
-// tomber. C'est à refaire à la main quand le contrat change de version majeure.
+// se vérifie qu'en passant les vrais YAML du paquet npm dans `copiedIn`. Fait à la main le
+// 02/08/2026 sur le contrat 2.5.0 : `openapi-admin.yaml` rend 28 signatures sur 28,
+// `openapi-public.yaml` 7 sur 7, les deux verdicts à « copie ». C'est à refaire quand le contrat
+// change de version majeure — un échantillon qui aurait dérivé rendrait cette porte verte sur une
+// vraie copie.
 //
 // Les documents sont rendus à partir du même tableau plutôt qu'écrits en clair : un YAML de contrat
 // recopié dans un littéral de ce fichier ferait tomber la porte ci-dessus sur ce fichier-ci, et
@@ -286,6 +322,28 @@ func TestACopyIsRecognizedByWhatItDeclares(t *testing.T) {
 
 		assert.False(t, copied, "un document qui cite le contrat en commentaire — une fiche de step, "+
 			"un overlay annoté — est accusé de le copier")
+	})
+
+	t.Run("laisse passer une fiche de step qui cite les opérations qu'elle relaie", func(t *testing.T) {
+		t.Parallel()
+
+		// La forme que prend réellement une fiche : de la prose, et un bloc clôturé en Markdown. La
+		// clôture **préserve** la syntaxe YAML — c'est tout son objet — donc les clés y sont relevées
+		// telles quelles, et aucune marque de citation ne les distingue. Ce qui distingue une fiche
+		// d'une copie n'est donc pas la forme des lignes mais leur nombre : elle en cite quelques-unes,
+		// la copie les porte toutes.
+		sheet := "# step-004 — relayer les clients\n\n" +
+			"Cette step relaie six opérations du plan de contrôle :\n\n" +
+			"```yaml\n" +
+			yamlDeclaring(admin.signatures[:6]...) +
+			"```\n\n" +
+			"Hors périmètre : le reste du contrat.\n"
+
+		matched, copied := admin.copiedIn(declarationsIn(sheet))
+
+		assert.Falsef(t, copied, "une fiche de step qui cite %d opérations dans un bloc clôturé est "+
+			"accusée de copier le contrat ; la sortie qu'on prendra sous pression est une exemption "+
+			"par chemin, c'est-à-dire le trou que cette porte existe pour fermer", matched)
 	})
 }
 

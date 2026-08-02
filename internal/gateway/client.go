@@ -30,6 +30,10 @@ const mockAccessToken = "jeton-factice-du-mock-prism"
 // Le client rendu vaut pour toute la vie du process : c'est lui qui porte le jeton en cache, et en
 // reconstruire un par requête relancerait une obtention de jeton à chaque appel.
 func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
+	if err := knownMode(cfg.Mode); err != nil {
+		return nil, err
+	}
+
 	transport, err := outboundTransport(cfg)
 	if err != nil {
 		return nil, err
@@ -60,6 +64,27 @@ func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
 	return client, nil
 }
 
+// knownMode refuse tout mode que ce package ne connaît pas, **la valeur zéro comprise**. La polarité
+// stricte de config.Load — l'absence repliée sur `real`, tout autre littéral refusé — s'arrête à
+// l'environnement : NewAdminClient prend une struct nue, que les tests construisent déjà à la main
+// et qu'un helper de route construira partiellement. Sans ce refus, une `GatewayConfig` sans `Mode`
+// prendrait le chemin `mock` : aucun mTLS, et le jeton factice en en-tête vers une passerelle de
+// production.
+//
+// Les deux branches qui suivent testent alors `== mock` et non `!= real`. La porte les rend
+// équivalentes, donc aucun test ne peut les distinguer ; la forme positive est là pour qu'un
+// troisième mode ajouté un jour tombe du côté strict, y compris de la main de quelqu'un qui aurait
+// oublié cette porte.
+func knownMode(mode config.GatewayMode) error {
+	switch mode {
+	case config.GatewayModeReal, config.GatewayModeMock:
+		return nil
+	default:
+		return fmt.Errorf("mode de passerelle %q inconnu, %s ou %s attendu",
+			mode, config.GatewayModeReal, config.GatewayModeMock)
+	}
+}
+
 // machineToken rend la source du jeton machine.
 //
 // En mode `real`, c'est `clientcredentials` qui la porte, et c'est lui qui tient les deux exigences
@@ -69,7 +94,7 @@ func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
 // trouvant le jeton expiré ne déclenchent donc qu'une seule requête. Et `defaultExpiryDelta =
 // 10 * time.Second` (token.go:22) fait renouveler dix secondes avant l'expiration annoncée.
 func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSource {
-	if cfg.Mode != config.GatewayModeReal {
+	if cfg.Mode == config.GatewayModeMock {
 		return oauth2.StaticTokenSource(&oauth2.Token{
 			AccessToken: mockAccessToken,
 			TokenType:   "Bearer",
@@ -108,10 +133,10 @@ func outboundTransport(cfg config.GatewayConfig) (http.RoundTripper, error) {
 	}}, nil
 }
 
-// mutualTLS rend nil hors du mode `real` : le mock n'authentifie personne, et lui exiger un
-// certificat empêcherait le développement local de démarrer.
+// mutualTLS rend nil en mode `mock` : le mock n'authentifie personne, et lui exiger un certificat
+// empêcherait le développement local de démarrer.
 func mutualTLS(cfg config.GatewayConfig) (*tls.Config, error) {
-	if cfg.Mode != config.GatewayModeReal {
+	if cfg.Mode == config.GatewayModeMock {
 		// Pas de configuration TLS est ici une réponse, pas un manque : nil laisse net/http servir
 		// http:// comme https:// selon l'URL, ce dont le mock local a besoin.
 		return nil, nil

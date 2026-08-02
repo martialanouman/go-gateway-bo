@@ -47,6 +47,10 @@ func worthReplaying(method string, response *http.Response, err error) bool {
 	// Jamais un POST, un PATCH ni un DELETE, même idempotents au sens de la RFC : une mutation est
 	// déclenchée par un opérateur présent à l'écran, et un rejeu automatique lui masque le conflit
 	// — y compris le cas réseau ambigu, où la mutation a peut-être déjà été appliquée.
+	//
+	// Cette garde passe **avant** celle de l'erreur réseau, et l'ordre est le fond : intervertir les
+	// deux rejoue les mutations dont la connexion est tombée, c'est-à-dire suspend deux fois un
+	// client. C'est ce que tient TestAdminClientNeverReplaysAMutationWhoseConnectionDropped.
 	if method != http.MethodGet && method != http.MethodHead {
 		return false
 	}

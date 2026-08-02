@@ -67,12 +67,32 @@ func newTestPKI(t *testing.T) testPKI {
 // serveTLS exige et vérifie le certificat client : sans lui, la poignée de main échoue et le test
 // qui l'affirme tombe pour de bon.
 func (p testPKI) serveTLS(t *testing.T, handler http.HandlerFunc) *httptest.Server {
+	return p.serveTLSWithClientAuth(t, tls.RequireAndVerifyClientCert, handler)
+}
+
+// serveTLSWithClientAuth laisse le test choisir sa politique de certificat client. Deux valeurs sont
+// utilisées, et l'écart entre elles n'est pas un détail de confort :
+//
+//   - RequireAndVerifyClientCert ferme la porte à la poignée de main. C'est le défaut : une
+//     régression du mTLS y fait tomber tout ce qui joint la passerelle, bruyamment.
+//   - VerifyClientCertIfGiven laisse entrer un client sans certificat et vérifie celui qu'il
+//     présente. C'est ce qui rend **falsifiable** l'assertion « le client a présenté le sien » :
+//     sous la première, une requête qui atteint le handler porte nécessairement un certificat pair,
+//     la branche fausse de l'assertion est inatteignable, et le test tombe sur la poignée de main —
+//     à un endroit qui n'accuse pas ce que l'assertion nomme. Mesuré le 02/08/2026 en retirant
+//     `Certificates` du client : `tls: certificate required` sur le require.NoError de l'appel, et
+//     pas une ligne sur le certificat manquant.
+func (p testPKI) serveTLSWithClientAuth(
+	t *testing.T,
+	clientAuth tls.ClientAuthType,
+	handler http.HandlerFunc,
+) *httptest.Server {
 	t.Helper()
 
 	server := httptest.NewUnstartedServer(handler)
 	server.TLS = &tls.Config{
 		Certificates: []tls.Certificate{p.serverCertificate},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientAuth:   clientAuth,
 		ClientCAs:    p.authorities,
 		MinVersion:   tls.VersionTLS12,
 	}

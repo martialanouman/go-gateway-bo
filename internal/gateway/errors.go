@@ -10,8 +10,9 @@ import (
 // CodeUpstreamUnreadable est le seul code que le BFF frappe lui-même : celui d'une réponse d'erreur
 // dont le corps n'est pas l'enveloppe du contrat. Le préfixe `bff_` nomme l'émetteur, et l'émetteur
 // n'est pas la passerelle — c'est ce qui interdit la confusion dans un log. Mesuré sur le contrat
-// 1.2.0 le 02/08/2026 : `code` n'y porte aucun `pattern`, ses exemples sont tous en snake_case
-// (`forbidden_scope`, `validation_error`…), et `bff_` n'apparaît nulle part dans le YAML.
+// **2.5.0**, celui que la branche installe, le 02/08/2026 : `code` n'y porte aucun `pattern`
+// (openapi-admin.yaml:1643-1646), ses exemples sont tous en snake_case (`forbidden_scope`,
+// `validation_error`…), et `grep -c bff_` rend 0 sur les deux YAML du paquet.
 const CodeUpstreamUnreadable = "bff_upstream_unreadable"
 
 // FieldError est un élément de `errors[]` : le champ fautif et son explication. Le type engendré ne
@@ -28,8 +29,9 @@ type FieldError struct {
 //
 // Message et Fields[].Message sont du texte **écrit par la passerelle**, que nous ne contrôlons pas.
 // Rien ne garantit qu'il ne recopie pas le corps d'un message, donc l'invariant (a) le tient hors de
-// tout rendu : voir Error(). Ils restent des champs parce que l'onglet qui affichera l'erreur en a
-// besoin — c'est la sérialisation et le log qui les excluent, pas la structure.
+// tout rendu : voir Error(), MarshalJSON() et GoString(). Ils restent des champs parce que l'onglet
+// qui affichera l'erreur en a besoin — c'est la sérialisation et le log qui les excluent, pas la
+// structure.
 //
 // Un appelant reconnaît ce qui l'intéresse par `errors.As` puis par Status et Code — le seul code
 // constant est CodeUpstreamUnreadable, parce qu'il est le seul que nous frappons. Aucune taxonomie
@@ -44,20 +46,58 @@ type APIError struct {
 	Fields  []FieldError
 }
 
+// Les trois méthodes qui suivent sont à **récepteur valeur**, et c'est l'essentiel de la garantie :
+// `errors.As` rend un `*APIError`, que déréférencer pour « logger la struct » ne coûte qu'un
+// caractère. Sur un récepteur pointeur, la valeur n'implémente ni `error`, ni `json.Marshaler`, ni
+// `fmt.GoStringer`, et chaque rendu retombe sur la réflexion : mesuré le 02/08/2026, neuf des seize
+// formes de TestErrorRendersNoUpstreamFreeText écrivaient alors le texte amont — dont
+// `slog.Error("…", "err", *apiErr)`, qui dumpait `Message` dans le journal JSON.
+//
+// Chacune ferme un chemin distinct : `Error()` les verbes de fmt et slog en mode texte, qui formate
+// par `%+v` ($GOROOT/src/log/slog/text_handler.go:117) ; `MarshalJSON()` un `json.Marshal` de
+// l'erreur ; `GoString()` le verbe `%#v`, que fmt résout par le seul GoStringer sans jamais
+// consulter `error` ($GOROOT/src/fmt/print.go, handleMethods). slog en mode JSON, lui, est couvert
+// deux fois : son handler prend le Marshaler quand il y en a un et `Error()` sinon
+// ($GOROOT/src/log/slog/json_handler.go:126-133) — retirer MarshalJSON ne le fait donc pas rougir,
+// mesuré.
+
 // Error ne rend que ce que nous contrôlons : le statut, le code stable, et les **noms** des champs
 // fautifs. Un nom désigne un champ, jamais sa valeur — le contrat décrit `errors[]` comme le détail
 // « per-field » d'une validation — et il oriente le débogage ; le message qui l'accompagne, lui, est
 // du texte libre amont et n'entre pas ici.
-//
-// C'est bien ce rendu, et lui seul, qui atteint un log : mesuré le 02/08/2026 sur `%v`, `%s`, `%+v`,
-// l'enveloppement par `%w` et `slog.NewJSONHandler` — tous passent par cette méthode
-// (TestErrorRendersNoUpstreamFreeText). Deux chemins y échappent et ne sont pas gardés ici : `%#v`
-// et un `json.Marshal` de l'erreur elle-même. Le second est couvert par la règle du DTO de sortie
-// déclaré — une réponse HTTP est un struct du BFF, jamais cette erreur marshalée.
-func (e *APIError) Error() string {
+func (e APIError) Error() string {
 	rendered := fmt.Sprintf("réponse d'erreur de l'API Admin : %d %s", e.Status, e.Code)
 	if len(e.Fields) == 0 {
 		return rendered
+	}
+
+	return rendered + " (champs : " + strings.Join(e.fieldNames(), ", ") + ")"
+}
+
+// MarshalJSON rend la forme rédigée. `Message` et `Fields[].Message` n'y ont **aucune clé** : c'est
+// la même défense que la règle du DTO de sortie déclaré — un champ absent du struct sérialisé ne
+// peut pas fuir, et il n'y a rien à se rappeler d'exclure.
+func (e APIError) MarshalJSON() ([]byte, error) {
+	redacted := struct {
+		Status int      `json:"status"`
+		Code   string   `json:"code"`
+		Fields []string `json:"fields,omitempty"`
+	}{Status: e.Status, Code: e.Code, Fields: e.fieldNames()}
+
+	// L'erreur est rendue nue et non enveloppée : trois champs de types plats, donc json.Marshal ne
+	// peut pas échouer ici, et habiller une branche inatteignable ferait croire qu'elle arrive.
+	return json.Marshal(redacted)
+}
+
+func (e APIError) GoString() string {
+	return fmt.Sprintf("gateway.APIError{Status:%d, Code:%q, Fields:%q}", e.Status, e.Code, e.fieldNames())
+}
+
+// fieldNames rend nil sur une erreur sans `errors[]`, ce qui fait disparaître la clé de la forme JSON
+// au lieu d'y laisser une liste vide.
+func (e APIError) fieldNames() []string {
+	if len(e.Fields) == 0 {
+		return nil
 	}
 
 	names := make([]string, 0, len(e.Fields))
@@ -65,15 +105,19 @@ func (e *APIError) Error() string {
 		names = append(names, field.Field)
 	}
 
-	return rendered + " (champs : " + strings.Join(names, ", ") + ")"
+	return names
 }
 
 // ErrorFrom décode le couple (statut, corps) que rend le client engendré, et rien d'autre — DN-7.
 // Mesuré sur le code engendré : une opération ne matérialise un champ `JSON4xx` que pour les statuts
 // qu'elle **déclare**, et un statut non déclaré ne laisse que `Body` et `HTTPResponse`. S'appuyer
-// sur les champs typés demanderait 133 mappings et ne traiterait aucun statut non déclaré — dont le
-// 503, que le contrat 1.2.0 ne déclare nulle part. Comme toutes les réponses d'erreur du contrat
-// sont des alias du même schéma `Error`, un décodeur unique les couvre toutes.
+// sur les champs typés demanderait 133 mappings et ne traiterait aucun statut non déclaré. Mesuré
+// sur le contrat **2.5.0** le 02/08/2026 : 3 de ses 133 opérations déclarent un 503
+// (`erase-customer-content`, `rotate-content-key`, `gdpr-erase` — openapi-admin.yaml:1429, 1442,
+// 1455), et le client engendré ne matérialise `JSON503` que pour ces trois-là (client.gen.go:18206,
+// 18270, 19152) ; les 130 autres opérations n'ont aucun champ où le ranger. Comme toutes les
+// réponses d'erreur du contrat sont des alias du même schéma `Error` — `ServiceUnavailable = Error`,
+// client.gen.go:3770 —, un décodeur unique les couvre toutes.
 //
 // Le succès est le 2xx, et tout le reste est une erreur : un statut inattendu — 3xx non suivi, ou le
 // 0 que rend `StatusCode()` quand `HTTPResponse` est nil — tombe ainsi du côté strict plutôt que de

@@ -1,6 +1,7 @@
 package gateway_test
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -50,11 +51,23 @@ func realModeGateway(
 ) (*gateway.ClientWithResponses, *tokenEndpoint) {
 	t.Helper()
 
+	return realModeGatewayWithClientAuth(t, tls.RequireAndVerifyClientCert, timeout, tokenLifetimes, api)
+}
+
+func realModeGatewayWithClientAuth(
+	t *testing.T,
+	clientAuth tls.ClientAuthType,
+	timeout time.Duration,
+	tokenLifetimes []int,
+	api http.HandlerFunc,
+) (*gateway.ClientWithResponses, *tokenEndpoint) {
+	t.Helper()
+
 	pki := newTestPKI(t)
 	tokens := &tokenEndpoint{lifetimes: tokenLifetimes}
 
-	apiServer := pki.serveTLS(t, api)
-	tokenServer := pki.serveTLS(t, tokens.handle)
+	apiServer := pki.serveTLSWithClientAuth(t, clientAuth, api)
+	tokenServer := pki.serveTLSWithClientAuth(t, clientAuth, tokens.handle)
 
 	client, err := gateway.NewAdminClient(config.GatewayConfig{
 		Mode:         config.GatewayModeReal,
@@ -75,15 +88,19 @@ func realModeGateway(
 func ok(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }
 
 // Le jeton s'obtient par le même transport que l'API : un `tokenUrl` joint hors mTLS serait une
-// authentification sortante à moitié protégée, et rien ne le signalerait. Ici les deux bouts
-// exigent et vérifient le certificat client, donc l'absence de l'un ou de l'autre fait tomber la
-// poignée de main — et le test avec elle.
+// authentification sortante à moitié protégée, et rien ne le signalerait.
+//
+// Les deux bouts sont montés en VerifyClientCertIfGiven et non en RequireAndVerifyClientCert, pour
+// que ce soient les assertions ci-dessous qui portent le verdict : un client sans certificat entre
+// ici, et se fait accuser par son nom au lieu de mourir dans la poignée de main. La vérification par
+// l'autorité, elle, reste — un certificat présenté est toujours contrôlé.
 func TestAdminClientPresentsItsCertificateOnBothOutboundCalls(t *testing.T) {
 	t.Parallel()
 
 	var api recorder
 
-	client, tokens := realModeGateway(t, 5*time.Second, []int{3600},
+	client, tokens := realModeGatewayWithClientAuth(t, tls.VerifyClientCertIfGiven, 5*time.Second,
+		[]int{3600},
 		func(w http.ResponseWriter, req *http.Request) {
 			api.record(req)
 			ok(w, req)

@@ -124,10 +124,11 @@ func TestAdminClientReplaysReadsOnce(t *testing.T) {
 	}
 }
 
-// L'accident que le rejeu existe pour absorber n'est pas un statut mais une connexion qui tombe :
-// une instance de la passerelle retirée du load balancer pendant un déploiement roulant.
-func TestAdminClientReplaysADroppedConnection(t *testing.T) {
-	t.Parallel()
+// dropsTheFirstConnection coupe la connexion de la première requête avant toute réponse, et répond
+// 200 aux suivantes. C'est l'accident que le rejeu existe pour absorber : une instance de la
+// passerelle retirée du load balancer pendant un déploiement roulant.
+func dropsTheFirstConnection(t *testing.T) (*recorder, *gateway.ClientWithResponses) {
+	t.Helper()
 
 	var (
 		api      recorder
@@ -163,8 +164,38 @@ func TestAdminClientReplaysADroppedConnection(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	return &api, client
+}
+
+func TestAdminClientReplaysADroppedConnection(t *testing.T) {
+	t.Parallel()
+
+	api, client := dropsTheFirstConnection(t)
+
 	// net/http ne rejoue de lui-même que sur une connexion réutilisée : celle-ci est neuve, donc ce
 	// qui produit la seconde requête ne peut être que le rejeu de ce package.
 	require.NoError(t, listCustomers(t.Context(), client))
 	assert.Equal(t, 2, api.count())
+}
+
+// Le croisement que les deux tests voisins laissent ouvert : une **mutation** dont la connexion
+// tombe. Chacun n'exerce qu'une moitié — « ne rejoue jamais un POST » sur un 502 de réponse, le
+// rejeu d'une connexion coupée sur une lecture — et le défaut qu'on commet vraiment vit précisément
+// à l'intersection : « une connexion tombée, ça se rejoue », écrit avant la garde de méthode.
+//
+// C'est le seul défaut de ce package à effet irréversible côté plan de données : la passerelle
+// applique la suspension, puis l'instance quitte le load balancer avant d'écrire la réponse. Rejouer
+// suspend deux fois, ou tourne deux fois un identifiant de bind.
+func TestAdminClientNeverReplaysAMutationWhoseConnectionDropped(t *testing.T) {
+	t.Parallel()
+
+	api, client := dropsTheFirstConnection(t)
+
+	err := suspendCustomer(t.Context(), client)
+
+	assert.Equal(t, 1, api.count(),
+		"une connexion coupée ne dit pas si la suspension a été appliquée ; la rejouer parie qu'elle "+
+			"ne l'a pas été, et ce pari se paie sur le plan de données")
+	require.Error(t, err,
+		"la connexion est tombée : l'appel doit remonter l'erreur de transport, pas une réponse")
 }

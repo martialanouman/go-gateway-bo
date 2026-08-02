@@ -93,9 +93,52 @@ func TestAdminClientAuthenticatesWithoutTokenEndpointInMockMode(t *testing.T) {
 			"Authorization : le mode mock doit donc porter un jeton, fût-il factice")
 }
 
-// Le matériel mTLS est lu au démarrage, et un manque doit **empêcher le lancement** en nommant le
-// fichier fautif (§1.8) : un BFF qui démarre puis échoue à la première requête laisse croire que
-// l'installation est bonne. Aucune de ces erreurs ne porte le secret client, qui n'entre pas ici.
+// Le mode est ce qui décide du mTLS et du jeton : la valeur zéro doit tomber du côté strict.
+//
+// `config.Load` replie l'absence sur `real` et refuse tout autre littéral, mais cette polarité ne
+// traverse pas la frontière du package — NewAdminClient prend une struct nue, que les tests
+// construisent déjà à la main et qu'un helper de step-004 construira partiellement. Un `Mode` vide
+// qui prendrait le chemin `mock` joindrait une passerelle de production sans certificat client et
+// avec le jeton factice en en-tête.
+func TestAdminClientRefusesAnUnknownGatewayMode(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []config.GatewayMode{"", "prod", "REAL", " mock"} {
+		t.Run(string(mode), func(t *testing.T) {
+			t.Parallel()
+
+			client, err := gateway.NewAdminClient(config.GatewayConfig{
+				Mode:    mode,
+				BaseURL: "https://admin.gateway.internal/v1",
+				Timeout: time.Second,
+			})
+
+			require.Error(t, err,
+				"un mode que le package ne connaît pas ne doit pas retomber sur le chemin permissif")
+			assert.Nil(t, client)
+			assert.Contains(t, err.Error(), string(config.GatewayModeReal))
+			assert.Contains(t, err.Error(), string(config.GatewayModeMock))
+		})
+	}
+}
+
+// NewAdminClient lit le matériel mTLS à la construction et refuse en nommant le fichier fautif
+// (§1.8), plutôt que de rendre un client qui échouera à sa première requête. Aucune de ces erreurs
+// ne porte le secret client, qui n'entre pas ici.
+//
+// **Ce que ce test ne prouve pas, et que la §1.8 demande pourtant** : que ce refus arrive au
+// démarrage. Mesuré le 02/08/2026 — `internal/gateway` n'a aucun importeur hors de lui-même,
+// `NewAdminClient` n'est appelé par aucun code de production, et `run()` de `cmd/dashboard/main.go`
+// enchaîne `config.Load` → `webassets.FS` → `net.Listen` → `serve` sans jamais construire de client
+// sortant. Du côté configuration, `requireRealGatewayMaterial` (internal/config/config.go) ne
+// contrôle que la **présence** des six variables du mode `real`, jamais que les fichiers qu'elles
+// nomment se chargent.
+//
+// Conséquence à ce jour : un déploiement en `real` dont `DASHBOARD_GATEWAY_CLIENT_CERT` pointe sur
+// un chemin inexistant démarre sans un mot. Le manque est un **appelant**, pas une garde — la
+// première route qui joint la passerelle arrive en step-004, et c'est son câblage qui donnera à ce
+// refus un moment de démarrage où s'exercer. Construire le client dans `main` avant qu'une route ne
+// l'utilise serait du code mort.
 func TestAdminClientRefusesIncompleteMutualTLSMaterial(t *testing.T) {
 	t.Parallel()
 

@@ -2,6 +2,7 @@ package gateway_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -99,9 +100,14 @@ func TestUnreadableCodeIsNotAGatewayCode(t *testing.T) {
 const smsBody = "RDV demain 14h, apporte les analyses"
 
 // Invariant (a) : le corps d'un message ne sort pas de l'onglet qui l'affiche — ni log, ni trace, ni
-// message d'erreur. Ce que `Error()` rend est précisément ce qui finit dans une chaîne enveloppée et
-// dans un log, donc il ne porte que ce que nous contrôlons : le statut, le code, et les noms de
-// champs.
+// message d'erreur. Ce que rendent Error(), MarshalJSON() et GoString() est précisément ce qui finit
+// dans une chaîne enveloppée et dans un log, donc rien d'autre que ce que nous contrôlons n'y entre :
+// le statut, le code, et les noms de champs.
+//
+// Chaque rendu est exercé **sur le pointeur et sur la valeur**. `errors.As` rend un pointeur, et le
+// déréférencer pour « logger la struct » ne coûte qu'un caractère : une garantie portée par les
+// seules méthodes à récepteur pointeur laisserait `slog.Error("…", "err", *apiErr)` écrire le texte
+// libre de la passerelle dans le journal JSON.
 func TestErrorRendersNoUpstreamFreeText(t *testing.T) {
 	t.Parallel()
 
@@ -110,17 +116,28 @@ func TestErrorRendersNoUpstreamFreeText(t *testing.T) {
 
 	err := gateway.ErrorFrom(http.StatusUnprocessableEntity, body)
 
-	var logged bytes.Buffer
+	var apiErr *gateway.APIError
 
-	slog.New(slog.NewJSONHandler(&logged, nil)).Error("appel de l'API Admin", "err", err)
+	require.ErrorAs(t, err, &apiErr)
 
 	renderings := map[string]string{
-		"Error()":            err.Error(),
-		"%v":                 fmt.Sprintf("%v", err),
-		"%s":                 fmt.Sprintf("%s", err),
-		"%+v":                fmt.Sprintf("%+v", err),
-		"enveloppée par %w":  fmt.Errorf("lecture des clients : %w", err).Error(),
-		"journalisée (slog)": logged.String(),
+		"Error()":                  err.Error(),
+		"%v":                       fmt.Sprintf("%v", err),
+		"%s":                       fmt.Sprintf("%s", err),
+		"%+v":                      fmt.Sprintf("%+v", err),
+		"%#v":                      fmt.Sprintf("%#v", err),
+		"enveloppée par %w":        fmt.Errorf("lecture des clients : %w", err).Error(),
+		"json.Marshal":             marshaled(t, err),
+		"journalisée (slog JSON)":  loggedAsJSON(err),
+		"journalisée (slog texte)": loggedAsText(err),
+
+		"la valeur, %v":                       fmt.Sprintf("%v", *apiErr),
+		"la valeur, %s":                       fmt.Sprintf("%s", *apiErr),
+		"la valeur, %+v":                      fmt.Sprintf("%+v", *apiErr),
+		"la valeur, %#v":                      fmt.Sprintf("%#v", *apiErr),
+		"la valeur, json.Marshal":             marshaled(t, *apiErr),
+		"la valeur, journalisée (slog JSON)":  loggedAsJSON(*apiErr),
+		"la valeur, journalisée (slog texte)": loggedAsText(*apiErr),
 	}
 
 	for name, rendered := range renderings {
@@ -135,11 +152,33 @@ func TestErrorRendersNoUpstreamFreeText(t *testing.T) {
 		})
 	}
 
-	var apiErr *gateway.APIError
-
-	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, smsBody, apiErr.Message,
 		"le texte reste accessible à l'onglet qui l'affichera ; c'est le rendu qui l'exclut")
+}
+
+func marshaled(t *testing.T, value any) string {
+	t.Helper()
+
+	encoded, err := json.Marshal(value)
+	require.NoError(t, err)
+
+	return string(encoded)
+}
+
+func loggedAsJSON(value any) string {
+	var out bytes.Buffer
+
+	slog.New(slog.NewJSONHandler(&out, nil)).Error("appel de l'API Admin", "err", value)
+
+	return out.String()
+}
+
+func loggedAsText(value any) string {
+	var out bytes.Buffer
+
+	slog.New(slog.NewTextHandler(&out, nil)).Error("appel de l'API Admin", "err", value)
+
+	return out.String()
 }
 
 // La plupart des erreurs n'ont pas d'`errors[]` — le contrat ne l'exige pas. Ce que lit un opérateur
@@ -170,12 +209,15 @@ func TestErrorFromDropsAnUnreadableBody(t *testing.T) {
 
 // DN-8 : 503 est une erreur, avec Réessayer — jamais un module désactivé.
 //
-// Mesuré sur le contrat 1.2.0 (`web/node_modules/@martialanouman/gateway-api-contracts`, le
-// 02/08/2026) : il ne déclare **aucune** réponse 503, aucun composant `ServiceUnavailable`, ni 501,
-// ni en-tête, ni code d'erreur pour un module désactivé. Les seuls signaux voisins sont des booléens
-// par ressource, qui voyagent dans des réponses 200. Interpréter 503 comme « ce module est éteint »
-// fabriquerait un signal que la passerelle n'émet pas, et remplacerait un état d'erreur réessayable
-// par un écran qui n'invite à rien.
+// Mesuré sur le contrat **2.5.0**, celui que la branche installe
+// (`web/node_modules/@martialanouman/gateway-api-contracts`), le 02/08/2026 : il déclare un 503 sur
+// 3 de ses 133 opérations (openapi-admin.yaml:1429, 1442, 1455) et un composant `ServiceUnavailable`
+// (ligne 1628), dont la description est *« A dependency (e.g. billing-svc) is unreachable or timed
+// out; retry once it recovers »* — un réessai, pas une extinction. Le contrat ne déclare toujours ni
+// 501, ni en-tête, ni code d'erreur pour un module désactivé : les seuls signaux voisins sont des
+// booléens par ressource, qui voyagent dans des réponses 200. Interpréter 503 comme « ce module est
+// éteint » fabriquerait donc un signal que la passerelle n'émet pas, et remplacerait un état
+// d'erreur réessayable par un écran qui n'invite à rien.
 func TestServiceUnavailableStaysAnError(t *testing.T) {
 	t.Parallel()
 
