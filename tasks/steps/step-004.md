@@ -1,6 +1,6 @@
 # step-004 — Contrat BFF : un OpenAPI, deux bouts typés
 
-> **Jalon :** M0 (§4.1, §5.1) · **Statut :** À FAIRE
+> **Jalon :** M0 (§4.1, §5.1) · **Statut :** LIVRÉE (02/08/2026)
 > **Dépend de :** step-000, step-003 · **Bloque :** toute route du BFF
 
 ## But
@@ -39,6 +39,15 @@ décrivait un RPC typé que le code n'a jamais implémenté.
 - Le test de DTO (§1.11) vit ici : il refuse `map[string]any` et l'embedding de struct dans un type de
   réponse. Il ne trouvera rien aujourd'hui — c'est un filet posé avant qu'il y ait de quoi tomber.
 
+  > **Précisé le 02/08 après revue, dans les deux sens.** Le test livré refuse **toute forme non
+  > déclarée — `map` ou `any`, à n'importe quelle profondeur de champ** : la première version ne
+  > regardait que le *sous-jacent* du type et laissait passer un `map[string]any` **dans** un DTO,
+  > c'est-à-dire précisément ce que la DoD ci-dessous exige. Et il **tolère** ce que le générateur
+  > produit légitimement — un sous-jacent `[]Foo` ou `string`, l'embarquement d'un `$ref` vers
+  > `components/responses/*` : sa population est celle des types de réponse **écrits à la main**,
+  > ceux qu'engendre l'outil étant déjà tenus par `check-generated`. Une garde qui refuse du légitime
+  > se fait désactiver, pas corriger.
+
 ## Tests (écrits dans la même PR)
 - **Scénario** : *Quand* `/api/health` est appelé, *Alors* la réponse valide le schéma du contrat.
 - Un handler dont la signature diverge de l'interface générée **ne compile pas** — vérifié par un cas
@@ -47,9 +56,38 @@ décrivait un RPC typé que le code n'a jamais implémenté.
 - La CI échoue si `make generate` produit un diff.
 
 ## Definition of Done
-- [ ] `make check` vert · `make generate` idempotent
-- [ ] les types client et serveur viennent du **même** fichier, et rien ne les recopie à la main
-- [ ] la mutation « introduire une `map[string]any` dans un DTO de réponse » fait rougir le test
+- [x] **`make check` vert** (02/08, onze portes) · **`make generate` idempotent** — établi plus
+      fortement qu'une idempotence : `check-generated` **supprime** les trois sorties, régénère, et
+      lit son verdict dans `git status --porcelain`. « Régénérer depuis zéro reproduit le commité »
+      est une propriété plus forte que « régénérer deux fois donne la même chose ». Elle tourne dans
+      `make check` **et** en CI.
+- [x] **les types client et serveur viennent du même fichier, et rien ne les recopie à la main** —
+      `api/oapi-codegen-bff.yaml` et la recette `generate` lisent tous deux `$(CONTRACT_BFF)` ; les
+      trois sorties sont dans `$(GENERATED)`, et trois mutations montrent que retirer l'une d'elles
+      de la liste laisse passer sa divergence. *La moitié TypeScript n'a pour l'instant qu'un
+      consommateur de test — c'est DN-6, et c'est dit.*
+- [x] **la mutation « introduire une `map[string]any` dans un DTO de réponse » fait rougir le test** —
+      `TestResponseTypesDeclareTheirFields`. *Elle ne le faisait **pas** rougir dans la première
+      version : le test ne regardait que le sous-jacent du type. C'est un relecteur qui l'a mesuré,
+      et c'est le bloquant principal de cette step.*
+
+### Les quatre critères transverses de `CLAUDE.md`
+
+1. **Le chemin qu'un humain traverse est traversé pour de bon.** Ici, c'est le load balancer — ou
+   l'exploitant — qui sonde `/api/health` : `cmd/dashboard/contrat.feature` lance le **binaire
+   compilé**, l'interroge par HTTP, et confronte les octets rendus au YAML du dépôt. Rien de simulé.
+   **Ce qui n'est pas traversé et doit se dire** : la moitié TypeScript n'a aucun consommateur
+   produit — seul un fichier d'assertions de typage lit les types engendrés.
+2. **Toute affirmation sur le monde extérieur confrontée à sa source.** Les citations de
+   `kin-openapi` et d'`oapi-codegen` ont été vérifiées ligne à ligne dans le module. Ce critère a
+   coûté cher malgré tout : la revue a trouvé **neuf** affirmations fausses, dont cinq documents qui
+   décrivaient un `make generate` que cette step venait de rendre faux, et un commentaire qui
+   promettait une garantie du compilateur qui n'existe pas.
+3. **Mutation partout où le retrait laisserait la suite verte.** Le tableau ci-dessus, en cinq
+   parties, dont treize mutations de correctifs et une ligne « trou mesuré » assumée.
+4. **Ce qui n'est pas testable est écrit là où il vit.** Le trou du montage de l'interface simple,
+   l'absence de journal sur un 500 (DN-12), et les gardes que rien n'exerce portent chacune leur
+   constat au-dessus de la ligne concernée.
 
 ## Hors périmètre
 Les routes métier — chacune arrive avec sa step. L'authentification → M1. Le client `openapi-fetch`
@@ -78,7 +116,7 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 |---|---|
 | Le handler rend un statut **hors de l'enum** | le scénario, **sur la validation** : `at '/status': value must be 'ok'` |
 | Un champ en trop dans le corps | `additional properties 'leak' not allowed` — `additionalProperties: false` mord |
-| Le handler monté **à la racine** au lieu de sous `/api` | 2 tests unitaires **et les 7 scénarios** |
+| Le handler monté **à la racine** au lieu de sous `/api` | 2 tests unitaires **et 5 des 7 scénarios** — les deux de `configuration.feature` attendent un refus de démarrage et ne joignent jamais `/api/health` ; valeur corrigée après mesure, elle disait « les 7 » |
 | `IncludeResponseStatus` retiré du validateur | un statut non documenté passe — c'est l'option qui l'empêche |
 | Le validateur neutralisé **et** le statut changé | le second `Alors`, témoin indépendant d'un validateur devenu inerte |
 | `api.NotFound(handleUnknownAPIRoute)` retiré | `TestUnknownAPIRouteIsNotFound` seul — **aucun scénario ne rougit**, vérifié : `la réponse n'est pas une page HTML` reste vraie du 404 nu de chi |
@@ -95,7 +133,31 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | Un type de réponse avec un champ anonyme | « embarque Secrets : les champs ajoutés au type embarqué fuiraient sans relecture » |
 | La population d'interfaces vidée | « aucune interface `ResponseObject…` » — un analyseur qui ne trouve rien est cassé, pas vert |
 | La population de types concrets vidée | `"0" is not positive` |
-| `Unimplemented` embarqué à la profondeur 1, puis 2 | la garde de réflexion, aux deux profondeurs |
+| `Unimplemented` embarqué à la profondeur 1, puis 2 | la garde de réflexion, aux deux profondeurs — **de la forme *valeur* uniquement** : la forme *pointeur* passait, et c'est un correctif de revue qui l'a fermée |
+
+### Mutations des correctifs de revue
+
+Un correctif est du code comme un autre : il repasse par le rouge et par la mutation.
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| Un `map[string]any` **dans un champ** d'un type de réponse | le test de DTO — c'est la mutation que la DoD nomme, et elle **passait** avant le correctif |
+| Un type de réponse écrit à la main qui embarque un type hors du généré | idem |
+| *Tolérance vérifiée* : sous-jacent `[]Health`, `string`, embarquement d'un `$ref` de réponse | **rien** — la sortie légitime du générateur passe, là où l'ancienne version rougissait sur les trois |
+| Une route `/api/health` écrite **à la main** | la porte qui confronte chaque handler monté au fichier qui le déclare |
+| Une route `/api/hors-contrat` | idem |
+| L'interface **simple** engendrée montée à la place de la stricte | **rien** — trou mesuré et écrit là où il vit, plutôt que promis |
+| `type API struct{ *Unimplemented }` (embedding par **pointeur**) | la garde `Unimplemented`, qui le laissait passer avant le correctif |
+| Le déréférencement de pointeur retiré | la profondeur 2 |
+| La carte `visited` retirée | débordement de pile, qui emporte le binaire de test — couverte par un test plutôt que par une annotation |
+| Les gestionnaires d'erreur laissés à leur défaut | « le message Go brut atteint le navigateur » : `text/plain` au lieu du DTO, et l'URL interne de la passerelle dans le corps |
+| Le message d'erreur recopié dans le DTO | idem — la fuite sous la bonne forme |
+| `contrat.feature` désactivé | `TestScenarios`, une fois le plancher relevé de 5 à 7 |
+| La restauration atomique de `check-generated` remise | une sortie désindexée + une génération en échec laissent l'arbre non compilable, sans un mot |
+
+Les treize ont été **rejouées sur l'arbre livré** : un `git checkout` accidenté avait effacé un
+correctif en cours de route sans qu'aucun remplacement suivant ne le dise — le piège que le dépôt
+nomme, « un correctif se vérifie sur le livré, pas sur l'intention du diff ».
 
 ### Les trois mesures qui ont corrigé DN-2
 
@@ -263,6 +325,19 @@ Le scénario charge donc `api/openapi-bff.yaml` (le fichier du dépôt, pas une 
 dans le test et non dans le binaire : mesuré, le code engendré ne valide pas les requêtes entrantes,
 et le middleware qui le ferait exigerait `embedded-spec: true`, c'est-à-dire une copie du contrat
 figée dans le binaire — ce que la règle d'or interdit.
+
+### DN-12 — Un 500 servi par le BFF ne laisse aucune trace côté serveur
+
+*(Constat de revue, consigné plutôt que corrigé.)*
+
+Les gestionnaires d'erreur du serveur strict rendent désormais le DTO d'erreur du produit au lieu du
+message Go brut — c'était un correctif de revue. Mais **rien n'est journalisé** : `NewRouter` ne
+reçoit que les assets, aucun journal n'atteint `internal/bff`, et l'erreur d'origine disparaît avec
+la réponse.
+
+Non traité ici parce qu'aucune route ne peut encore échouer : la première qui le pourra est celle qui
+appelle la passerelle, en step-060, et c'est elle qui dira quelle forme de journal lui sert. Le
+constat est écrit là où il vit, au-dessus du gestionnaire.
 
 ### DN-11 — `openapi-typescript` reçoit sa propre copie de TypeScript 5
 
