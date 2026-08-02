@@ -1,6 +1,6 @@
 # Les cibles granulaires (`test-go`, `lint-go`…) existent pour que les jobs de CI n'invoquent jamais
-# une cible qui dépend de l'autre toolchain : le job Go n'a ni pnpm ni `node_modules`, et une cible
-# composite l'y enverrait chercher un `pnpm` absent.
+# une cible qui dépend de l'autre toolchain : quatre des cinq jobs Go n'ont ni pnpm ni `node_modules`
+# — « Tests Go » est l'exception — et une cible composite les enverrait chercher un `pnpm` absent.
 #
 # Ce que ce fichier ne porte pas encore : les cibles du versant Go qui n'ont pas encore leur code
 # (`migrate`, `bootstrap`). Aucune cible vide ici : une cible qui ne fait rien passe pour verte.
@@ -12,8 +12,9 @@ WEBASSETS := internal/webassets/dist
 # génération le lit là où pnpm l'a installé. `internal/gateway/contrat_test.go` en fait une porte.
 #
 # C'est ce chemin qui range `generate` — et la porte qui la rejoue — du côté qui a les deux
-# toolchains : le versant Go n'a ni pnpm ni `node_modules`, et une cible de génération invoquée par un
-# job Go ne trouverait pas le contrat. Même raison que `build-go` face à `build`.
+# toolchains. Deux jobs de la CI les ont : « Tests Go » et « Build client et déployable » ; les quatre
+# autres jobs Go n'ont pas `node_modules` et n'y trouveraient pas le contrat. La porte vit dans le
+# second, avec `check-routes`, l'autre porte de fichier engendré et commité.
 CONTRACT_ADMIN := web/node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml
 ADMIN_CLIENT := internal/gateway/client.gen.go
 
@@ -57,7 +58,8 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 .PHONY: help build build-go build-web dev check test test-go test-web lint lint-go lint-web fmt-go \
         typecheck-web vuln-go vuln-web lint-workflows check-routes generate check-generated mock clean
 
-# Deux courses vivent entre les prérequis de `check`, et la seconde ne se voit pas :
+# Trois courses vivent entre les prérequis de `check` ; la deuxième ne se voit pas, la troisième est
+# la seule à rougir d'elle-même :
 #
 # 1. `build` et `check-routes` lancent chacun un `vite build` sur le même `web/dist`, que Vite vide
 #    avant d'écrire. Une sortie tronquée, ou un `check-routes` qui juge un arbre à moitié réécrit.
@@ -65,6 +67,11 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 #    propres fixtures d'assets, puis les retire. La copie peut se terminer dans cette fenêtre, et le
 #    `go build` embarque alors la coquille du harnais — qui porte le même titre que la vraie. Rien ne
 #    distingue les deux à l'œil, et toutes les portes restent vertes.
+# 3. `check-generated` supprime `$(ADMIN_CLIENT)` avant de le régénérer — absent le temps d'un
+#    `make generate`, 0,67 s mesuré — pendant que `test-go`, `lint-go` et `vuln-go` compilent `./...`,
+#    `internal/gateway` compris.
+#    Celle-ci est **bruyante** : fichier retiré, `go build ./...` rend `undefined: ClientWithResponses`
+#    (mesuré). `build` n'est pas concerné, `./cmd/dashboard` n'important pas `internal/gateway`.
 #
 # Le prérequis est **omis**. `.NOTPARALLEL: check` n'honore ses prérequis qu'à partir de GNU make 4.4 ;
 # la 3.81 que livre macOS l'accepte sans rien dire et sérialise le run entier de toute façon. La forme
@@ -77,9 +84,10 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 # jobs parallèles — c'est là que le temps se gagne, pas ici. Un `make -j` qui produit un binaire faux
 # une fois sur dix coûte plus cher que la minute qu'il fait gagner.
 #
-# **Aucune porte ne rougit si cette ligne disparaît** : la course qu'elle ferme est intermittente par
-# nature, et un test qui la déclencherait à coup sûr serait un test de `make -j`, pas du produit.
-# Vérifié en la retirant — `make check` reste vert.
+# **Aucune porte ne rougit si cette ligne disparaît** : les courses qu'elle ferme sont intermittentes
+# par nature, et un test qui les déclencherait à coup sûr serait un test de `make -j`, pas du produit.
+# Vérifié en la retirant, sur un `make check` **sans `-j`** — que make sérialise de toute façon. Cette
+# vérification ne dit donc rien du cas `-j`, qui est précisément celui que la directive couvre.
 .NOTPARALLEL:
 
 help: ## Liste les cibles disponibles
@@ -95,9 +103,10 @@ build: build-web ## Construit le client, l'installe dans le binaire, et compile
 	cp -R web/dist/. $(WEBASSETS)/
 	@$(MAKE) --no-print-directory build-go
 
-# Compiler sans le client est une cible à part parce qu'aucun des cinq jobs Go de la CI n'a pnpm ni
-# `node_modules` : celui qui compile appelle `build-go`, jamais `build`, qui l'enverrait chercher un
-# `pnpm` absent. (`ubuntu-latest` a Node et npm préinstallés — vérifié au manifeste des images
+# Compiler sans le client est une cible à part parce que « Build Go », le job qui compile, n'a ni pnpm
+# ni `node_modules` : il appelle `build-go`, jamais `build`, qui l'enverrait chercher un `pnpm` absent.
+# Trois des quatre autres jobs Go sont dans le même cas ; seul « Tests Go » a la toolchain du client.
+# (`ubuntu-latest` a Node et npm préinstallés — vérifié au manifeste des images
 # `actions/runner-images` ; c'est bien pnpm, et lui seul, qui manque.)
 #
 # Le binaire qui en sort n'a pas d'interface — le `.gitkeep` commité suffit à `//go:embed`, et c'est
@@ -224,7 +233,7 @@ generate: ## Engendre le client Go de l'API Admin depuis le contrat installé
 	}
 	go tool oapi-codegen --config api/oapi-codegen.yaml $(CONTRACT_ADMIN)
 
-# Le client de l'API Admin est engendré et **commité** : les jobs Go de la CI n'ont pas
+# Le client de l'API Admin est engendré et **commité** : quatre des cinq jobs Go de la CI n'ont pas
 # `node_modules`, donc pas le contrat, et sans le fichier commité ils ne compileraient plus.
 # Le régénérer et constater qu'il n'a pas bougé est la seule façon de savoir que ce qui est commité
 # correspond au contrat installé — un bump du paquet npm sans régénération passerait sinon inaperçu.
@@ -235,25 +244,34 @@ generate: ## Engendre le client Go de l'API Admin depuis le contrat installé
 # fichier commité faisant illusion. Sans génération, il ne réapparaît pas, et son absence rougit.
 #
 # Le verdict se lit dans `git status` et non dans `git diff HEAD`, seule différence de forme avec
-# `check-routes` : `git diff` ne connaît que les fichiers suivis, donc un client engendré mais jamais
-# ajouté à l'index le laisse muet — la porte serait verte sur un fichier que la CI ne clonera pas.
-# `git status --porcelain` le rend en `??`, au même titre qu'une modification ou une suppression.
+# `check-routes`, et c'est un **échange**, pas un progrès. Le gain : `git diff` ne connaît que les
+# fichiers suivis, donc un client engendré mais jamais ajouté à l'index le laisse muet — la porte
+# serait verte sur un fichier que la CI ne clonera pas, là où `git status --porcelain` le rend en `??`.
+# Le coût : un `git` qui échoue — `detected dubious ownership`, workspace d'un job `container:` —
+# écrit sur stderr et rend une **sortie vide**, que `git diff --quiet` aurait signalée par son code de
+# retour. Mesuré hors dépôt : `git diff --quiet HEAD` rend 1, `git status --porcelain` rend 128 avec un
+# stdout vide. D'où le code de retour capturé à part du contenu : un `test -z` sur la seule
+# substitution rendait la porte **verte** sur un client divergent, l'arbre restant régénéré à tort.
 check-generated: ## Vérifie que le client de l'API Admin commité est à jour et régénéré
 	@rm -f $(ADMIN_CLIENT)
 	@$(MAKE) --no-print-directory generate \
 		|| { git checkout -- $(ADMIN_CLIENT) 2>/dev/null; exit 1; }
-	@test -z "$$(git status --porcelain -- $(ADMIN_CLIENT))" || { \
+	@state=$$(git status --porcelain -- $(ADMIN_CLIENT)) || { \
+		echo "git n'a pas rendu l'état de $(ADMIN_CLIENT) — verdict inconnu, pas vert"; \
+		exit 1; \
+	}; \
+	test -z "$$state" || { \
 		echo "le client régénéré diffère du fichier commité — lancer make generate et commiter $(ADMIN_CLIENT)"; \
-		git --no-pager status --short -- $(ADMIN_CLIENT); \
+		echo "$$state"; \
 		exit 1; \
 	}
 
 # Le mock sert le contrat **installé**, jamais une copie — même source que `generate`, donc même
 # garde : le contrat vient de GitHub Packages et n'existe pas dans un arbre où `pnpm install` n'a pas
 # tourné. Prism, lui, est une devDependency du client. C'est cette double dépendance à
-# `web/node_modules/` qui range `mock` du côté à deux toolchains, avec `generate` : aucun job Go de la
-# CI ne pourrait la lancer telle quelle — et c'est pourquoi le job « Tests Go », dont les scénarios
-# lancent le même binaire, a reçu l'action de setup du versant client.
+# `web/node_modules/` qui range `mock` du côté à deux toolchains, avec `generate` : seuls deux jobs de
+# la CI peuvent la lancer telle quelle — « Build client et déployable », et « Tests Go », dont les
+# scénarios lancent le même binaire et qui a reçu l'action de setup du versant client pour ça.
 #
 # Le port est fixe et documenté ici, là où les scénarios godog en prennent un libre : les deux mocks
 # tournent donc côte à côte sans se marcher dessus. Un `PRISM_MOCK_BASE_URL` exporté fait réutiliser

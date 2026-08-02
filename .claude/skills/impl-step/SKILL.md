@@ -417,8 +417,10 @@ Un endpoint qui manque au contrat se corrige par une PR dans `go-gateway/api/`, 
 recopié ici. Si une **route BFF** est ajoutée : déclarée dans `api/openapi-bff.yaml`, régénérée,
 scénario rouge, puis handler avec sa garde, son audit et son **DTO de sortie**. Si une **permission**
 est ajoutée : trois endroits dans la même PR — catalogue `internal/permissions/`, garde serveur,
-tableau des rôles par défaut — puis `make generate`. Si une **route client** est ajoutée : l'arbre de
-routes régénéré **et commité** (`make check-routes` le vérifie).
+tableau des rôles par défaut. `make generate` n'engendre aujourd'hui que le client Go de l'API Admin :
+la dérivation du catalogue vers le TypeScript arrive avec step-006, et rien ne garde cet écart d'ici
+là. Si une **route client** est ajoutée : l'arbre de routes régénéré **et commité**
+(`make check-routes` le vérifie).
 
 Puis cocher la DoD de la fiche en **nommant les tests** qui couvrent chaque critère, et vérifier les
 quatre critères transverses de `CLAUDE.md` : le chemin humain traversé pour de bon (rien de simulé dans

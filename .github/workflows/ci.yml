@@ -168,10 +168,10 @@ jobs:
       - uses: ./.github/actions/setup
       - run: make vuln-web
 
-  # Le seul job qui ait les **deux** toolchains, et donc le seul qui puisse exercer `make build` — la
-  # chaîne complète : `build-web` → purge de `internal/webassets/dist/` → copie → `build-go`. Jusqu'ici
-  # aucun runner ne la traversait : aucun des cinq jobs Go n'a pnpm — « Build Go » appelle `build-go`,
-  # les quatre autres ne compilent rien de destiné à être livré — et ce job-ci s'arrêtait à
+  # Le second job à avoir les **deux** toolchains — « Tests Go » est l'autre — et le seul à exercer
+  # `make build`, la chaîne complète : `build-web` → purge de `internal/webassets/dist/` → copie →
+  # `build-go`. Jusqu'ici aucun runner ne la traversait : « Build Go » appelle `build-go`, les autres
+  # jobs Go ne compilent rien de destiné à être livré, et ce job-ci s'arrêtait à
   # `check-routes`. Une copie qui perdrait son `/.` déposerait les assets dans
   # `internal/webassets/dist/dist/` ; `all:dist` reste satisfait donc « Build Go » compile, le harnais
   # godog écrase le répertoire avec ses fixtures avant de compiler donc « Tests Go » reste vert — dix
@@ -200,9 +200,10 @@ jobs:
       # un arbre périmé ne se voit pas en local, où le plugin le régénère à chaque lancement.
       - run: make check-routes
       # Même raison que `check-routes`, sur l'autre fichier engendré et commité : le client de l'API
-      # Admin. Il est régénéré depuis le contrat installé par `pnpm install`, donc ce job est le seul
-      # à pouvoir le rejouer — les cinq jobs Go n'ont pas `node_modules`. Un contrat republié et
-      # installé sans régénération laisserait le dépôt compiler contre une version fantôme.
+      # Admin. Il est régénéré depuis le contrat installé par `pnpm install` : seuls ce job et
+      # « Tests Go » ont `node_modules`, et la porte vit ici, auprès de l'autre porte de régénération,
+      # plutôt que dispersée. Un contrat republié et installé sans régénération laisserait le dépôt
+      # compiler contre une version fantôme.
       - run: make check-generated
       - run: make build
       # `make build` vert ne dit encore que « la recette n'a pas échoué ». Ce qu'on veut savoir est que

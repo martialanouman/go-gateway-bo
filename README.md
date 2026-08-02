@@ -96,6 +96,7 @@ make test-web          # Vitest
 make lint-web          # Biome
 make vuln-web          # pnpm audit
 make check-routes      # l'arbre de routes commité est-il à jour et régénéré ?
+make check-generated   # le client Go de l'API Admin commité est-il à jour et régénéré ?
 make test / make lint  # les composites des deux toolchains
 # `pnpm -C web e2e` — cible, arrive avec le harnais Playwright de step-007
 ```
@@ -215,9 +216,9 @@ Le package est publié sur GitHub Packages, qui exige une authentification même
   puisque ce fichier suit le dépôt jusque dans ses forks.
 - **En CI**, le `GITHUB_TOKEN` du run, auquel le package accorde la lecture (*Package settings →
   Manage Actions access → `go-gateway-bo`*). Aucun PAT stocké en secret : un secret long-vécu expire un
-  matin sans prévenir et se révoque mal. Le workflow devra accorder `packages: read` — `ci.yml` n'a
-  aujourd'hui aucun job qui installe les dépendances client, donc aucune permission à élargir ; c'est
-  la première chose que step-001 y ajoutera, faute de quoi son job échoue en 401 sur le registre.
+  matin sans prévenir et se révoque mal. Chaque job qui passe par `.github/actions/setup` accorde
+  `packages: read` chez lui — les quatre portes client, « Tests Go » et « Build client et
+  déployable » —, faute de quoi `pnpm install` échoue en 401 sur le registre.
 
 ## Dépendances
 
@@ -253,7 +254,8 @@ Une **step = une PR**. Prendre le prochain fichier de `tasks/steps/` — **l'ord
 scénario rouge d'abord**, puis déplacer le fichier dans `tasks/steps/done/` en dernier commit.
 
 Les portes de qualité tournent en **jobs parallèles** — cinq portes Go, cinq portes client, dont la
-dernière est aussi la seule à avoir les deux toolchains et à construire le **déployable**. Une porte
+dernière a aussi la toolchain Go et construit le **déployable**. Deux jobs ont les deux toolchains :
+celui-là, et « Tests Go », dont les scénarios lancent le mock Prism sur le contrat installé. Une porte
 qui échoue n'empêche pas les autres de rendre leur verdict : on voit une erreur de compilation Go *et*
 un test client rouge au même run. La protection de branche
 exige le seul check **`CI`**, qui les agrège et reste valable quand une porte s'ajoute — mais en

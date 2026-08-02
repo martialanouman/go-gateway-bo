@@ -263,8 +263,10 @@ mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couver
 - **Ajouter une route client** : créer le fichier sous `web/src/routes/`, régénérer l'arbre de routes,
   **commiter le fichier généré**.
 - **Ajouter une permission** : trois endroits dans la même PR — le catalogue `internal/permissions/`,
-  la garde serveur qui l'exige, et le tableau des rôles par défaut (§6.10 de la spec). Puis
-  `make generate` : le TypeScript en dérive, et la CI échoue s'il diverge.
+  la garde serveur qui l'exige, et le tableau des rôles par défaut (§6.10 de la spec). Le TypeScript
+  n'en dérive **pas encore** : `make generate` n'engendre aujourd'hui que le client Go de l'API Admin,
+  et aucune porte ne compare un fichier qui n'existe pas. La dérivation arrive avec step-006 ; d'ici
+  là, ce qui est tenu à la main ne l'est que par la relecture.
 - **Un endpoint manque au contrat** : PR dans `go-gateway/api/` (YAML + bump), puis mise à jour ici.
 - **Un écran non encore livré** : route déclarée + état vide explicite nommant le jalon. Jamais une
   page blanche ni un lien mort.
