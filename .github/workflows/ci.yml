@@ -41,15 +41,28 @@ jobs:
       # déployable » qui exerce la chaîne complète, assets embarqués compris.
       - run: make build-go
 
+  # Le seul job Go qui ait **aussi** la toolchain du client, et ce n'est pas un doublon des quatre jobs
+  # `*-web` : les scénarios godog de `internal/gateway` lancent le mock Prism et l'interrogent, or
+  # Prism est une devDependency du client et le contrat de l'API Admin ne vit que sous
+  # `web/node_modules/` — ce dépôt ne copie jamais un contrat. Sans `pnpm install`, ces scénarios ne se
+  # sautent pas : ils échouent, et c'est voulu (un skip est vert). Retirer l'action de setup d'ici,
+  # c'est rendre ce job rouge, pas plus rapide.
+  #
+  # `packages: read` pour la même raison que les jobs du client : la lecture du contrat sur GitHub
+  # Packages est authentifiée, et `pnpm install` échoue sinon en 401.
   test:
     name: Tests Go
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Le jeton du run n'a rien à faire dans `.git/config` une fois le dépôt cloné.
           persist-credentials: false
+      - uses: ./.github/actions/setup
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -155,10 +168,10 @@ jobs:
       - uses: ./.github/actions/setup
       - run: make vuln-web
 
-  # Le seul job qui ait les **deux** toolchains, et donc le seul qui puisse exercer `make build` — la
-  # chaîne complète : `build-web` → purge de `internal/webassets/dist/` → copie → `build-go`. Jusqu'ici
-  # aucun runner ne la traversait : aucun des cinq jobs Go n'a pnpm — « Build Go » appelle `build-go`,
-  # les quatre autres ne compilent rien de destiné à être livré — et ce job-ci s'arrêtait à
+  # Le second job à avoir les **deux** toolchains — « Tests Go » est l'autre — et le seul à exercer
+  # `make build`, la chaîne complète : `build-web` → purge de `internal/webassets/dist/` → copie →
+  # `build-go`. Jusqu'ici aucun runner ne la traversait : « Build Go » appelle `build-go`, les autres
+  # jobs Go ne compilent rien de destiné à être livré, et ce job-ci s'arrêtait à
   # `check-routes`. Une copie qui perdrait son `/.` déposerait les assets dans
   # `internal/webassets/dist/dist/` ; `all:dist` reste satisfait donc « Build Go » compile, le harnais
   # godog écrase le répertoire avec ses fixtures avant de compiler donc « Tests Go » reste vert — dix
@@ -186,6 +199,12 @@ jobs:
       # `check-routes` construit le client puis vérifie que l'arbre de routes commité n'a pas bougé :
       # un arbre périmé ne se voit pas en local, où le plugin le régénère à chaque lancement.
       - run: make check-routes
+      # Même raison que `check-routes`, sur l'autre fichier engendré et commité : le client de l'API
+      # Admin. Il est régénéré depuis le contrat installé par `pnpm install` : seuls ce job et
+      # « Tests Go » ont `node_modules`, et la porte vit ici, auprès de l'autre porte de régénération,
+      # plutôt que dispersée. Un contrat republié et installé sans régénération laisserait le dépôt
+      # compiler contre une version fantôme.
+      - run: make check-generated
       - run: make build
       # `make build` vert ne dit encore que « la recette n'a pas échoué ». Ce qu'on veut savoir est que
       # le binaire sert la sortie que Vite vient d'émettre, et la seule façon de le savoir est de le
@@ -198,7 +217,13 @@ jobs:
       # celui-là sur le poste d'un développeur. La contrepartie est qu'il ne se rejoue pas en local.
       - name: Le binaire sert la sortie de Vite
         run: |
-          DASHBOARD_ADDR=127.0.0.1:3001 ./bin/dashboard &
+          # Le mode `mock` est explicite parce que le défaut est `real`, qui exigerait ici les
+          # identifiants OAuth2 et le matériel mTLS d'une passerelle que ce job ne joint jamais : ce
+          # qu'il vérifie est le service des assets. L'adresse est celle du mock, jamais interrogée.
+          DASHBOARD_ADDR=127.0.0.1:3001 \
+          DASHBOARD_GATEWAY_MODE=mock \
+          DASHBOARD_GATEWAY_BASE_URL=http://127.0.0.1:4010 \
+            ./bin/dashboard &
           bff=$!
           # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de
           # sortie d'un script qui avait réussi. Un binaire mort entre le dernier appel et la fin du

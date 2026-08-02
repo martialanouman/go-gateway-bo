@@ -16,9 +16,8 @@ le Go embarque les assets de la SPA.
 ## Commandes
 
 > `make help` liste ce qui existe, et c'est la cible par défaut — préférer la lancer à croire ce
-> bloc. Sont encore des **cibles**, et arrivent avec les steps qui les habitent : `make generate`,
-> `make mock`, `make migrate`, `make bootstrap`. Une cible absente rend `No rule to make target`,
-> jamais un vert silencieux.
+> bloc. Sont encore des **cibles**, et arrivent avec les steps qui les habitent : `make migrate`,
+> `make bootstrap`. Une cible absente rend `No rule to make target`, jamais un vert silencieux.
 
 ```bash
 make dev          # BFF Go (:3001) + Vite (:3000), /api et /ws proxifiés vers le BFF
@@ -26,14 +25,17 @@ make build        # le déployable : build-web → copie dans internal/webassets
 make build-go     # go build seul — ce que lance le job « Build Go », qui n'a ni pnpm ni node_modules
 make check        # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make test         # les deux suites · make lint — les deux linters
-make generate     # oapi-codegen + catalogue de permissions Go → TS      (cible)
-make mock         # mock Prism sur openapi-admin.yaml                    (cible)
+make generate     # oapi-codegen → client Go de l'API Admin
+                  # le catalogue de permissions Go → TS s'y ajoutera en step-006
+make mock         # mock Prism sur openapi-admin.yaml, sur :4010
+make check-generated  # le client engendré commité est-il à jour ?
 
 # Une porte granulaire par job de CI, à lancer seule pendant une boucle rouge → vert :
-#   build-go (Build Go) · test-go (godog + -race) · lint-go (+ fmt-go pour appliquer)
-#   vuln-go (govulncheck) · lint-workflows (actionlint + l'agrégateur attend-il tous les jobs ?)
+#   build-go (Build Go) · lint-go (+ fmt-go pour appliquer) · vuln-go (govulncheck)
+#   test-go (godog + -race) — seul job Go à avoir aussi pnpm : ses scénarios lancent Prism
+#   lint-workflows (actionlint + l'agrégateur attend-il tous les jobs ?)
 #   typecheck-web (tsc) · test-web (Vitest) · lint-web (Biome) · vuln-web (pnpm audit)
-#   check-routes + build + le contrôle du binaire → job « Build client et déployable »
+#   check-routes + check-generated + build + le contrôle du binaire → « Build client et déployable »
 ```
 
 `make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
@@ -97,10 +99,10 @@ tasks/             plan.md · todo.md · steps/ (à faire) · steps/done/ (livr�
 - **Les contrats sont la source de vérité** : le dépôt consomme `@martialanouman/gateway-api-contracts`
   et ne copie jamais un YAML. Tout manque se corrige par une PR dans `go-gateway/api/`.
 - **TOUJOURS relever la version du contrat au début d'une step qui le touche.** Il est publié à chaque
-  merge sur `main` de `go-gateway` : dix versions en une semaine, dont une majeure. Consigner l'écart
-  dans la PR, **ne jamais bumper au milieu d'une step**, et **relire le diff du YAML** — une contrainte
-  resserrée (`additionalProperties: false`, un `maximum`, un `enum` réduit) passe le typage et échoue à
-  l'exécution. `tasks/plan.md` §1.12.
+  merge sur `main` de `go-gateway` : quinze versions en moins de six jours, dont trois majeures.
+  Consigner l'écart dans la PR, **ne jamais bumper au milieu d'une step**, et **relire le diff du
+  YAML** — une contrainte resserrée (`additionalProperties: false`, un `maximum`, un `enum` réduit)
+  passe le typage et échoue à l'exécution. `tasks/plan.md` §1.12.
 - **Versions & API : jamais devinées.** `ctx7` côté JS, `pkg.go.dev` ou `proxy.golang.org` côté Go,
   avant tout ajout, bump ou usage d'API. Une signature inventée compile parfois.
 
@@ -261,8 +263,10 @@ mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couver
 - **Ajouter une route client** : créer le fichier sous `web/src/routes/`, régénérer l'arbre de routes,
   **commiter le fichier généré**.
 - **Ajouter une permission** : trois endroits dans la même PR — le catalogue `internal/permissions/`,
-  la garde serveur qui l'exige, et le tableau des rôles par défaut (§6.10 de la spec). Puis
-  `make generate` : le TypeScript en dérive, et la CI échoue s'il diverge.
+  la garde serveur qui l'exige, et le tableau des rôles par défaut (§6.10 de la spec). Le TypeScript
+  n'en dérive **pas encore** : `make generate` n'engendre aujourd'hui que le client Go de l'API Admin,
+  et aucune porte ne compare un fichier qui n'existe pas. La dérivation arrive avec step-006 ; d'ici
+  là, ce qui est tenu à la main ne l'est que par la relecture.
 - **Un endpoint manque au contrat** : PR dans `go-gateway/api/` (YAML + bump), puis mise à jour ici.
 - **Un écran non encore livré** : route déclarée + état vide explicite nommant le jalon. Jamais une
   page blanche ni un lien mort.

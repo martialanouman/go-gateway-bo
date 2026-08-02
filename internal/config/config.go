@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -20,11 +22,34 @@ import (
 const (
 	EnvAddr            = "DASHBOARD_ADDR"
 	EnvShutdownTimeout = "DASHBOARD_SHUTDOWN_TIMEOUT"
+
+	EnvGatewayMode         = "DASHBOARD_GATEWAY_MODE"
+	EnvGatewayBaseURL      = "DASHBOARD_GATEWAY_BASE_URL"
+	EnvGatewayTokenURL     = "DASHBOARD_GATEWAY_TOKEN_URL"
+	EnvGatewayClientID     = "DASHBOARD_GATEWAY_CLIENT_ID"
+	EnvGatewayClientSecret = "DASHBOARD_GATEWAY_CLIENT_SECRET"
+	EnvGatewayClientCert   = "DASHBOARD_GATEWAY_CLIENT_CERT"
+	EnvGatewayClientKey    = "DASHBOARD_GATEWAY_CLIENT_KEY"
+	EnvGatewayCACert       = "DASHBOARD_GATEWAY_CA_CERT"
+	EnvGatewayTimeout      = "DASHBOARD_GATEWAY_TIMEOUT"
 )
 
 // defaultShutdownTimeout laisse aux requêtes en vol de quoi se terminer pendant un déploiement
 // roulant. Un délai a une valeur par défaut, un secret n'en a jamais.
 const defaultShutdownTimeout = 15 * time.Second
+
+// defaultGatewayTimeout borne un appel sortant vers l'API Admin. Le tableau de bord est un
+// observateur : une passerelle qui traîne doit devenir un état d'erreur à l'écran, pas une requête
+// suspendue qui retient une connexion et l'opérateur avec elle.
+const defaultGatewayTimeout = 10 * time.Second
+
+// GatewayMode dit à qui le BFF parle : la vraie API Admin, ou le mock qui la simule.
+type GatewayMode string
+
+const (
+	GatewayModeReal GatewayMode = "real"
+	GatewayModeMock GatewayMode = "mock"
+)
 
 // Config est la configuration validée. Elle se construit une fois, dans main, et descend par
 // injection.
@@ -33,6 +58,26 @@ type Config struct {
 	Addr string
 	// ShutdownTimeout est le délai laissé aux requêtes en vol après un signal d'arrêt.
 	ShutdownTimeout time.Duration
+	// Gateway est la connexion sortante vers l'API Admin de la passerelle.
+	Gateway GatewayConfig
+}
+
+// GatewayConfig décrit la connexion sortante vers l'API Admin. Hors du mode `real`, seule BaseURL
+// porte une valeur exigée : le mock n'authentifie personne.
+type GatewayConfig struct {
+	Mode GatewayMode
+	// BaseURL porte le préfixe de chemin de l'API : la vraie sert sous `/v1`, le mock sans préfixe.
+	// C'est une différence de déploiement, jamais une constante du code.
+	BaseURL  string
+	TokenURL string
+	ClientID string
+	// ClientSecret est un secret : il ne sort ni dans un message d'erreur, ni dans un journal.
+	ClientSecret string
+	ClientCert   string
+	ClientKey    string
+	CACert       string
+	// Timeout borne un appel sortant, obtention du jeton comprise.
+	Timeout time.Duration
 }
 
 // Lookup a la signature de os.LookupEnv. La passer en paramètre est ce qui rend le chargeur testable
@@ -47,7 +92,21 @@ func Load(lookup Lookup) (Config, error) {
 	cfg := Config{
 		Addr:            r.listenAddr(EnvAddr),
 		ShutdownTimeout: r.positiveDuration(EnvShutdownTimeout, defaultShutdownTimeout),
+		Gateway: GatewayConfig{
+			Mode:         r.gatewayMode(EnvGatewayMode),
+			BaseURL:      r.requiredAbsoluteURL(EnvGatewayBaseURL, "http", "https"),
+			TokenURL:     r.optionalAbsoluteURL(EnvGatewayTokenURL, "https"),
+			ClientID:     r.optional(EnvGatewayClientID),
+			ClientSecret: r.optional(EnvGatewayClientSecret),
+			ClientCert:   r.optional(EnvGatewayClientCert),
+			ClientKey:    r.optional(EnvGatewayClientKey),
+			CACert:       r.optional(EnvGatewayCACert),
+			Timeout:      r.positiveDuration(EnvGatewayTimeout, defaultGatewayTimeout),
+		},
 	}
+
+	r.requireRealGatewayMaterial(cfg.Gateway.Mode)
+	r.requireEncryptedGatewayBaseURL(cfg.Gateway.Mode, cfg.Gateway.BaseURL)
 
 	if err := errors.Join(r.problems...); err != nil {
 		return Config{}, fmt.Errorf("configuration invalide :\n%w", err)
@@ -70,9 +129,11 @@ func Variables() []string {
 		seen  = map[string]bool{}
 	)
 
-	// Le dédoublonnage ne sert encore à rien — aucune variable n'est lue deux fois, et le retirer
-	// laisse la suite verte. Il est là pour le jour où ce sera le cas : un doublon ferait échouer le
-	// test de `.env.example` sur une divergence qui n'existe pas.
+	// Le dédoublonnage porte désormais quelque chose : les six variables qu'exige le mode `real` sont
+	// lues deux fois — une fois dans le littéral, une fois par requireRealGatewayMaterial qui constate
+	// leur absence sur l'environnement. Sans lui, `.env.example` se verrait reprocher une divergence
+	// qui n'existe pas. Vérifié en le retirant : `TestDotenvExampleListsExactlyWhatLoadReads` tombe,
+	// en réclamant neuf noms de passerelle déjà documentés.
 	_, _ = Load(func(name string) (string, bool) {
 		if !seen[name] {
 			seen[name] = true
@@ -105,6 +166,104 @@ func (r *reader) required(name string) (string, bool) {
 	}
 
 	return value, true
+}
+
+// requireRealGatewayMaterial exige les identifiants OAuth2 et le matériel mTLS d'une passerelle
+// jointe pour de vrai. Le manque se constate sur l'environnement et non sur la valeur chargée : une
+// valeur présente mais refusée plus haut est déjà signalée, et la redire « absente » ferait deux
+// lignes pour un seul problème.
+func (r *reader) requireRealGatewayMaterial(mode GatewayMode) {
+	if mode != GatewayModeReal {
+		return
+	}
+
+	for _, name := range []string{
+		EnvGatewayTokenURL,
+		EnvGatewayClientID,
+		EnvGatewayClientSecret,
+		EnvGatewayClientCert,
+		EnvGatewayClientKey,
+		EnvGatewayCACert,
+	} {
+		if r.optional(name) == "" {
+			r.reject(name, "variable obligatoire absente en mode %s", GatewayModeReal)
+		}
+	}
+}
+
+// requireEncryptedGatewayBaseURL refuse une passerelle réelle jointe en clair. Le schéma est admis
+// inconditionnellement plus haut — `http` reste la normale du mock Prism — et c'est ici, le mode
+// connu, qu'il se restreint : http.Transport ne consulte pas son tls.Config quand l'URL est en
+// `http`, si bien que le matériel mTLS serait chargé, posé, et jamais présenté, pendant que le jeton
+// machine et ses cinq scopes partiraient en clair à chaque appel. Rien ne tomberait.
+func (r *reader) requireEncryptedGatewayBaseURL(mode GatewayMode, baseURL string) {
+	// Une URL absente ou déjà refusée est rendue vide : la redire ferait deux lignes pour un problème.
+	if mode != GatewayModeReal || baseURL == "" {
+		return
+	}
+
+	// Le schéma est ce qui précède le premier `:` — la valeur a déjà traversé absoluteURL, donc elle
+	// s'analyse. La comparaison ignore la casse comme le fait net/url, qui minuscule le schéma
+	// ($GOROOT/src/net/url/url.go:454) : `HTTPS://` a passé la garde ci-dessus, refuser ici serait
+	// refuser une URL que le programme joint parfaitement.
+	if scheme, _, _ := strings.Cut(baseURL, ":"); !strings.EqualFold(scheme, "https") {
+		r.reject(EnvGatewayBaseURL, "URL absolue en https attendue en mode %s, reçu %q", GatewayModeReal, baseURL)
+	}
+}
+
+func (r *reader) requiredAbsoluteURL(name string, schemes ...string) string {
+	value, ok := r.required(name)
+	if !ok {
+		return ""
+	}
+
+	return r.absoluteURL(name, value, schemes)
+}
+
+func (r *reader) optionalAbsoluteURL(name string, schemes ...string) string {
+	value := r.optional(name)
+	if value == "" {
+		return ""
+	}
+
+	return r.absoluteURL(name, value, schemes)
+}
+
+// absoluteURL rend la valeur verbatim plutôt que la forme reconstruite par net/url : le préfixe de
+// chemin de l'API appartient à l'URL configurée — la vraie sert sous `/v1`, le mock Prism sans
+// préfixe — et rien ici ne doit le réécrire.
+func (r *reader) absoluteURL(name, value string, schemes []string) string {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || !slices.Contains(schemes, parsed.Scheme) {
+		r.reject(name, "URL absolue en %s attendue, reçu %q", strings.Join(schemes, " ou "), value)
+
+		return ""
+	}
+
+	return value
+}
+
+// optional rend une valeur sans jamais se plaindre de son absence : ce qui la rend obligatoire est le
+// mode, constaté après chargement. La lecture, elle, reste inconditionnelle — voir Variables.
+func (r *reader) optional(name string) string {
+	value, _ := r.lookup(name)
+
+	return strings.TrimSpace(value)
+}
+
+func (r *reader) gatewayMode(name string) GatewayMode {
+	switch mode := GatewayMode(r.optional(name)); mode {
+	case "":
+		return GatewayModeReal
+	case GatewayModeReal, GatewayModeMock:
+		return mode
+	default:
+		r.reject(name, "mode %q inconnu, %s ou %s attendu", mode, GatewayModeReal, GatewayModeMock)
+
+		// Le mode refusé est rendu tel quel, et non replié sur `real` : replié, il ferait exiger tout
+		// le matériel de production par-dessus, soit sept lignes d'erreur pour une faute de frappe.
+		return mode
+	}
 }
 
 func (r *reader) listenAddr(name string) string {

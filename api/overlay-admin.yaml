@@ -1,0 +1,47 @@
+# Overlay OpenAPI appliqué au contrat de l'API Admin avant génération — pas une copie du contrat :
+# deux actions qui le référencent, et rien de ce qu'il déclare.
+#
+# Il n'existe que pour lever deux collisions de noms Go qui arrêtent oapi-codegen v2.8.0 :
+#   error generating code: error generating code for type definitions: duplicate typename
+#   'ConnectorStatus' detected, can't auto-rename, please use x-go-name to specify your own name for
+#   one of them
+# — puis le même message sur `SenderId` une fois la première levée.
+#
+# Chaque action cible un **composant**, jamais la propriété inline qui participe à la collision :
+# mesuré, un `x-go-name` posé sur `Connector.properties.status` ne renomme rien et la génération
+# échoue sur le même message.
+#
+# Le mode strict d'oapi-codegen est laissé à son défaut (`true`, cf. `api/oapi-codegen.yaml`) : le
+# jour où l'amont renomme ou retire un de ces composants, le sélecteur ne matche plus rien et la
+# génération tombe sur `update action (2 / 2) target=…: does nothing` — mesuré en renommant la cible
+# de la seconde action. C'est ce qui rend cet overlay acceptable : il se périme en rouge.
+#
+# Ce que strict ne voit pas : une action dont la cible existe encore mais dont l'effet a disparu.
+# L'amont peut lever une collision de son côté sans que rien ne rougisse ici — l'overlay devient alors
+# inutile et inoffensif, et c'est la relecture du diff du contrat, exigée à chaque bump, qui le trouve.
+overlay: 1.0.0
+
+info:
+  title: Levée des collisions de noms Go du contrat Admin
+  version: 1.0.0
+
+actions:
+  # `Connector.status` est un enum **inline** (`active | degraded | disabled`), dont oapi-codegen
+  # tire le type `ConnectorStatus` — le nom que porte déjà le schéma de santé runtime. C'est ce
+  # dernier qui est renommé : sa description dit « Runtime health », et `ConnectorHealth` la sert
+  # mieux que le nom qu'il disputait à un enum de configuration.
+  #
+  # Caduque le jour où l'amont extrait cet enum en composant nommé, ou renomme l'un des deux.
+  - target: $.components.schemas.ConnectorStatus
+    update:
+      x-go-name: ConnectorHealth
+
+  # Le paramètre de chemin `senderId` et le schéma de la ressource « sender id » portent le même nom
+  # dans deux sections de composants différentes, et engendrent tous deux `SenderId`. C'est le
+  # paramètre qui est renommé : ce n'est qu'un UUID d'URL, là où le schéma est le type que tout le
+  # versant sender ids référence.
+  #
+  # Caduque le jour où l'amont renomme l'un des deux composants.
+  - target: $.components.parameters.SenderId
+    update:
+      x-go-name: SenderIdPathParam

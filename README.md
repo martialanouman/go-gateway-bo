@@ -38,12 +38,16 @@ cp .env.example .env       # puis remplir les secrets — voir plus bas
 docker compose up -d       # PostgreSQL 18 + Redis
 make migrate               # applique les migrations                        (cible, step-005)
 make bootstrap             # sème les permissions et crée le premier compte (cible)
-make mock                  # Prism sert le contrat sur :4010, autre terminal (cible, step-003)
+make mock                  # Prism sert le contrat sur :4010, autre terminal
 make dev                   # BFF (:3001) + Vite (:3000) — l'application est sur :3000
 ```
 
 Les lignes marquées `(cible)` arrivent avec leur step et rendent `No rule to make target` d'ici là —
 jamais un vert silencieux.
+
+**Un `.env` antérieur à step-003 ne démarre plus** : `DASHBOARD_GATEWAY_BASE_URL` y est devenue
+obligatoire dans les deux modes. Recopier le bloc « Passerelle » de `.env.example` ; le binaire refuse
+sinon de démarrer en nommant chaque variable manquante.
 
 Go et Node sont tous deux requis **en développement**. En production, ni l'un ni l'autre : le binaire
 embarque les assets et se suffit à lui-même.
@@ -82,8 +86,9 @@ make build-web  # vite build → web/dist
 make check      # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make help       # liste les cibles qui existent — c'est la cible par défaut
 make clean      # supprime bin/, web/dist et les assets copiés dans internal/webassets/dist/
-make generate   # contrat (Go + TS) et catalogue de permissions (Go → TS)   (cible)
-make mock       # Prism sur openapi-admin.yaml                        (cible, step-003)
+make generate   # client Go de l'API Admin depuis le contrat installé
+                # les types TS et le catalogue de permissions s'y ajouteront (steps 004 et 006)
+make mock       # Prism sur openapi-admin.yaml, sur :4010
 make migrate    # migrations de la base                               (cible, step-005)
 
 make test-go           # unitaires Go + scénarios godog, avec -race
@@ -95,6 +100,7 @@ make test-web          # Vitest
 make lint-web          # Biome
 make vuln-web          # pnpm audit
 make check-routes      # l'arbre de routes commité est-il à jour et régénéré ?
+make check-generated   # le client Go de l'API Admin commité est-il à jour et régénéré ?
 make test / make lint  # les composites des deux toolchains
 # `pnpm -C web e2e` — cible, arrive avec le harnais Playwright de step-007
 ```
@@ -166,7 +172,10 @@ partitionner sans jamais détacher n'apporte rien.
 Le comportement s'écrit en **Gherkin français** avant d'exister, il échoue, puis on l'implémente.
 
 - **Scénarios `godog`** — le comportement observable du BFF. Le `.feature` vit à côté du package qu'il
-  décrit. Ils tapent le **mock Prism**, jamais la vraie passerelle.
+  décrit. Ils tapent le **mock Prism**, jamais la vraie passerelle : le harnais le lance lui-même sur
+  un port libre, et **échoue** — jamais ne se saute — si le contrat ou Prism manquent. Un
+  `export PRISM_MOCK_BASE_URL=http://127.0.0.1:4010` leur fait réutiliser le mock de `make mock` au
+  lieu d'en démarrer un à chaque lancement.
 - **Unitaires Go** — les mécanismes aux limites : hachage, curseurs, mappings, sérialisation des DTO.
   La majorité des tests, en nombre.
 - **Composants (Vitest + Testing Library)** — états, permissions, clavier, copie.
@@ -193,9 +202,12 @@ décrit la frontière entre les deux moitiés de ce dépôt et engendre **les ty
 client TypeScript**. Un contrat, deux bouts typés, une divergence qui ne compile pas.
 
 En développement, le mock Prism sert le contrat sans dépendre de la passerelle — ce qui est
-nécessaire, **62 des 133 opérations n'étant pas encore implémentées en amont**. Le mode tranche entre
-Prism et la vraie passerelle, et **n'a pas de valeur par défaut**, dans un sens comme dans l'autre :
-servir des données inventées en les croyant vraies est aussi grave que l'inverse.
+nécessaire, **62 des 133 opérations n'étant pas encore implémentées en amont**.
+`DASHBOARD_GATEWAY_MODE` tranche entre Prism et la vraie passerelle, et **son absence vaut `real`** —
+la lecture la plus stricte, parce que `real` exige par-dessus l'URL de base les identifiants OAuth2 et
+le matériel mTLS : une production qui oublie la variable ne démarre pas, et le message nomme chaque
+manquant. Le défaut inverse aurait servi des données inventées sans que rien ne le dise ; un `mock`
+délibéré, lui, reste explicite et greppable dans l'environnement.
 
 Le jeton obtenu est un jeton **machine** à scopes fixes, qui porte `content:read` en permanence : il ne
 représente pas l'opérateur connecté, et aucune restriction par opérateur ne peut donc être déléguée à
@@ -211,9 +223,9 @@ Le package est publié sur GitHub Packages, qui exige une authentification même
   puisque ce fichier suit le dépôt jusque dans ses forks.
 - **En CI**, le `GITHUB_TOKEN` du run, auquel le package accorde la lecture (*Package settings →
   Manage Actions access → `go-gateway-bo`*). Aucun PAT stocké en secret : un secret long-vécu expire un
-  matin sans prévenir et se révoque mal. Le workflow devra accorder `packages: read` — `ci.yml` n'a
-  aujourd'hui aucun job qui installe les dépendances client, donc aucune permission à élargir ; c'est
-  la première chose que step-001 y ajoutera, faute de quoi son job échoue en 401 sur le registre.
+  matin sans prévenir et se révoque mal. Chaque job qui passe par `.github/actions/setup` accorde
+  `packages: read` chez lui — les quatre portes client, « Tests Go » et « Build client et
+  déployable » —, faute de quoi `pnpm install` échoue en 401 sur le registre.
 
 ## Dépendances
 
@@ -249,7 +261,8 @@ Une **step = une PR**. Prendre le prochain fichier de `tasks/steps/` — **l'ord
 scénario rouge d'abord**, puis déplacer le fichier dans `tasks/steps/done/` en dernier commit.
 
 Les portes de qualité tournent en **jobs parallèles** — cinq portes Go, cinq portes client, dont la
-dernière est aussi la seule à avoir les deux toolchains et à construire le **déployable**. Une porte
+dernière a aussi la toolchain Go et construit le **déployable**. Deux jobs ont les deux toolchains :
+celui-là, et « Tests Go », dont les scénarios lancent le mock Prism sur le contrat installé. Une porte
 qui échoue n'empêche pas les autres de rendre leur verdict : on voit une erreur de compilation Go *et*
 un test client rouge au même run. La protection de branche
 exige le seul check **`CI`**, qui les agrège et reste valable quand une porte s'ajoute — mais en

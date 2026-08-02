@@ -273,8 +273,11 @@ Conséquences :
 ### 1.12 Le contrat bouge pendant le développement — le suivre est une tâche, pas un réflexe
 
 `@martialanouman/gateway-api-contracts` est publié à chaque merge sur `main` de `go-gateway` touchant
-`api/**`. Dix versions en une semaine (1.0.0 → **2.5.0**), dont une **majeure**. Ce dépôt en est
-consommateur, pas propriétaire : il subit le rythme d'un autre.
+`api/**`. **Quinze versions en moins de six jours** — 1.0.0 le 27/07/2026 à 01:28 UTC, 4.0.0 le
+01/08/2026 à 17:46 —, dont **trois majeures**. Relevé le 02/08/2026 par
+`gh api "/user/packages/npm/gateway-api-contracts/versions" --jq '.[] | "\(.name)\t\(.created_at)"'`,
+qui reste la façon de le rejouer. Ce dépôt en est consommateur, pas propriétaire : il subit le rythme
+d'un autre.
 
 **La règle.** Relever la version disponible **au début de chaque step qui touche le contrat**, et
 consigner l'écart dans la PR. Ne jamais bumper au milieu d'une step : un changement de contrat au
@@ -298,6 +301,15 @@ pas la compilation. Une contrainte de validation resserrée (`additionalProperti
 >
 > Aucun de ces points n'aurait été vu en lisant seulement le numéro de version, et quatre sur six ne
 > font pas échouer la compilation.
+
+**Dette ouverte : le dépôt est en 2.5.0, le registre en 4.0.0.** step-003 a installé 2.5.0 le
+02/08/2026 à 00:19 UTC — c'était alors la dernière version *installable*, la quarantaine
+`minimumReleaseAge: 1440` de `web/pnpm-workspace.yaml` (mode strict) refusant toute version publiée
+depuis moins de 24 h, et 2.6.0 à 4.0.0 étant toutes parues le 01/08 entre 10:36 et 17:46 UTC. Elle
+**expire d'elle-même** : celle de 4.0.0 tombe le 02/08/2026 à 17:46 UTC, après quoi plus rien ne
+bloque le bump. **Deux majeures** séparent 2.5.0 de 4.0.0 et ce qu'elles changent n'a pas été relevé :
+le relever fait partie du travail, sous la règle du paragraphe ci-dessus. La step porteuse est
+inscrite dans `todo.md` (M0).
 
 ---
 

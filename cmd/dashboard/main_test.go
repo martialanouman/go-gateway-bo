@@ -355,6 +355,7 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	p := &process{}
 
 	ctx.Given(`^une configuration complète dont on retire "([^"]*)"$`, p.configurationWithout)
+	ctx.Given(`^une configuration complète dont on passe "([^"]*)" à "([^"]*)"$`, p.configurationWith)
 	ctx.Given(`^un serveur démarré$`, p.startAndServe)
 	ctx.When(`^le serveur démarre$`, p.start)
 	ctx.When(`^le serveur reçoit SIGTERM$`, p.signalTerm)
@@ -384,10 +385,13 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 var browser = &http.Client{Timeout: 2 * time.Second}
 
 // completeConfiguration est le plus petit environnement avec lequel le binaire démarre. Le port 0
-// laisse le système en choisir un libre.
+// laisse le système en choisir un libre, et le mode `mock` n'exige de la passerelle que son adresse —
+// aucun scénario d'ici ne la joint, mais la configuration se valide au démarrage, avant tout appel.
 func completeConfiguration() map[string]string {
 	return map[string]string{
-		"DASHBOARD_ADDR": "127.0.0.1:0",
+		"DASHBOARD_ADDR":             "127.0.0.1:0",
+		"DASHBOARD_GATEWAY_MODE":     "mock",
+		"DASHBOARD_GATEWAY_BASE_URL": "http://127.0.0.1:4010",
 	}
 }
 
@@ -410,11 +414,31 @@ type response struct {
 }
 
 func (p *process) configurationWithout(name string) error {
+	if err := p.startFromCompleteConfiguration(name); err != nil {
+		return err
+	}
+	delete(p.env, name)
+
+	return nil
+}
+
+func (p *process) configurationWith(name, value string) error {
+	if err := p.startFromCompleteConfiguration(name); err != nil {
+		return err
+	}
+	p.env[name] = value
+
+	return nil
+}
+
+// startFromCompleteConfiguration refuse une variable que la configuration complète ne porte pas :
+// sinon un nom mal orthographié décrirait un environnement que personne n'a, et le scénario passerait
+// pour avoir exercé ce qu'il annonce.
+func (p *process) startFromCompleteConfiguration(name string) error {
 	p.env = completeConfiguration()
 	if _, ok := p.env[name]; !ok {
 		return fmt.Errorf("%q n'appartient pas à la configuration complète du scénario", name)
 	}
-	delete(p.env, name)
 
 	return nil
 }
