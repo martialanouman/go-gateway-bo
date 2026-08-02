@@ -3,7 +3,7 @@
 # — « Tests Go » est l'exception — et une cible composite les enverrait chercher un `pnpm` absent.
 #
 # Ce que ce fichier ne porte pas encore : les cibles du versant Go qui n'ont pas encore leur code
-# (`migrate`, `bootstrap`). Aucune cible vide ici : une cible qui ne fait rien passe pour verte.
+# (`bootstrap`). Aucune cible vide ici : une cible qui ne fait rien passe pour verte.
 
 BIN := bin/dashboard
 WEBASSETS := internal/webassets/dist
@@ -72,7 +72,8 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 
 .DEFAULT_GOAL := help
 .PHONY: help build build-go build-web dev check test test-go test-web lint lint-go lint-web fmt-go \
-        typecheck-web vuln-go vuln-web lint-workflows check-routes generate check-generated mock clean
+        typecheck-web vuln-go vuln-web lint-workflows check-routes generate check-generated mock \
+        migrate clean
 
 # Trois courses vivent entre les prérequis de `check` ; la deuxième ne se voit pas, la troisième est
 # la seule à rougir d'elle-même :
@@ -340,6 +341,24 @@ mock: ## Mock Prism de l'API Admin sur :4010
 	done
 	@echo "pour que les scénarios réutilisent ce mock : export PRISM_MOCK_BASE_URL=http://127.0.0.1:$(MOCK_PORT)"
 	$(PRISM) mock --port $(MOCK_PORT) --host 127.0.0.1 $(CONTRACT_ADMIN)
+
+# Du Go pur, sans le moindre détour par pnpm : c'est ce qui la rend lançable depuis n'importe quel
+# job Go de la CI, dont quatre des cinq n'ont ni pnpm ni `node_modules`.
+#
+# Le DSN est lu ici — `.env` d'abord, comme `dev` — puis **passé en argument**. `internal/config` est
+# le seul package qui lit l'environnement (§1.8), et un `os.Getenv` dans `cmd/migrate` contournerait
+# la règle que `forbidigo` tient. Le Makefile, lui, n'est pas du Go.
+#
+# `go run` et non le binaire compilé : les migrations ne sont pas sur le chemin de `make dev`, et un
+# `bin/` de plus à purger dans `clean` coûterait plus que la seconde de compilation qu'il épargne.
+migrate: ## Applique les migrations du schéma du BFF (DASHBOARD_DATABASE_URL)
+	@set -a; if [ -f .env ]; then . ./.env; fi; set +a; \
+	test -n "$$DASHBOARD_DATABASE_URL" || { \
+		echo "DASHBOARD_DATABASE_URL est vide — sur un poste local, après docker compose up -d :"; \
+		echo "  DASHBOARD_DATABASE_URL=postgres://dashboard:dashboard@localhost:5432/dashboard?sslmode=disable"; \
+		exit 1; \
+	}; \
+	go run ./cmd/migrate "$$DASHBOARD_DATABASE_URL"
 
 # Idempotent jusqu'au bout. La version précédente supprimait `bin` et `web/dist`, puis échouait sur
 # un `find: … No such file or directory` quand `$(WEBASSETS)` avait disparu : un nettoyage à moitié
