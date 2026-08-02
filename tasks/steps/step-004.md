@@ -95,6 +95,31 @@ au constructeur, et refuse `Unimplemented`. Structurel et non textuel : le dép�
 un détecteur qui cherchait un nom dans du texte source, que le moindre commentaire rendait toujours
 vrai.
 
+> **Correction du 02/08, après mesure : le modèle de menace ci-dessus est faux, et la garde ne
+> protège pas ce qu'elle annonçait.** Trois mesures, faites après que deux agents se soient
+> contredits :
+>
+> 1. **Le scénario redouté est impossible en mode strict.** `Unimplemented` ne porte que les
+>    signatures **non-strict** (`Health(w, r)`), donc il ne peut jamais satisfaire
+>    `StrictServerInterface`. Sur un vrai contrat à deux opérations, embarquer `Unimplemented` pour
+>    n'en implémenter qu'une échoue à la compilation : `does not implement … (wrong type for method
+>    Ready)`. Le compilateur fait déjà le travail que ce DN confiait à un test.
+> 2. **Ce qui compile est autre chose** : un type qui embarque `Unimplemented` **et** déclare la
+>    méthode — le membre de profondeur 0 masque le promu. Inoffensif, mais trompeur pour un lecteur.
+>    C'est le seul cas que la garde attrape réellement. *(Un troisième cas, deux types embarqués au
+>    même niveau, donne `ambiguous selector` — c'est celui qu'un agent avait mesuré et pris pour le
+>    cas général.)*
+> 3. **Le danger réel est ailleurs, et il est couvert.** `Unimplemented` satisfait `ServerInterface`,
+>    donc `HandlerFromMux(Unimplemented{}, api)` compile et rendrait 501 sur toute la surface.
+>    Cette valeur naît dans `NewRouter` et aucune réflexion ne l'atteint depuis un test. Mesuré en la
+>    montant : `TestHealthProbe` tombe (`actual : 501`) **et** les scénarios godog aussi (« la sonde
+>    de vivacité rend 501 Not Implemented »). Ce sont eux qui tiennent cette frontière, pas la garde.
+>
+> La garde est conservée pour le cas 2, à son coût réel — quelques lignes de réflexion — et son
+> périmètre exact est écrit au-dessus d'elle plutôt que laissé à ce DN. Ce qu'il faut retenir n'est
+> pas la garde mais la méthode : le modèle de menace avait été *déduit* de la présence d'un type dans
+> le code engendré, jamais *observé*.
+
 ### DN-3 — Le `; charset=utf-8` disparaît, le dépôt s'aligne sur le code engendré
 
 Mesuré : le code engendré pose `Content-Type: application/json` ; le helper `writeJSON` du dépôt pose
