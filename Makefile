@@ -80,7 +80,7 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 # directive, 2,1 s sans — elle est bien appliquée.
 #
 # Le prix est la perte du parallélisme sur **toutes** les cibles, `make -j check` compris. Assumé : le
-# seul mur que `-j` raccourcissait est celui des dix portes de `check`, et la CI les lance déjà en
+# seul mur que `-j` raccourcissait est celui des onze portes de `check`, et la CI les lance déjà en
 # jobs parallèles — c'est là que le temps se gagne, pas ici. Un `make -j` qui produit un binaire faux
 # une fois sur dix coûte plus cher que la minute qu'il fait gagner.
 #

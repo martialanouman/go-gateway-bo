@@ -45,6 +45,10 @@ make dev                   # BFF (:3001) + Vite (:3000) — l'application est su
 Les lignes marquées `(cible)` arrivent avec leur step et rendent `No rule to make target` d'ici là —
 jamais un vert silencieux.
 
+**Un `.env` antérieur à step-003 ne démarre plus** : `DASHBOARD_GATEWAY_BASE_URL` y est devenue
+obligatoire dans les deux modes. Recopier le bloc « Passerelle » de `.env.example` ; le binaire refuse
+sinon de démarrer en nommant chaque variable manquante.
+
 Go et Node sont tous deux requis **en développement**. En production, ni l'un ni l'autre : le binaire
 embarque les assets et se suffit à lui-même.
 
@@ -198,9 +202,12 @@ décrit la frontière entre les deux moitiés de ce dépôt et engendre **les ty
 client TypeScript**. Un contrat, deux bouts typés, une divergence qui ne compile pas.
 
 En développement, le mock Prism sert le contrat sans dépendre de la passerelle — ce qui est
-nécessaire, **62 des 133 opérations n'étant pas encore implémentées en amont**. Le mode tranche entre
-Prism et la vraie passerelle, et **n'a pas de valeur par défaut**, dans un sens comme dans l'autre :
-servir des données inventées en les croyant vraies est aussi grave que l'inverse.
+nécessaire, **62 des 133 opérations n'étant pas encore implémentées en amont**.
+`DASHBOARD_GATEWAY_MODE` tranche entre Prism et la vraie passerelle, et **son absence vaut `real`** —
+la lecture la plus stricte, parce que `real` exige par-dessus l'URL de base les identifiants OAuth2 et
+le matériel mTLS : une production qui oublie la variable ne démarre pas, et le message nomme chaque
+manquant. Le défaut inverse aurait servi des données inventées sans que rien ne le dise ; un `mock`
+délibéré, lui, reste explicite et greppable dans l'environnement.
 
 Le jeton obtenu est un jeton **machine** à scopes fixes, qui porte `content:read` en permanence : il ne
 représente pas l'opérateur connecté, et aucune restriction par opérateur ne peut donc être déléguée à

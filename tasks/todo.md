@@ -89,8 +89,9 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 
 - **Le contrat est la source de vérité.** Le dépôt ne copie jamais un YAML : il consomme le package
   versionné. Tout manque côté passerelle se règle par une PR dans `go-gateway/api/`.
-- **Le contrat bouge vite** — dix versions en une semaine, dont une majeure. Relever la version
-  disponible **au début de chaque step qui le touche**, jamais au milieu. Voir `plan.md` §1.12.
+- **Le contrat bouge vite** — quinze versions en moins de six jours, dont trois majeures (relevé le
+  02/08/2026). Relever la version disponible **au début de chaque step qui le touche**, jamais au
+  milieu. Voir `plan.md` §1.12.
 - **Mock-first.** Chaque écran se développe contre le mock Prism ; l'intégration réelle n'est requise
   que pour les steps qui le disent.
 - **Langue.** Code en **anglais**, narratif en **français** — commentaires, scénarios Gherkin, copie.
@@ -107,11 +108,18 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - [x] step-001 — SPA Vite + TanStack Router : squelette d'application, coquille peinte au chargement à froid
 - [x] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
 - [ ] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
+- [ ] step-009 — Contrat Admin en **4.0.0** : deux majeures depuis 2.5.0, diff du YAML relu §
 - [ ] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS
 - [ ] step-005 — PostgreSQL : `pgx`, migrations, les six tables du §3.1, `audit_log` partitionné
 - [ ] step-006 — Catalogue de permissions : source Go, génération TS, test de divergence bloquant
 - [ ] step-007 — Harnais BDD : `godog`, `testify`, testcontainers, Vitest, Playwright, CI à deux toolchains
 - [ ] step-008 — Charte : tokens depuis le kit UI, `/_design`, contraste AA vérifié
+
+§ **Numéro hors bloc, position délibérée.** step-003 s'est arrêtée à 2.5.0 parce que la quarantaine de
+`minimumReleaseAge` refusait plus récent ; elle expire d'elle-même (`plan.md` §1.12). La step vient
+juste après, avant que M0 et M1 n'engendrent du code contre 2.5.0 : un bump payé sur le seul
+`internal/gateway/client.gen.go` coûte moins cher que le même bump payé sur tout ce qui l'appellera.
+Son fichier `steps/step-009.md` reste à écrire, comme ceux de M1 et au-delà.
 
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [ ] step-020 — Schéma auth (operators, roles, permissions, jointures) + seed des 44 clés et des 9 rôles

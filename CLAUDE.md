@@ -99,10 +99,10 @@ tasks/             plan.md · todo.md · steps/ (à faire) · steps/done/ (livr�
 - **Les contrats sont la source de vérité** : le dépôt consomme `@martialanouman/gateway-api-contracts`
   et ne copie jamais un YAML. Tout manque se corrige par une PR dans `go-gateway/api/`.
 - **TOUJOURS relever la version du contrat au début d'une step qui le touche.** Il est publié à chaque
-  merge sur `main` de `go-gateway` : dix versions en une semaine, dont une majeure. Consigner l'écart
-  dans la PR, **ne jamais bumper au milieu d'une step**, et **relire le diff du YAML** — une contrainte
-  resserrée (`additionalProperties: false`, un `maximum`, un `enum` réduit) passe le typage et échoue à
-  l'exécution. `tasks/plan.md` §1.12.
+  merge sur `main` de `go-gateway` : quinze versions en moins de six jours, dont trois majeures.
+  Consigner l'écart dans la PR, **ne jamais bumper au milieu d'une step**, et **relire le diff du
+  YAML** — une contrainte resserrée (`additionalProperties: false`, un `maximum`, un `enum` réduit)
+  passe le typage et échoue à l'exécution. `tasks/plan.md` §1.12.
 - **Versions & API : jamais devinées.** `ctx7` côté JS, `pkg.go.dev` ou `proxy.golang.org` côté Go,
   avant tout ajout, bump ou usage d'API. Une signature inventée compile parfois.
 
