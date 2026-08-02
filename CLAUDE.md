@@ -16,9 +16,8 @@ le Go embarque les assets de la SPA.
 ## Commandes
 
 > `make help` liste ce qui existe, et c'est la cible par défaut — préférer la lancer à croire ce
-> bloc. Sont encore des **cibles**, et arrivent avec les steps qui les habitent : `make generate`,
-> `make mock`, `make migrate`, `make bootstrap`. Une cible absente rend `No rule to make target`,
-> jamais un vert silencieux.
+> bloc. Sont encore des **cibles**, et arrivent avec les steps qui les habitent : `make migrate`,
+> `make bootstrap`. Une cible absente rend `No rule to make target`, jamais un vert silencieux.
 
 ```bash
 make dev          # BFF Go (:3001) + Vite (:3000), /api et /ws proxifiés vers le BFF
@@ -26,14 +25,17 @@ make build        # le déployable : build-web → copie dans internal/webassets
 make build-go     # go build seul — ce que lance le job « Build Go », qui n'a ni pnpm ni node_modules
 make check        # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make test         # les deux suites · make lint — les deux linters
-make generate     # oapi-codegen + catalogue de permissions Go → TS      (cible)
-make mock         # mock Prism sur openapi-admin.yaml                    (cible)
+make generate     # oapi-codegen → client Go de l'API Admin
+                  # le catalogue de permissions Go → TS s'y ajoutera en step-006
+make mock         # mock Prism sur openapi-admin.yaml, sur :4010
+make check-generated  # le client engendré commité est-il à jour ?
 
 # Une porte granulaire par job de CI, à lancer seule pendant une boucle rouge → vert :
-#   build-go (Build Go) · test-go (godog + -race) · lint-go (+ fmt-go pour appliquer)
-#   vuln-go (govulncheck) · lint-workflows (actionlint + l'agrégateur attend-il tous les jobs ?)
+#   build-go (Build Go) · lint-go (+ fmt-go pour appliquer) · vuln-go (govulncheck)
+#   test-go (godog + -race) — seul job Go à avoir aussi pnpm : ses scénarios lancent Prism
+#   lint-workflows (actionlint + l'agrégateur attend-il tous les jobs ?)
 #   typecheck-web (tsc) · test-web (Vitest) · lint-web (Biome) · vuln-web (pnpm audit)
-#   check-routes + build + le contrôle du binaire → job « Build client et déployable »
+#   check-routes + check-generated + build + le contrôle du binaire → « Build client et déployable »
 ```
 
 `make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à

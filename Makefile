@@ -2,9 +2,8 @@
 # une cible qui dépend de l'autre toolchain : le job Go n'a ni pnpm ni `node_modules`, et une cible
 # composite l'y enverrait chercher un `pnpm` absent.
 #
-# Ce que ce fichier ne porte pas encore : `mock` (Prism) et les cibles du versant Go qui n'ont pas
-# encore leur code (`migrate`, `bootstrap`). Aucune cible vide ici : une cible qui ne fait rien passe
-# pour verte.
+# Ce que ce fichier ne porte pas encore : les cibles du versant Go qui n'ont pas encore leur code
+# (`migrate`, `bootstrap`). Aucune cible vide ici : une cible qui ne fait rien passe pour verte.
 
 BIN := bin/dashboard
 WEBASSETS := internal/webassets/dist
@@ -17,6 +16,14 @@ WEBASSETS := internal/webassets/dist
 # job Go ne trouverait pas le contrat. Même raison que `build-go` face à `build`.
 CONTRACT_ADMIN := web/node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml
 ADMIN_CLIENT := internal/gateway/client.gen.go
+
+# Le mock de l'API Admin, et le port que `.env.example` vise avec `DASHBOARD_GATEWAY_BASE_URL`.
+#
+# Le binaire installé, jamais `npx` : celui-ci est prêt en ~1,0 s (mesuré le 02/08/2026) là où `npx`
+# repaie une résolution de paquet à chaque lancement. Les scénarios godog de `internal/gateway`
+# lancent le même binaire, sur un port libre.
+PRISM := web/node_modules/.bin/prism
+MOCK_PORT := 4010
 
 # Purge ce que la copie précédente a déposé, en épargnant `.gitkeep`.
 #
@@ -48,7 +55,7 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 
 .DEFAULT_GOAL := help
 .PHONY: help build build-go build-web dev check test test-go test-web lint lint-go lint-web fmt-go \
-        typecheck-web vuln-go vuln-web lint-workflows check-routes generate check-generated clean
+        typecheck-web vuln-go vuln-web lint-workflows check-routes generate check-generated mock clean
 
 # Deux courses vivent entre les prérequis de `check`, et la seconde ne se voit pas :
 #
@@ -240,6 +247,28 @@ check-generated: ## Vérifie que le client de l'API Admin commité est à jour e
 		git --no-pager status --short -- $(ADMIN_CLIENT); \
 		exit 1; \
 	}
+
+# Le mock sert le contrat **installé**, jamais une copie — même source que `generate`, donc même
+# garde : le contrat vient de GitHub Packages et n'existe pas dans un arbre où `pnpm install` n'a pas
+# tourné. Prism, lui, est une devDependency du client. C'est cette double dépendance à
+# `web/node_modules/` qui range `mock` du côté à deux toolchains, avec `generate` : aucun job Go de la
+# CI ne pourrait la lancer telle quelle — et c'est pourquoi le job « Tests Go », dont les scénarios
+# lancent le même binaire, a reçu l'action de setup du versant client.
+#
+# Le port est fixe et documenté ici, là où les scénarios godog en prennent un libre : les deux mocks
+# tournent donc côte à côte sans se marcher dessus. Un `PRISM_MOCK_BASE_URL` exporté fait réutiliser
+# celui-ci par les scénarios plutôt qu'en démarrer un second — c'est ce que la dernière ligne rappelle.
+#
+# Prism ne s'arrête pas tout seul : la cible occupe son terminal jusqu'à Ctrl-C, comme `dev`.
+mock: ## Mock Prism de l'API Admin sur :4010
+	@for required in $(PRISM) $(CONTRACT_ADMIN); do \
+		test -f "$$required" || { \
+			echo "$$required est absent — le mock et le contrat viennent de GitHub Packages : pnpm -C web install"; \
+			exit 1; \
+		}; \
+	done
+	@echo "pour que les scénarios réutilisent ce mock : export PRISM_MOCK_BASE_URL=http://127.0.0.1:$(MOCK_PORT)"
+	$(PRISM) mock --port $(MOCK_PORT) --host 127.0.0.1 $(CONTRACT_ADMIN)
 
 # Idempotent jusqu'au bout. La version précédente supprimait `bin` et `web/dist`, puis échouait sur
 # un `find: … No such file or directory` quand `$(WEBASSETS)` avait disparu : un nettoyage à moitié

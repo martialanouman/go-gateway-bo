@@ -1,8 +1,9 @@
-# Setup partagé par les jobs client de la CI. Les portes tournent en parallèle et chacune part
-# d'un runner vierge : sans cette action, les mêmes quatre étapes seraient recopiées dans chaque job,
-# et une divergence entre deux copies (version de Node, options de cache) produirait des échecs qui ne
-# reproduisent pas en local. Les jobs Go, eux, ne passent pas par ici — ils n'ont besoin ni de Node ni
-# du registre.
+# Setup partagé par les jobs de la CI qui ont besoin de la toolchain du client. Les portes tournent en
+# parallèle et chacune part d'un runner vierge : sans cette action, les mêmes quatre étapes seraient
+# recopiées dans chaque job, et une divergence entre deux copies (version de Node, options de cache)
+# produirait des échecs qui ne reproduisent pas en local. Quatre jobs Go sur cinq ne passent pas par
+# ici ; « Tests Go » si, parce que ses scénarios godog lancent le mock Prism sur le contrat installé —
+# le job le dit chez lui.
 name: Setup Node & pnpm
 description: Installe pnpm, Node à la version de .nvmrc, et les dépendances du lockfile.
 

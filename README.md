@@ -38,7 +38,7 @@ cp .env.example .env       # puis remplir les secrets — voir plus bas
 docker compose up -d       # PostgreSQL 18 + Redis
 make migrate               # applique les migrations                        (cible, step-005)
 make bootstrap             # sème les permissions et crée le premier compte (cible)
-make mock                  # Prism sert le contrat sur :4010, autre terminal (cible, step-003)
+make mock                  # Prism sert le contrat sur :4010, autre terminal
 make dev                   # BFF (:3001) + Vite (:3000) — l'application est sur :3000
 ```
 
@@ -82,8 +82,9 @@ make build-web  # vite build → web/dist
 make check      # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make help       # liste les cibles qui existent — c'est la cible par défaut
 make clean      # supprime bin/, web/dist et les assets copiés dans internal/webassets/dist/
-make generate   # contrat (Go + TS) et catalogue de permissions (Go → TS)   (cible)
-make mock       # Prism sur openapi-admin.yaml                        (cible, step-003)
+make generate   # client Go de l'API Admin depuis le contrat installé
+                # les types TS et le catalogue de permissions s'y ajouteront (steps 004 et 006)
+make mock       # Prism sur openapi-admin.yaml, sur :4010
 make migrate    # migrations de la base                               (cible, step-005)
 
 make test-go           # unitaires Go + scénarios godog, avec -race
@@ -166,7 +167,10 @@ partitionner sans jamais détacher n'apporte rien.
 Le comportement s'écrit en **Gherkin français** avant d'exister, il échoue, puis on l'implémente.
 
 - **Scénarios `godog`** — le comportement observable du BFF. Le `.feature` vit à côté du package qu'il
-  décrit. Ils tapent le **mock Prism**, jamais la vraie passerelle.
+  décrit. Ils tapent le **mock Prism**, jamais la vraie passerelle : le harnais le lance lui-même sur
+  un port libre, et **échoue** — jamais ne se saute — si le contrat ou Prism manquent. Un
+  `export PRISM_MOCK_BASE_URL=http://127.0.0.1:4010` leur fait réutiliser le mock de `make mock` au
+  lieu d'en démarrer un à chaque lancement.
 - **Unitaires Go** — les mécanismes aux limites : hachage, curseurs, mappings, sérialisation des DTO.
   La majorité des tests, en nombre.
 - **Composants (Vitest + Testing Library)** — états, permissions, clavier, copie.
