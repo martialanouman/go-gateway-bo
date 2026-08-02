@@ -1,7 +1,7 @@
 # step-007 — Harnais BDD : `godog`, Vitest, Playwright, CI à deux toolchains
 
 > **Jalon :** M0 · **Statut :** À FAIRE
-> **Dépend de :** step-000, step-001, step-002 · **Bloque :** toute step suivante
+> **Dépend de :** step-000, step-001, step-002, step-005 · **Bloque :** toute step suivante
 
 ## But
 Rendre la stratégie de test exécutable. Tant que le harnais n'a pas porté un scénario de bout en bout,
@@ -13,7 +13,10 @@ intention.
   contexte de scénario, et fabriques alimentées par les types du contrat. *(Le lanceur lui-même et sa
   convention d'emplacement sont livrés par **step-000** — voir l'amendement qui y est noté : la boucle
   impose le scénario rouge d'abord, donc step-000 ne pouvait pas attendre celle-ci.)*
-- **testcontainers** pour la base jetable, réutilisée entre suites plutôt que recréée à chaque test.
+- **testcontainers** : la *réutilisation entre suites* plutôt qu'un conteneur recréé à chaque test.
+  *(L'outil lui-même est introduit par **step-005**, qui ne peut pas tester ses migrations sans base
+  réelle — arbitré le 02/08/2026. Elle en livre la forme minimale, un conteneur par suite ; ce qui
+  reste ici est l'amortissement, pour lequel `modules/postgres` fournit `Snapshot`/`Restore`.)*
 - **Vitest + Testing Library** reciblés sur `web/`, avec la forme Étant donné / Quand / Alors dans la
   structure des tests — sans second moteur Cucumber.
 - **Playwright contre le binaire** : `make build` puis lancement du binaire, pas du serveur de

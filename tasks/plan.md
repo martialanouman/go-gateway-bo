@@ -418,7 +418,7 @@ contrats, et produit **un binaire qui sert la SPA**.
   réel/mock par environnement.
 - `api/openapi-bff.yaml` : le contrat du BFF, engendrant les types serveur Go **et** les types client
   TypeScript. Un seul contrat, deux bouts typés.
-- PostgreSQL 18 + `pgx`, les six tables du §3.1, migrations commitées, `audit_log` partitionné par
+- PostgreSQL 18 + `pgx`, les tables du §3.1, migrations commitées, `audit_log` partitionné par mois, `docker-compose.yml` (PostgreSQL + Redis).
   mois, `docker-compose.yml` (PostgreSQL + Redis).
 - `internal/permissions/` : le catalogue Go, la génération du TypeScript, et le test de divergence.
 - Tokens de la charte portés + page `/_design`, polices auto-hébergées.
@@ -864,7 +864,15 @@ moins : un scénario qui se lit juste inspire une confiance que rien n'a encore 
   À décider en step-005, sur les critères : partitionnement d'`audit_log`, rejouabilité, et absence de
   dépendance native.
 - **Requêtes typées** : `sqlc` génère depuis le SQL et convient au partitionnement ; à confirmer contre
-  `pgx` nu en step-005.
+  `pgx` nu.
+
+  > **Amendement du 02/08/2026, au début de step-005.** Cette décision disait « en step-005 ». Elle y
+  > est **indécidable** : le périmètre de cette step écrit noir sur blanc qu'« aucune requête n'est
+  > écrite ici ». Trancher un générateur de requêtes dans une step qui n'en écrit aucune produirait
+  > une décision qu'aucun code de la PR ne confronte. Elle revient donc à la **première step qui écrit
+  > une requête du store** — step-020. Ce qui se tranche dès step-005, en revanche : `pgx/v5/stdlib`
+  > entre de toute façon dans le dépôt, l'outil de migration travaillant sur `*sql.DB` ; cela ne
+  > préjuge de rien pour `sqlc`.
 - **Graphiques** : la spec dit « visx/Recharts ». À trancher en M4, sur la densité d'un cockpit sombre.
 - **Opérations au contrat sans step passerelle** (groupes, webhooks, sender rewrite, `reorder-routes`) :
   question à l'équipe passerelle avant d'ouvrir `M3` et `M6`.

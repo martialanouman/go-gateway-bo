@@ -159,7 +159,7 @@ le client — un test la cherche dans le bundle.
 
 ## Base de données
 
-Le BFF est propriétaire d'un petit schéma PostgreSQL : opérateurs, rôles et permissions, sessions,
+Le BFF est propriétaire d'un petit schéma PostgreSQL : opérateurs, rôles et permissions,
 journal d'audit, règles d'alerte, notifications, vues sauvegardées. **Il ne lit jamais la base de la
 passerelle** : tout ce qui vient d'elle passe par l'API Admin.
 
