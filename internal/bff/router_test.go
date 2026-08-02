@@ -70,7 +70,7 @@ func TestHealthProbe(t *testing.T) {
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
 	assert.JSONEq(t, `{"status":"ok"}`, bodyOf(t, resp))
 }
 
@@ -89,7 +89,7 @@ func TestUnknownAPIRouteIsNotFound(t *testing.T) {
 
 	payload := bodyOf(t, resp)
 	assert.NotContains(t, payload, "<!doctype html")
-	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"))
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
 	assert.JSONEq(t, `{"code":"not_found","message":"Cette route n'existe pas sur ce serveur."}`, payload)
 }
 
@@ -103,6 +103,27 @@ func TestWebSocketEndpointIsNotImplementedYet(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotImplemented, resp.StatusCode)
 	assert.NotContains(t, bodyOf(t, resp), "<!doctype html")
+}
+
+// La sonde est servie par l'implémentation du contrat : son type de réponse est celui qu'engendre
+// `api/openapi-bff.yaml`, donc un champ que le contrat ignore ne peut pas être écrit sans passer
+// d'abord par le YAML. Ce que ce test n'observe pas, c'est le montage — deux implémentations rendent
+// le même corps sur le fil, et rien dans la réponse ne dit laquelle a répondu ; c'est `NewRouter` qui
+// choisit, et le compilateur qui refuse d'y monter autre chose que `StrictServerInterface`.
+func TestTheContractImplementationAnswersTheLivenessProbe(t *testing.T) {
+	t.Parallel()
+
+	answer, err := bff.API{}.Health(t.Context(), bff.HealthRequestObject{})
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	require.NoError(t, answer.VisitHealthResponse(rec))
+
+	resp := rec.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.JSONEq(t, `{"status":"ok"}`, bodyOf(t, resp))
 }
 
 func TestHealthProbeRefusesOtherMethods(t *testing.T) {

@@ -23,7 +23,11 @@ func NewRouter(assets fs.FS) http.Handler {
 	r := chi.NewRouter()
 
 	r.Route("/api", func(api chi.Router) {
-		api.Get("/health", handleHealth)
+		// Les routes du contrat sont montées par le code qu'il engendre : le chemin, la méthode et le
+		// type de la réponse viennent tous du YAML, aucun n'est réécrit ici. La valeur de retour est
+		// sans usage — c'est le routeur passé qu'elle garnit (`bff.gen.go`, `HandlerWithOptions`), et
+		// le préfixe `/api` vient de ce `Route`, pas de `servers.url`.
+		HandlerFromMux(NewStrictHandler(API{}, nil), api)
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
@@ -61,17 +65,4 @@ func handleRealtimeNotImplemented(w http.ResponseWriter, _ *http.Request) {
 		Code:    "not_implemented",
 		Message: "Le canal temps réel n'est pas encore disponible.",
 	})
-}
-
-// healthResponse est le DTO de sortie de la sonde. Chaque réponse du BFF déclare le sien : un champ
-// absent du struct ne peut pas fuir (§1.11).
-type healthResponse struct {
-	Status string `json:"status"`
-}
-
-// handleHealth ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond
-// « le process est en vie », pas « le service est disponible ». Y brancher une dépendance ferait
-// redémarrer un serveur sain parce qu'une autre brique est tombée.
-func handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, healthResponse{Status: "ok"})
 }

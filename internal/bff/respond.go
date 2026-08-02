@@ -26,7 +26,11 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	// Sans `charset` : la RFC 8259 §8.1 définit JSON comme de l'UTF-8 et n'enregistre aucun paramètre
+	// `charset` pour `application/json`. C'est aussi ce que pose le code engendré depuis le contrat
+	// (`bff.gen.go`, `VisitHealthResponse`) — deux formes dans le même produit finiraient figées d'un
+	// côté par un test et de l'autre par un autre.
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(payload)
 }
