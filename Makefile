@@ -250,7 +250,7 @@ check-routes: ## Vérifie que l'arbre de routes commité est à jour et régén�
 # `generate` et `check-generated` n'apparaissent nulle part ailleurs que dans « Build client et
 # déployable », qui a Go, pnpm et `node_modules` — vérifié, `grep -rn 'make generate\|check-generated'
 # .github` ne rend que la ligne `- run: make check-generated` de ce job.
-generate: ## Engendre les deux sorties Go du contrat et les types TypeScript du BFF
+generate: ## Engendre le client Go de l'API Admin, et le serveur Go comme les types TS du BFF
 	@for required in $(CONTRACT_ADMIN) $(OPENAPI_TS); do \
 		test -f "$$required" || { \
 			echo "$$required est absent — il vient de pnpm : pnpm -C web install"; \
@@ -266,12 +266,20 @@ generate: ## Engendre les deux sorties Go du contrat et les types TypeScript du 
 # Le régénérer et constater qu'il n'a pas bougé est la seule façon de savoir que ce qui est commité
 # correspond au contrat installé — un bump du paquet npm sans régénération passerait sinon inaperçu.
 #
-# Les types TypeScript du BFF sont dans la même liste, pour une raison voisine et non identique : le
-# contrat du BFF, lui, est écrit ici, donc rien ne bouge sous les pieds du dépôt — mais le fichier
-# engendré est édité par une **commande** qu'il faut penser à relancer. C'est cette porte, et elle
-# seule, qui rend rouge un `api/openapi-bff.yaml` modifié sans régénération. Mesuré : le versant Go
-# ne suffit pas à l'attraper, `oapi-codegen` et `openapi-typescript` lisant le même fichier mais
-# écrivant dans deux arbres que rien ne relie.
+# Le serveur Go et les types TypeScript du BFF sont dans la même liste, pour une raison voisine et
+# non identique : le contrat du BFF est écrit ici, donc rien ne bouge sous les pieds du dépôt —
+# mais les fichiers engendrés le sont par une **commande** qu'il faut penser à relancer.
+#
+# Ce que cette porte tient, et ce qu'elle ne tient pas. Elle rend rouge un `api/openapi-bff.yaml`
+# modifié sans régénération — mais pas seule : le scénario godog de `cmd/dashboard` charge le
+# contrat directement, et un champ ajouté que le serveur ne rend pas le fait tomber tout seul
+# (mesuré, `required: [status, uptime_seconds]` → « missing property 'uptime_seconds' »).
+# À l'inverse,
+# une classe de modification lui échappe entièrement : ni l'un ni l'autre générateur ne lit l'URL de
+# `servers`, dont dépend pourtant le préfixe sous lequel tout le contrat est servi.
+# Mesuré, `- url: /api` remplacé par `- url: /v1` → porte **verte**, sorties identiques, et le
+# scénario godog rouge sur « le contrat ne décrit pas GET /api/health ». C'est lui, pas cette porte,
+# qui tient le lien entre le préfixe du contrat et le `r.Route("/api", …)` du routeur.
 #
 # Même forme que `check-routes`, et pour la même raison : le fichier est **supprimé** avant d'être
 # reconstruit, jamais seulement comparé. Une comparaison seule reste verte quand plus rien ne
@@ -287,10 +295,20 @@ generate: ## Engendre les deux sorties Go du contrat et les types TypeScript du 
 # retour. Mesuré hors dépôt : `git diff --quiet HEAD` rend 1, `git status --porcelain` rend 128 avec un
 # stdout vide. D'où le code de retour capturé à part du contenu : un `test -z` sur la seule
 # substitution rendait la porte **verte** sur un client divergent, l'arbre restant régénéré à tort.
-check-generated: ## Vérifie que tout ce qui est engendré et commité est à jour et régénéré
+#
+# Le rétablissement après un échec de génération se fait **fichier par fichier**, et sans étouffer
+# ce que git écrit. `git checkout -- <a> <b> <c>` est atomique sur le pathspec : un seul chemin
+# inconnu de l'index — la sortie qu'une step vient d'ajouter à `$(GENERATED)` sans l'avoir encore
+# commitée — et git refuse le lot entier. Mesuré, `api.gen.ts` désindexé et le contrat rendu
+# illisible : `error: pathspec … did not match any file(s) known to git` avalé par le `2>/dev/null`,
+# `bff.gen.go` resté supprimé, et `go build ./...` sur `undefined: HealthRequestObject`. La boucle
+# rétablit les autres et laisse git nommer celui qu'il ne peut pas rétablir.
+check-generated: ## Vérifie que ce qui dérive des contrats OpenAPI est à jour et régénéré
 	@rm -f $(GENERATED)
-	@$(MAKE) --no-print-directory generate \
-		|| { git checkout -- $(GENERATED) 2>/dev/null; exit 1; }
+	@$(MAKE) --no-print-directory generate || { \
+		for generated in $(GENERATED); do git checkout -- $$generated; done; \
+		exit 1; \
+	}
 	@state=$$(git status --porcelain -- $(GENERATED)) || { \
 		echo "git n'a pas rendu l'état de $(GENERATED) — verdict inconnu, pas vert"; \
 		exit 1; \

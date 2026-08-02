@@ -8,8 +8,11 @@
 # masque. Là où les deux formes divergeront, ce fichier le commentera.
 #
 # Les clés de chemin sont **relatives à `servers.url`**, qui porte le préfixe `/api`. C'est la forme
-# normale d'un document OpenAPI, et c'est aussi ce que la porte anti-copie de `internal/gateway`
-# reconnaît comme un contrat écrit ici plutôt qu'une copie de celui de la passerelle.
+# normale d'un document OpenAPI — et c'est précisément ce qui **fait ressembler** ce fichier au
+# contrat public de la passerelle, dont les cinq opérations portent les mêmes chemins génériques.
+# Ce qui l'en distingue devant la porte anti-copie de `internal/gateway` est son **identité** : il
+# ne porte ni le titre ni l'URL de serveur de ce contrat-là. Mesuré le 02/08/2026 en neutralisant
+# `identifiedIn` : un contrat du BFF à chemins relatifs rend 5 signatures sur 5, verdict « copie ».
 openapi: 3.1.0
 
 info:
@@ -19,6 +22,10 @@ info:
     Surface servie au navigateur. Le client ne parle qu'à elle : le jeton machine, le mTLS et la base
     vivent sous `internal/`, hors d'atteinte du bundle (invariant d).
 
+# Le seul consommateur de `servers` dans le dépôt est `kin-openapi`, dans le scénario godog de
+# `cmd/dashboard` : c'est lui, et lui seul, qui lie ce préfixe au `r.Route("/api", …)` du routeur.
+# Ni `oapi-codegen` ni `openapi-typescript` ne le lisent — mesuré, `/api` remplacé par `/v1` laisse
+# `make check-generated` vert et les trois sorties identiques, et fait tomber le scénario.
 servers:
   - url: /api
     description: Relatif à l'origine qui a servi la SPA — le client n'écrit jamais d'adresse absolue.

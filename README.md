@@ -86,8 +86,8 @@ make build-web  # vite build → web/dist
 make check      # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make help       # liste les cibles qui existent — c'est la cible par défaut
 make clean      # supprime bin/, web/dist et les assets copiés dans internal/webassets/dist/
-make generate   # client Go de l'API Admin depuis le contrat installé
-                # les types TS et le catalogue de permissions s'y ajouteront (steps 004 et 006)
+make generate   # client Go de l'API Admin depuis le contrat installé ; serveur Go et types TS du
+                # BFF depuis api/openapi-bff.yaml — le catalogue de permissions en step-006
 make mock       # Prism sur openapi-admin.yaml, sur :4010
 make migrate    # migrations de la base                               (cible, step-005)
 
@@ -100,7 +100,7 @@ make test-web          # Vitest
 make lint-web          # Biome
 make vuln-web          # pnpm audit
 make check-routes      # l'arbre de routes commité est-il à jour et régénéré ?
-make check-generated   # le client Go de l'API Admin commité est-il à jour et régénéré ?
+make check-generated   # ce qui dérive des deux contrats OpenAPI est-il à jour et régénéré ?
 make test / make lint  # les composites des deux toolchains
 # `pnpm -C web e2e` — cible, arrive avec le harnais Playwright de step-007
 ```

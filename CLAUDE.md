@@ -25,10 +25,10 @@ make build        # le déployable : build-web → copie dans internal/webassets
 make build-go     # go build seul — ce que lance le job « Build Go », qui n'a ni pnpm ni node_modules
 make check        # toutes les portes de la CI — OBLIGATOIRE avant toute PR
 make test         # les deux suites · make lint — les deux linters
-make generate     # oapi-codegen → client Go de l'API Admin
-                  # le catalogue de permissions Go → TS s'y ajoutera en step-006
+make generate     # oapi-codegen → client Go de l'API Admin, serveur Go du BFF
+                  # openapi-typescript → types TS du BFF ; le catalogue de permissions en step-006
 make mock         # mock Prism sur openapi-admin.yaml, sur :4010
-make check-generated  # le client engendré commité est-il à jour ?
+make check-generated  # ce qui dérive des deux contrats OpenAPI est-il à jour ?
 
 # Une porte granulaire par job de CI, à lancer seule pendant une boucle rouge → vert :
 #   build-go (Build Go) · lint-go (+ fmt-go pour appliquer) · vuln-go (govulncheck)
@@ -264,9 +264,10 @@ mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couver
   **commiter le fichier généré**.
 - **Ajouter une permission** : trois endroits dans la même PR — le catalogue `internal/permissions/`,
   la garde serveur qui l'exige, et le tableau des rôles par défaut (§6.10 de la spec). Le TypeScript
-  n'en dérive **pas encore** : `make generate` n'engendre aujourd'hui que le client Go de l'API Admin,
-  et aucune porte ne compare un fichier qui n'existe pas. La dérivation arrive avec step-006 ; d'ici
-  là, ce qui est tenu à la main ne l'est que par la relecture.
+  n'en dérive **pas encore** : `make generate` ne lit que les deux contrats OpenAPI — d'où il tire
+  le client Go de l'API Admin, le serveur Go et les types TS du BFF, les trois que
+  `check-generated` compare — et `internal/permissions/` n'existe pas. La dérivation arrive avec
+  step-006 ; d'ici là, ce qui est tenu à la main ne l'est que par la relecture.
 - **Un endpoint manque au contrat** : PR dans `go-gateway/api/` (YAML + bump), puis mise à jour ici.
 - **Un écran non encore livré** : route déclarée + état vide explicite nommant le jalon. Jamais une
   page blanche ni un lien mort.
