@@ -13,10 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Ce fichier est le seul du paquet à vivre **dans** `bff` plutôt que dans `bff_test` : les
-// gestionnaires d'erreur du handler strict ne sont atteignables par aucune requête que le contrat
-// autorise — `GET /health` n'a ni paramètre à lier ni implémentation qui échoue. Les exercer depuis
-// l'extérieur demanderait de les exporter, c'est-à-dire d'élargir la surface du paquet pour un test.
+// Ce fichier est le seul du paquet à vivre **dans** `bff` plutôt que dans `bff_test`, et la raison
+// diffère pour chacun des deux tests. Le premier a besoin de substituer l'implémentation montée, ce
+// que `mountContract` accepte et que `NewRouter` ne propose pas. Le second appelle `rejectRequest`
+// directement, faute de requête qui l'atteigne : `GET /health` n'a ni paramètre, ni en-tête, ni
+// corps. Les exercer depuis l'extérieur demanderait d'exporter les deux, c'est-à-dire d'élargir la
+// surface du paquet pour un test.
 
 // internalTopology est l'adresse que porterait une erreur enveloppée par une route future
 // (`fmt.Errorf("appel de %s: %w", cfg.Gateway.BaseURL, err)`). Le test cherche cette chaîne dans le
@@ -39,7 +41,7 @@ func TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser(t *testing.T) {
 	t.Parallel()
 
 	router := chi.NewRouter()
-	HandlerFromMux(newContractHandler(failingAPI{}), router)
+	mountContract(router, failingAPI{})
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
@@ -61,26 +63,52 @@ func TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser(t *testing.T) {
 		string(payload))
 }
 
-// La liaison des paramètres n'a aujourd'hui aucun chemin d'échec : `GET /health` n'a ni paramètre de
-// chemin, ni paramètre de requête, ni en-tête requis. Le gestionnaire est donc exercé par un appel
-// direct — la première opération du contrat qui portera un paramètre l'atteindra pour de bon.
+// La liaison n'a aujourd'hui aucun chemin d'échec atteignable : `GET /health` n'a ni paramètre de
+// chemin, ni paramètre de requête, ni en-tête requis, ni corps. Le gestionnaire est donc exercé par un
+// appel direct, avec les valeurs d'erreur **que le code engendré construit lui-même** plutôt qu'un
+// `errors.New` inventé — c'est ce qui rattache le refus du produit à sa source.
+//
+// Les deux valeurs ci-dessous ne viennent pas du même étage, et le savoir est le correctif : le
+// wrapper engendré les construit et appelle `ServerInterfaceWrapper.ErrorHandlerFunc`, que
+// `mountContract` pose. Le `RequestErrorHandlerFunc` du handler strict, lui, ne voit que le décodage
+// d'un corps de requête. La première opération du contrat qui portera un paramètre passera donc par le
+// premier chemin, jamais par le second.
 func TestARejectedRequestRendersTheProductDTO(t *testing.T) {
 	t.Parallel()
 
-	rec := httptest.NewRecorder()
-	rejectRequest(rec, httptest.NewRequest(http.MethodGet, "/health", nil),
-		errors.New("Query argument depuis is required, but not found"))
+	for _, refusal := range []struct {
+		name    string
+		binding error
+	}{
+		{"un paramètre requis absent", &RequiredParamError{ParamName: "depuis"}},
+		{
+			"un format illisible",
+			&InvalidParamFormatError{
+				ParamName: "depuis",
+				Err:       errors.New(`strconv.ParseInt: parsing "pasunentier": invalid syntax`),
+			},
+		},
+	} {
+		t.Run(refusal.name, func(t *testing.T) {
+			t.Parallel()
 
-	resp := rec.Result()
-	defer resp.Body.Close()
+			rec := httptest.NewRecorder()
+			rejectRequest(rec, httptest.NewRequest(http.MethodGet, "/health", nil), refusal.binding)
 
-	payload, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
+			resp := rec.Result()
+			defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
-	assert.JSONEq(t,
-		`{"code":"bad_request","message":"Cette requête a été refusée : sa forme ne correspond pas `+
-			`à ce que la route attend."}`,
-		string(payload))
+			payload, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+			assert.NotContains(t, string(payload), refusal.binding.Error(),
+				"le message du générateur nomme des champs internes : il ne part pas au navigateur")
+			assert.JSONEq(t,
+				`{"code":"bad_request","message":"Cette requête a été refusée : sa forme ne correspond pas `+
+					`à ce que la route attend."}`,
+				string(payload))
+		})
+	}
 }

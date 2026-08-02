@@ -9,8 +9,21 @@ import "context"
 // Elle ne tient pas le DTO de sortie pour autant, et il vaut mieux le savoir que le croire : la seule
 // méthode de `HealthResponseObject` prend elle-même un `ResponseWriter` nu. Mesuré le 02/08/2026, un
 // type de réponse écrit à la main qui l'implémente compile et écrit ce qu'il veut,
-// `{"status":"ok","body":"…"}` compris. Ce qui garde §1.11 est la porte
-// `TestResponseTypesDeclareTheirFields`, pas le compilateur.
+// `{"status":"ok","body":"http://passerelle.interne.svc:8443","secret":"fuite"}` compris.
+//
+// Ce que la porte `TestResponseTypesDeclareTheirFields` couvre est plus étroit que « §1.11 » : la
+// **forme des champs déclarés** — ni map ni interface vide, à n'importe quelle profondeur — et
+// l'embarquement de types que le contrat n'engendre pas. Mesuré le même jour, sur ce type sans champ :
+// la porte reste **verte**. Elle voit pourtant bien ce type — le même, doté d'un champ
+// `map[string]any`, la fait tomber en le nommant.
+//
+// Ce qu'**aucune porte structurelle** ne couvre, donc : un `Visit…` écrit à la main qui sérialise
+// autre chose que ses champs. Ce qui rougit se compte par route et non par propriété — mesuré, le
+// type ci-dessus effectivement servi par `Health` fait tomber deux choses, le test de corps exact
+// `TestHealthProbe` et le scénario godog « la sonde de vivacité rend ce que le contrat décrit », qui
+// confronte la réponse servie au YAML du dépôt (`additionalProperties: false` y refuse `body` et
+// `secret`). Une route livrée sans l'un ni l'autre n'aurait rien. La forme normale reste celle-ci, où
+// `Health200JSONResponse` et son `Visit…` viennent tous deux du contrat.
 //
 // Elle n'embarque pas `Unimplemented`, et la raison n'est pas celle qu'on croit : `Unimplemented` ne
 // porte que des méthodes de l'interface **simple**, donc une opération déclarée et non écrite rompt la

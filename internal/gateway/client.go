@@ -62,7 +62,7 @@ func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
 	// réseau (oauth2.go:308-320), un tokenUrl parti en trou noir sérialise les appels concurrents,
 	// chacun pour la durée du Timeout, et un appelant qui a renoncé n'en libère aucun. Rien n'est
 	// fait de ce constat tant qu'aucune route n'appelle la passerelle : la première arrive en
-	// step-004, et c'est elle qui dira si ce plafond se voit.
+	// step-060, et c'est elle qui dira si ce plafond se voit.
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, &http.Client{
 		Transport: transport,
 		Timeout:   cfg.Timeout,

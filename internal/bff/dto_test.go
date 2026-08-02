@@ -29,11 +29,17 @@ const contractInterfaceName = "StrictServerInterface"
 // loadBFF recharge le paquet par le type-checker. C'est ce qui permet d'énumérer *tous* les types de
 // réponse, y compris ceux qu'une step future ajoutera sans toucher à ce fichier — là où la réflexion
 // ne verrait que les types qu'un test nomme déjà.
+//
+// `NeedSyntax` et `NeedTypesInfo` servent la seule porte qui descend dans les **corps** de fonction,
+// `TestTheContractMountInstallsTheProductErrorHandler` : elle résout l'identifiant appelé en objet du
+// type-checker plutôt que de chercher un nom dans la source, où un commentaire suffirait à la rendre
+// toujours vraie.
 func loadBFF(t *testing.T) *packages.Package {
 	t.Helper()
 
 	loaded, err := packages.Load(&packages.Config{
-		Mode: packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps,
+		Mode: packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps |
+			packages.NeedSyntax | packages.NeedTypesInfo,
 	}, ".")
 	require.NoError(t, err)
 	require.Len(t, loaded, 1)

@@ -1,6 +1,8 @@
 package bff_test
 
 import (
+	"go/ast"
+	"go/types"
 	"io"
 	"io/fs"
 	"net/http"
@@ -176,12 +178,15 @@ func declaringFile(t *testing.T, pkg *packages.Package, handler http.Handler) st
 // autre paquet.
 //
 // Ce qu'elle ne couvre pas, et il faut le dire parce qu'aucune autre porte ne le couvre non plus :
-// `HandlerFromMux(simpleAPI{}, api)` — l'interface **simple** engendrée, dont les méthodes prennent un
-// `http.ResponseWriter` nu. `HandlerFromMux` monte `(*ServerInterfaceWrapper).Health` quelle que soit
+// une implémentation de l'interface **simple** engendrée, dont les méthodes prennent un
+// `http.ResponseWriter` nu. Le montage installe `(*ServerInterfaceWrapper).Health` quelle que soit
 // l'implémentation qu'il enveloppe ; le choix vit dans un champ non exporté d'une closure, qu'aucune
-// réflexion n'atteint. Mesuré : ce montage-là reste vert ici. Ce qui reste vrai est plus étroit que
-// « le compilateur refuse d'y monter autre chose » : `NewStrictHandler` n'accepte qu'un
-// `StrictServerInterface`, mais rien n'exige qu'il soit **appelé**.
+// réflexion n'atteint. Mesuré le 02/08/2026, `HandlerWithOptions(Unimplemented{}, …)` substitué à
+// `mountContract(api, API{})` : cette porte reste verte, et les trois autres portes structurelles du
+// paquet aussi ; ce qui tombe est `TestHealthProbe` et les scénarios godog de `cmd/dashboard`. Ce qui
+// reste vrai est plus étroit que « le compilateur refuse d'y monter autre chose » :
+// `NewStrictHandlerWithOptions` n'accepte qu'un `StrictServerInterface`, mais rien n'exige qu'il soit
+// **appelé**.
 //
 // `chi.Walk` ne rapporte pas le `NotFound` d'un sous-routeur — mesuré, les routes rapportées sont exactement
 // `/api/health`, `/assets/*`, `/ws` et `/*`. `handleUnknownAPIRoute` n'a donc pas à être exempté ici.
@@ -214,4 +219,118 @@ func TestOnlyGeneratedCodeServesTheAPIRoutes(t *testing.T) {
 		}))
 
 	require.Positivef(t, mounted, "aucune route sous %s : la porte est inerte, pas verte", apiPrefix)
+}
+
+// Les quatre points d'entrée de montage qu'écrit le gabarit chi d'oapi-codegen v2.8.0 — mesuré, ce
+// sont les seules fonctions du fichier engendré dont le nom commence par `Handler`. Trois d'entre
+// elles (`Handler`, `HandlerFromMux`, `HandlerFromMuxWithBaseURL`) délèguent à la quatrième **sans**
+// `ErrorHandlerFunc` : `HandlerWithOptions` installe alors son défaut,
+// `http.Error(w, err.Error(), 400)`. La porte ci-dessous n'énumère pas ces trois noms, elle les déduit
+// du préfixe : le jour où le générateur en ajoute un cinquième, il est couvert sans qu'on y pense.
+const (
+	mountEntrypointPrefix = "Handler"
+	optionsMountFunc      = "HandlerWithOptions"
+	errorHandlerOption    = "ErrorHandlerFunc"
+)
+
+// generatedFile rend le fichier qu'oapi-codegen écrit, repéré par la position de l'interface stricte
+// — même définition que celle des deux autres portes de ce paquet.
+func generatedFile(t *testing.T, pkg *packages.Package) string {
+	t.Helper()
+
+	contract := pkg.Types.Scope().Lookup(contractInterfaceName)
+	require.NotNil(t, contract, "%s introuvable : « fichier engendré » n'a plus de définition", contractInterfaceName)
+
+	return pkg.Fset.Position(contract.Pos()).Filename
+}
+
+// setsOption dit si un des arguments de `call` est un littéral composite qui pose la clé `option`.
+// Il ne suit pas une variable intermédiaire — un `opts := ChiServerOptions{…}` posé plus haut le
+// ferait rougir alors que le code serait correct. C'est assumé : la forme que la porte exige est le
+// littéral au site d'appel, où le lecteur voit le gestionnaire d'erreur en même temps que le montage.
+func setsOption(call *ast.CallExpr, option string) bool {
+	for _, arg := range call.Args {
+		literal, isLiteral := arg.(*ast.CompositeLit)
+		if !isLiteral {
+			continue
+		}
+
+		for _, element := range literal.Elts {
+			field, isField := element.(*ast.KeyValueExpr)
+			if !isField {
+				continue
+			}
+
+			if key, isIdent := field.Key.(*ast.Ident); isIdent && key.Name == option {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// Le montage des routes du contrat installe le gestionnaire d'erreur du produit.
+//
+// Ce qu'il couvre, et pourquoi une porte structurelle plutôt qu'une requête. Le gestionnaire visé est
+// celui du **wrapper** engendré (`bff.gen.go`, `ServerInterfaceWrapper.ErrorHandlerFunc`) : c'est lui
+// qui reçoit les erreurs de liaison des paramètres de requête, de chemin, des en-têtes et des cookies
+// (`chi-middleware.tmpl`, 14 sites d'appel). `GET /health` n'a aucun des quatre, donc **aucune requête
+// que le contrat autorise ne peut l'atteindre aujourd'hui** — c'est ce qui rend le défaut invisible et
+// c'est pourquoi la preuve est ici structurelle.
+//
+// Mesuré le 02/08/2026, contrat muté avec un `depuis` requis de type entier, régénéré, requête réelle
+// à travers `NewRouter` : avec `HandlerFromMux`, `GET /api/health` rend
+// `400 text/plain; charset=utf-8` et le corps `Query argument depuis is required, but not found` ;
+// avec `HandlerWithOptions` et `ErrorHandlerFunc: rejectRequest`, la même requête rend
+// `400 application/json` et le DTO d'erreur du produit. Le contrat a ensuite été restauré et
+// régénéré.
+func TestTheContractMountInstallsTheProductErrorHandler(t *testing.T) {
+	t.Parallel()
+
+	pkg := loadBFF(t)
+	generated := generatedFile(t, pkg)
+
+	mounts := 0
+
+	for _, file := range pkg.Syntax {
+		if pkg.Fset.Position(file.Pos()).Filename == generated {
+			continue
+		}
+
+		ast.Inspect(file, func(node ast.Node) bool {
+			call, isCall := node.(*ast.CallExpr)
+			if !isCall {
+				return true
+			}
+
+			called, isIdent := call.Fun.(*ast.Ident)
+			if !isIdent {
+				return true
+			}
+
+			mount, isFunc := pkg.TypesInfo.Uses[called].(*types.Func)
+			if !isFunc || pkg.Fset.Position(mount.Pos()).Filename != generated ||
+				!strings.HasPrefix(mount.Name(), mountEntrypointPrefix) {
+				return true
+			}
+
+			mounts++
+			at := pkg.Fset.Position(call.Pos())
+
+			if !assert.Equalf(t, optionsMountFunc, mount.Name(),
+				"%s: %s laisse le défaut d'oapi-codegen répondre en text/plain avec le message Go brut",
+				at, mount.Name()) {
+				return true
+			}
+
+			assert.Truef(t, setsOption(call, errorHandlerOption),
+				"%s: %s sans %s laisse le défaut d'oapi-codegen répondre en text/plain avec le message "+
+					"Go brut", at, mount.Name(), errorHandlerOption)
+
+			return true
+		})
+	}
+
+	require.Positive(t, mounts, "aucun montage du contrat : la porte est inerte, pas verte")
 }

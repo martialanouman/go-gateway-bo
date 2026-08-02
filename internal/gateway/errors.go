@@ -36,7 +36,7 @@ type FieldError struct {
 // Un appelant reconnaît ce qui l'intéresse par `errors.As` puis par Status et Code — le seul code
 // constant est CodeUpstreamUnreadable, parce qu'il est le seul que nous frappons. Aucune taxonomie
 // (sentinelles, prédicats par famille) n'est écrite ici : aucune route du BFF n'appelle encore la
-// passerelle — la première arrive en step-004 — et une taxonomie sans appelant est une liste de
+// passerelle — la première arrive en step-060 — et une taxonomie sans appelant est une liste de
 // suppositions qu'aucun test ne peut exercer.
 type APIError struct {
 	// Status vient de la ligne de statut : le contrat ne le duplique pas dans le corps.

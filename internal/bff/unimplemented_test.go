@@ -76,11 +76,18 @@ func embeddedPath(carrier, forbidden reflect.Type, path string, visited map[refl
 // langage n'honorera jamais, et sur laquelle un lecteur pressé comptera le jour où le contrat gagnera
 // une opération.
 //
-// Ce qu'elle ne couvre pas : `HandlerFromMux` prend un `ServerInterface`, que `Unimplemented`
-// satisfait exactement — mesuré, `HandlerFromMux(Unimplemented{}, r)` compile et rend 501 sur toutes
-// les routes en silence. Cette valeur-là est construite dans `NewRouter` et n'est atteignable par
-// aucune réflexion depuis ici ; c'est `TestOnlyGeneratedCodeServesTheAPIRoutes` qui garde ce
-// montage-là, et son commentaire dit jusqu'où.
+// Ce qu'elle ne couvre pas : le montage prend un `ServerInterface`, que `Unimplemented` satisfait
+// exactement — `HandlerWithOptions(Unimplemented{}, …)` compile et rend 501 sur toutes les routes en
+// silence. Cette valeur-là est construite dans `mountContract` et n'est atteignable par aucune
+// réflexion depuis ici.
+//
+// **Aucune porte structurelle ne garde ce montage-là**, et il faut le dire parce que ce commentaire a
+// affirmé le contraire. Mesuré le 02/08/2026, `Unimplemented{}` substitué à `API{}` sous la forme de
+// montage du produit : les quatre portes structurelles du paquet passent — celle-ci,
+// `TestOnlyGeneratedCodeServesTheAPIRoutes`, `TestResponseTypesDeclareTheirFields` et
+// `TestTheContractMountInstallsTheProductErrorHandler`. Ce qui tombe est le test de corps exact,
+// `TestHealthProbe`, et les cinq scénarios godog de `cmd/dashboard` qui traversent la sonde. Ce sont
+// eux qui gardent le montage, et rien d'autre.
 func TestTheMountedImplementationDoesNotEmbedUnimplemented(t *testing.T) {
 	t.Parallel()
 
