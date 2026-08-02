@@ -53,6 +53,48 @@ condition de faisabilité du projet (`plan.md` §16).
 Les trois flux `stream-*` → step-043. Les permissions par opérateur → step-025. Le contrat du BFF
 lui-même → step-004.
 
+## Tableau des mutations
+
+Tenu au fil de l'eau. Une ligne « aucune porte ne rougit » est un constat de la DoD (critère 4), pas
+un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dessus de la ligne concernée.
+
+| Mutation appliquée (le défaut réel qu'elle rejoue) | Ce qui tombe |
+|---|---|
+| **Renouvellement de jeton rendu concurrent** — assemblage à la main avec une source **non** réutilisée, l'oubli du `ReuseTokenSource` (*mutation nommée par la DoD*) | compteur du faux endpoint de jeton : 1 → **3**, et 2 → **9** sous concurrence |
+| **503 traité comme un module désactivé** (`Code: "module_disabled"`) (*mutation nommée par DN-8*) | `TestServiceUnavailableStaysAnError` |
+| **503 avalé** — la traduction rend `nil` | idem |
+| Garde sur la méthode HTTP retirée (client *moins* prudent) | `ne_rejoue_jamais_un_POST` : 1 → 2 |
+| 429 ajouté aux statuts rejouables | `ne_rejoue_pas_sur_429` : 1 → 2 |
+| 503 ajouté aux statuts rejouables | `ne_rejoue_pas_sur_503` : 1 → 2 |
+| Une seconde tentative supplémentaire | 502 et 504 : 2 → 3 |
+| `Timeout` retiré du client du contexte | « l'appel n'a jamais rendu la main : le Timeout ne borne pas l'obtention du jeton » |
+| `Certificates` retiré du `tls.Config` | `PresentsItsCertificateOnBothOutboundCalls` |
+| `content:read` retiré des scopes demandés | test des scopes |
+| Erreurs de chargement du matériel mTLS avalées | `An error is expected but got nil.` |
+| Corps d'erreur non conforme avalé en silence | `TestErrorFromNamesAnUnreadableBody` |
+| Détail champ par champ perdu | `TestErrorFromKeepsTheFlatEnvelope` |
+| `Error()` recopie le message amont (fuite potentielle, invariant a) | les six rendus de `TestErrorRendersNoUpstreamFreeText` |
+| Appel de `requireRealGatewayMaterial` retiré | le test de config **et** le scénario godog : « il a démarré avec une configuration incomplète » |
+| Mode absent replié sur `mock` (le défaut permissif que DN-9 écarte) | `un_mode_absent_vaut_real` |
+| Clémence du mode `mock` retirée (garde *trop large*) | 7 tests, dont `n'exige_que_l'adresse_du_mock_en_mode_mock` |
+| Une validation du secret qui cite sa valeur | `ne_recopie_jamais_le_secret_client…` |
+| Copie du contrat déposée dans le dépôt, puis **renommée**, puis ré-extensionnée | la porte anti-copie, 8/8 et 5/5 signatures — le nom n'y est pour rien |
+| Contrat du BFF légitime + overlay déposés | la porte **passe** — le légitime n'est pas refusé |
+| Génération cassée (overlay retiré, configuration renommée, outil retiré de `tool`) | `check-generated`, qui régénère au lieu de comparer |
+| Une action de l'overlay ne cible plus rien | `does nothing` — le mode strict |
+| Client engendré retiré du suivi git | `check-generated` (`git status`, là où `git diff HEAD` reste muet) |
+| **Binaire Prism renommé** | `TestScenarios` **et** la sonde échouent — ni vert, ni skip |
+| Base URL affublée du préfixe `/v1` que Prism ne sert pas | scénario de liste : 404 |
+| `Bearer` retiré | scénario de liste en **401** — la preuve qu'il traverse l'authentification sortante |
+| Sonde pointée sur une route inexistante | 118 routes sur 133 en refus de routage |
+| `.feature` renommé | `0 scénario(s) exécuté(s) pour un plancher de 2` — **trou trouvé ainsi**, la suite passait sans rien exécuter |
+| Dédoublonnage de `config.Variables()` retiré | la porte `.env.example` — le commentaire qui le disait sans effet a été corrigé |
+| Drainage de la réponse abandonnée au rejeu (`discard`) retiré | **aucune porte ne rougit** — ce qu'il empêche s'observe sous charge ; écrit au-dessus de la fonction |
+| Branche `HEAD` du filtre de rejeu retirée | **aucune porte ne rougit** — le contrat ne déclare aucune opération HEAD ; écrit au-dessus de la fonction |
+| Garde de faute de frappe du harnais godog retirée | **aucune porte ne rougit** — elle protège l'auteur d'un futur scénario, pas un comportement du produit |
+
+Deux mutations ont été **rejetées comme invalides** plutôt que comptées : `ReuseTokenSourceWithExpiry(…, 0)`, où `0` signifie « prends le défaut » et ne reproduit donc aucun défaut ; et la suppression du bloc de succès du décodeur d'erreur, qui casse la compilation au lieu de rejouer une faute. Toutes deux ont été refaites sous une forme qui reproduit l'erreur qu'on commet vraiment.
+
 ## Design arrêté (2026-08-01)
 
 Les faits chiffrés ci-dessous ont été **mesurés** le 01/08/2026, pas déduits ; chaque décision cite
