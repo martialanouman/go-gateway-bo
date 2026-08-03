@@ -117,12 +117,13 @@ func TestTheBuildStopsWhenItsDeadlinePasses(t *testing.T) {
 // exige qu'ils aient tourné vit dans `internal/bddtest`, avec ses propres tests unitaires.
 func TestScenarios(t *testing.T) {
 	ran := &bddtest.Ledger{}
+	visited := &bddtest.OperationLedger{}
 
 	suite := godog.TestSuite{
 		Name: "dashboard",
 		ScenarioInitializer: func(ctx *godog.ScenarioContext) {
 			ran.Watch(ctx)
-			initializeScenario(ctx)
+			initializeScenario(ctx, visited)
 		},
 		Options: &godog.Options{
 			Format:   "pretty",
@@ -139,6 +140,12 @@ func TestScenarios(t *testing.T) {
 	}
 
 	ran.RequireCorpusExercised(t, ".", minimumScenarios)
+
+	// Chaque opération du contrat doit avoir été confrontée à lui par un scénario. C'est la seule porte
+	// qui attrape un type de réponse écrit à la main dont le `Visit…` sérialise ce qu'il veut : les
+	// portes structurelles de `internal/bff` regardent la forme des champs déclarés, et un type sans
+	// champ n'en a aucun à examiner. Elle vit ici parce que c'est ici que les scénarios valident.
+	visited.RequireEveryOperationVisited(t, contractPath)
 }
 
 // minimumScenarios est un plancher, pas un compte : en ajouter un n'oblige à rien ici, en retirer un
@@ -149,8 +156,11 @@ func TestScenarios(t *testing.T) {
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
 const minimumScenarios = 8
 
-func initializeScenario(ctx *godog.ScenarioContext) {
-	p := &process{}
+// Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
+// rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
+// opération validée.
+func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLedger) {
+	p := &process{visited: visited}
 
 	ctx.Given(`^une configuration complète dont on retire "([^"]*)"$`, p.configurationWithout)
 	ctx.Given(`^une configuration complète dont on passe "([^"]*)" à "([^"]*)"$`, p.configurationWith)
@@ -199,6 +209,7 @@ func completeConfiguration() map[string]string {
 }
 
 type process struct {
+	visited  *bddtest.OperationLedger
 	env      map[string]string
 	cmd      *exec.Cmd
 	output   *bddtest.SyncBuffer
@@ -543,6 +554,11 @@ func (p *process) responseMatchesTheContract() error {
 	if err != nil {
 		return fmt.Errorf("la réponse servie ne valide pas le contrat: %w\n%s", err, p.received.body)
 	}
+
+	// L'opération n'est portée au registre qu'**ici**, une fois la validation passée — pas au moment où
+	// le scénario demande le chemin. Une route qu'un scénario appelle sans confronter sa réponse au
+	// contrat reste donc à découvert, ce qui est exactement le défaut que la porte cherche.
+	p.visited.Visit(route.Operation.OperationID)
 
 	return nil
 }

@@ -261,6 +261,8 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | Avant adoption : `go test -run 'TestScenarios/le_schéma' ./internal/store/` | `TestScenarios` tombait — c'était le défaut, et c'est le rouge qui a précédé l'adoption. Vert après |
 | Garde d'imports : `internal/bff/api.go` importe `bddtest` | `TestNoProductionFileImportsTheHarness` — « …/internal/bff importe le harnais depuis un fichier de production » |
 | Garde d'imports : chemin du harnais faussé d'une lettre | la garde reste **verte** — et c'est le **témoin** qui tombe : « l'analyse ne voit le harnais nulle part ». C'est ce que le témoin existe pour attraper |
+| **Couverture du contrat, la mutation que la fiche exige** : une opération `version` ajoutée à `api/openapi-bff.yaml`, serveur régénéré, handler écrit, **aucun scénario** | `TestScenarios` — « l'opération "version" est déclarée au contrat et aucun scénario ne valide sa réponse contre lui […] lui écrire un scénario » |
+| Couverture du contrat : la même, **plus** un scénario qui demande `/api/version` et vérifie un 200 sans confronter la réponse au contrat | la porte rougit **toujours**. C'est ce qui prouve DN-2 : est visitée l'opération *validée*, jamais l'opération seulement appelée |
 
 ## Hors périmètre
 Les scénarios métier — chacun arrive avec sa step. L'audit d'accessibilité automatisé → step-185.
