@@ -250,6 +250,10 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
+| `bddtest` : désarmement sous filtre `-run` retiré (`filtersScenarios` court-circuité) | `TestARunFilterStandsTheCorpusFloorDown` — « 0 scénario(s) exécuté(s) pour un plancher de 8 » |
+| `bddtest` : `FeatureFiles` ne descend plus dans les sous-répertoires | `TestFeatureFilesAreFoundInSubdirectoriesToo` — `sous-repertoire/range.feature` manquant |
+| `bddtest` : verrou d'écriture de `SyncBuffer` retiré | `TestTheBufferSurvivesConcurrentWritesAndReads` sous `-race` — quatre `DATA RACE` |
+| `bddtest` : plancher neutralisé (`if false && l.executed < minimum`) | `TestTheLedgerReportsACorpusThatShrank` **et** `TestTheFloorIsTheCallersAndNotThePackages` |
 
 ## Hors périmètre
 Les scénarios métier — chacun arrive avec sa step. L'audit d'accessibilité automatisé → step-185.
