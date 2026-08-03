@@ -299,7 +299,7 @@ func (p *process) startAndServe() error {
 		return err
 	}
 
-	addr, err := p.awaitListenAddr(5 * time.Second)
+	addr, err := p.awaitListenAddr(startupTimeout)
 	if err != nil {
 		return err
 	}
@@ -317,6 +317,19 @@ func (p *process) startAndServe() error {
 
 	return nil
 }
+
+// startupTimeout vise un démarrage parti en vrille, pas une machine chargée — même arbitrage que
+// `prismStartup` dans `internal/gateway`, et pour une raison mesurée ici le 03/08/2026 : sous un
+// `go test -race ./...`, où dix paquets compilent et tournent de front, le binaire n'avait **rien**
+// écrit au bout des 5 s que cette borne valait alors. Le message d'échec le montrait, son journal
+// étant vide. Le scénario avait tout d'un défaut du produit et n'était qu'une machine occupée ; la
+// même suite lancée seule passait, et le passage suivant sur l'arbre entier aussi.
+//
+// Aucun test ne rougit si cette valeur revient à 5 s, ce qui a été vérifié plutôt que supposé : le
+// défaut ne se reproduit que sous une charge qu'aucune porte ne fabrique. C'est un flottement, et un
+// flottement se corrige à la source de son ambiguïté — ici, une borne qui confondait « le serveur ne
+// démarre pas » et « le serveur n'a pas encore eu la main ».
+const startupTimeout = 30 * time.Second
 
 // awaitListenAddr lit l'adresse effectivement obtenue dans le journal de démarrage. C'est ce qui
 // permet au scénario de demander le port 0 : il ne suppose aucun port libre sur la machine de CI.
