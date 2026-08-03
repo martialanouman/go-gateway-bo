@@ -259,6 +259,8 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | Couverture client : `perFile` retiré, orphelin d'une ligne sans fonction | **rien ne rougit** — les quatre seuils globaux passent (78,57 % de lignes pour 75 exigés) |
 | Après adoption : `cmd/dashboard/contrat.feature` renommé en `.disabled` | `TestScenarios` — « 7 scénario(s) exécuté(s) pour un plancher de 8 » |
 | Avant adoption : `go test -run 'TestScenarios/le_schéma' ./internal/store/` | `TestScenarios` tombait — c'était le défaut, et c'est le rouge qui a précédé l'adoption. Vert après |
+| Garde d'imports : `internal/bff/api.go` importe `bddtest` | `TestNoProductionFileImportsTheHarness` — « …/internal/bff importe le harnais depuis un fichier de production » |
+| Garde d'imports : chemin du harnais faussé d'une lettre | la garde reste **verte** — et c'est le **témoin** qui tombe : « l'analyse ne voit le harnais nulle part ». C'est ce que le témoin existe pour attraper |
 
 ## Hors périmètre
 Les scénarios métier — chacun arrive avec sa step. L'audit d'accessibilité automatisé → step-185.
