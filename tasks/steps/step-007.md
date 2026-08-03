@@ -175,6 +175,15 @@ Deux garde-fous, sans lesquels la cible serait un vert silencieux : **`make e2e`
 bruyamment quand les navigateurs manquent**, et le job doit entrer dans le `needs:` de l'agrégateur —
 ce que `scripts/check-ci-aggregator.py` vérifie déjà, et qui est donc le filet.
 
+> **Amendement du 03/08/2026, après mesure.** Le premier garde-fou n'appelle **aucun** contrôle dans
+> la cible : Playwright échoue de lui-même et imprime le remède. Mesuré en pointant
+> `PLAYWRIGHT_BROWSERS_PATH` sur un répertoire vide — « Executable doesn't exist at … Please run the
+> following command to download new browsers ». Un contrôle de plus dirait la même chose, moins bien.
+>
+> **Défaut trouvé au passage, et corrigé ici** : le motif de `make help` était `^[a-z-]+:`, qui ne
+> capte aucun nom de cible contenant un chiffre. `e2e` existait et n'était pas listée — or `make help`
+> « fait foi sur ce qui existe ». Le motif devient `^[a-z][a-z0-9-]*:`.
+
 Le harnais lance le **binaire** (`webServer` de Playwright sur `./bin/dashboard`), jamais `vite dev` :
 l'ordonnancement `/api` avant le fallback SPA, les en-têtes de cache et l'embarquement des assets
 n'existent que là. Un seul parcours et un seul navigateur ici — les cinq parcours de `plan.md` §17.4
@@ -263,6 +272,9 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | Garde d'imports : chemin du harnais faussé d'une lettre | la garde reste **verte** — et c'est le **témoin** qui tombe : « l'analyse ne voit le harnais nulle part ». C'est ce que le témoin existe pour attraper |
 | **Couverture du contrat, la mutation que la fiche exige** : une opération `version` ajoutée à `api/openapi-bff.yaml`, serveur régénéré, handler écrit, **aucun scénario** | `TestScenarios` — « l'opération "version" est déclarée au contrat et aucun scénario ne valide sa réponse contre lui […] lui écrire un scénario » |
 | Couverture du contrat : la même, **plus** un scénario qui demande `/api/version` et vérifie un 200 sans confronter la réponse au contrat | la porte rougit **toujours**. C'est ce qui prouve DN-2 : est visitée l'opération *validée*, jamais l'opération seulement appelée |
+| Parcours : `data-skeleton="rail"` retiré du document servi | le parcours tombe sur la première assertion — `expect(received).toContain(expected)` |
+| Parcours : l'asset embarqué remplacé par un `throw`, binaire recompilé | le document servi reste correct et la **première** assertion passe ; les suivantes tombent, « element(s) not found ». C'est ce que le parcours prouve en propre, et qu'aucune autre porte ne voit |
+| `PLAYWRIGHT_BROWSERS_PATH` pointé sur un répertoire vide | Playwright **échoue** et imprime le remède (« Please run the following command to download new browsers ») — il ne saute pas. C'est ce qui dispense la cible `make e2e` d'un contrôle préalable |
 
 ## Hors périmètre
 Les scénarios métier — chacun arrive avec sa step. L'audit d'accessibilité automatisé → step-185.
