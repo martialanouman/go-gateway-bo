@@ -254,6 +254,11 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | `bddtest` : `FeatureFiles` ne descend plus dans les sous-répertoires | `TestFeatureFilesAreFoundInSubdirectoriesToo` — `sous-repertoire/range.feature` manquant |
 | `bddtest` : verrou d'écriture de `SyncBuffer` retiré | `TestTheBufferSurvivesConcurrentWritesAndReads` sous `-race` — quatre `DATA RACE` |
 | `bddtest` : plancher neutralisé (`if false && l.executed < minimum`) | `TestTheLedgerReportsACorpusThatShrank` **et** `TestTheFloorIsTheCallersAndNotThePackages` |
+| Couverture client : un module orphelin d'une ligne ajouté sous `src/lib/` | `vitest run` — `ERROR: Coverage for lines (0%) … for src/lib/orphelin.ts` |
+| Couverture client : `coverage.include` retiré, orphelin conservé | **rien ne rougit** — le module est absent du rapport et `exit=0`. C'est la mesure qui justifie la ligne |
+| Couverture client : `perFile` retiré, orphelin d'une ligne sans fonction | **rien ne rougit** — les quatre seuils globaux passent (78,57 % de lignes pour 75 exigés) |
+| Après adoption : `cmd/dashboard/contrat.feature` renommé en `.disabled` | `TestScenarios` — « 7 scénario(s) exécuté(s) pour un plancher de 8 » |
+| Avant adoption : `go test -run 'TestScenarios/le_schéma' ./internal/store/` | `TestScenarios` tombait — c'était le défaut, et c'est le rouge qui a précédé l'adoption. Vert après |
 
 ## Hors périmètre
 Les scénarios métier — chacun arrive avec sa step. L'audit d'accessibilité automatisé → step-185.

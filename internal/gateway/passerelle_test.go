@@ -3,10 +3,8 @@ package gateway_test
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,7 +12,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 	"github.com/martialanouman/go-gateway-bo/internal/config"
 	"github.com/martialanouman/go-gateway-bo/internal/gateway"
 )
@@ -51,17 +49,16 @@ const prismStartup = 30 * time.Second
 
 // `godog` ne pose aucun plancher : `Paths` qui ne trouve rien rend une suite **vide et réussie**, et
 // `Strict` ne couvre que les steps non définies d'un scénario lu. Vérifié le 02/08/2026 en renommant
-// `passerelle.feature` — la suite rend `ok` sans avoir joint le mock une seule fois. Le registre
-// ferme les deux trous : un plancher sur ce qui a tourné, et l'exigence que chaque `.feature` du
-// répertoire ait porté au moins un scénario.
+// `passerelle.feature` — la suite rend `ok` sans avoir joint le mock une seule fois. Le registre qui
+// ferme ces deux trous vit dans `internal/bddtest`, avec ses propres tests unitaires.
 func TestScenarios(t *testing.T) {
 	baseURL := adminMock(t)
-	ran := &scenarioLedger{}
+	ran := &bddtest.Ledger{}
 
 	suite := godog.TestSuite{
 		Name: "gateway",
 		ScenarioInitializer: func(ctx *godog.ScenarioContext) {
-			ran.watch(ctx)
+			ran.Watch(ctx)
 			initializeScenario(ctx, baseURL)
 		},
 		Options: &godog.Options{
@@ -78,7 +75,7 @@ func TestScenarios(t *testing.T) {
 		t.Fatal("des scénarios ont échoué")
 	}
 
-	ran.requireCorpusExercised(t)
+	ran.RequireCorpusExercised(t, ".", minimumScenarios)
 }
 
 // La ligne de DoD « le mock sert les 133 opérations » est établie ici, et par les deux affirmations
@@ -121,7 +118,7 @@ func TestTheMockServesEveryOperationTheContractDeclares(t *testing.T) {
 func declaredOperations(t *testing.T) int {
 	t.Helper()
 
-	contract, err := os.ReadFile(filepath.Join(repositoryRoot(t), adminContract))
+	contract, err := os.ReadFile(filepath.Join(bddtest.RepositoryRoot(t), adminContract))
 	require.NoError(t, err, "lecture du contrat de l'API Admin")
 
 	declared := 0
@@ -212,92 +209,6 @@ func probeRoute(t *testing.T, probe *http.Client, route announcedRoute) string {
 // minimumScenarios est un plancher, pas un compte : en ajouter un n'oblige à rien ici, en retirer un
 // demande de le dire.
 const minimumScenarios = 2
-
-// scenarioLedger note ce que la suite a réellement exécuté. Le verrou n'est pas décoratif : godog
-// exécute les scénarios en parallèle dès que `Concurrency` dépasse 1, et ce jour-là le compteur se
-// tairait sous `-race` plutôt que de compter faux.
-type scenarioLedger struct {
-	mu     sync.Mutex
-	byFile map[string]int
-	total  int
-}
-
-func (l *scenarioLedger) watch(ctx *godog.ScenarioContext) {
-	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		l.mu.Lock()
-		defer l.mu.Unlock()
-
-		if l.byFile == nil {
-			l.byFile = make(map[string]int)
-		}
-		l.byFile[sc.Uri]++
-		l.total++
-
-		return ctx, nil
-	})
-}
-
-func (l *scenarioLedger) requireCorpusExercised(t *testing.T) {
-	t.Helper()
-
-	// `TestingT: t` fait de chaque pickle un sous-test, et `t.Run` rend `true` sans exécuter sa closure
-	// — donc sans le hook `Before` — quand le nom ne correspond pas au filtre. Déboguer un scénario
-	// seul est un flux de travail normal : le dire, plutôt que d'accuser le corpus d'avoir fondu.
-	if filter := runFilter(); strings.Contains(filter, "/") {
-		t.Logf("plancher et couverture du corpus non vérifiés : `-run %s` ne demande qu'une partie des "+
-			"scénarios", filter)
-
-		return
-	}
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	assert.GreaterOrEqualf(t, l.total, minimumScenarios,
-		"%d scénario(s) exécuté(s) pour un plancher de %d : le corpus a fondu, ou la suite ne le trouve "+
-			"plus — dans les deux cas elle ne prouve plus rien du client sortant", l.total, minimumScenarios)
-
-	for _, feature := range featureFiles(t, ".") {
-		assert.Positivef(t, l.byFile[feature],
-			"%s n'a exécuté aucun scénario : il est présent mais la suite l'ignore", feature)
-	}
-}
-
-// runFilter rend le motif que `-run` a posé, vide quand la suite tourne en entier. `test.run` est
-// enregistré par `testing.Init`, que `m.Run` appelle : il existe donc quand un test s'exécute.
-func runFilter() string {
-	filter := flag.Lookup("test.run")
-	if filter == nil {
-		return ""
-	}
-
-	return filter.Value.String()
-}
-
-// featureFiles nomme les scénarios que la suite doit exercer, dans la forme où godog les nomme :
-// relatifs à `root`, séparés par des `/`. La recherche descend dans les sous-répertoires parce que
-// `Paths: ["."]` y descend aussi — un glob `*.feature` ne verrait que le répertoire courant, et un
-// `.feature` rangé plus bas tournerait sans que personne n'exige qu'il tourne.
-func featureFiles(t *testing.T, root string) []string {
-	t.Helper()
-
-	var features []string
-
-	err := fs.WalkDir(os.DirFS(root), ".", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !entry.IsDir() && strings.HasSuffix(path, ".feature") {
-			features = append(features, path)
-		}
-
-		return nil
-	})
-	require.NoErrorf(t, err, "lecture des fichiers de scénarios sous %s", root)
-
-	return features
-}
 
 func initializeScenario(ctx *godog.ScenarioContext, baseURL string) {
 	calls := &adminCalls{}
@@ -483,7 +394,7 @@ func (r announcedRoute) String() string {
 func startPrism(t *testing.T) *prismMock {
 	t.Helper()
 
-	root := repositoryRoot(t)
+	root := bddtest.RepositoryRoot(t)
 	binary := filepath.Join(root, prismBinary)
 	contract := filepath.Join(root, adminContract)
 
@@ -493,7 +404,7 @@ func startPrism(t *testing.T) *prismMock {
 			"pnpm -C web install", required)
 	}
 
-	output := &syncBuffer{}
+	output := &bddtest.SyncBuffer{}
 	prism := exec.Command(binary, "mock", "--port", "0", "--host", "127.0.0.1", contract)
 	prism.Stdout = output
 	prism.Stderr = output
@@ -520,7 +431,7 @@ var (
 	prismRouteAnnouncement = regexp.MustCompile(`info\s+([A-Z]+)\s+(http://\S+)`)
 )
 
-func awaitPrism(output *syncBuffer, within time.Duration) (*prismMock, error) {
+func awaitPrism(output *bddtest.SyncBuffer, within time.Duration) (*prismMock, error) {
 	deadline := time.Now().Add(within)
 
 	for time.Now().Before(deadline) {
@@ -544,25 +455,4 @@ func announcedRoutes(printed string) []announcedRoute {
 	}
 
 	return routes
-}
-
-// Prism écrit depuis sa propre goroutine pendant que le harnais lit : sans verrou, `-race` signale la
-// course avant même que quoi que ce soit n'échoue.
-type syncBuffer struct {
-	mu       sync.Mutex
-	contents strings.Builder
-}
-
-func (b *syncBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.contents.Write(p)
-}
-
-func (b *syncBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.contents.String()
 }

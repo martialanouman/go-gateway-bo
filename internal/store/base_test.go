@@ -5,29 +5,28 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sync"
 	"testing"
 
 	"github.com/cucumber/godog"
 	"github.com/jackc/pgx/v5"
-	"github.com/stretchr/testify/assert"
 
+	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// `godog` ne pose aucun plancher : `Paths` qui ne trouve rien rend une suite **vide et réussie**, et
-// `Strict` ne couvre que les steps non définies d'un scénario lu — mesuré dans `internal/gateway` le
-// 02/08/2026. Le compteur ci-dessous ferme le trou : une suite qui n'a exercé aucun scénario ne peut
-// pas passer pour verte.
+// Le plancher du corpus de ce paquet. Le registre qui le tient vit dans `internal/bddtest` : cette
+// suite portait jusqu'ici un simple compteur, sans couverture par fichier ni exemption sous `-run` —
+// mesuré, `go test -run 'TestScenarios/le_schéma' ./internal/store/` faisait tomber le plancher sur
+// un flux de travail parfaitement normal, celui qui consiste à déboguer un scénario seul.
 const minimumScenarios = 2
 
 func TestScenarios(t *testing.T) {
-	ran := &scenarioCounter{}
+	ran := &bddtest.Ledger{}
 
 	suite := godog.TestSuite{
 		Name: "store",
 		ScenarioInitializer: func(ctx *godog.ScenarioContext) {
-			ran.watch(ctx)
+			ran.Watch(ctx)
 			initializeScenario(ctx)
 		},
 		Options: &godog.Options{
@@ -44,38 +43,7 @@ func TestScenarios(t *testing.T) {
 		t.Fatal("des scénarios ont échoué")
 	}
 
-	ran.requireFloor(t)
-}
-
-// scenarioCounter note ce que la suite a réellement exécuté. Le verrou n'est pas décoratif : godog
-// exécute les scénarios en parallèle dès que `Concurrency` dépasse 1, et ce jour-là le compteur se
-// tairait sous `-race` plutôt que de compter faux.
-type scenarioCounter struct {
-	mu    sync.Mutex
-	total int
-}
-
-func (c *scenarioCounter) watch(ctx *godog.ScenarioContext) {
-	ctx.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-
-		c.total++
-
-		return ctx, nil
-	})
-}
-
-func (c *scenarioCounter) requireFloor(t *testing.T) {
-	t.Helper()
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	assert.GreaterOrEqualf(t, c.total, minimumScenarios,
-		"%d scénario(s) exécuté(s) pour un plancher de %d : le corpus a fondu, ou la suite ne trouve "+
-			"plus `base.feature` — dans les deux cas elle ne prouve plus rien du schéma", c.total,
-		minimumScenarios)
+	ran.RequireCorpusExercised(t, ".", minimumScenarios)
 }
 
 func initializeScenario(ctx *godog.ScenarioContext) {

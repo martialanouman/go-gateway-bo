@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,7 +13,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -27,6 +24,8 @@ import (
 	"github.com/getkin/kin-openapi/routers/legacy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 )
 
 // Les scénarios exercent le binaire livré, pas une fonction appelée en bibliothèque : ce qui est
@@ -114,19 +113,15 @@ func TestTheBuildStopsWhenItsDeadlinePasses(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
-// Ces scénarios sont le seul endroit où le câblage réel est exercé (DN-3, niveau 2). Or `godog` ne
-// pose aucun plancher : `Paths` qui ne trouve rien rend une suite vide et réussie, et `Strict` ne
-// couvre que les steps non définies d'un scénario **lu**. Un `.feature` déplacé, renommé ou vidé
-// laisserait donc la suite verte sans que rien du binaire n'ait tourné. Le registre ferme les deux
-// trous : un plancher sur ce qui a réellement tourné, et l'exigence que chaque `.feature` du
-// répertoire ait porté au moins un scénario.
+// Ces scénarios sont le seul endroit où le câblage réel est exercé (DN-3, niveau 2). Le registre qui
+// exige qu'ils aient tourné vit dans `internal/bddtest`, avec ses propres tests unitaires.
 func TestScenarios(t *testing.T) {
-	ran := &scenarioLedger{}
+	ran := &bddtest.Ledger{}
 
 	suite := godog.TestSuite{
 		Name: "dashboard",
 		ScenarioInitializer: func(ctx *godog.ScenarioContext) {
-			ran.watch(ctx)
+			ran.Watch(ctx)
 			initializeScenario(ctx)
 		},
 		Options: &godog.Options{
@@ -143,25 +138,7 @@ func TestScenarios(t *testing.T) {
 		t.Fatal("des scénarios ont échoué")
 	}
 
-	ran.requireCorpusExercised(t, runFilter())
-}
-
-// runFilter rend le motif que `-run` a posé, vide quand la suite tourne en entier. `test.run` est
-// enregistré par `testing.Init`, que `m.Run` appelle : il existe donc quand un test s'exécute.
-func runFilter() string {
-	filter := flag.Lookup("test.run")
-	if filter == nil {
-		return ""
-	}
-
-	return filter.Value.String()
-}
-
-// filtersScenarios dit si le filtre coupe dans les scénarios eux-mêmes. `-test.run` découpe son motif
-// sur les `/`, un niveau par profondeur de sous-test : sans `/`, il ne choisit que le test de tête, et
-// les scénarios que celui-ci porte tournent tous.
-func filtersScenarios(runFilter string) bool {
-	return strings.Contains(runFilter, "/")
+	ran.RequireCorpusExercised(t, ".", minimumScenarios)
 }
 
 // minimumScenarios est un plancher, pas un compte : en ajouter un n'oblige à rien ici, en retirer un
@@ -171,194 +148,6 @@ func filtersScenarios(runFilter string) bool {
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
 const minimumScenarios = 8
-
-// scenarioLedger note ce que la suite a réellement exécuté. Le verrou n'est pas décoratif : `godog`
-// exécute les scénarios en parallèle dès que `Concurrency` dépasse 1, et ce jour-là le compteur se
-// tairait sous `-race` plutôt que de compter faux.
-type scenarioLedger struct {
-	mu       sync.Mutex
-	byFile   map[string]int
-	executed int
-}
-
-func (l *scenarioLedger) watch(ctx *godog.ScenarioContext) {
-	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		l.mu.Lock()
-		defer l.mu.Unlock()
-
-		if l.byFile == nil {
-			l.byFile = make(map[string]int)
-		}
-		// `sc.Uri` est le chemin relatif au répertoire que godog a parcouru, séparé par des `/` :
-		// c'est la forme que `featureFiles` reproduit, et deux `.feature` de même nom rangés dans des
-		// sous-répertoires différents y restent distincts.
-		l.byFile[sc.Uri]++
-		l.executed++
-
-		return ctx, nil
-	})
-}
-
-func (l *scenarioLedger) requireCorpusExercised(t *testing.T, runFilter string) {
-	t.Helper()
-
-	// `TestingT: t` fait de chaque pickle un sous-test, et `t.Run` rend `true` sans exécuter sa closure
-	// — donc sans le hook `Before` du registre — quand le nom ne correspond pas au filtre. Le registre
-	// ne voit alors qu'une partie du corpus, et les deux exigences accuseraient celui qui débogue un
-	// scénario seul d'avoir fait fondre le corpus. Le dire, plutôt que se taire, pour que personne ne
-	// croie la porte active.
-	if filtersScenarios(runFilter) {
-		t.Logf("plancher et couverture du corpus non vérifiés : `-run %s` ne demande qu'une partie des "+
-			"scénarios. Ces deux portes ne mordent qu'une suite lancée en entier", runFilter)
-
-		return
-	}
-
-	features, err := featureFiles(".")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, shortfall := range l.shortfalls(features) {
-		t.Error(shortfall)
-	}
-}
-
-// shortfalls rend ce que le registre reproche au corpus, et rien quand il est entièrement exercé.
-func (l *scenarioLedger) shortfalls(features []string) []string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	var shortfalls []string
-
-	if l.executed < minimumScenarios {
-		shortfalls = append(shortfalls, fmt.Sprintf(
-			"%d scénario(s) exécuté(s) pour un plancher de %d : le corpus a fondu, ou la suite ne le "+
-				"trouve plus — dans les deux cas elle ne prouve plus rien du binaire",
-			l.executed, minimumScenarios))
-	}
-
-	for _, feature := range features {
-		if l.byFile[feature] == 0 {
-			shortfalls = append(shortfalls, fmt.Sprintf(
-				"%s n'a exécuté aucun scénario : il est présent mais la suite l'ignore", feature))
-		}
-	}
-
-	return shortfalls
-}
-
-// featureFiles nomme les scénarios que la suite doit exercer, dans la forme où godog les nomme :
-// relatifs à `root`, séparés par des `/`. La recherche descend dans les sous-répertoires parce que
-// `Paths: ["."]` y descend aussi — un glob `*.feature` ne verrait que le répertoire courant, et un
-// `.feature` rangé plus bas tournerait sans que personne n'exige qu'il tourne.
-func featureFiles(root string) ([]string, error) {
-	var features []string
-
-	err := fs.WalkDir(os.DirFS(root), ".", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !entry.IsDir() && strings.HasSuffix(path, ".feature") {
-			features = append(features, path)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("lecture des fichiers de scénarios sous %s: %w", root, err)
-	}
-
-	return features, nil
-}
-
-// `TestingT: t` fait de chaque pickle un sous-test, et les hooks `Before` s'exécutent **dans** la
-// closure de `t.Run` — or `t.Run` rend `true` sans l'exécuter quand le nom ne correspond pas à
-// `-test.run`. Déboguer un scénario seul n'ouvre donc qu'un `Before` sur cinq : le registre compterait
-// 1 et accuserait le corpus d'avoir fondu, sur un flux de travail parfaitement normal.
-func TestARunFilterStandsTheCorpusFloorDown(t *testing.T) {
-	t.Parallel()
-
-	// Registre vide, comme après un `-run 'TestScenarios/aucun_nom_ne_correspond'`. Si la porte
-	// mordait encore, c'est ce test-ci qui tomberait.
-	(&scenarioLedger{}).requireCorpusExercised(t, "TestScenarios/une_URL_collée")
-}
-
-// La porte ne se retire que devant un filtre qui coupe vraiment dans les scénarios. `-test.run`
-// découpe son motif sur les `/`, un niveau par profondeur de sous-test : sans `/`, il ne choisit que
-// le test de tête et les cinq scénarios tournent tous — se taire là rendrait le plancher retirable
-// par un `go test -run TestScenarios`, qui est la commande de tous les jours.
-func TestOnlyASubtestFilterStandsTheCorpusFloorDown(t *testing.T) {
-	t.Parallel()
-
-	for filter, standsDown := range map[string]bool{
-		"":                                 false,
-		"TestScenarios":                    false,
-		"TestSc":                           false,
-		"TestScenarios/une_URL_collée.*":   true,
-		"TestScenarios/aucun_nom_ne_colle": true,
-	} {
-		assert.Equal(t, standsDown, filtersScenarios(filter), "-run %q", filter)
-	}
-}
-
-func TestTheLedgerReportsACorpusThatShrank(t *testing.T) {
-	t.Parallel()
-
-	ran := ledgerOf("assets.feature", minimumScenarios-1)
-
-	shortfalls := ran.shortfalls([]string{"assets.feature"})
-
-	require.NotEmpty(t, shortfalls,
-		"le corpus a fondu sous le plancher sans que le registre le dise : la suite ne prouve plus "+
-			"grand-chose du binaire et se tait")
-	assert.Contains(t, strings.Join(shortfalls, "\n"), "plancher")
-}
-
-func TestTheLedgerReportsAFeatureThatRanNothing(t *testing.T) {
-	t.Parallel()
-
-	ran := ledgerOf("assets.feature", minimumScenarios)
-
-	shortfalls := ran.shortfalls([]string{"assets.feature", "sous-repertoire/silencieux.feature"})
-
-	require.Len(t, shortfalls, 1,
-		"un `.feature` présent que la suite n'ouvre jamais — mal nommé, mal rangé, filtré par un tag — "+
-			"est un comportement décrit que personne n'exerce")
-	assert.Contains(t, shortfalls[0], "sous-repertoire/silencieux.feature")
-}
-
-func TestTheLedgerIsSilentOnAFullyExercisedCorpus(t *testing.T) {
-	t.Parallel()
-
-	ran := ledgerOf("assets.feature", minimumScenarios)
-
-	assert.Empty(t, ran.shortfalls([]string{"assets.feature"}),
-		"un corpus entièrement exercé n'a rien à se reprocher")
-}
-
-// `Paths: ["."]` descend dans les sous-répertoires, là où un glob `*.feature` ne voit que le
-// répertoire courant : l'exigence doit couvrir exactement ce que godog exécute.
-func TestFeatureFilesAreFoundInSubdirectoriesToo(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(root, "sous-repertoire"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(root, "racine.feature"), nil, 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(root, "sous-repertoire", "range.feature"), nil, 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(root, "pas-un-scenario.go"), nil, 0o644))
-
-	features, err := featureFiles(root)
-
-	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"racine.feature", "sous-repertoire/range.feature"}, features,
-		"un `.feature` rangé dans un sous-répertoire tournerait sans que personne n'exige qu'il tourne")
-}
-
-func ledgerOf(feature string, scenarios int) *scenarioLedger {
-	return &scenarioLedger{byFile: map[string]int{feature: scenarios}, executed: scenarios}
-}
 
 func initializeScenario(ctx *godog.ScenarioContext) {
 	p := &process{}
@@ -412,7 +201,7 @@ func completeConfiguration() map[string]string {
 type process struct {
 	env      map[string]string
 	cmd      *exec.Cmd
-	output   *syncBuffer
+	output   *bddtest.SyncBuffer
 	exited   chan error
 	addr     string
 	received *response
@@ -473,7 +262,7 @@ func (p *process) start() error {
 		p.env = completeConfiguration()
 	}
 
-	p.output = &syncBuffer{}
+	p.output = &bddtest.SyncBuffer{}
 	p.cmd = exec.Command(dashboardBinary)
 	p.cmd.Env = environment(p.env)
 	p.cmd.Stdout = p.output
@@ -858,25 +647,4 @@ func environment(vars map[string]string) []string {
 	}
 
 	return env
-}
-
-// Le process écrit depuis sa propre goroutine pendant que les steps lisent : sans verrou, `-race`
-// signale la course avant même que le scénario n'échoue.
-type syncBuffer struct {
-	mu       sync.Mutex
-	contents strings.Builder
-}
-
-func (b *syncBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.contents.Write(p)
-}
-
-func (b *syncBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.contents.String()
 }
