@@ -168,7 +168,8 @@ jobs:
       - uses: ./.github/actions/setup
       - run: make vuln-web
 
-  # Le second job à avoir les **deux** toolchains — « Tests Go » est l'autre — et le seul à exercer
+  # L'un des trois jobs à avoir les **deux** toolchains — « Tests Go » et « Parcours de bout en
+  # bout » sont les autres — et le seul à exercer
   # `make build`, la chaîne complète : `build-web` → purge de `internal/webassets/dist/` → copie →
   # `build-go`. Jusqu'ici aucun runner ne la traversait : « Build Go » appelle `build-go`, les autres
   # jobs Go ne compilent rien de destiné à être livré, et ce job-ci s'arrêtait à

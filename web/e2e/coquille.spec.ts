@@ -12,7 +12,9 @@ import { expect, test } from '@playwright/test'
  * suivantes tombent, « element(s) not found ». C'est exactement le défaut qu'aucune autre porte ne
  * voit.
  *
- * Les quatre autres parcours de `plan.md` §17.4 arrivent chacun avec la step qui livre son écran.
+ * `plan.md` §17.4 pose « cinq parcours seulement » — un plafond, jamais une liste : ni lui ni la
+ * spécification n'en énumèrent un seul. Les suivants arriveront donc avec la step qui livre leur
+ * écran, et c'est elle qui les nommera ; les quatre restants ne sont pour l'instant qu'un budget.
  *
  * Ce que ce parcours n'observe pas : le contenu servi par `/api` ni l'ordonnancement du fallback SPA,
  * tenus par les scénarios `godog` ; ni l'égalité octet à octet entre ce que le binaire rend et la

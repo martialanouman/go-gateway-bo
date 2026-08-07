@@ -1,8 +1,10 @@
 package bddtest
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,6 +48,53 @@ func TestAContractWithoutOperationsIsRefusedRatherThanIgnored(t *testing.T) {
 	assert.Contains(t, err.Error(), "aucune opération")
 }
 
+// `operationId` est facultatif en OpenAPI, et `oapi-codegen` en synthétise un quand il manque : un
+// contrat qui en omet reste engendrable, donc `check-generated` reste vert. Empilées telles quelles,
+// deux opérations sans `operationId` entrent sous la même clé `""` et valider l'une marquerait
+// l'autre visitée — la porte serait verte sur une route qu'aucun scénario ne touche, c'est-à-dire sur
+// le trou qu'elle existe pour fermer.
+const uneOperationSansIdentifiant = `openapi: 3.1.0
+info: { title: contrat de test, version: 0.0.0 }
+paths:
+  /health:
+    get:
+      operationId: health
+      responses: { '200': { description: ok } }
+  /gateways:
+    post:
+      responses: { '201': { description: créé } }
+`
+
+func TestAnOperationWithoutAnOperationIDIsRefusedRatherThanCollapsed(t *testing.T) {
+	t.Parallel()
+
+	_, err := DeclaredOperations(contractFile(t, uneOperationSansIdentifiant))
+
+	require.Error(t, err)
+	assert.Containsf(t, err.Error(), "POST /gateways",
+		"le refus ne désigne pas l'opération : personne ne saura laquelle nommer — %v", err)
+}
+
+func TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice(t *testing.T) {
+	t.Parallel()
+
+	var contract strings.Builder
+
+	contract.WriteString("openapi: 3.1.0\ninfo: { title: ordre, version: 0.0.0 }\npaths:\n")
+
+	for _, operationID := range []string{"zeta", "delta", "alpha", "omega", "beta", "gamma"} {
+		fmt.Fprintf(&contract, "  /%s:\n    get:\n      operationId: %s\n"+
+			"      responses: { '200': { description: ok } }\n", operationID, operationID)
+	}
+
+	declared, err := DeclaredOperations(contractFile(t, contract.String()))
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"alpha", "beta", "delta", "gamma", "omega", "zeta"}, declared,
+		"l'ordre est celui d'une map Go : ce que la porte reproche changerait d'une exécution à "+
+			"l'autre, et deux sorties du même défaut ne se compareraient plus")
+}
+
 func TestTheOperationLedgerNamesWhatNoScenarioVisited(t *testing.T) {
 	t.Parallel()
 
@@ -75,8 +124,32 @@ func TestTheOperationLedgerIsSilentWhenEveryOperationWasVisited(t *testing.T) {
 func TestARunFilterStandsTheContractGateDown(t *testing.T) {
 	t.Parallel()
 
-	(&OperationLedger{}).requireEveryOperationVisited(t, contractFile(t, deuxOperations),
+	stoodDown := &recordedT{}
+
+	(&OperationLedger{}).requireEveryOperationVisited(stoodDown, contractFile(t, deuxOperations),
 		"TestScenarios/la_sonde_de_vivacité")
+
+	assert.Empty(t, stoodDown.errors,
+		"la porte accuse celui qui débogue un scénario seul d'avoir livré des routes sans filet")
+	assert.NotEmpty(t, stoodDown.logs,
+		"la porte se retire sans le dire : rien ne signale qu'elle ne mord plus, et on la croira active")
+}
+
+// Même fil, même trou : `unvisited` nomme les opérations sans scénario, et c'est la boucle de
+// `requireEveryOperationVisited` qui les rapporte. Le remplacer par `_ = l.unvisited(declared)`
+// laissait la couverture du contrat entièrement muette sans qu'un seul test le dise.
+func TestTheContractGateReportsItsUnvisitedOperationsToTheTest(t *testing.T) {
+	t.Parallel()
+
+	reported := &recordedT{}
+
+	(&OperationLedger{}).requireEveryOperationVisited(reported, contractFile(t, deuxOperations), "")
+
+	require.Empty(t, reported.fatals,
+		"le contrat n'a pas été lu : le silence qui suit ne dirait rien de la porte")
+	assert.Len(t, reported.errors, 2,
+		"les deux opérations du contrat n'ont aucun scénario et la porte se tait : elle lit le "+
+			"contrat pour personne")
 }
 
 func contractFile(t *testing.T, body string) string {

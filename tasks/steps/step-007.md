@@ -13,6 +13,17 @@ intention.
   contexte de scénario, et fabriques alimentées par les types du contrat. *(Le lanceur lui-même et sa
   convention d'emplacement sont livrés par **step-000** — voir l'amendement qui y est noté : la boucle
   impose le scénario rouge d'abord, donc step-000 ne pouvait pas attendre celle-ci.)*
+  **Amendement du 03/08/2026 — trois des quatre livrables de cette ligne ne sont pas livrés, et DN-1
+  dit ce qui l'est à leur place.** Aucune **définition de step** n'est partagée : vérifié, les trois
+  suites n'en ont aucune en commun — `cmd/dashboard` pilote un process, `internal/gateway` un client
+  sortant, `internal/store` un schéma. Il n'y a rien à extraire, et extraire par anticipation
+  fabriquerait l'abstraction que le troisième cas fait naître, pas le premier. Pas de **contexte de
+  scénario** partagé non plus : la convention du dépôt est une struct par scénario, propre au package
+  qui la décrit, et c'est elle qui garantit que rien ne fuit d'un scénario à l'autre. Pas de
+  **fabriques alimentées par les types du contrat** : le contrat du BFF déclare une opération et un
+  schéma à deux champs — il n'y a pas de quoi fabriquer. **Déclencheur de reprise** : la première step
+  qui écrit une définition de step déjà présente ailleurs, ou le premier contrat assez large pour
+  qu'une fabrique épargne quelque chose.
 - **testcontainers** : la *réutilisation entre suites* plutôt qu'un conteneur recréé à chaque test.
   *(L'outil lui-même est introduit par **step-005**, qui ne peut pas tester ses migrations sans base
   réelle — arbitré le 02/08/2026. Elle en livre la forme minimale, un conteneur par suite ; ce qui
@@ -98,9 +109,12 @@ package dans les fichiers serait rendu toujours vrai par un commentaire ou un ho
 existe déjà — `TestOnlyGeneratedCodeServesTheAPIRoutes` (`internal/bff/router_test.go`) résout des
 symboles plutôt que des chaînes.
 
-Ce qui entre dans le package est ce qui est **aujourd'hui dupliqué**, et rien de plus : le registre de
-scénarios, l'énumération des `.feature`, la lecture du filtre `-run`, le tampon de sortie concurrent,
-la racine du dépôt. Mesuré : `syncBuffer`, `runFilter` et `featureFiles` sont copiés littéralement
+Ce qui entre dans le package est ce qui est **aujourd'hui dupliqué** — le registre de scénarios,
+l'énumération des `.feature`, la lecture du filtre `-run`, le tampon de sortie concurrent, la racine
+du dépôt — **plus la seule brique neuve de la step, le registre d'opérations de DN-2**, qui n'était
+dupliquée nulle part et n'existait pas. Elle y vit parce qu'elle est du harnais et qu'elle partage le
+désarmement sous `-run` avec le registre de scénarios ; elle est le seul ajout, et c'est délibéré.
+Mesuré : `syncBuffer`, `runFilter` et `featureFiles` sont copiés littéralement
 entre `cmd/dashboard` et `internal/gateway` ; `repositoryRoot` existe en **deux implémentations
 divergentes** (`git rev-parse` dans l'une, remontée des `..` jusqu'à un `go.mod` dans l'autre) ; et le
 registre existe en **trois variantes**, dont celle d'`internal/store` n'a ni couverture par fichier ni
@@ -122,6 +136,18 @@ est une brique de `internal/bddtest` (DN-1).
 Elle se désarme sous un filtre `-run` qui coupe dans les scénarios, exactement comme le registre de
 `.feature` : `TestingT: t` fait de chaque scénario un sous-test, et un filtre partiel ferait accuser
 la porte à tort.
+
+> **Correction du 03/08/2026, après revue.** Le paragraphe ci-dessus affirmait que la porte « ne
+> devient falsifiable qu'ici ». **C'est faux, et il faut le dire** : `api/openapi-bff.yaml` déclare
+> toujours **une** opération, couverte par **un** scénario — exactement la configuration que ce même
+> paragraphe décrit comme rédhibitoire. La porte est donc verte par construction aujourd'hui, et elle
+> ne mordra qu'à partir de la deuxième route.
+>
+> Ce qui reste vrai, et qui la justifie quand même : elle a été **vue mordre**, sur l'oubli réel
+> reproduit (une opération ajoutée au contrat, régénérée, sans scénario — voir le tableau des
+> mutations) ; et son câblage, lui, est gardé — retirer l'enregistrement de la visite dans
+> `responseMatchesTheContract` fait rougir `TestScenarios`. C'est un pari sur la route suivante, pas
+> une preuve sur celle-ci, et la formulation d'origine présentait le pari pour une preuve.
 
 ### DN-3 — L'amortissement de testcontainers n'a aucun utilisateur : rien n'est construit, et `WithReuse` est écarté nommément
 
@@ -181,8 +207,17 @@ ce que `scripts/check-ci-aggregator.py` vérifie déjà, et qui est donc le file
 > following command to download new browsers ». Un contrôle de plus dirait la même chose, moins bien.
 >
 > **Défaut trouvé au passage, et corrigé ici** : le motif de `make help` était `^[a-z-]+:`, qui ne
-> capte aucun nom de cible contenant un chiffre. `e2e` existait et n'était pas listée — or `make help`
-> « fait foi sur ce qui existe ». Le motif devient `^[a-z][a-z0-9-]*:`.
+> capte aucun nom de cible contenant un chiffre. `e2e` naissait dans cette step et n'aurait pas été
+> listée — or `make help` « fait foi sur ce qui existe ». Le motif devient `^[a-z][a-z0-9-]*:`.
+>
+> **Ce que la sortie de `check` crée, et qu'il faut nommer** (constat de revue, 03/08/2026) : une
+> **quatrième course**, hors de portée du `.NOTPARALLEL:` du Makefile, qui ne couvre qu'un seul
+> processus `make`. `make e2e` dans un terminal et `go test ./cmd/dashboard/` dans un autre se
+> disputent `internal/webassets/dist/`. Elle est écrite au-dessus de la cible, avec les trois autres.
+>
+> **Correction du 03/08/2026** : la première version de ce DN justifiait la sortie de `check` par « la
+> cible lie un port, celui que `make dev` occuperait ». **C'est faux** — `make dev` lie 3000 et 3001,
+> les parcours 3101, précisément pour cohabiter. Les deux vraies raisons sont celles écrites ci-dessus.
 
 Le harnais lance le **binaire** (`webServer` de Playwright sur `./bin/dashboard`), jamais `vite dev` :
 l'ordonnancement `/api` avant le fallback SPA, les en-têtes de cache et l'embarquement des assets
@@ -193,14 +228,27 @@ arrivent chacun avec la step qui livre son écran.
 
 L'`include` est ce qui porte le bénéfice réel : sans lui, le fournisseur v8 ne découvre pas les
 fichiers qu'aucun test n'a chargés, et un module orphelin est **absent** du rapport au lieu d'y figurer
-à zéro. Vérifié dans la source de Vitest (`packages/vitest/src/node/coverage.ts`) : `getUntestedFiles`
-rend `[]` tant que `coverage.include` est `undefined`. Et `perFile` **ne s'hérite pas** par motif
-(`docs/config/coverage.md`) : il se pose explicitement.
+à zéro. Vérifié dans la source de Vitest installée
+(`web/node_modules/vitest/dist/chunks/coverage.*.js`) : `getUntestedFiles` rend `[]` tant que
+`coverage.include` est `undefined`.
+
+> **Correction du 03/08/2026, après revue.** Ce paragraphe ajoutait « et `perFile` **ne s'hérite pas**
+> par motif (`docs/config/coverage.md`) ». La phrase existe — sur la branche `main` de Vitest, **pas
+> dans la version 4.1.10 que ce dépôt exécute**, dont la documentation ne dit rien de tel. Elle est
+> retirée plutôt que corrigée : la configuration livrée ne pose **aucun** seuil par motif, donc la
+> question de l'héritage ne se pose pas ici, et l'affirmation ne servait qu'à donner du poids à un
+> réglage qui se justifie tout seul (voir le tableau des mutations : `perFile` retiré laisse passer un
+> module orphelin d'une ligne).
 
 Sont exclus de l'`include` les fichiers **engendrés** (`*.gen.ts`) et `api.test-d.ts`, qui n'est
 exécuté par aucun runner — c'est `tsc --noEmit` qui le juge. Mesuré le 03/08/2026 sur `src/**` :
-`main.tsx`, `router.ts`, `routeTree.gen.ts` et `api.gen.ts` à 100 %, `__root.tsx` et `index.tsx` à
-75 %, `permissions.gen.ts` et `api.test-d.ts` à 0 %.
+`main.tsx`, `router.ts` et `routeTree.gen.ts` à 100 %, `__root.tsx` et `index.tsx` à 75 %,
+`permissions.gen.ts` et `api.test-d.ts` à 0 %.
+
+> **Correction du 03/08/2026.** Ce relevé donnait aussi `api.gen.ts` à 100 %. **Il est à 0 %** : c'est
+> un module de **types purs**, donc zéro instruction, et v8 rapporte `0/0` comme 0 %. Le chiffre écrit
+> argumentait contre la conclusion qu'il servait — c'est justement parce qu'un fichier sans instruction
+> ne peut pas atteindre un plancher qu'il doit être exclu.
 
 Les seuils sont des **planchers anti-régression**, jamais une cible : les 25 % manquants de
 `__root.tsx` et `index.tsx` sont des accolades fermantes et du commentaire dans la cartographie de v8,
@@ -226,6 +274,23 @@ ce que le produit n'a pas —, et cette discipline-là est bien tenue. La garde 
 qui livrera un `useQuery` sans provider monté dans l'application. **Renvoi** : c'est cette step-là qui
 monte le provider, dans le produit et non dans le harnais.
 
+### DN-9 — La borne de démarrage du binaire passe de 5 s à 30 s
+
+Ajouté le 03/08/2026, après un flottement observé pendant la step et un constat de revue : le
+correctif n'existait que dans un message de commit, alors que c'est un changement de comportement du
+harnais — la borne qui décide si le binaire est en panne.
+
+Observé sur un `go test -race ./...` : un scénario est tombé sur « le serveur n'a pas annoncé son
+adresse d'écoute » avec un journal **vide**, le binaire n'ayant rien écrit en 5 s pendant que dix
+paquets compilaient et tournaient de front. La même suite lancée seule passait, et le passage suivant
+sur l'arbre entier aussi. La borne visait un démarrage parti en vrille et attrapait une machine
+occupée — même arbitrage que `prismStartup` dans `internal/gateway`, qui porte déjà 30 s pour cette
+raison.
+
+Aucun test ne rougit si la valeur revient à 5 s, ce qui a été vérifié plutôt que supposé : le défaut
+ne se reproduit que sous une charge qu'aucune porte ne fabrique. C'est écrit au-dessus de la ligne
+concernée, comme le critère 4 l'exige.
+
 ### DN-8 — Étant donné / Quand / Alors est une convention d'écriture, pas une réécriture des tests existants
 
 Les quatre fichiers de test client existants nomment leurs `describe`/`it` par des phrases françaises
@@ -234,8 +299,17 @@ gagnée, et sortirait du périmètre. La convention s'applique aux tests que cet
 
 ## Tests (écrits dans la même PR)
 - Le scénario de `/api/health` passe, et **casser le handler le fait rougir** — la vérification qui
-  prouve que le harnais est branché.
-- Un `.feature` dont une step n'est pas définie fait échouer la suite.
+  prouve que le harnais est branché. *(Déjà établi par step-004, dont le tableau de mutations porte
+  « le handler rend un statut hors de l'enum → le scénario, sur la validation ». Cette step ne le
+  rejoue pas ; elle en ajoute une voisine — l'enregistrement de la visite retiré, ci-dessous.)*
+- Un `.feature` dont une step n'est pas définie fait échouer la suite. *(Constat du 03/08/2026 :
+  **aucune preuve n'existe dans le dépôt**, et cette ligne l'affirmait sans en avoir. `Strict: true`
+  est bien posé dans les trois suites, et la lecture de `godog@v0.16.0/suite.go` montre que
+  `shouldFail` rend `s.strict` sur `ErrUndefined` — mais c'est une lecture de source, pas une porte :
+  aucun test ne rougirait si `Strict` disparaissait des trois `godog.Options`. Écrit ici plutôt que
+  couvert par un test de complaisance ; le fermer demande un `.feature` volontairement orphelin, que
+  le registre de corpus ferait alors rougir pour une autre raison — c'est ce nœud qu'il faudra
+  démêler.)*
 - Un test de composant Vitest tourne sur `web/` et échoue quand le composant change.
 - Le parcours Playwright ouvre l'application **servie par le binaire** et voit le squelette puis le
   contenu.
@@ -275,6 +349,9 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | Parcours : `data-skeleton="rail"` retiré du document servi | le parcours tombe sur la première assertion — `expect(received).toContain(expected)` |
 | Parcours : l'asset embarqué remplacé par un `throw`, binaire recompilé | le document servi reste correct et la **première** assertion passe ; les suivantes tombent, « element(s) not found ». C'est ce que le parcours prouve en propre, et qu'aucune autre porte ne voit |
 | `PLAYWRIGHT_BROWSERS_PATH` pointé sur un répertoire vide | Playwright **échoue** et imprime le remède (« Please run the following command to download new browsers ») — il ne saute pas. C'est ce qui dispense la cible `make e2e` d'un contrôle préalable |
+| Couverture du contrat : l'enregistrement de la visite retiré de `responseMatchesTheContract` | `TestScenarios` — « l'opération "health" est déclarée au contrat et aucun scénario ne valide sa réponse contre lui ». Le câblage est gardé, même quand la porte est verte par construction |
+| Couverture client : `main.test.tsx` retiré de la suite | `main.tsx` **et** `router.ts` rougissent nommément — la preuve que le seuil `perFile` contraint quatre fichiers et non deux, contre un constat de revue qui affirmait le contraire |
+| Agrégateur de CI : `build-web` retiré du `needs:` de `ci`, **avant** correction du script | **rien ne rougit** — `check-ci-aggregator.py` rendait 0. C'est le faux négatif que le second `needs:` du workflow a rendu réel, et le rouge qui a précédé sa correction |
 
 ## Hors périmètre
 Les scénarios métier — chacun arrive avec sa step. L'audit d'accessibilité automatisé → step-185.

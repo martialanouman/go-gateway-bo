@@ -104,7 +104,7 @@ make vuln-web          # pnpm audit
 make check-routes      # l'arbre de routes commité est-il à jour et régénéré ?
 make check-generated   # ce qui dérive des deux contrats OpenAPI est-il à jour et régénéré ?
 make test / make lint  # les composites des deux toolchains
-# `pnpm -C web e2e` — cible, arrive avec le harnais Playwright de step-007
+make e2e               # les parcours Playwright, contre le binaire — hors de `make check`
 ```
 
 Les linters passent par `go tool` et sont épinglés dans `go.mod` : rien à installer
@@ -263,8 +263,9 @@ Une **step = une PR**. Prendre le prochain fichier de `tasks/steps/` — **l'ord
 scénario rouge d'abord**, puis déplacer le fichier dans `tasks/steps/done/` en dernier commit.
 
 Les portes de qualité tournent en **jobs parallèles** — cinq portes Go, cinq portes client, dont la
-dernière a aussi la toolchain Go et construit le **déployable**. Deux jobs ont les deux toolchains :
-celui-là, et « Tests Go », dont les scénarios lancent le mock Prism sur le contrat installé. Une porte
+dernière a aussi la toolchain Go et construit le **déployable**. Trois jobs ont les deux toolchains :
+celui-là, « Tests Go », dont les scénarios lancent le mock Prism sur le contrat installé, et
+« Parcours de bout en bout », qui construit le binaire pour l'exercer dans un navigateur. Une porte
 qui échoue n'empêche pas les autres de rendre leur verdict : on voit une erreur de compilation Go *et*
 un test client rouge au même run. La protection de branche
 exige le seul check **`CI`**, qui les agrège et reste valable quand une porte s'ajoute — mais en

@@ -25,21 +25,27 @@ def main() -> int:
 
     # Les noms à deux espaces d'indentation n'appartiennent à `jobs:` que sous cette section : ailleurs
     # ce sont les déclencheurs de `on:`, et `push` s'y faisait prendre pour un job.
+    #
+    # Le `needs:` se lit **dans le bloc de l'agrégateur**, et nulle part ailleurs. La version d'avant
+    # les collectait tous, ce qui était sans effet tant que le workflow n'en portait qu'un : le job
+    # `e2e` a introduit le second, et un job cité par un autre job passait alors pour attendu par
+    # l'agrégateur. Mesuré le 03/08/2026 en retirant `build-web` de la liste de `ci` — le seul job qui
+    # exerce la chaîne complète et le contrôle du binaire aurait pu échouer sans bloquer une PR, et
+    # cette porte rendait 0.
     in_jobs = False
+    in_aggregator = False
     jobs: set[str] = set()
+    needed: set[str] = set()
     for line in lines:
         if re.match(r"^[a-z]", line):
             in_jobs = line.startswith("jobs:")
+            in_aggregator = False
         elif in_jobs and (m := JOB.match(line)):
             jobs.add(m.group(1))
+            in_aggregator = m.group(1) == AGGREGATOR
+        elif in_aggregator and (m := NEEDS.match(line)):
+            needed |= {name.strip() for name in m.group(1).split(",") if name.strip()}
     jobs -= {AGGREGATOR}
-    needed = {
-        name.strip()
-        for line in lines
-        if (m := NEEDS.match(line))
-        for name in m.group(1).split(",")
-        if name.strip()
-    }
 
     if not jobs:
         print(f"{WORKFLOW.name} : aucun job trouvé — le format a changé, cette porte ne garde plus rien")

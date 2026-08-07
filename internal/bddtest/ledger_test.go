@@ -1,6 +1,7 @@
 package bddtest
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,9 +20,15 @@ const floor = 8
 func TestARunFilterStandsTheCorpusFloorDown(t *testing.T) {
 	t.Parallel()
 
-	// Registre vide, comme après un `-run 'TestScenarios/aucun_nom_ne_correspond'`. Si la porte
-	// mordait encore, c'est ce test-ci qui tomberait.
-	(&Ledger{}).requireCorpusExercised(t, ".", floor, "TestScenarios/une_URL_collée")
+	// Registre vide, comme après un `-run 'TestScenarios/aucun_nom_ne_correspond'`.
+	stoodDown := &recordedT{}
+
+	(&Ledger{}).requireCorpusExercised(stoodDown, ".", floor, "TestScenarios/une_URL_collée")
+
+	assert.Empty(t, stoodDown.errors,
+		"la porte accuse celui qui débogue un scénario seul d'avoir fait fondre le corpus")
+	assert.NotEmpty(t, stoodDown.logs,
+		"la porte se retire sans le dire : rien ne signale qu'elle ne mord plus, et on la croira active")
 }
 
 // La porte ne se retire que devant un filtre qui coupe vraiment dans les scénarios. `-test.run`
@@ -110,3 +117,43 @@ func TestFeatureFilesAreFoundInSubdirectoriesToo(t *testing.T) {
 func ledgerOf(feature string, scenarios int) *Ledger {
 	return &Ledger{byFile: map[string]int{feature: scenarios}, executed: scenarios}
 }
+
+// `shortfalls` calcule ce que le registre reproche ; c'est la boucle de `requireCorpusExercised` qui
+// le rapporte. Le calcul est testé au-dessus, le fil ne l'était nulle part : le remplacer par
+// `_ = l.shortfalls(...)` laissait `go test -race ./...` entièrement vert, plancher et couverture par
+// fichier supprimés en silence.
+func TestTheCorpusGateReportsItsShortfallsToTheTest(t *testing.T) {
+	t.Parallel()
+
+	reported := &recordedT{}
+
+	// Un registre vide contre un plancher : `.` est le répertoire de ce paquet, qui ne porte aucun
+	// `.feature` — seul le plancher a donc de quoi se plaindre.
+	(&Ledger{}).requireCorpusExercised(reported, ".", floor, "")
+
+	require.Len(t, reported.errors, 1,
+		"le registre a compté en silence : la porte calcule ce qu'elle reproche et ne le dit à personne")
+	assert.Contains(t, reported.errors[0], "plancher")
+}
+
+// recordedT capte ce qu'un registre rapporte, là où `*testing.T` le ferait tomber. `testing.TB` porte
+// une méthode privée et n'est pas implémentable ici ; `testingTB` ne nomme que les quatre méthodes que
+// les registres appellent.
+//
+// `Fatal` enregistre et rend la main, là où `testing.T.Fatal` sort de la goroutine : les deux tests
+// qui s'en servent n'atteignent pas cette branche, et un `Fatal` qui interromprait le calcul le
+// rendrait invisible plutôt que constatable.
+type recordedT struct {
+	errors []string
+	fatals []string
+	logs   []string
+}
+
+func (r *recordedT) Helper() {}
+
+func (r *recordedT) Logf(format string, args ...any) {
+	r.logs = append(r.logs, fmt.Sprintf(format, args...))
+}
+
+func (r *recordedT) Error(args ...any) { r.errors = append(r.errors, fmt.Sprint(args...)) }
+func (r *recordedT) Fatal(args ...any) { r.fatals = append(r.fatals, fmt.Sprint(args...)) }

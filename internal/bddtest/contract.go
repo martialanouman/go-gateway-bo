@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -43,13 +42,13 @@ func (l *OperationLedger) Visit(operationID string) {
 }
 
 // RequireEveryOperationVisited est ce qu'une suite appelle après `suite.Run()`.
-func (l *OperationLedger) RequireEveryOperationVisited(t *testing.T, contractPath string) {
+func (l *OperationLedger) RequireEveryOperationVisited(t testingTB, contractPath string) {
 	t.Helper()
 
 	l.requireEveryOperationVisited(t, contractPath, runFilter())
 }
 
-func (l *OperationLedger) requireEveryOperationVisited(t *testing.T, contractPath, runFilter string) {
+func (l *OperationLedger) requireEveryOperationVisited(t testingTB, contractPath, runFilter string) {
 	t.Helper()
 
 	if filtersScenarios(runFilter) {
@@ -92,9 +91,16 @@ func (l *OperationLedger) unvisited(declared []string) []string {
 // plutôt que dans le code engendré : le code engendré dirait ce que la génération a compris, et
 // c'est justement l'écart qu'on cherche.
 //
-// Un contrat sans opération est une **erreur** et non une exigence vide : un chemin qui ne pointe
-// plus au bon endroit, ou un document que le loader n'a pas su lire, rendrait la liste vide et la
-// porte serait verte sans avoir rien exigé.
+// Deux refus plutôt qu'une exigence vide ou faussement satisfaite.
+//
+// Un contrat **sans opération** vient d'un YAML valide dépourvu de `paths` — un chemin qui ne pointe
+// plus au bon endroit et un document illisible sont, eux, rendus par la branche d'erreur ci-dessus,
+// mesuré sur `kin-openapi@v0.144.0`. La liste vide rendrait la porte verte sans avoir rien exigé.
+//
+// Une opération **sans `operationId`** est légale : le champ est facultatif, et `oapi-codegen` en
+// synthétise un, donc rien en amont ne l'attrape. Empilées telles quelles, deux d'entre elles
+// entreraient sous la même clé `""` dans le registre des visites, et valider l'une marquerait
+// l'autre visitée — la porte serait verte sur une route sans scénario.
 func DeclaredOperations(contractPath string) ([]string, error) {
 	document, err := (&openapi3.Loader{Context: context.Background()}).LoadFromFile(contractPath)
 	if err != nil {
@@ -103,8 +109,14 @@ func DeclaredOperations(contractPath string) ([]string, error) {
 
 	var declared []string
 
-	for _, item := range document.Paths.Map() {
-		for _, operation := range item.Operations() {
+	for path, item := range document.Paths.Map() {
+		for method, operation := range item.Operations() {
+			if operation.OperationID == "" {
+				return nil, fmt.Errorf("%s déclare %s %s sans operationId : la couverture du contrat "+
+					"nomme les opérations, et celles qui n'ont pas de nom se confondraient — lui en "+
+					"donner un", contractPath, method, path)
+			}
+
 			declared = append(declared, operation.OperationID)
 		}
 	}

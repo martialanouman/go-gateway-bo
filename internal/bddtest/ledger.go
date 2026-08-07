@@ -4,8 +4,10 @@
 // de test partageable — un `foo_test` n'est importable de nulle part. Le langage ne l'empêche donc
 // pas d'entrer dans le binaire, et c'est une garde d'imports qui s'en charge.
 //
-// Le précédent est `net/http/httptest` : un paquet de la bibliothèque standard qui importe `testing`
-// et n'a de sens que sous un test.
+// Le précédent est `net/http/httptest` : un paquet **ordinaire** de la bibliothèque standard qui n'a
+// de sens que sous un test. Le précédent s'arrête là et ne dispense pas de la garde : `go list -f
+// '{{join .Imports " "}}' net/http/httptest` ne montre pas `testing` — il n'emporte donc rien de plus
+// dans un binaire qui l'importerait, là où ce paquet-ci emporte `testing`, `godog` et `testify`.
 package bddtest
 
 import (
@@ -16,10 +18,21 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"testing"
 
 	"github.com/cucumber/godog"
 )
+
+// testingTB est ce que les deux registres appellent sur le `*testing.T` qu'une suite leur passe, et
+// rien de plus. `testing.TB` ne conviendrait pas : sa méthode privée interdit toute implémentation
+// hors du paquet `testing`, donc aucun test ne pourrait observer ce que le registre rapporte. Le fil
+// entre le calcul et `t.Error` resterait alors le seul morceau que rien ne tue — le retirer laissait
+// la suite entière verte.
+type testingTB interface {
+	Helper()
+	Logf(format string, args ...any)
+	Error(args ...any)
+	Fatal(args ...any)
+}
 
 // Ledger note ce que la suite a réellement exécuté. `godog` ne pose aucun plancher : `Paths` qui ne
 // trouve rien rend une suite vide et **réussie**, et `Strict` ne couvre que les steps non définies
@@ -58,13 +71,13 @@ func (l *Ledger) Watch(ctx *godog.ScenarioContext) {
 // RequireCorpusExercised est ce qu'une suite appelle après `suite.Run()`. Le plancher vient de
 // l'appelant : les trois suites du dépôt n'ont pas le même corpus, et un plancher partagé serait
 // celui de la plus petite — c'est-à-dire aucun.
-func (l *Ledger) RequireCorpusExercised(t *testing.T, root string, minimum int) {
+func (l *Ledger) RequireCorpusExercised(t testingTB, root string, minimum int) {
 	t.Helper()
 
 	l.requireCorpusExercised(t, root, minimum, runFilter())
 }
 
-func (l *Ledger) requireCorpusExercised(t *testing.T, root string, minimum int, runFilter string) {
+func (l *Ledger) requireCorpusExercised(t testingTB, root string, minimum int, runFilter string) {
 	t.Helper()
 
 	// `TestingT: t` fait de chaque pickle un sous-test, et `t.Run` rend `true` sans exécuter sa closure
@@ -139,7 +152,10 @@ func FeatureFiles(root string) ([]string, error) {
 }
 
 // runFilter rend le motif que `-run` a posé, vide quand la suite tourne en entier. `test.run` est
-// enregistré par `testing.Init`, que `m.Run` appelle : il existe donc quand un test s'exécute.
+// enregistré par `testing.Init`, qu'appelle `testing.MainStart` — donc le `_testmain.go` qu'engendre
+// `go test`, avant que quoi que ce soit du binaire ne tourne. Le drapeau existe dès qu'un test
+// s'exécute, y compris sous un `TestMain` qui n'appellerait jamais `m.Run`
+// (`$(go env GOROOT)/src/testing/testing.go`).
 func runFilter() string {
 	filter := flag.Lookup("test.run")
 	if filter == nil {

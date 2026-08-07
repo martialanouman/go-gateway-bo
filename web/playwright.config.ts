@@ -10,6 +10,15 @@ export default defineConfig({
   // runner qui va avec.
   testDir: './e2e',
 
+  // Un `test.only` oublié ne rougit pas, il rend **vert** sur un seul parcours : `filterOnly()`
+  // — `playwright/lib/common/index.js` en 1.62.0 — ne garde du plan que les entrées portant `_only`.
+  // Le défaut de Playwright étant `false`, rien ne le dirait. Un seul parcours existe aujourd'hui, la
+  // porte doit donc précéder ceux qui rendront le silence coûteux. Mesuré le 03/08/2026 sur un
+  // `.only` temporaire : `playwright test --list` rend 0 sans `CI`, et 1 avec `CI=1`, sur « item
+  // focused with '.only' is not allowed ». Conditionné à `CI` : `.only` reste l'outil d'itération
+  // normal en local.
+  forbidOnly: !!process.env.CI,
+
   // La CI ne réessaie pas : un parcours instable doit se voir tout de suite. Le jour où l'un d'eux
   // clignotera, c'est le parcours qu'il faudra corriger, pas le compteur de reprises.
   retries: 0,
@@ -20,9 +29,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
 
-  // Chromium seul. Les cinq parcours de la spécification décrivent un outil interne desktop-first, dont
-  // le parc est connu : multiplier les moteurs multiplierait le temps de CI sans décrire un risque que
-  // ce produit court.
+  // Chromium seul. Le produit est un outil interne au parc connu (`CLAUDE.md` : « desktop-first ») :
+  // multiplier les moteurs multiplierait le temps de CI sans décrire un risque qu'il court.
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
   webServer: {
@@ -31,9 +39,14 @@ export default defineConfig({
     // construit avant d'arriver ici.
     command: '../bin/dashboard',
     url: `http://127.0.0.1:${port}/`,
-    // Jamais de réutilisation, même en local : un serveur déjà lancé sert des assets embarqués à une
-    // autre version que celle qu'on vient de construire, et le parcours dirait vert d'un binaire qu'il
-    // n'a pas exercé. Le port dédié ci-dessus est ce qui rend ce refus tenable.
+    // Ce que ce `false` tient exactement : `_startProcess` (`playwright/lib/runner/index.js` en
+    // 1.62.0) sonde l'URL et, si elle répond déjà, **jette** au lieu de s'y raccrocher — les parcours
+    // n'exerceront jamais un serveur qu'ils n'ont pas lancé. Le port dédié ci-dessus rend ce refus
+    // tenable en local.
+    //
+    // Ce qu'il ne tient pas : la fraîcheur du binaire. `command` lance `../bin/dashboard` tel qu'il
+    // est sur le disque, donc un `pnpm e2e` direct exercerait un déployable périmé sans le dire. La
+    // garantie appartient à `make e2e`, qui dépend de `build`.
     reuseExistingServer: false,
     stdout: 'pipe',
     stderr: 'pipe',

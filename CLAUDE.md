@@ -38,6 +38,8 @@ make migrate      # migrations goose sur DASHBOARD_DATABASE_URL — celle de l'a
 #   lint-workflows (actionlint + l'agrégateur attend-il tous les jobs ?)
 #   typecheck-web (tsc) · test-web (Vitest) · lint-web (Biome) · vuln-web (pnpm audit)
 #   check-routes + check-generated + build + le contrôle du binaire → « Build client et déployable »
+#   e2e (Playwright contre le binaire) → « Parcours de bout en bout » — hors de `make check`, seule
+#     porte dans ce cas avec le contrôle du binaire ci-dessus
 ```
 
 `make check` enchaîne les portes que la CI lance en **jobs parallèles** — il n'y a donc pas d'ordre à
