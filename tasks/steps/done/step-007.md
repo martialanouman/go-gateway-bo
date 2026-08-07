@@ -326,10 +326,31 @@ gagnée, et sortirait du périmètre. La convention s'applique aux tests que cet
   binaire et la garde n'est qu'une phrase.
 
 ## Definition of Done
-- [ ] `make check` vert et enchaîne les deux suites
-- [ ] la CI a ses deux jobs et le job de bout en bout dépend du build
-- [ ] les mutations ci-dessus ont été **jouées**, pas supposées — celle de la porte de couverture
-      comprise
+- [x] `make check` vert et enchaîne les deux suites — onze prérequis (`Makefile:193`), dont `test-go`
+      (godog + `-race`) et `test-web` (Vitest). `make e2e` reste dehors, par DN-5.
+- [x] la CI a ses deux jobs et le job de bout en bout dépend du build — onze jobs hors agrégateur ;
+      `e2e` porte `needs: [build-web]` et figure dans le `needs:` de `ci`, ce que
+      `scripts/check-ci-aggregator.py` vérifie. Ce script a lui-même été vu rendre un faux négatif
+      avant correction (dernière ligne du tableau).
+- [x] les mutations ci-dessus ont été **jouées**, pas supposées — celle de la porte de couverture
+      comprise, et dans les **deux** formes que DN-2 distingue : opération sans scénario, puis
+      opération avec un scénario qui l'appelle sans confronter sa réponse au contrat.
+
+**Les quatre critères transverses.**
+
+1. *Le chemin qu'un humain traverse.* `web/e2e/coquille.spec.ts`, contre le **binaire**, rien de
+   simulé dans le produit. Il a prouvé en propre ce qu'aucune autre porte ne voit : l'asset embarqué
+   remplacé par un `throw`, le document servi reste correct et seules les assertions de rendu tombent.
+2. *Toute affirmation confrontée à sa source.* C'est le critère qui a coûté le plus cher ici — trois
+   lots de correctifs, et **chacun** a introduit une affirmation fausse que le suivant a trouvée. Le
+   dernier en date était une probabilité que je présentais comme mesurée et que ma propre mesure,
+   écrite deux lignes plus haut, réfutait. Voir l'encadré du 07/08/2026 sous le tableau.
+3. *Mutation partout où le retrait laisserait la suite verte.* Le tableau ci-dessous, dont les
+   **quatre** lignes qui disent « rien ne rougit » comptent autant que les autres.
+4. *Ce qui n'est pas testable écrit là où il vit.* Deux endroits : `Strict: true` des trois
+   `godog.Options` — posé dans les trois suites, et aucun test ne rougirait s'il disparaissait, ce que
+   dit la section Tests — et le `return` après `t.Fatal` côté contrat, dont le commentaire de
+   `contract.go` porte le constat, vérifié par mutation et non supposé.
 
 ## Tableau des mutations
 
@@ -356,24 +377,32 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | `PLAYWRIGHT_BROWSERS_PATH` pointé sur un répertoire vide | Playwright **échoue** et imprime le remède (« Please run the following command to download new browsers ») — il ne saute pas. C'est ce qui dispense la cible `make e2e` d'un contrôle préalable |
 | Couverture du contrat : l'enregistrement de la visite retiré de `responseMatchesTheContract` | `TestScenarios` — « l'opération "health" est déclarée au contrat et aucun scénario ne valide sa réponse contre lui ». Le câblage est gardé, même quand la porte est verte par construction |
 | Couverture client : `main.test.tsx` retiré de la suite | `main.tsx` **et** `router.ts` rougissent nommément — la preuve que le seuil `perFile` contraint quatre fichiers et non deux, contre un constat de revue qui affirmait le contraire |
-| Contrat : tri d'`unnamed` retiré (le refus des opérations sans `operationId`) | `TestTheRefusalNamesThemInTheSameOrderTwice` — **10 échecs sur 10**, et seulement parce que le test relit vingt fois. Une lecture unique sortait triée par hasard **une fois sur deux** — mesuré à 0,5004 sur 200 000 tirages, la formule est (9−n)/8 et non 1/n. Voir la correction du 07/08/2026 ci-dessous |
-| Contrat : tri de `declared` retiré | `TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice` — 10 sur 10 **après** l'avoir fait relire vingt fois ; son nom promettait deux lectures et il n'en faisait qu'une, donc **trois faux verts sur huit** (0,3748 mesuré) |
+| Contrat : tri d'`unnamed` retiré (le refus des opérations sans `operationId`) | `TestTheRefusalNamesThemInTheSameOrderTwice` — **10 échecs sur 10**, et seulement parce que le test relit vingt fois. Une lecture unique sortait juste **une fois sur trois** (0,3111 mesuré sur 20 000 lectures du chemin réel). Voir la correction du 07/08/2026 ci-dessous |
+| Contrat : tri de `declared` retiré | `TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice` — 10 sur 10 **après** l'avoir fait relire vingt fois ; son nom promettait deux lectures et il n'en faisait qu'une, donc **plus d'un faux vert sur cinq** (0,2208 mesuré) |
 | Contrat : retour au `return` sur la **première** opération sans `operationId` | `TestEveryOperationWithoutAnOperationIDIsNamed` — 10 sur 10. Première tentative écartée : un `break` qui sortait d'une boucle de méthodes dont chaque route n'a qu'un membre, donc équivalent au code correct — une mutation qui ne prouvait rien |
 | `bddtest` : `features, _ := FeatureFiles(root)` (le `t.Fatal` du corpus retiré) | `TestACorpusRootThatDoesNotExistIsSaidAndNotTakenForAnEmptyOne`. Ce test a d'abord rougi sur le code **correct** : `testingTB.Fatal` n'interrompt pas, et la porte enchaînait sur « 0 scénario(s) pour un plancher de 8 » — un message qui envoie écrire des scénarios déjà écrits |
 | `bddtest` : le `return` après `t.Fatal` retiré, côté **corpus** | le même test tombe |
 | `bddtest` : le `return` après `t.Fatal` retiré, côté **contrat** | **rien ne rougit** — `unvisited(nil)` ne reproche rien. Constat écrit sur place, vérifié et non supposé |
 | Agrégateur de CI : `build-web` retiré du `needs:` de `ci`, **avant** correction du script | **rien ne rougit** — `check-ci-aggregator.py` rendait 0. C'est le faux négatif que le second `needs:` du workflow a rendu réel, et le rouge qui a précédé sa correction |
 
-> **Correction du 07/08/2026, après la passe de clôture.** Les deux lignes de tri ci-dessus
-> annonçaient « une fois sur cinq » et « une fois sur six », présentés comme mesurés. Le nombre
-> d'ordres l'était — cinq et six — mais **pas leur probabilité**, et l'inférence « *n* ordres donc
-> 1/*n* » est fausse : les rotations ne sont pas équiprobables. L'offset de parcours se tire sur les
-> **huit** créneaux d'un groupe, et ceux qui dépassent le nombre de clés se rabattent tous sur le
-> premier — d'où (9−*n*)/8, soit **1/2** et **3/8**. Mesuré à 0,5004 et 0,3748 sur 200 000 tirages.
+> **Correction du 07/08/2026 — le même chiffre a été faux deux fois, et pour deux raisons
+> différentes.** Il justifie la forme des deux tests d'ordre, qui relisent vingt fois au lieu d'une.
 >
-> Le chiffre faux contredisait une observation écrite deux lignes plus haut, et personne ne l'a vu :
-> la mutation « tri retiré » tombait *trois exécutions sur cinq*, ce qui donne une détection de ~1/2
-> et non de 4/5. C'était la mesure qui réfutait la formule, dans le même paragraphe qu'elle.
+> **Première version.** « Une fois sur cinq », « une fois sur six » : le nombre d'ordres était mesuré,
+> leur probabilité non, et l'inférence « *n* ordres donc 1/*n* » suppose des rotations équiprobables
+> qu'elles ne sont pas. Le chiffre contredisait une observation écrite deux lignes plus haut dans le
+> même message — la mutation tombait *trois exécutions sur cinq*, ce qui donne ~1/2 et non 4/5.
+>
+> **Deuxième version.** (9−*n*)/8, soit 0,5004 et 0,3748 — cette fois-ci vraiment mesuré, mais **sur
+> autre chose que le système** : une map littérale peuplée dans l'ordre trié. Or `Paths.Map()`
+> **recopie** la map avant de la rendre (`maps.Copy`, `openapi3/maplike.go:308`), donc le chemin réel
+> compose **deux** randomisations. Mesuré cette fois par `LoadFromFile` + `Paths.Map()`, 20 000
+> lectures : **0,3111** et **0,2208**.
+>
+> Ce que la deuxième erreur apprend et que la première n'apprenait pas : une mesure juste sur un
+> proxy ne dit rien du système. Les deux fois, ce qui manquait n'était pas la rigueur du calcul mais
+> le fait de mesurer **ce qui tourne en vrai**. La conclusion pratique — relire vingt fois — n'a
+> jamais bougé : à 0,3111, vingt lectures laissent 7·10⁻¹¹ de faux vert.
 
 ## Hors périmètre
 Les scénarios métier — chacun arrive avec sa step. L'audit d'accessibilité automatisé → step-185.

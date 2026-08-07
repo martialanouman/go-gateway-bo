@@ -109,13 +109,16 @@ func TestEveryOperationWithoutAnOperationIDIsNamed(t *testing.T) {
 		"le refus n'en nomme qu'une partie — %v", err)
 }
 
-// Le tri se garde par la répétition, et non par une lecture comparée à l'ordre attendu. Un parcours
-// de map Go n'est pas une permutation quelconque : pour une map qui tient dans un groupe — huit
-// entrées — c'est une **rotation**, et cinq clés ne rendent que cinq ordres. Les rotations ne sont pas
-// équiprobables pour autant : l'offset se tire sur les **huit** créneaux du groupe, et ceux qui
-// dépassent le nombre de clés se rabattent sur le premier. Une lecture unique sort donc triée avec
-// probabilité (9−n)/8 — **une fois sur deux** ici, mesuré à 0,5004 sur 200 000 tirages. C'est ce qui
-// explique que la mutation « tri retiré » ne tombait que trois exécutions sur cinq.
+// Le tri se garde par la répétition, et non par une lecture comparée à l'ordre attendu : le tri
+// retiré, une lecture unique de ces quatre opérations sort quand même juste **une fois sur trois**
+// (0,3111 mesuré sur 20 000 lectures), et laisse la suite verte d'autant.
+//
+// Le chiffre a été mesuré deux fois, et la première ne valait rien : elle portait sur une map
+// littérale peuplée dans l'ordre trié, et donnait 0,5004. Le vrai chemin en diffère parce que
+// `Paths.Map()` **recopie** la map (`maps.Copy` dans une map neuve, `openapi3/maplike.go:308`) — deux
+// randomisations composées, pas une. Un parcours de map Go n'est pas non plus une permutation
+// quelconque : quatre éléments ne rendent que quatre ordres, jamais vingt-quatre. Aucun raisonnement
+// sur le runtime n'aurait donné le bon chiffre ; seule la mesure du chemin réel l'a donné.
 func TestTheRefusalNamesThemInTheSameOrderTwice(t *testing.T) {
 	t.Parallel()
 
@@ -147,8 +150,9 @@ func TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice(t *testing.T) 
 	file := contractFile(t, contract.String())
 
 	// Relu, et pas une seule fois : le nom de ce test promet deux lectures, et il n'en faisait qu'une.
-	// Le tri retiré, une lecture unique de ces six opérations sort juste **trois fois sur huit**
-	// (mesuré à 0,3748) — voir le test au-dessus pour d'où vient ce chiffre.
+	// Le tri retiré, une lecture unique de ces six opérations sort juste **plus d'une fois sur cinq**
+	// (0,2208 mesuré) — voir le test au-dessus pour comment ce chiffre a été obtenu, et pour la
+	// première mesure, fausse, qui portait sur autre chose que le chemin réel.
 	for range 20 {
 		declared, err := DeclaredOperations(file)
 
