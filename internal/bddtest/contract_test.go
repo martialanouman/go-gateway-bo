@@ -109,10 +109,13 @@ func TestEveryOperationWithoutAnOperationIDIsNamed(t *testing.T) {
 		"le refus n'en nomme qu'une partie — %v", err)
 }
 
-// Le tri se garde par la répétition, et non par une lecture comparée à l'ordre attendu. Mesuré : un
-// parcours de map Go n'est pas une permutation quelconque mais une **rotation** — 2000 parcours d'une
-// map à cinq clés ne rendent que cinq ordres distincts. Une lecture unique sort donc triée par hasard
-// une fois sur cinq, et la mutation « tri retiré » ne tombait que trois exécutions sur cinq.
+// Le tri se garde par la répétition, et non par une lecture comparée à l'ordre attendu. Un parcours
+// de map Go n'est pas une permutation quelconque : pour une map qui tient dans un groupe — huit
+// entrées — c'est une **rotation**, et cinq clés ne rendent que cinq ordres. Les rotations ne sont pas
+// équiprobables pour autant : l'offset se tire sur les **huit** créneaux du groupe, et ceux qui
+// dépassent le nombre de clés se rabattent sur le premier. Une lecture unique sort donc triée avec
+// probabilité (9−n)/8 — **une fois sur deux** ici, mesuré à 0,5004 sur 200 000 tirages. C'est ce qui
+// explique que la mutation « tri retiré » ne tombait que trois exécutions sur cinq.
 func TestTheRefusalNamesThemInTheSameOrderTwice(t *testing.T) {
 	t.Parallel()
 
@@ -144,8 +147,8 @@ func TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice(t *testing.T) 
 	file := contractFile(t, contract.String())
 
 	// Relu, et pas une seule fois : le nom de ce test promet deux lectures, et il n'en faisait qu'une.
-	// Six opérations rendent six ordres possibles — le tri retiré, une lecture unique tombait juste une
-	// fois sur six et laissait la suite verte d'autant.
+	// Le tri retiré, une lecture unique de ces six opérations sort juste **trois fois sur huit**
+	// (mesuré à 0,3748) — voir le test au-dessus pour d'où vient ce chiffre.
 	for range 20 {
 		declared, err := DeclaredOperations(file)
 

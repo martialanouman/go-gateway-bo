@@ -96,8 +96,9 @@ intention.
 
 ## Design arrêté (2026-08-03)
 
-Quatre de ces décisions **amendent le périmètre écrit ci-dessus** — DN-1, DN-3, DN-4 et DN-8 — et
-chacune porte la mesure qui l'a montré. La fiche a été écrite avant que step-000 à step-006 n'existent : une partie de ce qu'elle
+Cinq de ces décisions **amendent le périmètre écrit ci-dessus** — DN-1, DN-2, DN-3, DN-6 et DN-8 — et
+chacune porte la mesure qui l'a montré. DN-4, lui, périme un **piège** et non une ligne du périmètre.
+C'est la ligne amendée qui nomme son DN ; ce compte n'en est que le résumé, et il a déjà été faux. La fiche a été écrite avant que step-000 à step-006 n'existent : une partie de ce qu'elle
 demande a été livrée en chemin, et une autre partie décrit un bénéficiaire qui n'existe pas.
 
 ### DN-1 — Le harnais partagé vit dans `internal/bddtest/`, et une garde d'imports l'empêche d'entrer dans le produit
@@ -355,13 +356,24 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | `PLAYWRIGHT_BROWSERS_PATH` pointé sur un répertoire vide | Playwright **échoue** et imprime le remède (« Please run the following command to download new browsers ») — il ne saute pas. C'est ce qui dispense la cible `make e2e` d'un contrôle préalable |
 | Couverture du contrat : l'enregistrement de la visite retiré de `responseMatchesTheContract` | `TestScenarios` — « l'opération "health" est déclarée au contrat et aucun scénario ne valide sa réponse contre lui ». Le câblage est gardé, même quand la porte est verte par construction |
 | Couverture client : `main.test.tsx` retiré de la suite | `main.tsx` **et** `router.ts` rougissent nommément — la preuve que le seuil `perFile` contraint quatre fichiers et non deux, contre un constat de revue qui affirmait le contraire |
-| Contrat : tri d'`unnamed` retiré (le refus des opérations sans `operationId`) | `TestTheRefusalNamesThemInTheSameOrderTwice` — **10 échecs sur 10**. La forme du test vient d'une mesure : un parcours de map Go est une **rotation**, pas une permutation — 2000 parcours d'une map à cinq clés ne rendent que **cinq** ordres. Une lecture unique comparée à l'ordre attendu tombait juste une fois sur cinq |
-| Contrat : tri de `declared` retiré | `TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice` — 10 sur 10 **après** l'avoir fait relire vingt fois ; son nom promettait deux lectures et il n'en faisait qu'une, donc six ordres possibles et un faux vert sur six |
+| Contrat : tri d'`unnamed` retiré (le refus des opérations sans `operationId`) | `TestTheRefusalNamesThemInTheSameOrderTwice` — **10 échecs sur 10**, et seulement parce que le test relit vingt fois. Une lecture unique sortait triée par hasard **une fois sur deux** — mesuré à 0,5004 sur 200 000 tirages, la formule est (9−n)/8 et non 1/n. Voir la correction du 07/08/2026 ci-dessous |
+| Contrat : tri de `declared` retiré | `TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice` — 10 sur 10 **après** l'avoir fait relire vingt fois ; son nom promettait deux lectures et il n'en faisait qu'une, donc **trois faux verts sur huit** (0,3748 mesuré) |
 | Contrat : retour au `return` sur la **première** opération sans `operationId` | `TestEveryOperationWithoutAnOperationIDIsNamed` — 10 sur 10. Première tentative écartée : un `break` qui sortait d'une boucle de méthodes dont chaque route n'a qu'un membre, donc équivalent au code correct — une mutation qui ne prouvait rien |
 | `bddtest` : `features, _ := FeatureFiles(root)` (le `t.Fatal` du corpus retiré) | `TestACorpusRootThatDoesNotExistIsSaidAndNotTakenForAnEmptyOne`. Ce test a d'abord rougi sur le code **correct** : `testingTB.Fatal` n'interrompt pas, et la porte enchaînait sur « 0 scénario(s) pour un plancher de 8 » — un message qui envoie écrire des scénarios déjà écrits |
 | `bddtest` : le `return` après `t.Fatal` retiré, côté **corpus** | le même test tombe |
 | `bddtest` : le `return` après `t.Fatal` retiré, côté **contrat** | **rien ne rougit** — `unvisited(nil)` ne reproche rien. Constat écrit sur place, vérifié et non supposé |
 | Agrégateur de CI : `build-web` retiré du `needs:` de `ci`, **avant** correction du script | **rien ne rougit** — `check-ci-aggregator.py` rendait 0. C'est le faux négatif que le second `needs:` du workflow a rendu réel, et le rouge qui a précédé sa correction |
+
+> **Correction du 07/08/2026, après la passe de clôture.** Les deux lignes de tri ci-dessus
+> annonçaient « une fois sur cinq » et « une fois sur six », présentés comme mesurés. Le nombre
+> d'ordres l'était — cinq et six — mais **pas leur probabilité**, et l'inférence « *n* ordres donc
+> 1/*n* » est fausse : les rotations ne sont pas équiprobables. L'offset de parcours se tire sur les
+> **huit** créneaux d'un groupe, et ceux qui dépassent le nombre de clés se rabattent tous sur le
+> premier — d'où (9−*n*)/8, soit **1/2** et **3/8**. Mesuré à 0,5004 et 0,3748 sur 200 000 tirages.
+>
+> Le chiffre faux contredisait une observation écrite deux lignes plus haut, et personne ne l'a vu :
+> la mutation « tri retiré » tombait *trois exécutions sur cinq*, ce qui donne une détection de ~1/2
+> et non de 4/5. C'était la mesure qui réfutait la formule, dans le même paragraphe qu'elle.
 
 ## Hors périmètre
 Les scénarios métier — chacun arrive avec sa step. L'audit d'accessibilité automatisé → step-185.

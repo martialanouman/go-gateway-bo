@@ -266,12 +266,11 @@ Les portes de qualité tournent en **jobs parallèles** — onze, hors du check 
 client dont la dernière construit le **déployable**, et le parcours de bout en bout, qui n'est d'aucun
 des deux côtés. Trois d'entre eux ont les deux toolchains : le job du déployable, « Tests Go », dont
 les scénarios lancent le mock Prism sur le contrat installé, et « Parcours de bout en bout », qui
-construit le binaire pour l'exercer dans un navigateur. Une porte
-qui échoue n'empêche pas les autres de rendre leur verdict : on voit une erreur de compilation Go *et*
-un test client rouge au même run. La protection de branche
-exige le seul check **`CI`**, qui les agrège et reste valable quand une porte s'ajoute — mais en
-contrepartie, un job absent du `needs:` de l'agrégateur le laisserait vert : la liste se tient dans
-`ci.yml`, à côté des jobs.
+construit le binaire pour l'exercer dans un navigateur. Une porte qui échoue n'empêche pas les autres
+de rendre leur verdict : on voit une erreur de compilation Go *et* un test client rouge au même run.
+La protection de branche exige le seul check **`CI`**, qui les agrège et reste valable quand une porte
+s'ajoute — mais en contrepartie, un job absent du `needs:` de l'agrégateur le laisserait vert : la
+liste se tient dans `ci.yml`, à côté des jobs.
 
 Les conventions, invariants et la Definition of Done sont dans [`CLAUDE.md`](./CLAUDE.md) ; le cadre et
 l'ordre dans [`tasks/plan.md`](./tasks/plan.md) ; le quoi et le pourquoi dans

@@ -117,13 +117,14 @@ func DeclaredOperations(contractPath string) ([]string, error) {
 
 	for path, item := range document.Paths.Map() {
 		for method, operation := range item.Operations() {
+			// Un `else` plutôt qu'un `continue` : le `continue` n'était falsifiable par aucune
+			// mutation. Le retirer faisait empiler des `""` dans `declared`, que la fonction ne rend
+			// jamais quand `unnamed` n'est pas vide — zéro différence observable, toujours.
 			if operation.OperationID == "" {
 				unnamed = append(unnamed, method+" "+path)
-
-				continue
+			} else {
+				declared = append(declared, operation.OperationID)
 			}
-
-			declared = append(declared, operation.OperationID)
 		}
 	}
 
