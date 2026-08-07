@@ -12,9 +12,10 @@ WEBASSETS := internal/webassets/dist
 # génération le lit là où pnpm l'a installé. `internal/gateway/contrat_test.go` en fait une porte.
 #
 # C'est ce chemin qui range `generate` — et la porte qui la rejoue — du côté qui a les deux
-# toolchains. Deux jobs de la CI les ont : « Tests Go » et « Build client et déployable » ; les quatre
-# autres jobs Go n'ont pas `node_modules` et n'y trouveraient pas le contrat. La porte vit dans le
-# second, avec `check-routes`, l'autre porte de fichier engendré et commité.
+# toolchains. Trois jobs de la CI les ont : « Tests Go », « Build client et déployable » et
+# « Parcours de bout en bout » ; les autres jobs Go n'ont pas `node_modules` et n'y trouveraient pas
+# le contrat. La porte vit dans le deuxième, avec `check-routes`, l'autre porte de fichier engendré
+# et commité.
 CONTRACT_ADMIN := web/node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml
 ADMIN_CLIENT := internal/gateway/client.gen.go
 
@@ -79,7 +80,7 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 .DEFAULT_GOAL := help
 .PHONY: help build build-go build-web dev check test test-go test-web lint lint-go lint-web fmt-go \
         typecheck-web vuln-go vuln-web lint-workflows check-routes generate check-generated mock \
-        migrate clean generate-permissions
+        migrate clean generate-permissions e2e
 
 # Trois courses vivent entre les prérequis de `check` ; la deuxième ne se voit pas, la troisième est
 # la seule à rougir d'elle-même :
@@ -116,7 +117,7 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 .NOTPARALLEL:
 
 help: ## Liste les cibles disponibles
-	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-z][a-z0-9-]*:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # `build-go` est appelé par récursion et non déclaré en prérequis, et ce n'est pas qu'une affaire de
 # `-j` : un prérequis tourne **avant** la recette, dans tous les cas. Déclaré en prérequis, le
@@ -209,6 +210,24 @@ lint-web: ## Biome
 
 test-web: ## Vitest
 	pnpm -C web test
+
+# Hors de `check`, pour deux raisons que la fiche de step-007 arrête (DN-5) : la Definition of Done y
+# parle des **deux** suites, et l'inclure imposerait à tout poste d'avoir téléchargé les navigateurs.
+# Ce n'est **pas** un conflit de port : `dev` lie 3000 et 3001, les parcours 3101, choisi pour cela.
+#
+# Ce que la sortie de `check` crée en revanche, et qu'il faut nommer : une **quatrième course**, hors
+# de portée du `.NOTPARALLEL:` ci-dessus, qui ne couvre qu'un seul processus `make`. `make e2e` dans
+# un terminal et `go test ./cmd/dashboard/` dans un autre se disputent `$(WEBASSETS)` — le second y met
+# en scène ses fixtures d'assets pendant que le premier vient d'y copier la sortie de Vite. Le binaire
+# embarque alors la coquille du harnais et le parcours échoue en cherchant le squelette. Bruyant dans
+# ce sens, silencieux dans l'autre.
+#
+# Aucun contrôle préalable des navigateurs ici : Playwright échoue de lui-même et imprime le remède —
+# mesuré le 03/08/2026 en pointant `PLAYWRIGHT_BROWSERS_PATH` sur un répertoire vide, « Executable
+# doesn't exist at … Please run the following command to download new browsers ». Un contrôle de plus
+# dirait la même chose, moins bien.
+e2e: build ## Parcours Playwright, contre le binaire (:3101)
+	pnpm -C web e2e
 
 # `pnpm-workspace.yaml` porte tout un appareil de triage — `ignoreGhsas: []`, deux `overrides` — dont
 # aucune porte ne vérifiait qu'il tient encore. Le versant client est la moitié à la plus grosse
@@ -354,9 +373,10 @@ check-generated: ## Vérifie que tout le code engendré et commité est à jour 
 # Le mock sert le contrat **installé**, jamais une copie — même source que `generate`, donc même
 # garde : le contrat vient de GitHub Packages et n'existe pas dans un arbre où `pnpm install` n'a pas
 # tourné. Prism, lui, est une devDependency du client. C'est cette double dépendance à
-# `web/node_modules/` qui range `mock` du côté à deux toolchains, avec `generate` : seuls deux jobs de
-# la CI peuvent la lancer telle quelle — « Build client et déployable », et « Tests Go », dont les
-# scénarios lancent le même binaire et qui a reçu l'action de setup du versant client pour ça.
+# `web/node_modules/` qui range `mock` du côté à deux toolchains, avec `generate` : seuls trois jobs
+# de la CI peuvent la lancer telle quelle — « Build client et déployable », « Parcours de bout en
+# bout », et « Tests Go », dont les scénarios lancent le même binaire et qui a reçu l'action de setup
+# du versant client pour ça.
 #
 # Le port est fixe et documenté ici, là où les scénarios godog en prennent un libre : les deux mocks
 # tournent donc côte à côte sans se marcher dessus. Un `PRISM_MOCK_BASE_URL` exporté fait réutiliser

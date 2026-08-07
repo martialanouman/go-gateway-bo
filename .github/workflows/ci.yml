@@ -168,14 +168,19 @@ jobs:
       - uses: ./.github/actions/setup
       - run: make vuln-web
 
-  # Le second job à avoir les **deux** toolchains — « Tests Go » est l'autre — et le seul à exercer
-  # `make build`, la chaîne complète : `build-web` → purge de `internal/webassets/dist/` → copie →
-  # `build-go`. Jusqu'ici aucun runner ne la traversait : « Build Go » appelle `build-go`, les autres
-  # jobs Go ne compilent rien de destiné à être livré, et ce job-ci s'arrêtait à
-  # `check-routes`. Une copie qui perdrait son `/.` déposerait les assets dans
-  # `internal/webassets/dist/dist/` ; `all:dist` reste satisfait donc « Build Go » compile, le harnais
-  # godog écrase le répertoire avec ses fixtures avant de compiler donc « Tests Go » reste vert — dix
-  # jobs verts et un binaire qui rend 404 sur `/`.
+  # L'un des trois jobs à avoir les **deux** toolchains — « Tests Go » et « Parcours de bout en bout »
+  # sont les autres — et le premier à exercer `make build`, la chaîne complète : `build-web` → purge de
+  # `internal/webassets/dist/` → copie → `build-go`. Aucun runner ne la traversait avant lui : « Build
+  # Go » appelle `build-go`, les autres jobs Go ne compilent rien de destiné à être livré, et ce job-ci
+  # s'arrêtait à `check-routes`.
+  #
+  # Une copie qui perdrait son `/.` déposerait les assets dans `internal/webassets/dist/dist/` ;
+  # `all:dist` reste satisfait donc « Build Go » compile, et le harnais godog écrase le répertoire avec
+  # ses fixtures avant de compiler donc « Tests Go » reste vert. Sur les onze jobs hors agrégateur,
+  # **deux** verraient le défaut : celui-ci, et « Parcours de bout en bout » — `make e2e` reconstruit le
+  # même binaire et la première assertion du parcours est un `GET /`. Le contrôle vit ici quand même,
+  # parce qu'il tombe le premier — `e2e` a `needs: [build-web]` et ne tournerait pas — et parce qu'il
+  # nomme le défaut au lieu de le faire constater par un 404 dans un navigateur.
   #
   # Une **étape ajoutée ici** plutôt qu'un job dédié : celui-ci a déjà Node, pnpm et l'authentification
   # au registre, donc `setup-go` suffit à en faire le job du déployable. Un job séparé repaierait
@@ -251,12 +256,47 @@ jobs:
           curl --fail --silent --show-error --max-time 10 \
             --output /dev/null "http://127.0.0.1:3001$asset"
 
+  e2e:
+    name: Parcours de bout en bout
+    # Le job dépend du build : inutile de payer un parcours quand le déployable ne se construit pas,
+    # et c'est le déployable que ces parcours exercent. `make e2e` le reconstruit ici — le dépôt n'a
+    # aucun partage d'artefact entre jobs, et en introduire un pour épargner un `go build` coûterait
+    # plus qu'il ne rapporte.
+    needs: [build-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          # go.mod est la source unique de la version de Go ; ne jamais la répéter ici.
+          go-version-file: go.mod
+      # Chromium seul, comme la configuration des parcours. `--with-deps` installe les bibliothèques
+      # système que le runner n'a pas ; la version du navigateur vient de `@playwright/test`, épinglé
+      # dans le lockfile, donc rien à répéter ici.
+      - run: pnpm -C web exec playwright install --with-deps chromium
+      - run: make e2e
+      # Les traces ne sont conservées que d'un parcours tombé : `trace: 'retain-on-failure'`. Sans cette
+      # étape, un parcours qui échoue en CI ne laisse rien à examiner et se rejoue à l'aveugle.
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: traces-des-parcours
+          path: web/test-results/
+          retention-days: 7
+
   ci:
     name: CI
     # `always()` fait tourner l'agrégation même quand une porte a échoué : sans lui, le check reste
     # « skipped », état qu'une protection de branche accepte.
     if: always()
-    needs: [build, test, lint, vuln, workflows, typecheck-web, lint-web, test-web, vuln-web, build-web]
+    needs: [build, test, lint, vuln, workflows, typecheck-web, lint-web, test-web, vuln-web, build-web, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

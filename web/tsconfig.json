@@ -36,5 +36,5 @@
   // Les tests posés à la racine de `web/` en font partie : sans eux, une erreur de type dans le
   // fichier qui porte le critère d'acceptation de la step ne serait attrapée par aucune porte —
   // vérifié. `vitest.artefact.config.ts` a disparu avec la v1.0.
-  "include": ["src", "*.config.ts", "*.test.ts"]
+  "include": ["src", "e2e", "*.config.ts", "*.test.ts"]
 }

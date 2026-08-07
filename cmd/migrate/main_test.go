@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 )
 
 // Le DSN porte le mot de passe de la base. Ce dépôt a déjà dépensé trois commentaires et un test à
@@ -104,7 +106,7 @@ func makeRecipe(t *testing.T, target string) string {
 	// GNU Make 3.81, qui ne l'imprime pas. Mesuré le 02/08/2026 sur `golang:1.25` (Make 4.4.1),
 	// après que la CI l'a trouvé et pas `make check`.
 	command := exec.Command("make", "--dry-run", "--no-print-directory", target)
-	command.Dir = repositoryRoot(t)
+	command.Dir = bddtest.RepositoryRoot(t)
 
 	recipe, err := command.Output()
 	require.NoErrorf(t, err, "lire la recette de `make %s`", target)
@@ -142,22 +144,4 @@ func pathLedBy(environment []string, directory string) string {
 	}
 
 	return "PATH=" + directory
-}
-
-func repositoryRoot(t *testing.T) string {
-	t.Helper()
-
-	directory, err := os.Getwd()
-	require.NoError(t, err)
-
-	for {
-		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
-			return directory
-		}
-
-		parent := filepath.Dir(directory)
-		require.NotEqualf(t, parent, directory, "aucun go.mod au-dessus de %s", directory)
-
-		directory = parent
-	}
 }

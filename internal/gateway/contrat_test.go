@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 )
 
 // Le contrat de l'API Admin est consommé depuis `@martialanouman/gateway-api-contracts`, où la
@@ -205,7 +207,7 @@ func cutKey(line string) (key, value string, declares bool) {
 func TestNoGatewayContractIsCopiedIntoTheRepository(t *testing.T) {
 	t.Parallel()
 
-	root := repositoryRoot(t)
+	root := bddtest.RepositoryRoot(t)
 
 	for _, path := range trackedFiles(t, root) {
 		content, err := os.ReadFile(filepath.Join(root, path))
@@ -260,20 +262,6 @@ func trackedFiles(t *testing.T, root string) []string {
 			"verte sans avoir rien lu")
 
 	return files
-}
-
-// git rend la racine depuis n'importe quel répertoire de l'arbre, là où remonter des `..` depuis le
-// répertoire du test coderait la profondeur de ce package.
-func repositoryRoot(t *testing.T) string {
-	t.Helper()
-
-	show := exec.Command("git", "rev-parse", "--show-toplevel")
-	show.Stderr = os.Stderr
-
-	root, err := show.Output()
-	require.NoError(t, err, "racine du dépôt introuvable")
-
-	return strings.TrimSpace(string(root))
 }
 
 // Ces cas prouvent le discriminant, pas la fidélité des signatures au contrat publié : celle-là ne
