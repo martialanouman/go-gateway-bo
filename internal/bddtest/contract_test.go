@@ -65,6 +65,29 @@ paths:
       responses: { '201': { description: créé } }
 `
 
+// Plusieurs fautives plutôt qu'une : c'est le cas où un refus qui s'arrête à la première envoie
+// corriger une route, relancer, et découvrir la suivante.
+const plusieursOperationsSansIdentifiant = `openapi: 3.1.0
+info: { title: contrat de test, version: 0.0.0 }
+paths:
+  /health:
+    get:
+      operationId: health
+      responses: { '200': { description: ok } }
+  /gateways:
+    post:
+      responses: { '201': { description: créé } }
+  /clients:
+    delete:
+      responses: { '204': { description: supprimé } }
+  /routes:
+    put:
+      responses: { '200': { description: remplacé } }
+  /connectors:
+    patch:
+      responses: { '200': { description: modifié } }
+`
+
 func TestAnOperationWithoutAnOperationIDIsRefusedRatherThanCollapsed(t *testing.T) {
 	t.Parallel()
 
@@ -73,6 +96,37 @@ func TestAnOperationWithoutAnOperationIDIsRefusedRatherThanCollapsed(t *testing.
 	require.Error(t, err)
 	assert.Containsf(t, err.Error(), "POST /gateways",
 		"le refus ne désigne pas l'opération : personne ne saura laquelle nommer — %v", err)
+}
+
+func TestEveryOperationWithoutAnOperationIDIsNamed(t *testing.T) {
+	t.Parallel()
+
+	_, err := DeclaredOperations(contractFile(t, plusieursOperationsSansIdentifiant))
+
+	require.Error(t, err)
+	assert.Containsf(t, err.Error(),
+		"DELETE /clients, PATCH /connectors, POST /gateways, PUT /routes",
+		"le refus n'en nomme qu'une partie — %v", err)
+}
+
+// Le tri se garde par la répétition, et non par une lecture comparée à l'ordre attendu. Mesuré : un
+// parcours de map Go n'est pas une permutation quelconque mais une **rotation** — 2000 parcours d'une
+// map à cinq clés ne rendent que cinq ordres distincts. Une lecture unique sort donc triée par hasard
+// une fois sur cinq, et la mutation « tri retiré » ne tombait que trois exécutions sur cinq.
+func TestTheRefusalNamesThemInTheSameOrderTwice(t *testing.T) {
+	t.Parallel()
+
+	contract := contractFile(t, plusieursOperationsSansIdentifiant)
+
+	_, first := DeclaredOperations(contract)
+	require.Error(t, first)
+
+	for range 20 {
+		_, again := DeclaredOperations(contract)
+		require.EqualErrorf(t, again, first.Error(),
+			"deux lectures du même contrat ne reprochent pas la même chose : ce que la porte imprime "+
+				"change d'une exécution à l'autre, et deux sorties du même défaut ne se comparent plus")
+	}
 }
 
 func TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice(t *testing.T) {
@@ -87,12 +141,19 @@ func TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice(t *testing.T) 
 			"      responses: { '200': { description: ok } }\n", operationID, operationID)
 	}
 
-	declared, err := DeclaredOperations(contractFile(t, contract.String()))
+	file := contractFile(t, contract.String())
 
-	require.NoError(t, err)
-	assert.Equal(t, []string{"alpha", "beta", "delta", "gamma", "omega", "zeta"}, declared,
-		"l'ordre est celui d'une map Go : ce que la porte reproche changerait d'une exécution à "+
-			"l'autre, et deux sorties du même défaut ne se compareraient plus")
+	// Relu, et pas une seule fois : le nom de ce test promet deux lectures, et il n'en faisait qu'une.
+	// Six opérations rendent six ordres possibles — le tri retiré, une lecture unique tombait juste une
+	// fois sur six et laissait la suite verte d'autant.
+	for range 20 {
+		declared, err := DeclaredOperations(file)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"alpha", "beta", "delta", "gamma", "omega", "zeta"}, declared,
+			"l'ordre est celui d'une map Go : ce que la porte reproche changerait d'une exécution à "+
+				"l'autre, et deux sorties du même défaut ne se compareraient plus")
+	}
 }
 
 func TestTheOperationLedgerNamesWhatNoScenarioVisited(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -107,18 +108,29 @@ func DeclaredOperations(contractPath string) ([]string, error) {
 		return nil, fmt.Errorf("lecture du contrat %s: %w", contractPath, err)
 	}
 
-	var declared []string
+	var declared, unnamed []string
 
 	for path, item := range document.Paths.Map() {
 		for method, operation := range item.Operations() {
 			if operation.OperationID == "" {
-				return nil, fmt.Errorf("%s déclare %s %s sans operationId : la couverture du contrat "+
-					"nomme les opérations, et celles qui n'ont pas de nom se confondraient — lui en "+
-					"donner un", contractPath, method, path)
+				unnamed = append(unnamed, method+" "+path)
+
+				continue
 			}
 
 			declared = append(declared, operation.OperationID)
 		}
+	}
+
+	// Toutes, et triées : s'arrêter à la première ferait corriger une route, relancer, en découvrir
+	// une autre — et l'ordre de `Paths.Map()` n'étant aucun, deux exécutions n'en nommeraient pas la
+	// même. C'est la norme que la fin de cette fonction pose pour ce qu'elle rend.
+	if len(unnamed) > 0 {
+		sort.Strings(unnamed)
+
+		return nil, fmt.Errorf("%s déclare %s sans operationId : la couverture du contrat nomme les "+
+			"opérations, et celles qui n'ont pas de nom se confondraient — leur en donner un",
+			contractPath, strings.Join(unnamed, ", "))
 	}
 
 	if len(declared) == 0 {
