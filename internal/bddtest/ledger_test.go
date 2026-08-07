@@ -159,9 +159,10 @@ func TestACorpusRootThatDoesNotExistIsSaidAndNotTakenForAnEmptyOne(t *testing.T)
 // une méthode privée et n'est pas implémentable ici ; `testingTB` ne nomme que les quatre méthodes que
 // les registres appellent.
 //
-// `Fatal` enregistre et rend la main, là où `testing.T.Fatal` sort de la goroutine : les deux tests
-// qui s'en servent n'atteignent pas cette branche, et un `Fatal` qui interromprait le calcul le
-// rendrait invisible plutôt que constatable.
+// `Fatal` enregistre et rend la main, là où `testing.T.Fatal` sort de la goroutine — un `Fatal` qui
+// interromprait le calcul le rendrait invisible plutôt que constatable. C'est cette divergence qui a
+// fait rougir `TestACorpusRootThatDoesNotExist…` sur le code correct, et les deux registres portent
+// depuis un `return` explicite pour ne plus rien devoir à la sémantique de `Fatal`.
 type recordedT struct {
 	errors []string
 	fatals []string

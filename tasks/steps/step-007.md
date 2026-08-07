@@ -39,7 +39,9 @@ intention.
 - CI : deux jobs, Go et client, plus le job de bout en bout qui dépend du build.
 - **Une porte de couverture du contrat** : chaque opération déclarée par `api/openapi-bff.yaml` est
   exercée par au moins un scénario. Voir le point d'implémentation ci-dessous — elle vient d'un
-  constat de step-004, et elle n'est falsifiable qu'à partir de cette step.
+  constat de step-004. **Elle n'est pas falsifiable à partir de cette step** : le contrat n'y déclare
+  toujours qu'une opération, couverte par un scénario. DN-2 porte la mesure et ce qui la justifie
+  malgré cela.
 
 ## Pièges connus, payés par la première tentative
 - **`pnpm/action-setup` lit `packageManager` depuis la racine du dépôt.** Le client vivant sous
@@ -87,14 +89,15 @@ intention.
   Le patron existe déjà dans le dépôt : le registre de `cmd/dashboard/main_test.go` refuse qu'un
   `.feature` n'exécute aucun scénario. Le transposer au contrat — « toute opération déclarée est
   visitée » — transforme « il faut penser à écrire le scénario de la nouvelle route » en une porte.
-  **Elle ne devient falsifiable qu'ici** : avec une seule opération et un scénario qui la couvre, elle
-  serait verte par construction et ne prouverait rien — le mode d'échec que step-004 a nommé trois
-  fois (« un analyseur qui ne trouve rien est cassé, pas vert »).
+  **Elle ne devient pas falsifiable ici** : `api/openapi-bff.yaml` déclare une seule opération, et un
+  scénario la couvre — la porte est donc verte par construction, ce que step-004 a nommé trois fois
+  (« un analyseur qui ne trouve rien est cassé, pas vert »). Elle ne mordra qu'à la deuxième route.
+  Ce qui la justifie quand même — elle a été **vue mordre**, et son câblage est gardé — est en DN-2.
 
 ## Design arrêté (2026-08-03)
 
-Trois de ces décisions **amendent le périmètre écrit ci-dessus**, et chacune porte la mesure qui l'a
-montré. La fiche a été écrite avant que step-000 à step-006 n'existent : une partie de ce qu'elle
+Quatre de ces décisions **amendent le périmètre écrit ci-dessus** — DN-1, DN-3, DN-4 et DN-8 — et
+chacune porte la mesure qui l'a montré. La fiche a été écrite avant que step-000 à step-006 n'existent : une partie de ce qu'elle
 demande a été livrée en chemin, et une autre partie décrit un bénéficiaire qui n'existe pas.
 
 ### DN-1 — Le harnais partagé vit dans `internal/bddtest/`, et une garde d'imports l'empêche d'entrer dans le produit
@@ -137,8 +140,9 @@ Elle se désarme sous un filtre `-run` qui coupe dans les scénarios, exactement
 `.feature` : `TestingT: t` fait de chaque scénario un sous-test, et un filtre partiel ferait accuser
 la porte à tort.
 
-> **Correction du 03/08/2026, après revue.** Le paragraphe ci-dessus affirmait que la porte « ne
-> devient falsifiable qu'ici ». **C'est faux, et il faut le dire** : `api/openapi-bff.yaml` déclare
+> **Correction du 03/08/2026, après revue.** Le **Périmètre** et les **Points d'implémentation clés**
+> affirmaient tous deux que la porte « ne devient falsifiable qu'ici » — les deux phrases sont
+> corrigées sur place, et voici pourquoi. **C'est faux** : `api/openapi-bff.yaml` déclare
 > toujours **une** opération, couverte par **un** scénario — exactement la configuration que ce même
 > paragraphe décrit comme rédhibitoire. La porte est donc verte par construction aujourd'hui, et elle
 > ne mordra qu'à partir de la deuxième route.
@@ -191,11 +195,9 @@ Son timeout de 120 s est conservé — un runner de CI est plus lent qu'un poste
 
 ### DN-5 — Playwright : un parcours, contre le binaire, dans sa propre cible, hors de `make check`
 
-`make e2e` est une cible distincte et un job CI dédié, pas une douzième ligne de `make check`. Trois
-raisons : la DoD de cette fiche parle des **deux** suites ; l'écart local/CI que l'inclusion
-prétendrait éviter existe déjà pour la même cause — le harnais lie un port, motif exact pour lequel le
-contrôle « le binaire sert la sortie de Vite » vit dans la CI et non dans `make check` ; et l'inclure
-imposerait à tout poste d'avoir téléchargé les navigateurs.
+`make e2e` est une cible distincte et un job CI dédié, pas une douzième ligne de `make check`. Deux
+raisons : la DoD de cette fiche parle des **deux** suites ; et l'inclure imposerait à tout poste
+d'avoir téléchargé les navigateurs.
 
 Deux garde-fous, sans lesquels la cible serait un vert silencieux : **`make e2e` doit échouer
 bruyamment quand les navigateurs manquent**, et le job doit entrer dans le `needs:` de l'agrégateur —
@@ -215,9 +217,11 @@ ce que `scripts/check-ci-aggregator.py` vérifie déjà, et qui est donc le file
 > processus `make`. `make e2e` dans un terminal et `go test ./cmd/dashboard/` dans un autre se
 > disputent `internal/webassets/dist/`. Elle est écrite au-dessus de la cible, avec les trois autres.
 >
-> **Correction du 03/08/2026** : la première version de ce DN justifiait la sortie de `check` par « la
+> **Correction du 03/08/2026** : la première version de ce DN donnait **trois** raisons, dont « la
 > cible lie un port, celui que `make dev` occuperait ». **C'est faux** — `make dev` lie 3000 et 3001,
-> les parcours 3101, précisément pour cohabiter. Les deux vraies raisons sont celles écrites ci-dessus.
+> les parcours 3101, précisément pour cohabiter. La raison est retirée du paragraphe ci-dessus, qui
+> n'en porte plus que deux ; le motif du port reste valable pour le contrôle « le binaire sert la
+> sortie de Vite », qui lie 3001 pour de bon, et c'est de là que la confusion venait.
 
 Le harnais lance le **binaire** (`webServer` de Playwright sur `./bin/dashboard`), jamais `vite dev` :
 l'ordonnancement `/api` avant le fallback SPA, les en-têtes de cache et l'embarquement des assets
@@ -342,8 +346,8 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | Couverture client : `perFile` retiré, orphelin d'une ligne sans fonction | **rien ne rougit** — les quatre seuils globaux passent (78,57 % de lignes pour 75 exigés) |
 | Après adoption : `cmd/dashboard/contrat.feature` renommé en `.disabled` | `TestScenarios` — « 7 scénario(s) exécuté(s) pour un plancher de 8 » |
 | Avant adoption : `go test -run 'TestScenarios/le_schéma' ./internal/store/` | `TestScenarios` tombait — c'était le défaut, et c'est le rouge qui a précédé l'adoption. Vert après |
-| Garde d'imports : `internal/bff/api.go` importe `bddtest` | `TestNoProductionFileImportsTheHarness` — « …/internal/bff importe le harnais depuis un fichier de production » |
-| Garde d'imports : chemin du harnais faussé d'une lettre | la garde reste **verte** — et c'est le **témoin** qui tombe : « l'analyse ne voit le harnais nulle part ». C'est ce que le témoin existe pour attraper |
+| Garde d'imports : `internal/bff/api.go` importe `bddtest` | `TestNoProductionPackageReachesTheHarness` — « le harnais entre dans le binaire livré par … », **deux fois** : pour `internal/bff`, et pour `cmd/dashboard` qui l'atteint à travers lui. La chaîne complète est imprimée, et c'est le transitif qui se voit |
+| Garde d'imports : chemin du harnais faussé d'une lettre | la garde reste **verte** — et c'est le **témoin** qui tombe : « l'analyse ne retrouve pas les suites qui importent le harnais : elle ne garde rien, et la garde jumelle est verte pour cette raison-là ». C'est ce que le témoin existe pour attraper |
 | **Couverture du contrat, la mutation que la fiche exige** : une opération `version` ajoutée à `api/openapi-bff.yaml`, serveur régénéré, handler écrit, **aucun scénario** | `TestScenarios` — « l'opération "version" est déclarée au contrat et aucun scénario ne valide sa réponse contre lui […] lui écrire un scénario » |
 | Couverture du contrat : la même, **plus** un scénario qui demande `/api/version` et vérifie un 200 sans confronter la réponse au contrat | la porte rougit **toujours**. C'est ce qui prouve DN-2 : est visitée l'opération *validée*, jamais l'opération seulement appelée |
 | Parcours : `data-skeleton="rail"` retiré du document servi | le parcours tombe sur la première assertion — `expect(received).toContain(expected)` |
@@ -351,6 +355,12 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | `PLAYWRIGHT_BROWSERS_PATH` pointé sur un répertoire vide | Playwright **échoue** et imprime le remède (« Please run the following command to download new browsers ») — il ne saute pas. C'est ce qui dispense la cible `make e2e` d'un contrôle préalable |
 | Couverture du contrat : l'enregistrement de la visite retiré de `responseMatchesTheContract` | `TestScenarios` — « l'opération "health" est déclarée au contrat et aucun scénario ne valide sa réponse contre lui ». Le câblage est gardé, même quand la porte est verte par construction |
 | Couverture client : `main.test.tsx` retiré de la suite | `main.tsx` **et** `router.ts` rougissent nommément — la preuve que le seuil `perFile` contraint quatre fichiers et non deux, contre un constat de revue qui affirmait le contraire |
+| Contrat : tri d'`unnamed` retiré (le refus des opérations sans `operationId`) | `TestTheRefusalNamesThemInTheSameOrderTwice` — **10 échecs sur 10**. La forme du test vient d'une mesure : un parcours de map Go est une **rotation**, pas une permutation — 2000 parcours d'une map à cinq clés ne rendent que **cinq** ordres. Une lecture unique comparée à l'ordre attendu tombait juste une fois sur cinq |
+| Contrat : tri de `declared` retiré | `TestTheDeclaredOperationsAreSortedSoTheGateReadsTheSameTwice` — 10 sur 10 **après** l'avoir fait relire vingt fois ; son nom promettait deux lectures et il n'en faisait qu'une, donc six ordres possibles et un faux vert sur six |
+| Contrat : retour au `return` sur la **première** opération sans `operationId` | `TestEveryOperationWithoutAnOperationIDIsNamed` — 10 sur 10. Première tentative écartée : un `break` qui sortait d'une boucle de méthodes dont chaque route n'a qu'un membre, donc équivalent au code correct — une mutation qui ne prouvait rien |
+| `bddtest` : `features, _ := FeatureFiles(root)` (le `t.Fatal` du corpus retiré) | `TestACorpusRootThatDoesNotExistIsSaidAndNotTakenForAnEmptyOne`. Ce test a d'abord rougi sur le code **correct** : `testingTB.Fatal` n'interrompt pas, et la porte enchaînait sur « 0 scénario(s) pour un plancher de 8 » — un message qui envoie écrire des scénarios déjà écrits |
+| `bddtest` : le `return` après `t.Fatal` retiré, côté **corpus** | le même test tombe |
+| `bddtest` : le `return` après `t.Fatal` retiré, côté **contrat** | **rien ne rougit** — `unvisited(nil)` ne reproche rien. Constat écrit sur place, vérifié et non supposé |
 | Agrégateur de CI : `build-web` retiré du `needs:` de `ci`, **avant** correction du script | **rien ne rougit** — `check-ci-aggregator.py` rendait 0. C'est le faux négatif que le second `needs:` du workflow a rendu réel, et le rouge qui a précédé sa correction |
 
 ## Hors périmètre

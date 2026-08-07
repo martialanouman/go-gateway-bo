@@ -168,15 +168,19 @@ jobs:
       - uses: ./.github/actions/setup
       - run: make vuln-web
 
-  # L'un des trois jobs à avoir les **deux** toolchains — « Tests Go » et « Parcours de bout en
-  # bout » sont les autres — et le seul à exercer
-  # `make build`, la chaîne complète : `build-web` → purge de `internal/webassets/dist/` → copie →
-  # `build-go`. Jusqu'ici aucun runner ne la traversait : « Build Go » appelle `build-go`, les autres
-  # jobs Go ne compilent rien de destiné à être livré, et ce job-ci s'arrêtait à
-  # `check-routes`. Une copie qui perdrait son `/.` déposerait les assets dans
-  # `internal/webassets/dist/dist/` ; `all:dist` reste satisfait donc « Build Go » compile, le harnais
-  # godog écrase le répertoire avec ses fixtures avant de compiler donc « Tests Go » reste vert — dix
-  # jobs verts et un binaire qui rend 404 sur `/`.
+  # L'un des trois jobs à avoir les **deux** toolchains — « Tests Go » et « Parcours de bout en bout »
+  # sont les autres — et le premier à exercer `make build`, la chaîne complète : `build-web` → purge de
+  # `internal/webassets/dist/` → copie → `build-go`. Aucun runner ne la traversait avant lui : « Build
+  # Go » appelle `build-go`, les autres jobs Go ne compilent rien de destiné à être livré, et ce job-ci
+  # s'arrêtait à `check-routes`.
+  #
+  # Une copie qui perdrait son `/.` déposerait les assets dans `internal/webassets/dist/dist/` ;
+  # `all:dist` reste satisfait donc « Build Go » compile, et le harnais godog écrase le répertoire avec
+  # ses fixtures avant de compiler donc « Tests Go » reste vert. Sur les onze jobs hors agrégateur,
+  # **deux** verraient le défaut : celui-ci, et « Parcours de bout en bout » — `make e2e` reconstruit le
+  # même binaire et la première assertion du parcours est un `GET /`. Le contrôle vit ici quand même,
+  # parce qu'il tombe le premier — `e2e` a `needs: [build-web]` et ne tournerait pas — et parce qu'il
+  # nomme le défaut au lieu de le faire constater par un 404 dans un navigateur.
   #
   # Une **étape ajoutée ici** plutôt qu'un job dédié : celui-ci a déjà Node, pnpm et l'authentification
   # au registre, donc `setup-go` suffit à en faire le job du déployable. Un job séparé repaierait

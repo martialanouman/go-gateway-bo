@@ -262,10 +262,11 @@ Une **step = une PR**. Prendre le prochain fichier de `tasks/steps/` — **l'ord
 [`tasks/todo.md`](./tasks/todo.md) fait foi**, pas le numéro —, l'implémenter en **BDD strict,
 scénario rouge d'abord**, puis déplacer le fichier dans `tasks/steps/done/` en dernier commit.
 
-Les portes de qualité tournent en **jobs parallèles** — cinq portes Go, cinq portes client, dont la
-dernière a aussi la toolchain Go et construit le **déployable**. Trois jobs ont les deux toolchains :
-celui-là, « Tests Go », dont les scénarios lancent le mock Prism sur le contrat installé, et
-« Parcours de bout en bout », qui construit le binaire pour l'exercer dans un navigateur. Une porte
+Les portes de qualité tournent en **jobs parallèles** — onze, hors du check agrégateur : cinq Go, cinq
+client dont la dernière construit le **déployable**, et le parcours de bout en bout, qui n'est d'aucun
+des deux côtés. Trois d'entre eux ont les deux toolchains : le job du déployable, « Tests Go », dont
+les scénarios lancent le mock Prism sur le contrat installé, et « Parcours de bout en bout », qui
+construit le binaire pour l'exercer dans un navigateur. Une porte
 qui échoue n'empêche pas les autres de rendre leur verdict : on voit une erreur de compilation Go *et*
 un test client rouge au même run. La protection de branche
 exige le seul check **`CI`**, qui les agrège et reste valable quand une porte s'ajoute — mais en

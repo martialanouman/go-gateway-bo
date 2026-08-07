@@ -6,8 +6,10 @@
 //
 // Le précédent est `net/http/httptest` : un paquet **ordinaire** de la bibliothèque standard qui n'a
 // de sens que sous un test. Le précédent s'arrête là et ne dispense pas de la garde : `go list -f
-// '{{join .Imports " "}}' net/http/httptest` ne montre pas `testing` — il n'emporte donc rien de plus
-// dans un binaire qui l'importerait, là où ce paquet-ci emporte `testing`, `godog` et `testify`.
+// '{{join .Deps "\n"}}' net/http/httptest | grep -x testing` ne rend rien sur ses 186 dépendances —
+// il n'emporte donc pas `testing` dans un binaire qui l'importerait, là où ce paquet-ci l'emporte avec
+// `godog` et `testify`. C'est `.Deps` qui l'établit et non `.Imports` : la propriété est transitive,
+// et la garde qui vit dans `imports_test.go` l'est pour la même raison.
 package bddtest
 
 import (
