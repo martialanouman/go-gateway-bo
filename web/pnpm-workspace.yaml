@@ -19,9 +19,9 @@ allowBuilds:
   ssh2: false
 
 # Corrections de versions transitives. Un avis qu'on peut réellement résoudre ne s'ignore pas : ces
-# deux entrées suppriment quatre avis de l'arbre au lieu de les inscrire dans `ignoreGhsas`.
+# entrées suppriment les avis de l'arbre au lieu de les inscrire dans `ignoreGhsas`.
 #
-# Les deux viennent du même endroit : `@stoplight/prism-cli > @stoplight/http-spec >
+# Les deux premières viennent du même endroit : `@stoplight/prism-cli > @stoplight/http-spec >
 # postman-collection`, qui épingle des versions anciennes. Le sélecteur `parent>enfant` limite
 # volontairement la portée à ce chemin — rien d'autre du dépôt ne dépend de ces paquets, et une
 # correction globale masquerait le jour où quelque chose d'autre en dépendrait.
@@ -32,6 +32,18 @@ overrides:
   # uuid <11.1.1 : lecture hors bornes quand un buffer est fourni à v3/v5/v6
   # (GHSA-w5hq-g745-h8pq). `postman-collection` épingle 8.3.2, dépréciée par ailleurs.
   'postman-collection>uuid': '^11.1.1'
+  # js-yaml >=4.0.0 <4.3.1 : consommation CPU quadratique à la résolution d'un `!!omap`
+  # (GHSA-5p4m-2wfm-xmqj, élevée). Le correctif de CVE-2026-59870 n'a pas été rétroporté sous 4.3.1.
+  # Chemin unique : `openapi-typescript > @redocly/openapi-core`, qui lit les YAML de contrat pendant
+  # `make generate` — c'est-à-dire exactement le document qu'un attaquant amont contrôlerait.
+  '@redocly/openapi-core>js-yaml': '^4.3.1'
+  # Le **même** avis sur la branche 3.x — un seul GHSA couvre les deux, corrigé en 3.15.1 et 4.3.1.
+  # Chemin unique : `@stoplight/prism-cli > json-schema-faker > json-schema-ref-parser`.
+  'json-schema-ref-parser>js-yaml': '^3.15.1'
+  # fast-uri >=3.0.0 <3.1.5 : confusion d'hôte via une barre oblique inversée dans l'autorité
+  # (GHSA-7p8r-x3mc-p8w7, élevée) — une URL mal découpée peut faire prendre un hôte pour un autre.
+  # Arrive par `ajv`, le validateur que Prism utilise pour juger les requêtes.
+  'ajv>fast-uri': '^3.1.5'
 
 # Avis `pnpm audit` triés explicitement. Un avis n'entre ici qu'avec sa justification écrite, et
 # `pnpm vuln` échoue sur tout ce qui n'y figure pas — c'est ce qui rend le triage conscient plutôt
