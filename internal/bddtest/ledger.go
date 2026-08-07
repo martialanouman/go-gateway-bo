@@ -94,7 +94,12 @@ func (l *Ledger) requireCorpusExercised(t testingTB, root string, minimum int, r
 
 	features, err := FeatureFiles(root)
 	if err != nil {
+		// `return` explicite : `testing.T.Fatal` sort de la goroutine, mais `testingTB` ne promet pas
+		// cette sémantique et rien ici ne doit en dépendre. Sans lui, une racine fausse se reprochait
+		// **aussi** comme un plancher manqué — un message qui envoie écrire des scénarios existants.
 		t.Fatal(err)
+
+		return
 	}
 
 	for _, shortfall := range l.shortfalls(features, minimum) {

@@ -62,7 +62,12 @@ func (l *OperationLedger) requireEveryOperationVisited(t testingTB, contractPath
 
 	declared, err := DeclaredOperations(contractPath)
 	if err != nil {
+		// Même raison que dans `requireCorpusExercised` : rien ici ne dépend de ce que `Fatal`
+		// interrompe. Le symptôme y était visible, ici il ne l'est pas — `unvisited(nil)` ne reproche
+		// rien — mais c'est le même trou, et il se refermerait à la première opération enregistrée.
 		t.Fatal(err)
+
+		return
 	}
 
 	for _, unvisited := range l.unvisited(declared) {

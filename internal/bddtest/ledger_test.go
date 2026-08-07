@@ -136,6 +136,25 @@ func TestTheCorpusGateReportsItsShortfallsToTheTest(t *testing.T) {
 	assert.Contains(t, reported.errors[0], "plancher")
 }
 
+// Le défaut qu'on reproduit ici est une racine fausse — une suite déplacée, un chemin mal recopié.
+// Sans cette preuve, retirer le `t.Fatal` du même chemin laissait la suite entière verte : la porte
+// aurait alors reproché « 0 scénario(s) exécuté(s) pour un plancher de 8 », qui envoie écrire des
+// scénarios là où il n'y a qu'un chemin à corriger.
+func TestACorpusRootThatDoesNotExistIsSaidAndNotTakenForAnEmptyOne(t *testing.T) {
+	t.Parallel()
+
+	reported := &recordedT{}
+
+	(&Ledger{}).requireCorpusExercised(reported, filepath.Join(t.TempDir(), "corpus-absent"), floor, "")
+
+	require.Len(t, reported.fatals, 1,
+		"la racine du corpus n'existe pas et la porte n'en dit rien")
+	assert.Contains(t, reported.fatals[0], "corpus-absent")
+	assert.Empty(t, reported.errors,
+		"la porte reproche un plancher là où le chemin est faux : elle envoie écrire des scénarios "+
+			"qui existent déjà")
+}
+
 // recordedT capte ce qu'un registre rapporte, là où `*testing.T` le ferait tomber. `testing.TB` porte
 // une méthode privée et n'est pas implémentable ici ; `testingTB` ne nomme que les quatre méthodes que
 // les registres appellent.
