@@ -43,6 +43,17 @@ func TestMain(m *testing.M) {
 // répertoire embarqué appartient à l'arbre de travail, et `os.Exit` n'en déroule aucun. Le code de
 // sortie est nommé parce qu'une restauration ratée le remplace après coup.
 func runTests(m *testing.M) (code int) {
+	// Le conteneur naît avant la compilation du binaire : les deux prennent quelques secondes, et
+	// échouer sur un Docker absent avant d'avoir compilé rend la main plus vite.
+	terminatePostgres, err := startPostgres(context.Background())
+	defer terminatePostgres()
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+
+		return 1
+	}
+
 	restoreAssets, err := stageAssetFixtures()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mise en scène des assets:", err)
@@ -154,7 +165,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 8
+const minimumScenarios = 11
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -165,6 +176,16 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.Given(`^une configuration complète dont on retire "([^"]*)"$`, p.configurationWithout)
 	ctx.Given(`^une configuration complète dont on passe "([^"]*)" à "([^"]*)"$`, p.configurationWith)
 	ctx.Given(`^un serveur démarré$`, p.startAndServe)
+
+	schema := &schemaWorld{process: p}
+
+	ctx.Given(`^une base dont le schéma est en retard d'une migration$`, schema.outdatedSchema)
+	ctx.Given(`^une base vierge$`, schema.freshSchema)
+	ctx.Given(`^l'adresse d'écoute déjà occupée$`, schema.occupyListenAddress)
+	ctx.Then(`^le message d'erreur nomme la version trouvée et la version attendue$`,
+		schema.messageNamesBothVersions)
+	ctx.Then(`^le message d'erreur parle du schéma et non de l'adresse$`,
+		schema.messageNamesTheSchemaNotTheAddress)
 	ctx.When(`^le serveur démarre$`, p.start)
 	ctx.When(`^le serveur reçoit SIGTERM$`, p.signalTerm)
 	ctx.When(`^le navigateur demande "([^"]*)"$`, p.fetch)
@@ -183,6 +204,7 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 
 	ctx.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
 		p.kill()
+		schema.release()
 
 		return ctx, err
 	})
@@ -197,14 +219,16 @@ var browser = &http.Client{Timeout: 2 * time.Second}
 // completeConfiguration est le plus petit environnement avec lequel le binaire démarre. Le port 0
 // laisse le système en choisir un libre, et le mode `mock` n'exige de la passerelle que son adresse —
 // aucun scénario d'ici ne la joint, mais la configuration se valide au démarrage, avant tout appel.
-// Le DSN est du même ordre : exigé et validé au démarrage, jamais composé — aucun scénario d'ici n'a
-// de PostgreSQL en face, et le pool ne se connecte qu'à la première requête qui le demande (DN-5).
+//
+// Le DSN, lui, désigne une **vraie base à jour** depuis step-020 : le binaire contrôle la version du
+// schéma avant de lier son port, et une adresse qui ne répond pas le ferait refuser de démarrer.
+// C'était l'inverse jusqu'ici — le DSN était exigé, validé en forme, et jamais composé.
 func completeConfiguration() map[string]string {
 	return map[string]string{
 		"DASHBOARD_ADDR":             "127.0.0.1:0",
 		"DASHBOARD_GATEWAY_MODE":     "mock",
 		"DASHBOARD_GATEWAY_BASE_URL": "http://127.0.0.1:4010",
-		"DASHBOARD_DATABASE_URL":     "postgres://dashboard:dashboard@127.0.0.1:5432/dashboard",
+		"DASHBOARD_DATABASE_URL":     migratedSuiteDSN,
 	}
 }
 

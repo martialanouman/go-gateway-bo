@@ -5,9 +5,14 @@
 // Il est **figé et versionné avec les livraisons** (§3.1) : jamais éditable depuis l'interface. Un
 // administrateur compose des rôles à partir de ces clés, il n'en invente pas.
 //
-// Le package ne porte **aucune garde, aucun rôle, aucun middleware** — seulement le vocabulaire.
-// `RequirePermission` arrive en step-025, les neuf rôles par défaut et le seed en step-020, et le
-// TypeScript que consomme le client est **engendré** depuis ici : la garde serveur est ce qui
+// Le package porte aussi les **neuf rôles par défaut** du §6.10 (`roles.go`) : les paquets de clés
+// que le §3.1 donne pour pré-remplis et non supprimables. Ils vivent ici et non dans
+// `internal/store` parce que la règle que la spécification exige — toute clé hors des trois
+// délibérées appartient à au moins un rôle — est une propriété du vocabulaire et de la politique,
+// pas de la base. Le seed n'en est que la projection.
+//
+// Le package ne porte **aucune garde et aucun middleware**. `RequirePermission` arrive en step-025,
+// et le TypeScript que consomme le client est **engendré** depuis ici : la garde serveur est ce qui
 // protège réellement, le rendu conditionnel du client n'est qu'un confort (invariant c), donc la
 // source vit du côté qui décide.
 //

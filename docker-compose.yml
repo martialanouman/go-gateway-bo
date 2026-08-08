@@ -3,7 +3,7 @@
 # passerelle — clients, comptes SMPP, connecteurs, CDR et soldes se lisent à travers l'API Admin, à
 # chaque requête, et ne sont jamais recopiés ici (§3.2).
 #
-# Un poste neuf : `docker compose up -d` puis `make migrate`.
+# Un poste neuf : `docker compose up -d`, puis `make migrate`, puis `make bootstrap`.
 
 services:
   postgres:

@@ -83,14 +83,21 @@ const (
 // (`requiredDatabaseURL`, sur `pgxpool.ParseConfig`), et le scénario est vert aujourd'hui alors que
 // `cmd/dashboard` ne mentionne `store` nulle part. Retirer un câblage ne ferait donc rougir aucune
 // porte, et en ajouter un ne serait observable par rien : un pool paresseux qui ne se connecte pas
-// n'a aucun effet qu'un scénario sans Docker puisse voir.
+// n'a aucun effet qu'un scénario puisse voir. (Cette phrase disait « qu'un scénario **sans Docker**
+// puisse voir » : depuis step-020, les scénarios de `cmd/dashboard` ont un PostgreSQL réel. La
+// prémisse a changé, la conclusion non — un pool que rien n'atteint reste invisible.)
 //
 // Le câbler quand même livrerait exactement ce que ce dépôt a déjà refusé deux fois — un artefact
-// qu'aucun appelant n'atteint, un client instancié que rien n'appelle. Le pool part donc avec la
-// première route qui lit la base (step-020), qui l'atteindra pour de bon et pourra l'observer. Ce
-// que la fiche demande — cycle de vie attaché au `context` racine, arrêt propre — est tenu **par
-// cette fonction** et exercé par `pool_test.go` contre un PostgreSQL réel ; seul le site d'appel
-// attend.
+// qu'aucun appelant n'atteint, un client instancié que rien n'appelle. Ce que la fiche demande —
+// cycle de vie attaché au `context` racine, arrêt propre — est tenu **par cette fonction** et exercé
+// par `pool_test.go` contre un PostgreSQL réel ; seul le site d'appel attend.
+//
+// Cette phrase annonçait « le pool part avec la première route qui lit la base (step-020) ».
+// **step-020 est passée et ne livre aucune route** : elle livre un contrôle de démarrage, qui
+// travaille sur le `*sql.DB` que goose expose, et une commande hors ligne, qui ouvre une `pgx.Conn`
+// unique — trois requêtes jouées une fois par déploiement n'ont que faire d'un pool de dix
+// connexions réglé pour un serveur qui vit. Ni l'un ni l'autre n'appelle un `pgxpool`. Le
+// pool part donc avec `POST /auth/login`, step-021, qui l'atteindra pour de bon et pourra l'observer.
 func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {

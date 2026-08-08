@@ -94,13 +94,38 @@ func openSQL(dsn string) (*sql.DB, error) {
 			"DSN PostgreSQL invalide ; la valeur n'est pas citée, elle porte le mot de passe de la base")
 	}
 
+	// Même borne que le pool applicatif, et pour une raison plus aiguë : non renseigné,
+	// `ConnectTimeout` reste **nul** (`pgconn/config.go`, tant que le DSN ne porte pas
+	// `connect_timeout=`), et pgconn n'installe alors aucune échéance de dial. Or `VerifySchema`
+	// s'exécute au démarrage du binaire, **avant** `net.Listen` : contre un hôte qui avale les
+	// paquets — une règle de pare-feu changée, une bascule en cours — l'instance resterait pendue
+	// sans listener pour répondre à une sonde et sans une ligne de journal pour dire pourquoi. Le
+	// déploiement roulant verrait une instance muette plutôt qu'une instance qui refuse.
+	//
+	// Comme les quatre lignes équivalentes de `pool.go`, **aucun test ne rougit si celle-ci
+	// disparaît**, et c'est vérifié plutôt que supposé : l'exercer demanderait un hôte qui ne répond
+	// ni n'échoue, que le réseau d'un runner rendrait faux un jour sur dix.
+	config.ConnectTimeout = connectTimeout
+
 	return stdlib.OpenDB(*config), nil
 }
 
-func newMigrationProvider(db *sql.DB) (*goose.Provider, error) {
+// migrationSources rend le système de fichiers des migrations embarquées. Deux chemins le lisent —
+// celui qui les applique et celui qui vérifie la version au démarrage — et c'est **la même liste
+// pour les deux** : ce que le binaire exige de la base est exactement ce qu'il sait lui appliquer.
+func migrationSources() (fs.FS, error) {
 	sources, err := fs.Sub(migrationsFS, migrationsDir)
 	if err != nil {
 		return nil, fmt.Errorf("lire les migrations embarquées : %w", err)
+	}
+
+	return sources, nil
+}
+
+func newMigrationProvider(db *sql.DB) (*goose.Provider, error) {
+	sources, err := migrationSources()
+	if err != nil {
+		return nil, err
 	}
 
 	// goose ne verrouille rien par défaut — sa documentation le dit mot pour mot, « If
