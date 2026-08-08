@@ -28,10 +28,32 @@
  * step-008, elles arrivent en step-041/042.)*
  */
 
+import { readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { CONTRAST_PAIRS, RADII, SPACINGS, SURFACES, TYPE_ROLES } from '../src/lib/design-tokens'
 import { contrastRatio, readTokens, resolveColor, resolveToken } from './tokens'
 
 const tokens = readTokens()
+
+/**
+ * Le CSS que step-008 livre. `components.css` de la v1.0 n'en fait pas partie : les primitives
+ * habillées sont de step-041/042. La liste est **nommée plutôt que globbée** — un fichier de style
+ * ajouté sans y être inscrit échapperait à la garantie, et l'oubli se voit en relisant cette ligne.
+ */
+const STYLED_FILES = ['app.css', 'design-reference.css'] as const
+
+function readStyledCss(): string {
+  const here = dirname(fileURLToPath(import.meta.url))
+  // Les commentaires sortent d'abord : ils citent des noms de tokens, et les compter comme consommés
+  // ferait rougir pour la mauvaise raison.
+  return STYLED_FILES.map((file) =>
+    readFileSync(join(resolve(here, '..'), 'src', 'styles', file), 'utf8'),
+  )
+    .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+}
 
 /** Seuils WCAG 2.1 AA. Le texte large commence à 18,66 px en gras ou 24 px en normal. */
 const AA_NORMAL_TEXT = 4.5
@@ -90,6 +112,40 @@ describe('tokens de la charte', () => {
 
   it.each(expected)('%s est défini', (name) => {
     expect(resolveToken(tokens, name)).toBeDefined()
+  })
+
+  it('n’en consomme aucun qui n’existe pas', () => {
+    // On part de ce que le CSS **consomme réellement**, jamais d'une liste écrite à la main : une
+    // liste ne voit jamais le token qu'on vient d'inventer. `vite-plugin-tokens` tient déjà ce front
+    // sur le CSS émis ; ce test le tient sur les sources, et il rougit plus tôt — à `make test-web`
+    // plutôt qu'à `make build`.
+    const used = new Set(
+      [...readStyledCss().matchAll(/var\(\s*(--[\w-]+)/g)].map(([, name]) => name as string),
+    )
+
+    expect([...used].filter((name) => !tokens.has(name)).sort()).toEqual([])
+  })
+
+  it('en consomme assez pour que ce test garde quelque chose', () => {
+    // Sans ce plancher, une expression régulière qui cesserait de reconnaître `var(--…)` rendrait le
+    // test précédent vert et vide — la panne la plus discrète qu'un test puisse avoir. Mesuré le
+    // 08/08/2026 : 55 occurrences, 13 dans `app.css` et 42 dans `design-reference.css`.
+    expect([...readStyledCss().matchAll(/var\(\s*(--[\w-]+)/g)].length).toBeGreaterThan(40)
+  })
+
+  it('ne rend, dans /_design, que des tokens qui existent', () => {
+    // Le trou que `vite-plugin-tokens` nomme : la page compose ses `var()` à l'exécution
+    // (`style={{ font: `var(${token})` }}`), donc **aucun de ces noms n'apparaît dans le CSS émis**.
+    // Le build ne peut pas les voir ; cette table est le seul endroit d'où ils viennent.
+    const named = [
+      ...TYPE_ROLES.map(({ token }) => token),
+      ...SURFACES.map(({ token }) => token),
+      ...RADII.map(({ token }) => token),
+      ...SPACINGS,
+      ...CONTRAST_PAIRS.flatMap(({ text, background, over }) => [text, background, over ?? '']),
+    ].filter(Boolean)
+
+    expect(named.filter((name) => !tokens.has(name)).sort()).toEqual([])
   })
 
   it('ne promet pas de thème clair', () => {

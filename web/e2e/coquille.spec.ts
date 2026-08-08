@@ -65,5 +65,18 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
     "aucune police n'a été chargée : la charte n'est pas servie",
   ).not.toHaveLength(0)
 
+  // Et la référence visuelle est atteignable **sur le binaire**, pas seulement dans un routeur monté
+  // en mémoire par un test de composant. C'est ce que la DoD appelle traverser le chemin pour de
+  // bon : rien de simulé, le vrai déployable, le vrai fallback SPA sur une URL profonde. La v1.0
+  // avait trois défauts que seul ce genre de traversée avait trouvés.
+  await page.goto('/_design')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Référence visuelle')
+  // Hors de la coquille : elle ne s'adresse pas à un opérateur.
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toHaveCount(0)
+  // Et elle rend la charte pour de vrai — la police, pas un repli système. `getComputedStyle` dans
+  // Chromium résout les `var()` et les `color-mix()`, ce que jsdom ne fait pas : c'est le seul
+  // endroit de la suite où l'on lit ce qui est **réellement peint**.
+  await expect(page.locator('h1')).toHaveCSS('font-family', /IBM Plex Sans/)
+
   expect(problems).toEqual([])
 })
