@@ -255,6 +255,39 @@ jobs:
           test -n "$asset" || { echo "::error::aucun asset JS référencé par index.html"; exit 1; }
           curl --fail --silent --show-error --max-time 10 \
             --output /dev/null "http://127.0.0.1:3001$asset"
+          # La feuille, puis une police, **depuis les octets que le binaire sert** — étendu en
+          # step-008. Le JS seul ne disait rien de la charte : une police que le déployable ne sert
+          # pas laisserait cette étape verte et l'écran sans typographie. Le parcours Playwright
+          # observe ce qu'un navigateur demande ; celle-ci vérifie ce que le binaire répond, et
+          # aucune des deux ne remplace l'autre.
+          sheet=$(grep -o '/assets/[A-Za-z0-9._-]*\.css' web/dist/index.html | head -n 1)
+          test -n "$sheet" || { echo "::error::aucune feuille de style référencée par index.html"; exit 1; }
+          curl --fail --silent --show-error --max-time 10 \
+            --output "$RUNNER_TEMP/servi.css" "http://127.0.0.1:3001$sheet"
+          # Aucune origine absolue dans la feuille servie : un `@import url(https://fonts.…)` y
+          # révélerait à un tiers l'adresse d'un outil interne et l'instant où un opérateur travaille.
+          ! grep -qE 'https?://' "$RUNNER_TEMP/servi.css" \
+            || { echo "::error::la feuille servie référence une origine absolue"; exit 1; }
+          # Le nom haché est extrait de ce qui est servi, pas du disque : c'est ce couplage qui rend
+          # l'étape capable de voir un asset présent dans dist/ et absent du binaire — mesuré, elle
+          # rougit alors en `curl (22)`.
+          #
+          # Ce qu'elle ne couvre pas, et que deux mutations vertes ont délimité : **une seule police**,
+          # la première référencée — supprimer une autre des sept la laisse verte, comme le `head -n 1`
+          # du JS juste au-dessus ; et **le régime de cache**, puisque retirer la route `/assets/*` du
+          # routeur Go fait tomber la requête dans `serveShell`, qui sert le même octet en `no-cache`.
+          # Les deux sont des choix : cette étape prouve que le déployable sert la charte, pas qu'il la
+          # sert vite.
+          font=$(grep -o '/assets/[A-Za-z0-9._-]*\.woff2' "$RUNNER_TEMP/servi.css" | head -n 1)
+          test -n "$font" || { echo "::error::la feuille servie ne charge aucune police"; exit 1; }
+          curl --fail --silent --show-error --max-time 10 \
+            --write-out '%{content_type}\n' \
+            --output "$RUNNER_TEMP/servie.woff2" "http://127.0.0.1:3001$font" | grep -qx 'font/woff2' \
+            || { echo "::error::la police n'est pas servie en font/woff2"; exit 1; }
+          # La signature `wOF2`, parce qu'un 200 ne prouve pas le contenu : le fallback SPA rendrait
+          # `index.html` en 200 pour un chemin inconnu, et le `@font-face` serait sans effet.
+          head -c 4 "$RUNNER_TEMP/servie.woff2" | grep -qx 'wOF2' \
+            || { echo "::error::la réponse n'est pas un woff2"; exit 1; }
 
   e2e:
     name: Parcours de bout en bout

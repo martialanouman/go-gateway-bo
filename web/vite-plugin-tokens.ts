@@ -20,6 +20,14 @@
  *   qui le garde, pas ce plugin.
  * - Il lit le CSS **émis**, donc après `@import` et minification. Un token qu'aucune règle atteinte
  *   ne consomme n'existe pas pour lui, ce qui est le bon comportement : on garde ce qui est servi.
+ * - **Il refuse les variables qu'un composant pose depuis JavaScript.** Trouvé en jouant une mutation
+ *   qui versait `components.css` de la v1.0 dans la feuille : la construction a échoué sur
+ *   `--active-tab-left`, `--active-tab-width` et `--anchor-width` — trois variables qu'aucun CSS ne
+ *   déclare parce qu'un `style.setProperty()` les écrit à l'exécution. Le plugin a raison sur la
+ *   lettre et tort sur l'intention. **step-041, qui livrera ces primitives, devra les déclarer** :
+ *   soit avec une valeur de repli dans `:root`, ce qui est préférable — une largeur d'onglet a une
+ *   valeur au premier rendu, avant que le JavaScript ne mesure —, soit par une liste d'exemptions
+ *   nommées ici. La v1.0 avait choisi la seconde ; la première ne demande aucun code.
  */
 
 import type { Plugin } from 'vite'
