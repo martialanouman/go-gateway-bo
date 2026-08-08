@@ -214,6 +214,22 @@ func TestAucunRoleNAccordeUneCleHorsCatalogue(t *testing.T) {
 	}
 }
 
+// Une clé déclarée deux fois dans le même rôle échappe à la comparaison par ensembles ci-dessus, et
+// ne se manifeste qu'au seed : `role_permissions` a `(role_id, permission_key)` pour clé primaire,
+// donc l'insertion échouerait sur une violation d'unicité — loin d'ici, et au déploiement.
+func TestAucunRoleNAccordeDeuxFoisLaMemeCle(t *testing.T) {
+	t.Parallel()
+
+	for _, role := range permissions.DefaultRoles() {
+		seen := map[permissions.Key]bool{}
+
+		for _, key := range role.Keys {
+			assert.False(t, seen[key], "le rôle %s accorde %q deux fois", role.Name, key)
+			seen[key] = true
+		}
+	}
+}
+
 func TestChaqueRoleParDefautPorteUneDescription(t *testing.T) {
 	t.Parallel()
 

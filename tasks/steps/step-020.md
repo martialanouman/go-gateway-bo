@@ -197,16 +197,28 @@ alors, `errMissingZeroVersion`, est **non exportée**, donc inatteignable par `e
 crée jamais la table. `goose.DefaultTablename` est exactement le nom que `NewProvider` utilise tant
 qu'on ne passe pas `WithTableName` — ce que ce dépôt ne fait nulle part.
 
-### DN-8 — La révocation d'attribution est réservée aux rôles `is_default`, et laisse une question à step-029
+### DN-8 — La révocation ne porte que sur les rôles que le code décrit, et laisse une question à step-029
 
 Le seed **ajoute et révoque** sur `role_permissions` : sans révocation, une clé retirée d'un rôle par
 une release resterait accordée indéfiniment — la forme temporelle du défaut que cette step existe pour
-éviter. La révocation porte `AND r.is_default`, sans quoi le seed écraserait un rôle créé à l'écran.
+éviter.
 
-**Question léguée à step-029** : un administrateur qui édite un rôle par défaut verra son édition
-défaite au déploiement suivant. Deux sorties possibles — interdire l'édition des attributions d'un
-rôle `is_default`, ou basculer `is_default = false` à la première édition. Ne pas trancher ici serait
-laisser un piège ; trancher ici serait déborder du périmètre.
+La garde est `EXISTS (… wanted …)` : la révocation ne touche que les rôles dont le code décrit la
+composition. Ce seul prédicat couvre les deux cas — un rôle composé à l'écran n'est pas dans `wanted`,
+et un rôle `is_default` que le code ne décrit plus est signalé comme inconnu par la requête précédente,
+qui le laisse intact.
+
+Un `AND r.is_default` avait été écrit à côté. **Mesuré inatteignable** : le retirer seul laissait les
+huit scénarios et les tests unitaires verts, parce que `upsertRoles` force `is_default = true` sur
+exactement les rôles de `wanted`, deux instructions plus haut dans la même transaction. Retiré plutôt
+que doté d'un test de complaisance.
+
+**Question léguée à step-029**, avec ce que cette PR lui impose déjà : un administrateur qui édite un
+rôle par défaut verra son édition défaite au déploiement suivant. Deux sorties possibles — interdire
+l'édition des attributions d'un rôle `is_default`, ou basculer `is_default = false` à la première
+édition. **La seconde ne marche pas en l'état** : le seed remet `is_default = true` sur tout rôle dont
+le nom figure au code, donc la bascule serait défaite au déploiement suivant. La retenir demanderait
+de changer `upsertRoles` ici — c'est la moitié de l'information que step-029 aurait cherchée elle-même.
 
 ## Tableau des mutations
 

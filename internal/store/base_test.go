@@ -18,7 +18,7 @@ import (
 // suite portait jusqu'ici un simple compteur, sans couverture par fichier ni exemption sous `-run` —
 // mesuré, `go test -run 'TestScenarios/le_schéma' ./internal/store/` faisait tomber le plancher sur
 // un flux de travail parfaitement normal, celui qui consiste à déboguer un scénario seul.
-const minimumScenarios = 2
+const minimumScenarios = 8
 
 func TestScenarios(t *testing.T) {
 	ran := &bddtest.Ledger{}
@@ -28,6 +28,7 @@ func TestScenarios(t *testing.T) {
 		ScenarioInitializer: func(ctx *godog.ScenarioContext) {
 			ran.Watch(ctx)
 			initializeScenario(ctx)
+			initializeSeedScenario(ctx)
 		},
 		Options: &godog.Options{
 			Format:   "pretty",
