@@ -290,3 +290,23 @@ la règle plutôt que du chiffre.
 - **`design-reference.css` atterrit dans la feuille d'entrée**, pas dans un chunk : 1 912 octets servis sur `/` pour une page que seul un développeur visite. La cause est mesurée — l'`import` de la route est statique dans `routeTree.gen.ts`, donc `autoCodeSplitting` scinde le composant et pas sa feuille. Inscrit dans `index.html`.
 - **Le raccourci `font:` réinitialise `font-variant-numeric`**, donc les `tabular-nums` que `base.css` pose sur `body` sont défaits partout où un rôle typographique s'applique. Le kit de la charte a le même trou ; le portage est fidèle. Sans effet aujourd'hui (les chiffres visibles sont en mono), réel pour les KPI de step-041.
 - **Le volume de commentaire** est élevé (30 % en moyenne, 75 % sur `__root.tsx`), et le piège du nom de route est raconté trois fois. Assumé sur les gardes, dont tout l'intérêt est de dire ce qu'elles ne couvrent pas.
+
+### Ce que CodeQL a trouvé, et que `make check` ne pouvait pas voir
+
+`CLAUDE.md` prévient que trois portes ne se rejouent jamais en local — CodeQL, `code_quality`, et le
+contrôle du job « Build client et déployable ». La première a bloqué cette PR après onze portes vertes.
+
+**`js/incomplete-multi-character-sanitization`, sévérité haute**, sur la ligne qui retirait les
+commentaires avant de compter les tokens : un remplacement unique de `<!--…-->` laisse passer une
+imbrication.
+
+Ce n'était pas une faille — le résultat d'un outil de build n'est jamais rendu comme HTML. Mais
+l'alerte était juste **sur la forme**, et elle pointait un défaut de conception plus intéressant que
+le risque qu'elle nommait : ce code n'a aucune raison de prétendre nettoyer du HTML. Ce dont il a
+besoin, ce sont les blocs `<style>` du document.
+
+Le correctif est donc plus précis que l'alerte ne l'exigeait. Les commentaires HTML — qui citent des
+noms de tokens dans `index.html` — cessent d'être **lus**, au lieu d'être nettoyés. Muté comme le
+reste : `var(--danger-border)` fait toujours échouer `make build` en nommant le token, et un token
+déclaré par le `<style>` du document puis consommé par la feuille passe toujours — l'union que le
+plugin juge n'a pas bougé.
