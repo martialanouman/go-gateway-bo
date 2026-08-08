@@ -53,9 +53,9 @@ var defaultRoles = []DefaultRole{
 	},
 	{
 		Name: "ops",
-		Description: "Exploite le réseau : routage, connecteurs, sessions, anti-spam, scripts et " +
-			"numéros entrants en écriture ; ne peut ni lever un désabonnement ni afficher le corps " +
-			"d'un message",
+		Description: "Exploite le réseau : routage, scripts, réécriture de sender, connecteurs, " +
+			"sessions, anti-spam, numéros entrants et alertes en écriture, MSISDN en clair et export " +
+			"de masse compris ; ne peut ni lever un désabonnement ni afficher le corps d'un message",
 		Keys: []Key{
 			RoutesRead, RoutesWrite, RoutesImport,
 			ScriptsRead, ScriptsWrite, ScriptsPublish,
@@ -80,9 +80,9 @@ var defaultRoles = []DefaultRole{
 	},
 	{
 		Name: "support_readonly",
-		Description: "Investigue en lecture seule — comptes, routage, connecteurs, sessions, CDR et " +
-			"facturation, MSISDN en clair compris ; ne voit ni le code source d'un script, ni les " +
-			"identifiants, ni le corps d'un message",
+		Description: "Investigue en lecture seule — comptes, routage, connecteurs, sessions, CDR, " +
+			"facturation et alertes, MSISDN en clair compris ; ne voit ni le code source d'un script, " +
+			"ni les règles de réécriture, ni les identifiants, ni le corps d'un message",
 		Keys: []Key{
 			CustomersRead, AccountsRead, GroupsRead,
 			RoutesRead, ConnectorsRead, SessionsRead,

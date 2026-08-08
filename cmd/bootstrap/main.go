@@ -85,7 +85,9 @@ func report(out, errOut io.Writer, outcome store.SeedOutcome) {
 	}
 
 	printCount(out, len(outcome.PermissionsInserted), "permission(s) posée(s)")
-	printCount(out, len(outcome.PermissionsUpdated), "description(s) remise(s) à ce que le catalogue dit")
+	// « entrée(s) » et non « description(s) » : la requête déclenche sur `(category, description)`,
+	// donc une catégorie corrigée en Go compte ici aussi.
+	printCount(out, len(outcome.PermissionsUpdated), "entrée(s) remise(s) à ce que le catalogue dit")
 	printNames(out, outcome.RolesInserted, "rôle(s) par défaut posé(s)")
 	printNames(out, outcome.RolesUpdated, "rôle(s) par défaut mis à jour")
 	printCount(out, len(outcome.GrantsAdded), "attribution(s) accordée(s)")
@@ -106,17 +108,18 @@ func warnAboutDivergence(errOut io.Writer, outcome store.SeedOutcome) {
 
 	for _, key := range outcome.UnknownPermissions {
 		printLine(errOut, "ATTENTION — la base porte la permission %q, que le catalogue ne déclare "+
-			"plus", key)
+			"plus.\n  La ligne est conservée : la supprimer échouerait tant qu'un rôle la détient, et "+
+			"les rôles\n  composés depuis l'écran la gardent. Les rôles par défaut, eux, ne "+
+			"l'accordent plus — voir\n  les attributions révoquées ci-dessus. La retirer pour de bon "+
+			"est une migration, qui\n  révoque d'abord.", key)
 	}
 
 	for _, role := range outcome.UnknownRoles {
 		printLine(errOut, "ATTENTION — la base porte le rôle par défaut %q, que le code ne décrit "+
-			"plus", role)
+			"plus.\n  Ni le rôle ni ses attributions ne sont touchés : le vider dépossèderait sans "+
+			"rien dire les\n  opérateurs qui le détiennent. Le retirer est une migration, qui "+
+			"détache ses opérateurs\n  d'abord.", role)
 	}
-
-	printLine(errOut, "  Rien n'est supprimé : le retrait d'une clé encore accordée échouerait sur "+
-		"la contrainte,\n  et un retrait silencieux dépossèderait les rôles qui la détiennent. Ce "+
-		"retrait est une\n  migration, qui révoque d'abord.")
 }
 
 func printCount(out io.Writer, count int, what string) {

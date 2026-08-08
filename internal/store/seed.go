@@ -10,6 +10,17 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 )
 
+// SeedLockKey est la clé du verrou consultatif que `Seed` prend pour toute sa transaction.
+//
+// Elle est exportée pour que les tests puissent l'observer dans `pg_locks` — c'est le seul endroit
+// d'où un verrou se constate, deux exécutions concurrentes se croisant trop rarement pour qu'un test
+// qui les lance prouve quoi que ce soit.
+//
+// La valeur n'a pas de sens en soi ; elle doit seulement être stable d'une version à l'autre et ne
+// pas entrer en collision avec celle de goose (`5887940537704921958`), qui verrouille les migrations
+// sur la même base.
+const SeedLockKey int64 = 7_020_020_020_020_020
+
 // Grant est une attribution : le rôle par défaut, et la clé qu'il accorde.
 type Grant struct {
 	Role string
@@ -94,6 +105,25 @@ func Seed(ctx context.Context, dsn string) (SeedOutcome, error) {
 func seedWithin(ctx context.Context, tx pgx.Tx) (SeedOutcome, error) {
 	var outcome SeedOutcome
 
+	// Le verrou avant la première lecture, et rendu par la fin de la transaction — `xact` et non
+	// `session` : il n'y a rien à libérer à la main, y compris sur le chemin d'erreur.
+	//
+	// Il existe pour la raison qui a fait poser `WithSessionLocker` sur les migrations : deux
+	// exécutions concurrentes sur une base pas encore semée verraient toutes deux la même clé
+	// absente et l'insèreraient, et la seconde échouerait sur `permissions_pkey`. Les CTE se gardent
+	// par `NOT EXISTS` sur snapshot, ce qui ne sérialise rien. Faire échouer une livraison sur le cas
+	// le plus fréquent — la première installation — contredirait DN-4, qui refuse d'arrêter un
+	// déploiement pour un état qui n'empêche rien.
+	//
+	// **Sa position en tête est tenue par la lecture, par aucun test**, et c'est mesuré : le glisser
+	// après `seedPermissions` laisse `seed_lock_test.go` vert — il observe que le seed attend, pas
+	// qu'il attend avant d'avoir écrit. L'exercer demanderait de voir dans une transaction non
+	// validée, ou de lancer deux exécutions en espérant la collision, ce qui rendrait vert « elles ne
+	// se sont pas croisées ».
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", SeedLockKey); err != nil {
+		return SeedOutcome{}, fmt.Errorf("prendre le verrou du seed : %w", err)
+	}
+
 	if err := seedPermissions(ctx, tx, &outcome); err != nil {
 		return SeedOutcome{}, err
 	}
@@ -120,9 +150,11 @@ func seedWithin(ctx context.Context, tx pgx.Tx) (SeedOutcome, error) {
 // 44 lignes à l'identique et se rapporterait comme ayant changé quelque chose. C'est lui qui rend
 // « rejouer ne change rien » observable plutôt que supposé.
 //
-// La CTE `unknown` lit `permissions` sur le **snapshot d'avant l'instruction** : les lignes que
-// `inserted` vient de poser ne s'y voient pas, donc une base vierge ne se signale pas 44 clés
-// inconnues à elle-même.
+// La troisième branche du `SELECT` final — celle qui classe `unknown` — ne peut pas croiser les deux
+// autres : son prédicat est `NOT EXISTS (… wanted …)`, et tout ce qu'`inserted` et `updated`
+// touchent vient de `wanted`. C'est **ce prédicat** qui fait qu'une base vierge ne se signale pas 44
+// clés inconnues à elle-même, et non la sémantique de snapshot — une première rédaction de ce
+// commentaire l'attribuait à celle-ci, ce qui expliquait un code correct par une raison qu'il n'a pas.
 const upsertPermissions = `
 WITH wanted (key, category, description) AS (
 	SELECT * FROM unnest($1::text[], $2::text[], $3::text[])
@@ -206,6 +238,13 @@ UNION ALL SELECT 'updated', name FROM updated
 UNION ALL SELECT 'unknown', r.name FROM roles r
 	WHERE r.is_default AND NOT EXISTS (SELECT 1 FROM wanted w WHERE w.name = r.name)`
 
+// Ce que `upsertRoles` ne distingue pas, et qu'il faut savoir : **l'identité d'un rôle est son nom**.
+// Un rôle composé depuis l'écran qui porterait le nom d'un rôle par défaut — celui d'aujourd'hui, ou
+// celui qu'une release future ajoutera — serait basculé en `is_default`, verrait sa description
+// écrasée et ses attributions ramenées à la liste du code. Le rapport le compte, donc ce n'est pas
+// silencieux, mais c'est destructeur par défaut. C'est la seconde moitié de la question léguée à
+// step-029, qui décidera si l'écran interdit ces neuf noms ou ce qu'il fait d'une collision.
+
 func seedRoles(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error {
 	defaults := permissions.DefaultRoles()
 
@@ -244,6 +283,13 @@ func seedRoles(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error {
 // ligne dans `wanted`, et un rôle marqué `is_default` que le code ne décrit plus est signalé comme
 // inconnu par la requête précédente, qui le laisse intact — le dépouiller ici serait deux traitements
 // contraires du même cas.
+//
+// L'invariant exact est « révoquer sur les rôles **dont le code liste au moins une clé** », et non
+// « sur les rôles que le code nomme » : `wanted` est bâtie depuis les couples (rôle, clé), donc un
+// rôle par défaut dont la liste deviendrait vide en sortirait, et garderait indéfiniment tout ce
+// qu'il détient. Ce n'est pas livrable aujourd'hui — `roles_test.go` exige que chaque rôle accorde
+// quelque chose — mais c'est le SQL qui ne se défend pas seul, et deux des neuf rôles n'ont qu'une
+// clé.
 //
 // Un `AND r.is_default` a d'abord été écrit à côté, et **mesuré inatteignable** : le retirer seul
 // laissait les huit scénarios et les tests unitaires verts. La raison est deux instructions plus

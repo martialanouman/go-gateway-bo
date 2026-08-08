@@ -2,7 +2,6 @@ package store_test
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -52,8 +51,8 @@ func TestUnSchemaEnRetardFaitRefuser(t *testing.T) {
 	// L'exploitant qui lit ce message doit savoir quoi jouer, donc les deux nombres y sont. Les
 	// chercher dans le texte plutôt que dans la structure : c'est le message qui atterrit dans les
 	// journaux, et une structure bien remplie derrière un message muet ne sert personne.
-	assert.Contains(t, err.Error(), strconv.FormatInt(embedded-1, 10))
-	assert.Contains(t, err.Error(), strconv.FormatInt(embedded, 10))
+	assert.Contains(t, err.Error(), store.AppliedVersionPhrase(remaining))
+	assert.Contains(t, err.Error(), store.ExpectedVersionPhrase(embedded))
 }
 
 // Le cas de l'installation qu'on a oublié de migrer. Il porte en plus l'assertion qui compte le
@@ -118,13 +117,44 @@ func TestUnSchemaEnAvanceLaisseDemarrer(t *testing.T) {
 }
 
 // Le DSN porte le mot de passe de la base, et cette erreur remonte jusqu'aux journaux de démarrage.
+//
+// La forme `password = '…'` avec espaces est choisie exprès : c'est celle que la rédaction de pgconn
+// **laisse passer** (mesurée en step-005, ses deux expressions rationnelles sont ancrées sur
+// `password='…'` et `password=…`). Écrit en URL, ce test resterait vert même si l'erreur de la
+// bibliothèque était propagée telle quelle — il aurait alors prouvé le travail de pgx, pas le nôtre.
 func TestUnDSNIllisibleNeRecopieJamaisLeMotDePasse(t *testing.T) {
 	t.Parallel()
 
-	err := store.VerifySchema(t.Context(), "postgres://operateur:tr3s-secret@:/ pas un dsn")
+	const password = "tr3s-secret"
+
+	err := store.VerifySchema(t.Context(), "password = '"+password+"' host=localhost sslmode=zzz")
 
 	require.Error(t, err)
-	assert.NotContains(t, err.Error(), "tr3s-secret")
+	assert.NotContains(t, err.Error(), password)
+}
+
+// Le cas que step-005 (DN-7) léguait à la première step qui lirait la base : **DSN bien formé, base
+// injoignable**. Il n'était couvert par rien, alors que `configuration.feature` renvoyait déjà ici.
+//
+// Ce qu'il tient : le refus n'est pas confondu avec « schéma en retard ». Annoncer « version 0 »
+// pour une base qu'on n'a pas jointe enverrait l'exploitant jouer des migrations qui sont peut-être
+// déjà là, sur une base qui ne répond pas.
+func TestUneBaseInjoignableNEstPasPriseEnLenteurPourUnSchemaEnRetard(t *testing.T) {
+	t.Parallel()
+
+	// Le port 1 n'écoute nulle part et refuse immédiatement, là où une adresse routée mais muette
+	// ferait attendre ce test aussi longtemps que la borne de connexion.
+	err := store.VerifySchema(t.Context(),
+		"postgres://dashboard:dashboard@127.0.0.1:1/dashboard?sslmode=disable")
+
+	require.Error(t, err, "une base injoignable a laissé le binaire démarrer")
+
+	var outdated store.OutdatedSchemaError
+
+	assert.NotErrorAs(t, err, &outdated,
+		"une base injoignable est rapportée comme un schéma en retard : l'exploitant irait jouer des "+
+			"migrations sur une base qui ne répond pas")
+	assert.NotContains(t, err.Error(), "dashboard:dashboard", "le DSN est reparti dans l'erreur")
 }
 
 // deleteLatestAppliedVersion retire de la table de version la dernière migration appliquée. Elle

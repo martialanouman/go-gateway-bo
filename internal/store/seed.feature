@@ -14,6 +14,8 @@ Fonctionnalité: Le vocabulaire de l'autorisation est semé depuis le catalogue 
     Quand le seed est joué
     Alors le catalogue du code et celui de la base coïncident
     Et les neuf rôles par défaut accordent ce que le code leur donne
+    Et le rapport annonce avoir posé tout le vocabulaire
+    Et le rapport ne signale aucune divergence
 
   Scénario: rejouer le seed ne change rien et n'échoue pas
     Étant donné une base migrée
@@ -21,6 +23,7 @@ Fonctionnalité: Le vocabulaire de l'autorisation est semé depuis le catalogue 
     Quand le seed est rejoué
     Alors la seconde exécution ne rapporte aucun changement
     Et le vocabulaire de la base est inchangé
+    Et le rapport ne signale aucune divergence
 
   Scénario: une description réécrite à la main est remise à ce que le catalogue dit
     Étant donné une base migrée
@@ -36,7 +39,7 @@ Fonctionnalité: Le vocabulaire de l'autorisation est semé depuis le catalogue 
     Et une clé "legacy:read" posée en base hors du catalogue
     Quand le seed est rejoué
     Alors le rapport nomme "legacy:read" comme inconnue du catalogue
-    Et "legacy:read" est toujours en base
+    Et la clé "legacy:read" est toujours en base
 
   Scénario: une attribution ajoutée à la main sur un rôle par défaut est révoquée
     Étant donné une base migrée

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/cucumber/godog"
@@ -25,12 +26,14 @@ func initializeSeedScenario(ctx *godog.ScenarioContext) {
 	ctx.When(`^le seed est (?:joué|rejoué)$`, seed.seed)
 	ctx.Then(`^le catalogue du code et celui de la base coïncident$`, seed.catalogsMatch)
 	ctx.Then(`^les neuf rôles par défaut accordent ce que le code leur donne$`, seed.defaultRolesMatch)
+	ctx.Then(`^le rapport annonce avoir posé tout le vocabulaire$`, seed.reportedSeedingEverything)
+	ctx.Then(`^le rapport ne signale aucune divergence$`, seed.reportedNoDivergence)
 	ctx.Then(`^la seconde exécution ne rapporte aucun changement$`, seed.lastRunChangedNothing)
 	ctx.Then(`^le vocabulaire de la base est inchangé$`, seed.vocabularyIsUnchanged)
 	ctx.Then(`^"([^"]+)" a retrouvé la description du catalogue$`, seed.descriptionMatchesCatalog)
 	ctx.Then(`^la seconde exécution ne rapporte que la mise à jour de "([^"]+)"$`, seed.lastRunUpdatedOnly)
 	ctx.Then(`^le rapport nomme "([^"]+)" comme inconnue du catalogue$`, seed.reportedAsUnknown)
-	ctx.Then(`^"([^"]+)" est toujours en base$`, seed.keyIsStillThere)
+	ctx.Then(`^la clé "([^"]+)" est toujours en base$`, seed.keyIsStillThere)
 	ctx.Then(`^le rapport révoque "([^"]+)" du rôle "([^"]+)"$`, seed.reportedAsRevoked)
 	ctx.Then(`^le rôle "([^"]+)" n'accorde plus "([^"]+)"$`, seed.roleNoLongerGrants)
 	ctx.Then(`^le rôle "([^"]+)" accorde toujours "([^"]+)"$`, seed.roleStillGrants)
@@ -122,7 +125,7 @@ func (w *seedWorld) catalogsMatch(ctx context.Context) error {
 
 	if len(inDatabase) > 0 {
 		return fmt.Errorf("la base porte %d clé(s) que le catalogue ne déclare pas : %v",
-			len(inDatabase), slices.Sorted(maps(inDatabase)))
+			len(inDatabase), slices.Sorted(maps.Keys(inDatabase)))
 	}
 
 	return nil
@@ -130,6 +133,11 @@ func (w *seedWorld) catalogsMatch(ctx context.Context) error {
 
 func (w *seedWorld) defaultRolesMatch(ctx context.Context) error {
 	granted, err := w.grantsByRole(ctx)
+	if err != nil {
+		return err
+	}
+
+	described, err := w.roleDescriptions(ctx)
 	if err != nil {
 		return err
 	}
@@ -153,7 +161,78 @@ func (w *seedWorld) defaultRolesMatch(ctx context.Context) error {
 				role.Name, actual, expected)
 		}
 
+		// La description est de la copie que l'écran de gestion des rôles affiche telle quelle : sans
+		// ce contrôle, le seed pouvait projeter n'importe quel texte sans qu'une porte le voie.
+		if described[role.Name] != role.Description {
+			return fmt.Errorf("le rôle %q est décrit en base par %q, et dans le code par %q",
+				role.Name, described[role.Name], role.Description)
+		}
+
 		delete(granted, role.Name)
+	}
+
+	// Le reliquat, sans quoi la boucle ci-dessus se lisait comme une comparaison bidirectionnelle
+	// sans en être une : un rôle `is_default` de trop passait inaperçu.
+	if len(granted) > 0 {
+		return fmt.Errorf("la base porte %d rôle(s) que le code ne décrit pas : %v",
+			len(granted), slices.Sorted(maps.Keys(granted)))
+	}
+
+	return nil
+}
+
+func (w *seedWorld) roleDescriptions(ctx context.Context) (map[string]string, error) {
+	rows, err := w.query(ctx, "SELECT name, description FROM roles")
+	if err != nil {
+		return nil, err
+	}
+
+	described := map[string]string{}
+	for _, row := range rows {
+		described[row[0]] = row[1]
+	}
+
+	return described, nil
+}
+
+func (w *seedWorld) reportedSeedingEverything() error {
+	catalog := permissions.All()
+	if len(w.lastOutcome.PermissionsInserted) != len(catalog) {
+		return fmt.Errorf("le rapport annonce %d clé(s) posée(s) pour %d au catalogue",
+			len(w.lastOutcome.PermissionsInserted), len(catalog))
+	}
+
+	defaults := permissions.DefaultRoles()
+	if len(w.lastOutcome.RolesInserted) != len(defaults) {
+		return fmt.Errorf("le rapport annonce %d rôle(s) posé(s) pour %d dans le code",
+			len(w.lastOutcome.RolesInserted), len(defaults))
+	}
+
+	var expectedGrants int
+	for _, role := range defaults {
+		expectedGrants += len(role.Keys)
+	}
+
+	if len(w.lastOutcome.GrantsAdded) != expectedGrants {
+		return fmt.Errorf("le rapport annonce %d attribution(s) pour %d dans le code",
+			len(w.lastOutcome.GrantsAdded), expectedGrants)
+	}
+
+	if !w.lastOutcome.Changed() {
+		return errors.New("le rapport se dit sans changement après avoir rempli une base vide")
+	}
+
+	return nil
+}
+
+// reportedNoDivergence est le pendant négatif, et il manquait : `Diverges()` n'était jamais affirmé
+// faux nulle part. Retirer le `NOT EXISTS` de la branche qui classe `unknown` faisait alors signaler
+// les 44 clés du catalogue comme inconnues **du catalogue**, à chaque déploiement, suite verte.
+func (w *seedWorld) reportedNoDivergence() error {
+	if w.lastOutcome.Diverges() {
+		return fmt.Errorf("le rapport signale une divergence sur une base que le seed vient de "+
+			"remplir lui-même : permissions %v, rôles %v",
+			w.lastOutcome.UnknownPermissions, w.lastOutcome.UnknownRoles)
 	}
 
 	return nil
@@ -189,6 +268,10 @@ func (w *seedWorld) vocabularyIsUnchanged(ctx context.Context) error {
 func (w *seedWorld) rewriteDescription(ctx context.Context, key string) error {
 	return w.exec(ctx, "UPDATE permissions SET description = 'réécrite à la main' WHERE key = $1", key)
 }
+
+// grantsByRole, roleDescriptions et les `Étant donné` qui écrivent partagent une exigence : avoir
+// touché une ligne. Sans elle, `Étant donné la description de "audit:reed" réécrite à la main` ne
+// prépare rien, et le `Alors` qui suit est vrai sans avoir rien observé.
 
 func (w *seedWorld) descriptionMatchesCatalog(ctx context.Context, key string) error {
 	rows, err := w.query(ctx, "SELECT description FROM permissions WHERE key = $1", key)
@@ -427,8 +510,13 @@ func (w *seedWorld) exec(ctx context.Context, sql string, args ...any) error {
 
 	defer func() { _ = conn.Close(ctx) }()
 
-	if _, err = conn.Exec(ctx, sql, args...); err != nil {
+	tag, err := conn.Exec(ctx, sql, args...)
+	if err != nil {
 		return fmt.Errorf("écrire dans la base du scénario : %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("la mise en scène du scénario n'a touché aucune ligne : %s", sql)
 	}
 
 	return nil
@@ -445,14 +533,4 @@ func (w *seedWorld) connect(ctx context.Context) (*pgx.Conn, error) {
 	}
 
 	return conn, nil
-}
-
-func maps(m map[permissions.Key]permissions.Entry) func(func(string) bool) {
-	return func(yield func(string) bool) {
-		for key := range m {
-			if !yield(string(key)) {
-				return
-			}
-		}
-	}
 }

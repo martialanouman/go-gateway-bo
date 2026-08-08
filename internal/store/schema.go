@@ -31,10 +31,25 @@ type OutdatedSchemaError struct {
 // le journalise sous « le serveur s'arrête ».
 func (e OutdatedSchemaError) Error() string {
 	return fmt.Sprintf(
-		"le schéma de la base est en version %d, ce binaire attend la version %d : les migrations "+
-			"doivent être jouées d'abord. Travailler sur un schéma en retard produirait des échecs "+
-			"de forme inconnue à l'exécution, sur des colonnes absentes",
-		e.Applied, e.Embedded)
+		"le schéma de la base est %s, ce binaire %s : les migrations doivent être jouées d'abord. "+
+			"Travailler sur un schéma en retard produirait des échecs de forme inconnue à "+
+			"l'exécution, sur des colonnes absentes",
+		AppliedVersionPhrase(e.Applied), ExpectedVersionPhrase(e.Embedded))
+}
+
+// AppliedVersionPhrase et ExpectedVersionPhrase nomment une version dans le message de refus.
+//
+// Elles sont exportées **pour être exigées par les tests**, et cette exportation est le correctif
+// d'un défaut mesuré : la version précédente des scénarios cherchait le nombre nu dans la sortie du
+// process, or celle-ci est du JSON `slog` horodaté — « 0 » et « 2 » sont tous deux dans « 2026 », si
+// bien qu'un message vidé de ses deux versions restait vert. Une phrase entière ne se trouve pas par
+// accident.
+func AppliedVersionPhrase(applied int64) string {
+	return fmt.Sprintf("en version %d", applied)
+}
+
+func ExpectedVersionPhrase(embedded int64) string {
+	return fmt.Sprintf("attend la version %d", embedded)
 }
 
 // VerifySchema refuse un schéma en retard sur celui que ce binaire embarque.

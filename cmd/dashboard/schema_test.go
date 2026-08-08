@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
-	"strconv"
 	"strings"
+
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // schemaWorld porte ce que le scénario du schéma doit connaître pour lire le message de refus : la
@@ -59,6 +61,8 @@ func (w *schemaWorld) pointTheServerAt(dsn string) error {
 			"plus varier ce qu'il annonce")
 	}
 
+	// Ce que les pas précédents ont déjà posé est conservé — l'adresse d'écoute occupée, par exemple.
+	maps.Copy(env, w.process.env)
 	env["DASHBOARD_DATABASE_URL"] = dsn
 	w.process.env = env
 
@@ -75,6 +79,14 @@ func (w *schemaWorld) occupyListenAddress() error {
 	}
 
 	w.occupied = listener
+
+	// L'environnement est complété plutôt que supposé présent : `pointTheServerAt` le **remplace**
+	// en entier, donc écrire ici dans une map que ce pas-là recréerait ensuite perdrait l'adresse en
+	// silence si l'ordre des `Étant donné` changeait. Une map nil paniquerait, en plus.
+	if w.process.env == nil {
+		w.process.env = completeConfiguration()
+	}
+
 	w.process.env["DASHBOARD_ADDR"] = listener.Addr().String()
 
 	return nil
@@ -106,15 +118,19 @@ func (w *schemaWorld) messageNamesTheSchemaNotTheAddress() error {
 // messageNamesBothVersions lit le message **tel que le binaire l'imprime**, et non la structure
 // d'erreur qui le porte : c'est ce texte qui atterrit dans les journaux de déploiement, et c'est de
 // lui seul qu'un exploitant tire quoi faire.
+//
+// Il cherche les **phrases** que le message compose, jamais les nombres nus. La version précédente
+// faisait l'inverse et ne prouvait rien : la sortie du process est du JSON `slog` horodaté, où « 0 »
+// et « 2 » figurent tous deux dans « 2026 » — un message vidé de ses deux versions restait vert.
 func (w *schemaWorld) messageNamesBothVersions() error {
 	output := w.process.output.String()
 
-	for label, version := range map[string]int64{
-		"la version trouvée":  w.applied,
-		"la version attendue": suiteSchemaVersion,
+	for label, phrase := range map[string]string{
+		"la version trouvée":  store.AppliedVersionPhrase(w.applied),
+		"la version attendue": store.ExpectedVersionPhrase(suiteSchemaVersion),
 	} {
-		if !strings.Contains(output, strconv.FormatInt(version, 10)) {
-			return fmt.Errorf("le message ne nomme pas %s (%d) :\n%s", label, version, output)
+		if !strings.Contains(output, phrase) {
+			return fmt.Errorf("le message ne nomme pas %s (%q) :\n%s", label, phrase, output)
 		}
 	}
 

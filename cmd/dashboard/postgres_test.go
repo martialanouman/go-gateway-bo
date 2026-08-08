@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"sync/atomic"
@@ -38,7 +37,7 @@ const (
 )
 
 // suiteDSN désigne la base d'administration du conteneur de la suite ; migratedSuiteDSN désigne une
-// base à jour, celle avec laquelle démarrent les scénarios qui n'ont rien à dire du schéma. Les deux
+// base à jour, celle avec laquelle démarrent les scénarios qui n'ont rien à dire du schéma. Toutes
 // sont posées par `TestMain` avant tout scénario, et lues seulement ensuite.
 var suiteDSN, migratedSuiteDSN string
 
@@ -77,12 +76,40 @@ func startPostgres(ctx context.Context) (func(), error) {
 		return terminate, err
 	}
 
+	// Relevée **ici et nulle part ailleurs**, sur une base déjà migrée. La version précédente
+	// l'écrivait depuis `migratedDatabase`, donc aussi depuis un pas de scénario — sans course
+	// aujourd'hui, godog exécutant en séquence, mais une écriture non synchronisée qui aurait viré au
+	// rouge sous `-race` le jour où quelqu'un pose `Concurrency`.
+	if suiteSchemaVersion, err = appliedSchemaVersion(ctx, migratedSuiteDSN); err != nil {
+		return terminate, err
+	}
+
 	if suiteSchemaVersion == 0 {
 		return terminate, fmt.Errorf("les migrations n'ont pas relevé de version : le scénario du " +
 			"schéma en retard comparerait à zéro")
 	}
 
 	return terminate, nil
+}
+
+// appliedSchemaVersion lit la version que la base porte, sans passer par le produit : ce que le
+// harnais affirme doit venir d'ailleurs que de ce qu'il contrôle.
+func appliedSchemaVersion(ctx context.Context, dsn string) (int64, error) {
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		return 0, fmt.Errorf("se connecter pour relever la version du schéma : %w", err)
+	}
+
+	defer func() { _ = conn.Close(ctx) }()
+
+	var version int64
+
+	if err = conn.QueryRow(ctx,
+		"SELECT coalesce(max(version_id), 0) FROM goose_db_version").Scan(&version); err != nil {
+		return 0, fmt.Errorf("relever la version du schéma : %w", err)
+	}
+
+	return version, nil
 }
 
 var databaseCounter atomic.Uint64
@@ -114,12 +141,9 @@ func migratedDatabase(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	outcome, err := store.Migrate(ctx, dsn)
-	if err != nil {
+	if _, err = store.Migrate(ctx, dsn); err != nil {
 		return "", fmt.Errorf("migrer la base de test : %w", err)
 	}
-
-	suiteSchemaVersion = outcome.Version
 
 	return dsn, nil
 }
@@ -142,16 +166,13 @@ func outdatedDatabase(ctx context.Context) (dsn string, remaining int64, err err
 
 	var forgotten int64
 
+	// Un `RETURNING` qui ne supprime rien rend `pgx.ErrNoRows`, capté ici : il n'y a pas de garde
+	// `forgotten == 0` à écrire en dessous, elle serait inatteignable.
 	err = conn.QueryRow(ctx,
 		"DELETE FROM goose_db_version WHERE version_id = (SELECT max(version_id) FROM "+
 			"goose_db_version) RETURNING version_id").Scan(&forgotten)
 	if err != nil {
 		return "", 0, fmt.Errorf("faire oublier la dernière migration : %w", err)
-	}
-
-	if forgotten == 0 {
-		return "", 0, errors.New("la base n'avait aucune migration à oublier : le scénario partirait " +
-			"d'un schéma déjà en retard pour une autre raison")
 	}
 
 	// Lue plutôt que déduite de `forgotten - 1` : rien n'oblige la prochaine migration à s'appeler
