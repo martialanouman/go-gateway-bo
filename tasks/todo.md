@@ -56,7 +56,7 @@ Versions Go relevées sur `proxy.golang.org` le 01/08/2026 ; versions JS telles 
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat API | `@martialanouman/gateway-api-contracts` | **2.5.0** |
+| Contrat API | `@martialanouman/gateway-api-contracts` | **4.0.2** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests client | Vitest + Playwright | 4.1.10 / 1.62.0 |
 | Langage client | TypeScript, `strict` | 7.0.2 |
@@ -89,8 +89,8 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 
 - **Le contrat est la source de vérité.** Le dépôt ne copie jamais un YAML : il consomme le package
   versionné. Tout manque côté passerelle se règle par une PR dans `go-gateway/api/`.
-- **Le contrat bouge vite** — quinze versions en moins de six jours, dont trois majeures (relevé le
-  02/08/2026). Relever la version disponible **au début de chaque step qui le touche**, jamais au
+- **Le contrat bouge vite** — dix-sept versions en treize jours, dont trois majeures (relevé le
+  08/08/2026). Relever la version disponible **au début de chaque step qui le touche**, jamais au
   milieu. Voir `plan.md` §1.12.
 - **Mock-first.** Chaque écran se développe contre le mock Prism ; l'intégration réelle n'est requise
   que pour les steps qui le disent.

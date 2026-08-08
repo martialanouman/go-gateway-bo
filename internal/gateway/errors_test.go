@@ -305,15 +305,20 @@ func TestErrorFromDropsAnUnreadableBody(t *testing.T) {
 
 // DN-8 : 503 est une erreur, avec Réessayer — jamais un module désactivé.
 //
-// Mesuré sur le contrat **2.5.0**, celui que la branche installe
-// (`web/node_modules/@martialanouman/gateway-api-contracts`), le 02/08/2026 : il déclare un 503 sur
-// 3 de ses 133 opérations (openapi-admin.yaml:1429, 1442, 1455) et un composant `ServiceUnavailable`
-// (ligne 1628), dont la description est *« A dependency (e.g. billing-svc) is unreachable or timed
-// out; retry once it recovers »* — un réessai, pas une extinction. Le contrat ne déclare toujours ni
-// 501, ni en-tête, ni code d'erreur pour un module désactivé : les seuls signaux voisins sont des
-// booléens par ressource, qui voyagent dans des réponses 200. Interpréter 503 comme « ce module est
-// éteint » fabriquerait donc un signal que la passerelle n'émet pas, et remplacerait un état
-// d'erreur réessayable par un écran qui n'invite à rien.
+// Mesuré sur le contrat **4.0.2**, celui que la branche installe
+// (`web/node_modules/@martialanouman/gateway-api-contracts`), le 08/08/2026 : il déclare un 503 sur
+// 4 de ses 133 opérations (openapi-admin.yaml:1429, 1442, 1455 et 1531) et un composant
+// `ServiceUnavailable` (ligne 1672), dont la description est *« A dependency (e.g. billing-svc) is
+// unreachable or timed out; retry once it recovers »* — un réessai, pas une extinction.
+//
+// La quatrième est arrivée avec la 4.0.0 et mérite d'être nommée, parce qu'elle touche ce DN de plus
+// près que les trois autres : *« Export storage is not configured in this deployment »*. C'est ce que
+// le contrat porte de plus proche d'un module désactivé — une capacité absente de ce déploiement-ci —
+// et il l'exprime quand même par un **503**, donc par une erreur avec Réessayer. Le contrat ne
+// déclare toujours ni 501, ni en-tête, ni code d'erreur pour un module désactivé : les seuls signaux
+// voisins sont des booléens par ressource, qui voyagent dans des réponses 200. Interpréter 503 comme
+// « ce module est éteint » fabriquerait donc un signal que la passerelle n'émet pas, et remplacerait
+// un état d'erreur réessayable par un écran qui n'invite à rien.
 func TestServiceUnavailableStaysAnError(t *testing.T) {
 	t.Parallel()
 

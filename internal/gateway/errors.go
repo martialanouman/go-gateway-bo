@@ -10,8 +10,8 @@ import (
 // CodeUpstreamUnreadable est le seul code que le BFF frappe lui-même : celui d'une réponse d'erreur
 // dont le corps n'est pas l'enveloppe du contrat. Le préfixe `bff_` nomme l'émetteur, et l'émetteur
 // n'est pas la passerelle — c'est ce qui interdit la confusion dans un log. Mesuré sur le contrat
-// **2.5.0**, celui que la branche installe, le 02/08/2026 : `code` n'y porte aucun `pattern`
-// (openapi-admin.yaml:1643-1646), ses exemples sont tous en snake_case (`forbidden_scope`,
+// **4.0.2**, celui que la branche installe, le 08/08/2026 : `code` n'y porte aucun `pattern`
+// (openapi-admin.yaml:1687-1690), ses exemples sont tous en snake_case (`forbidden_scope`,
 // `validation_error`…), et `grep -c bff_` rend 0 sur les deux YAML du paquet.
 const CodeUpstreamUnreadable = "bff_upstream_unreadable"
 
@@ -150,12 +150,21 @@ func (e APIError) fieldNames() []string {
 // Mesuré sur le code engendré : une opération ne matérialise un champ `JSON4xx` que pour les statuts
 // qu'elle **déclare**, et un statut non déclaré ne laisse que `Body` et `HTTPResponse`. S'appuyer
 // sur les champs typés demanderait 133 mappings et ne traiterait aucun statut non déclaré. Mesuré
-// sur le contrat **2.5.0** le 02/08/2026 : 3 de ses 133 opérations déclarent un 503
+// sur le contrat **4.0.2** le 08/08/2026 : 4 de ses 133 opérations déclarent un 503
 // (`erase-customer-content`, `rotate-content-key`, `gdpr-erase` — openapi-admin.yaml:1429, 1442,
-// 1455), et le client engendré ne matérialise `JSON503` que pour ces trois-là (client.gen.go:18206,
-// 18270, 19152) ; les 130 autres opérations n'ont aucun champ où le ranger. Comme toutes les
-// réponses d'erreur du contrat sont des alias du même schéma `Error` — `ServiceUnavailable = Error`,
-// client.gen.go:3770 —, un décodeur unique les couvre toutes.
+// 1455 — et `create-message-export`, ligne 1531, arrivée avec la 4.0.0), et le client engendré ne
+// matérialise `JSON503` que pour ces quatre-là (client.gen.go:18259, 18323, 19205, 19824) ; les 129
+// autres opérations n'ont aucun champ où le ranger. Comme toutes les réponses d'erreur du contrat
+// sont des alias du même schéma `Error` — `ServiceUnavailable = Error`, client.gen.go:3791 —, un
+// décodeur unique les couvre toutes.
+//
+// La quatrième renforce l'argument au lieu de l'entamer : elle déclare son 503 **en ligne** plutôt
+// que par `$ref`, et le champ engendré est directement `*Error`. Deux formes de déclaration, un seul
+// type à décoder — ce qu'un mapping par opération aurait dû suivre à la main.
+//
+// *(Le chiffre disait 3 jusqu'au 08/08 : mesuré sur 2.5.0 le 02/08, il est resté juste jusqu'à ce que
+// le bump l'invalide. La conclusion, elle, n'a jamais bougé — ce qui est précisément ce qui rend ce
+// genre d'erreur durable : rien ne la fait tomber.)*
 //
 // Le succès est le 2xx, et tout le reste est une erreur : un statut inattendu — 3xx non suivi, ou le
 // 0 que rend `StatusCode()` quand `HTTPResponse` est nil — tombe ainsi du côté strict plutôt que de
