@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -60,8 +61,8 @@ func operation(path, operationID string) signature {
 // contrat **2.5.0**), le 02/08/2026, en extrayant les couples chemin + operationId des deux YAML.
 // **Re-vérifiées sur le contrat 4.0.2 le 08/08/2026** (step-009, deux majeures) : les 28 signatures
 // Admin et les 7 du contrat public sont intactes — les deux majeures n'ont ajouté, retiré ni renommé
-// aucune opération. Cette re-vérification n'est plus à faire à la main :
-// TestTheSampleStillMatchesTheContractItWasTakenFrom la joue à chaque suite.
+// aucune opération. Elles n'ont plus à l'être à la main, voir
+// TestTheSampleStillMatchesTheContractItWasTakenFrom.
 //
 // L'échantillon est large parce que c'est **lui** qui sépare les deux populations, et non le seuil.
 // Mesuré : à sept opérations, une fiche de step qui en citait quatre dans un bloc clôturé était
@@ -254,10 +255,27 @@ func TestNoGatewayContractIsCopiedIntoTheRepository(t *testing.T) {
 // la seule source qui bouge — et transforme en porte ce qui était une re-mesure à la main, « à
 // refaire quand le contrat change de version majeure ». Il lit `web/node_modules/`, ce que ce package
 // fait déjà pour lancer Prism.
+//
+// **Il vérifie les couples, pas les lignes.** `declaredIn` teste l'appartenance de chaque déclaration
+// à un ensemble plat, donc rien n'y exige que le chemin et l'operationId appartiennent à la *même*
+// opération : mesuré, `operation("/admin/customers", "suspend-customer")` — une paire qui n'existe
+// dans aucun contrat — passait. C'est sans conséquence pour le verdict de copie, où les deux moitiés
+// arrivent ensemble par construction ; c'en a une ici, où l'on juge la fidélité. Le couple se lit donc
+// sur le document analysé, pas sur ses lignes.
+//
+// **Et il vérifie la taille.** Confronter les signatures présentes ne dit rien de celles qu'on
+// retire, or c'est la taille de l'échantillon qui règle le seuil (voir gatewayContracts) : en
+// retirer une abaisse la barre sans bruit. Mesuré : la suite restait verte.
 func TestTheSampleStillMatchesTheContractItWasTakenFrom(t *testing.T) {
 	t.Parallel()
 
 	root := bddtest.RepositoryRoot(t)
+
+	// Le décompte est écrit ici plutôt que dérivé : dérivé, il suivrait le rétrécissement qu'il doit
+	// interdire. Le changer est une décision, et elle passe par cette ligne.
+	require.Len(t, gatewayContracts[0].signatures, 28, "l'échantillon Admin a changé de taille")
+	require.Len(t, gatewayContracts[1].signatures, 5, "l'échantillon public a changé de taille")
+	require.Len(t, gatewayContracts[1].identity, 2, "le contrat public a perdu une marque d'identité")
 
 	for _, gatewayContract := range gatewayContracts {
 		path := filepath.Join(root, "web", "node_modules",
@@ -268,11 +286,17 @@ func TestTheSampleStillMatchesTheContractItWasTakenFrom(t *testing.T) {
 			gatewayContract.npmFile)
 
 		declared := declarationsIn(string(content))
+		operations := operationsDeclaredIn(t, path)
 
 		// L'identité est vérifiée avec les signatures : c'est elle qui porte le verdict sur le contrat
 		// public, donc une identité périmée y désarme la porte entièrement.
 		for _, sig := range slices.Concat(gatewayContract.identity, gatewayContract.signatures) {
-			assert.Truef(t, sig.declaredIn(declared),
+			matches := sig.declaredIn(declared)
+			if operationPath, operationID, isOperation := sig.operation(); isOperation {
+				matches = operations[operationPath+" "+operationID]
+			}
+
+			assert.Truef(t, matches,
 				"%s ne déclare plus %v : l'échantillon a dérivé du contrat qu'il prélève. Chaque "+
 					"signature perdue rapproche le décompte du seuil sans que rien ne le dise, et un "+
 					"échantillon périmé rend la porte verte sur une vraie copie. Relever la signature "+
@@ -281,6 +305,42 @@ func TestTheSampleStillMatchesTheContractItWasTakenFrom(t *testing.T) {
 				gatewayContract.npmFile, sig)
 		}
 	}
+}
+
+// operation rend le couple d'une signature bâtie par `operation()`, et dit si c'en est une. Les
+// marques d'identité — un titre, une URL de serveur — n'en sont pas : elles se lisent à plat.
+func (s signature) operation() (path, operationID string, ok bool) {
+	for _, d := range s {
+		switch {
+		case d.key == "operationId":
+			operationID = d.value
+		case strings.HasPrefix(d.key, "/"):
+			path = d.key
+		}
+	}
+
+	return path, operationID, path != "" && operationID != ""
+}
+
+// operationsDeclaredIn rend les couples « chemin operationId » que le document déclare réellement,
+// lus par l'analyseur OpenAPI plutôt que ligne à ligne. C'est la seule lecture structurelle de ce
+// fichier, et elle est ici parce que la question posée est structurelle : deux lignes présentes ne
+// font pas une opération.
+func operationsDeclaredIn(t *testing.T, contractPath string) map[string]bool {
+	t.Helper()
+
+	document, err := (&openapi3.Loader{Context: t.Context()}).LoadFromFile(contractPath)
+	require.NoErrorf(t, err, "analyse de %s", contractPath)
+
+	declared := make(map[string]bool)
+
+	for path, item := range document.Paths.Map() {
+		for _, op := range item.Operations() {
+			declared[path+" "+op.OperationID] = true
+		}
+	}
+
+	return declared
 }
 
 // Les fichiers suivis par git sont la bonne population : une copie posée dans un arbre de travail

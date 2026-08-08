@@ -89,7 +89,7 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 
 - **Le contrat est la source de vérité.** Le dépôt ne copie jamais un YAML : il consomme le package
   versionné. Tout manque côté passerelle se règle par une PR dans `go-gateway/api/`.
-- **Le contrat bouge vite** — dix-sept versions en treize jours, dont trois majeures (relevé le
+- **Le contrat bouge vite** — dix-sept versions en douze jours, dont trois majeures (relevé le
   08/08/2026). Relever la version disponible **au début de chaque step qui le touche**, jamais au
   milieu. Voir `plan.md` §1.12.
 - **Mock-first.** Chaque écran se développe contre le mock Prism ; l'intégration réelle n'est requise
@@ -213,7 +213,17 @@ sur un schéma en retard protège quelque chose. *(Arbitré le 02/08/2026, au d�
 - [ ] step-101 — Fiche message composée côté BFF
 - [ ] step-102 — Visualiseur de trace (cascade de spans)
 - [ ] step-103 — Corps du message gardé par `content:read` + journal des accès  *(invariant a)*
-- [ ] step-104 — Export CSV asynchrone gouverné
+- [ ] step-104 — Export CSV asynchrone gouverné ◊
+
+◊ **Le jeton machine ne porte pas le scope que ces opérations exigent, et rien ne le dira.** Le contrat
+exige `cdr:export_bulk` sur `create-message-export` et `get-message-export` (depuis la 4.0.0), et
+`msisdn:reveal` pour un export non masqué. `internal/gateway/client.go` n'en demande aucun des deux :
+step-009 l'a constaté et a **choisi** de ne pas élargir le jeton machine pour du code qui n'existait
+pas encore. oapi-codegen n'engendrant rien du `security`, le symptôme sera un **403 de la passerelle**
+sur du code qui compile — et le réflexe sera de chercher du côté de `RequirePermission()`, puisque
+`cdr:export_bulk` est **aussi** une permission BFF (§6.10). Deux objets homonymes, deux couches : le
+403 vient du jeton sortant, pas de la garde entrante. Décider en connaissance de cause, et corriger
+au passage le manque amont — `cdr:export_bulk` est exigé par le contrat sans y être catalogué.
 
 ## M6 — Routage & scripts  (§6.1, §6.2, §6.7, §6.13)
 - [ ] step-120 — Routes : table par priorité + réordonnancement souris et clavier

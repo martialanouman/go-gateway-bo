@@ -284,7 +284,7 @@ Conséquences :
 ### 1.12 Le contrat bouge pendant le développement — le suivre est une tâche, pas un réflexe
 
 `@martialanouman/gateway-api-contracts` est publié à chaque merge sur `main` de `go-gateway` touchant
-`api/**`. **Dix-sept versions en treize jours** — 1.0.0 le 27/07/2026 à 01:28 UTC, 4.0.3 le 08/08 à
+`api/**`. **Dix-sept versions en douze jours** — 1.0.0 le 27/07/2026 à 01:28 UTC, 4.0.3 le 08/08 à
 12:04 —, dont **trois majeures**, et quinze des dix-sept dans les six premiers jours. Relevé le
 08/08/2026 par `pnpm view @martialanouman/gateway-api-contracts versions time`, depuis `web/` pour que
 l'authentification de GitHub Packages soit prise en compte ; c'est la façon de le rejouer. Ce dépôt en

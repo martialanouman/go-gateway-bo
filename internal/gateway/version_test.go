@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -73,7 +74,7 @@ func versionsAnnouncedIn(content string) []string {
 
 	versions := make([]string, 0, len(matches))
 	for _, match := range matches {
-		versions = append(versions, match[1])
+		versions = append(versions, strings.TrimSpace(match[1]))
 	}
 
 	return versions
