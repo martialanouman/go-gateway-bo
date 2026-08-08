@@ -1,6 +1,6 @@
 # step-008 — Charte portée : tokens, `/_design`, contraste vérifié
 
-> **Jalon :** M0 (§1.7 de la charte) · **Statut :** À FAIRE
+> **Jalon :** M0 (§1.7 de la charte) · **Statut :** LIVRÉE (08/08/2026)
 > **Dépend de :** step-001, step-007 · **Bloque :** step-041, step-042, step-040
 
 ## But
@@ -34,10 +34,36 @@ Rendre la charte utilisable : les tokens portés sous `web/src/styles/`, la page
 - `/_design` rend sans erreur de console et sans requête réseau sortante vers un tiers.
 
 ## Definition of Done
-- [ ] `make check` vert
-- [ ] `/_design` montre la charte complète et sert de référence aux steps d'interface
-- [ ] aucune police ni feuille de style chargée depuis un domaine tiers, **vérifié sur le binaire**
-- [ ] les deux mutations ci-dessus ont été jouées
+- [x] **`make check` vert** (08/08, onze portes) · **`make e2e` vert**, qui en est hors et que la
+      première case ne couvre donc pas
+- [x] **`/_design` montre la charte complète** — six familles de tokens, et le test refuse qu'une
+      section disparaisse *ou* qu'une septième apparaisse sans être annoncée. Elle sert de référence
+      parce que ses tables **sont** celles que le contrôle de contraste juge, ce qui n'était pas le
+      cas avant la revue
+- [x] **aucune police ni feuille chargée depuis un domaine tiers, vérifié sur le binaire** — l'étape
+      CI suit la feuille puis une police dans les octets servis (signature `wOF2`, `content_type`), et
+      le parcours Playwright écoute les requêtes d'un vrai navigateur, avec un plancher « au moins un
+      `.woff2` ». Muté des deux côtés : `fonts.css` rebranché sur Google Fonts, puis privé de tout
+      `@import`
+- [x] **les deux mutations nommées ont été jouées**, et onze autres avec elles — voir les tableaux
+      ci-dessus. Trois d'entre elles étaient d'abord mal construites et se lisaient comme des succès
+
+### Les quatre critères transverses de `CLAUDE.md`
+
+1. **Le chemin qu'un humain traverse.** `/_design` est traversée **sur le binaire**, dans le parcours
+   existant étendu — pas dans un routeur monté en mémoire. On y lit la police réellement peinte, ce
+   que jsdom ne sait pas faire : `getComputedStyle` de Chromium résout les `var()` et les
+   `color-mix()`. Muté en retirant IBM Plex Sans de `--font-sans` : rouge.
+2. **Toute affirmation confrontée à sa source.** Deux chiffres écrits dans cette PR étaient périmés au
+   moment où la revue les a relus — la taille de la feuille et le nombre de fichiers de police — et
+   une phrase affichée **à l'écran** promettait une vérification qui n'existait pas. Les trois sont
+   corrigés sur la sortie livrée, pas sur l'intention.
+3. **Mutation partout où le retrait laisserait la suite verte.** Treize jouées. Quatre gardes ne
+   gardaient rien avant la revue ; trois mutations ont dû être refaites parce que leur première forme
+   ne reproduisait aucun défaut.
+4. **Ce qui n'est pas testable est écrit là où il vit.** Ce que le plugin ne voit pas est dans le
+   plugin ; ce que l'étape CI ne couvre pas est dans l'étape ; la règle qui découle du 4,21 est dans
+   le test, à l'intention de step-041.
 
 ## Hérité de step-001, à traiter ici
 - **La feuille de style de l'application bloque la première peinture.** Vite émet un
