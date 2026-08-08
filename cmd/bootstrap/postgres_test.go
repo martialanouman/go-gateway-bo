@@ -22,6 +22,12 @@ import (
 // `report` — parce que les cas voisins appellent `report` eux-mêmes plutôt que la commande.
 //
 // Même contrat qu'ailleurs : aucun skip. Un Docker absent fait rouge.
+//
+// **Ce que ce `TestMain` coûte, et qui n'est pas gratuit** : les sept cas de `main_test.go` — refus
+// d'argument, entrée vide, mise en forme du rapport — n'avaient besoin de rien et tournaient sur un
+// poste sans Docker. Ils ne le peuvent plus, un `TestMain` valant pour tout le paquet. C'est le prix
+// d'exercer la commande pour de bon, et il est assumé ici plutôt que contourné par un `t.Skip` qui
+// rendrait vert un paquet n'ayant rien exercé.
 const postgresImage = "postgres:18-alpine"
 
 const (

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/pressly/goose/v3/lock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/martialanouman/go-gateway-bo/internal/store"
@@ -21,6 +23,16 @@ import (
 // concurrents passent la plupart du temps sans se croiser, et le test vert dirait alors « ils ne se
 // sont pas rencontrés » plutôt que « le verrou tient ». Ici, une transaction de contrôle prend le
 // verrou d'abord et ne le rend qu'à la fin : `Seed` doit attendre, ce qui est un fait binaire.
+// `pg_advisory_xact_lock` et le `pg_try_advisory_lock` que goose prend pour les migrations partagent
+// le même espace d'identifiants : la même valeur ferait attendre un seed derrière une migration
+// concurrente, ou l'inverse. Les deux constantes sont comparées plutôt que recopiées — un nombre
+// recopié dans un commentaire n'est vérifié par personne, et celui qui l'était était faux.
+func TestLeVerrouDuSeedNEntrePasEnCollisionAvecCeluiDeGoose(t *testing.T) {
+	t.Parallel()
+
+	assert.NotEqual(t, lock.DefaultLockID, store.SeedLockKey)
+}
+
 func TestUnSecondSeedAttendLePremierPlutotQueDEchouer(t *testing.T) {
 	t.Parallel()
 
@@ -74,7 +86,12 @@ func waitingForSeedLock(ctx context.Context, t *testing.T, conn *pgx.Conn) bool 
 
 	require.NoError(t, conn.QueryRow(ctx,
 		"SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted "+
-			"AND ((classid::bigint << 32) | objid::bigint) = $1)", store.SeedLockKey).Scan(&waiting))
+			// `objsubid = 1` est la forme `bigint` du verrou, celle que prend le seed ; `database`
+			// borne la question à la base de ce test, `pg_locks` étant visible pour tout le cluster
+			// et cette suite tournant en parallèle contre un conteneur unique.
+			"AND objsubid = 1 AND database = (SELECT oid FROM pg_database WHERE datname = "+
+			"current_database()) AND ((classid::bigint << 32) | objid::bigint) = $1)",
+		store.SeedLockKey).Scan(&waiting))
 
 	return waiting
 }

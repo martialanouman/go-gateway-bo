@@ -54,8 +54,9 @@ var defaultRoles = []DefaultRole{
 	{
 		Name: "ops",
 		Description: "Exploite le réseau : routage, scripts, réécriture de sender, connecteurs, " +
-			"sessions, anti-spam, numéros entrants et alertes en écriture, MSISDN en clair et export " +
-			"de masse compris ; ne peut ni lever un désabonnement ni afficher le corps d'un message",
+			"sessions, anti-spam, numéros entrants, désabonnements et alertes en écriture, MSISDN en " +
+			"clair et export de masse compris ; lecture seule sur la facturation et l'audit. Ne peut " +
+			"ni lever un désabonnement ni afficher le corps d'un message",
 		Keys: []Key{
 			RoutesRead, RoutesWrite, RoutesImport,
 			ScriptsRead, ScriptsWrite, ScriptsPublish,

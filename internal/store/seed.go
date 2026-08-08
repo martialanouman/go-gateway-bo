@@ -17,8 +17,11 @@ import (
 // qui les lance prouve quoi que ce soit.
 //
 // La valeur n'a pas de sens en soi ; elle doit seulement être stable d'une version à l'autre et ne
-// pas entrer en collision avec celle de goose (`5887940537704921958`), qui verrouille les migrations
-// sur la même base.
+// pas entrer en collision avec celle de goose, qui verrouille les migrations sur la même base et
+// dans le **même espace** — `pg_advisory_xact_lock` et le `pg_try_advisory_lock` de goose partagent
+// leurs identifiants. Celle de goose est `lock.DefaultLockID`, et `seed_lock_test.go` compare les
+// deux plutôt que de recopier sa valeur : une première rédaction de ce commentaire citait un nombre
+// qui n'existe nulle part dans le module.
 const SeedLockKey int64 = 7_020_020_020_020_020
 
 // Grant est une attribution : le rôle par défaut, et la clé qu'il accorde.
@@ -38,9 +41,11 @@ type SeedOutcome struct {
 	GrantsRevoked       []Grant
 
 	// UnknownPermissions porte les clés que la base garde et que le catalogue ne déclare plus. Elles
-	// ne sont **pas** supprimées : le `RESTRICT` de `role_permissions.permission_key` ferait échouer
-	// le retrait d'une clé encore accordée, et un retrait silencieux dépossèderait les rôles qui la
-	// détiennent. Leur retrait est une migration, qui révoque d'abord.
+	// ne sont **pas** supprimées. Les rôles par défaut, eux, ont bien perdu l'attribution — c'est la
+	// révocation de `reconcileGrants`, et elle est rapportée dans `GrantsRevoked` ; ce qui subsiste
+	// est la ligne du catalogue, et l'attribution d'un rôle composé à l'écran, que le `RESTRICT` de
+	// `role_permissions.permission_key` protège. Retirer la clé est une migration, qui révoque
+	// d'abord ce qui reste.
 	UnknownPermissions []permissions.Key
 	// UnknownRoles porte les rôles marqués `is_default` que le code ne décrit plus. Le seed ne touche
 	// pas non plus à leurs attributions : les révoquer les viderait de leur sens sans que personne
@@ -238,7 +243,8 @@ UNION ALL SELECT 'updated', name FROM updated
 UNION ALL SELECT 'unknown', r.name FROM roles r
 	WHERE r.is_default AND NOT EXISTS (SELECT 1 FROM wanted w WHERE w.name = r.name)`
 
-// Ce que `upsertRoles` ne distingue pas, et qu'il faut savoir : **l'identité d'un rôle est son nom**.
+// seedRoles projette les neuf rôles par défaut. Ce que la requête ci-dessus ne distingue pas, et
+// qu'il faut savoir : **l'identité d'un rôle est son nom**.
 // Un rôle composé depuis l'écran qui porterait le nom d'un rôle par défaut — celui d'aujourd'hui, ou
 // celui qu'une release future ajoutera — serait basculé en `is_default`, verrait sa description
 // écrasée et ses attributions ramenées à la liste du code. Le rapport le compte, donc ce n'est pas

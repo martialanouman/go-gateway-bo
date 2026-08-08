@@ -69,8 +69,7 @@ tous les seconds facteurs**, codes de récupération compris.
 ### `make bootstrap` prépare une installation neuve
 
 Elle sème le catalogue de permissions et les neuf rôles par défaut du §6.10, et se **rejoue sans
-effet** :
-un déploiement l'appelle à chaque fois. Ce qu'elle change, elle le compte ; ce que la base porte et
+effet** : un déploiement l'appelle à chaque fois. Ce qu'elle change, elle le compte ; ce que la base porte et
 que le code ne déclare plus, elle le nomme sur la sortie d'erreur sans arrêter la livraison — le
 retrait d'une clé est une migration, qui révoque d'abord. Elle refuse de semer sur un schéma en
 retard, en nommant la version trouvée et la version attendue.

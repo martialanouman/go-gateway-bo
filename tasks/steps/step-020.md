@@ -156,9 +156,10 @@ permissions ». C'est ce qui fait qu'une clé ajoutée en step-060 revient d'off
 Une clé que la base garde et que le catalogue ne déclare plus est nommée sur stderr avec sa raison ;
 `bootstrap` sort en **0**.
 
-Ne pas la supprimer : le `RESTRICT` de `role_permissions.permission_key` ferait de toute façon échouer
-le retrait d'une clé encore accordée, et un retrait silencieux dépossèderait les rôles qui la
-détiennent. Son retrait est une migration, qui révoque d'abord.
+Ne pas la supprimer : la ligne du catalogue survit, et avec elle l'attribution d'un rôle composé à
+l'écran, que le `RESTRICT` de `role_permissions.permission_key` protège. Les rôles **par défaut**, eux,
+ont perdu l'attribution — c'est la révocation de DN-8, et elle est rapportée. Retirer la clé est une
+migration, qui révoque d'abord ce qui reste.
 
 Ne pas échouer : arrêter une livraison sur un reliquat de vocabulaire bloquerait le déploiement pour
 un état qui n'empêche rien de fonctionner. Ce qu'on refuse est le silence, pas la livraison.
@@ -239,16 +240,22 @@ mutations et dans le corps de la PR :
 - **`cmd/bootstrap` n'était joué de bout en bout nulle part.** Trois mutations y survivaient. La
   commande a désormais sa suite contre un PostgreSQL réel, et c'est elle qui tient la ligne de DoD
   « deux exécutions laissent la base identique — comparée ».
-- **La copie mentait sur le livré.** Le message de divergence affirmait qu'aucun rôle n'était
-  dépossédé au moment même où la révocation retirait la clé aux rôles par défaut : reproduit à la
-  main, puis réécrit. Deux descriptions de rôle omettaient des clés qu'elles accordent.
+- **La copie mentait sur le livré.** Le message de divergence disait « Rien n'est supprimé » et
+  « un retrait silencieux dépossèderait les rôles qui la détiennent », au moment même où la
+  révocation venait de retirer la clé aux rôles par défaut : reproduit à la main sur une vraie base,
+  puis réécrit. La seconde rédaction était fausse à son tour — elle affirmait qu'un rôle détenait la
+  clé, ce qui n'est vrai d'aucun des quatre cas où le message se lit —, et une passe de revue sur les
+  correctifs l'a rattrapée. Deux descriptions de rôle omettaient des clés qu'elles accordent.
 - **Deux manques de fond** : `openSQL` ne posait aucune borne de connexion alors que le contrôle
   s'exécute avant `net.Listen` — une base muette aurait pendu le démarrage sans un mot ; et `Seed` ne
   prenait aucun verrou là où `Migrate` en prend un pour la même raison.
 
-**Deux messages de commit sur-comptent, et ne sont pas réécrits** : `e78bb04` annonce « trois
-commentaires » corrigés là où il en corrige deux, et `4e38a46` attribue à `CLAUDE.md` une affirmation
-que seul le README portait. L'historique n'est pas réécrit pour si peu ; l'écart est consigné ici,
+**Trois messages de commit sont imprécis, et ne sont pas réécrits** : `e78bb04` annonce « trois
+commentaires » corrigés là où il en corrige deux ; `4e38a46` attribue à `CLAUDE.md` une affirmation
+que seul le README portait ; et `2373b8f` compte « quatre mutations qui ont survécu » là où le
+tableau ci-dessous en marque six, et annonce un correctif de `playwright.config.ts` que ce commit ne
+porte pas — il a été fait dans le suivant, après qu'une passe de revue sur les correctifs l'a
+constaté. L'historique n'est pas réécrit pour si peu ; l'écart est consigné ici,
 puisque c'est la fiche qui reste lisible après le merge.
 
 ## Tableau des mutations

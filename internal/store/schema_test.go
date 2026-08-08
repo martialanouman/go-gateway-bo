@@ -18,6 +18,22 @@ import (
 // La forme des cas est le **verdict observé**, jamais l'inventaire d'une table de version : ce qu'on
 // veut savoir est qu'un démarrage est refusé ou accepté, pas qu'une ligne de catalogue existe.
 
+// Le seul endroit où le message est confronté à du **texte écrit à la main**. Partout ailleurs,
+// l'attendu se construit avec `AppliedVersionPhrase` / `ExpectedVersionPhrase`, c'est-à-dire avec la
+// fonction sous test : les faire rendre la chaîne vide laisserait toutes ces assertions vertes sur
+// un message qui ne nomme plus rien — `Contains(s, "")` est toujours vrai. C'est ici que le juge est
+// branché.
+func TestLeRefusNommeLesDeuxVersionsEnToutesLettres(t *testing.T) {
+	t.Parallel()
+
+	message := store.OutdatedSchemaError{Applied: 2, Embedded: 3}.Error()
+
+	assert.Contains(t, message, "en version 2")
+	assert.Contains(t, message, "attend la version 3")
+	assert.Equal(t, "en version 2", store.AppliedVersionPhrase(2))
+	assert.Equal(t, "attend la version 3", store.ExpectedVersionPhrase(3))
+}
+
 func TestUnSchemaAJourLaisseDemarrer(t *testing.T) {
 	t.Parallel()
 

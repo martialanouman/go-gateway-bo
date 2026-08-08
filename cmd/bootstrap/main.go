@@ -106,12 +106,17 @@ func warnAboutDivergence(errOut io.Writer, outcome store.SeedOutcome) {
 		return
 	}
 
+	// Ce message est lu dans quatre situations — la clé n'est détenue par personne, par des rôles
+	// par défaut seulement, par des rôles composés à l'écran seulement, ou par les deux — et il ne
+	// dit donc que ce qui est vrai des quatre. Une première rédaction affirmait « la supprimer
+	// échouerait tant qu'un rôle la détient » et « les rôles composés depuis l'écran la gardent » :
+	// les deux sont fausses dès que personne ne la détient, c'est-à-dire dans le cas le plus courant.
 	for _, key := range outcome.UnknownPermissions {
 		printLine(errOut, "ATTENTION — la base porte la permission %q, que le catalogue ne déclare "+
-			"plus.\n  La ligne est conservée : la supprimer échouerait tant qu'un rôle la détient, et "+
-			"les rôles\n  composés depuis l'écran la gardent. Les rôles par défaut, eux, ne "+
-			"l'accordent plus — voir\n  les attributions révoquées ci-dessus. La retirer pour de bon "+
-			"est une migration, qui\n  révoque d'abord.", key)
+			"plus.\n  La ligne est conservée : aucun rôle par défaut ne l'accorde plus, mais un rôle "+
+			"composé\n  depuis l'écran peut la détenir, et la supprimer échouerait alors sur la "+
+			"contrainte. La\n  retirer pour de bon est une migration, qui révoque d'abord ce qui "+
+			"reste.", key)
 	}
 
 	for _, role := range outcome.UnknownRoles {

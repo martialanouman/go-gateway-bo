@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -23,7 +25,12 @@ func TestDeuxExecutionsLaissentLaBaseIdentique(t *testing.T) {
 
 	first := &bytes.Buffer{}
 	require.NoError(t, start(strings.NewReader(dsn), first, &bytes.Buffer{}, nil))
-	assert.Contains(t, first.String(), "44 permission(s) posée(s)")
+
+	// Le compte se dérive du catalogue : un `44` écrit ici serait la seconde déclaration tenue à la
+	// main que `catalog.go` refuse explicitement, et son incrément 44 → 45 ne porterait aucune
+	// information relisible.
+	assert.Contains(t, first.String(),
+		fmt.Sprintf("%d permission(s) posée(s)", len(permissions.All())))
 
 	before := vocabularyFingerprint(ctx, t, dsn)
 

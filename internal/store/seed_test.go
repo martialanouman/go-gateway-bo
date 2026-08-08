@@ -269,9 +269,9 @@ func (w *seedWorld) rewriteDescription(ctx context.Context, key string) error {
 	return w.exec(ctx, "UPDATE permissions SET description = 'réécrite à la main' WHERE key = $1", key)
 }
 
-// grantsByRole, roleDescriptions et les `Étant donné` qui écrivent partagent une exigence : avoir
-// touché une ligne. Sans elle, `Étant donné la description de "audit:reed" réécrite à la main` ne
-// prépare rien, et le `Alors` qui suit est vrai sans avoir rien observé.
+// Les `Étant donné` qui écrivent partagent une exigence, tenue par `exec` : avoir touché une ligne.
+// Sans elle, `Étant donné la description de "audit:raed" réécrite à la main` ne prépare rien, et le
+// `Alors` qui suit serait vrai sans avoir rien observé.
 
 func (w *seedWorld) descriptionMatchesCatalog(ctx context.Context, key string) error {
 	rows, err := w.query(ctx, "SELECT description FROM permissions WHERE key = $1", key)
