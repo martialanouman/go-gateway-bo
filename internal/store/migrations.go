@@ -97,10 +97,22 @@ func openSQL(dsn string) (*sql.DB, error) {
 	return stdlib.OpenDB(*config), nil
 }
 
-func newMigrationProvider(db *sql.DB) (*goose.Provider, error) {
+// migrationSources rend le système de fichiers des migrations embarquées. Deux chemins le lisent —
+// celui qui les applique et celui qui vérifie la version au démarrage — et c'est **la même liste
+// pour les deux** : ce que le binaire exige de la base est exactement ce qu'il sait lui appliquer.
+func migrationSources() (fs.FS, error) {
 	sources, err := fs.Sub(migrationsFS, migrationsDir)
 	if err != nil {
 		return nil, fmt.Errorf("lire les migrations embarquées : %w", err)
+	}
+
+	return sources, nil
+}
+
+func newMigrationProvider(db *sql.DB) (*goose.Provider, error) {
+	sources, err := migrationSources()
+	if err != nil {
+		return nil, err
 	}
 
 	// goose ne verrouille rien par défaut — sa documentation le dit mot pour mot, « If

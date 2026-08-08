@@ -244,9 +244,9 @@ func TestWhatADeletionCarriesAway(t *testing.T) {
 	}
 }
 
-// migratedDatabase taille une base neuve, y joue les migrations et rend une connexion nue. Une base
-// par test — les cas, eux, s'isolent dans une transaction annulée.
-func migratedDatabase(ctx context.Context, t *testing.T) *pgx.Conn {
+// migratedDatabaseDSN taille une base neuve, y joue les migrations et rend son DSN. C'est la forme
+// qu'attendent les fonctions du produit — `Seed` et `VerifySchema` prennent un DSN, comme `Migrate`.
+func migratedDatabaseDSN(ctx context.Context, t *testing.T) string {
 	t.Helper()
 
 	dsn := freshDatabase(ctx, t)
@@ -254,7 +254,15 @@ func migratedDatabase(ctx context.Context, t *testing.T) *pgx.Conn {
 	_, err := store.Migrate(ctx, dsn)
 	require.NoError(t, err, "jouer les migrations")
 
-	conn, err := pgx.Connect(ctx, dsn)
+	return dsn
+}
+
+// migratedDatabase ajoute à la précédente une connexion nue sur la base taillée. Une base par test —
+// les cas, eux, s'isolent dans une transaction annulée.
+func migratedDatabase(ctx context.Context, t *testing.T) *pgx.Conn {
+	t.Helper()
+
+	conn, err := pgx.Connect(ctx, migratedDatabaseDSN(ctx, t))
 	require.NoError(t, err, "se connecter à la base du test")
 
 	t.Cleanup(func() { _ = conn.Close(context.WithoutCancel(ctx)) })
