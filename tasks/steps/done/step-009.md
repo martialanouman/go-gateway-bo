@@ -1,6 +1,6 @@
 # step-009 — Contrat Admin en 4.0.2 : deux majeures relues, payées sur le seul généré
 
-> **Jalon :** M0 (§3.2, §5.1) · **Statut :** À FAIRE
+> **Jalon :** M0 (§3.2, §5.1) · **Statut :** LIVRÉE (08/08/2026)
 > **Dépend de :** step-003 · **Bloque :** step-043, et toute step touchant CDR, recherche ou export
 
 ## But
@@ -89,11 +89,35 @@ contrainte JSON Schema : ni le générateur ni le typage ne les verront jamais, 
 - `passerelle.feature` rejoué contre Prism, qui lit le même YAML et suit le bump seul.
 
 ## Definition of Done
-- [ ] `make check` vert
-- [ ] le diff du YAML relu ligne à ligne, et ses ruptures inscrites dans cette fiche
-- [ ] `make check-generated` vert sur l'arbre régénéré
-- [ ] la porte anti-copie re-mesurée sur le contrat 4.0.x, et vue mordre
-- [ ] aucun texte du dépôt n'affirme plus une version que le dépôt n'installe pas
+- [x] **`make check` vert** (08/08, onze portes)
+- [x] **le diff relu ligne à ligne**, ses six ruptures inscrites ci-dessus — et le sha256 des trois
+      YAML de la série 4.0.x vérifié identique, ce qui est ce qui autorise 4.0.2 sous le titre « 4.0.0 »
+- [x] **`make check-generated` vert** sur l'arbre régénéré (rc=0)
+- [x] **la porte anti-copie re-mesurée, et le rituel remplacé par une porte** — les 28 signatures
+      Admin et les 7 du contrat public sont intactes en 4.0.2, et
+      `TestTheSampleStillMatchesTheContractItWasTakenFrom` l'exige désormais à chaque suite. Deux
+      mutations : un operationId dérivé, l'identité `url` du contrat public
+- [x] **aucun texte n'affirme plus une version que le dépôt n'installe pas** — pour la classe (A) de
+      DN-4, gardée par `TestTheDocumentedContractVersionIsTheInstalledOne` (deux mutations, dont la
+      ligne du tableau retirée, qui viderait la porte). *La classe (B) — les mesures datées — a été
+      remesurée à la main et n'a aucune porte, ce que DN-4 assume et explique.*
+
+### Les quatre critères transverses de `CLAUDE.md`
+
+1. **Le chemin qu'un humain traverse.** Cette step n'en livre aucun : elle ne touche ni écran, ni
+   route, ni handler. Le chemin le plus proche est celui du développeur qui régénère, et il est
+   exercé par `make check-generated` sur l'arbre réel. À dire dans la PR plutôt que coché en silence.
+2. **Toute affirmation confrontée à sa source.** C'est le cœur de cette step, et elle s'est appliqué
+   la règle à elle-même : la fiche annonçait un rouge de compilation, `go build` a rendu rc=0, et la
+   prédiction est corrigée en DN-2 au lieu d'être effacée. Une re-mesure intermédiaire a par ailleurs
+   crié à la dérive de l'identité `url` — c'était mon regex qui ignorait le tiret YAML, pas le
+   contrat ; refaite avec la logique exacte du test, elle rend « intact ».
+3. **Mutation partout où le retrait laisserait la suite verte.** Quatre mutations jouées, plus un
+   constat mesuré : l'échantillon anti-copie muté laissait **toute la suite verte**, et c'est ce trou
+   qui a motivé la porte d'U2.
+4. **Ce qui n'est pas testable est écrit là où il vit.** R4, R5 et les plafonds en prose n'ont pas de
+   porte proportionnée : ils sont dans le tableau ci-dessus et au-dessus de la liste de scopes de
+   `client.go`. La classe (B) de DN-4 est dans le commentaire de `version_test.go`.
 
 ## Hors périmètre
 L'ajout des scopes `cdr:export_bulk` et `msisdn:reveal` au jeton machine → la step qui livrera

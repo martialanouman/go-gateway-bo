@@ -157,6 +157,19 @@ func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSou
 		// **entièrement** à la charge du BFF, et le rendre réglable ici laisserait croire qu'on peut
 		// restreindre par là ce qui doit l'être par `RequirePermission()` — c'est l'origine de
 		// l'invariant (c).
+		//
+		// **Deux scopes du contrat manquent délibérément à cette liste, et aucune porte ne le voit** :
+		// `cdr:export_bulk`, qu'exigent `create-message-export` et `get-message-export`, et
+		// `msisdn:reveal`, qu'exige un export non masqué. Ils sont arrivés avec la 4.0.0 ;
+		// oapi-codegen n'engendre rien du `security`, donc rien ne rougit — le symptôme sera un **403
+		// à l'exécution** sur du code qui compile, et la première step à le rencontrer mettra du temps
+		// à remonter jusqu'ici. Le mot est donc écrit ici plutôt que dans une fiche.
+		//
+		// Ils ne sont pas ajoutés parce qu'aucun code de ce dépôt n'appelle ces opérations : les
+		// ajouter élargirait le jeton machine pour personne, et `msisdn:reveal` — voir les numéros
+		// d'abonnés en clair là où le contrat les masque — déplacerait la frontière que la 4.0.0 vient
+		// d'établir. C'est à la step qui livrera l'export de décider, sachant ce qu'elle sert.
+		// step-009, 08/08/2026.
 		Scopes: []string{"admin:read", "admin:write", "content:read", "content:erase", "gdpr:erase"},
 	}
 

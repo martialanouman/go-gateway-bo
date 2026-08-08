@@ -108,24 +108,28 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - [x] step-001 — SPA Vite + TanStack Router : squelette d'application, coquille peinte au chargement à froid
 - [x] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
 - [x] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
-- [ ] step-009 — Contrat Admin en **4.0.0** : deux majeures depuis 2.5.0, diff du YAML relu §
+- [x] step-009 — Contrat Admin en **4.0.2** : deux majeures depuis 2.5.0, diff du YAML relu §
 - [x] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS ‡
 - [x] step-005 — PostgreSQL : `pgx`, migrations, les tables du §3.1, `audit_log` partitionné
 - [x] step-006 — Catalogue de permissions : source Go, génération TS, test de divergence bloquant
 - [x] step-007 — Harnais BDD : `godog`, `testify`, testcontainers, Vitest, Playwright, CI à deux toolchains
 - [ ] step-008 — Charte : tokens depuis le kit UI, `/_design`, contraste AA vérifié
 
-§ **Numéro hors bloc, position délibérée.** step-003 s'est arrêtée à 2.5.0 parce que la quarantaine de
-`minimumReleaseAge` refusait plus récent ; elle expire d'elle-même (`plan.md` §1.12). La step vient
-juste après, avant que M0 et M1 n'engendrent du code contre 2.5.0 : un bump payé sur le seul
-`internal/gateway/client.gen.go` coûte moins cher que le même bump payé sur tout ce qui l'appellera.
-Son fichier `steps/step-009.md` reste à écrire, comme ceux de M1 et au-delà.
+§ **Numéro hors bloc, position délibérée — et le pari a tenu.** step-003 s'est arrêtée à 2.5.0 parce
+que la quarantaine de `minimumReleaseAge` refusait plus récent ; elle a expiré d'elle-même
+(`plan.md` §1.12). La step est passée avant que M0 n'engendre du code contre 2.5.0, et c'est ce qui a
+rendu le bump gratuit : **livré le 08/08/2026, il n'a touché aucun appelant** — les six opérations que
+les deux majeures modifient ne sont appelées nulle part, et `go build` est resté vert sur trois
+ruptures de type. Payé sur le seul `internal/gateway/client.gen.go`, comme annoncé.
 
-‡ **step-004 est passée devant step-009, et la position ci-dessus reste la bonne.** Mesuré le 02/08 à
-09:26 UTC : la quarantaine de 4.0.0 courait jusqu'à 17:46 UTC et `pnpm` la refusait encore — step-009
-était matériellement infaisable. step-004 ne dépend pas d'elle et n'engendre aucun code contre le
-contrat Admin, donc l'argument du renvoi § n'est pas entamé : ce qui reste à payer au bump n'a pas
-grossi. step-009 garde sa place, en tête de ce qui reste.
+*(La version épinglée est **4.0.2** et non 4.0.0 : les trois `openapi-admin.yaml` de la série 4.0.x
+sont identiques au sha256, et 4.0.3 était en quarantaine. Voir `steps/done/step-009.md`, DN-1.)*
+
+‡ **step-004 est passée devant step-009, et la position ci-dessus est restée la bonne.** Mesuré le
+02/08 à 09:26 UTC : la quarantaine de 4.0.0 courait jusqu'à 17:46 UTC et `pnpm` la refusait encore —
+step-009 était matériellement infaisable. step-004 ne dépendait pas d'elle et n'engendrait aucun code
+contre le contrat Admin, donc l'argument du renvoi § n'était pas entamé. Vérifié à la livraison : ce
+qui restait à payer au bump n'avait effectivement pas grossi.
 
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [ ] step-020 — Seed auth : les 44 clés de permission et les 9 rôles par défaut, idempotent ¶
