@@ -1,8 +1,9 @@
 /*
  * Feuille racine du tableau de bord.
  *
- * Elle n'écrit **aucune valeur** : elle assemble les tokens de la charte, seule source de vérité
- * visuelle. Un écran qui a besoin d'une couleur, d'un rayon ou d'une graisse la prend ici ; s'il n'en
+ * Elle n'écrit **aucune couleur, graisse ni espacement** : elle assemble les tokens de la charte,
+ * seule source de vérité
+ * Un écran qui a besoin d'une couleur, d'un rayon ou d'une graisse la prend ici ; s'il n'en
  * trouve pas, c'est une question à poser à la charte, pas une valeur à inventer. La page `/_design`
  * rend l'ensemble et sert de référence de relecture.
  *
@@ -60,6 +61,7 @@
   font: var(--text-label);
 }
 
+/* 42rem : une largeur de mesure, que la charte ne définit pas — elle n'a pas de token de mesure. */
 .empty {
   max-width: 42rem;
 }

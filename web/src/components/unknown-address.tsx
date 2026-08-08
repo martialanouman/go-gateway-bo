@@ -1,4 +1,4 @@
-import { Coquille } from '~/components/coquille'
+import { Shell } from '~/components/shell'
 
 /**
  * L'état de contenu d'une adresse qui ne correspond à aucun écran.
@@ -11,9 +11,9 @@ import { Coquille } from '~/components/coquille'
  * mise en page ne s'applique pas, et l'opérateur se retrouverait sur une page nue. Il doit pouvoir
  * repartir d'où il est, sans revenir en arrière ni retaper une URL.
  */
-export function AdresseInconnue() {
+export function UnknownAddress() {
   return (
-    <Coquille>
+    <Shell>
       <section className="empty">
         <h1 className="empty__title">Cette adresse ne correspond à aucun écran</h1>
         <p className="empty__body">
@@ -21,6 +21,6 @@ export function AdresseInconnue() {
           jalon par jalon, et chacun apparaît dans la navigation dès qu'il existe.
         </p>
       </section>
-    </Coquille>
+    </Shell>
   )
 }

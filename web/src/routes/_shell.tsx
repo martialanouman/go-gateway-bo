@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
-import { Coquille } from '~/components/coquille'
+import { Shell } from '~/components/shell'
 
 /**
  * La mise en page des écrans du produit — **sans chemin** : le souligné en tête du nom de fichier le
@@ -13,8 +13,8 @@ export const Route = createFileRoute('/_shell')({ component: ShellLayout })
 
 function ShellLayout() {
   return (
-    <Coquille>
+    <Shell>
       <Outlet />
-    </Coquille>
+    </Shell>
   )
 }

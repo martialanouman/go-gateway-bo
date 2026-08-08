@@ -13,7 +13,8 @@
      elle atteint 4,5 sur toutes les surfaces du système — y compris les surfaces **composées**,
      qui sont le vrai point bas : sur une ligne sélectionnée (`--surface-selected`, teinte teal à
      14 %), la première valeur essayée retombait à 4,04. La hiérarchie à trois niveaux reste
-     lisible. C'est l'un des deux écarts assumés avec la charte, et un test le garde. */
+     lisible. C'est **le seul écart de valeur** avec la charte ; deux tokens y sont par ailleurs
+     ajoutés (`--red-400` plus bas, `--qr-paper`). Les trois sont gardés par un test. */
   --n-300: #848f9e;
   --n-400: #4a5563;
   --n-500: #2f3945;
@@ -39,7 +40,7 @@
      que 4,33 sur le canvas et 4,05 sur une carte — sous le seuil AA de 4,5, et c'est exactement la
      combinaison des pilules `failed`, `suspended` et `sev-critical`, l'état qu'un opérateur doit
      lire en premier. Le rouge pleine surface reste `--red-500` ; seul le TEXTE posé sur un fond
-     teinté rouge prend cette variante (4,69 sur carte). Second et dernier écart assumé. */
+     teinté rouge prend cette variante (4,69 sur carte). Premier des deux tokens ajoutés. */
   --red-400: #e85e62;
   --blue-500: #7fb2ff; /* métrique secondaire, types techniques, alertmanager */
   --violet-500: #c586c0; /* domaine métier : réputation, facturation, évaluation BFF */

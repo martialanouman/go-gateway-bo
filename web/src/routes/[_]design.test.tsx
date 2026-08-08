@@ -40,9 +40,25 @@ describe('la référence visuelle', () => {
   it('rend les familles de tokens sous des titres de section', async () => {
     await visitDesign()
 
-    for (const section of ['Typographie', 'Surfaces', 'Accent et sémantique', 'Espacements']) {
+    // **Les six, pas quatre.** Mesuré le 08/08/2026 : avec la liste amputée de « Rayons » et
+    // « Contraste », supprimer la section Rayons de la page laissait les 137 tests verts. Une page de
+    // référence à laquelle il manque un tiers de la charte est pire qu'absente : on la croit
+    // complète.
+    const sections = [
+      'Typographie',
+      'Surfaces',
+      'Accent et sémantique',
+      'Espacements',
+      'Rayons',
+      'Contraste',
+    ]
+
+    for (const section of sections) {
       expect(screen.getByRole('heading', { level: 2, name: section })).toBeInTheDocument()
     }
+
+    // Et pas de septième non annoncée : la liste ci-dessus est la page, pas un échantillon d'elle.
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(sections.length)
   })
 
   it('rend une paire de contraste par ligne de la table que le test de charte vérifie', async () => {

@@ -213,3 +213,54 @@ binaire. Les deux moitiés sont nécessaires, et aucune ne remplace l'autre.
    fichier** et six de ses huit sections, en esprit.
 4. **`internal/gateway/version_test.go`** (step-009) lit les tableaux de versions de `plan.md` et
    `todo.md` et échoue s'il n'en trouve plus : ne pas casser leur forme en les modifiant.
+
+## Ce que la revue a trouvé, et les mutations des correctifs
+
+Deux relecteurs en lecture seule, sur deux axes : solidité des gardes, et conformité charte /
+accessibilité / langue. **Chaque constat a été remesuré avant d'être corrigé** — l'un d'eux s'est
+révélé faux à la première mesure, puis vrai à la seconde, et c'est instructif.
+
+### Deux bloquants, tous deux réels
+
+**Le juge n'était pas branché.** `[_]design.tsx` écrit à l'écran, en français : « Chaque ligne est
+vérifiée à 4,5:1 par `test/charte.test.ts`, qui lit cette même table. » **C'était faux.** Le test
+importait bien `CONTRAST_PAIRS`, mais seulement pour vérifier que les *tokens existent* ; les
+assertions de ratio portaient sur trois listes écrites à la main. Mesuré : une paire à 2,53:1 ajoutée
+à la table laissait les 108 tests verts, et la page l'affichait comme vérifiée. DN-5 tout entière
+reposait sur ce couplage inexistant. Corrigé par un `it.each(CONTRAST_PAIRS)` ; muté, il mord.
+
+**`--text-faint` ne tient pas AA sur une ligne sélectionnée en carte : 4,21.** `colors.css` affirmait
+« 4,5 sur toutes les surfaces du système — y compris les surfaces composées ». Le test ne composait
+`--surface-selected` que sur `--surface-page`, la porteuse la plus clémente (4,56). Sur `--surface-card`,
+où vivent les tables du produit, la même paire rend **4,21**.
+
+*Ma première mesure n'a rien trouvé* — `console.log` avalé par Vitest — et j'ai failli classer le
+constat comme faux. La seconde, en faisant échouer une assertion pour lire la valeur, l'a confirmé.
+
+L'issue « éclaircir encore » est **fermée** : la première valeur conforme partout est `#8b95a3`, qui
+est exactement `--n-200`. Confondre deux échelons supprimerait un cran de l'échelle. La règle retenue
+est donc de design : **sur une surface interactive, le texte discret remonte d'un cran** —
+`--text-muted` (4,55 en carte), jamais `--text-faint`. Le test compose désormais sur les deux
+porteuses et exclut `--text-faint` avec sa mesure écrite ; step-041, qui livrera les tables, hérite de
+la règle plutôt que du chiffre.
+
+### Les constats requis, et ce que chaque correctif a rendu falsifiable
+
+| Constat | Remesuré | Correctif, et la mutation qui le tient |
+|---|---|---|
+| **L'anneau de focus pouvait disparaître.** Retirer `@import "./tokens/base.css"` d'`app.css` laissait 137 tests verts et `vite build` à rc=0 — or `base.css` porte seul `:focus-visible { box-shadow: var(--focus-ring) }` | **Juste**, et c'est WCAG 2.4.7 | l'assemblage d'`app.css` est comparé à `TOKEN_FILES` ; muté : rouge |
+| **Deux tiers de `/_design` pouvaient s'évaporer.** Le test n'énumérait que 4 des 6 sections ; supprimer « Rayons » restait vert | **Juste** | les six, plus un décompte qui refuse une septième non annoncée ; muté : rouge |
+| **La page pouvait rendre nue.** Retirer `import '~/styles/design-reference.css'` laissait tout vert — le test lisait la feuille *sur disque*, pas dans le bundle | **Juste** | chaque fichier de `STYLED_FILES` doit être importé par un module ; muté : rouge |
+| **Le seuil AA lui-même n'était gardé par rien** : `AA_NORMAL_TEXT = 1` laissait tout vert | **Juste** | un cas négatif — une paire dont on *sait* qu'elle échoue ; muté : rouge |
+| **« 10 723 octets »** dans `index.html` et le test | **Faux** : **12 635** bruts, 3 420 gzip. Le chiffre datait d'avant `/_design`, pris au commit précédent | remesuré, et la marge réelle sous le plafond écrite : 3,7 Ko |
+| **« les sept `.woff2` (144 Ko) »** | **Faux** : **14 fichiers**, 7 `.woff2` (139 Ko) *et* 7 `.woff` (132 Ko), `@fontsource` déclarant les deux formats | corrigé ; les `.woff` sont du lest assumé — les retirer demanderait de réécrire sept `@font-face` à la main, ce que DN-6 a écarté |
+| **`Coquille` et `AdresseInconnue` sont des identifiants français**, ce que « le code est en anglais » interdit | **Juste**, et c'était la première occurrence dans le dépôt | `Shell` et `UnknownAddress`, fichiers renommés ; le plugin passe de `tokens-declares` à `declared-tokens` |
+| **`colors.css` se contredit** : « l'un des deux écarts » puis « second et dernier », alors qu'il y en a trois | **Juste** | un seul écart *de valeur*, deux tokens *ajoutés* — dit ainsi |
+| **« aucune valeur littérale »** alors que `60ch`, `14rem` et `42rem` en sont | **Juste** | la phrase dit ce qu'elle couvre, et pourquoi ces trois-là n'ont pas de token : la charte ne définit ni mesure ni gabarit de grille |
+
+### Ce que la revue a signalé et que je n'ai pas corrigé
+
+- **Le plugin accepte un token déclaré dans une portée où il ne s'applique pas** — `@media print { :root { --x } }` dans `tokens/`, consommé ailleurs : build vert. Réel, mais fermer ce trou demanderait un analyseur CSS complet là où le plugin fait 50 lignes. **Écrit dans le plugin**, avec le cas exact.
+- **`design-reference.css` atterrit dans la feuille d'entrée**, pas dans un chunk : 1 912 octets servis sur `/` pour une page que seul un développeur visite. La cause est mesurée — l'`import` de la route est statique dans `routeTree.gen.ts`, donc `autoCodeSplitting` scinde le composant et pas sa feuille. Inscrit dans `index.html`.
+- **Le raccourci `font:` réinitialise `font-variant-numeric`**, donc les `tabular-nums` que `base.css` pose sur `body` sont défaits partout où un rôle typographique s'applique. Le kit de la charte a le même trou ; le portage est fidèle. Sans effet aujourd'hui (les chiffres visibles sont en mono), réel pour les KPI de step-041.
+- **Le volume de commentaire** est élevé (30 % en moyenne, 75 % sur `__root.tsx`), et le piège du nom de route est raconté trois fois. Assumé sur les gardes, dont tout l'intérêt est de dire ce qu'elles ne couvrent pas.

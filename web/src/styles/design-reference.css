@@ -2,8 +2,12 @@
  * Mise en page de `/_design`. Elle n'habille aucune primitive du produit — les composants arrivent
  * en step-041 et step-042 — et ne sert qu'à disposer les échantillons de tokens.
  *
- * Comme tout le reste, elle ne pose **aucune valeur littérale** : ce serait contradictoire de la part
- * de la page qui montre la charte.
+ * Elle ne pose **aucune couleur, graisse, rayon ni espacement** en littéral : ce serait contradictoire
+ * de la part de la page qui montre la charte. Deux valeurs y échappent, et elles ne sont pas des
+ * tokens : `max-width: 60ch`, une mesure de lisibilité en unités de texte, et `minmax(14rem, 1fr)`,
+ * un plancher de colonne. La charte ne les couvre pas — elle ne définit ni largeur de mesure ni
+ * gabarit de grille — et les inventer comme tokens serait ajouter à la charte depuis une page de
+ * documentation.
  */
 
 .design {

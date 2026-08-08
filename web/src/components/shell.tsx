@@ -14,7 +14,7 @@ import type { ReactNode } from 'react'
  * disparaîtrait, alors qu'elle décrit un comportement voulu : l'opérateur doit pouvoir repartir d'où
  * il est.
  */
-export function Coquille({ children }: { children: ReactNode }) {
+export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <nav className="shell__rail" aria-label="Navigation principale">

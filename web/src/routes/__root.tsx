@@ -1,5 +1,5 @@
 import { createRootRoute } from '@tanstack/react-router'
-import { AdresseInconnue } from '~/components/adresse-inconnue'
+import { UnknownAddress } from '~/components/unknown-address'
 
 /**
  * La racine ne rend plus la coquille : elle laisse passer ses enfants — sans `component`, TanStack
@@ -10,4 +10,4 @@ import { AdresseInconnue } from '~/components/adresse-inconnue'
  * frère de `_shell` plutôt qu'en enfant. Et il prépare M1, dont la garde de session ira sur `_shell` :
  * ce qui n'est pas un écran du produit n'aura pas à s'en exempter au cas par cas.
  */
-export const Route = createRootRoute({ notFoundComponent: AdresseInconnue })
+export const Route = createRootRoute({ notFoundComponent: UnknownAddress })

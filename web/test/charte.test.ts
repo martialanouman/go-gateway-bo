@@ -33,7 +33,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { CONTRAST_PAIRS, RADII, SPACINGS, SURFACES, TYPE_ROLES } from '../src/lib/design-tokens'
-import { contrastRatio, readTokens, resolveColor, resolveToken } from './tokens'
+import { contrastRatio, readTokens, resolveColor, resolveToken, TOKEN_FILES } from './tokens'
 
 const tokens = readTokens()
 
@@ -42,7 +42,7 @@ const tokens = readTokens()
  * habillées sont de step-041/042. La liste est **nommée plutôt que globbée** — un fichier de style
  * ajouté sans y être inscrit échapperait à la garantie, et l'oubli se voit en relisant cette ligne.
  */
-const STYLED_FILES = ['app.css', 'design-reference.css'] as const
+const STYLED_FILES = ['app.css', 'design-reference.css', 'tokens/base.css'] as const
 
 function readStyledCss(): string {
   const here = dirname(fileURLToPath(import.meta.url))
@@ -112,6 +112,42 @@ describe('tokens de la charte', () => {
 
   it.each(expected)('%s est défini', (name) => {
     expect(resolveToken(tokens, name)).toBeDefined()
+  })
+
+  it('assemble tout ce que la charte a besoin de servir', () => {
+    // **Ce que ce test ferme, mesuré le 08/08/2026** : retirer `@import "./tokens/base.css"` d'app.css
+    // laissait les 137 tests verts et `vite build` à rc=0 — alors que `base.css` porte à lui seul le
+    // reset, `color-scheme: dark`, la couleur du corps, et surtout la règle `:focus-visible` qui pose
+    // l'anneau de focus sur tous les contrôles. Le produit perdait son indicateur de focus (WCAG
+    // 2.4.7) sans qu'aucune porte ne bouge.
+    //
+    // L'assemblage se teste ici plutôt que par le rendu, parce qu'aucun test de composant ne visite
+    // un `:focus-visible` et qu'aucune règle de `base.css` n'a de porteur dans le DOM de test.
+    const here = dirname(fileURLToPath(import.meta.url))
+    const app = readFileSync(join(resolve(here, '..'), 'src', 'styles', 'app.css'), 'utf8')
+
+    const assembled = [...app.matchAll(/@import\s+"\.\/(tokens\/[\w-]+\.css)"/g)].map(
+      ([, file]) => file as string,
+    )
+
+    expect(assembled).toEqual([...TOKEN_FILES.map((file) => `tokens/${file}`), 'tokens/base.css'])
+  })
+
+  it('sert chaque feuille que STYLED_FILES prétend garder', () => {
+    // Une feuille qu'aucun module n'importe n'est pas servie, et la garantie ci-dessus se met alors à
+    // juger un fichier mort. Mesuré le 08/08/2026 : retirer `import '~/styles/design-reference.css'`
+    // de la route laissait les 137 tests verts et `vite build` à rc=0 — la page rendait nue, et ce
+    // fichier continuait de lire la feuille **sur disque** comme si de rien n'était.
+    const here = dirname(fileURLToPath(import.meta.url))
+    const sources = ['src/styles/app.css', 'src/routes/[_]design.tsx', 'src/main.tsx']
+      .map((file) => readFileSync(join(resolve(here, '..'), file), 'utf8'))
+      .join('\n')
+
+    for (const file of STYLED_FILES) {
+      expect(sources, `${file} n'est importée par aucun module : elle n'est pas servie`).toContain(
+        file.replace('tokens/', './tokens/').replace(/^(app|design-reference)/, 'styles/$1'),
+      )
+    }
   })
 
   it('n’en consomme aucun qui n’existe pas', () => {
@@ -223,24 +259,84 @@ describe('contraste WCAG 2.1 AA', () => {
       expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
     })
 
-    /** Survol et sélection changent le fond sous un texte qui, lui, ne change pas. */
+    /**
+     * Survol et sélection changent le fond sous un texte qui, lui, ne change pas.
+     *
+     * **Les deux porteuses, pas une.** `--surface-selected` est une teinte translucide : son rendu
+     * dépend de la surface qui la porte, et les tables du produit vivent dans des cartes autant que
+     * sur le canvas. Ne composer que sur le canvas retenait le cas le plus clément — mesuré le
+     * 08/08/2026, `--text-faint` y donne 4,56, et 4,21 en carte. `--surface-hover` et
+     * `--surface-active`, elles, sont opaques (`color-mix(…, var(--n-800))`) : la porteuse ne change
+     * rien pour elles, et les tester deux fois ne coûte que deux assertions.
+     */
+    const carriers = ['--surface-page', '--surface-card'] as const
     const interactive = ['--surface-hover', '--surface-active', '--surface-selected'] as const
-    const readable = ['--text-primary', '--text-muted', '--text-faint'] as const
 
-    const interactivePairs = interactive.flatMap((surface) =>
-      readable.map((text) => ({ text, surface })),
+    /**
+     * `--text-faint` n'est **pas** de la partie, et c'est une règle de la charte plutôt qu'une
+     * exemption de confort : sur une surface interactive, le texte le plus discret remonte d'un cran.
+     * Mesuré — `--text-faint` sur une ligne sélectionnée rend 4,56 sur le canvas mais **4,21** en
+     * carte, sous AA. L'éclaircir davantage était l'autre issue : elle est fermée, `--n-300` (#848f9e)
+     * touche déjà `--n-200` (#8b95a3), et les confondre supprimerait un échelon de l'échelle.
+     *
+     * Ce que cela engage pour step-041, qui livrera les tables : une ligne sélectionnée porte son
+     * texte discret en `--text-muted` (4,55 en carte), jamais en `--text-faint`.
+     */
+    const readable = ['--text-primary', '--text-muted'] as const
+
+    const interactivePairs = carriers.flatMap((carrier) =>
+      interactive.flatMap((surface) => readable.map((text) => ({ text, surface, carrier }))),
     )
 
-    it.each(interactivePairs)('$text reste lisible sur $surface', ({ text, surface }) => {
-      // Ces surfaces se composent sur le canvas ; c'est lui qu'on passe comme fond de composition.
-      const page = resolveColor(tokens, '--surface-page') as string
-      const bg = resolveColor(tokens, surface, page)
-      const fg = resolveColor(tokens, text, page)
-      expect(bg, `${surface} non résoluble`).toBeDefined()
-      expect(fg, `${text} non résoluble`).toBeDefined()
+    it.each(interactivePairs)(
+      '$text reste lisible sur $surface, posé sur $carrier',
+      ({ text, surface, carrier }) => {
+        const base = resolveColor(tokens, carrier) as string
+        const bg = resolveColor(tokens, surface, base)
+        const fg = resolveColor(tokens, text, base)
+        expect(bg, `${surface} non résoluble`).toBeDefined()
+        expect(fg, `${text} non résoluble`).toBeDefined()
 
+        expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+      },
+    )
+  })
+
+  /**
+   * **Les paires que `/_design` rend réellement.** Les listes croisées ci-dessus couvrent la palette
+   * systématiquement ; celle-ci couvre ce que la page affiche, sous un libellé qui promet à son
+   * lecteur « chaque ligne est vérifiée à 4,5:1 par ce fichier ». Sans ce bloc, la promesse était
+   * fausse : mesuré le 08/08/2026, une paire à 2,53:1 ajoutée à la table laissait la suite verte, et
+   * la page l'affichait comme vérifiée.
+   *
+   * Les deux jeux se recouvrent aujourd'hui, et c'est voulu : les croisements attrapent une couleur
+   * qui se dégrade partout, celui-ci attrape une **combinaison** que quelqu'un décide de montrer.
+   */
+  it.each(CONTRAST_PAIRS)(
+    '$text sur $background atteint 4,5:1 — $usage',
+    ({ text, background, over }) => {
+      // `over` nomme la surface porteuse quand le fond est translucide : sans elle, la teinte se
+      // composerait sur du noir et le ratio ne correspondrait à rien de ce qui est peint.
+      const base = resolveColor(tokens, over ?? '--surface-page') as string
+      const fg = resolveColor(tokens, text, base)
+      const bg = resolveColor(tokens, background, base)
+
+      expect(fg, `${text} non résoluble`).toBeDefined()
+      expect(bg, `${background} non résoluble`).toBeDefined()
       expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
-    })
+    },
+  )
+
+  /**
+   * Le juge lui-même. Sans ce cas, abaisser `AA_NORMAL_TEXT` de 4,5 à 1 désarmait tout l'appareil de
+   * contraste sans qu'une seule porte ne bronche — mesuré. Une paire dont on **sait** qu'elle échoue
+   * prouve que la machinerie sait refuser, et non seulement accepter.
+   */
+  it('sait refuser une paire non conforme', () => {
+    const faint = resolveColor(tokens, '--n-400') as string
+    const page = resolveColor(tokens, '--surface-page') as string
+
+    expect(contrastRatio(faint, page)).toBeLessThan(AA_NORMAL_TEXT)
   })
 
   it('la bordure de carte se distingue de la surface qu’elle délimite', () => {

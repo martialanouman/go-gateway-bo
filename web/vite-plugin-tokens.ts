@@ -62,7 +62,7 @@ export function undeclaredTokens(sources: readonly string[]): string[] {
  */
 export function declaredTokens(): Plugin {
   return {
-    name: 'tokens-declares',
+    name: 'declared-tokens',
     apply: 'build',
     writeBundle(_options, bundle) {
       const sources = Object.values(bundle)

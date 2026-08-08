@@ -174,9 +174,14 @@ describe('chargement à froid', () => {
 
   it("garde la feuille d'entrée assez petite pour que l'aller-retour reste le seul coût", async () => {
     // step-001 mesurait 680 octets et concluait « négligeable tant que la feuille est petite ».
-    // C'était une hypothèse ; ce plafond en fait une condition. Remesuré le 08/08/2026, tokens et
-    // polices versés : 10 723 octets bruts, 2 981 compressés. Le plafond laisse la marge d'un écran
-    // ou deux, pas celle de `components.css` — 1 568 lignes en v1.0, qui arrive en step-041.
+    // C'était une hypothèse ; ce plafond en fait une condition. Remesuré le 08/08/2026 sur la sortie
+    // livrée, tokens, polices et feuille de `/_design` versés : **12 635 octets bruts, 3 420
+    // compressés** — la marge sous le plafond est de 3,7 Ko, pas celle de `components.css` (1 568
+    // lignes en v1.0, qui arrive en step-041).
+    //
+    // *(Le chiffre a d'abord été écrit à 10 723 : c'était la mesure d'avant `/_design`, prise au
+    // commit précédent et jamais refaite. Une revue l'a relevée. C'est le critère 2 — l'affirmation se
+    // confronte à la sortie, pas à l'intention du diff.)*
     const entry = /<link rel="stylesheet"[^>]*href="([^"]+)"/.exec(html)?.[1]
     expect(entry, "le document ne lie plus de feuille d'entrée").toBeDefined()
 

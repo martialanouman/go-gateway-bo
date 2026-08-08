@@ -15,15 +15,23 @@
       première peinture attend donc cet aller-retour. Le coût est l'aller-retour, pas le volume, et
       inliner la feuille la rendrait non cacheable entre deux déploiements.
 
-      **Remesuré en step-008, qui y a versé les tokens et les polices :** 10 723 octets, 2 981
-      compressés, contre 680 et 379 auparavant. La feuille a grossi d'un facteur 15,7 et le verdict ne
-      change pas — un aller-retour reste un aller-retour, et 3 Ko compressés voyagent dans le même
-      paquet que 379 octets. Un test plafonne désormais cette taille, pour que la prochaine step qui
-      voudrait y verser `components.css` (1 568 lignes en v1.0) rencontre une décision plutôt qu'une
-      dérive.
+      **Remesuré en step-008, qui y a versé les tokens, les polices et la feuille de `/_design` :**
+      12 635 octets, 3 420 compressés, contre 680 et 379 auparavant. La feuille a grossi d'un facteur
+      18,6 et le verdict ne change pas — un aller-retour reste un aller-retour, et 3,4 Ko compressés
+      voyagent dans le même paquet que 379 octets. Un test la plafonne désormais à 16 Ko, pour que la
+      prochaine step qui voudrait y verser `components.css` (1 568 lignes en v1.0) rencontre une
+      décision plutôt qu'une dérive ; la marge restante est de 3,7 Ko.
 
-      **Les polices ne sont pas préchargées, et c'est mesuré.** Les sept `.woff2` (144 Ko, latin seul)
-      sont découverts après l'analyse de cette feuille — deux allers-retours sérialisés. La parade
+      *(Ces 12 635 octets incluent 1 912 octets de `design-reference.css`, servis sur `/` alors que
+      seule `/_design` les utilise : l'`import` de la route est statique dans `routeTree.gen.ts`, donc
+      `autoCodeSplitting` scinde le composant mais pas sa feuille. Mesuré, assumé, et à rouvrir si une
+      step d'écran fait grossir ce poste.)*
+
+      **Les polices ne sont pas préchargées, et c'est mesuré.** Sept `.woff2` (139 Ko, latin seul) —
+      accompagnés de sept `.woff` (132 Ko) que `@fontsource` déclare en repli et qu'aucun navigateur
+      cible ne demandera, du lest dans le binaire qu'on n'enlève pas sans réécrire les `@font-face` à
+      la main. Ils sont découverts après l'analyse de cette feuille — deux allers-retours
+      sérialisés. La parade
       classique est un `<link rel="preload" as="font" crossorigin>`, et elle n'est pas posée : la
       première peinture ne contient **aucun texte visible**, le squelette n'ayant qu'un libellé
       `sr-only`. Le premier texte réel n'arrive qu'après le montage de React, donc après le chunk JS,
