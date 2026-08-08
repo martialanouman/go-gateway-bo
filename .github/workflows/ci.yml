@@ -192,6 +192,31 @@ jobs:
     permissions:
       contents: read
       packages: read
+    # Posé au niveau du job : `make migrate` le lit et le passe dans un tube, et l'étape qui lance le
+    # binaire le lui donne. Un seul endroit à corriger le jour où le service change de port ou de nom
+    # de base — deux copies auraient divergé sans qu'aucune porte ne le voie.
+    env:
+      DASHBOARD_DATABASE_URL: postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable
+    # Depuis step-020, le binaire **contrôle la version du schéma au démarrage** et refuse de servir
+    # sur une base en retard. Lancer le déployable exige donc une base joignable et migrée : c'est le
+    # binaire qu'on déploie, pas une variante que le job aurait assouplie.
+    #
+    # L'image, les identifiants et le healthcheck sont ceux de `docker-compose.yml` — le poste et la
+    # CI voient la même version de PostgreSQL, et `uuidv7()` n'existe qu'à partir de la 18.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: dashboard
+          POSTGRES_PASSWORD: dashboard
+          POSTGRES_DB: dashboard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dashboard -d dashboard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -215,6 +240,12 @@ jobs:
       # fantôme.
       - run: make check-generated
       - run: make build
+      # Le binaire refuse de servir sur un schéma en retard : la base du service doit porter les
+      # migrations avant qu'on ne le lance. `make bootstrap` n'y est pas — le service des assets ne
+      # lit ni permission ni rôle, et l'ajouter ferait passer ce job pour une porte du seed, qu'il
+      # n'est pas : celle-là vit dans `internal/store`, contre un PostgreSQL réel.
+      - name: Migrer la base du service
+        run: make migrate
       # `make build` vert ne dit encore que « la recette n'a pas échoué ». Ce qu'on veut savoir est que
       # le binaire sert la sortie que Vite vient d'émettre, et la seule façon de le savoir est de le
       # lancer. La comparaison est un `diff` avec `web/dist/index.html` plutôt qu'une recherche du nom
@@ -229,13 +260,13 @@ jobs:
           # Le mode `mock` est explicite parce que le défaut est `real`, qui exigerait ici les
           # identifiants OAuth2 et le matériel mTLS d'une passerelle que ce job ne joint jamais : ce
           # qu'il vérifie est le service des assets. L'adresse est celle du mock, jamais interrogée.
-          # Le DSN est du même ordre : la configuration l'exige et le valide au démarrage, mais aucune
-          # connexion n'est ouverte tant qu'aucune requête ne demande la base — ce job n'a pas de
-          # PostgreSQL, et n'en a pas besoin.
+          # Le DSN, lui, désigne le service `postgres` ci-dessus, que l'étape précédente vient de
+          # migrer : depuis step-020, le binaire refuse de servir sur un schéma en retard, et ce
+          # refus arrive avant qu'il ne lie son port.
           DASHBOARD_ADDR=127.0.0.1:3001 \
           DASHBOARD_GATEWAY_MODE=mock \
           DASHBOARD_GATEWAY_BASE_URL=http://127.0.0.1:4010 \
-          DASHBOARD_DATABASE_URL=postgres://dashboard:dashboard@127.0.0.1:5432/dashboard \
+          DASHBOARD_DATABASE_URL="$DASHBOARD_DATABASE_URL" \
             ./bin/dashboard &
           bff=$!
           # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de
@@ -301,6 +332,26 @@ jobs:
     permissions:
       contents: read
       packages: read
+    # Même raison que `build-web` : ces parcours lancent le déployable, qui refuse de servir sur un
+    # schéma en retard depuis step-020. Le DSN doit coïncider avec celui de `web/playwright.config.ts`,
+    # qui lance le binaire — les deux portent `?sslmode=disable`, le service ne présentant aucun
+    # certificat.
+    env:
+      DASHBOARD_DATABASE_URL: postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: dashboard
+          POSTGRES_PASSWORD: dashboard
+          POSTGRES_DB: dashboard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dashboard -d dashboard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -314,6 +365,10 @@ jobs:
       # système que le runner n'a pas ; la version du navigateur vient de `@playwright/test`, épinglé
       # dans le lockfile, donc rien à répéter ici.
       - run: pnpm -C web exec playwright install --with-deps chromium
+      # Avant `make e2e`, qui construit le binaire puis le lance : un schéma en retard le ferait
+      # refuser de démarrer, et Playwright n'aurait rien à interroger.
+      - name: Migrer la base du service
+        run: make migrate
       - run: make e2e
       # Les traces ne sont conservées que d'un parcours tombé : `trace: 'retain-on-failure'`. Sans cette
       # étape, un parcours qui échoue en CI ne laisse rien à examiner et se rejoue à l'aveugle.

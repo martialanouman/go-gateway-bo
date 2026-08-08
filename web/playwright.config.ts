@@ -52,12 +52,19 @@ export default defineConfig({
     stderr: 'pipe',
     env: {
       DASHBOARD_ADDR: `127.0.0.1:${port}`,
-      // Aucun mock n'est lancé et aucune base n'est jointe : la configuration est exigée au démarrage,
-      // mais le client sortant n'est appelé par aucun écran et le pool ne se connecte qu'à la première
-      // requête qui le demande (DN-5 de step-005).
+      // Aucun mock n'est lancé : le client sortant n'est appelé par aucun écran, et la configuration
+      // ne fait qu'exiger son adresse au démarrage.
+      //
+      // La base, elle, **doit répondre et porter les migrations** depuis step-020 : le binaire
+      // contrôle la version du schéma avant de lier son port, et refuse de servir sur un schéma en
+      // retard. Un `make e2e` sur un poste sans `docker compose up -d && make migrate` échoue donc
+      // ici, en nommant les deux versions — ce qui vaut mieux qu'un parcours qui échoue sur un écran
+      // blanc. `?sslmode=disable` parce que ni le conteneur local ni le service de la CI ne
+      // présentent de certificat.
       DASHBOARD_GATEWAY_MODE: 'mock',
       DASHBOARD_GATEWAY_BASE_URL: 'http://127.0.0.1:4010',
-      DASHBOARD_DATABASE_URL: 'postgres://dashboard:dashboard@127.0.0.1:5432/dashboard',
+      DASHBOARD_DATABASE_URL:
+        'postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable',
     },
   },
 })
