@@ -23,7 +23,7 @@ import (
 //
 // Même contrat qu'ailleurs : aucun skip. Un Docker absent fait rouge.
 //
-// **Ce que ce `TestMain` coûte, et qui n'est pas gratuit** : les sept cas de `main_test.go` — refus
+// **Ce que ce `TestMain` coûte, et qui n'est pas gratuit** : les six cas de `main_test.go` — refus
 // d'argument, entrée vide, mise en forme du rapport — n'avaient besoin de rien et tournaient sur un
 // poste sans Docker. Ils ne le peuvent plus, un `TestMain` valant pour tout le paquet. C'est le prix
 // d'exercer la commande pour de bon, et il est assumé ici plutôt que contourné par un `t.Skip` qui

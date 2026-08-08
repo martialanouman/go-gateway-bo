@@ -23,6 +23,10 @@ import (
 // fonction sous test : les faire rendre la chaîne vide laisserait toutes ces assertions vertes sur
 // un message qui ne nomme plus rien — `Contains(s, "")` est toujours vrai. C'est ici que le juge est
 // branché.
+// Deux couples de valeurs, et non un : avec un seul, des helpers qui rendraient les constantes du
+// test — `return "en version 2"` — passeraient les quatre assertions, et le binaire annoncerait les
+// mêmes deux versions à chaque refus, quelles que soient les vraies. La chaîne vide n'est pas la
+// seule façon de ne rien nommer ; une constante en est une autre.
 func TestLeRefusNommeLesDeuxVersionsEnToutesLettres(t *testing.T) {
 	t.Parallel()
 
@@ -30,8 +34,16 @@ func TestLeRefusNommeLesDeuxVersionsEnToutesLettres(t *testing.T) {
 
 	assert.Contains(t, message, "en version 2")
 	assert.Contains(t, message, "attend la version 3")
-	assert.Equal(t, "en version 2", store.AppliedVersionPhrase(2))
-	assert.Equal(t, "attend la version 3", store.ExpectedVersionPhrase(3))
+
+	autre := store.OutdatedSchemaError{Applied: 0, Embedded: 41}.Error()
+
+	assert.Contains(t, autre, "en version 0")
+	assert.Contains(t, autre, "attend la version 41")
+	assert.NotContains(t, autre, "version 2",
+		"le message porte une version qu'on ne lui a pas donnée")
+
+	assert.Equal(t, "en version 7", store.AppliedVersionPhrase(7))
+	assert.Equal(t, "attend la version 12", store.ExpectedVersionPhrase(12))
 }
 
 func TestUnSchemaAJourLaisseDemarrer(t *testing.T) {

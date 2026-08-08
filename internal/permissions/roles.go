@@ -93,8 +93,9 @@ var defaultRoles = []DefaultRole{
 	},
 	{
 		Name: "billing_admin",
-		Description: "Tient la facturation de bout en bout, rechargements et fournisseurs compris, " +
-			"et lit le reste sans voir les MSISDN en clair",
+		Description: "Tient la facturation de bout en bout, rechargements et fournisseurs compris ; " +
+			"lit par ailleurs les clients, les comptes, les groupes, le routage, les connecteurs, les " +
+			"sessions et les alertes, sans voir les MSISDN en clair",
 		Keys: []Key{
 			BillingRead, BillingWrite, BillingTopup, BillingProviderWrite, BillingScopeChange,
 			CustomersRead, AccountsRead, GroupsRead,
@@ -111,8 +112,9 @@ var defaultRoles = []DefaultRole{
 	},
 	{
 		Name: "account_manager",
-		Description: "Ouvre et suit les clients — fiches, comptes SMPP, identifiants, groupes et " +
-			"paramètres de facturation ; ne peut ni recharger un solde ni toucher au routage",
+		Description: "Ouvre et suit les clients — fiches, comptes SMPP, groupes, identifiants " +
+			"(création et rotation comprises) et facturation, balance_scope compris ; ne peut ni " +
+			"recharger un solde ni toucher au routage, aux connecteurs ou au fournisseur de facturation",
 		Keys: []Key{
 			CustomersRead, CustomersWrite,
 			AccountsRead, AccountsWrite,
@@ -123,9 +125,10 @@ var defaultRoles = []DefaultRole{
 	},
 	{
 		Name: "compliance",
-		Description: "Seul rôle par défaut habilité à lever un désabonnement et à exécuter un " +
-			"effacement RGPD ; lit les comptes et les CDR, MSISDN en clair compris, sans afficher le " +
-			"corps d'un message",
+		Description: "Conformité : lève les désabonnements, gère les numéros entrants en lecture, " +
+			"exécute un effacement RGPD et détruit la clé de chiffrement d'un contenu — le seul rôle " +
+			"à le pouvoir hors super_admin. Lit les comptes et les CDR, MSISDN en clair et export de " +
+			"masse compris, sans jamais afficher le corps d'un message",
 		Keys: []Key{
 			SuppressionsRead, SuppressionsWrite, SuppressionsDelete,
 			InboundRead,

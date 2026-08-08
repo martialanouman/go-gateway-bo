@@ -41,11 +41,12 @@ type SeedOutcome struct {
 	GrantsRevoked       []Grant
 
 	// UnknownPermissions porte les clés que la base garde et que le catalogue ne déclare plus. Elles
-	// ne sont **pas** supprimées. Les rôles par défaut, eux, ont bien perdu l'attribution — c'est la
-	// révocation de `reconcileGrants`, et elle est rapportée dans `GrantsRevoked` ; ce qui subsiste
-	// est la ligne du catalogue, et l'attribution d'un rôle composé à l'écran, que le `RESTRICT` de
-	// `role_permissions.permission_key` protège. Retirer la clé est une migration, qui révoque
-	// d'abord ce qui reste.
+	// ne sont **pas** supprimées. Les rôles par défaut **que ce code décrit** ont bien perdu
+	// l'attribution — c'est la révocation de `reconcileGrants`, rapportée dans `GrantsRevoked`. Ce
+	// qui subsiste est la ligne du catalogue, et l'attribution de tout autre rôle : un rôle composé à
+	// l'écran, ou un rôle `is_default` d'une release antérieure, que la même garde épargne. Le
+	// `RESTRICT` de `role_permissions.permission_key` protège alors la ligne. Retirer la clé est une
+	// migration, qui révoque d'abord ce qui reste.
 	UnknownPermissions []permissions.Key
 	// UnknownRoles porte les rôles marqués `is_default` que le code ne décrit plus. Le seed ne touche
 	// pas non plus à leurs attributions : les révoquer les viderait de leur sens sans que personne

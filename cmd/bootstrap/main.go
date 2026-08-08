@@ -106,15 +106,19 @@ func warnAboutDivergence(errOut io.Writer, outcome store.SeedOutcome) {
 		return
 	}
 
-	// Ce message est lu dans quatre situations — la clé n'est détenue par personne, par des rôles
-	// par défaut seulement, par des rôles composés à l'écran seulement, ou par les deux — et il ne
-	// dit donc que ce qui est vrai des quatre. Une première rédaction affirmait « la supprimer
-	// échouerait tant qu'un rôle la détient » et « les rôles composés depuis l'écran la gardent » :
-	// les deux sont fausses dès que personne ne la détient, c'est-à-dire dans le cas le plus courant.
+	// Ce message est lu dans **cinq** situations, selon qui détient encore la clé : personne, un rôle
+	// par défaut que le code décrit, un rôle composé à l'écran, un rôle marqué `is_default` que le
+	// code ne décrit plus, ou plusieurs à la fois. Il ne dit donc que ce qui est vrai des cinq.
+	//
+	// Deux rédactions précédentes ne l'étaient pas : la première affirmait qu'un rôle détenait la clé
+	// — faux dès que personne ne la détient — et la seconde que « aucun rôle par défaut ne l'accorde
+	// plus », que le message voisin sur un rôle inconnu dément six lignes plus bas, puisque celui-là
+	// conserve ses attributions. D'où « que ce code décrit », qui est la formulation exacte de la
+	// garde de la révocation.
 	for _, key := range outcome.UnknownPermissions {
 		printLine(errOut, "ATTENTION — la base porte la permission %q, que le catalogue ne déclare "+
-			"plus.\n  La ligne est conservée : aucun rôle par défaut ne l'accorde plus, mais un rôle "+
-			"composé\n  depuis l'écran peut la détenir, et la supprimer échouerait alors sur la "+
+			"plus.\n  La ligne est conservée : aucun rôle par défaut que ce code décrit ne l'accorde "+
+			"plus, mais\n  un autre rôle peut la détenir, et la supprimer échouerait alors sur la "+
 			"contrainte. La\n  retirer pour de bon est une migration, qui révoque d'abord ce qui "+
 			"reste.", key)
 	}

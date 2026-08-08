@@ -156,10 +156,11 @@ permissions ». C'est ce qui fait qu'une clé ajoutée en step-060 revient d'off
 Une clé que la base garde et que le catalogue ne déclare plus est nommée sur stderr avec sa raison ;
 `bootstrap` sort en **0**.
 
-Ne pas la supprimer : la ligne du catalogue survit, et avec elle l'attribution d'un rôle composé à
-l'écran, que le `RESTRICT` de `role_permissions.permission_key` protège. Les rôles **par défaut**, eux,
-ont perdu l'attribution — c'est la révocation de DN-8, et elle est rapportée. Retirer la clé est une
-migration, qui révoque d'abord ce qui reste.
+Ne pas la supprimer : la ligne du catalogue survit, et avec elle l'attribution de tout rôle que la
+révocation de DN-8 épargne — un rôle composé à l'écran, ou un rôle `is_default` d'une release
+antérieure. Le `RESTRICT` de `role_permissions.permission_key` protège alors la ligne. Les rôles par
+défaut **que le code décrit**, eux, ont perdu l'attribution, et elle est rapportée. Retirer la clé est
+une migration, qui révoque d'abord ce qui reste.
 
 Ne pas échouer : arrêter une livraison sur un reliquat de vocabulaire bloquerait le déploiement pour
 un état qui n'empêche rien de fonctionner. Ce qu'on refuse est le silence, pas la livraison.
@@ -316,4 +317,4 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 |---|---|
 | `config.ConnectTimeout` dans `openSQL` | aucune porte ne rougit — l'exercer demanderait un hôte qui avale les paquets sans répondre. Écrit au-dessus de la ligne, comme les quatre bornes équivalentes de `pool.go` |
 | La position du verrou en tête de transaction | voir ci-dessus |
-| Les descriptions de rôles, **en tant que copie** | la projection est gardée (base contre code), la justesse ne l'est pas : rien ne dit qu'une phrase décrit bien ce que le rôle accorde. Les deux qui mentaient ont été corrigées en revue, à la main |
+| Les descriptions de rôles, **en tant que copie** | la projection est gardée (base contre code), la justesse ne l'est pas : rien ne dit qu'une phrase décrit bien ce que le rôle accorde. **Quatre** ont menti et ont été corrigées à la main, sur trois passes de revue — `ops` deux fois, puis `compliance` et `billing_admin`, que les deux premières passes n'avaient pas relus. C'est la ligne de ce tableau qui a le plus coûté |
