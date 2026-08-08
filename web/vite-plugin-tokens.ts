@@ -38,11 +38,15 @@ const CONSUMED = /var\(\s*(--[\w-]+)/g
 /** Une déclaration `--nom:`, en tête de propriété. */
 const DECLARED = /(--[\w-]+)\s*:/g
 
-/** Un commentaire CSS ou une balise de commentaire HTML. */
-const COMMENTS = /\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->/g
+/** Un commentaire CSS. */
+const COMMENTS = /\/\*[\s\S]*?\*\//g
+
+/** Le contenu d'un bloc `<style>`, seul endroit d'un document HTML où vivent des tokens. */
+const STYLE_BLOCK = /<style[^>]*>([\s\S]*?)<\/style>/g
 
 /**
- * Les tokens que `sources` consomme sans qu'aucune d'elles ne les déclare, triés et dédoublonnés.
+ * Les tokens que `sources` — du **CSS** — consomme sans qu'aucune d'elles ne les déclare, triés et
+ * dédoublonnés.
  *
  * Les commentaires sortent d'abord : sans ça, le fichier de test de ce plugin — qui cite les trois
  * noms de l'incident de step-026 — se ferait rejeter par le plugin qu'il teste.
@@ -57,6 +61,22 @@ export function undeclaredTokens(sources: readonly string[]): string[] {
 }
 
 /**
+ * Le CSS d'un asset émis : son contenu s'il est déjà du CSS, sinon les blocs `<style>` qu'il porte.
+ *
+ * **On n'assainit pas le HTML, on en extrait le CSS.** La première version retirait les commentaires
+ * HTML du document pour le traiter comme du CSS ; CodeQL l'a signalé en `js/incomplete-multi-character-sanitization`,
+ * et l'alerte était juste sur la forme même si le résultat n'est jamais rendu — un remplacement
+ * unique de `<!--…-->` laisse passer une imbrication. Extraire les `<style>` est plus précis : les
+ * commentaires HTML, qui citent des noms de tokens dans `index.html`, cessent d'être lus du tout, au
+ * lieu d'être nettoyés.
+ */
+function styleSheetsIn(fileName: string, source: string): string[] {
+  if (fileName.endsWith('.css')) return [source]
+
+  return [...source.matchAll(STYLE_BLOCK)].map(([, css]) => css as string)
+}
+
+/**
  * `writeBundle` plutôt que `generateBundle` : à ce moment tous les `generateBundle` ont tourné, donc
  * le document émis par `vite:build-html` est là sans dépendre d'un ordre entre plugins.
  */
@@ -67,7 +87,9 @@ export function declaredTokens(): Plugin {
     writeBundle(_options, bundle) {
       const sources = Object.values(bundle)
         .filter((asset) => asset.type === 'asset' && /\.(css|html)$/.test(asset.fileName))
-        .map((asset) => String((asset as { source: string | Uint8Array }).source))
+        .flatMap((asset) =>
+          styleSheetsIn(asset.fileName, String((asset as { source: string | Uint8Array }).source)),
+        )
 
       const missing = undeclaredTokens(sources)
       if (missing.length === 0) return
