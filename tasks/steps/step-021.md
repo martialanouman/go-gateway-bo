@@ -17,7 +17,19 @@ livre le premier facteur et la porte qui le limite, pas la session.
 - **Anti-brute-force partagé entre instances** : compteur d'échecs et verrouillage temporaire en
   PostgreSQL, par compte **et** par adresse source. Migration `00004`.
 - `make bootstrap`, **seconde moitié** : crée le premier opérateur, lit ses valeurs dans
-  l'environnement, refuse de s'exécuter dès qu'un opérateur existe.
+  l'environnement, et **ne recrée personne** dès qu'un opérateur existe.
+
+  > **Amendement du 08/08/2026, à la livraison de step-020.** Ces trois lignes disaient « refuse de
+  > s'exécuter dès qu'un opérateur existe », et le README avec elles. step-020 a livré la première
+  > moitié de la commande **rejouable**, parce qu'un déploiement l'appelle à chaque fois et que le
+  > seed doit pouvoir reprojeter le catalogue : une commande qui échouerait dès le second passage
+  > obligerait à la retirer du déploiement, donc à ne plus jamais resemer.
+  >
+  > Ce qui ne se rejoue pas est la **création du compte**, pas la commande : `bootstrap` sème, puis
+  > crée le premier opérateur **s'il n'y en a aucun**, et le dit quand il n'en crée pas. Le mode
+  > d'échec que le « refuse » visait — un second compte propriétaire créé en douce par quelqu'un qui
+  > relance la commande avec d'autres variables — est couvert à l'identique, sans casser la
+  > rejouabilité. La DoD et les tests ci-dessous sont amendés dans le même sens.
 - Les variables nouvelles dans `internal/config` et `.env.example`, sans valeur par défaut.
 
 ## Points d'implémentation clés

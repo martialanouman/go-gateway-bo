@@ -881,7 +881,7 @@ moins : un scénario qui se lit juste inspire une confiance que rien n'a encore 
   contre `pgx` nu.~~ **Tranché en step-020 : `pgx` nu**, la première step qui écrit une requête, comme
   l'amendement ci-dessous le prévoyait. Trois faits pris sur le code de cette PR — les trois
   instructions du seed passent leurs paramètres en tableaux `unnest($1::text[], …)` construits en Go
-  et rendent deux colonnes, donc `sqlc` n'aurait presque rien à engendrer contre une dépendance
+  et rendent au plus trois colonnes, donc `sqlc` n'aurait presque rien à engendrer contre une dépendance
   `tool`, un `sqlc.yaml` et une cinquième entrée dans `$(GENERATED)` ; il introduirait un **second
   analyseur SQL** devant avaler `uuidv7()`, la table partitionnée et le bloc PL/pgSQL — le mode
   d'échec que `internal/store/permissions_catalog_test.go` a précisément corrigé ; et ce que `pgx` nu

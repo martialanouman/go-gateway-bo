@@ -430,7 +430,7 @@ migrate: ## Applique les migrations du schéma du BFF (DASHBOARD_DATABASE_URL)
 # `bootstrap` ne dépend pas de `migrate` : ce sont deux gestes que l'exploitant enchaîne lui-même, et
 # le refus de `bootstrap` sur un schéma en retard nomme le remède. Les lier ferait migrer une base
 # qu'on voulait seulement semer.
-bootstrap: ## Sème les 44 permissions et les 9 rôles par défaut (DASHBOARD_DATABASE_URL)
+bootstrap: ## Sème le catalogue de permissions et les rôles par défaut (DASHBOARD_DATABASE_URL)
 	@dsn="$$DASHBOARD_DATABASE_URL"; \
 	set -a; if [ -f .env ]; then . ./.env; fi; set +a; \
 	dsn="$${dsn:-$$DASHBOARD_DATABASE_URL}"; \

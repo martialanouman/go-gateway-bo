@@ -30,8 +30,8 @@ make mock         # mock Prism sur openapi-admin.yaml, sur :4010
 make check-generated  # ce qui dérive des deux contrats OpenAPI est-il à jour ?
 make migrate      # migrations goose sur DASHBOARD_DATABASE_URL — celle de l'appelant l'emporte
                   # sur .env, et le DSN passe par stdin plutôt que par argv, que `ps` afficherait
-make bootstrap    # sème les 44 permissions et les 9 rôles par défaut, rejouable ; même précédence
-                  # de DSN que migrate. Le premier opérateur arrive en step-021
+make bootstrap    # sème le catalogue de permissions et les rôles par défaut, rejouable ; même
+                  # précédence de DSN que migrate. Le premier opérateur arrive en step-021
 
 # Une porte granulaire par job de CI, à lancer seule pendant une boucle rouge → vert :
 #   build-go (Build Go) · lint-go (+ fmt-go pour appliquer) · vuln-go (govulncheck)
@@ -267,8 +267,11 @@ mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couver
   rouge, puis le handler avec sa garde, son audit et son **DTO de sortie**.
 - **Ajouter une route client** : créer le fichier sous `web/src/routes/`, régénérer l'arbre de routes,
   **commiter le fichier généré**.
-- **Ajouter une permission** : trois endroits dans la même PR — le catalogue `internal/permissions/`,
-  la garde serveur qui l'exige, et le tableau des rôles par défaut (§6.10 de la spec). Le TypeScript
+- **Ajouter une permission** : trois endroits dans la même PR — le catalogue
+  `internal/permissions/catalog.go`, la garde serveur qui l'exige, et les rôles par défaut de
+  `internal/permissions/roles.go` (§6.10 de la spec). Le troisième n'est plus une consigne : depuis
+  step-020, une clé qu'aucun rôle ne détient fait **rougir** `TestAucuneCleOrphelineHorsDesTroisDeliberees`
+  — sauf à l'inscrire parmi les trois orphelines délibérées, ce qui se relit. Le TypeScript
   n'en dérive **pas encore** : `make generate` ne lit que les deux contrats OpenAPI — d'où il tire
   le client Go de l'API Admin, le serveur Go et les types TS du BFF, les trois que
   `check-generated` compare — et `internal/permissions/` n'existe pas. La dérivation arrive avec

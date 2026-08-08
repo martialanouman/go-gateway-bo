@@ -78,12 +78,12 @@ step-187. L'appel récurrent à `ensure_audit_log_partitions()` → step-025, pr
 code réel de cette step**, pas en général.
 
 Ce que cette step écrit : trois instructions de réconciliation dont les paramètres sont des tableaux
-`unnest($1::text[], …)` construits en Go, et qui rendent toutes la même forme minuscule —
-`(kind text, name text)`. Plus une lecture de version, qui n'est même pas notre SQL : c'est
-`database.Store` de goose.
+`unnest($1::text[], …)` construits en Go, et qui rendent une classe et un ou deux noms — deux colonnes
+pour les permissions et les rôles, trois pour les attributions. Plus une lecture de version, qui n'est
+même pas notre SQL : c'est `database.Store` de goose.
 
 - **Ce que `sqlc` engendrerait est plus petit que ce qu'il coûte.** Sa valeur est le mappage colonnes →
-  struct. Ici, trois requêtes et deux colonnes de retour. En face : une dépendance `tool`, un
+  struct. Ici, trois requêtes et au plus trois colonnes de retour. En face : une dépendance `tool`, un
   `sqlc.yaml`, un paquet engendré et commité, une **cinquième** entrée dans `$(GENERATED)` que
   `check-generated` supprime et régénère, une cible `make` de plus.
 - **Il introduirait un second analyseur SQL, et ce dépôt s'est déjà brûlé là.**
@@ -144,6 +144,9 @@ qu'il existe pour interdire.
 - **« lecture seule comptes » de `compliance`** se lit comme celle de `support_readonly` :
   `customers:read`, `accounts:read`, `groups:read`, sans `credentials:read`.
 - **`compliance` reçoit `inbound:read` sans `inbound:write`** — la prose ne nomme que le premier.
+- **`support_readonly` ne reçoit pas `audit:read`.** L'énumération de son cas ne nomme pas l'audit, là
+  où celle d'`ops` le nomme. Exclusion du même ordre que les précédentes, écrite ici pour être
+  relisible — elle manquait à cette liste, et un relecteur l'a signalée.
 
 `super_admin` n'est **pas** écrit à la main : il est dérivé du catalogue, le §6.10 disant « toutes les
 permissions ». C'est ce qui fait qu'une clé ajoutée en step-060 revient d'office au propriétaire.
@@ -220,11 +223,90 @@ l'édition des attributions d'un rôle `is_default`, ou basculer `is_default = f
 le nom figure au code, donc la bascule serait défaite au déploiement suivant. La retenir demanderait
 de changer `upsertRoles` ici — c'est la moitié de l'information que step-029 aurait cherchée elle-même.
 
+### DN-9 — Ce que la revue a corrigé, et deux commits qui sur-comptent
+
+Trois relecteurs en lecture seule (correction/sécurité, tests et mutations, affirmations) ont rendu
+vingt-neuf constats. Ce qui suit est ce qu'ils ont changé au **fond**, le reste étant au tableau des
+mutations et dans le corps de la PR :
+
+- **Le message de refus n'était pas gardé.** Les scénarios cherchaient le nombre nu dans une sortie
+  `slog` JSON horodatée, où « 0 » et « 2 » figurent tous deux dans « 2026 » : vider
+  `OutdatedSchemaError` de ses deux versions restait vert. Le message expose maintenant les phrases
+  qu'il compose, et les scénarios exigent celles-ci.
+- **Le rapport du seed n'était observé nulle part** sur un premier passage, ni son silence sur une
+  base saine. Deux `Alors` ajoutés ; sans eux, `make bootstrap` pouvait annoncer « rien à semer »
+  après avoir tout posé, ou crier 44 divergences à chaque déploiement.
+- **`cmd/bootstrap` n'était joué de bout en bout nulle part.** Trois mutations y survivaient. La
+  commande a désormais sa suite contre un PostgreSQL réel, et c'est elle qui tient la ligne de DoD
+  « deux exécutions laissent la base identique — comparée ».
+- **La copie mentait sur le livré.** Le message de divergence affirmait qu'aucun rôle n'était
+  dépossédé au moment même où la révocation retirait la clé aux rôles par défaut : reproduit à la
+  main, puis réécrit. Deux descriptions de rôle omettaient des clés qu'elles accordent.
+- **Deux manques de fond** : `openSQL` ne posait aucune borne de connexion alors que le contrôle
+  s'exécute avant `net.Listen` — une base muette aurait pendu le démarrage sans un mot ; et `Seed` ne
+  prenait aucun verrou là où `Migrate` en prend un pour la même raison.
+
+**Deux messages de commit sur-comptent, et ne sont pas réécrits** : `e78bb04` annonce « trois
+commentaires » corrigés là où il en corrige deux, et `4e38a46` attribue à `CLAUDE.md` une affirmation
+que seul le README portait. L'historique n'est pas réécrit pour si peu ; l'écart est consigné ici,
+puisque c'est la fiche qui reste lisible après le merge.
+
 ## Tableau des mutations
 
 Tenu au fil de l'eau. Une ligne « aucune porte ne rougit » est un constat de la DoD (critère 4), pas
 un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dessus de la ligne concernée.
 
+### Les rôles par défaut
+
 | Mutation appliquée (le défaut réel qu'elle rejoue) | Ce qui tombe |
 |---|---|
-| *(à remplir)* | |
+| `suppressions:delete` retirée de `compliance` *(la DoD la nomme)* | `compliance n'accorde pas ce que le §6.10 lui donne : [suppressions:delete]`, **et** le contrôle des orphelines |
+| `billing:topup` accordée à `account_manager` *(la DoD la nomme)* | `account_manager accorde ce que le §6.10 ne lui donne pas` — la branche « en trop », que seule la comparaison dans les deux sens voit |
+| Le clone des clés retiré de `DefaultRoles` (copie **superficielle**, le défaut réel) | `un appelant a accordé roles:manage à un rôle pour tout le process`. La version « aucun clone » ne compile pas : elle ne prouverait rien |
+| `super_admin` figé sur une liste écrite à la main | `super_admin n'a pas [42 clés]` |
+
+### La version du schéma
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| `applied != embedded` au lieu de `applied <` | `TestUnSchemaEnAvanceLaisseDemarrer` — une instance en cours de remplacement refuserait de servir |
+| `Provider.GetVersions` à la place de `database.NewStore` *(import retiré pour que ça compile)* | `le contrôle de version a créé la table de version sur une base qu'il refuse` |
+| Le code 42P01 traité comme une panne | la base vierge n'est plus refusée pour la bonne raison (`ErrorAs` tombe) |
+| La version embarquée figée à **1**, puis à **9**, au lieu d'être lue sur les sources | les deux directions de dérive rougissent. Figée à sa valeur juste, elle reste verte — c'est le seul cas où elle est équivalente |
+| L'erreur de pgx propagée telle quelle dans `openSQL` | `"…cannot parse password = 'tr3s-secret'…" should not contain "tr3s-secret"` |
+| Une base injoignable classée « base vierge » | `une base injoignable est rapportée comme un schéma en retard` |
+| `OutdatedSchemaError.Error()` vidé de ses deux versions *(revue)* | `le message ne nomme pas la version trouvée ("en version 2")`. **Cette mutation survivait** avant la revue : les scénarios cherchaient le chiffre nu dans une sortie `slog` JSON, où « 0 » et « 2 » figurent tous deux dans « 2026 » |
+
+### Le seed
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| Le `IS DISTINCT FROM` retiré | `la seconde exécution a rapporté des changements` — 44 clés en mise à jour |
+| `ON CONFLICT DO NOTHING` à la place des CTE | la description réécrite à la main survit au rejeu |
+| Les clés inconnues supprimées *(par une CTE `purged` bien formée)* | `la clé "legacy:read" a été supprimée`. La **première tentative échouait sur une erreur de syntaxe SQL** : elle ne prouvait rien, et a été refaite |
+| La révocation retirée | l'attribution posée à la main sur `auditor` survit au rejeu |
+| Les deux prédicats de la révocation retirés | le rôle composé à l'écran est vidé |
+| `AND r.is_default` retiré **seul** | **rien** — mesuré inatteignable, `upsertRoles` forçant `is_default = true` deux instructions plus haut. La garde a été **retirée** plutôt que dotée d'un test de complaisance (DN-8) |
+| Le verrou consultatif retiré *(revue)* | `aucune transaction n'attend le verrou du seed` |
+| Le verrou glissé **après** `seedPermissions` *(revue)* | **rien** — le test observe que le seed attend, pas qu'il attend avant d'avoir écrit. Constat écrit au-dessus de la ligne (critère 4) |
+| Les `append` de `inserted` et `added` perdus *(revue)* | `le rapport annonce 0 clé(s) posée(s) pour 44 au catalogue`. **Survivait** avant la revue : `make bootstrap` aurait annoncé « rien à semer » après avoir tout posé |
+| Le `NOT EXISTS` de la branche `unknown` retiré *(revue)* | `le rapport signale une divergence sur une base que le seed vient de remplir lui-même` — 44 avertissements par déploiement. **Survivait** avant la revue |
+
+### La commande et le binaire
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| `store.VerifySchema` retirée de `run()` *(la DoD la nomme)* | `schema.feature` : le binaire sert, et le hook de fin le trouve encore vivant |
+| Le contrôle déplacé **après** `net.Listen` | `bind: address already in use` au lieu du message de schéma. **Survivait** jusqu'à ce qu'un scénario occupe l'adresse d'écoute d'avance : l'ordre du démarrage n'était observable par rien |
+| `store.VerifySchema` retirée de `cmd/bootstrap` *(revue)* | `Should be in error chain: OutdatedSchemaError`. **Survivait** : la commande n'était jouée de bout en bout nulle part |
+| Les deux écrivains de `report` intervertis *(revue)* | le compte rendu part sur stderr, l'avertissement sur stdout. **Survivait** pour la même raison |
+| L'appel à `report` supprimé *(revue)* | la commande ne dit plus rien |
+| Les deux `Étant donné` du scénario d'ordre intervertis *(revue)* | **rien**, et c'est voulu : le pas complète l'environnement au lieu de le remplacer, donc il ne dépend plus de l'ordre |
+
+### Ce qui n'est gardé par rien, vérifié plutôt que supposé
+
+| Ligne | Constat |
+|---|---|
+| `config.ConnectTimeout` dans `openSQL` | aucune porte ne rougit — l'exercer demanderait un hôte qui avale les paquets sans répondre. Écrit au-dessus de la ligne, comme les quatre bornes équivalentes de `pool.go` |
+| La position du verrou en tête de transaction | voir ci-dessus |
+| Les descriptions de rôles, **en tant que copie** | la projection est gardée (base contre code), la justesse ne l'est pas : rien ne dit qu'une phrase décrit bien ce que le rôle accorde. Les deux qui mentaient ont été corrigées en revue, à la main |

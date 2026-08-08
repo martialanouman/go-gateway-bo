@@ -42,8 +42,9 @@ make mock                  # Prism sert le contrat sur :4010, autre terminal
 make dev                   # BFF (:3001) + Vite (:3000) — l'application est sur :3000
 ```
 
-Les lignes marquées `(cible)` arrivent avec leur step et rendent `No rule to make target` d'ici là —
-jamais un vert silencieux.
+Toutes les commandes de ce bloc existent depuis step-020, la dernière étant `make bootstrap`. La
+convention reste : une commande annoncée avant sa step est signalée `(cible)` et rend
+`No rule to make target` d'ici là — jamais un vert silencieux.
 
 **Un `.env` antérieur à step-003 ne démarre plus** : `DASHBOARD_GATEWAY_BASE_URL` y est devenue
 obligatoire dans les deux modes. Recopier le bloc « Passerelle » de `.env.example` ; le binaire refuse
@@ -67,7 +68,8 @@ tous les seconds facteurs**, codes de récupération compris.
 
 ### `make bootstrap` prépare une installation neuve
 
-Elle sème les 44 permissions du catalogue et les neuf rôles par défaut, et se **rejoue sans effet** :
+Elle sème le catalogue de permissions et les neuf rôles par défaut du §6.10, et se **rejoue sans
+effet** :
 un déploiement l'appelle à chaque fois. Ce qu'elle change, elle le compte ; ce que la base porte et
 que le code ne déclare plus, elle le nomme sur la sortie d'erreur sans arrêter la livraison — le
 retrait d'une clé est une migration, qui révoque d'abord. Elle refuse de semer sur un schéma en
@@ -101,6 +103,8 @@ make mock       # Prism sur openapi-admin.yaml, sur :4010
 make migrate    # migrations goose. Le DSN de l'appelant l'emporte sur .env — c'est ce qui rend
                 # DASHBOARD_DATABASE_URL=…/staging make migrate sûr — et passe par stdin, jamais
                 # par argv : `ps aux` afficherait le mot de passe de la base
+make bootstrap  # sème le catalogue de permissions et les rôles par défaut, sur une base déjà
+                # migrée. Rejouable ; même précédence de DSN que migrate
 
 make test-go           # unitaires Go + scénarios godog, avec -race
 make lint-go           # golangci-lint · make fmt-go applique le formatage
@@ -113,7 +117,9 @@ make vuln-web          # pnpm audit
 make check-routes      # l'arbre de routes commité est-il à jour et régénéré ?
 make check-generated   # ce qui dérive des deux contrats OpenAPI est-il à jour et régénéré ?
 make test / make lint  # les composites des deux toolchains
-make e2e               # les parcours Playwright, contre le binaire — hors de `make check`
+make e2e               # les parcours Playwright, contre le binaire — hors de `make check`.
+                       # Exige un PostgreSQL migré : le binaire refuse de servir sur un schéma
+                       # en retard (step-020)
 ```
 
 Les linters passent par `go tool` et sont épinglés dans `go.mod` : rien à installer
