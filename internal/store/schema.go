@@ -25,11 +25,15 @@ type OutdatedSchemaError struct {
 	Embedded int64
 }
 
+// Le message ne dit ni « démarrer » ni « servir » : deux commandes le rendent — le serveur, qui
+// refuse de servir, et `bootstrap`, qui refuse de semer. Écrit pour l'une, il aurait décrit de
+// travers ce que l'autre venait de faire. Chaque appelant, lui, donne son contexte : `cmd/dashboard`
+// le journalise sous « le serveur s'arrête ».
 func (e OutdatedSchemaError) Error() string {
 	return fmt.Sprintf(
-		"le schéma de la base est en version %d, ce binaire attend la version %d : jouer les "+
-			"migrations avant de démarrer. Servir sur un schéma en retard produirait des échecs de "+
-			"forme inconnue à l'exécution, sur des colonnes absentes",
+		"le schéma de la base est en version %d, ce binaire attend la version %d : les migrations "+
+			"doivent être jouées d'abord. Travailler sur un schéma en retard produirait des échecs "+
+			"de forme inconnue à l'exécution, sur des colonnes absentes",
 		e.Applied, e.Embedded)
 }
 

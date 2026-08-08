@@ -2,8 +2,9 @@
 # une cible qui dépend de l'autre toolchain : quatre des cinq jobs Go n'ont ni pnpm ni `node_modules`
 # — « Tests Go » est l'exception — et une cible composite les enverrait chercher un `pnpm` absent.
 #
-# Ce que ce fichier ne porte pas encore : les cibles du versant Go qui n'ont pas encore leur code
-# (`bootstrap`). Aucune cible vide ici : une cible qui ne fait rien passe pour verte.
+# Aucune cible vide ici : une cible qui ne fait rien passe pour verte. C'est pourquoi `bootstrap`
+# n'apparaît qu'avec step-020, qui lui donne son code — et n'en sème encore que la moitié, la
+# création du premier opérateur revenant à step-021.
 
 BIN := bin/dashboard
 WEBASSETS := internal/webassets/dist
@@ -80,7 +81,7 @@ RESTORE_WEBASSETS := echo "$(WEBASSETS) a disparu — le rétablir : git checkou
 .DEFAULT_GOAL := help
 .PHONY: help build build-go build-web dev check test test-go test-web lint lint-go lint-web fmt-go \
         typecheck-web vuln-go vuln-web lint-workflows check-routes generate check-generated mock \
-        migrate clean generate-permissions e2e
+        migrate bootstrap clean generate-permissions e2e
 
 # Trois courses vivent entre les prérequis de `check` ; la deuxième ne se voit pas, la troisième est
 # la seule à rougir d'elle-même :
@@ -419,6 +420,26 @@ migrate: ## Applique les migrations du schéma du BFF (DASHBOARD_DATABASE_URL)
 		exit 1; \
 	}; \
 	printf '%s' "$$dsn" | go run ./cmd/migrate
+
+# Même recette que `migrate`, à la commande près, et **recopiée plutôt que factorisée** : ce qu'un
+# `define` économiserait ici est six lignes de shell, contre un niveau d'indirection sur la seule
+# recette du dépôt dont l'ordre de précédence décide de quelle base on écrit. La précédence est la
+# même — l'environnement de l'appelant l'emporte sur `.env` — pour la raison écrite au-dessus de
+# `migrate`, et le DSN part dans un tube pour celle qui la suit.
+#
+# `bootstrap` ne dépend pas de `migrate` : ce sont deux gestes que l'exploitant enchaîne lui-même, et
+# le refus de `bootstrap` sur un schéma en retard nomme le remède. Les lier ferait migrer une base
+# qu'on voulait seulement semer.
+bootstrap: ## Sème les 44 permissions et les 9 rôles par défaut (DASHBOARD_DATABASE_URL)
+	@dsn="$$DASHBOARD_DATABASE_URL"; \
+	set -a; if [ -f .env ]; then . ./.env; fi; set +a; \
+	dsn="$${dsn:-$$DASHBOARD_DATABASE_URL}"; \
+	test -n "$$dsn" || { \
+		echo "DASHBOARD_DATABASE_URL est vide — sur un poste local, après docker compose up -d :"; \
+		echo "  DASHBOARD_DATABASE_URL=postgres://dashboard:dashboard@localhost:5432/dashboard?sslmode=disable"; \
+		exit 1; \
+	}; \
+	printf '%s' "$$dsn" | go run ./cmd/bootstrap
 
 # Idempotent jusqu'au bout. La version précédente supprimait `bin` et `web/dist`, puis échouait sur
 # un `find: … No such file or directory` quand `$(WEBASSETS)` avait disparu : un nettoyage à moitié
