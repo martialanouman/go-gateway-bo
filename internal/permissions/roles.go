@@ -53,10 +53,11 @@ var defaultRoles = []DefaultRole{
 	},
 	{
 		Name: "ops",
-		Description: "Exploite le réseau : routage, scripts, réécriture de sender, connecteurs, " +
-			"sessions, anti-spam, numéros entrants, désabonnements et alertes en écriture, MSISDN en " +
-			"clair et export de masse compris ; lecture seule sur la facturation et l'audit. Ne peut " +
-			"ni lever un désabonnement ni afficher le corps d'un message",
+		Description: "Exploite le réseau : routage, scripts — publication en production comprise —, " +
+			"réécriture de sender, connecteurs et leurs binds (rebind compris), sessions, anti-spam, " +
+			"numéros entrants, désabonnements et alertes en écriture ; MSISDN en clair et export de " +
+			"masse ; lecture seule sur la facturation et l'audit. Ne peut ni lever un désabonnement " +
+			"ni afficher le corps d'un message",
 		Keys: []Key{
 			RoutesRead, RoutesWrite, RoutesImport,
 			ScriptsRead, ScriptsWrite, ScriptsPublish,
@@ -127,8 +128,9 @@ var defaultRoles = []DefaultRole{
 		Name: "compliance",
 		Description: "Conformité : lève les désabonnements, gère les numéros entrants en lecture, " +
 			"exécute un effacement RGPD et détruit la clé de chiffrement d'un contenu — le seul rôle " +
-			"à le pouvoir hors super_admin. Lit les comptes et les CDR, MSISDN en clair et export de " +
-			"masse compris, sans jamais afficher le corps d'un message",
+			"par défaut à le pouvoir avec super_admin. Lit les clients, les comptes, les groupes et " +
+			"les CDR, MSISDN en clair et export de masse compris, sans jamais afficher le corps d'un " +
+			"message",
 		Keys: []Key{
 			SuppressionsRead, SuppressionsWrite, SuppressionsDelete,
 			InboundRead,

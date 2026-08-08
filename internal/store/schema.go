@@ -102,10 +102,11 @@ func embeddedSchemaVersion(db *sql.DB) (int64, error) {
 		return 0, err
 	}
 
+	// Pas de garde sur une liste vide : `goose.NewProvider` rend `ErrNoMigrations` dès qu'il n'a rien
+	// à charger (`provider.go:147`), donc `newVersionProvider` a déjà échoué deux lignes plus haut.
+	// Une garde qu'aucune mutation ne peut faire tomber ne garde rien — même arbitrage que le
+	// `AND r.is_default` du seed, retiré pour la même raison.
 	sources := provider.ListSources()
-	if len(sources) == 0 {
-		return 0, errors.New("ce binaire n'embarque aucune migration : il ne peut rien exiger de la base")
-	}
 
 	return sources[len(sources)-1].Version, nil
 }

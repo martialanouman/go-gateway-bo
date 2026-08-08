@@ -1,6 +1,6 @@
 # step-020 — Seed de l'autorisation : les 44 clés, les 9 rôles, idempotent
 
-> **Jalon :** M1 (§3.1, §6.10) · **Statut :** EN COURS
+> **Jalon :** M1 (§3.1, §6.10) · **Statut :** FAIT
 > **Dépend de :** step-005, step-006 · **Bloque :** step-021 → step-029, et toute garde de M2
 
 ## But
@@ -56,13 +56,18 @@ contre `pgx` nu (`plan.md` §19, renvoyée ici par l'amendement du 02/08/2026).
   version trouvée.
 
 ## Definition of Done
-- [ ] `make check` vert
-- [ ] `make bootstrap` existe et sème ; deux exécutions successives laissent la base **identique** —
-      comparée, pas supposée
-- [ ] le choix `sqlc` / `pgx` nu est écrit avec sa raison, et `plan.md` §19 ne le donne plus pour ouvert
-- [ ] la mutation « retirer `suppressions:delete` de `compliance` » et celle « accorder
+- [x] `make check` vert
+- [x] `make bootstrap` existe et sème ; deux exécutions successives laissent la base **identique** —
+      comparée, pas supposée : `cmd/bootstrap/commande_test.go` joue la commande deux fois et compare
+      une empreinte qui inclut les `uuidv7()` et les `created_at`, donc un seed qui détruirait puis
+      recréerait à l'identique se verrait
+- [x] le choix `sqlc` / `pgx` nu est écrit avec sa raison (DN-1), et `plan.md` §19 ne le donne plus
+      pour ouvert
+- [x] la mutation « retirer `suppressions:delete` de `compliance` » et celle « accorder
       `billing:topup` à `account_manager` » font rougir la table de vérité
-- [ ] la mutation « retirer la vérification de version du schéma » fait rougir le scénario de démarrage
+- [x] la mutation « retirer la vérification de version du schéma » fait rougir le scénario de
+      démarrage — et celle qui la déplace après `net.Listen` aussi, depuis qu'un scénario occupe
+      l'adresse d'écoute d'avance
 
 ## Hors périmètre
 La création du premier opérateur et `argon2id` → step-021. `RequirePermission` → step-025. L'édition
@@ -254,9 +259,17 @@ mutations et dans le corps de la PR :
 **Trois messages de commit sont imprécis, et ne sont pas réécrits** : `e78bb04` annonce « trois
 commentaires » corrigés là où il en corrige deux ; `4e38a46` attribue à `CLAUDE.md` une affirmation
 que seul le README portait ; et `2373b8f` compte « quatre mutations qui ont survécu » là où le
-tableau ci-dessous en marque six, et annonce un correctif de `playwright.config.ts` que ce commit ne
+tableau ci-dessous en marque sept, et annonce un correctif de `playwright.config.ts` que ce commit ne
 porte pas — il a été fait dans le suivant, après qu'une passe de revue sur les correctifs l'a
-constaté. L'historique n'est pas réécrit pour si peu ; l'écart est consigné ici,
+constaté. `49e7575`, enfin, écrit « huit clés de lecture » refusées à `billing_admin` là où il y en a
+neuf.
+
+**Quatre passes de revue ont été nécessaires**, et les trois dernières n'ont trouvé presque que des
+correctifs de la précédente. Ce que cela dit de cette step : le **code** était juste dès la première
+passe — SQL, transaction, verrou, ordre de démarrage, RESTRICT, les neuf rôles. C'est la **copie** qui
+ne l'était pas, neuf fois. Un message d'avertissement a demandé trois rédactions, l'oracle du message
+de refus quatre, et deux descriptions de rôle n'ont été relues qu'à la troisième passe — celle de
+`compliance` taisait `content:erase`, la clé qui rend un corps de message illisible pour toujours. L'historique n'est pas réécrit pour si peu ; l'écart est consigné ici,
 puisque c'est la fiche qui reste lisible après le merge.
 
 ## Tableau des mutations
@@ -311,10 +324,23 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | L'appel à `report` supprimé *(revue)* | la commande ne dit plus rien |
 | Les deux `Étant donné` du scénario d'ordre intervertis *(revue)* | **rien**, et c'est voulu : le pas complète l'environnement au lieu de le remplacer, donc il ne dépend plus de l'ordre |
 
+### Le message de refus, qui aura demandé trois oracles
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| Le message vidé de ses deux versions *(passe 1)* | `le message ne nomme pas la version trouvée ("en version 2")` — mais seulement après que l'oracle a cessé de chercher le chiffre nu dans du JSON horodaté |
+| Les deux helpers rendent `""` *(passe 2)* | **rien d'abord** : les trois sites construisaient l'attendu avec la fonction sous test, et `Contains(s, "")` est toujours vrai. Un test qui écrit le texte à la main les tue |
+| Les deux helpers rendent les constantes du test *(passe 3)* | **rien d'abord** : un seul couple de valeurs ne distingue pas « formate » de « rend 2 et 3 ». Un second couple les tue |
+| `applied % 10` *(passe 4)* | **rien d'abord** : les trois arguments écrits à la main tenaient sur un chiffre. Une version 12 aurait été annoncée « en version 2 », envoyant rejouer des migrations déjà appliquées. Des nombres à deux chiffres le tuent |
+| Le verrou du seed `pg_advisory_xact_lock` retiré | `aucune transaction n'attend le verrou du seed` |
+| `SeedLockKey` posée à la valeur de goose | `Should not be: 4097083626` |
+
 ### Ce qui n'est gardé par rien, vérifié plutôt que supposé
 
 | Ligne | Constat |
 |---|---|
 | `config.ConnectTimeout` dans `openSQL` | aucune porte ne rougit — l'exercer demanderait un hôte qui avale les paquets sans répondre. Écrit au-dessus de la ligne, comme les quatre bornes équivalentes de `pool.go` |
 | La position du verrou en tête de transaction | voir ci-dessus |
+| `config.ConnectTimeout` de `pgx.Connect` dans `Seed` | non posée : `VerifySchema` compose la connexion en premier, avec sa borne, et `bootstrap` porte un `ctx` notifié par signal. Constat, pas correctif |
+| `IsoLevel: pgx.ReadCommitted` sur la transaction du seed | aucune porte ne rougit — le conteneur de la suite tourne au défaut `read committed`, où les deux formes coïncident. L'exercer demanderait un serveur configuré autrement |
 | Les descriptions de rôles, **en tant que copie** | la projection est gardée (base contre code), la justesse ne l'est pas : rien ne dit qu'une phrase décrit bien ce que le rôle accorde. **Quatre** ont menti et ont été corrigées à la main, sur trois passes de revue — `ops` deux fois, puis `compliance` et `billing_admin`, que les deux premières passes n'avaient pas relus. C'est la ligne de ce tableau qui a le plus coûté |

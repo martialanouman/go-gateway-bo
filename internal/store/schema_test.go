@@ -22,11 +22,12 @@ import (
 // l'attendu se construit avec `AppliedVersionPhrase` / `ExpectedVersionPhrase`, c'est-à-dire avec la
 // fonction sous test : les faire rendre la chaîne vide laisserait toutes ces assertions vertes sur
 // un message qui ne nomme plus rien — `Contains(s, "")` est toujours vrai. C'est ici que le juge est
-// branché.
-// Deux couples de valeurs, et non un : avec un seul, des helpers qui rendraient les constantes du
-// test — `return "en version 2"` — passeraient les quatre assertions, et le binaire annoncerait les
-// mêmes deux versions à chaque refus, quelles que soient les vraies. La chaîne vide n'est pas la
-// seule façon de ne rien nommer ; une constante en est une autre.
+// branché, et il lui a fallu trois rédactions pour l'être vraiment.
+//
+// Deux couples de valeurs plutôt qu'un, parce que des helpers rendant les constantes du test —
+// `return "en version 2"` — passaient la première version. Et des nombres à deux chiffres, parce
+// qu'un `applied % 10` passait la deuxième : la chaîne vide n'est pas la seule façon de ne rien
+// nommer, une constante en est une autre, et une troncature aussi.
 func TestLeRefusNommeLesDeuxVersionsEnToutesLettres(t *testing.T) {
 	t.Parallel()
 
@@ -42,7 +43,10 @@ func TestLeRefusNommeLesDeuxVersionsEnToutesLettres(t *testing.T) {
 	assert.NotContains(t, autre, "version 2",
 		"le message porte une version qu'on ne lui a pas donnée")
 
-	assert.Equal(t, "en version 7", store.AppliedVersionPhrase(7))
+	// Deux chiffres des deux côtés : avec des arguments à un seul chiffre, un
+	// `fmt.Sprintf("en version %d", applied%%10)` passait tout — et une base en version 12 aurait été
+	// annoncée « en version 2 », envoyant l'exploitant rejouer des migrations déjà appliquées.
+	assert.Equal(t, "en version 70", store.AppliedVersionPhrase(70))
 	assert.Equal(t, "attend la version 12", store.ExpectedVersionPhrase(12))
 }
 

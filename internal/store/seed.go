@@ -89,7 +89,17 @@ func Seed(ctx context.Context, dsn string) (SeedOutcome, error) {
 
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
 
-	tx, err := conn.Begin(ctx)
+	// Le niveau d'isolation est **imposé**, pas hérité. Sous `REPEATABLE READ` — que
+	// `default_transaction_isolation` ou un `ALTER DATABASE … SET` peut poser en production — le
+	// snapshot est figé dès la première instruction, c'est-à-dire dès la prise du verrou ci-dessous :
+	// la seconde exécution verrait alors la base telle qu'elle était **avant** d'attendre, croirait
+	// les clés absentes, et échouerait sur `permissions_pkey`. Le verrou serait pris pour rien, et
+	// sur le cas que DN-4 nomme le plus fréquent — la première installation.
+	//
+	// **Aucun test ne rougit si cette option disparaît**, et c'est mesuré : le conteneur de la suite
+	// tourne au défaut `read committed`, où les deux formes coïncident. L'exercer demanderait un
+	// serveur configuré autrement, que le harnais ne sait pas produire aujourd'hui.
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return SeedOutcome{}, fmt.Errorf("ouvrir la transaction du seed : %w", err)
 	}
