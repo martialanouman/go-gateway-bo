@@ -10,6 +10,7 @@ overrides:
   '@redocly/openapi-core>js-yaml': ^4.3.1
   json-schema-ref-parser>js-yaml: ^3.15.1
   ajv>fast-uri: ^3.1.5
+  postcss>nanoid: ^3.3.17
 
 pnpmfileChecksum: sha256-5yFiorBQTNscaFFHBn/RFM0thrForuO+YKGHovjusUA=
 
@@ -27,8 +28,8 @@ importers:
         specifier: 5.3.0
         version: 5.3.0
       '@martialanouman/gateway-api-contracts':
-        specifier: 2.5.0
-        version: 2.5.0
+        specifier: 4.0.2
+        version: 4.0.2
       '@simplewebauthn/browser':
         specifier: 13.3.0
         version: 13.3.0
@@ -568,8 +569,8 @@ packages:
     peerDependencies:
       jsep: ^0.4.0||^1.0.0
 
-  '@martialanouman/gateway-api-contracts@2.5.0':
-    resolution: {integrity: sha512-DXMNL+4Ey/4XiBHUv9DjD3ZG/be8U1Pe5EVqs7IzlFpWew836eLGGFNaU/4ebxYmuienhT33H1s+bgP99s3xzw==, tarball: https://npm.pkg.github.com/download/@martialanouman/gateway-api-contracts/2.5.0/58fd4186744d629a1f96a0b90057bdc178f7f650}
+  '@martialanouman/gateway-api-contracts@4.0.2':
+    resolution: {integrity: sha512-F4jYb1jNdpjH1zr/7iwWO//9TqRarpn5TGMirCYHG021plyfx2jUQ88XAMkk2X1kK247RKG1NRaRv3qrRrunfg==, tarball: https://npm.pkg.github.com/download/@martialanouman/gateway-api-contracts/4.0.2/a75b3e51992a0281900082a64ff73e5d2b2db266}
 
   '@napi-rs/wasm-runtime@1.1.6':
     resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
@@ -1972,8 +1973,8 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  nanoid@3.3.16:
-    resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
+  nanoid@3.3.17:
+    resolution: {integrity: sha512-xQLf0A3HOMlgHq0n247/LRuAOYmB7dXJ/DvAxGvsSBij45XtBSmQycu+F8ODbHwns/XyFZagyL1+J0Offw1E0g==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -3023,7 +3024,7 @@ snapshots:
     dependencies:
       jsep: 1.4.0
 
-  '@martialanouman/gateway-api-contracts@2.5.0': {}
+  '@martialanouman/gateway-api-contracts@4.0.2': {}
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
@@ -4362,7 +4363,7 @@ snapshots:
 
   ms@2.1.3: {}
 
-  nanoid@3.3.16: {}
+  nanoid@3.3.17: {}
 
   negotiator@0.6.3: {}
 
@@ -4476,7 +4477,7 @@ snapshots:
 
   postcss@8.5.23:
     dependencies:
-      nanoid: 3.3.16
+      nanoid: 3.3.17
       picocolors: 1.1.1
       source-map-js: 1.2.1
 

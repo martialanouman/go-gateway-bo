@@ -130,7 +130,7 @@ Aucune autre bibliothèque pour ces rôles sans décision d'équipe.
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat | `@martialanouman/gateway-api-contracts` | **2.5.0** |
+| Contrat | `@martialanouman/gateway-api-contracts` | **4.0.2** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests | `vitest` + `@playwright/test` | 4.1.10 / 1.62.0 |
 | Langage | `typescript` | 7.0.2 |
@@ -284,11 +284,11 @@ Conséquences :
 ### 1.12 Le contrat bouge pendant le développement — le suivre est une tâche, pas un réflexe
 
 `@martialanouman/gateway-api-contracts` est publié à chaque merge sur `main` de `go-gateway` touchant
-`api/**`. **Quinze versions en moins de six jours** — 1.0.0 le 27/07/2026 à 01:28 UTC, 4.0.0 le
-01/08/2026 à 17:46 —, dont **trois majeures**. Relevé le 02/08/2026 par
-`gh api "/user/packages/npm/gateway-api-contracts/versions" --jq '.[] | "\(.name)\t\(.created_at)"'`,
-qui reste la façon de le rejouer. Ce dépôt en est consommateur, pas propriétaire : il subit le rythme
-d'un autre.
+`api/**`. **Dix-sept versions en douze jours** — 1.0.0 le 27/07/2026 à 01:28 UTC, 4.0.3 le 08/08 à
+12:04 —, dont **trois majeures**, et quinze des dix-sept dans les six premiers jours. Relevé le
+08/08/2026 par `pnpm view @martialanouman/gateway-api-contracts versions time`, depuis `web/` pour que
+l'authentification de GitHub Packages soit prise en compte ; c'est la façon de le rejouer. Ce dépôt en
+est consommateur, pas propriétaire : il subit le rythme d'un autre.
 
 **La règle.** Relever la version disponible **au début de chaque step qui touche le contrat**, et
 consigner l'écart dans la PR. Ne jamais bumper au milieu d'une step : un changement de contrat au
@@ -313,14 +313,22 @@ pas la compilation. Une contrainte de validation resserrée (`additionalProperti
 > Aucun de ces points n'aurait été vu en lisant seulement le numéro de version, et quatre sur six ne
 > font pas échouer la compilation.
 
-**Dette ouverte : le dépôt est en 2.5.0, le registre en 4.0.0.** step-003 a installé 2.5.0 le
-02/08/2026 à 00:19 UTC — c'était alors la dernière version *installable*, la quarantaine
-`minimumReleaseAge: 1440` de `web/pnpm-workspace.yaml` (mode strict) refusant toute version publiée
-depuis moins de 24 h, et 2.6.0 à 4.0.0 étant toutes parues le 01/08 entre 10:36 et 17:46 UTC. Elle
-**expire d'elle-même** : celle de 4.0.0 tombe le 02/08/2026 à 17:46 UTC, après quoi plus rien ne
-bloque le bump. **Deux majeures** séparent 2.5.0 de 4.0.0 et ce qu'elles changent n'a pas été relevé :
-le relever fait partie du travail, sous la règle du paragraphe ci-dessus. La step porteuse est
-inscrite dans `todo.md` (M0).
+**Dette soldée le 08/08/2026 : le dépôt est en 4.0.2** (step-009). Les deux majeures qui le séparaient
+de 2.5.0 ont été relues ligne à ligne, et ce qu'elles changent est inscrit dans
+`tasks/steps/done/step-009.md`. En résumé : 133 opérations avant et après, aucune ajoutée, retirée ni
+renommée, six touchées dont aucune que le BFF appelle — le bump s'est payé sur le seul
+`internal/gateway/client.gen.go`, ce qui était l'argument de sa position dans `todo.md`.
+
+**4.0.2 et non 4.0.3**, la dernière publiée : les trois `openapi-admin.yaml` de la série 4.0.x sont
+identiques au sha256, les patches n'ayant touché que le contrat *public*, que ce dépôt ne consomme
+pas. 4.0.3 était en quarantaine, et l'épinglage exact en mode strict la refuse au lieu de reculer.
+
+**Ce que la step a appris et qui vaut pour les prochains bumps** : la compilation n'est pas le filet
+qu'on croit. `go build` est resté vert sur trois ruptures de type — `from_date` devenu requis,
+`parquet` retiré de l'enum, `filters` typé — parce qu'aucune opération touchée n'était appelée. Une
+rupture dans du code que nul n'appelle ne rompt rien, et se paiera à l'usage. Trois autres — un `enum`
+élargi, deux scopes qu'oapi-codegen ignore, des plafonds qui ne vivent que dans des `description` — ne
+casseront **jamais** la compilation.
 
 ---
 
@@ -734,9 +742,12 @@ la bascule.** Le contrat décrit **133 opérations** — chiffre mesuré le 01/0
 documents hérités disaient 134. La passerelle n'en avait implémenté que **71 au 27/07/2026** ; les 62
 restantes existent au contrat, sont servies par le mock, mais **ne répondaient pas encore en réel**.
 
-> ⚠️ **Le ratio 71/133 date du 27/07 et n'a pas été revérifié contre la 2.5.0.** Le contrat a pris dix
-> versions depuis, dont une majeure — l'implémentation amont a probablement avancé. **Le relever à
-> l'ouverture de chaque jalon**, et corriger le tableau ci-dessous plutôt que de le croire.
+> ⚠️ **Le ratio 71/133 date du 27/07 et n'a toujours pas été revérifié.** Le contrat a pris seize
+> versions depuis, dont trois majeures — l'implémentation amont a probablement avancé. Le
+> dénominateur, lui, est vérifié : **133 opérations en 4.0.2 comme en 2.5.0**, les deux majeures
+> n'en ayant ajouté ni retiré aucune (step-009, 08/08/2026). C'est le numérateur qui est périmé, et il
+> ne se relève pas ici — il se lit dans `go-gateway`, pas dans le contrat. **Le relever à l'ouverture
+> de chaque jalon**, et corriger le tableau ci-dessous plutôt que de le croire.
 
 | Jalon | Opérations manquantes | Jalon passerelle attendu |
 |---|---|---|

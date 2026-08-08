@@ -329,6 +329,8 @@ func (e BreakerState) Valid() bool {
 
 // Defines values for CdrStatus.
 const (
+	CdrStatusAccepted  CdrStatus = "accepted"
+	CdrStatusCancelled CdrStatus = "cancelled"
 	CdrStatusDelivered CdrStatus = "delivered"
 	CdrStatusEnroute   CdrStatus = "enroute"
 	CdrStatusExpired   CdrStatus = "expired"
@@ -340,6 +342,10 @@ const (
 // Valid indicates whether the value is a known member of the CdrStatus enum.
 func (e CdrStatus) Valid() bool {
 	switch e {
+	case CdrStatusAccepted:
+		return true
+	case CdrStatusCancelled:
+		return true
 	case CdrStatusDelivered:
 		return true
 	case CdrStatusEnroute:
@@ -1334,9 +1340,8 @@ func (e MessageContentEncoding) Valid() bool {
 
 // Defines values for MessageExportRequestFormat.
 const (
-	Csv     MessageExportRequestFormat = "csv"
-	Jsonl   MessageExportRequestFormat = "jsonl"
-	Parquet MessageExportRequestFormat = "parquet"
+	Csv   MessageExportRequestFormat = "csv"
+	Jsonl MessageExportRequestFormat = "jsonl"
 )
 
 // Valid indicates whether the value is a known member of the MessageExportRequestFormat enum.
@@ -1345,8 +1350,6 @@ func (e MessageExportRequestFormat) Valid() bool {
 	case Csv:
 		return true
 	case Jsonl:
-		return true
-	case Parquet:
 		return true
 	default:
 		return false
@@ -2845,11 +2848,14 @@ type ExportJob struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	// DownloadUrl Present when completed; expires.
-	DownloadUrl *string            `json:"download_url,omitempty"`
-	ExpiresAt   *time.Time         `json:"expires_at,omitempty"`
-	JobId       openapi_types.UUID `json:"job_id"`
-	RowCount    *int               `json:"row_count,omitempty"`
-	Status      ExportJobStatus    `json:"status"`
+	DownloadUrl *string `json:"download_url,omitempty"`
+
+	// Error Why a failed job failed; null otherwise.
+	Error     *string            `json:"error,omitempty"`
+	ExpiresAt *time.Time         `json:"expires_at,omitempty"`
+	JobId     openapi_types.UUID `json:"job_id"`
+	RowCount  *int               `json:"row_count,omitempty"`
+	Status    ExportJobStatus    `json:"status"`
 }
 
 // ExportJobStatus defines model for ExportJob.Status.
@@ -3067,13 +3073,28 @@ type MessageContent struct {
 // MessageContentEncoding defines model for MessageContent.Encoding.
 type MessageContentEncoding string
 
+// MessageExportFilters The search-messages predicates, combined with AND. Unknown members are refused rather than ignored: an ignored filter would widen an export instead of narrowing it.
+type MessageExportFilters struct {
+	AccountId  *openapi_types.UUID `json:"accountId,omitempty"`
+	CustomerId *openapi_types.UUID `json:"customerId,omitempty"`
+	Direction  *Direction          `json:"direction,omitempty"`
+	FromDate   time.Time           `json:"from_date"`
+	GroupId    *openapi_types.UUID `json:"groupId,omitempty"`
+
+	// Msisdn Exact E.164 match on either address.
+	Msisdn  *string             `json:"msisdn,omitempty"`
+	Status  *CdrStatus          `json:"status,omitempty"`
+	ToDate  time.Time           `json:"to_date"`
+	TraceId *openapi_types.UUID `json:"traceId,omitempty"`
+}
+
 // MessageExportRequest defines model for MessageExportRequest.
 type MessageExportRequest struct {
-	// Filters Same predicates as search-messages (accountId, customerId, status, date range...).
-	Filters map[string]interface{}      `json:"filters"`
+	// Filters The search-messages predicates, combined with AND. Unknown members are refused rather than ignored: an ignored filter would widen an export instead of narrowing it.
+	Filters MessageExportFilters        `json:"filters"`
 	Format  *MessageExportRequestFormat `json:"format,omitempty"`
 
-	// MaskMsisdn Role-based MSISDN masking (§5.3).
+	// MaskMsisdn Role-based MSISDN masking (§5.3). Setting it to false requires msisdn:reveal; without that scope the request is REFUSED rather than silently masked, so an operator never mistakes a masked artefact for an unmasked one.
 	MaskMsisdn *bool `json:"mask_msisdn,omitempty"`
 }
 
@@ -3113,7 +3134,7 @@ type MessageSummaryPage struct {
 	NextCursor *string          `json:"next_cursor,omitempty"`
 }
 
-// MessageTrace OpenTelemetry span timeline. NEVER carries the body — at most a truncated content_hash.
+// MessageTrace Lifecycle timeline of a message, one entry per recorded stage, built from the durable CDR event log. Span-level detail lives in the tracing backend — pivot on trace_id. NEVER carries the body.
 type MessageTrace struct {
 	MessageId openapi_types.UUID `json:"message_id"`
 	Spans     []struct {
@@ -3121,7 +3142,7 @@ type MessageTrace struct {
 		DurationMs *float32                `json:"duration_ms,omitempty"`
 		End        *time.Time              `json:"end,omitempty"`
 
-		// Name Examples: pipeline.senderid_auth, connector.submit_sm
+		// Name Examples: cdr.accepted, cdr.enroute, cdr.delivered
 		Name   string                  `json:"name"`
 		Start  time.Time               `json:"start"`
 		Status MessageTraceSpansStatus `json:"status"`
@@ -3888,14 +3909,18 @@ type SearchMessagesParams struct {
 	TraceId    *openapi_types.UUID `form:"traceId,omitempty" json:"traceId,omitempty"`
 	AccountId  *openapi_types.UUID `form:"accountId,omitempty" json:"accountId,omitempty"`
 	CustomerId *openapi_types.UUID `form:"customerId,omitempty" json:"customerId,omitempty"`
-	GroupId    *openapi_types.UUID `form:"groupId,omitempty" json:"groupId,omitempty"`
-	Status     *CdrStatus          `form:"status,omitempty" json:"status,omitempty"`
-	Direction  *Direction          `form:"direction,omitempty" json:"direction,omitempty"`
-	Msisdn     *string             `form:"msisdn,omitempty" json:"msisdn,omitempty"`
-	FromDate   *time.Time          `form:"from_date,omitempty" json:"from_date,omitempty"`
-	ToDate     *time.Time          `form:"to_date,omitempty" json:"to_date,omitempty"`
-	Cursor     *Cursor             `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Limit      *Limit              `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// GroupId Customers CURRENTLY in this group; membership is resolved at read time.
+	GroupId   *openapi_types.UUID `form:"groupId,omitempty" json:"groupId,omitempty"`
+	Status    *CdrStatus          `form:"status,omitempty" json:"status,omitempty"`
+	Direction *Direction          `form:"direction,omitempty" json:"direction,omitempty"`
+
+	// Msisdn Exact E.164 match on either address. Never a prefix — that would allow enumeration.
+	Msisdn   *string   `form:"msisdn,omitempty" json:"msisdn,omitempty"`
+	FromDate time.Time `form:"from_date" json:"from_date"`
+	ToDate   time.Time `form:"to_date" json:"to_date"`
+	Cursor   *Cursor   `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit    *Limit    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // GetMetricsSummaryParams defines parameters for GetMetricsSummary.
@@ -4855,14 +4880,18 @@ type ClientInterface interface {
 	// Corresponds with PATCH /admin/inbound-numbers/{id}/keywords/{keywordId} (the `UpdateInboundKeyword` operationId).
 	UpdateInboundKeyword(ctx context.Context, id Id, keywordId openapi_types.UUID, body UpdateInboundKeywordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateMessageExportWithBody Create an async CDR export job (audited, row-capped, role-based MSISDN mask)
+	// CreateMessageExportWithBody Create an async CDR export job (row-capped, role-based MSISDN mask)
+	//
+	// Queues an export and returns immediately: the artefact is produced in the background. The filters are those of search-messages, with the same mandatory 31-day window, and the export is capped at 100000 rows — beyond it the job FAILS rather than truncating silently, because a truncated export reads as an exhaustive one. Unmasking (mask_msisdn=false) requires msisdn:reveal. No message body is ever exported.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /admin/messages/export (the `CreateMessageExport` operationId).
 	CreateMessageExportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateMessageExport Create an async CDR export job (audited, row-capped, role-based MSISDN mask)
+	// CreateMessageExport Create an async CDR export job (row-capped, role-based MSISDN mask)
+	//
+	// Queues an export and returns immediately: the artefact is produced in the background. The filters are those of search-messages, with the same mandatory 31-day window, and the export is capped at 100000 rows — beyond it the job FAILS rather than truncating silently, because a truncated export reads as an exhaustive one. Unmasking (mask_msisdn=false) requires msisdn:reveal. No message body is ever exported.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4871,10 +4900,14 @@ type ClientInterface interface {
 
 	// GetMessageExport Export job status + download URL when ready
 	//
+	// Requires cdr:export_bulk like the creation — the status carries the artefact's location.
+	//
 	// Corresponds with GET /admin/messages/export/{jobId} (the `GetMessageExport` operationId).
 	GetMessageExport(ctx context.Context, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchMessages Search CDR (by traceId, account, customer, group, status, ...)
+	//
+	// Every predicate combines with AND — an extra filter can only narrow a result set. The date window is REQUIRED and capped at 31 days: it is what lets the CDR's daily partitions be pruned, so an unbounded search cannot be expressed. MSISDNs are masked in the response unless the caller holds msisdn:reveal. No message body is ever returned.
 	//
 	// Corresponds with GET /admin/messages/search (the `SearchMessages` operationId).
 	SearchMessages(ctx context.Context, params *SearchMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5405,19 +5438,23 @@ type ClientInterface interface {
 	// Corresponds with PATCH /admin/smpp-accounts/{id}/webhooks/{webhookId} (the `UpdateWebhook` operationId).
 	UpdateWebhook(ctx context.Context, id Id, webhookId openapi_types.UUID, body UpdateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// StreamBillingAlerts WebSocket — MT low-balance / MT overdraft-attempt / MO floor-reached alerts
+	// StreamBillingAlerts WebSocket — MO floor-reached alerts
+	//
+	// Upgrade to a WebSocket. Emits one metricstream BillingAlert per frame (`{v, feed, customer_id, owner_type, owner_id, alert, balance}`). Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
 	//
 	// Corresponds with GET /admin/stream/billing-alerts (the `StreamBillingAlerts` operationId).
 	StreamBillingAlerts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StreamMetrics WebSocket — live metrics stream
 	//
-	// Upgrade to a WebSocket. Emits MetricsSummary frames. `101 Switching Protocols` on upgrade.
+	// Upgrade to a WebSocket. Emits one metricstream Snapshot per frame (`{v, feed, service, instance, emitted_at, samples[]}`); branch on `v`. `101 Switching Protocols` on upgrade.
 	//
 	// Corresponds with GET /admin/stream/metrics (the `StreamMetrics` operationId).
 	StreamMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StreamSessions WebSocket — live session events
+	//
+	// Upgrade to a WebSocket. Emits one metricstream SessionEvent per frame (`{v, feed, account_id, system_id, state, sessions}`). `101 Switching Protocols` on upgrade.
 	//
 	// Corresponds with GET /admin/stream/sessions (the `StreamSessions` operationId).
 	StreamSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6986,7 +7023,9 @@ func (c *Client) UpdateInboundKeyword(ctx context.Context, id Id, keywordId open
 	return c.Client.Do(req)
 }
 
-// CreateMessageExportWithBody Create an async CDR export job (audited, row-capped, role-based MSISDN mask)
+// CreateMessageExportWithBody Create an async CDR export job (row-capped, role-based MSISDN mask)
+//
+// Queues an export and returns immediately: the artefact is produced in the background. The filters are those of search-messages, with the same mandatory 31-day window, and the export is capped at 100000 rows — beyond it the job FAILS rather than truncating silently, because a truncated export reads as an exhaustive one. Unmasking (mask_msisdn=false) requires msisdn:reveal. No message body is ever exported.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7003,7 +7042,9 @@ func (c *Client) CreateMessageExportWithBody(ctx context.Context, contentType st
 	return c.Client.Do(req)
 }
 
-// CreateMessageExport Create an async CDR export job (audited, row-capped, role-based MSISDN mask)
+// CreateMessageExport Create an async CDR export job (row-capped, role-based MSISDN mask)
+//
+// Queues an export and returns immediately: the artefact is produced in the background. The filters are those of search-messages, with the same mandatory 31-day window, and the export is capped at 100000 rows — beyond it the job FAILS rather than truncating silently, because a truncated export reads as an exhaustive one. Unmasking (mask_msisdn=false) requires msisdn:reveal. No message body is ever exported.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7022,6 +7063,8 @@ func (c *Client) CreateMessageExport(ctx context.Context, body CreateMessageExpo
 
 // GetMessageExport Export job status + download URL when ready
 //
+// Requires cdr:export_bulk like the creation — the status carries the artefact's location.
+//
 // Corresponds with GET /admin/messages/export/{jobId} (the `GetMessageExport` operationId).
 func (c *Client) GetMessageExport(ctx context.Context, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMessageExportRequest(c.Server, jobId)
@@ -7036,6 +7079,8 @@ func (c *Client) GetMessageExport(ctx context.Context, jobId openapi_types.UUID,
 }
 
 // SearchMessages Search CDR (by traceId, account, customer, group, status, ...)
+//
+// Every predicate combines with AND — an extra filter can only narrow a result set. The date window is REQUIRED and capped at 31 days: it is what lets the CDR's daily partitions be pruned, so an unbounded search cannot be expressed. MSISDNs are masked in the response unless the caller holds msisdn:reveal. No message body is ever returned.
 //
 // Corresponds with GET /admin/messages/search (the `SearchMessages` operationId).
 func (c *Client) SearchMessages(ctx context.Context, params *SearchMessagesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8416,7 +8461,9 @@ func (c *Client) UpdateWebhook(ctx context.Context, id Id, webhookId openapi_typ
 	return c.Client.Do(req)
 }
 
-// StreamBillingAlerts WebSocket — MT low-balance / MT overdraft-attempt / MO floor-reached alerts
+// StreamBillingAlerts WebSocket — MO floor-reached alerts
+//
+// Upgrade to a WebSocket. Emits one metricstream BillingAlert per frame (`{v, feed, customer_id, owner_type, owner_id, alert, balance}`). Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
 //
 // Corresponds with GET /admin/stream/billing-alerts (the `StreamBillingAlerts` operationId).
 func (c *Client) StreamBillingAlerts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8433,7 +8480,7 @@ func (c *Client) StreamBillingAlerts(ctx context.Context, reqEditors ...RequestE
 
 // StreamMetrics WebSocket — live metrics stream
 //
-// Upgrade to a WebSocket. Emits MetricsSummary frames. `101 Switching Protocols` on upgrade.
+// Upgrade to a WebSocket. Emits one metricstream Snapshot per frame (`{v, feed, service, instance, emitted_at, samples[]}`); branch on `v`. `101 Switching Protocols` on upgrade.
 //
 // Corresponds with GET /admin/stream/metrics (the `StreamMetrics` operationId).
 func (c *Client) StreamMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8449,6 +8496,8 @@ func (c *Client) StreamMetrics(ctx context.Context, reqEditors ...RequestEditorF
 }
 
 // StreamSessions WebSocket — live session events
+//
+// Upgrade to a WebSocket. Emits one metricstream SessionEvent per frame (`{v, feed, account_id, system_id, state, sessions}`). `101 Switching Protocols` on upgrade.
 //
 // Corresponds with GET /admin/stream/sessions (the `StreamSessions` operationId).
 func (c *Client) StreamSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -11497,28 +11546,20 @@ func NewSearchMessagesRequest(server string, params *SearchMessagesParams) (*htt
 
 		}
 
-		if params.FromDate != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from_date", *params.FromDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from_date", params.FromDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
 			}
-
 		}
 
-		if params.ToDate != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to_date", *params.ToDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to_date", params.ToDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
 			}
-
 		}
 
 		if params.Cursor != nil {
@@ -15124,14 +15165,18 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /admin/inbound-numbers/{id}/keywords/{keywordId} (the `UpdateInboundKeyword` operationId).
 	UpdateInboundKeywordWithResponse(ctx context.Context, id Id, keywordId openapi_types.UUID, body UpdateInboundKeywordJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateInboundKeywordResponse, error)
 
-	// CreateMessageExportWithBodyWithResponse Create an async CDR export job (audited, row-capped, role-based MSISDN mask)
+	// CreateMessageExportWithBodyWithResponse Create an async CDR export job (row-capped, role-based MSISDN mask)
+	//
+	// Queues an export and returns immediately: the artefact is produced in the background. The filters are those of search-messages, with the same mandatory 31-day window, and the export is capped at 100000 rows — beyond it the job FAILS rather than truncating silently, because a truncated export reads as an exhaustive one. Unmasking (mask_msisdn=false) requires msisdn:reveal. No message body is ever exported.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /admin/messages/export (the `CreateMessageExport` operationId).
 	CreateMessageExportWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateMessageExportResponse, error)
 
-	// CreateMessageExportWithResponse Create an async CDR export job (audited, row-capped, role-based MSISDN mask)
+	// CreateMessageExportWithResponse Create an async CDR export job (row-capped, role-based MSISDN mask)
+	//
+	// Queues an export and returns immediately: the artefact is produced in the background. The filters are those of search-messages, with the same mandatory 31-day window, and the export is capped at 100000 rows — beyond it the job FAILS rather than truncating silently, because a truncated export reads as an exhaustive one. Unmasking (mask_msisdn=false) requires msisdn:reveal. No message body is ever exported.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15140,12 +15185,16 @@ type ClientWithResponsesInterface interface {
 
 	// GetMessageExportWithResponse Export job status + download URL when ready
 	//
+	// Requires cdr:export_bulk like the creation — the status carries the artefact's location.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /admin/messages/export/{jobId} (the `GetMessageExport` operationId).
 	GetMessageExportWithResponse(ctx context.Context, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetMessageExportResponse, error)
 
 	// SearchMessagesWithResponse Search CDR (by traceId, account, customer, group, status, ...)
+	//
+	// Every predicate combines with AND — an extra filter can only narrow a result set. The date window is REQUIRED and capped at 31 days: it is what lets the CDR's daily partitions be pruned, so an unbounded search cannot be expressed. MSISDNs are masked in the response unless the caller holds msisdn:reveal. No message body is ever returned.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15742,7 +15791,9 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /admin/smpp-accounts/{id}/webhooks/{webhookId} (the `UpdateWebhook` operationId).
 	UpdateWebhookWithResponse(ctx context.Context, id Id, webhookId openapi_types.UUID, body UpdateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWebhookResponse, error)
 
-	// StreamBillingAlertsWithResponse WebSocket — MT low-balance / MT overdraft-attempt / MO floor-reached alerts
+	// StreamBillingAlertsWithResponse WebSocket — MO floor-reached alerts
+	//
+	// Upgrade to a WebSocket. Emits one metricstream BillingAlert per frame (`{v, feed, customer_id, owner_type, owner_id, alert, balance}`). Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15751,7 +15802,7 @@ type ClientWithResponsesInterface interface {
 
 	// StreamMetricsWithResponse WebSocket — live metrics stream
 	//
-	// Upgrade to a WebSocket. Emits MetricsSummary frames. `101 Switching Protocols` on upgrade.
+	// Upgrade to a WebSocket. Emits one metricstream Snapshot per frame (`{v, feed, service, instance, emitted_at, samples[]}`); branch on `v`. `101 Switching Protocols` on upgrade.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15759,6 +15810,8 @@ type ClientWithResponsesInterface interface {
 	StreamMetricsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*StreamMetricsResponse, error)
 
 	// StreamSessionsWithResponse WebSocket — live session events
+	//
+	// Upgrade to a WebSocket. Emits one metricstream SessionEvent per frame (`{v, feed, account_id, system_id, state, sessions}`). `101 Switching Protocols` on upgrade.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -19761,11 +19814,39 @@ type CreateMessageExportResponse struct {
 	HTTPResponse *http.Response
 	// JSON202 the response for an HTTP 202 `application/json` response
 	JSON202 *ExportJob
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON202 returns the response for an HTTP 202 `application/json` response
 func (r CreateMessageExportResponse) GetJSON202() *ExportJob {
 	return r.JSON202
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CreateMessageExportResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r CreateMessageExportResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r CreateMessageExportResponse) GetJSON422() *ValidationError {
+	return r.JSON422
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r CreateMessageExportResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -19802,6 +19883,10 @@ type GetMessageExportResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ExportJob
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
 }
@@ -19809,6 +19894,16 @@ type GetMessageExportResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetMessageExportResponse) GetJSON200() *ExportJob {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetMessageExportResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetMessageExportResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -19850,11 +19945,32 @@ type SearchMessagesResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *MessageSummaryPage
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r SearchMessagesResponse) GetJSON200() *MessageSummaryPage {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r SearchMessagesResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r SearchMessagesResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r SearchMessagesResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -24844,7 +24960,9 @@ func (c *ClientWithResponses) UpdateInboundKeywordWithResponse(ctx context.Conte
 	return ParseUpdateInboundKeywordResponse(rsp)
 }
 
-// CreateMessageExportWithBodyWithResponse Create an async CDR export job (audited, row-capped, role-based MSISDN mask)
+// CreateMessageExportWithBodyWithResponse Create an async CDR export job (row-capped, role-based MSISDN mask)
+//
+// Queues an export and returns immediately: the artefact is produced in the background. The filters are those of search-messages, with the same mandatory 31-day window, and the export is capped at 100000 rows — beyond it the job FAILS rather than truncating silently, because a truncated export reads as an exhaustive one. Unmasking (mask_msisdn=false) requires msisdn:reveal. No message body is ever exported.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -24857,7 +24975,9 @@ func (c *ClientWithResponses) CreateMessageExportWithBodyWithResponse(ctx contex
 	return ParseCreateMessageExportResponse(rsp)
 }
 
-// CreateMessageExportWithResponse Create an async CDR export job (audited, row-capped, role-based MSISDN mask)
+// CreateMessageExportWithResponse Create an async CDR export job (row-capped, role-based MSISDN mask)
+//
+// Queues an export and returns immediately: the artefact is produced in the background. The filters are those of search-messages, with the same mandatory 31-day window, and the export is capped at 100000 rows — beyond it the job FAILS rather than truncating silently, because a truncated export reads as an exhaustive one. Unmasking (mask_msisdn=false) requires msisdn:reveal. No message body is ever exported.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -24872,6 +24992,8 @@ func (c *ClientWithResponses) CreateMessageExportWithResponse(ctx context.Contex
 
 // GetMessageExportWithResponse Export job status + download URL when ready
 //
+// Requires cdr:export_bulk like the creation — the status carries the artefact's location.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /admin/messages/export/{jobId} (the `GetMessageExport` operationId).
@@ -24884,6 +25006,8 @@ func (c *ClientWithResponses) GetMessageExportWithResponse(ctx context.Context, 
 }
 
 // SearchMessagesWithResponse Search CDR (by traceId, account, customer, group, status, ...)
+//
+// Every predicate combines with AND — an extra filter can only narrow a result set. The date window is REQUIRED and capped at 31 days: it is what lets the CDR's daily partitions be pruned, so an unbounded search cannot be expressed. MSISDNs are masked in the response unless the caller holds msisdn:reveal. No message body is ever returned.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -25990,7 +26114,9 @@ func (c *ClientWithResponses) UpdateWebhookWithResponse(ctx context.Context, id 
 	return ParseUpdateWebhookResponse(rsp)
 }
 
-// StreamBillingAlertsWithResponse WebSocket — MT low-balance / MT overdraft-attempt / MO floor-reached alerts
+// StreamBillingAlertsWithResponse WebSocket — MO floor-reached alerts
+//
+// Upgrade to a WebSocket. Emits one metricstream BillingAlert per frame (`{v, feed, customer_id, owner_type, owner_id, alert, balance}`). Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -26005,7 +26131,7 @@ func (c *ClientWithResponses) StreamBillingAlertsWithResponse(ctx context.Contex
 
 // StreamMetricsWithResponse WebSocket — live metrics stream
 //
-// Upgrade to a WebSocket. Emits MetricsSummary frames. `101 Switching Protocols` on upgrade.
+// Upgrade to a WebSocket. Emits one metricstream Snapshot per frame (`{v, feed, service, instance, emitted_at, samples[]}`); branch on `v`. `101 Switching Protocols` on upgrade.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -26019,6 +26145,8 @@ func (c *ClientWithResponses) StreamMetricsWithResponse(ctx context.Context, req
 }
 
 // StreamSessionsWithResponse WebSocket — live session events
+//
+// Upgrade to a WebSocket. Emits one metricstream SessionEvent per frame (`{v, feed, account_id, system_id, state, sessions}`). `101 Switching Protocols` on upgrade.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -29153,6 +29281,34 @@ func ParseCreateMessageExportResponse(rsp *http.Response) (*CreateMessageExportR
 		}
 		response.JSON202 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
@@ -29178,6 +29334,20 @@ func ParseGetMessageExportResponse(rsp *http.Response) (*GetMessageExportRespons
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
@@ -29211,6 +29381,27 @@ func ParseSearchMessagesResponse(rsp *http.Response) (*SearchMessagesResponse, e
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 

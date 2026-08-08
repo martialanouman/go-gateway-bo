@@ -152,11 +152,27 @@ func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSou
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
 		TokenURL:     cfg.TokenURL,
-		// Les scopes sont ceux que déclare le contrat, codés ici et non configurables. Le jeton
-		// machine porte donc `content:read` en permanence : ce qu'un opérateur a le droit de voir est
-		// **entièrement** à la charge du BFF, et le rendre réglable ici laisserait croire qu'on peut
-		// restreindre par là ce qui doit l'être par `RequirePermission()` — c'est l'origine de
-		// l'invariant (c).
+		// Ces scopes sont **cinq des six** que le contrat catalogue, codés ici et non configurables.
+		// Le jeton machine porte donc `content:read` en permanence : ce qu'un opérateur a le droit de
+		// voir est **entièrement** à la charge du BFF, et le rendre réglable ici laisserait croire
+		// qu'on peut restreindre par là ce qui doit l'être par `RequirePermission()` — c'est l'origine
+		// de l'invariant (c).
+		//
+		// **Ce qui manque est un choix, et aucune porte ne le voit** — oapi-codegen n'engendre rien du
+		// `security`, donc le symptôme sera un **403 à l'exécution** sur du code qui compile. Mesuré
+		// sur le contrat 4.0.2 le 08/08/2026 :
+		//
+		//   - `msisdn:reveal` est catalogué (depuis la 3.0.0) et absent de cette liste. Voir les
+		//     numéros d'abonnés en clair là où le contrat les masque par défaut est une frontière
+		//     qu'il a posée ; la déplacer pour du code qui n'existe pas ne se justifie pas.
+		//   - `cdr:export_bulk` est exigé par `security:` sur `create-message-export` et
+		//     `get-message-export` (4.0.0) mais **n'est catalogué nulle part** — le bloc `scopes` du
+		//     `securitySchemes` n'en compte que six et ne le contient pas. C'est un manque du contrat
+		//     amont, à corriger par une PR dans `go-gateway/api/` plutôt qu'en le devinant ici.
+		//
+		// Aucune des deux opérations n'est appelée par ce dépôt : les ajouter élargirait le jeton
+		// machine pour personne. C'est à la step qui livrera l'export de décider, sachant ce qu'elle
+		// sert — step-104, prévenue dans `tasks/todo.md`. step-009, 08/08/2026.
 		Scopes: []string{"admin:read", "admin:write", "content:read", "content:erase", "gdpr:erase"},
 	}
 

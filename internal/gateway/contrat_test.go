@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -58,6 +59,10 @@ func operation(path, operationID string) signature {
 
 // Signatures relevées dans le paquet npm (`web/node_modules/@martialanouman/gateway-api-contracts`,
 // contrat **2.5.0**), le 02/08/2026, en extrayant les couples chemin + operationId des deux YAML.
+// **Re-vérifiées sur le contrat 4.0.2 le 08/08/2026** (step-009, deux majeures) : les 28 signatures
+// Admin et les 7 du contrat public sont intactes — les deux majeures n'ont ajouté, retiré ni renommé
+// aucune opération. Elles n'ont plus à l'être à la main, voir
+// TestTheSampleStillMatchesTheContractItWasTakenFrom.
 //
 // L'échantillon est large parce que c'est **lui** qui sépare les deux populations, et non le seuil.
 // Mesuré : à sept opérations, une fiche de step qui en citait quatre dans un bloc clôturé était
@@ -236,6 +241,108 @@ func TestNoGatewayContractIsCopiedIntoTheRepository(t *testing.T) {
 	}
 }
 
+// L'échantillon ci-dessus est une **copie du contrat**, à ceci près qu'elle n'en prend que
+// trente-cinq lignes. Comme toute copie, elle ne suit pas les republications — et une signature qui
+// a dérivé ne compte plus, ce qui rapproche le décompte du seuil sans que rien ne le dise. À
+// l'extrême, un échantillon entièrement périmé rend la porte verte sur une vraie copie.
+//
+// Rien ne le voyait : les cas de TestACopyIsRecognizedByWhatItDeclares fabriquent leur YAML **depuis**
+// l'échantillon (`yamlDeclaring(admin.signatures...)`), donc ils restent vrais quelle que soit sa
+// dérive. Mesuré le 08/08/2026 pendant le bump vers 4.0.2, en remplaçant `reorder-routes` par un
+// operationId inexistant : suite du package entièrement verte.
+//
+// Ce test est la moitié manquante. Il confronte l'échantillon au YAML que le paquet npm installe —
+// la seule source qui bouge — et transforme en porte ce qui était une re-mesure à la main, « à
+// refaire quand le contrat change de version majeure ». Il lit `web/node_modules/`, ce que ce package
+// fait déjà pour lancer Prism.
+//
+// **Il vérifie les couples, pas les lignes.** `declaredIn` teste l'appartenance de chaque déclaration
+// à un ensemble plat, donc rien n'y exige que le chemin et l'operationId appartiennent à la *même*
+// opération : mesuré, `operation("/admin/customers", "suspend-customer")` — une paire qui n'existe
+// dans aucun contrat — passait. C'est sans conséquence pour le verdict de copie, où les deux moitiés
+// arrivent ensemble par construction ; c'en a une ici, où l'on juge la fidélité. Le couple se lit donc
+// sur le document analysé, pas sur ses lignes.
+//
+// **Et il vérifie la taille.** Confronter les signatures présentes ne dit rien de celles qu'on
+// retire, or c'est la taille de l'échantillon qui règle le seuil (voir gatewayContracts) : en
+// retirer une abaisse la barre sans bruit. Mesuré : la suite restait verte.
+func TestTheSampleStillMatchesTheContractItWasTakenFrom(t *testing.T) {
+	t.Parallel()
+
+	root := bddtest.RepositoryRoot(t)
+
+	// Le décompte est écrit ici plutôt que dérivé : dérivé, il suivrait le rétrécissement qu'il doit
+	// interdire. Le changer est une décision, et elle passe par cette ligne.
+	require.Len(t, gatewayContracts[0].signatures, 28, "l'échantillon Admin a changé de taille")
+	require.Len(t, gatewayContracts[1].signatures, 5, "l'échantillon public a changé de taille")
+	require.Len(t, gatewayContracts[1].identity, 2, "le contrat public a perdu une marque d'identité")
+
+	for _, gatewayContract := range gatewayContracts {
+		path := filepath.Join(root, "web", "node_modules",
+			"@martialanouman", "gateway-api-contracts", gatewayContract.npmFile)
+
+		content, err := os.ReadFile(path)
+		require.NoErrorf(t, err, "lecture de %s — il vient de pnpm : pnpm -C web install",
+			gatewayContract.npmFile)
+
+		declared := declarationsIn(string(content))
+		operations := operationsDeclaredIn(t, path)
+
+		// L'identité est vérifiée avec les signatures : c'est elle qui porte le verdict sur le contrat
+		// public, donc une identité périmée y désarme la porte entièrement.
+		for _, sig := range slices.Concat(gatewayContract.identity, gatewayContract.signatures) {
+			matches := sig.declaredIn(declared)
+			if operationPath, operationID, isOperation := sig.operation(); isOperation {
+				matches = operations[operationPath+" "+operationID]
+			}
+
+			assert.Truef(t, matches,
+				"%s ne déclare plus %v : l'échantillon a dérivé du contrat qu'il prélève. Chaque "+
+					"signature perdue rapproche le décompte du seuil sans que rien ne le dise, et un "+
+					"échantillon périmé rend la porte verte sur une vraie copie. Relever la signature "+
+					"actuelle dans le YAML plutôt que de la retirer — la retirer rétrécit l'échantillon, "+
+					"ce que gatewayContracts explique.",
+				gatewayContract.npmFile, sig)
+		}
+	}
+}
+
+// operation rend le couple d'une signature bâtie par `operation()`, et dit si c'en est une. Les
+// marques d'identité — un titre, une URL de serveur — n'en sont pas : elles se lisent à plat.
+func (s signature) operation() (path, operationID string, ok bool) {
+	for _, d := range s {
+		switch {
+		case d.key == "operationId":
+			operationID = d.value
+		case strings.HasPrefix(d.key, "/"):
+			path = d.key
+		}
+	}
+
+	return path, operationID, path != "" && operationID != ""
+}
+
+// operationsDeclaredIn rend les couples « chemin operationId » que le document déclare réellement,
+// lus par l'analyseur OpenAPI plutôt que ligne à ligne. C'est la seule lecture structurelle de ce
+// fichier, et elle est ici parce que la question posée est structurelle : deux lignes présentes ne
+// font pas une opération.
+func operationsDeclaredIn(t *testing.T, contractPath string) map[string]bool {
+	t.Helper()
+
+	document, err := (&openapi3.Loader{Context: t.Context()}).LoadFromFile(contractPath)
+	require.NoErrorf(t, err, "analyse de %s", contractPath)
+
+	declared := make(map[string]bool)
+
+	for path, item := range document.Paths.Map() {
+		for _, op := range item.Operations() {
+			declared[path+" "+op.OperationID] = true
+		}
+	}
+
+	return declared
+}
+
 // Les fichiers suivis par git sont la bonne population : une copie posée dans un arbre de travail
 // n'engage personne, une copie indexée engage tout le monde.
 func trackedFiles(t *testing.T, root string) []string {
@@ -264,12 +371,15 @@ func trackedFiles(t *testing.T, root string) []string {
 	return files
 }
 
-// Ces cas prouvent le discriminant, pas la fidélité des signatures au contrat publié : celle-là ne
-// se vérifie qu'en passant les vrais YAML du paquet npm dans `copiedIn`. Fait à la main le
-// 02/08/2026 sur le contrat 2.5.0, chacun recopié sous un autre nom et une autre extension :
-// `openapi-admin.yaml` rend 28 signatures sur 28, `openapi-public.yaml` 5 sur 5 et son identité,
-// les deux verdicts à « copie ». C'est à refaire quand le contrat change de version majeure — un
-// échantillon qui aurait dérivé rendrait cette porte verte sur une vraie copie.
+// Ces cas prouvent le discriminant, pas la fidélité des signatures au contrat publié : celle-là ne se
+// vérifie que contre les vrais YAML du paquet npm. Faite à la main le 02/08/2026 sur le contrat
+// 2.5.0 — `openapi-admin.yaml` rendait 28 signatures sur 28, `openapi-public.yaml` 5 sur 5 et son
+// identité, les deux verdicts à « copie ».
+//
+// Elle n'est plus à refaire à la main : TestTheSampleStillMatchesTheContractItWasTakenFrom l'exige à
+// chaque suite, et signature par signature — donc plus strictement que le verdict, qui se contente de
+// la moitié. Le rendre automatique était la seule façon de le rendre vrai : « à refaire quand le
+// contrat change de version majeure » est un rituel, et un rituel ne rougit pas quand on l'oublie.
 //
 // Les documents sont rendus à partir du même tableau plutôt qu'écrits en clair : un YAML de contrat
 // recopié dans un littéral de ce fichier ferait tomber la porte ci-dessus sur ce fichier-ci, et

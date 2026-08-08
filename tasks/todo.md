@@ -56,7 +56,7 @@ Versions Go relevées sur `proxy.golang.org` le 01/08/2026 ; versions JS telles 
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat API | `@martialanouman/gateway-api-contracts` | **2.5.0** |
+| Contrat API | `@martialanouman/gateway-api-contracts` | **4.0.2** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests client | Vitest + Playwright | 4.1.10 / 1.62.0 |
 | Langage client | TypeScript, `strict` | 7.0.2 |
@@ -89,8 +89,8 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 
 - **Le contrat est la source de vérité.** Le dépôt ne copie jamais un YAML : il consomme le package
   versionné. Tout manque côté passerelle se règle par une PR dans `go-gateway/api/`.
-- **Le contrat bouge vite** — quinze versions en moins de six jours, dont trois majeures (relevé le
-  02/08/2026). Relever la version disponible **au début de chaque step qui le touche**, jamais au
+- **Le contrat bouge vite** — dix-sept versions en douze jours, dont trois majeures (relevé le
+  08/08/2026). Relever la version disponible **au début de chaque step qui le touche**, jamais au
   milieu. Voir `plan.md` §1.12.
 - **Mock-first.** Chaque écran se développe contre le mock Prism ; l'intégration réelle n'est requise
   que pour les steps qui le disent.
@@ -108,24 +108,28 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - [x] step-001 — SPA Vite + TanStack Router : squelette d'application, coquille peinte au chargement à froid
 - [x] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
 - [x] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
-- [ ] step-009 — Contrat Admin en **4.0.0** : deux majeures depuis 2.5.0, diff du YAML relu §
+- [x] step-009 — Contrat Admin en **4.0.2** : deux majeures depuis 2.5.0, diff du YAML relu §
 - [x] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS ‡
 - [x] step-005 — PostgreSQL : `pgx`, migrations, les tables du §3.1, `audit_log` partitionné
 - [x] step-006 — Catalogue de permissions : source Go, génération TS, test de divergence bloquant
 - [x] step-007 — Harnais BDD : `godog`, `testify`, testcontainers, Vitest, Playwright, CI à deux toolchains
 - [ ] step-008 — Charte : tokens depuis le kit UI, `/_design`, contraste AA vérifié
 
-§ **Numéro hors bloc, position délibérée.** step-003 s'est arrêtée à 2.5.0 parce que la quarantaine de
-`minimumReleaseAge` refusait plus récent ; elle expire d'elle-même (`plan.md` §1.12). La step vient
-juste après, avant que M0 et M1 n'engendrent du code contre 2.5.0 : un bump payé sur le seul
-`internal/gateway/client.gen.go` coûte moins cher que le même bump payé sur tout ce qui l'appellera.
-Son fichier `steps/step-009.md` reste à écrire, comme ceux de M1 et au-delà.
+§ **Numéro hors bloc, position délibérée — et le pari a tenu.** step-003 s'est arrêtée à 2.5.0 parce
+que la quarantaine de `minimumReleaseAge` refusait plus récent ; elle a expiré d'elle-même
+(`plan.md` §1.12). La step est passée avant que M0 n'engendre du code contre 2.5.0, et c'est ce qui a
+rendu le bump gratuit : **livré le 08/08/2026, il n'a touché aucun appelant** — les six opérations que
+les deux majeures modifient ne sont appelées nulle part, et `go build` est resté vert sur trois
+ruptures de type. Payé sur le seul `internal/gateway/client.gen.go`, comme annoncé.
 
-‡ **step-004 est passée devant step-009, et la position ci-dessus reste la bonne.** Mesuré le 02/08 à
-09:26 UTC : la quarantaine de 4.0.0 courait jusqu'à 17:46 UTC et `pnpm` la refusait encore — step-009
-était matériellement infaisable. step-004 ne dépend pas d'elle et n'engendre aucun code contre le
-contrat Admin, donc l'argument du renvoi § n'est pas entamé : ce qui reste à payer au bump n'a pas
-grossi. step-009 garde sa place, en tête de ce qui reste.
+*(La version épinglée est **4.0.2** et non 4.0.0 : les trois `openapi-admin.yaml` de la série 4.0.x
+sont identiques au sha256, et 4.0.3 était en quarantaine. Voir `steps/done/step-009.md`, DN-1.)*
+
+‡ **step-004 est passée devant step-009, et la position ci-dessus est restée la bonne.** Mesuré le
+02/08 à 09:26 UTC : la quarantaine de 4.0.0 courait jusqu'à 17:46 UTC et `pnpm` la refusait encore —
+step-009 était matériellement infaisable. step-004 ne dépendait pas d'elle et n'engendrait aucun code
+contre le contrat Admin, donc l'argument du renvoi § n'était pas entamé. Vérifié à la livraison : ce
+qui restait à payer au bump n'avait effectivement pas grossi.
 
 ## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [ ] step-020 — Seed auth : les 44 clés de permission et les 9 rôles par défaut, idempotent ¶
@@ -209,7 +213,17 @@ sur un schéma en retard protège quelque chose. *(Arbitré le 02/08/2026, au d�
 - [ ] step-101 — Fiche message composée côté BFF
 - [ ] step-102 — Visualiseur de trace (cascade de spans)
 - [ ] step-103 — Corps du message gardé par `content:read` + journal des accès  *(invariant a)*
-- [ ] step-104 — Export CSV asynchrone gouverné
+- [ ] step-104 — Export CSV asynchrone gouverné ◊
+
+◊ **Le jeton machine ne porte pas le scope que ces opérations exigent, et rien ne le dira.** Le contrat
+exige `cdr:export_bulk` sur `create-message-export` et `get-message-export` (depuis la 4.0.0), et
+`msisdn:reveal` pour un export non masqué. `internal/gateway/client.go` n'en demande aucun des deux :
+step-009 l'a constaté et a **choisi** de ne pas élargir le jeton machine pour du code qui n'existait
+pas encore. oapi-codegen n'engendrant rien du `security`, le symptôme sera un **403 de la passerelle**
+sur du code qui compile — et le réflexe sera de chercher du côté de `RequirePermission()`, puisque
+`cdr:export_bulk` est **aussi** une permission BFF (§6.10). Deux objets homonymes, deux couches : le
+403 vient du jeton sortant, pas de la garde entrante. Décider en connaissance de cause, et corriger
+au passage le manque amont — `cdr:export_bulk` est exigé par le contrat sans y être catalogué.
 
 ## M6 — Routage & scripts  (§6.1, §6.2, §6.7, §6.13)
 - [ ] step-120 — Routes : table par priorité + réordonnancement souris et clavier

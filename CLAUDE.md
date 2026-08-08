@@ -103,10 +103,12 @@ tasks/             plan.md · todo.md · steps/ (à faire) · steps/done/ (livr�
 - **Les contrats sont la source de vérité** : le dépôt consomme `@martialanouman/gateway-api-contracts`
   et ne copie jamais un YAML. Tout manque se corrige par une PR dans `go-gateway/api/`.
 - **TOUJOURS relever la version du contrat au début d'une step qui le touche.** Il est publié à chaque
-  merge sur `main` de `go-gateway` : quinze versions en moins de six jours, dont trois majeures.
-  Consigner l'écart dans la PR, **ne jamais bumper au milieu d'une step**, et **relire le diff du
-  YAML** — une contrainte resserrée (`additionalProperties: false`, un `maximum`, un `enum` réduit)
-  passe le typage et échoue à l'exécution. `tasks/plan.md` §1.12.
+  merge sur `main` de `go-gateway` : dix-sept versions en douze jours, dont trois majeures (relevé le
+  08/08/2026). Consigner l'écart dans la PR, **ne jamais bumper au milieu d'une step**, et **relire le
+  diff du YAML** — une contrainte resserrée (`additionalProperties: false`, un `maximum`, un `enum`
+  réduit) passe le typage et échoue à l'exécution, et **la compilation n'est pas le filet qu'on
+  croit** : au bump de step-009, trois ruptures de type sont passées vertes faute d'appelant.
+  `tasks/plan.md` §1.12.
 - **Versions & API : jamais devinées.** `ctx7` côté JS, `pkg.go.dev` ou `proxy.golang.org` côté Go,
   avant tout ajout, bump ou usage d'API. Une signature inventée compile parfois.
 
@@ -167,14 +169,12 @@ exemples qui teste un mapping ; deux scénarios qui ne diffèrent que par une va
 
 ## La boucle de travail
 
-**Une step = une session = une PR.** La procédure complète — neuf phases, prompts de sous-agents,
-pièges de terrain — vit dans le skill **`impl-step`** : l'invoquer est la première action dès qu'une
-step est engagée, avant de lire du code et avant d'écrire le moindre plan. Ce qui suit est le
-squelette — ce qu'on exige, pas comment on l'obtient.
+**Une step = une session = une PR.** Ce qui suit est ce qu'on exige d'une step, du premier commit au
+merge — il n'y a pas de procédure plus détaillée ailleurs.
 
-**Puis chaque phase s'ouvre par `using-agent-skills`** — contexte, plan, spécification,
-implémentation, revue, débogage. Le méta-skill oriente vers le skill de la phase, et chacun porte un
-cadre que l'improvisation ne reproduit pas. Le mode d'échec est silencieux : sans le skill on finit par
+**Chaque phase s'ouvre par `using-agent-skills`** — contexte, plan, spécification, implémentation,
+revue, débogage. Le méta-skill oriente vers le skill de la phase, et chacun porte un cadre que
+l'improvisation ne reproduit pas. Le mode d'échec est silencieux : sans le skill on finit par
 trouver, plus lentement et sans structure, donc rien ne signale l'oubli.
 
 **Quatre portes**, dans l'ordre, chacune interdisant la suite tant qu'elle n'est pas franchie :
@@ -281,7 +281,6 @@ mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couver
 - Quoi/pourquoi : `docs/specification-technique-tableau-de-bord.md` (v2.1)
 - Comment/dans quel ordre : `tasks/plan.md`
 - Découpage en PRs : `tasks/todo.md` + `tasks/steps/step-NNN.md`
-- Procédure d'une step, phase par phase : skill `impl-step` (`.claude/skills/impl-step/SKILL.md`)
 - Charte graphique & kit UI : `.claude/skills/sms-gateway-design/README.md`
 - Contrat API : `@martialanouman/gateway-api-contracts` (jamais copié ici)
 - Passerelle (dépôt séparé) : `../go-gateway`
