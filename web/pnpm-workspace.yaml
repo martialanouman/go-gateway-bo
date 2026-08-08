@@ -44,6 +44,15 @@ overrides:
   # (GHSA-7p8r-x3mc-p8w7, élevée) — une URL mal découpée peut faire prendre un hôte pour un autre.
   # Arrive par `ajv`, le validateur que Prism utilise pour juger les requêtes.
   'ajv>fast-uri': '^3.1.5'
+  # nanoid <3.3.17 : un générateur personnalisé boucle indéfiniment quand la taille vaut zéro
+  # (GHSA-2v37-7h3g-55p8, élevée). `pnpm audit` l'annonce par huit chemins, mais `pnpm why` n'en voit
+  # qu'un seul parent — `postcss`, qui s'en sert pour nommer ses fichiers de source map. Un sélecteur
+  # sur `postcss` les couvre donc tous les huit sans élargir la portée.
+  #
+  # Avis apparu entre le merge de #42 et le 08/08/2026 : `main` était rouge sans qu'aucun fichier ait
+  # bougé, ce que `CLAUDE.md` annonce des bases vivantes. Corrigé ici plutôt que dans sa propre PR
+  # parce qu'il bloquait la porte `vuln-web` de step-009 — le mélange est assumé, pas subi.
+  'postcss>nanoid': '^3.3.17'
 
 # Avis `pnpm audit` triés explicitement. Un avis n'entre ici qu'avec sa justification écrite, et
 # `pnpm vuln` échoue sur tout ce qui n'y figure pas — c'est ce qui rend le triage conscient plutôt
