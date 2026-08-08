@@ -74,9 +74,10 @@ contrainte JSON Schema : ni le générateur ni le typage ne les verront jamais, 
 *(Le `maximum: 500` du YAML est celui du paramètre `Limit` de pagination — pas un plafond de groupe.)*
 
 ## Tests (écrits dans la même PR)
-- **La régénération est le rouge.** `make generate` puis `go build ./...` doit **montrer R1, R2 et R3**.
-  Une compilation verte du premier coup n'est pas un succès : c'est un signal à instruire, parce que
-  le diff annonce trois ruptures de type.
+- ~~**La régénération est le rouge.** `make generate` puis `go build ./...` doit **montrer R1, R2 et
+  R3**.~~ **Faux, mesuré en U1 : `go build ./...` rend rc=0**, et `go test ./internal/gateway/...`
+  passe. Voir la correction en DN-2 — la prédiction contredisait une mesure que cette fiche portait
+  déjà trois paragraphes plus haut.
 - **La porte anti-copie re-mesurée.** Son échantillon a été prélevé sur 2.5.0 ; son commentaire exige
   la re-mesure à chaque majeure, « un échantillon qui aurait dérivé rendrait cette porte verte sur une
   vraie copie ». Mutation : altérer un operationId relevé — le test doit tomber.
@@ -128,14 +129,33 @@ patch qui ne touche pas notre versant.
 côtés, corriger, et **relire le diff du YAML** — parce que tout ne casse pas la compilation ».
 
 Écrire un test qui *anticipe* R1, R2 ou R3 serait un test de complaisance : il asserterait la forme du
-code engendré, c'est-à-dire le comportement d'oapi-codegen, et non celui du produit. Le rouge de cette
-step est donc la compilation elle-même — mais il ne couvre que trois ruptures sur six.
+code engendré, c'est-à-dire le comportement d'oapi-codegen, et non celui du produit.
 
-Les trois autres — R4, R5, et les plafonds en prose — n'ont **aucun mécanisme automatisable
-proportionné**. Un test qui compterait les valeurs de `CdrStatus` figerait un nombre sans le lire ; un
-test qui confronterait les scopes du contrat à ceux de `client.go` refuserait précisément la décision
-de DN-3. Ce qui est livrable pour eux, c'est de les **écrire là où ils vivent** (critère 4) : le
-tableau ci-dessus, et un commentaire au-dessus de la liste de scopes de `client.go`.
+> **Corrigé en U1, contre la mesure.** Ce DN concluait « le rouge de cette step est donc la
+> compilation elle-même — mais il ne couvre que trois ruptures sur six ». **Il n'en couvre aucune** :
+> `go build ./...` rend **rc=0**, et `go test ./internal/gateway/...` passe sans une modification.
+>
+> La raison était sous mes yeux, dans cette fiche : *aucune* opération touchée n'est appelée par du
+> code écrit à la main. R1, R2 et R3 cassent bien la forme des types engendrés — vérifié après
+> régénération : `FromDate time.Time` sans `omitempty` (l. 3920), `Parquet` disparu (0 occurrence),
+> `Filters MessageExportFilters` (l. 3094) et son schéma neuf (l. 3077) — mais **personne ne les
+> référence**, donc rien ne casse. Une rupture de type dans du code que nul n'appelle ne rompt rien.
+>
+> Ce n'est pas un détail de formulation : la fiche promettait un rouge, et l'exigence « rouge lu et
+> compris avant la première ligne d'implémentation » aurait été déclarée franchie sur un vert. Le
+> vrai état de cette step est qu'elle **n'a pas de rouge de compilation à offrir** — ce qui la rend
+> d'autant plus dépendante de la relecture du diff, seule chose qui ait regardé les six ruptures.
+
+Les six ruptures sont donc, toutes, hors de portée de la compilation aujourd'hui. Trois s'y
+manifesteront le jour où une step appellera les opérations touchées ; les trois autres — R4, R5, et les
+plafonds en prose — ne s'y manifesteront **jamais**.
+
+Aucune des six n'a de **mécanisme automatisable proportionné**. Un test qui compterait les valeurs de
+`CdrStatus` figerait un nombre sans le lire ; un test qui confronterait les scopes du contrat à ceux de
+`client.go` refuserait précisément la décision de DN-3 ; et asserter la forme d'un type engendré
+reviendrait à tester oapi-codegen. Ce qui est livrable pour elles, c'est de les **écrire là où elles
+vivent** (critère 4) : le tableau ci-dessus, et un commentaire au-dessus de la liste de scopes de
+`client.go`.
 
 ### DN-3 — Les deux scopes ne sont pas ajoutés au jeton machine
 
