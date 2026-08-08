@@ -113,7 +113,7 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - [x] step-005 — PostgreSQL : `pgx`, migrations, les tables du §3.1, `audit_log` partitionné
 - [x] step-006 — Catalogue de permissions : source Go, génération TS, test de divergence bloquant
 - [x] step-007 — Harnais BDD : `godog`, `testify`, testcontainers, Vitest, Playwright, CI à deux toolchains
-- [ ] step-008 — Charte : tokens depuis le kit UI, `/_design`, contraste AA vérifié
+- [x] step-008 — Charte : tokens portés de la v1.0, `/_design`, contraste AA vérifié
 
 § **Numéro hors bloc, position délibérée — et le pari a tenu.** step-003 s'est arrêtée à 2.5.0 parce
 que la quarantaine de `minimumReleaseAge` refusait plus récent ; elle a expiré d'elle-même

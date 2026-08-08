@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/')({ component: HomeScreen })
+export const Route = createFileRoute('/_shell/')({ component: HomeScreen })
 
 /**
  * L'état vide de §1.9 : la route existe, l'écran n'est pas encore livré, et la copie nomme le jalon

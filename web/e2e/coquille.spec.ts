@@ -24,6 +24,17 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   page,
   request,
 }) => {
+  // Les écouteurs sont posés **avant** le premier `goto`, sinon les requêtes du chargement initial —
+  // celles qui portent justement la feuille et les polices — échapperaient à l'observation.
+  const requested: string[] = []
+  const problems: string[] = []
+  page.on('request', (r) => requested.push(r.url()))
+  page.on('requestfailed', (r) => problems.push(`requête échouée : ${r.url()}`))
+  page.on('pageerror', (error) => problems.push(`exception : ${error.message}`))
+  page.on('console', (message) => {
+    if (message.type() === 'error') problems.push(`console : ${message.text()}`)
+  })
+
   // Étant donné le document que le binaire sert, avant qu'aucun script ne s'exécute — c'est la
   // requête brute, pas celle du navigateur, qui montre ce qui part sur le fil.
   const served = await request.get('/')
@@ -39,4 +50,33 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   )
   await expect(page.locator('[data-skeleton="rail"]')).toHaveCount(0)
   await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible()
+
+  // Et le navigateur n'est sorti nulle part. C'est la moitié « vérifiée sur le binaire » de la DoD de
+  // step-008 : la charte est servie par le déployable, jamais par un tiers. Le test de bundle attrape
+  // déjà une adresse écrite en dur dans les sources ; lui seul ne dit rien de ce qu'un navigateur
+  // demande réellement — un `@import` résolu à l'exécution ne laisse aucune trace dans le bundle.
+  const origin = new URL(page.url()).origin
+  expect(requested.filter((url) => !url.startsWith(origin))).toEqual([])
+
+  // Un plancher, sans quoi « aucune police tierce » serait vrai en n'ayant chargé aucune police :
+  // l'assertion ci-dessus passe tout aussi bien si les `@font-face` ont disparu de la feuille.
+  expect(
+    requested.filter((url) => url.endsWith('.woff2')),
+    "aucune police n'a été chargée : la charte n'est pas servie",
+  ).not.toHaveLength(0)
+
+  // Et la référence visuelle est atteignable **sur le binaire**, pas seulement dans un routeur monté
+  // en mémoire par un test de composant. C'est ce que la DoD appelle traverser le chemin pour de
+  // bon : rien de simulé, le vrai déployable, le vrai fallback SPA sur une URL profonde. La v1.0
+  // avait trois défauts que seul ce genre de traversée avait trouvés.
+  await page.goto('/_design')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Référence visuelle')
+  // Hors de la coquille : elle ne s'adresse pas à un opérateur.
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toHaveCount(0)
+  // Et elle rend la charte pour de vrai — la police, pas un repli système. `getComputedStyle` dans
+  // Chromium résout les `var()` et les `color-mix()`, ce que jsdom ne fait pas : c'est le seul
+  // endroit de la suite où l'on lit ce qui est **réellement peint**.
+  await expect(page.locator('h1')).toHaveCSS('font-family', /IBM Plex Sans/)
+
+  expect(problems).toEqual([])
 })

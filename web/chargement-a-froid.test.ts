@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { readTokens, resolveToken } from './test/tokens'
 
 /**
  * Coller une URL profonde dans un onglet neuf doit peindre la silhouette de la coquille — jamais un
@@ -133,22 +134,60 @@ describe('chargement à froid', () => {
     expect(style.overflow).toBe('hidden')
   })
 
-  it('fait consommer à la coquille la géométrie que le document déclare', () => {
-    // Partager quatre custom properties rend impossible que les *valeurs* divergent — mais pas que la
-    // *référence* se casse : une faute de frappe dans `app.css`, ou la grille de `.shell` vidée,
-    // laissaient la suite verte pendant que la mise en page sursautait au montage de React.
-    const declared = new Set(html.match(/--[\w-]+(?=\s*:)/g) ?? [])
-    const consumed = new Set(
-      stylesheet.match(/var\((--[\w-]+)\)/g)?.map((v) => v.slice(4, -1)) ?? [],
-    )
+  it('recopie fidèlement, dans le document, les tokens que la coquille consomme', () => {
+    // **Ce test a changé de sens en step-008, et son remplaçant est plus fort.** Il exigeait avant
+    // que *tout* `var()` de la feuille soit déclaré dans `index.html` — écrit pour quatre variables
+    // de géométrie, il tombait au premier `var(--text-primary)` parmi 236 tokens. Ce contrôle
+    // d'existence vit désormais dans le build (`vite-plugin-tokens`), où il juge l'**union** du
+    // document et du CSS émis : il couvre les 236 tokens au lieu de quatre, et il fait échouer
+    // `vite build` plutôt qu'un test.
+    //
+    // Ce qui reste ici est ce que le build ne peut pas voir : le `<style>` inline **duplique** quatre
+    // tokens de la charte, parce que la première peinture n'a aucune feuille à sa disposition. La
+    // duplication est imposée ; ce qui se teste, c'est qu'elle soit fidèle. Non alignées, ces valeurs
+    // font sauter le rail de 4 px et changent la luminance du canvas au montage de React.
+    const tokens = readTokens()
 
-    expect(consumed, 'la feuille ne consomme plus la géométrie partagée').toContain(
-      '--shell-rail-width',
-    )
-    expect(consumed).toContain('--shell-topbar-height')
-    for (const name of consumed) {
-      expect(declared, `${name} est consommée sans être déclarée par le document`).toContain(name)
+    const copies = [
+      ['--shell-rail-width', '--nav-width'],
+      ['--shell-topbar-height', '--topbar-height'],
+      ['--skeleton-surface', '--surface-page'],
+      ['--skeleton-shape', '--border-subtle'],
+    ] as const
+
+    for (const [inDocument, inCharter] of copies) {
+      const declared = new RegExp(`${inDocument}:\\s*([^;]+);`).exec(html)?.[1]?.trim()
+      const token = resolveToken(tokens, inCharter)
+
+      expect(token, `${inCharter} a disparu de la charte`).toBeDefined()
+      expect(declared, `${inDocument} ne recopie plus ${inCharter}`).toBe(token)
     }
+
+    // Et la coquille consomme bien les tokens de la charte, non la copie : sinon le document
+    // pourrait recopier fidèlement des tokens que plus personne n'utilise.
+    const consumed = new Set(
+      stylesheet.match(/var\((--[\w-]+)\)/g)?.map((reference) => reference.slice(4, -1)) ?? [],
+    )
+    expect(consumed).toContain('--nav-width')
+    expect(consumed).toContain('--topbar-height')
+  })
+
+  it("garde la feuille d'entrée assez petite pour que l'aller-retour reste le seul coût", async () => {
+    // step-001 mesurait 680 octets et concluait « négligeable tant que la feuille est petite ».
+    // C'était une hypothèse ; ce plafond en fait une condition. Remesuré le 08/08/2026 sur la sortie
+    // livrée, tokens, polices et feuille de `/_design` versés : **12 635 octets bruts, 3 420
+    // compressés** — la marge sous le plafond est de 3,7 Ko, pas celle de `components.css` (1 568
+    // lignes en v1.0, qui arrive en step-041).
+    //
+    // *(Le chiffre a d'abord été écrit à 10 723 : c'était la mesure d'avant `/_design`, prise au
+    // commit précédent et jamais refaite. Une revue l'a relevée. C'est le critère 2 — l'affirmation se
+    // confronte à la sortie, pas à l'intention du diff.)*
+    const entry = /<link rel="stylesheet"[^>]*href="([^"]+)"/.exec(html)?.[1]
+    expect(entry, "le document ne lie plus de feuille d'entrée").toBeDefined()
+
+    const bytes = (await readFile(join(outDir, (entry as string).replace(/^\//, '')))).byteLength
+
+    expect(bytes).toBeLessThan(16_384)
   })
 
   it("annonce le chargement aux technologies d'assistance", () => {
@@ -179,13 +218,21 @@ describe('chargement à froid', () => {
     // cette step produit le premier bundle.
     // Tout ce qui est servi, et pas seulement `assets/` : Vite recopie `public/` tel quel, et un
     // fichier de configuration déposé là échapperait à une lecture du seul répertoire des bundles.
+    // Les binaires sont exclus **par extension** plutôt que lus en `utf8` : depuis que step-008
+    // auto-héberge les polices, sept `.woff2` (144 Ko) transiteraient sinon par cette regex, décodés
+    // en UTF-8 avec des `U+FFFD` partout. Un octet mal placé y produirait une fausse origine, sur du
+    // contenu qui ne peut de toute façon pas porter d'URL.
+    const TEXTUAL = /\.(js|mjs|cjs|css|html|json|svg|txt|map|webmanifest)$/
     const emitted = await readdir(outDir, { recursive: true, withFileTypes: true })
     const sources = await Promise.all(
       emitted
-        .filter((entry) => entry.isFile())
+        .filter((entry) => entry.isFile() && TEXTUAL.test(entry.name))
         .map((entry) => readFile(join(entry.parentPath, entry.name), 'utf8')),
     )
     const shipped = sources.join('\n')
+
+    // Sans ce plancher, le filtre ci-dessus pourrait tout exclure et laisser la garde verte et vide.
+    expect(sources.length).toBeGreaterThanOrEqual(3)
 
     // Liste blanche et non liste noire : interdire `:3001` et `:4010` se périmerait le jour où
     // l'API Admin aura une vraie adresse, sans que personne ne s'en aperçoive. Ici, **toute** origine

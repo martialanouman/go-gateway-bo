@@ -1,0 +1,362 @@
+// @vitest-environment node
+
+/**
+ * La charte, tenue par des tests.
+ *
+ * Deux garanties distinctes :
+ *
+ * 1. **Les tokens que les écrans consomment existent.** Un `var(--surface-card)` qui ne résout rien
+ *    ne casse pas : le navigateur applique la valeur héritée, et l'écran s'affiche presque juste.
+ *    Un token renommé se remarquerait donc des semaines plus tard, sur une capture d'écran. La v1.0
+ *    en a fait les frais — step-026 avait inventé `--danger-border`, `--danger-surface` et
+ *    `--danger-text`, et le bandeau de refus s'affichait sans bordure ni fond, `pnpm check` vert.
+ *
+ *    Le sens qui manquait est testé ici : on part de ce que le CSS **consomme réellement**, jamais
+ *    d'une liste écrite à la main — une liste ne voit jamais le token qu'on vient d'inventer. Depuis
+ *    step-008, cette garantie est **doublée par le build** : `vite-plugin-tokens` fait échouer
+ *    `vite build` sur un `var()` non déclaré. Le test garde ce que le plugin ne voit pas — les
+ *    `var()` composés à l'exécution, que le CSS émis ne contient pas.
+ * 2. **Le contraste est conforme dès les tokens**, pas rattrapé écran par écran — sur les surfaces
+ *    plates *et* sur les surfaces composées. Ces dernières sont le vrai point bas : une pilule pose
+ *    son texte sur sa propre teinte, une ligne se survole et se sélectionne. Un test qui ne
+ *    regarderait que les fonds littéraux de la palette laisserait passer les combinaisons que le
+ *    produit rend réellement — c'est ce qui est arrivé à la première version de ce fichier, et deux
+ *    paires étaient sous le seuil.
+ *
+ * *(Porté de la v1.0, `909eb8d:src/test/charte.test.ts`. Les deux tests qui visaient
+ * `src/styles/components.css` sont reciblés : les primitives habillées sont hors périmètre de
+ * step-008, elles arrivent en step-041/042.)*
+ */
+
+import { readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describe, expect, it } from 'vitest'
+import { CONTRAST_PAIRS, RADII, SPACINGS, SURFACES, TYPE_ROLES } from '../src/lib/design-tokens'
+import { contrastRatio, readTokens, resolveColor, resolveToken, TOKEN_FILES } from './tokens'
+
+const tokens = readTokens()
+
+/**
+ * Le CSS que step-008 livre. `components.css` de la v1.0 n'en fait pas partie : les primitives
+ * habillées sont de step-041/042. La liste est **nommée plutôt que globbée** — un fichier de style
+ * ajouté sans y être inscrit échapperait à la garantie, et l'oubli se voit en relisant cette ligne.
+ */
+const STYLED_FILES = ['app.css', 'design-reference.css', 'tokens/base.css'] as const
+
+function readStyledCss(): string {
+  const here = dirname(fileURLToPath(import.meta.url))
+  // Les commentaires sortent d'abord : ils citent des noms de tokens, et les compter comme consommés
+  // ferait rougir pour la mauvaise raison.
+  return STYLED_FILES.map((file) =>
+    readFileSync(join(resolve(here, '..'), 'src', 'styles', file), 'utf8'),
+  )
+    .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+}
+
+/** Seuils WCAG 2.1 AA. Le texte large commence à 18,66 px en gras ou 24 px en normal. */
+const AA_NORMAL_TEXT = 4.5
+const AA_LARGE_TEXT_OR_UI = 3
+
+describe('tokens de la charte', () => {
+  const expected = [
+    // Surfaces — la charte en définit quatre, et il n'y a pas de thème clair.
+    '--surface-page',
+    '--surface-chrome',
+    '--surface-card',
+    '--surface-sunken',
+    // Texte
+    '--text-primary',
+    '--text-secondary',
+    '--text-muted',
+    '--text-faint',
+    // Bordures : sur ce fond, c'est la bordure qui porte la profondeur, pas l'ombre.
+    '--border-default',
+    '--border-subtle',
+    // Accent unique
+    '--teal-500',
+    // Sémantique de statut
+    '--green-500',
+    '--amber-500',
+    '--red-500',
+    '--blue-500',
+    '--violet-500',
+    // Rôles typographiques : six pour l'interface, trois pour les valeurs machine.
+    '--text-page-title',
+    '--text-section-title',
+    '--text-card-title',
+    '--text-body',
+    '--text-label',
+    '--text-overline',
+    '--text-metric',
+    '--text-data',
+    '--text-pill',
+    // Familles
+    '--font-sans',
+    '--font-mono',
+    // Espacements canoniques : 4 · 8 · 12 · 16 · 24 · 40
+    '--sp-2',
+    '--sp-4',
+    '--sp-6',
+    '--sp-7',
+    '--sp-9',
+    '--sp-11',
+    // Rayons
+    '--r-field',
+    '--r-card',
+    '--r-pill',
+    // Accessibilité
+    '--focus-ring',
+  ]
+
+  it.each(expected)('%s est défini', (name) => {
+    expect(resolveToken(tokens, name)).toBeDefined()
+  })
+
+  it('assemble tout ce que la charte a besoin de servir', () => {
+    // **Ce que ce test ferme, mesuré le 08/08/2026** : retirer `@import "./tokens/base.css"` d'app.css
+    // laissait les 137 tests verts et `vite build` à rc=0 — alors que `base.css` porte à lui seul le
+    // reset, `color-scheme: dark`, la couleur du corps, et surtout la règle `:focus-visible` qui pose
+    // l'anneau de focus sur tous les contrôles. Le produit perdait son indicateur de focus (WCAG
+    // 2.4.7) sans qu'aucune porte ne bouge.
+    //
+    // L'assemblage se teste ici plutôt que par le rendu, parce qu'aucun test de composant ne visite
+    // un `:focus-visible` et qu'aucune règle de `base.css` n'a de porteur dans le DOM de test.
+    const here = dirname(fileURLToPath(import.meta.url))
+    const app = readFileSync(join(resolve(here, '..'), 'src', 'styles', 'app.css'), 'utf8')
+
+    const assembled = [...app.matchAll(/@import\s+"\.\/(tokens\/[\w-]+\.css)"/g)].map(
+      ([, file]) => file as string,
+    )
+
+    expect(assembled).toEqual([...TOKEN_FILES.map((file) => `tokens/${file}`), 'tokens/base.css'])
+  })
+
+  it('sert chaque feuille que STYLED_FILES prétend garder', () => {
+    // Une feuille qu'aucun module n'importe n'est pas servie, et la garantie ci-dessus se met alors à
+    // juger un fichier mort. Mesuré le 08/08/2026 : retirer `import '~/styles/design-reference.css'`
+    // de la route laissait les 137 tests verts et `vite build` à rc=0 — la page rendait nue, et ce
+    // fichier continuait de lire la feuille **sur disque** comme si de rien n'était.
+    const here = dirname(fileURLToPath(import.meta.url))
+    const sources = ['src/styles/app.css', 'src/routes/[_]design.tsx', 'src/main.tsx']
+      .map((file) => readFileSync(join(resolve(here, '..'), file), 'utf8'))
+      .join('\n')
+
+    for (const file of STYLED_FILES) {
+      expect(sources, `${file} n'est importée par aucun module : elle n'est pas servie`).toContain(
+        file.replace('tokens/', './tokens/').replace(/^(app|design-reference)/, 'styles/$1'),
+      )
+    }
+  })
+
+  it('n’en consomme aucun qui n’existe pas', () => {
+    // On part de ce que le CSS **consomme réellement**, jamais d'une liste écrite à la main : une
+    // liste ne voit jamais le token qu'on vient d'inventer. `vite-plugin-tokens` tient déjà ce front
+    // sur le CSS émis ; ce test le tient sur les sources, et il rougit plus tôt — à `make test-web`
+    // plutôt qu'à `make build`.
+    const used = new Set(
+      [...readStyledCss().matchAll(/var\(\s*(--[\w-]+)/g)].map(([, name]) => name as string),
+    )
+
+    expect([...used].filter((name) => !tokens.has(name)).sort()).toEqual([])
+  })
+
+  it('en consomme assez pour que ce test garde quelque chose', () => {
+    // Sans ce plancher, une expression régulière qui cesserait de reconnaître `var(--…)` rendrait le
+    // test précédent vert et vide — la panne la plus discrète qu'un test puisse avoir. Mesuré le
+    // 08/08/2026 : 55 occurrences, 13 dans `app.css` et 42 dans `design-reference.css`.
+    expect([...readStyledCss().matchAll(/var\(\s*(--[\w-]+)/g)].length).toBeGreaterThan(40)
+  })
+
+  it('ne rend, dans /_design, que des tokens qui existent', () => {
+    // Le trou que `vite-plugin-tokens` nomme : la page compose ses `var()` à l'exécution
+    // (`style={{ font: `var(${token})` }}`), donc **aucun de ces noms n'apparaît dans le CSS émis**.
+    // Le build ne peut pas les voir ; cette table est le seul endroit d'où ils viennent.
+    const named = [
+      ...TYPE_ROLES.map(({ token }) => token),
+      ...SURFACES.map(({ token }) => token),
+      ...RADII.map(({ token }) => token),
+      ...SPACINGS,
+      ...CONTRAST_PAIRS.flatMap(({ text, background, over }) => [text, background, over ?? '']),
+    ].filter(Boolean)
+
+    expect(named.filter((name) => !tokens.has(name)).sort()).toEqual([])
+  })
+
+  it('ne promet pas de thème clair', () => {
+    // La charte est sombre, sans bascule. Un token de thème clair signalerait qu'une variante a
+    // été introduite sans que la décision soit prise.
+    const suspects = [...tokens.keys()].filter((name) => /light|day|inverse-theme/.test(name))
+    expect(suspects).toEqual([])
+  })
+})
+
+describe('contraste WCAG 2.1 AA', () => {
+  const backgrounds = ['--surface-page', '--surface-card', '--surface-chrome', '--surface-sunken']
+
+  /** Tout ce qui rend du texte de taille courante doit tenir 4,5:1 sur chaque surface. */
+  const textColors = [
+    '--text-primary',
+    '--text-secondary',
+    '--text-muted',
+    // Porte `--text-data-sm` en 11 px : c'est du texte normal, pas du grand texte. Il a fallu
+    // l'éclaircir par rapport à la charte v1.0 pour qu'il tienne ce seuil — voir `colors.css`.
+    '--text-faint',
+    '--text-link',
+  ]
+
+  /** Un état se lit aussi en couleur : ces teintes portent du texte de pilule et des libellés. */
+  const statusColors = [
+    '--teal-500',
+    '--green-500',
+    '--amber-500',
+    '--red-500',
+    '--blue-500',
+    '--violet-500',
+  ]
+
+  const pairs = backgrounds.flatMap((background) =>
+    [...textColors, ...statusColors].map((foreground) => ({ foreground, background })),
+  )
+
+  it.each(pairs)('$foreground sur $background atteint 4,5:1', ({ foreground, background }) => {
+    const fg = resolveToken(tokens, foreground)
+    const bg = resolveToken(tokens, background)
+    expect(fg, `${foreground} introuvable`).toBeDefined()
+    expect(bg, `${background} introuvable`).toBeDefined()
+
+    expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+  })
+
+  describe('surfaces composées', () => {
+    // Une teinte est peinte sur la surface qui la porte : le contraste réel dépend donc des deux.
+    const surfaces = ['--surface-page', '--surface-card'] as const
+
+    /** Chaque pilule pose son libellé sur sa propre teinte — la combinaison la plus fréquente. */
+    const tinted = [
+      { text: '--teal-500', background: '--tint-teal' },
+      { text: '--green-500', background: '--tint-green' },
+      { text: '--amber-500', background: '--tint-amber' },
+      { text: '--blue-500', background: '--tint-blue' },
+      { text: '--violet-500', background: '--tint-violet' },
+      // Le rouge de pleine surface ne tient pas sur sa propre teinte (4,05 sur carte) : c'est la
+      // variante claire qui porte le texte, et c'est tout l'intérêt de la tester ici.
+      { text: '--text-danger-on-tint', background: '--tint-red' },
+    ] as const
+
+    const pairs = surfaces.flatMap((surface) => tinted.map((pair) => ({ ...pair, surface })))
+
+    it.each(pairs)('$text sur $background posé sur $surface', ({ text, background, surface }) => {
+      const base = resolveColor(tokens, surface)
+      expect(base, `${surface} non résoluble`).toBeDefined()
+
+      const fg = resolveColor(tokens, text, base as string)
+      const bg = resolveColor(tokens, background, base as string)
+      expect(fg, `${text} non résoluble`).toBeDefined()
+      expect(bg, `${background} non résoluble`).toBeDefined()
+
+      expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+    })
+
+    /**
+     * Survol et sélection changent le fond sous un texte qui, lui, ne change pas.
+     *
+     * **Les deux porteuses, pas une.** `--surface-selected` est une teinte translucide : son rendu
+     * dépend de la surface qui la porte, et les tables du produit vivent dans des cartes autant que
+     * sur le canvas. Ne composer que sur le canvas retenait le cas le plus clément — mesuré le
+     * 08/08/2026, `--text-faint` y donne 4,56, et 4,21 en carte. `--surface-hover` et
+     * `--surface-active`, elles, sont opaques (`color-mix(…, var(--n-800))`) : la porteuse ne change
+     * rien pour elles, et les tester deux fois ne coûte que deux assertions.
+     */
+    const carriers = ['--surface-page', '--surface-card'] as const
+    const interactive = ['--surface-hover', '--surface-active', '--surface-selected'] as const
+
+    /**
+     * `--text-faint` n'est **pas** de la partie, et c'est une règle de la charte plutôt qu'une
+     * exemption de confort : sur une surface interactive, le texte le plus discret remonte d'un cran.
+     * Mesuré — `--text-faint` sur une ligne sélectionnée rend 4,56 sur le canvas mais **4,21** en
+     * carte, sous AA. L'éclaircir davantage était l'autre issue : elle est fermée, `--n-300` (#848f9e)
+     * touche déjà `--n-200` (#8b95a3), et les confondre supprimerait un échelon de l'échelle.
+     *
+     * Ce que cela engage pour step-041, qui livrera les tables : une ligne sélectionnée porte son
+     * texte discret en `--text-muted` (4,55 en carte), jamais en `--text-faint`.
+     */
+    const readable = ['--text-primary', '--text-muted'] as const
+
+    const interactivePairs = carriers.flatMap((carrier) =>
+      interactive.flatMap((surface) => readable.map((text) => ({ text, surface, carrier }))),
+    )
+
+    it.each(interactivePairs)(
+      '$text reste lisible sur $surface, posé sur $carrier',
+      ({ text, surface, carrier }) => {
+        const base = resolveColor(tokens, carrier) as string
+        const bg = resolveColor(tokens, surface, base)
+        const fg = resolveColor(tokens, text, base)
+        expect(bg, `${surface} non résoluble`).toBeDefined()
+        expect(fg, `${text} non résoluble`).toBeDefined()
+
+        expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+      },
+    )
+  })
+
+  /**
+   * **Les paires que `/_design` rend réellement.** Les listes croisées ci-dessus couvrent la palette
+   * systématiquement ; celle-ci couvre ce que la page affiche, sous un libellé qui promet à son
+   * lecteur « chaque ligne est vérifiée à 4,5:1 par ce fichier ». Sans ce bloc, la promesse était
+   * fausse : mesuré le 08/08/2026, une paire à 2,53:1 ajoutée à la table laissait la suite verte, et
+   * la page l'affichait comme vérifiée.
+   *
+   * Les deux jeux se recouvrent aujourd'hui, et c'est voulu : les croisements attrapent une couleur
+   * qui se dégrade partout, celui-ci attrape une **combinaison** que quelqu'un décide de montrer.
+   */
+  it.each(CONTRAST_PAIRS)(
+    '$text sur $background atteint 4,5:1 — $usage',
+    ({ text, background, over }) => {
+      // `over` nomme la surface porteuse quand le fond est translucide : sans elle, la teinte se
+      // composerait sur du noir et le ratio ne correspondrait à rien de ce qui est peint.
+      const base = resolveColor(tokens, over ?? '--surface-page') as string
+      const fg = resolveColor(tokens, text, base)
+      const bg = resolveColor(tokens, background, base)
+
+      expect(fg, `${text} non résoluble`).toBeDefined()
+      expect(bg, `${background} non résoluble`).toBeDefined()
+      expect(contrastRatio(fg as string, bg as string)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+    },
+  )
+
+  /**
+   * Le juge lui-même. Sans ce cas, abaisser `AA_NORMAL_TEXT` de 4,5 à 1 désarmait tout l'appareil de
+   * contraste sans qu'une seule porte ne bronche — mesuré. Une paire dont on **sait** qu'elle échoue
+   * prouve que la machinerie sait refuser, et non seulement accepter.
+   */
+  it('sait refuser une paire non conforme', () => {
+    const faint = resolveColor(tokens, '--n-400') as string
+    const page = resolveColor(tokens, '--surface-page') as string
+
+    expect(contrastRatio(faint, page)).toBeLessThan(AA_NORMAL_TEXT)
+  })
+
+  it('la bordure de carte se distingue de la surface qu’elle délimite', () => {
+    // Sur un fond quasi-noir, c'est la bordure qui porte la profondeur. Si elle disparaît, les
+    // cartes fusionnent avec le canvas. WCAG 1.4.11 demande 3:1 pour un élément d'interface, mais
+    // cette séparation-là est décorative — on vérifie seulement qu'elle est perceptible.
+    const border = resolveColor(tokens, '--border-default')
+    const surface = resolveColor(tokens, '--surface-card')
+
+    expect(contrastRatio(border as string, surface as string)).toBeGreaterThan(1.2)
+  })
+
+  it('l’anneau de focus tranche sur le canvas', () => {
+    // Un focus invisible rend la navigation au clavier impraticable (WCAG 2.4.7). L'anneau est en
+    // teal ; on vérifie la couleur qui le compose, pas l'ombre portée qui l'assemble.
+    const ring = resolveColor(tokens, '--teal-500')
+    const page = resolveColor(tokens, '--surface-page')
+
+    expect(contrastRatio(ring as string, page as string)).toBeGreaterThanOrEqual(
+      AA_LARGE_TEXT_OR_UI,
+    )
+  })
+})

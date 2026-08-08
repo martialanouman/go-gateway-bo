@@ -33,7 +33,17 @@ export default mergeConfig(
         // deux origines et deux portes, ce qui est voulu : `api.gen.ts` et `permissions.gen.ts`
         // viennent de `make generate` et sont tenus par `check-generated` ; `routeTree.gen.ts` vient
         // du plugin TanStack pendant `build-web` et est tenu par `check-routes`.
-        exclude: ['src/**/*.gen.ts', 'src/**/*.test-d.ts'],
+        // `__root.tsx` est exempté depuis step-008, et c'est une exemption **de mesure**, pas de
+        // test : le fichier est exercé à 100 % en lignes, en fonctions et en branches. Il ne contient
+        // plus qu'un `createRootRoute({ notFoundComponent })` depuis que la coquille est passée dans
+        // `_shell` et le message d'adresse inconnue dans `components/` — et sur cette unique ligne, v8
+        // compte deux statements dont il n'en couvre qu'un, soit **50 %** quoi qu'on fasse. Mesuré :
+        // 50 % avec ou sans commentaire de tête, 66,66 % en y remettant le composant, jamais 75.
+        //
+        // Abaisser le seuil pour tout le monde était l'autre issue, et la DoD l'interdit nommément.
+        // **À retirer dès que ce fichier reportera du code** — un `errorComponent`, un
+        // `beforeLoad` : il redeviendrait mesurable, et l'exemption le couvrirait alors en silence.
+        exclude: ['src/**/*.gen.ts', 'src/**/*.test-d.ts', 'src/routes/__root.tsx'],
 
         // Le **tableau** doit lister les mêmes fichiers quel que soit le lecteur. Vitest 4.1.10 force
         // `skipFull` sur le reporter `text` dès qu'il détecte un agent — `if (isAgent) { text[1] =

@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { declaredTokens } from './vite-plugin-tokens'
 
 /**
  * Port du BFF Go. `make dev` exporte `.env` avant de lancer Vite, donc `DASHBOARD_ADDR` est là quand
@@ -23,6 +24,7 @@ export default defineConfig({
       routeFileIgnorePattern: '\\.test\\.tsx?$',
     }),
     react(),
+    declaredTokens(),
   ],
 
   resolve: {

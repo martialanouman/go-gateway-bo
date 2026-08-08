@@ -1,0 +1,142 @@
+/*
+ * Mise en page de `/_design`. Elle n'habille aucune primitive du produit — les composants arrivent
+ * en step-041 et step-042 — et ne sert qu'à disposer les échantillons de tokens.
+ *
+ * Elle ne pose **aucune couleur, graisse, rayon ni espacement** en littéral : ce serait contradictoire
+ * de la part de la page qui montre la charte. Deux valeurs y échappent, et elles ne sont pas des
+ * tokens : `max-width: 60ch`, une mesure de lisibilité en unités de texte, et `minmax(14rem, 1fr)`,
+ * un plancher de colonne. La charte ne les couvre pas — elle ne définit ni largeur de mesure ni
+ * gabarit de grille — et les inventer comme tokens serait ajouter à la charte depuis une page de
+ * documentation.
+ */
+
+.design {
+  max-width: var(--content-max);
+  padding: var(--sp-11) var(--pad-panel);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+
+.design__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.design__title {
+  margin: 0;
+  font: var(--text-page-title);
+}
+
+.design__lede {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--text-secondary);
+  font: var(--text-body);
+  line-height: var(--lh-relaxed);
+}
+
+.design__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-7);
+}
+
+.design__section h2 {
+  margin: 0;
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+  font: var(--text-section-title);
+}
+
+.design__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-7);
+}
+
+.design__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.design__meta {
+  color: var(--text-muted);
+  font: var(--text-label);
+}
+
+.design__sample {
+  color: var(--text-primary);
+}
+
+.design__bar {
+  height: var(--sp-4);
+  background: var(--teal-500);
+  border-radius: var(--r-pill);
+}
+
+.design__swatches {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--sp-7);
+}
+
+.design__swatch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--pad-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-card);
+}
+
+.design__swatch--bordered {
+  background: var(--surface-card);
+}
+
+.design__chip,
+.design__radius {
+  height: var(--sp-11);
+  background: var(--teal-500);
+}
+
+.design__radius {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-strong);
+}
+
+.design__table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body);
+}
+
+.design__table th,
+.design__table td {
+  padding: var(--pad-cell-y) var(--pad-cell-x);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.design__table th {
+  color: var(--text-muted);
+  font: var(--text-overline);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.design__pair {
+  display: inline-block;
+  padding: var(--sp-2) var(--sp-6);
+  border-radius: var(--r-pill);
+  font: var(--text-pill);
+}

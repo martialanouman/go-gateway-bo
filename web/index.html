@@ -12,26 +12,50 @@
 
       Ce qu'il ne faut pas croire pour autant : en production, Vite émet un `<link rel="stylesheet">`
       dans ce `<head>`, et une feuille liée bloque le rendu du document entier — squelette compris. La
-      première peinture attend donc cet aller-retour. Mesuré sur le document livré : 680 octets, 379
-      compressés, 0,6 à 0,8 ms sur une boucle locale — le coût est l'aller-retour, pas le volume, et
-      inliner la feuille la rendrait non cacheable entre deux déploiements. L'arbitrage se rouvre en
-      step-008, qui y versera les tokens et les polices auto-hébergées.
+      première peinture attend donc cet aller-retour. Le coût est l'aller-retour, pas le volume, et
+      inliner la feuille la rendrait non cacheable entre deux déploiements.
 
-      Les couleurs sont provisoires et délibérément sobres — la charte arrive avec cette même step.
+      **Remesuré en step-008, qui y a versé les tokens, les polices et la feuille de `/_design` :**
+      12 635 octets, 3 420 compressés, contre 680 et 379 auparavant. La feuille a grossi d'un facteur
+      18,6 et le verdict ne change pas — un aller-retour reste un aller-retour, et 3,4 Ko compressés
+      voyagent dans le même paquet que 379 octets. Un test la plafonne désormais à 16 Ko, pour que la
+      prochaine step qui voudrait y verser `components.css` (1 568 lignes en v1.0) rencontre une
+      décision plutôt qu'une dérive ; la marge restante est de 3,7 Ko.
+
+      *(Ces 12 635 octets incluent 1 912 octets de `design-reference.css`, servis sur `/` alors que
+      seule `/_design` les utilise : l'`import` de la route est statique dans `routeTree.gen.ts`, donc
+      `autoCodeSplitting` scinde le composant mais pas sa feuille. Mesuré, assumé, et à rouvrir si une
+      step d'écran fait grossir ce poste.)*
+
+      **Les polices ne sont pas préchargées, et c'est mesuré.** Sept `.woff2` (139 Ko, latin seul) —
+      accompagnés de sept `.woff` (132 Ko) que `@fontsource` déclare en repli et qu'aucun navigateur
+      cible ne demandera, du lest dans le binaire qu'on n'enlève pas sans réécrire les `@font-face` à
+      la main. Ils sont découverts après l'analyse de cette feuille — deux allers-retours
+      sérialisés. La parade
+      classique est un `<link rel="preload" as="font" crossorigin>`, et elle n'est pas posée : la
+      première peinture ne contient **aucun texte visible**, le squelette n'ayant qu'un libellé
+      `sr-only`. Le premier texte réel n'arrive qu'après le montage de React, donc après le chunk JS,
+      alors que la requête de police part dès l'analyse du CSS — largement avant. `font-display: swap`
+      est par ailleurs déjà posé par `@fontsource`, ce qui écarte le FOIT.
     -->
     <style>
       /*
-        Ces quatre valeurs sont la source unique des dimensions de la coquille : `app.css` les
-        consomme au lieu de les redire, et le bloc `<style>` survit au montage de React, donc elles
-        restent définies. Les valeurs ne peuvent plus diverger ; la référence, si — un test confronte
-        donc ce que la feuille consomme à ce qui est déclaré ici.
+        Ces quatre valeurs peignent le squelette avant toute requête. Elles **recopient** les tokens
+        de la charte que la coquille consomme — `--nav-width`, `--topbar-height`, `--surface-page`,
+        `--border-subtle` — parce qu'aucune feuille n'est encore chargée à cet instant : c'est une
+        duplication que la première peinture impose, pas un choix.
+
+        Les noms restent distincts : ils désignent « ce que le squelette peint », pas les tokens
+        eux-mêmes. Ce qui est testé, c'est donc que la **copie soit fidèle** — quatre paires
+        confrontées aux tokens dans `chargement-a-froid.test.ts`. Non alignées, le rail sauterait de
+        4 px et le canvas changerait de luminance au montage de React.
       */
       :root {
         color-scheme: dark;
-        --shell-rail-width: 15rem;
-        --shell-topbar-height: 3.5rem;
-        --skeleton-surface: #12151c;
-        --skeleton-shape: #1c212b;
+        --shell-rail-width: 236px;
+        --shell-topbar-height: 56px;
+        --skeleton-surface: #0c0f14;
+        --skeleton-shape: #1c242f;
       }
 
       * {
