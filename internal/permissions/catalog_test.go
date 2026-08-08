@@ -78,8 +78,8 @@ func TestEveryKeyFollowsTheAdmittedShape(t *testing.T) {
 }
 
 // Une clé en double ne se voit pas à la relecture d'une liste de 44 entrées, et la table
-// `permissions` en ferait un échec de clé primaire au seed de step-020 — chez quelqu'un qui n'aura
-// plus ce contexte.
+// `permissions` en fait un échec de clé primaire au seed — donc au `make bootstrap` d'un
+// déploiement, chez quelqu'un qui n'aura plus ce contexte.
 func TestNoKeyIsDeclaredTwice(t *testing.T) {
 	seen := make(map[permissions.Key]string, len(permissions.All()))
 

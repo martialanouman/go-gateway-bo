@@ -9,9 +9,10 @@ Fonctionnalité: Configuration validée au démarrage
     Alors le serveur refuse de démarrer
     Et le message d'erreur nomme "DASHBOARD_ADDR"
 
-  # Le DSN est exigé alors qu'aucune route ne lit encore la base : le pool est paresseux et rien ne
-  # se connecte au démarrage, mais une installation dont le DSN ne veut rien dire s'arrête ici plutôt
-  # qu'au premier écran qui demandera la base.
+  # Le DSN est refusé sur sa **forme**, avant même qu'on tente de joindre quoi que ce soit : c'est
+  # `internal/config` qui l'analyse, et le message nomme la variable plutôt que la valeur, qui porte
+  # le mot de passe. Depuis step-020, un DSN bien formé mais dont la base ne répond pas ou porte un
+  # schéma en retard arrête aussi le démarrage — c'est `schema.feature` qui le décrit.
   Scénario: un DSN de base mal formé empêche le démarrage
     Étant donné une configuration complète dont on passe "DASHBOARD_DATABASE_URL" à "pas-un-dsn"
     Quand le serveur démarre

@@ -13,6 +13,7 @@ import (
 
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
 	"github.com/martialanouman/go-gateway-bo/internal/config"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 	"github.com/martialanouman/go-gateway-bo/internal/webassets"
 )
 
@@ -46,6 +47,19 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// plus tard dans main passerait avec elle.
 	cfg, err := config.Load(os.LookupEnv)
 	if err != nil {
+		return err
+	}
+
+	// Avant `net.Listen`, et non après : une instance qui lie son port puis refuse est déjà dans le
+	// pool du load balancer, le temps d'un aller-retour de sonde. Le récit du démarrage se lit alors
+	// dans l'ordre — la configuration est-elle complète, le schéma est-il celui que j'attends, les
+	// assets, j'écoute.
+	//
+	// Ce que cette ligne change pour l'exploitation : le binaire exige désormais une base
+	// **joignable**. Jusqu'ici le DSN n'était validé qu'en forme (step-005, DN-5), et le cas « DSN
+	// bien formé, base injoignable » n'était observable nulle part — c'est la dette que DN-6 laissait
+	// à la première step qui lirait la base.
+	if err = store.VerifySchema(ctx, cfg.DatabaseURL); err != nil {
 		return err
 	}
 

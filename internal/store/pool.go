@@ -86,11 +86,15 @@ const (
 // n'a aucun effet qu'un scénario sans Docker puisse voir.
 //
 // Le câbler quand même livrerait exactement ce que ce dépôt a déjà refusé deux fois — un artefact
-// qu'aucun appelant n'atteint, un client instancié que rien n'appelle. Le pool part donc avec la
-// première route qui lit la base (step-020), qui l'atteindra pour de bon et pourra l'observer. Ce
-// que la fiche demande — cycle de vie attaché au `context` racine, arrêt propre — est tenu **par
-// cette fonction** et exercé par `pool_test.go` contre un PostgreSQL réel ; seul le site d'appel
-// attend.
+// qu'aucun appelant n'atteint, un client instancié que rien n'appelle. Ce que la fiche demande —
+// cycle de vie attaché au `context` racine, arrêt propre — est tenu **par cette fonction** et exercé
+// par `pool_test.go` contre un PostgreSQL réel ; seul le site d'appel attend.
+//
+// Cette phrase annonçait « le pool part avec la première route qui lit la base (step-020) ».
+// **step-020 est passée et ne livre aucune route** : elle livre une commande hors ligne et un
+// contrôle de démarrage, tous deux sur un `*sql.DB` — l'interface que goose expose — et non sur un
+// `pgxpool`. En câbler un en plus y aurait fait deux chemins de connexion pour un seul besoin. Le
+// pool part donc avec `POST /auth/login`, step-021, qui l'atteindra pour de bon et pourra l'observer.
 func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {

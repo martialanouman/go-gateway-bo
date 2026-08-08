@@ -15,7 +15,8 @@ import (
 // Les onze catégories vivent à trois endroits : `internal/permissions`, le TypeScript qu'il
 // engendre, et le `CHECK` sur `permissions.category`. `check-generated` tient le front Go↔TS ; ces
 // deux cas sont tout ce qui tient le front Go↔SQL. Sans eux, une catégorie mal orthographiée en Go
-// passe toutes les portes et n'échoue qu'à l'`INSERT` du seed, en step-020.
+// passe toutes les portes et n'échoue qu'à l'`INSERT` du seed — c'est-à-dire, depuis step-020, au
+// `make bootstrap` d'un déploiement.
 //
 // # Pourquoi ces cas vivent ici et non dans `internal/permissions`
 //
