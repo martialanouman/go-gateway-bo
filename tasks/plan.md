@@ -877,8 +877,19 @@ moins : un scénario qui se lit juste inspire une confiance que rien n'a encore 
   209 ; dernière release de `migrate` il y a huit mois contre onze jours, et un `pgx` bloqué en
   v5.5.4 quand `goose` est déjà sur la v5.10.0 imposée ici. Ce que le choix coûte est écrit dans sa
   fiche : `goose` ne verrouille pas par défaut, `WithSessionLocker` est posé dès le premier câblage.
-- **Requêtes typées** : `sqlc` génère depuis le SQL et convient au partitionnement ; à confirmer contre
-  `pgx` nu.
+- ~~**Requêtes typées** : `sqlc` génère depuis le SQL et convient au partitionnement ; à confirmer
+  contre `pgx` nu.~~ **Tranché en step-020 : `pgx` nu**, la première step qui écrit une requête, comme
+  l'amendement ci-dessous le prévoyait. Trois faits pris sur le code de cette PR — les trois
+  instructions du seed passent leurs paramètres en tableaux `unnest($1::text[], …)` construits en Go
+  et rendent deux colonnes, donc `sqlc` n'aurait presque rien à engendrer contre une dépendance
+  `tool`, un `sqlc.yaml` et une cinquième entrée dans `$(GENERATED)` ; il introduirait un **second
+  analyseur SQL** devant avaler `uuidv7()`, la table partitionnée et le bloc PL/pgSQL — le mode
+  d'échec que `internal/store/permissions_catalog_test.go` a précisément corrigé ; et ce que `pgx` nu
+  coûte est déjà payé, chaque requête étant exercée contre un PostgreSQL 18 réel par testcontainers.
+  Ce qui doit faire réviser : un store au-delà d'une vingtaine de requêtes, ou une requête à plus de
+  cinq ou six colonnes — c'est dans une liste d'arguments de `Scan` tenue à la main que vit le défaut
+  silencieux que `sqlc` supprime par construction. **Point de réexamen : step-025**, ou la première
+  route de liste de M3, selon celle qui arrive la première.
 
   > **Amendement du 02/08/2026, au début de step-005.** Cette décision disait « en step-005 ». Elle y
   > est **indécidable** : le périmètre de cette step écrit noir sur blanc qu'« aucune requête n'est
