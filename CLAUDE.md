@@ -167,14 +167,12 @@ exemples qui teste un mapping ; deux scénarios qui ne diffèrent que par une va
 
 ## La boucle de travail
 
-**Une step = une session = une PR.** La procédure complète — neuf phases, prompts de sous-agents,
-pièges de terrain — vit dans le skill **`impl-step`** : l'invoquer est la première action dès qu'une
-step est engagée, avant de lire du code et avant d'écrire le moindre plan. Ce qui suit est le
-squelette — ce qu'on exige, pas comment on l'obtient.
+**Une step = une session = une PR.** Ce qui suit est ce qu'on exige d'une step, du premier commit au
+merge — il n'y a pas de procédure plus détaillée ailleurs.
 
-**Puis chaque phase s'ouvre par `using-agent-skills`** — contexte, plan, spécification,
-implémentation, revue, débogage. Le méta-skill oriente vers le skill de la phase, et chacun porte un
-cadre que l'improvisation ne reproduit pas. Le mode d'échec est silencieux : sans le skill on finit par
+**Chaque phase s'ouvre par `using-agent-skills`** — contexte, plan, spécification, implémentation,
+revue, débogage. Le méta-skill oriente vers le skill de la phase, et chacun porte un cadre que
+l'improvisation ne reproduit pas. Le mode d'échec est silencieux : sans le skill on finit par
 trouver, plus lentement et sans structure, donc rien ne signale l'oubli.
 
 **Quatre portes**, dans l'ordre, chacune interdisant la suite tant qu'elle n'est pas franchie :
@@ -281,7 +279,6 @@ mérite un test, ou bien il ne l'est pas et mérite d'être supprimé, ou couver
 - Quoi/pourquoi : `docs/specification-technique-tableau-de-bord.md` (v2.1)
 - Comment/dans quel ordre : `tasks/plan.md`
 - Découpage en PRs : `tasks/todo.md` + `tasks/steps/step-NNN.md`
-- Procédure d'une step, phase par phase : skill `impl-step` (`.claude/skills/impl-step/SKILL.md`)
 - Charte graphique & kit UI : `.claude/skills/sms-gateway-design/README.md`
 - Contrat API : `@martialanouman/gateway-api-contracts` (jamais copié ici)
 - Passerelle (dépôt séparé) : `../go-gateway`
