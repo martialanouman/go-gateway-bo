@@ -14,28 +14,23 @@ sombre, desktop-first) qui pilote clients, comptes SMPP, connecteurs, routage, c
 facturation. Ce n'est **pas** un portail client — les clients n'ont aucun accès à la plateforme.
 
 Le navigateur ne parle qu'au **BFF Go**, qui parle à l'**API Admin de la passerelle** (dépôt
-`go-gateway`, séparé) et à son petit schéma PostgreSQL propre. Le tout se livre en **un seul binaire** :
-le Go embarque les assets de la SPA.
+`go-gateway`, séparé) et à son petit schéma PostgreSQL propre.
 
 ## Commandes
 
 `make help` est la cible par défaut et **fait foi** — la lancer plutôt que croire une liste. Une cible
 absente rend `No rule to make target`, jamais un vert silencieux. **`make check` avant toute PR.**
 
-Poste neuf : `cp .env.example .env`, `docker compose up -d`, `make migrate`, `make bootstrap`. Sans
+Poste neuf : la séquence complète est dans `README.md` — elle commence par une authentification à
+GitHub Packages, sans quoi l'installation des contrats échoue sur un 401 qui ne se nomme pas. Sans
 base joignable et migrée, le binaire refuse de démarrer — il compare la version du schéma avant même
 de lier son port — et toute porte qui le lance échoue sans nommer la cause.
 
-Un vert local ne garantit pas une PR verte : certaines portes ne sont **jamais rejouées ici** (le
-titre de la PR, les règles du ruleset de `main` qui bloquent sans passer par le check `CI`, le job
-qui lance le binaire et compare ce qu'il sert à la sortie de Vite), et d'autres sont **rejouées sans
-verdict garanti** — les scanners de vulnérabilités interrogent des bases vivantes, `-race` change
-d'architecture, `--frozen-lockfile` échoue là où un `node_modules` dérivé masque l'écart.
-
 ## Architecture (carte mentale)
 
-**Un seul déployable** : un binaire Go sert la SPA *et* porte la logique BFF. Deux moitiés dans un
-même dépôt, séparées par une frontière que le langage applique :
+**Un seul déployable** : un binaire Go sert la SPA *et* porte la logique BFF. Carte de la cible — le
+livré du jour se lit dans `ls internal/`. Deux moitiés dans un même dépôt, séparées par une frontière
+que le langage applique :
 
 - **Client** (`web/`) — React, TanStack Router + Query, une WebSocket multiplexée. Aucun secret.
 - **Serveur** (`internal/`) — session et authentification, permissions, journal d'audit, proxy vers
@@ -44,29 +39,33 @@ même dépôt, séparées par une frontière que le langage applique :
 En production : **≥2 instances** derrière un load balancer avec affinité WS, coordonnées par Redis
 Pub/Sub. Un process unique serait un SPOF et la cible de 99,9 % inatteignable.
 
-## Règles d'or (toujours / jamais)
+## Règles d'or, et les cinq invariants qu'elles portent
 
-- **JAMAIS le corps d'un message hors de l'onglet qui l'affiche.** Ni log, ni toast, ni URL, ni
+Les cinq lettres sont des **tests bloquants, verts à vie** — le code les cite par leur étiquette.
+
+- **(a) JAMAIS le corps d'un message hors de l'onglet qui l'affiche.** Ni log, ni toast, ni URL, ni
   message d'erreur, ni export, ni cache persisté, ni attribut de trace. L'affichage exige
   `content:read` et déclenche un appel **audité**.
 - **TOUJOURS un DTO de sortie déclaré.** Une réponse HTTP est un struct Go, jamais une
   `map[string]any`, jamais un type de domaine marshalé directement. Un champ absent du struct ne peut
   pas fuir — c'est ainsi que l'invariant (a) tient sans discipline.
-- **JAMAIS un secret réaffiché.** Identifiants de bind, clés API, secrets de webhook et de
+- **(b) JAMAIS un secret réaffiché.** Identifiants de bind, clés API, secrets de webhook et de
   fournisseur : masqués en permanence, montrés exactement une fois à la création ou à la rotation.
   Aucune action « révéler » n'existe nulle part.
-- **TOUJOURS l'autorisation côté serveur.** `RequirePermission()` en middleware. Le rendu conditionnel
-  de l'UI est un confort ; un contrôle masqué dont la route n'est pas gardée est une faille.
-- **JAMAIS le navigateur en direct sur l'API Admin.** Le jeton machine, le mTLS et la connexion
+- **(c) TOUJOURS l'autorisation côté serveur, et l'audit avec elle.** Toute route de mutation porte une
+  garde de permission **et** une écriture d'audit — `RequirePermission()` en middleware. Le rendu
+  conditionnel de l'UI est un confort ; un contrôle masqué dont la route n'est pas gardée est une
+  faille.
+- **(d) JAMAIS le navigateur en direct sur l'API Admin.** Le jeton machine, le mTLS et la connexion
   PostgreSQL vivent sous `internal/`, que le langage rend inatteignable : l'invariant (d) est une
   propriété du compilateur, pas une consigne. Le risque résiduel n'est plus un import mais une **URL
   codée en dur** dans le client — et **rien ne la cherche encore**, aucune porte ne lit le bundle.
-- **JAMAIS sur le chemin critique du plan de données.** Une panne du tableau de bord dégrade la
+- **(e) JAMAIS sur le chemin critique du plan de données.** Une panne du tableau de bord dégrade la
   visualisation, jamais le débit de SMS ni la détection d'incident (Alertmanager est indépendant).
 - **Un contrôle interdit est désactivé et expliqué**, jamais silencieusement masqué.
 - **Les contrats sont la source de vérité** : le dépôt consomme `@martialanouman/gateway-api-contracts`
-  et ne copie jamais un YAML. Tout manque se corrige par une PR dans `go-gateway/api/`, puis une mise
-  à jour ici.
+  et ne copie jamais un YAML. Tout manque se corrige par une PR dans `go-gateway/api/`, puis un bump
+  du package dans ce dépôt.
 - **TOUJOURS relever la version du contrat au début d'une step qui le touche.** Il est publié à chaque
   merge sur `main` de `go-gateway`, à un rythme qui périme toute version notée ici. Consigner l'écart
   dans la PR, **ne jamais bumper au milieu d'une step**, et **relire le diff du YAML** : une contrainte
@@ -76,13 +75,6 @@ Pub/Sub. Un process unique serait un SPOF et la cible de 99,9 % inatteignable.
 - **Versions & API : jamais devinées.** `ctx7` côté JS, `pkg.go.dev` ou `proxy.golang.org` côté Go,
   avant tout ajout, bump ou usage d'API — et les CVE connues avant d'adopter. Une signature inventée
   compile parfois.
-
-## Les 5 invariants (tests bloquants, verts à vie)
-
-**(a)** le corps ne fuit dans aucune sérialisation et chaque lecture est auditée ; **(b)** aucun secret
-n'est jamais réaffiché ; **(c)** toute route de mutation a une garde de permission et une écriture
-d'audit ; **(d)** le client ne joint jamais l'API Admin ; **(e)** une panne du tableau de bord ne
-dégrade que la visualisation.
 
 ## Code & langue
 
@@ -95,11 +87,8 @@ que là où le code ne peut pas parler : un *pourquoi* contre-intuitif, un arbit
 meilleur nom ou une fonction extraite — et le critère 2 existe parce que **certains commentaires de la
 v1.0 mentaient** sur le code qu'ils surplombaient.
 
-Interface en **français**, troisième personne, **conséquence d'abord**. Les identifiants techniques
-restent en anglais et en mono, verbatim du contrat : `link_status`, `breaker_state`, `max_sessions`,
-`balance_scope`, `half_open`, `query_sm`. Ne jamais traduire un identifiant — un opérateur le grep dans
-les logs. « Sécurisé » n'est jamais une promesse : dire ce que la protection couvre et où s'arrête la
-frontière d'accès.
+Interface en **français**, troisième personne, **conséquence d'abord**. « Sécurisé » n'est jamais une
+promesse : dire ce que la protection couvre et où s'arrête la frontière d'accès.
 
 **Cinq états de contenu, cinq copies distinctes** : chargement (squelette de la vraie mise en page) ·
 vide (rien encore + comment créer) · aucun résultat (filtres trop étroits + comment élargir) · module
@@ -132,41 +121,16 @@ opérations du contrat n'existe qu'au contrat, côté passerelle. Décompte à j
 
 ## La boucle de travail
 
-**Une step = une session = une PR.** Ce qui suit est ce qu'on exige d'une step, du premier commit au
-merge — il n'y a pas de procédure plus détaillée ailleurs.
-
-**Chaque phase s'ouvre par `using-agent-skills`** — contexte, plan, spécification, implémentation,
-revue, débogage. Chaque skill porte un cadre que l'improvisation ne reproduit pas, et le mode d'échec
-est silencieux : sans lui on finit par trouver, plus lentement, donc rien ne signale l'oubli.
-
-**Quatre portes**, dans l'ordre, chacune interdisant la suite tant qu'elle n'est pas franchie :
-**design arrêté, écrit dans la fiche et commité** avant la première ligne de code · **rouge lu et
-compris** avant la première ligne d'implémentation · **mutation vue tomber** avant de déclarer une
-unité verte · **revue sans bloquant** avant de cocher la DoD — celle ci-dessous *et* celle de la fiche.
-
-Ce que la boucle exige en propre sur ce dépôt :
+**Une step = une session = une PR.** Ce qui suit est tout ce qu'on exige d'une step, du premier commit
+au merge — il n'y a pas de procédure plus détaillée ailleurs.
 
 - **L'ordre de `tasks/todo.md` fait foi**, pas le numéro — **sauf quand la ligne « Dépend de » de la
   fiche le contredit : les dépendances déclarées priment**. Une divergence constatée se corrige *dans
   le plan* avant d'écrire du code, jamais en la contournant en silence.
 - Branche `feat/step-NNN-slug` (ou `fix/`, `docs/`, `chore/`, `test/`). **Commits atomiques au fil de
   l'eau** : une unité verte = un commit.
-- **BDD strict, le scénario rouge d'abord**, jamais le code en premier — pour **chaque** reprise de
-  code, correctifs de revue compris.
-- La revue se fait en **sous-agents lecture seule** : ils remontent des constats, ils ne corrigent
-  rien ; la correction revient à la session, et si le contexte manque, on **replanifie avant de
-  toucher au code**. **Un correctif de revue est du code comme un autre** — même DoD, même mutation,
-  même méfiance : en v1.0, une large part des constats des passes 2 à 5 portaient sur les correctifs
-  des passes précédentes.
-- **Relire ce que la step vient de périmer** avant de la clore : ce manuel d'abord, puis les fiches et
-  les commentaires qui décrivent un mécanisme qu'elle a déplacé. Aucune porte ne voit une phrase
-  devenue fausse, et une consigne périmée dicte le mauvais geste à qui la lit. La recette des
-  permissions de ce fichier a menti quatre steps durant, alors que le titre même du commit de
-  step-006 annonçait « un TypeScript engendré ».
 - Dernier commit : `git mv tasks/steps/step-NNN.md tasks/steps/done/`, ligne cochée dans
-  `tasks/todo.md`. Puis PR — titre en conventional commit portant la step : `feat(routing): éditeur de
-  route (step-121)` — et **merge dès que la CI est verte**. Si elle échoue : **deux relances au
-  maximum**, ensuite on rend la main.
+  `tasks/todo.md`.
 - Un jalon est terminé quand **toutes** ses steps sont dans `tasks/steps/done/`.
 
 **Arbitrage.** Une décision se tranche d'abord sur le contexte disponible : spec, plan, contrat,
