@@ -1,5 +1,8 @@
 // Package config charge la configuration du tableau de bord depuis l'environnement et la valide une
-// fois pour toutes, au démarrage.
+// fois pour toutes, au lancement.
+//
+// « Au lancement » et non « au démarrage du serveur » : il y a deux programmes et deux chargeurs
+// depuis step-021 — `Load` pour le serveur, `LoadBootstrap` pour la commande d'installation.
 //
 // Aucun autre package ne lit l'environnement : une variable lue ailleurs se découvrirait manquante à
 // la première requête qui l'emprunte, c'est-à-dire en production, sur un serveur qu'on croyait en

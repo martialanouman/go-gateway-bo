@@ -92,12 +92,17 @@ const (
 // cycle de vie attaché au `context` racine, arrêt propre — est tenu **par cette fonction** et exercé
 // par `pool_test.go` contre un PostgreSQL réel ; seul le site d'appel attend.
 //
-// Cette phrase annonçait « le pool part avec la première route qui lit la base (step-020) ».
-// **step-020 est passée et ne livre aucune route** : elle livre un contrôle de démarrage, qui
-// travaille sur le `*sql.DB` que goose expose, et une commande hors ligne, qui ouvre une `pgx.Conn`
-// unique — trois requêtes jouées une fois par déploiement n'ont que faire d'un pool de dix
-// connexions réglé pour un serveur qui vit. Ni l'un ni l'autre n'appelle un `pgxpool`. Le
-// pool part donc avec `POST /auth/login`, step-021, qui l'atteindra pour de bon et pourra l'observer.
+// **Ce paragraphe décrivait une attente ; elle a pris fin en step-021.** `cmd/dashboard` appelle
+// désormais `NewPool`, entre le contrôle de schéma et `net.Listen`, et `store.Logins` s'en sert pour
+// servir `POST /auth/login`. Ce qui reste vrai de ce qui précède : ni le contrôle de version ni la
+// commande d'installation ne l'empruntent, chacun pour la raison écrite plus haut.
+//
+// Ce que le câblage a appris, et qui n'était écrit nulle part : **le contexte qu'on passe ici ne doit
+// pas être celui de l'arrêt**. `context.AfterFunc` ci-dessous ferme le pool à l'annulation, donc lui
+// donner le contexte annulé par SIGTERM fermerait le pool **au début** du délai de grâce, et les
+// requêtes que ce délai existe pour laisser finir tomberaient sur un pool fermé. `cmd/dashboard` lui
+// passe un contexte détaché, et aucune porte ne le garde — mesuré : `arret-propre.feature` n'a
+// aucune requête assez lente pour ouvrir la fenêtre.
 func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {

@@ -11,11 +11,16 @@
 # normale d'un document OpenAPI.
 #
 # Ce qui l'acquitte devant la porte anti-copie de `internal/gateway` est le **compte d'opérations
-# qu'il déclare en commun avec les contrats de la passerelle**, et rien d'autre. Sondé le 02/08/2026
-# sur ce fichier, avec la logique de la porte :
+# qu'il déclare en commun avec les contrats de la passerelle**, et rien d'autre. **Re-sondé le
+# 09/08/2026** à l'ajout de `POST /auth/login`, plutôt que recopié :
 #
 #   openapi-admin.yaml   0 signature sur 28  → sous le seuil
 #   openapi-public.yaml  1 signature sur 5   → sous le seuil
+#
+# Inchangé, et la raison est vérifiable : le dénominateur est l'échantillon **de la passerelle**, pas
+# le nombre d'opérations de ce fichier. La seule signature commune est `/health`, que le contrat
+# public déclare aussi ; `/auth/*` n'existe dans aucun des deux contrats amont, dont les opérations
+# sont toutes sous `/admin/…` ou parmi `/messages`, `/account`, `/health`.
 #
 # Le seuil est la moitié. Deux versions successives de ce commentaire ont désigné une autre cause —
 # les chemins relatifs, puis l'absence de marque d'identité — et les deux étaient fausses : la marque

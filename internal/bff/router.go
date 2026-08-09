@@ -114,17 +114,22 @@ func mountContract(api chi.Router, impl StrictServerInterface) {
 // Ce que ces deux-là couvrent exactement, lu dans le gabarit plutôt que supposé
 // (`strict-http.tmpl` d'oapi-codegen v2.8.0) : `RequestErrorHandlerFunc` n'a que huit sites d'appel,
 // **tous** dans le décodage du **corps** de la requête — JSON, formdata, multipart, texte brut. Il ne
-// voit ni paramètre, ni en-tête, ni cookie, et il est donc sans site d'appel dans `bff.gen.go`
-// aujourd'hui, `GET /health` n'ayant pas de corps. `ResponseErrorHandlerFunc`, lui, est atteint dès
+// voit ni paramètre, ni en-tête, ni cookie. Il était sans site d'appel jusqu'à step-021 : `POST
+// /auth/login` est la **première** opération du contrat à porter un corps de requête, donc la
+// première à l'atteindre — un JSON illisible envoyé sur cette route rend son 400. C'est pourquoi le
+// contrat déclare ce statut : sans lui, le scénario qui valide la réponse échouerait sur un statut
+// que le YAML ne connaît pas. `ResponseErrorHandlerFunc`, lui, est atteint dès
 // qu'une implémentation rend une erreur — le seul des trois qu'une requête exerce pour de bon ici,
 // par `TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser`. Une route future qui enveloppe son
 // erreur — `fmt.Errorf("appel de %s: %w", cfg.Gateway.BaseURL, err)` — servirait sans lui l'adresse
 // interne de l'API Admin au navigateur.
 //
 // L'erreur n'est ni journalisée ni propagée, et c'est un manque assumé plutôt qu'un oubli : aucun
-// journal n'atteint ce paquet aujourd'hui — `NewRouter` ne prend que les assets, et le `*slog.Logger`
-// s'arrête à `cmd/dashboard`. Un 500 servi ici ne laisse donc **aucune trace côté serveur**. Le
-// premier appel réel à la passerelle (step-060) devra apporter les deux à la fois.
+// journal n'atteint ce paquet aujourd'hui. `NewRouter` prend depuis step-021 une struct de
+// dépendances — mais elle ne porte pas de `*slog.Logger`, qui s'arrête toujours à `cmd/dashboard`. Un
+// 500 servi ici ne laisse donc **aucune trace côté serveur**, et c'est désormais vrai d'une route qui
+// travaille : un `password_hash` corrompu en base fait refuser la connexion sans que rien ne le dise.
+// Le premier appel réel à la passerelle (step-060) devra apporter les deux à la fois.
 func newContractHandler(impl StrictServerInterface) ServerInterface {
 	return NewStrictHandlerWithOptions(impl, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  rejectRequest,

@@ -13,7 +13,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// Ce que ces deux suites tiennent est le **contenu** du schéma, que ni l'inventaire des neuf tables
+// Ce que ces deux suites tiennent est le **contenu** du schéma, que ni l'inventaire des onze tables
 // ni l'empreinte de `base_test.go` n'observent : l'empreinte se compare à elle-même avant et après
 // rejeu, donc elle prouve l'idempotence et jamais qu'une contrainte existe. Mesuré le 02/08/2026,
 // on pouvait retirer n'importe quel `CHECK`, n'importe quel `ON DELETE` et l'index unique sur

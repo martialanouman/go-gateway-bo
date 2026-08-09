@@ -139,9 +139,12 @@ func (w *schemaWorld) everyMigrationWasReported() error {
 	return nil
 }
 
-// dashboardTables est l'inventaire du §3.1 — neuf tables, ni plus ni moins. Il est écrit ici en
+// dashboardTables est l'inventaire du §3.1 — onze tables, ni plus ni moins. Il est écrit ici en
 // toutes lettres plutôt que dérivé des fichiers de migration : une liste dérivée du SQL dirait
 // seulement que le SQL fait ce que le SQL dit.
+//
+// Les deux dernières viennent de step-021, qui a **amendé le §3.1** : il n'en déclarait que neuf, et
+// livrer deux tables que la spec ignore les rendrait invisibles à quiconque la relit.
 var dashboardTables = []string{
 	"operators",
 	"permissions",

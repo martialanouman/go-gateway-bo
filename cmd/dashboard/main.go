@@ -43,9 +43,11 @@ func start(logger *slog.Logger) error {
 }
 
 func run(ctx context.Context, logger *slog.Logger) error {
-	//nolint:forbidigo // La seule lecture d'environnement du dépôt, et elle ne fait que la passer au
-	// chargeur. L'exemption est posée sur la ligne, pas sur le fichier : sinon toute lecture ajoutée
-	// plus tard dans main passerait avec elle.
+	//nolint:forbidigo // La seule lecture d'environnement **du serveur**, et elle ne fait que la
+	// passer au chargeur. Elle n'est plus la seule du dépôt depuis step-021 : `cmd/bootstrap` en porte
+	// une, pour ses propres variables, avec la même exemption sur la ligne. Une par programme, aucune
+	// ailleurs. L'exemption reste posée sur la ligne et non sur le fichier : sinon toute lecture
+	// ajoutée plus tard dans main passerait avec elle.
 	cfg, err := config.Load(os.LookupEnv)
 	if err != nil {
 		return err
