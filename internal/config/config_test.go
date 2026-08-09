@@ -27,8 +27,13 @@ func minimalEnv() map[string]string {
 		config.EnvGatewayMode:    string(config.GatewayModeMock),
 		config.EnvGatewayBaseURL: "http://127.0.0.1:4010",
 		config.EnvDatabaseURL:    localDatabaseURL,
+		config.EnvBruteForceSalt: testBruteForceSalt,
 	}
 }
+
+// testBruteForceSalt a la longueur qu'exige Load, et rien d'un secret d'installation : ces tests ne
+// hachent rien, ils vérifient que la variable est exigée et bornée.
+const testBruteForceSalt = "un-sel-de-test-assez-long-pour-passer-la-borne"
 
 // localDatabaseURL est le DSN du `docker-compose.yml` de développement : ni un secret d'installation,
 // ni une base que ces tests joignent — rien ici n'ouvre de connexion.
@@ -50,6 +55,7 @@ func realGatewayEnv() map[string]string {
 		config.EnvGatewayTimeout:      "5s",
 		config.EnvShutdownTimeout:     "30s",
 		config.EnvDatabaseURL:         localDatabaseURL,
+		config.EnvBruteForceSalt:      testBruteForceSalt,
 	}
 }
 
@@ -487,6 +493,8 @@ func TestLoadReportsEveryProblemAtOnce(t *testing.T) {
 	assert.Contains(t, err.Error(), config.EnvGatewayBaseURL)
 }
 
+// Les trois dernières ne sont pas lues par le serveur mais par `cmd/bootstrap` : depuis step-021,
+// `Variables` sonde les **deux** chargeurs, parce que `.env.example` documente les deux programmes.
 func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 	t.Parallel()
 
@@ -503,5 +511,10 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvGatewayCACert,
 		config.EnvGatewayTimeout,
 		config.EnvDatabaseURL,
+		config.EnvBruteForceSalt,
+		config.EnvTrustedProxies,
+		config.EnvBootstrapOperatorEmail,
+		config.EnvBootstrapOperatorName,
+		config.EnvBootstrapOperatorPassword,
 	}, config.Variables())
 }
