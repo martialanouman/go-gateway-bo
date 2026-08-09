@@ -97,8 +97,10 @@ func (l *Logins) OperatorByEmail(ctx context.Context, lowerEmail string) (*Opera
 	return &operator, nil
 }
 
-// LockFor rend le verrou en cours sur l'une des deux dimensions — le plus long des deux s'il y en a
-// deux. Il est consulté **avant** tout hachage : c'est ce qui borne à la fois le coût d'une attaque
+// LockFor rend le verrou en cours sur l'une des deux dimensions : le plus **récent**, qui est aussi
+// le plus long — mais seulement parce que les deux lignes partagent la même fenêtre `$3`, ce qui rend
+// la durée restante monotone en `last_failure_at`. Le jour où une dimension aurait sa propre fenêtre,
+// ce tri deviendrait faux en silence et il faudrait trier sur l'expression qui calcule `Remaining`. Il est consulté **avant** tout hachage : c'est ce qui borne à la fois le coût d'une attaque
 // et le nombre de lignes qu'elle peut créer dans la table des compteurs.
 func (l *Logins) LockFor(ctx context.Context, emailKey, sourceKey string, window time.Duration,
 	threshold int,

@@ -12,11 +12,22 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 )
 
-// maximumPasswordLength redit en Go la borne que le contrat déclare. Le redire n'est pas une
-// duplication : **rien dans ce dépôt ne valide une requête à l'exécution** contre le YAML — le code
-// engendré ne le fait pas, et `contrat.feature` ne valide que les réponses. Sans cette ligne, un
-// corps de quatre mébioctets de mot de passe traverserait jusqu'à argon2id.
-const maximumPasswordLength = 4096
+// maximumPasswordLength et maximumEmailLength redisent en Go les bornes que le contrat déclare. Le
+// redire n'est pas une duplication : **rien dans ce dépôt ne valide une requête à l'exécution** contre
+// le YAML — le code engendré ne le fait pas, et `contrat.feature` ne valide que les réponses.
+//
+// Le corps entier est déjà borné à huit kibioctets par `RequestSize`. Ces deux lignes bornent les
+// **champs**, et ce n'est pas redondant : huit kibioctets de mot de passe restent huit kibioctets à
+// hacher, et huit kibioctets d'adresse deviennent la clé `subject` de `login_attempt_counters`, la
+// seule table du schéma qu'une requête non authentifiée fait écrire.
+//
+// Le compte est en **runes** et non en octets, comme la `maxLength` du contrat et comme les deux
+// autres lectures bornées du dépôt. En octets, un mot de passe de 2 049 caractères accentués aurait
+// été refusé alors que le contrat l'autorise.
+const (
+	maximumPasswordLength = 4096
+	maximumEmailLength    = 320
+)
 
 // maximumLoginBodyBytes borne ce que le décodeur JSON accepte de lire. La borne du champ ne suffit
 // pas : elle s'applique après le décodage, donc après avoir lu le corps entier en mémoire.
@@ -77,7 +88,9 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 		return nil, errNoClientAddress
 	}
 
-	if request.Body == nil || len(request.Body.Password) > maximumPasswordLength {
+	if request.Body == nil ||
+		len([]rune(request.Body.Password)) > maximumPasswordLength ||
+		len([]rune(request.Body.Email)) > maximumEmailLength {
 		return Login400JSONResponse(badRequest()), nil
 	}
 
@@ -132,9 +145,15 @@ func lockedResponse(remaining time.Duration) Login429JSONResponse {
 		Headers: Login429ResponseHeaders{RetryAfter: seconds},
 		Body: Error{
 			Code: "too_many_attempts",
+			// La copie ne promet pas les deux dimensions à la fois. `LockFor` n'en rend **qu'une** — celle
+			// qui a franchi son seuil — et les deux le franchissent indépendamment : cinq adresses
+			// essayées depuis une même source ne verrouillent que la source, et un opérateur légitime
+			// derrière elle lirait « ce compte est bloqué » alors qu'il pourrait entrer d'ailleurs. Elle
+			// ne dit pas « ce compte » non plus : les compteurs portent sur l'adresse **soumise**, et il
+			// n'y a pas toujours de compte derrière.
 			Message: "La connexion est temporairement bloquée après plusieurs échecs : réessayez dans " +
-				humanDelay(seconds) + ". Le blocage porte sur ce compte et sur votre adresse, et se " +
-				"lève tout seul.",
+				humanDelay(seconds) + ". Le blocage porte sur les tentatives récentes visant cette " +
+				"adresse et sur celles venues de votre réseau, et se lève tout seul.",
 		},
 	}
 }

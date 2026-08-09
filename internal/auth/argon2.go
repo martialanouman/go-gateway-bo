@@ -24,15 +24,21 @@ const (
 	// Trente-deux octets en sortie. Plus long ne rend pas la préimage plus dure — le coût est déjà
 	// porté par la mémoire et les passes — et plus court réduirait la marge sans rien gagner.
 	keyLength = 32
-	// Argon2 refuse un sel de moins de huit octets (RFC 9106 §3.1). Une ligne de base qui en porte
-	// moins n'est pas un mot de passe faux : c'est une ligne abîmée, et la lire ferait paniquer
-	// `argon2.IDKey`.
+	// La RFC 9106 §3.1 pose huit octets comme minimum. **`x/crypto` ne le vérifie pas** — relu dans
+	// `argon2.go` v0.54.0, `initHash` écrit `uint32(len(salt))` puis le sel dans BLAKE2b sans jamais
+	// inspecter la longueur, et un sel de quatre octets dérive une clé en silence. Le refus est donc
+	// ici, ou nulle part. (Une rédaction précédente disait qu'`argon2.IDKey` paniquerait : faux.)
 	minimumSaltLength = 8
 	// La borne haute du hachage relu. Elle n'a aucune vertu cryptographique : elle existe pour que la
 	// longueur lue en base tienne dans le `uint32` qu'attend `argon2.IDKey` **par construction**, sans
 	// dépendre d'une conversion qu'on affirmerait sûre. Quatre kibioctets sont cent vingt-huit fois ce
 	// que ce paquet produit ; au-delà, la ligne est abîmée, pas ancienne.
 	maximumKeyLength = 4096
+	// Bornes **hautes** des coûts relus. Un gibioctet est seize fois ce que ce paquet produit, et
+	// seize passes cinq fois : au-delà, la ligne est abîmée, pas ancienne. Voir `validate` pour ce que
+	// leur absence coûterait — une allocation de plusieurs tébioctets, donc un arrêt non récupérable.
+	maximumMemory = 1024 * 1024
+	maximumTime   = 16
 )
 
 // Params porte les trois paramètres d'un hachage argon2id. Ils voyagent **avec** le hachage, dans son
@@ -187,9 +193,21 @@ func VerifyDummy(secret string) {
 		currentParams.Memory, currentParams.Parallelism, keyLength))
 }
 
-// validate refuse les paramètres sur lesquels `argon2.IDKey` **panique** plutôt que de rendre une
-// erreur (x/crypto v0.54.0, `deriveKey` : « number of rounds too small », « parallelism degree too
-// low »). Une ligne de base abîmée doit devenir une erreur lisible, pas un panic dans un handler.
+// validate refuse trois coûts nuls et deux coûts démesurés — mais pas tous pour la même raison, et
+// la nuance a été payée en revue.
+//
+// `t == 0` et `p == 0` font **paniquer** `deriveKey` (x/crypto v0.54.0 : « number of rounds too
+// small », « parallelism degree too low »), et un panic dans un handler que personne n'a besoin
+// d'authentifier pour appeler est le mode d'échec à fermer.
+//
+// `m == 0`, lui, **ne panique pas** : `deriveKey` l'écrête silencieusement à `2·syncPoints·p`. Le
+// refuser est un autre argument, et il tient tout autant — un hachage relu avec `m=0` serait vérifié
+// avec des paramètres qui ne sont pas les siens.
+//
+// Les bornes **hautes** ferment le versant symétrique : `deriveKey` alloue `memory` blocs d'un
+// kibioctet (`initBlocks`), donc un `password_hash` portant `m=4294967295` demanderait quatre
+// tébioctets en une allocation — un `fatal error: out of memory` **non récupérable**, là où le
+// `recover` de `net/http` aurait absorbé un panic. Le remède serait pire que le mal.
 func (p Params) validate() error {
 	switch {
 	case p.Time == 0:
@@ -198,6 +216,10 @@ func (p Params) validate() error {
 		return MalformedHashError{Reason: "aucune voie déclarée"}
 	case p.Memory == 0:
 		return MalformedHashError{Reason: "aucune mémoire déclarée"}
+	case p.Memory > maximumMemory:
+		return MalformedHashError{Reason: "mémoire hors de proportion"}
+	case p.Time > maximumTime:
+		return MalformedHashError{Reason: "nombre de passes hors de proportion"}
 	default:
 		return nil
 	}

@@ -109,11 +109,18 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 	return a.challenge(ctx, emailKey, operator.ID)
 }
 
-// passwordMatches est le **seul** endroit où un mot de passe est confronté à quoi que ce soit, et
-// c'est ce qui rend l'oracle d'énumération difficile à réintroduire : un opérateur absent traverse la
-// même fonction que les autres, il n'a pas de branche à lui. Retirer le hachage factice demande donc
-// d'**ajouter** un retour anticipé — ce qui se voit en revue — et non de supprimer une ligne, ce qui
-// ne se voit pas.
+// passwordMatches est le **seul** endroit où un mot de passe est confronté à quoi que ce soit.
+//
+// **Rien ne garde l'appel à `VerifyDummy` ci-dessous, et il faut le dire sans l'enjoliver.** Une
+// rédaction précédente affirmait que le retirer demanderait d'*ajouter* un retour anticipé, donc que
+// la mutation se verrait en revue : c'est faux. `VerifyDummy(password)` est une instruction isolée
+// dans une branche qui existe déjà, et sa suppression laisse un `if` parfaitement idiomatique. Le
+// test qui la nomme, `TestLeHachageFacticeSExecuteSurNImporteQuelSecret`, l'appelle **directement** :
+// il garde la fonction, jamais son site d'appel.
+//
+// Ce qui reste est la mesure manuelle écrite au-dessus de `VerifyDummy` et la revue. Une porte
+// structurelle est possible — `internal/bff/dto_test.go` descend déjà dans les corps de fonction avec
+// le type-checker — et elle appartient à la step qui reprendra ce chemin.
 //
 // Un `password_hash` illisible est traité comme un refus et non comme une panne : la ligne est
 // abîmée, mais le dire au navigateur distinguerait ce compte des autres. L'erreur est écartée ici et

@@ -27,7 +27,7 @@ import (
 // n'existait plus en base. Le même angle mort couvrait un `ALTER … DROP CONSTRAINT` posé par une
 // migration ultérieure, que la lecture de `00001` seule ne peut pas voir.
 //
-// Ici, la contrainte est **celle que PostgreSQL applique** après les trois migrations : un
+// Ici, la contrainte est **celle que PostgreSQL applique** après toutes les migrations : un
 // commentaire n'en fait plus partie, et un `ALTER` d'une future `00004` s'y voit — vérifié en posant
 // une `00004` qui `DROP` la contrainte, que la lecture de `00001` seule laissait verte. Le prix est
 // un conteneur, que ce package paie déjà pour toutes ses suites : mesuré le 02/08/2026, la suite

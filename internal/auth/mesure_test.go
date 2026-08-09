@@ -21,8 +21,10 @@ import (
 // défaut d'une seconde ferait des dizaines de tours pour une précision dont on n'a que faire — on
 // choisit entre 60 ms et 400 ms, pas entre 250 et 252.
 //
-// **Relevé du 09/08/2026**, machine de développement (Apple Silicon, Go 1.26.5), report dans DN-5 de
-// la fiche step-021. Ce qui est retenu est le jeu le plus proche de 250 ms à 64 MiB.
+// **Relevé du 09/08/2026**, machine de développement (Apple Silicon, Go 1.26.5), report dans **DN-4**
+// de la fiche step-021. Ce qui est retenu est le profil « seconde option » de la RFC 9106 §4 : la
+// cible de 250 ms de la fiche a été **abandonnée**, parce qu'elle ne coexiste pas avec 64 MiB — DN-4
+// dit pourquoi, et le tableau complet des dix profils est au-dessus de `currentParams`.
 func BenchmarkVerification(b *testing.B) {
 	candidates := []auth.Params{
 		{Memory: 19 * 1024, Time: 2, Parallelism: 1},

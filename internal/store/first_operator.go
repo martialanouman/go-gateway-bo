@@ -81,12 +81,16 @@ func CreateFirstOperator(ctx context.Context, dsn, email, displayName, passwordH
 	return outcome, nil
 }
 
-// insertOwner pose le compte et son rôle **dans une seule instruction**.
+// insertOwner pose le compte et son rôle dans une seule instruction.
 //
-// La forme CTE n'est pas de la coquetterie : le compte et son rôle doivent apparaître ensemble ou pas
-// du tout. Un opérateur sans rôle **peut se connecter et ne peut rien faire** — c'est une
-// installation qui a l'air bonne et dans laquelle personne ne peut travailler, le symptôme le plus
-// coûteux à diagnostiquer de cette commande.
+// **L'atomicité n'est pas ce que la CTE achète** — la transaction de l'appelant s'en charge déjà, et
+// le `defer tx.Rollback` annule le tout si le rôle manque. Ce qu'elle achète est de rendre les deux
+// comptes en un seul aller-retour, donc de distinguer « rien créé » de « créé sans rôle » sans
+// seconde requête.
+//
+// Cette distinction vaut la peine : un opérateur sans rôle **peut se connecter et ne peut rien
+// faire** — une installation qui a l'air bonne et dans laquelle personne ne peut travailler, le
+// symptôme le plus coûteux à diagnostiquer de cette commande.
 func insertOwner(ctx context.Context, tx pgx.Tx, email, displayName, passwordHash string) (
 	FirstOperatorOutcome, error,
 ) {

@@ -107,10 +107,12 @@ func TestUnEncodageIllisibleEstUneErreurEtNonUnRefus(t *testing.T) {
 	}
 }
 
-// `argon2.IDKey` ne rend pas d'erreur sur des coûts nuls : il **panique** (x/crypto v0.54.0,
-// `deriveKey` — « number of rounds too small », « parallelism degree too low »). Une ligne de base
-// abîmée arriverait donc jusqu'au handler sous forme de panic, sur une route que n'importe qui peut
-// appeler sans être authentifié. Le refus doit venir avant l'appel.
+// `argon2.IDKey` ne rend jamais d'erreur sur des coûts aberrants, et il ne réagit pas de la même
+// façon aux trois. `t=0` et `p=0` le font **paniquer** (x/crypto v0.54.0, `deriveKey` — « number of
+// rounds too small », « parallelism degree too low ») : une ligne de base abîmée arriverait jusqu'au
+// handler sous forme de panic, sur une route que n'importe qui peut appeler sans être authentifié.
+// `m=0`, lui, est **écrêté** en silence, donc le hachage serait vérifié avec des paramètres qui ne
+// sont pas les siens. Les trois se refusent avant l'appel, pour ces deux raisons distinctes.
 //
 // Les cas se fabriquent en abîmant un encodage **réel** plutôt qu'en en écrivant un à la main : un
 // littéral inventé serait refusé pour une autre raison que celle qu'on croit tester, et le test
@@ -134,7 +136,8 @@ func TestDesCoutsNulsSontRefusesPlutotQueDeFairePaniquer(t *testing.T) {
 			require.NotEqual(t, sain, encoded, "la substitution n'a rien remplacé : ce cas ne teste rien")
 
 			ok, err := auth.Verify(encoded, "peu importe")
-			require.Error(t, err, "ces coûts sont acceptés, donc argon2.IDKey va paniquer")
+			require.Error(t, err, "ces coûts sont acceptés : t=0 et p=0 feraient paniquer argon2.IDKey, et m=0 "+
+				"ferait vérifier avec des paramètres écrêtés qui ne sont pas ceux du hachage")
 			assert.False(t, ok)
 		})
 	}
@@ -168,7 +171,9 @@ func TestLesParametresNeDescendentPasSousLePlancher(t *testing.T) {
 }
 
 // VerifyDummy n'a aucun effet observable : ce qu'il achète est du **temps**, et c'est ce que ce test
-// ne peut pas prouver — voir `mesure_test.go`, qui le mesure, et DN-5 pour le constat écrit.
+// ne peut pas prouver. La mesure est **manuelle, contre le binaire**, et vit au-dessus de
+// `VerifyDummy` dans `argon2.go` ; le constat est dans le tableau des mutations de la fiche, section
+// « La route ». (`mesure_test.go` mesure `Verify`, jamais `VerifyDummy`.)
 // Ce test-ci ne garde qu'une chose : qu'il existe et qu'il ne panique pas sur un secret quelconque.
 func TestLeHachageFacticeSExecuteSurNImporteQuelSecret(t *testing.T) {
 	t.Parallel()
