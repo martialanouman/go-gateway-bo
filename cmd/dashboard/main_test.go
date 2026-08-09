@@ -165,7 +165,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 11
+const minimumScenarios = 18
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -178,6 +178,23 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.Given(`^un serveur démarré$`, p.startAndServe)
 
 	schema := &schemaWorld{process: p}
+
+	login := &loginWorld{process: p}
+
+	ctx.Given(`^une installation avec un opérateur$`, login.installationWithOneOperator)
+	ctx.Given(`^l'opérateur se connecte (\d+) fois avec un mauvais mot de passe$`, login.signInWithAWrongPasswordTimes)
+	ctx.When(`^l'opérateur se connecte (\d+) fois avec un mauvais mot de passe$`, login.signInWithAWrongPasswordTimes)
+	ctx.When(`^l'opérateur se connecte avec son mot de passe$`, login.signInWithTheRightPassword)
+	ctx.When(`^l'opérateur se connecte avec un mauvais mot de passe$`, login.signInWithAWrongPassword)
+	ctx.When(`^quelqu'un se connecte avec une adresse qui n'existe pas$`, login.signInWithAnUnknownAddress)
+	ctx.When(`^le verrou arrive à échéance$`, login.lockExpires)
+	ctx.When(`^le navigateur envoie un corps qui n'est pas du JSON à la connexion$`, login.postMalformedBody)
+	ctx.Then(`^un challenge est émis avec son échéance$`, login.challengeIsIssued)
+	ctx.Then(`^le refus ne nomme ni l'adresse ni le facteur en cause$`, login.refusalNamesNothing)
+	ctx.Then(`^les deux refus sont indiscernables$`, login.refusalsAreIndistinguishable)
+	ctx.Then(`^la réponse porte l'en-tête "([^"]+)"$`, login.responseCarriesHeader)
+	ctx.Then(`^le message annonce la durée restante$`, login.messageAnnouncesTheRemainingDelay)
+	ctx.Then(`^la réponse est conforme au contrat du BFF$`, p.responseMatchesTheContract)
 
 	ctx.Given(`^une base dont le schéma est en retard d'une migration$`, schema.outdatedSchema)
 	ctx.Given(`^une base vierge$`, schema.freshSchema)
@@ -419,6 +436,32 @@ func (p *process) fetch(path string) error {
 		status: resp.StatusCode,
 		header: resp.Header,
 		body:   string(body),
+	}
+
+	return nil
+}
+
+// post envoie un corps JSON. Le harnais n'avait que `fetch`, en GET : `POST /auth/login` est la
+// première opération du contrat à porter un corps, et `responseMatchesTheContract` a besoin de la
+// **méthode** pour retrouver la route dans le YAML.
+func (p *process) post(path, body string) error {
+	resp, err := browser.Post(p.url(path), "application/json", strings.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("la requête vers %s a échoué: %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	received, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("lecture de la réponse de %s: %w", path, err)
+	}
+
+	p.received = &response{
+		method: http.MethodPost,
+		path:   path,
+		status: resp.StatusCode,
+		header: resp.Header,
+		body:   string(received),
 	}
 
 	return nil

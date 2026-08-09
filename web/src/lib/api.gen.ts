@@ -26,6 +26,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Premier facteur — adresse et mot de passe
+         * @description Vérifie l'adresse et le mot de passe, et rend un **challenge de second facteur** à usage
+         *     unique et de courte durée. Rien n'est ouvert à ce stade : le cookie de session appartient à
+         *     step-022, la vérification du second facteur à step-023 et step-024.
+         *
+         *     Le refus ne dit jamais lequel des deux facteurs a échoué. Même code, même corps et **même
+         *     durée** pour « adresse inconnue », « mot de passe faux » et « compte désactivé » : les
+         *     distinguer dirait à une machine quelles adresses existent.
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -34,6 +60,30 @@ export interface components {
         Health: {
             /** @enum {string} */
             status: "ok";
+        };
+        /** @description Le premier facteur, tel que le formulaire de connexion l'envoie. */
+        LoginRequest: {
+            email: string;
+            password: string;
+        };
+        /**
+         * @description Le challenge de second facteur. C'est un objet en base et non un jeton signé : il doit être
+         *     révocable à la seconde où il est consommé, ce qu'un jeton sans état ne permet pas. Le serveur
+         *     n'en garde que l'empreinte — cette valeur n'est rendue qu'une fois.
+         */
+        MfaChallenge: {
+            challenge: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        /**
+         * @description La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
+         *     `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
+         *     première route qui relaie la passerelle (step-060).
+         */
+        Error: {
+            code: string;
+            message: string;
         };
     };
     responses: never;
@@ -60,6 +110,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Le premier facteur est franchi ; le second reste à fournir. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaChallenge"];
+                };
+            };
+            /** @description La requête n'a pas la forme que la route attend. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Les identifiants ne conviennent pas. Le corps est le même que l'adresse soit inconnue,
+             *     que le mot de passe soit faux ou que le compte soit désactivé.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Trop d'échecs sur ce compte ou depuis cette adresse. Le message porte la durée restante :
+             *     un refus muet ferait retenter l'opérateur, puis ouvrir un ticket.
+             */
+            429: {
+                headers: {
+                    /**
+                     * @description Secondes restant à attendre. Un entier et jamais une date HTTP : une date oblige le
+                     *     client à faire confiance à sa propre horloge pour la soustraire.
+                     */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

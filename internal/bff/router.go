@@ -9,21 +9,50 @@ package bff
 import (
 	"io/fs"
 	"net/http"
+	"net/netip"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/martialanouman/go-gateway-bo/internal/auth"
 )
 
-// NewRouter assemble les routes du BFF et le service des assets de la SPA. `assets` a pour racine la
-// racine du site : la coquille y est `index.html`, les fichiers hachés sous `assets/`. Le prendre en
-// `fs.FS` plutôt qu'en `embed.FS` est ce qui permet de tester le repli sans build client.
+// Dependencies porte ce que les routes du BFF ne savent pas fabriquer.
+//
+// Une struct plutôt que des options variadiques, et c'est un choix : des options laisseraient
+// compiler un routeur amputé de sa dépendance, qui rendrait 500 sur la seule route qui compte, en
+// production, sans que rien ne l'ait dit au démarrage. La struct force le compilateur à revisiter
+// chaque site d'appel le jour où une dépendance obligatoire apparaît — ce qui est arrivé ici.
+type Dependencies struct {
+	// Assets a pour racine la racine du site : la coquille y est `index.html`, les fichiers hachés
+	// sous `assets/`. Le prendre en `fs.FS` plutôt qu'en `embed.FS` est ce qui permet de tester le
+	// repli sans build client.
+	Assets fs.FS
+	// Authenticator porte le premier facteur. Ce paquet ne connaît ni le pool ni la configuration : il
+	// reçoit un collaborateur déjà construit, ce qui le garde à l'écart de `pgxpool` et de
+	// `internal/config`.
+	Authenticator *auth.Authenticator
+	// TrustedProxies alimente la dérivation de l'adresse cliente. Vide est une valeur sûre : voir
+	// `withClientAddress` et `internal/auth.ClientAddress`.
+	TrustedProxies []netip.Prefix
+}
+
+// NewRouter assemble les routes du BFF et le service des assets de la SPA.
 //
 // Le repli n'est monté qu'en GET et HEAD : une écriture sur une route non montée est une erreur
 // d'appelant, à qui chi rend alors 405 plutôt que la coquille en 200.
-func NewRouter(assets fs.FS) http.Handler {
+func NewRouter(deps Dependencies) http.Handler {
+	assets := deps.Assets
+
 	r := chi.NewRouter()
 
 	r.Route("/api", func(api chi.Router) {
-		mountContract(api, API{})
+		// Borne la lecture du corps **avant** le décodage : la `maxLength` du contrat s'applique après,
+		// donc sur une valeur déjà entièrement chargée en mémoire.
+		api.Use(middleware.RequestSize(maximumLoginBodyBytes))
+		api.Use(withClientAddress(deps.TrustedProxies))
+
+		mountContract(api, API{Authenticator: deps.Authenticator})
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde

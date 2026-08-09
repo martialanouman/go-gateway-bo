@@ -10,10 +10,10 @@ import (
 // DTO — et le champ `errors[]` qui l'accompagne — arrive avec la première route du BFF qui **appelle**
 // la passerelle, soit **step-060**. Step-003 a livré le client et le mapping typé, et a explicitement
 // refusé de porter la réexposition, faute d'une route à servir (fiche step-003, DN-12).
-type errorResponse struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
+// Depuis step-021, c'est un **alias** du type engendré depuis `api/openapi-bff.yaml` et non une
+// seconde déclaration : le contrat déclare désormais ce schéma, et deux définitions du même corps
+// finiraient figées l'une par un test et l'autre par un autre, puis divergeraient.
+type errorResponse = Error
 
 // writeJSON sérialise un DTO de sortie déclaré. Le corps est produit **avant** l'en-tête de statut :
 // une fois le statut envoyé, un échec de sérialisation ne laisserait qu'une réponse tronquée que le

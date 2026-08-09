@@ -1,6 +1,10 @@
 package bff
 
-import "context"
+import (
+	"context"
+
+	"github.com/martialanouman/go-gateway-bo/internal/auth"
+)
 
 // API implémente l'interface **stricte** qu'engendre `api/openapi-bff.yaml`. Ce que l'interface
 // stricte achète tient en une phrase : elle **retire le `http.ResponseWriter` de la signature du
@@ -32,7 +36,12 @@ import "context"
 // trompeuse dans le type : un repli en 501 que le langage n'honorera jamais ici, et sur lequel un
 // lecteur pressé comptera. C'est cette promesse-là que garde
 // `TestTheMountedImplementationDoesNotEmbedUnimplemented`.
-type API struct{}
+type API struct {
+	// Authenticator porte le premier facteur. `API` cesse ici d'être un struct vide : la remarque
+	// ci-dessus sur les portes structurelles reste vraie, elle parle simplement d'un type qui a
+	// désormais un champ.
+	Authenticator *auth.Authenticator
+}
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le
 // process est en vie », pas « le service est disponible ». Y brancher une dépendance ferait

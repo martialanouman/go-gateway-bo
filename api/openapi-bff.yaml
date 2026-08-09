@@ -55,6 +55,61 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Health' }
 
+  /auth/login:
+    post:
+      operationId: login
+      summary: Premier facteur — adresse et mot de passe
+      description: |
+        Vérifie l'adresse et le mot de passe, et rend un **challenge de second facteur** à usage
+        unique et de courte durée. Rien n'est ouvert à ce stade : le cookie de session appartient à
+        step-022, la vérification du second facteur à step-023 et step-024.
+
+        Le refus ne dit jamais lequel des deux facteurs a échoué. Même code, même corps et **même
+        durée** pour « adresse inconnue », « mot de passe faux » et « compte désactivé » : les
+        distinguer dirait à une machine quelles adresses existent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Le premier facteur est franchi ; le second reste à fournir.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MfaChallenge' }
+        '400':
+          # Cette réponse n'est pas décorative. `POST /auth/login` est la **première** opération du
+          # contrat à porter un corps de requête, donc la première à donner un site d'appel au
+          # gestionnaire d'erreur de décodage (`internal/bff/router.go`, `newContractHandler`). Un
+          # corps illisible rend ce DTO, et un scénario qui valide la réponse contre ce fichier
+          # échouerait sur un statut non déclaré.
+          description: La requête n'a pas la forme que la route attend.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: |
+            Les identifiants ne conviennent pas. Le corps est le même que l'adresse soit inconnue,
+            que le mot de passe soit faux ou que le compte soit désactivé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: |
+            Trop d'échecs sur ce compte ou depuis cette adresse. Le message porte la durée restante :
+            un refus muet ferait retenter l'opérateur, puis ouvrir un ticket.
+          headers:
+            Retry-After:
+              description: |
+                Secondes restant à attendre. Un entier et jamais une date HTTP : une date oblige le
+                client à faire confiance à sa propre horloge pour la soustraire.
+              required: true
+              schema: { type: integer, minimum: 1 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
 components:
   schemas:
     Health:
@@ -70,3 +125,50 @@ components:
           type: string
           enum: [ok]
       required: [status]
+
+    LoginRequest:
+      type: object
+      description: Le premier facteur, tel que le formulaire de connexion l'envoie.
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          maxLength: 320
+        password:
+          # La borne n'est pas cosmétique : chaque tentative coûte un argon2id de 64 MiB au serveur,
+          # et un corps sans borne en ferait une arme. Elle est **aussi** appliquée en Go — rien dans
+          # ce dépôt ne valide une requête à l'exécution contre ce fichier.
+          type: string
+          minLength: 1
+          maxLength: 4096
+      required: [email, password]
+
+    MfaChallenge:
+      type: object
+      description: |
+        Le challenge de second facteur. C'est un objet en base et non un jeton signé : il doit être
+        révocable à la seconde où il est consommé, ce qu'un jeton sans état ne permet pas. Le serveur
+        n'en garde que l'empreinte — cette valeur n'est rendue qu'une fois.
+      additionalProperties: false
+      properties:
+        challenge:
+          type: string
+          minLength: 43
+        expiresAt:
+          type: string
+          format: date-time
+      required: [challenge, expiresAt]
+
+    Error:
+      type: object
+      description: |
+        La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
+        `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
+        première route qui relaie la passerelle (step-060).
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required: [code, message]

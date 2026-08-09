@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
 	"github.com/martialanouman/go-gateway-bo/internal/config"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
@@ -78,6 +79,25 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("assets embarqués : %w", err)
 	}
 
+	// **Le pool ne reçoit pas `ctx`**, et l'écart mérite d'être lu deux fois. `NewPool` attache
+	// `pool.Close` à l'annulation du contexte qu'on lui passe (`context.AfterFunc`) : lui donner `ctx`
+	// fermerait le pool à l'instant du SIGTERM, c'est-à-dire **au début** du délai de grâce — et les
+	// requêtes que ce délai existe pour laisser finir tomberaient sur un pool fermé. Le pool survit
+	// donc à l'annulation et meurt quand `serve` a rendu la main.
+	//
+	// Aucune porte ne garde cette ligne, et ça a été vérifié plutôt que supposé : `arret-propre.feature`
+	// n'a aucune requête assez lente pour ouvrir la fenêtre, donc le câbler sur `ctx` laisse la suite
+	// verte. Ce qui la garde est ce commentaire.
+	poolCtx, closePool := context.WithCancel(context.WithoutCancel(ctx))
+	defer closePool()
+
+	pool, err := store.NewPool(poolCtx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+
+	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt)
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", cfg.Addr, err)
@@ -85,5 +105,11 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 	logger.Info("le serveur écoute", "addr", ln.Addr().String())
 
-	return serve(ctx, ln, bff.NewRouter(assets), cfg.ShutdownTimeout, logger)
+	router := bff.NewRouter(bff.Dependencies{
+		Assets:         assets,
+		Authenticator:  authenticator,
+		TrustedProxies: cfg.Auth.TrustedProxies,
+	})
+
+	return serve(ctx, ln, router, cfg.ShutdownTimeout, logger)
 }

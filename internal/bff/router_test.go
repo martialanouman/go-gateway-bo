@@ -56,7 +56,7 @@ func call(t *testing.T, method, target string) *http.Response {
 	t.Helper()
 
 	rec := httptest.NewRecorder()
-	bff.NewRouter(testAssets()).ServeHTTP(rec, httptest.NewRequest(method, target, nil))
+	bff.NewRouter(bff.Dependencies{Assets: testAssets()}).ServeHTTP(rec, httptest.NewRequest(method, target, nil))
 
 	return rec.Result()
 }
@@ -199,7 +199,7 @@ func TestOnlyGeneratedCodeServesTheAPIRoutes(t *testing.T) {
 	require.NotNil(t, contract, "%s introuvable : « code engendré » n'a plus de définition", contractInterfaceName)
 	generated := pkg.Fset.Position(contract.Pos()).Filename
 
-	routes, isRouter := bff.NewRouter(testAssets()).(chi.Routes)
+	routes, isRouter := bff.NewRouter(bff.Dependencies{Assets: testAssets()}).(chi.Routes)
 	require.True(t, isRouter, "le routeur ne s'énumère plus : la porte ne prouverait plus rien")
 
 	mounted := 0

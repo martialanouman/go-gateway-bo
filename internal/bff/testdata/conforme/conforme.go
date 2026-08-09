@@ -18,4 +18,10 @@ func (API) Health(_ context.Context, _ bff.HealthRequestObject) (bff.HealthRespo
 	return bff.Health200JSONResponse{Status: bff.HealthStatusOk}, nil
 }
 
+// Login est identique dans les deux fixtures : ce que la porte mesure est l'écart sur `Health`, et
+// une méthode qui différerait ici brouillerait la mesure.
+func (API) Login(_ context.Context, _ bff.LoginRequestObject) (bff.LoginResponseObject, error) {
+	return bff.Login401JSONResponse{Code: "invalid_credentials", Message: "Refusé."}, nil
+}
+
 var _ = bff.NewStrictHandler(API{}, nil)
