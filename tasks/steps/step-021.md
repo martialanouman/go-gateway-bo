@@ -60,7 +60,9 @@ livre le premier facteur et la porte qui le limite, pas la session.
 - Unitaire : « adresse inconnue » et « mot de passe faux » rendent le même corps et le même code. La
   durée est **mesurée à la main** et le constat écrit sur place — un test de temps est instable en CI.
 - Le compteur est bien partagé : deux pools distincts sur la même base additionnent leurs échecs.
-- `make bootstrap` sur une base qui porte déjà un opérateur **refuse**, et ne modifie rien.
+- `make bootstrap` sur une base qui porte déjà un opérateur **sème quand même et ne crée personne**, et
+  le dit. *(Ligne amendée par DN-1 : elle disait « refuse, et ne modifie rien », ce que l'amendement du
+  08/08 contredisait sans l'avoir réécrite.)*
 
 ## Definition of Done
 - [ ] `make check` vert
@@ -69,7 +71,9 @@ livre le premier facteur et la porte qui le limite, pas la session.
 - [ ] la mutation « retirer le verrouillage » fait rougir le scénario
 - [ ] la mutation « retirer le hachage factice sur adresse inconnue » : ce qui tombe, ou le constat
       qu'aucune porte ne rougit, écrit au-dessus de la ligne
-- [ ] la mutation « laisser `bootstrap` s'exécuter deux fois » fait rougir
+- [ ] la mutation « laisser `bootstrap` créer un second opérateur alors qu'il en existe déjà » fait
+      rougir *(amendée par DN-1 : la formulation d'origine, « laisser `bootstrap` s'exécuter deux
+      fois », décrivait la mutation d'une commande qui refuse — or elle se rejoue)*
 
 ## Hors périmètre
 Le cookie de session, `/auth/me` et `/auth/logout` → step-022. La vérification du second facteur →
