@@ -54,8 +54,8 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Given(`^les migrations déjà jouées$`, schema.migrateThenRecordSchema)
 	ctx.When(`^les migrations sont jouées$`, schema.migrate)
 	ctx.When(`^les migrations sont rejouées$`, schema.migrate)
-	ctx.Then(`^les trois migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
-	ctx.Then(`^les neuf tables du schéma existent$`, schema.everyTableExists)
+	ctx.Then(`^les quatre migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
+	ctx.Then(`^les onze tables du schéma existent$`, schema.everyTableExists)
 	ctx.Then(`^le journal d'audit accepte un événement daté du (mois courant|mois suivant)$`,
 		schema.auditLogAcceptsEventDated)
 	ctx.Then(`^la seconde exécution n'a rien appliqué$`, schema.lastRunAppliedNothing)
@@ -119,9 +119,10 @@ var initialMigrations = []string{
 	"00001_operators_roles_permissions.sql",
 	"00002_audit_log.sql",
 	"00003_alerts_notifications_saved_views.sql",
+	"00004_login_challenges_and_throttling.sql",
 }
 
-const latestSchemaVersion = 3
+const latestSchemaVersion = 4
 
 func (w *schemaWorld) everyMigrationWasReported() error {
 	if !slices.Equal(w.lastOutcome.Applied, initialMigrations) {
@@ -151,12 +152,14 @@ var dashboardTables = []string{
 	"alert_rules",
 	"notifications",
 	"saved_views",
+	"mfa_challenges",
+	"login_attempt_counters",
 }
 
 // dashboardTableCount est le plancher de l'inventaire ci-dessus. Il n'est pas décoratif : mesuré le
 // 02/08/2026, `dashboardTables = []string{}` laissait cette suite **verte** — le scénario « les neuf
 // tables existent » passait en n'ayant cherché aucune table.
-const dashboardTableCount = 9
+const dashboardTableCount = 11
 
 func (w *schemaWorld) everyTableExists(ctx context.Context) error {
 	if len(dashboardTables) != dashboardTableCount {

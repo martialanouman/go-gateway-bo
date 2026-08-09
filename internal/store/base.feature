@@ -1,14 +1,14 @@
 # language: fr
 Fonctionnalité: Le schéma propre au BFF s'applique sur une base vierge
-  Une installation neuve joue les migrations et obtient les neuf tables du §3.1. Les rejouer est sans
+  Une installation neuve joue les migrations et obtient les onze tables du §3.1. Les rejouer est sans
   effet : le produit tourne à ≥2 instances et elles démarrent ensemble, donc la seconde ne doit ni
   échouer ni modifier le schéma que la première vient de poser.
 
   Scénario: une base vierge reçoit le schéma du tableau de bord
     Étant donné une base PostgreSQL vierge
     Quand les migrations sont jouées
-    Alors les trois migrations du schéma sont rapportées appliquées
-    Et les neuf tables du schéma existent
+    Alors les quatre migrations du schéma sont rapportées appliquées
+    Et les onze tables du schéma existent
     Et le journal d'audit accepte un événement daté du mois courant
     Et le journal d'audit accepte un événement daté du mois suivant
 
