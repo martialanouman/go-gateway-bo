@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/martialanouman/go-gateway-bo/internal/config"
 	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
@@ -24,7 +25,7 @@ func TestDeuxExecutionsLaissentLaBaseIdentique(t *testing.T) {
 	dsn := migratedDatabase(ctx, t)
 
 	first := &bytes.Buffer{}
-	require.NoError(t, start(strings.NewReader(dsn), first, &bytes.Buffer{}, nil))
+	require.NoError(t, start(strings.NewReader(dsn), first, &bytes.Buffer{}, nil, ownerEnv))
 
 	// Le compte se dérive du catalogue : un `44` écrit ici serait la seconde déclaration tenue à la
 	// main que `catalog.go` refuse explicitement, et son incrément 44 → 45 ne porterait aucune
@@ -35,7 +36,7 @@ func TestDeuxExecutionsLaissentLaBaseIdentique(t *testing.T) {
 	before := vocabularyFingerprint(ctx, t, dsn)
 
 	second := &bytes.Buffer{}
-	require.NoError(t, start(strings.NewReader(dsn), second, &bytes.Buffer{}, nil))
+	require.NoError(t, start(strings.NewReader(dsn), second, &bytes.Buffer{}, nil, ownerEnv))
 
 	assert.Contains(t, second.String(), "déjà à jour")
 	assert.Equal(t, before, vocabularyFingerprint(ctx, t, dsn),
@@ -49,7 +50,7 @@ func TestSemerUneBaseNonMigreeEstRefuseEnNommantLesDeuxVersions(t *testing.T) {
 	ctx := t.Context()
 	dsn := freshDatabase(ctx, t)
 
-	err := start(strings.NewReader(dsn), &bytes.Buffer{}, &bytes.Buffer{}, nil)
+	err := start(strings.NewReader(dsn), &bytes.Buffer{}, &bytes.Buffer{}, nil, ownerEnv)
 
 	require.Error(t, err, "la commande a semé sur une base qu'aucune migration n'a touchée")
 
@@ -67,7 +68,7 @@ func TestUneDivergenceNArretePasLaCommandeEtNeSaliPasLeCompteRendu(t *testing.T)
 	ctx := t.Context()
 	dsn := migratedDatabase(ctx, t)
 
-	require.NoError(t, start(strings.NewReader(dsn), &bytes.Buffer{}, &bytes.Buffer{}, nil))
+	require.NoError(t, start(strings.NewReader(dsn), &bytes.Buffer{}, &bytes.Buffer{}, nil, ownerEnv))
 
 	conn, err := pgx.Connect(ctx, dsn)
 	require.NoError(t, err)
@@ -81,7 +82,7 @@ func TestUneDivergenceNArretePasLaCommandeEtNeSaliPasLeCompteRendu(t *testing.T)
 
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
 
-	require.NoError(t, start(strings.NewReader(dsn), out, errOut, nil),
+	require.NoError(t, start(strings.NewReader(dsn), out, errOut, nil, ownerEnv),
 		"un reliquat de vocabulaire a arrêté le déploiement")
 
 	assert.Contains(t, errOut.String(), "legacy:read")
@@ -124,4 +125,101 @@ func vocabularyFingerprint(ctx context.Context, t *testing.T, dsn string) string
 		"l'empreinte est vide : la comparaison « avant/après » serait vraie sans rien observer")
 
 	return fingerprint
+}
+
+// La ligne amendée de la fiche (DN-1) : la commande **se rejoue**, et c'est la création du compte
+// qui ne se rejoue pas. Le mode d'échec que le « refuse » d'origine visait — un second compte
+// propriétaire créé en douce par quelqu'un qui relance avec d'autres variables — est couvert à
+// l'identique, sans casser la rejouabilité.
+func TestUnSecondPassageNeCreeAucunSecondOperateur(t *testing.T) {
+	t.Parallel()
+
+	dsn := migratedDatabase(t.Context(), t)
+
+	require.NoError(t, start(strings.NewReader(dsn), &bytes.Buffer{}, &bytes.Buffer{}, nil, ownerEnv))
+
+	second := &bytes.Buffer{}
+	require.NoError(t, start(strings.NewReader(dsn), second, &bytes.Buffer{}, nil, otherOwnerEnv),
+		"le second passage a échoué : un déploiement qui rappelle la commande casserait")
+
+	assert.Contains(t, second.String(), "aucun compte n'a été créé")
+
+	assert.Equal(t, []string{"camille.durand@exemple.test"}, operatorEmails(t, dsn),
+		"un second compte propriétaire a été créé, ou le premier a été remplacé")
+}
+
+// Sans les variables, une installation neuve doit **refuser** en les nommant : la laisser passer
+// livrerait un vocabulaire complet et personne pour l'exercer, ce qui a l'air d'une réussite.
+func TestUneInstallationNeuveSansVariablesRefuseEnLesNommant(t *testing.T) {
+	t.Parallel()
+
+	dsn := migratedDatabase(t.Context(), t)
+
+	err := start(strings.NewReader(dsn), &bytes.Buffer{}, &bytes.Buffer{}, nil,
+		func(string) (string, bool) { return "", false })
+
+	require.Error(t, err)
+
+	for _, name := range []string{
+		config.EnvBootstrapOperatorEmail,
+		config.EnvBootstrapOperatorName,
+		config.EnvBootstrapOperatorPassword,
+	} {
+		assert.Contains(t, err.Error(), name, "le refus ne nomme pas %s", name)
+	}
+}
+
+// Le compte propriétaire détient le rôle qui accorde tout. Sans lui il pourrait se connecter et ne
+// rien faire — une installation qui a l'air bonne et dans laquelle personne ne peut travailler.
+func TestLeCompteProprietaireDetientLeRoleQuiAccordeTout(t *testing.T) {
+	t.Parallel()
+
+	dsn := migratedDatabase(t.Context(), t)
+	require.NoError(t, start(strings.NewReader(dsn), &bytes.Buffer{}, &bytes.Buffer{}, nil, ownerEnv))
+
+	conn, err := pgx.Connect(t.Context(), dsn)
+	require.NoError(t, err)
+
+	defer func() { _ = conn.Close(context.WithoutCancel(t.Context())) }()
+
+	var roles []string
+
+	rows, err := conn.Query(t.Context(),
+		`SELECT r.name FROM operator_roles orl JOIN roles r ON r.id = orl.role_id`)
+	require.NoError(t, err)
+
+	roles, err = pgx.CollectRows(rows, pgx.RowTo[string])
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{permissions.SuperAdminRole}, roles)
+}
+
+// otherOwnerEnv est l'environnement d'un **second** administrateur qui relancerait la commande. Il
+// diffère d'ownerEnv sur les trois valeurs : si la garde tombait, le compte créé porterait cette
+// adresse-là, et le test le verrait.
+func otherOwnerEnv(name string) (string, bool) {
+	value, found := map[string]string{
+		config.EnvBootstrapOperatorEmail:    "quelqun.dautre@exemple.test",
+		config.EnvBootstrapOperatorName:     "Quelqu'un d'autre",
+		config.EnvBootstrapOperatorPassword: "un autre mot de passe d'installation",
+	}[name]
+
+	return value, found
+}
+
+func operatorEmails(t *testing.T, dsn string) []string {
+	t.Helper()
+
+	conn, err := pgx.Connect(t.Context(), dsn)
+	require.NoError(t, err)
+
+	defer func() { _ = conn.Close(context.WithoutCancel(t.Context())) }()
+
+	rows, err := conn.Query(t.Context(), `SELECT email FROM operators ORDER BY email`)
+	require.NoError(t, err)
+
+	emails, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	require.NoError(t, err)
+
+	return emails
 }

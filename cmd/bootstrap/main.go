@@ -11,10 +11,17 @@
 // sortie d'erreur sans arrêter la livraison — le retrait d'une clé du catalogue est une migration,
 // qui révoque d'abord.
 //
-// # Ce qu'elle ne fait pas encore
+// # Le compte propriétaire
 //
-// La création du premier opérateur arrive en step-021. Une installation neuve a donc, à l'issue de
-// cette commande, un vocabulaire complet et personne pour l'exercer.
+// Elle crée aussi le premier opérateur — **s'il n'y en a aucun**, et elle le dit quand elle n'en crée
+// pas. C'est la création du compte qui ne se rejoue pas, pas la commande : un déploiement l'appelle à
+// chaque livraison, et une commande qui échouerait au second passage finirait retirée du déploiement,
+// donc le catalogue ne serait plus jamais reprojeté.
+//
+// Les valeurs du compte se lisent dans l'**environnement** et non en argument, pour la raison qui fait
+// déjà lire le DSN sur l'entrée standard : `ps aux` affiche la ligne de commande de tout processus de
+// la machine. Elles ne sont exigées que lorsque la base ne porte aucun opérateur, c'est-à-dire au seul
+// moment où elles servent.
 package main
 
 import (
@@ -27,6 +34,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/martialanouman/go-gateway-bo/internal/auth"
+	"github.com/martialanouman/go-gateway-bo/internal/config"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -34,13 +43,17 @@ const usage = "usage : printf '%s' \"$DASHBOARD_DATABASE_URL\" | bootstrap"
 
 func main() {
 	// os.Exit reste seul dans main : appelé depuis start, il court-circuiterait son `defer`.
-	if err := start(os.Stdin, os.Stdout, os.Stderr, os.Args[1:]); err != nil {
+	//nolint:forbidigo // La seconde et dernière lecture d'environnement du dépôt — une par
+	// programme — et elle ne fait que la passer au chargeur de `internal/config`. L'exemption est
+	// posée sur la ligne, pas sur le fichier : sinon toute lecture ajoutée plus tard passerait avec
+	// elle.
+	if err := start(os.Stdin, os.Stdout, os.Stderr, os.Args[1:], os.LookupEnv); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func start(in io.Reader, out, errOut io.Writer, args []string) error {
+func start(in io.Reader, out, errOut io.Writer, args []string, lookup config.Lookup) error {
 	if len(args) > 0 {
 		return errors.New("bootstrap ne prend aucun argument : un DSN passé en argument s'affiche " +
 			"dans `ps aux`, avec le mot de passe de la base. Il se lit sur l'entrée standard.\n" + usage)
@@ -71,15 +84,62 @@ func start(in io.Reader, out, errOut io.Writer, args []string) error {
 		return fmt.Errorf("le seed a échoué : %w", err)
 	}
 
-	report(out, errOut, outcome)
+	owner, err := createOwner(ctx, dsn, lookup)
+	if err != nil {
+		return err
+	}
+
+	report(out, errOut, outcome, owner)
 
 	return nil
+}
+
+// createOwner crée le compte propriétaire s'il n'y en a aucun.
+//
+// **L'ordre compte** : on regarde d'abord si un opérateur existe, et on n'exige les variables que
+// dans le cas contraire. L'inverse — exiger puis regarder — ferait échouer la commande sur toute
+// installation déjà faite, c'est-à-dire à chaque déploiement après le premier.
+//
+// Ce retour anticipé n'est **pas** la garde contre un second compte : c'est
+// `store.CreateFirstOperator`, sous son verrou, qui la tient quand deux exécutions se croisent.
+// Mesuré, retirer l'un des deux laisse la suite verte et il faut retirer les deux pour la faire
+// rougir — le constat complet est au-dessus de `CreateFirstOperator`.
+func createOwner(ctx context.Context, dsn string, lookup config.Lookup) (store.FirstOperatorOutcome, error) {
+	populated, err := store.HasAnyOperator(ctx, dsn)
+	if err != nil {
+		return store.FirstOperatorOutcome{}, err
+	}
+
+	if populated {
+		return store.FirstOperatorOutcome{}, nil
+	}
+
+	cfg, err := config.LoadBootstrap(lookup)
+	if err != nil {
+		return store.FirstOperatorOutcome{}, err
+	}
+
+	if !cfg.Complete() {
+		return store.FirstOperatorOutcome{}, fmt.Errorf(
+			"cette base ne porte aucun opérateur, et le compte propriétaire ne peut pas être créé : "+
+				"%s manquent dans l'environnement.\n  Sans lui, l'installation a un vocabulaire complet "+
+				"et personne pour l'exercer", strings.Join(cfg.MissingNames(), ", "))
+	}
+
+	hash, err := auth.Hash(cfg.OperatorPassword)
+	if err != nil {
+		// Le message n'enveloppe pas l'erreur d'origine : elle vient du tirage du sel, et rien de ce
+		// qu'elle porte ne concerne l'exploitant.
+		return store.FirstOperatorOutcome{}, errors.New("le hachage du mot de passe a échoué")
+	}
+
+	return store.CreateFirstOperator(ctx, dsn, cfg.OperatorEmail, cfg.OperatorName, hash)
 }
 
 // report écrit ce que le seed vient de faire. Les comptes viennent du rapport, donc de ce que la
 // base a réellement accepté — jamais de la taille du catalogue en mémoire, qui décrirait le code au
 // lieu de décrire l'effet.
-func report(out, errOut io.Writer, outcome store.SeedOutcome) {
+func report(out, errOut io.Writer, outcome store.SeedOutcome, owner store.FirstOperatorOutcome) {
 	if !outcome.Changed() {
 		printLine(out, "vocabulaire déjà à jour : rien à semer")
 	}
@@ -93,12 +153,23 @@ func report(out, errOut io.Writer, outcome store.SeedOutcome) {
 	printCount(out, len(outcome.GrantsAdded), "attribution(s) accordée(s)")
 	printCount(out, len(outcome.GrantsRevoked), "attribution(s) révoquée(s)")
 
-	if outcome.Changed() {
-		printLine(out, "la création du premier opérateur arrive en step-021 : "+
-			"`make bootstrap` ne la fait pas encore")
-	}
+	reportOwner(out, owner)
 
 	warnAboutDivergence(errOut, outcome)
+}
+
+// reportOwner dit ce qui est arrivé au compte propriétaire, **dans les deux cas**. Le silence sur
+// « rien à faire » ferait douter l'exploitant de ce que la commande vient de garantir, et la ligne qui
+// compte pour lui est justement celle-là : personne n'a été créé en douce.
+func reportOwner(out io.Writer, owner store.FirstOperatorOutcome) {
+	if owner.Created {
+		// L'adresse est rendue, le mot de passe jamais — ni ici, ni ailleurs.
+		printLine(out, "compte propriétaire créé pour %s, avec le rôle %s", owner.Email, owner.Role)
+
+		return
+	}
+
+	printLine(out, "un opérateur existe déjà : aucun compte n'a été créé")
 }
 
 func warnAboutDivergence(errOut io.Writer, outcome store.SeedOutcome) {
