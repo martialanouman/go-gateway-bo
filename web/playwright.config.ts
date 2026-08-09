@@ -65,6 +65,10 @@ export default defineConfig({
       DASHBOARD_GATEWAY_BASE_URL: 'http://127.0.0.1:4010',
       DASHBOARD_DATABASE_URL:
         'postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable',
+      // Obligatoire depuis step-021, sans repli : le binaire refuse de démarrer sans elle, et ce
+      // refus arrive avant qu'il ne lie son port — un parcours démarrerait donc sur un serveur qui
+      // n'écoute pas. Rien d'un secret : aucun parcours ne relit un HMAC.
+      DASHBOARD_BRUTEFORCE_SALT: 'un-sel-de-parcours-assez-long-pour-passer-la-borne',
     },
   },
 })
