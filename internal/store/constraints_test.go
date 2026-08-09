@@ -103,6 +103,33 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			sqlstate: uniqueViolation,
 		},
 		{
+			// Les deux dimensions comptées sont fermées par le schéma. Une troisième valeur écrite par
+			// erreur ne serait comptée par rien et ne verrouillerait rien : le refus est le seul
+			// symptôme possible.
+			name: "un compteur d'échecs ne connaît que deux dimensions",
+			act: `INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
+				VALUES ('empreinte', 'x', 1, now())`,
+			sqlstate: checkViolation,
+		},
+		{
+			// Inatteignable depuis le produit aujourd'hui — `RecordFailure` n'écrit que `1` ou
+			// `c.failures + 1`. La contrainte garde contre la step qui décrémentera : un compteur passé
+			// sous zéro rendrait le verrou inatteignable, sans erreur et sans symptôme.
+			name: "un compteur d'échecs ne descend pas sous zéro",
+			act: `INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
+				VALUES ('email', 'x@exemple.test', -1, now())`,
+			sqlstate: checkViolation,
+		},
+		{
+			// Inatteignable de même — `IssueChallenge` ajoute un intervalle positif. Elle garde contre
+			// une durée de vie devenue nulle ou négative, dont le symptôme serait un opérateur qui ne
+			// franchit jamais le second facteur, sans rien dans les journaux.
+			name: "un challenge n'expire pas avant d'avoir été émis",
+			act: `INSERT INTO mfa_challenges (operator_id, token_hash, created_at, expires_at)
+				VALUES ('` + seedOperator + `', '\\x00'::bytea, now(), now() - interval '1 second')`,
+			sqlstate: checkViolation,
+		},
+		{
 			name: "une règle d'alerte porte une portée connue",
 			act: `INSERT INTO alert_rules (metric, scope, evaluation_owner, condition_json, status)
 				VALUES ('m', 'client', 'bff', '{}'::jsonb, 'active')`,
