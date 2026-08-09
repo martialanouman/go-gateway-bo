@@ -151,3 +151,4 @@ The charter closes this question: *« Pas de pictogrammes décoratifs ni d'emoji
 1. **Fonts** — IBM Plex Sans/Mono are the charter's own choice, but loaded from Google Fonts. Send `.woff2` binaries to self-host.
 2. **Companion spec** — `specification-technique-passerelle-sms.md` is cited ~20× and was never supplied.
 3. **Unmocked surfaces** — anti-spam, désabonnements, numéros entrants, contenu/RGPD, opérateurs/rôles, journal d'audit and the Monaco script editor are specified in prose but have no visual reference; the kit shows an explicit empty state rather than inventing them.
+4. **No `Tooltip` component** — the identifier rule above needs one and the kit has none. `IconButton` is the closest thing, and it carries its label through `title`, which that rule rules out. The first screen showing a French label for a technical state — `step-084`, connector health — has to add the component before it can comply.
