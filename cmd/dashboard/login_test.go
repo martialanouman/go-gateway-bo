@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -160,7 +162,7 @@ func (w *loginWorld) lockExpires(ctx context.Context) error {
 	return nil
 }
 
-func (w *loginWorld) challengeIsIssued() error {
+func (w *loginWorld) challengeIsIssued(ctx context.Context) error {
 	if w.process.received == nil {
 		return errors.New("aucune réponse à lire")
 	}
@@ -185,6 +187,46 @@ func (w *loginWorld) challengeIsIssued() error {
 
 	if !expiresAt.After(time.Now()) {
 		return fmt.Errorf("le challenge est émis déjà périmé (%s)", challenge.ExpiresAt)
+	}
+
+	return w.challengeMatchesWhatTheDatabaseKeeps(ctx, challenge.Challenge)
+}
+
+// challengeMatchesWhatTheDatabaseKeeps confronte le jeton **rendu** à l'empreinte **stockée**.
+//
+// Sans ce pas, rendre l'empreinte à la place du jeton passait toutes les portes : les deux font 32
+// octets, donc 43 caractères, donc le `minLength` du contrat aussi. La panne n'apparaîtrait qu'en
+// step-023, au moment de vérifier un second facteur que personne ne peut plus fournir.
+//
+// C'est aussi ce qui exerce enfin l'usage unique que DN-9 dit « porté par le schéma » : l'empreinte
+// est cherchée par l'index unique, et une ligne non consommée est ce que step-023 consommera.
+func (w *loginWorld) challengeMatchesWhatTheDatabaseKeeps(ctx context.Context, token string) error {
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return fmt.Errorf("le challenge rendu n'est pas du base64url : %w", err)
+	}
+
+	digest := sha256.Sum256(raw)
+
+	conn, err := pgx.Connect(ctx, w.dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var pending bool
+
+	err = conn.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM mfa_challenges WHERE token_hash = $1 AND consumed_at IS NULL)`,
+		digest[:]).Scan(&pending)
+	if err != nil {
+		return fmt.Errorf("chercher l'empreinte du challenge : %w", err)
+	}
+
+	if !pending {
+		return errors.New("aucun challenge en base ne porte l'empreinte du jeton rendu : le second " +
+			"facteur n'aura rien à vérifier")
 	}
 
 	return nil

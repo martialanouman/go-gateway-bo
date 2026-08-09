@@ -232,7 +232,12 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | le verrou n'est plus consulté avant la vérification | le scénario « le verrou tient même quand le mot de passe est le bon » |
 | le refus nomme l'adresse (« aucun compte pour cette adresse ») | le pas « le refus ne nomme ni l'adresse ni le facteur en cause » |
 | le `400` retiré des statuts attendus côté client | `pnpm typecheck` sur `api.test-d.ts` |
-| **retirer le hachage factice sur adresse inconnue** *(la DoD la nomme)* | **rien**, et c'est le constat qu'elle demande : le corps et le code sont identiques par construction, seule la durée diffère. La forme de `passwordMatches` fait de cette mutation une ligne à **ajouter** — un retour anticipé — et non une ligne à retirer, ce qui la rend visible en revue. |
+| `Header.Get` au lieu de `Header.Values` sur `X-Forwarded-For` | `TestUneSecondeLigneForwardedForNeMasquePasCelleDuProxy` |
+| la clé de source rendue à l'adresse nue (pas de /64) | `TestDeuxAdressesDuMemeReseauIpv6PartagentLeurCompteur` |
+| `itoa` inverse ses chiffres | `TestLaDureeAnnonceeArrondItToujoursAuSuperieur` |
+| le plancher à 1 de `retryAfterSeconds` retiré | `TestUneDureeNulleOuNegativeNAnnonceJamaisZero` |
+| le serveur rend l'**empreinte** au lieu du jeton de challenge | le pas « un challenge est émis avec son échéance » — la panne n'aurait éclaté qu'en step-023 |
+| **retirer le hachage factice sur adresse inconnue** *(la DoD la nomme)* | **rien**, et c'est le constat qu'elle demande : le corps et le code sont identiques par construction, seule la durée diffère. *(Une rédaction précédente affirmait ici que la forme de `passwordMatches` rendait cette mutation visible en revue — la relecture l'a démentie : c'est une suppression d'une ligne dans une branche existante, et le test qui nomme `VerifyDummy` l'appelle directement, donc garde la fonction et jamais son site d'appel.)* |
 
 ### La commande d'installation
 
@@ -257,3 +262,7 @@ exécutions se croisent. Ce cas-là n'est exercé par rien, exactement comme le 
 | la cible de durée d'argon2id | aucune porte. Ce qui est gardé est le **plancher** des paramètres (`TestLesParametresNeDescendentPasSousLePlancher`), pas la durée — celle-ci est écrite avec sa date, sa machine et sa commande |
 | `poolCtx` détaché du contexte d'arrêt | aucune porte, faute d'une requête assez lente pour traverser SIGTERM |
 | `pg_advisory_xact_lock` en tête de `CreateFirstOperator` | aucune porte — deux exécutions concurrentes se croisent trop rarement pour qu'un test qui les lance prouve quoi que ce soit |
+| l'**appel** à `VerifyDummy` dans `passwordMatches` | aucune porte, et pas de propriété structurelle non plus. Une porte du type-checker est possible — `internal/bff/dto_test.go` descend déjà dans les corps de fonction — et appartient à la step qui reprendra ce chemin |
+| les trois `CHECK` et le `ON DELETE CASCADE` de la migration `00004` | aucune porte : `constraints_test.go` couvre `00001`–`00003` et n'a pas été étendu. Deux d'entre eux sont d'ailleurs **inatteignables depuis le produit** — à trancher par un test, une suppression, ou une exemption commentée |
+| les bornes d'entrée `maximumPasswordLength`, `maximumEmailLength` et `RequestSize` | aucune porte : aucun test n'appelle `API.Login` et aucun scénario n'envoie de corps démesuré |
+| le chemin d'erreur base pendant un login | aucune porte : la plomberie du 500 est gardée sur `Health`, jamais sur `Login` |
