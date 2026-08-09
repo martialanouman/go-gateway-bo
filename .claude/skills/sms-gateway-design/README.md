@@ -29,7 +29,7 @@ No codebase and no Figma file were provided. The charter's rendered pages were r
 
 ## CONTENT FUNDAMENTALS
 
-**Language.** UI copy is **French**; technical identifiers stay **English and monospace**, verbatim from the API: `link_status`, `breaker_state`, `max_sessions`, `balance_scope`, `mo_billing_floor`, `content:read`, `query_sm`, `weighted`, `resolveRoute()`. Never translate an identifier — an operator greps for it in logs.
+**Language.** UI copy is **French**; technical identifiers stay **English and monospace**, verbatim from the API: `link_status`, `breaker_state`, `max_sessions`, `balance_scope`, `mo_billing_floor`, `content:read`, `query_sm`, `weighted`, `resolveRoute()`. A French label **may stand for** an identifier — `reconnecting` shown as « Reconnexion » — but it never **replaces** it: the identifier stays reachable right next to the label, through a focusable trigger whose tooltip is wired with `aria-describedby` and shown **on focus as well as hover**. `title` alone does not qualify — it never opens for a keyboard user, and an operator who cannot see the identifier can no longer match the screen to what they grep in the logs.
 
 **Mono means machine.** The charter is explicit: *« Le mono est réservé aux valeurs machine : identifiants, compteurs, MSISDN, sender IDs, états techniques. Jamais pour du texte narratif. »* So `msg_01J9K2A7QF`, `2250701020304`, `8 123 MT/s`, `breaker: half_open` are mono; sentences never are.
 
@@ -151,3 +151,4 @@ The charter closes this question: *« Pas de pictogrammes décoratifs ni d'emoji
 1. **Fonts** — IBM Plex Sans/Mono are the charter's own choice, but loaded from Google Fonts. Send `.woff2` binaries to self-host.
 2. **Companion spec** — `specification-technique-passerelle-sms.md` is cited ~20× and was never supplied.
 3. **Unmocked surfaces** — anti-spam, désabonnements, numéros entrants, contenu/RGPD, opérateurs/rôles, journal d'audit and the Monaco script editor are specified in prose but have no visual reference; the kit shows an explicit empty state rather than inventing them.
+4. **No `Tooltip` component** — the identifier rule above needs one and the kit has none. `IconButton` is the closest thing, and it carries its label through `title`, which that rule rules out. The first screen showing a French label for a technical state — `step-084`, connector health — has to add the component before it can comply.
