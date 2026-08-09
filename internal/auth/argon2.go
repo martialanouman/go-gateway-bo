@@ -171,6 +171,17 @@ var dummySalt = []byte("adresse-inconnue")
 // Le résultat n'est écrit nulle part — un `var` de paquet en ferait une course sous `-race` dès que
 // deux requêtes arrivent ensemble. `runtime.KeepAlive` suffit à interdire au compilateur d'élider
 // l'appel, qui est tout ce qu'on lui demande.
+//
+// **Mesuré à la main le 09/08/2026**, contre le binaire, cinq requêtes de chaque côté, compteurs
+// remis à zéro entre chacune (la fiche écarte un test de temps, instable en CI) :
+//
+//	mot de passe faux   31,4 · 31,4 · 28,8 · 31,5 · 31,2 ms
+//	adresse inconnue    30,9 · 30,8 · 31,6 · 34,0 · 31,0 ms
+//
+// Les deux distributions se recouvrent : l'écart entre les deux chemins est noyé dans le bruit de la
+// requête. Sans cet appel, la seconde ligne tomberait sous la milliseconde et l'écart deviendrait le
+// signal. C'est ce constat, et non un test, qui garde cette fonction — la mutation qui la retire
+// laisse tout vert, ce qui est écrit dans le tableau des mutations de la fiche.
 func VerifyDummy(secret string) {
 	runtime.KeepAlive(argon2.IDKey([]byte(secret), dummySalt, currentParams.Time,
 		currentParams.Memory, currentParams.Parallelism, keyLength))
