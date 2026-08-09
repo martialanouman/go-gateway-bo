@@ -26,9 +26,40 @@ const sourceKeyDomain = "source:"
 // actions authentifiées. Une surface d'écriture libre ne se transforme pas en journal de connexion.
 func SourceKey(salt []byte, address string) string {
 	mac := hmac.New(sha256.New, salt)
-	_, _ = mac.Write([]byte(sourceKeyDomain + address))
+	_, _ = mac.Write([]byte(sourceKeyDomain + sourceScope(address)))
 
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// ipv6SourcePrefix est la taille du bloc sous lequel une source IPv6 est comptée.
+//
+// **Compter une IPv6 à l'adresse près ne compte rien.** Le plus petit bloc qu'un fournisseur
+// résidentiel délègue est un /64, et un serveur loué en obtient couramment un /48 : l'attaquant
+// change d'adresse à chaque requête à l'intérieur de son propre bloc, sans la coopération de
+// personne — c'est un `bind()` local. La dimension « source » ne verrouillerait jamais, et la table
+// des compteurs grossirait sans plafond, ce que le commentaire de la migration 00004 tient pour
+// impossible.
+//
+// /64 et non /48 : c'est la frontière que la RFC 4291 §2.5.4 pose entre le réseau et l'interface,
+// donc la plus petite unité qu'on puisse attribuer à « quelqu'un » plutôt qu'à « une machine ».
+// Plus large punirait des voisins qui ne partagent qu'un fournisseur.
+const ipv6SourcePrefix = 64
+
+// sourceScope rend le réseau sous lequel une adresse est comptée : elle-même en IPv4, son /64 en
+// IPv6. La forme rendue est textuelle et stable — c'est elle qui entre dans le HMAC.
+func sourceScope(address string) string {
+	parsed, err := netip.ParseAddr(address)
+	if err != nil {
+		// Une adresse illisible n'arrive pas par `ClientAddress`, qui ne rend que des adresses
+		// analysées. Si elle arrivait, la compter telle quelle vaut mieux que de ne pas la compter.
+		return address
+	}
+
+	if parsed.Is4() || parsed.Is4In6() {
+		return parsed.Unmap().String()
+	}
+
+	return netip.PrefixFrom(parsed, ipv6SourcePrefix).Masked().String()
 }
 
 // ClientAddress dérive l'adresse à compter à partir de l'adresse de pair et de `X-Forwarded-For`.

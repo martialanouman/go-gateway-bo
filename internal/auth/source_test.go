@@ -119,3 +119,38 @@ func TestDeuxSelsDifferentsRendentDesClesDifferentes(t *testing.T) {
 	assert.NotEqual(t, first, second)
 	assert.Equal(t, strings.ToLower(first), first, "la clé doit être stable en casse : elle sert d'index")
 }
+
+// Deux adresses du même /64 doivent partager leur compteur. Sans cette normalisation, un attaquant
+// change d'adresse à chaque requête à l'intérieur de son propre bloc — sans la coopération de
+// personne, c'est un `bind()` local — et la dimension « source » ne verrouille jamais.
+func TestDeuxAdressesDuMemeReseauIpv6PartagentLeurCompteur(t *testing.T) {
+	t.Parallel()
+
+	salt := []byte("un sel de test assez long pour la borne")
+
+	first := auth.SourceKey(salt, "2001:db8:abcd:1234::1")
+	second := auth.SourceKey(salt, "2001:db8:abcd:1234:ffff:ffff:ffff:ffff")
+
+	assert.Equal(t, first, second,
+		"deux adresses du même /64 sont comptées séparément : un client IPv6 dispose de 2^64 compteurs")
+}
+
+// Le pendant : deux réseaux distincts ne doivent pas se punir l'un l'autre.
+func TestDeuxReseauxIpv6DistinctsGardentDesCompteursDistincts(t *testing.T) {
+	t.Parallel()
+
+	salt := []byte("un sel de test assez long pour la borne")
+
+	assert.NotEqual(t,
+		auth.SourceKey(salt, "2001:db8:abcd:1234::1"),
+		auth.SourceKey(salt, "2001:db8:abcd:5678::1"))
+}
+
+// En IPv4 la clé reste l'adresse : un /32 est déjà une machine, et élargir punirait un voisinage.
+func TestDeuxAdressesIpv4VoisinesGardentDesCompteursDistincts(t *testing.T) {
+	t.Parallel()
+
+	salt := []byte("un sel de test assez long pour la borne")
+
+	assert.NotEqual(t, auth.SourceKey(salt, "203.0.113.7"), auth.SourceKey(salt, "203.0.113.8"))
+}
