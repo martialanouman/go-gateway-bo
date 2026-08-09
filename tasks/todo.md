@@ -95,8 +95,8 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - **Mock-first.** Chaque écran se développe contre le mock Prism ; l'intégration réelle n'est requise
   que pour les steps qui le disent.
 - **Langue.** Code en **anglais**, narratif en **français** — commentaires, scénarios Gherkin, copie.
-  Les identifiants techniques du contrat restent verbatim et en mono (`link_status`, `breaker_state`,
-  `max_sessions`, `balance_scope`).
+  Un libellé français peut tenir lieu d'identifiant technique, jamais le remplacer : la valeur
+  verbatim reste affichée à côté, en mono et atteignable au clavier. Voir la charte.
 - **Commentaires avec parcimonie** : seulement là où le code ne peut pas parler. Voir `plan.md` §1.7.
 - **Cinq états de contenu** partout : chargement · vide · aucun résultat · module désactivé · erreur.
   Jamais un blanc, jamais une erreur déguisée en vide.

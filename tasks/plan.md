@@ -180,8 +180,10 @@ C'est la convention la plus structurante du dépôt, et elle change de nature av
 - **Pagination par curseur** partout où le contrat l'impose. Aucune UI « page 4 sur 120 ».
 - **Crédits = entiers**, jamais une devise formatée.
 - Dates en ISO 8601 UTC sur le fil ; affichage localisé en français, fuseau affiché quand il compte.
-- Les identifiants techniques ne se traduisent **jamais** et se rendent en mono, verbatim du payload :
-  `link_status`, `breaker_state`, `max_sessions`, `balance_scope`, `half_open`, `query_sm`.
+- Un libellé français peut **tenir lieu** d'identifiant technique à l'écran, jamais le **remplacer** :
+  la valeur verbatim du payload reste affichée à côté, en mono et atteignable au clavier :
+  `link_status`, `breaker_state`, `max_sessions`, `balance_scope`, `half_open`, `query_sm`. La forme
+  exacte vit dans la charte (*Content fundamentals*) et n'est pas recopiée ici.
 
 ### 1.6 Conventions temps réel
 

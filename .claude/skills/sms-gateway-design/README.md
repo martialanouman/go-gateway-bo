@@ -29,7 +29,7 @@ No codebase and no Figma file were provided. The charter's rendered pages were r
 
 ## CONTENT FUNDAMENTALS
 
-**Language.** UI copy is **French**; technical identifiers stay **English and monospace**, verbatim from the API: `link_status`, `breaker_state`, `max_sessions`, `balance_scope`, `mo_billing_floor`, `content:read`, `query_sm`, `weighted`, `resolveRoute()`. Never translate an identifier — an operator greps for it in logs.
+**Language.** UI copy is **French**; technical identifiers stay **English and monospace**, verbatim from the API: `link_status`, `breaker_state`, `max_sessions`, `balance_scope`, `mo_billing_floor`, `content:read`, `query_sm`, `weighted`, `resolveRoute()`. A French label **may stand for** an identifier — `reconnecting` shown as « Reconnexion » — but it never **replaces** it: the identifier stays reachable right next to the label, through a focusable trigger whose tooltip is wired with `aria-describedby` and shown **on focus as well as hover**. `title` alone does not qualify — it never opens for a keyboard user, and an operator who cannot see the identifier can no longer match the screen to what they grep in the logs.
 
 **Mono means machine.** The charter is explicit: *« Le mono est réservé aux valeurs machine : identifiants, compteurs, MSISDN, sender IDs, états techniques. Jamais pour du texte narratif. »* So `msg_01J9K2A7QF`, `2250701020304`, `8 123 MT/s`, `breaker: half_open` are mono; sentences never are.
 
