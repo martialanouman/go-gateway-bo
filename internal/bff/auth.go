@@ -52,10 +52,6 @@ func withClientAddress(trusted []netip.Prefix) func(http.Handler) http.Handler {
 			// `option forwardfor` en écrit une seconde ligne. Chez un tel proxy, `Get` rendrait la ligne
 			// écrite par le **client**, et la remontée de droite à gauche s'appliquerait à une chaîne
 			// entièrement forgée : l'attaquant choisirait sa clé de compteur, ou celle d'un tiers.
-			//
-			// Les lignes passent telles quelles, sans être jointes : `ClientAddress` les remonte de la
-			// dernière à la première et borne ce qu'il examine. Les joindre aurait recopié tout ce que
-			// le client a bien voulu envoyer, avant même de décider s'il fallait le lire.
 			address, err := auth.ClientAddress(r.RemoteAddr, r.Header.Values("X-Forwarded-For"), trusted)
 			if err != nil {
 				next.ServeHTTP(w, r)
@@ -90,16 +86,10 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 		return nil, errNoClientAddress
 	}
 
-	// Les deux bornes sont gardées par `bornes_test.go`, sur une base morte : ce qui les franchit y
-	// tombe, donc 400 s'y distingue de 500 et une borne retirée bascule de l'un à l'autre.
-	//
-	// **`request.Body == nil` est inatteignable par le routeur**, et c'est mesuré plutôt que supposé :
-	// `strictHandler.Login` décode le corps puis assigne le pointeur **sans condition** (gabarit
-	// `strict-http.tmpl` d'oapi-codegen v2.8.0) — un corps illisible rend 400 avant d'arriver ici, un
-	// corps lisible donne toujours un pointeur. Aucun test ne la garde, et lui en écrire un demanderait
-	// d'appeler cette méthode hors de son routeur : il prouverait la garde et rien du produit. Elle
-	// reste parce que c'est la régénération du contrat qui décide de cette forme, pas nous — un corps
-	// déclaré optionnel demain la rendrait atteignable, et son absence serait alors un panic.
+	// `request.Body == nil` est inatteignable par le routeur — `strictHandler.Login` assigne le
+	// pointeur sans condition — donc aucun test ne la garde. Elle reste parce que c'est la
+	// régénération du contrat qui décide de cette forme : un corps déclaré optionnel la rendrait
+	// atteignable, et son absence serait alors un panic.
 	if request.Body == nil ||
 		len([]rune(request.Body.Password)) > maximumPasswordLength ||
 		len([]rune(request.Body.Email)) > maximumEmailLength {

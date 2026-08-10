@@ -17,19 +17,11 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// Ces tests montent le routeur **entier** sur une base morte, et c'est cette base morte qui les rend
-// lisibles : une requête qui franchit les bornes tombe forcément dessus, donc
+// Ces tests montent le routeur entier sur une base morte, et c'est elle qui les rend lisibles : ce
+// qui franchit les bornes tombe dessus, donc **400** veut dire « refusée à la porte » et **500**
+// « arrivée jusqu'à la base ». Une borne retirée bascule de l'un à l'autre.
 //
-//	400 — refusée à la porte, la borne a mordu ;
-//	500 — acceptée, arrivée jusqu'à la base.
-//
-// Retirer une borne fait basculer son test de 400 à 500, ce qui **reproduit le défaut réel** : la
-// valeur démesurée est bien allée jusqu'au hachage ou jusqu'à la clé de compteur. Un test qui
-// affirmerait seulement « 400 » resterait vert sur une garde déplacée ou sur une panne fortuite.
-//
-// Aucun conteneur, aucun réseau : le pool est paresseux — `NewPool` ne compose rien (DN-5) — et une
-// fois fermé, chaque requête échoue sur place. Le DSN désigne un port où personne n'écoute, ce qui
-// n'est jamais mis à l'épreuve.
+// Aucun conteneur, aucun réseau : le pool est paresseux (DN-5) et fermé avant tout usage.
 func loginRouter(t *testing.T) http.Handler {
 	t.Helper()
 
@@ -44,9 +36,8 @@ func loginRouter(t *testing.T) http.Handler {
 	})
 }
 
-// postLogin sert la requête et rend le statut et le corps servis. Le corps est passé **en clair**
-// plutôt que composé : c'est ce qui permet d'en envoyer un que `json.Marshal` refuserait, et de
-// mesurer sa taille en octets là où la borne du corps se compte en octets.
+// postLogin rend le statut et le corps servis. Le corps est passé en clair pour que sa taille en
+// octets soit celle que la borne du corps mesure.
 func postLogin(t *testing.T, body string) (int, string) {
 	t.Helper()
 
@@ -75,9 +66,8 @@ func credentials(t *testing.T, email, password string) string {
 	return string(body)
 }
 
-// Ce que la borne du mot de passe protège n'est pas le temps d'argon2 — il tient à la mémoire et aux
-// passes, pas à la longueur du secret — mais ce que le serveur accepte de copier et de garder en vol
-// pour une requête que personne n'a authentifiée.
+// La borne du mot de passe ne protège pas le temps d'argon2 — il tient à la mémoire et aux passes —
+// mais ce que le serveur copie et garde en vol pour une requête que personne n'a authentifiée.
 func TestUnMotDePasseDemesureNAtteintPasLeHachage(t *testing.T) {
 	t.Parallel()
 
@@ -88,9 +78,8 @@ func TestUnMotDePasseDemesureNAtteintPasLeHachage(t *testing.T) {
 		"le mot de passe démesuré a traversé jusqu'à la base : la borne ne mord plus")
 }
 
-// L'adresse soumise devient la clé `subject` de `login_attempt_counters` — la **seule** table du
-// schéma qu'une requête non authentifiée fait écrire. Sans borne, chaque tentative y pose ce que
-// l'appelant a bien voulu envoyer.
+// L'adresse soumise devient la clé `subject` de `login_attempt_counters`, la seule table qu'une
+// requête non authentifiée fait écrire.
 func TestUneAdresseDemesureeNeDevientPasUneCleDeCompteur(t *testing.T) {
 	t.Parallel()
 
@@ -101,9 +90,8 @@ func TestUneAdresseDemesureeNeDevientPasUneCleDeCompteur(t *testing.T) {
 		"l'adresse démesurée a traversé jusqu'à la base : elle y serait devenue une clé de compteur")
 }
 
-// Le compte est en **runes** et non en octets, comme la `maxLength` du contrat. En octets, une
-// adresse d'accents que le contrat autorise serait refusée — et l'opérateur lirait « cette requête a
-// été refusée » sans jamais savoir pourquoi la même adresse marche chez son voisin.
+// Le compte est en **runes**, comme la `maxLength` du contrat : en octets, une adresse d'accents que
+// le contrat autorise serait refusée.
 func TestUneAdresseDAccentsSousLaBorneNEstPasRefusee(t *testing.T) {
 	t.Parallel()
 
@@ -119,20 +107,14 @@ func TestUneAdresseDAccentsSousLaBorneNEstPasRefusee(t *testing.T) {
 			"contrat compte des caractères")
 }
 
-// La borne du **corps**, celle qui s'applique avant le décodage. Les bornes de champ ne valent qu'une
-// fois la valeur lue, donc une fois le corps entier en mémoire : sans celle-ci, il n'y a pas de
-// plafond à ce qu'une requête non authentifiée fait allouer.
+// La borne du **corps**, celle qui s'applique avant le décodage : les bornes de champ ne valent
+// qu'une fois le corps entier en mémoire.
 func TestUnCorpsPlusGrandQueLaBorneNEstPasDecode(t *testing.T) {
 	t.Parallel()
 
-	// **Chaque champ reste sous sa propre borne**, et c'est toute la difficulté de ce test : des runes
-	// de deux octets font tenir 4 096 caractères — la borne exacte du mot de passe — dans 8 192 octets,
-	// que l'adresse et la syntaxe JSON portent au-delà de la borne du corps. Ce qui doit refuser cette
-	// requête est donc la taille du corps, et rien d'autre.
-	//
-	// Une première rédaction répétait `maximumLoginBodyBytes` runes : le mot de passe franchissait sa
-	// propre borne, le test était vert et le restait `RequestSize` retiré. C'est la mutation qui l'a
-	// dit.
+	// **Chaque champ reste sous sa propre borne**, sans quoi le 400 viendrait d'elle : des runes de deux
+	// octets font tenir 4 096 caractères — la borne exacte du mot de passe — dans 8 192 octets, que
+	// l'adresse et la syntaxe JSON portent au-delà de la borne du corps.
 	oversized := credentials(t, "camille@exemple.test", strings.Repeat("é", maximumPasswordLength))
 	require.Greater(t, len(oversized), maximumLoginBodyBytes,
 		"ce corps tient sous la borne : la mutation qui retire RequestSize resterait verte")
@@ -144,13 +126,11 @@ func TestUnCorpsPlusGrandQueLaBorneNEstPasDecode(t *testing.T) {
 			"champ arrivent trop tard pour l'empêcher", len(oversized))
 }
 
-// La plus grave des lignes que ces tests gardent. Une base injoignable doit se voir comme une panne
-// **du serveur** : la lire comme un refus d'identifiants ferait retaper son mot de passe à un
-// opérateur dont le mot de passe est bon, pendant que la vraie cause reste invisible.
+// La plus grave des lignes que ces tests gardent : une base injoignable lue comme un refus
+// d'identifiants ferait retaper son mot de passe à un opérateur dont le mot de passe est bon.
 //
-// Le corps est vérifié autant que le statut. `internal/bff` n'a toujours pas de journal — un 500 servi
-// ici ne laisse aucune trace côté serveur — donc ce que le navigateur reçoit est tout ce qui existe,
-// et il ne doit porter ni le message Go ni le DSN qu'il transporte.
+// Le corps est vérifié autant que le statut — `internal/bff` n'a pas de journal, donc ce que le
+// navigateur reçoit est tout ce qui existe.
 func TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants(t *testing.T) {
 	t.Parallel()
 

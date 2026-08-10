@@ -88,22 +88,15 @@ func TestUneAdresseIpv4MappeeEnIpv6EstReconnueDansUnPrefixeIpv4(t *testing.T) {
 		"le proxy déclaré n'a pas été reconnu sous sa forme mappée : son en-tête est ignoré")
 }
 
-// La borne de la remontée. Sans elle, la taille du travail est choisie par le client : `net/http`
-// accepte un mébioctet d'en-têtes, soit un demi-million de sauts à analyser sur la seule route
-// ouverte sans session.
-//
-// Ce que le test affirme est l'abandon — l'adresse de pair, pas le saut lointain. C'est le même repli
-// que « chaîne entièrement interne » et que « chaîne illisible » : au-delà de ce qu'on consent à
-// lire, on ne croit plus l'en-tête. Une chaîne légitime ne l'atteint jamais, le saut le plus à droite
-// étant celui qu'écrit notre propre proxy.
+// Au-delà de ce qu'on consent à lire, on ne croit plus l'en-tête : le test affirme donc l'adresse de
+// pair, comme pour une chaîne illisible ou entièrement interne.
 func TestUneChaineDeSautsPlusLongueQueLaBorneNEstPasRemontee(t *testing.T) {
 	t.Parallel()
 
 	const beyondTheBound = 17
 
-	hops := make([]string, 0, beyondTheBound+1)
 	// Le saut du client, tout à gauche : c'est lui que la remontée atteindrait sans borne.
-	hops = append(hops, "198.51.100.9")
+	hops := []string{"198.51.100.9"}
 
 	for index := range beyondTheBound {
 		hops = append(hops, "10.0.0."+strconv.Itoa(index+1))
@@ -117,15 +110,13 @@ func TestUneChaineDeSautsPlusLongueQueLaBorneNEstPasRemontee(t *testing.T) {
 		beyondTheBound)
 }
 
-// Le pendant, sans lequel le test ci-dessus serait vrai d'une remontée qui n'irait jamais plus loin
-// que le premier saut : juste sous la borne, la chaîne se remonte pour de bon.
+// Le pendant, sans lequel le test ci-dessus serait vrai d'une remontée qui n'irait jamais nulle part.
 func TestUneChaineJusteSousLaBorneSeRemonteEntierement(t *testing.T) {
 	t.Parallel()
 
 	const withinTheBound = 15
 
-	hops := make([]string, 0, withinTheBound+1)
-	hops = append(hops, "198.51.100.9")
+	hops := []string{"198.51.100.9"}
 
 	for index := range withinTheBound {
 		hops = append(hops, "10.0.0."+strconv.Itoa(index+1))
@@ -137,8 +128,8 @@ func TestUneChaineJusteSousLaBorneSeRemonteEntierement(t *testing.T) {
 		"la remontée s'est arrêtée avant le saut du client alors que la chaîne tient sous la borne")
 }
 
-// Les lignes répétées comptent dans la **même** remontée : deux lignes de neuf sauts en font
-// dix-huit, et un proxy qui ajoute la sienne ne rouvre pas le budget de celle du client.
+// Les lignes répétées comptent dans la **même** remontée : un proxy qui ajoute la sienne ne rouvre
+// pas le budget que la ligne du client a consommé.
 func TestLaBornePorteSurLesLignesReuniesEtNonSurChacune(t *testing.T) {
 	t.Parallel()
 

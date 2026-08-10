@@ -62,26 +62,19 @@ func sourceScope(address string) string {
 	return netip.PrefixFrom(parsed, ipv6SourcePrefix).Masked().String()
 }
 
-// maxForwardedHops borne le nombre de sauts que la remontée examine.
+// maxForwardedHops borne le nombre de sauts que la remontée examine : sans elle, la taille du travail
+// est choisie par le client, qui peut envoyer le mébioctet d'en-têtes que `net/http` accepte.
 //
-// **Sans borne, la taille du travail est choisie par le client.** `net/http` accepte un mébioctet
-// d'en-têtes par requête : un demi-million de sauts à analyser, sur la seule route que le produit
-// ouvre sans session, pour un attaquant qui n'a rien eu à prouver. C'est un amplificateur offert au
-// premier venu.
-//
-// Seize est très au-dessus du réel — un proxy en production, deux avec un ingress. Une chaîne
-// légitime n'approche jamais cette borne, et pour une raison plus forte qu'un ordre de grandeur : le
-// saut le plus à droite est celui qu'écrit **notre** proxy, il porte l'adresse publique du client,
-// elle n'est pas de confiance, et la remontée s'arrête donc au premier. La borne ne décide de rien
-// en exploitation ; elle borne le pire cas.
+// Seize est très au-dessus du réel, et une chaîne légitime ne l'approche jamais : le saut le plus à
+// droite est celui qu'écrit notre propre proxy, il n'est pas de confiance, et la remontée s'arrête
+// donc au premier.
 const maxForwardedHops = 16
 
 // ClientAddress dérive l'adresse à compter à partir de l'adresse de pair et de `X-Forwarded-For`.
 //
-// `forwardedFor` porte les **lignes** de l'en-tête, telles que `http.Header.Values` les rend et non
-// telles que `Get` les résumerait : Go ne fusionne pas les lignes répétées, et tous les proxys
-// n'ajoutent pas à la même — HAProxy `option forwardfor` en écrit une seconde. Les recevoir séparées
-// plutôt que jointes évite aussi de recopier l'en-tête entier avant de le lire.
+// `forwardedFor` porte les **lignes** de l'en-tête, telles que `http.Header.Values` les rend : Go ne
+// fusionne pas les lignes répétées, et tous les proxys n'ajoutent pas à la même — HAProxy `option
+// forwardfor` en écrit une seconde.
 //
 // **Sans réseau de confiance, l'en-tête est ignoré**, et c'est la moitié qui compte : `X-Forwarded-For`
 // est écrit par le client, donc le croire sans condition offrirait à quiconque une évasion du
@@ -116,9 +109,8 @@ func ClientAddress(remoteAddr string, forwardedFor []string, trusted []netip.Pre
 // l'un des nôtres. Il ne rend pas d'erreur : une chaîne illisible n'est pas une panne, c'est un
 // en-tête auquel on cesse de croire, et l'appelant retombe sur l'adresse de pair.
 //
-// Le découpage se fait **saut par saut**, depuis la fin, plutôt qu'en tranchant la chaîne entière :
-// c'est ce qui fait que la borne borne pour de bon. Un `strings.Split` aurait alloué le demi-million
-// de sous-chaînes avant que le compteur ait le temps de les refuser.
+// Le découpage se fait saut par saut plutôt qu'en tranchant la chaîne entière : un `strings.Split`
+// aurait alloué toutes les sous-chaînes avant que la borne ait le temps de les refuser.
 func firstUntrustedHop(lines []string, trusted []netip.Prefix) (netip.Addr, bool) {
 	examined := 0
 

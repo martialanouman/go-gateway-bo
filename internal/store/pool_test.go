@@ -193,15 +193,12 @@ func TestClosingThePoolDirectlyLeavesNoGoroutineBehind(t *testing.T) {
 		before, runtime.NumGoroutine(), pools)
 }
 
-// La borne de `ClosePool`, et la raison pour laquelle un `defer pool.Close()` nu ne suffisait pas :
-// `Close` attend sans limite que les connexions **empruntées** reviennent. Après un délai de grâce
-// expiré — ce que `serve` rapporte — une requête en détient encore une, et le binaire pendrait à
-// l'instant où il doit sortir.
+// La borne de `ClosePool` : `Close` attend sans limite qu'une connexion **empruntée** revienne, et un
+// handler qui ne la rendrait jamais ferait pendre le binaire à l'instant où il doit sortir.
 //
 // Le verdict est relevé sur un canal plutôt qu'affirmé après l'appel : c'est la seule forme qui
-// **rougit** au lieu de pendre. Constaté sur la mutation « borne retirée » — un test qui appelle
-// directement `ClosePool` sans borne ne revient jamais, et un rouge qui n'arrive pas ne prouve rien.
-// La même leçon que la connexion de trop de `TestTheDSNCannotLoosenThePoolBounds`.
+// rougit au lieu de pendre quand la borne disparaît. Même leçon que la connexion de trop de
+// `TestTheDSNCannotLoosenThePoolBounds`.
 func TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack(t *testing.T) {
 	t.Parallel()
 
@@ -211,7 +208,7 @@ func TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack(t *testing.T) {
 	pool, err := store.NewPool(ctx, dsn)
 	require.NoError(t, err, "construire le pool")
 
-	// Empruntée et **jamais rendue** : c'est la requête que le délai de grâce n'a pas vu finir.
+	// Empruntée et jamais rendue : la requête que le délai de grâce n'a pas vu finir.
 	held, err := pool.Acquire(ctx)
 	require.NoError(t, err, "acquérir la connexion que rien ne rendra")
 
