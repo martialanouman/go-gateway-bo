@@ -29,4 +29,9 @@ func (API) Me(_ context.Context, _ bff.MeRequestObject) (bff.MeResponseObject, e
 	return bff.Me401JSONResponse{Code: "unauthenticated", Message: "Reconnectez-vous."}, nil
 }
 
+// Logout est identique dans les deux fixtures, pour la même raison que `Login`.
+func (API) Logout(_ context.Context, _ bff.LogoutRequestObject) (bff.LogoutResponseObject, error) {
+	return bff.Logout204Response{}, nil
+}
+
 var _ = bff.NewStrictHandler(API{}, nil)

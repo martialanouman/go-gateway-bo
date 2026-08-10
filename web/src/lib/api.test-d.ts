@@ -102,3 +102,15 @@ expectTypeOf<MeOperation['responses'][200]['content']['application/json']>().toE
 // Deux statuts seulement. Le client n'a que deux cas à traiter : il est connecté, ou il ne l'est
 // plus — et la seconde branche mène à l'écran de connexion, sans qu'il ait à savoir pourquoi.
 expectTypeOf<keyof MeOperation['responses']>().toEqualTypeOf<200 | 401>()
+
+/**
+ * `POST /api/auth/logout` — step-022. Un seul statut, et c'est ce que le client doit savoir : il n'y
+ * a pas de branche « la déconnexion a échoué » à écrire, pas même quand la session n'existait plus.
+ */
+
+type LogoutOperation = paths['/auth/logout']['post']
+
+expectTypeOf<keyof LogoutOperation['responses']>().toEqualTypeOf<204>()
+
+// Aucun corps à envoyer : rien à composer, donc rien à oublier de composer.
+expectTypeOf<LogoutOperation['requestBody']>().toEqualTypeOf<undefined>()

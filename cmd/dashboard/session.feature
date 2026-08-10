@@ -51,6 +51,30 @@ Fonctionnalité: La session, d'une requête à l'autre
     Alors le serveur répond 401
     Et redemander "/api/auth/me" est refusé de même
 
+  # Le rejeu est le cœur du scénario, pas un ornement. Constater que "/api/auth/me" refuse après une
+  # déconnexion ne prouverait rien : c'est le navigateur qui a jeté son cookie. Ce qui prouve que la
+  # ligne a disparu est de renvoyer exactement celui qu'il avait avant.
+  Scénario: se déconnecter détruit la session, et le cookie rejoué ne la ressuscite pas
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand le navigateur se déconnecte
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 204
+    Et le cookie de session est expiré
+    Quand le navigateur rejoue le cookie qu'il portait avant la déconnexion
+    Et le navigateur demande "/api/auth/me"
+    Alors le serveur répond 401
+
+  # Se déconnecter est une demande d'état, et l'état est atteint. Refuser obligerait le client à
+  # traiter un cas sans conséquence, et dirait à qui teste un cookie ce qu'il vaut encore.
+  Scénario: se déconnecter sans session réussit aussi
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Quand le navigateur se déconnecte
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 204
+
   # Une base en panne n'est pas une session fermée. Les confondre ferait se reconnecter l'opérateur
   # en boucle pendant que la panne dure, et masquerait l'incident derrière un écran de connexion.
   Scénario: une base en panne ne se lit pas comme une session fermée

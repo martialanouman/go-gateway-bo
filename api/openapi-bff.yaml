@@ -146,6 +146,25 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Fermer la session
+      description: |
+        La ligne de session est **supprimée**, et le cookie expiré. Le second sans le premier ne
+        protège rien : un cookie qu'on garde se rejoue.
+
+        **Le même statut sans session**, et c'est délibéré : se déconnecter est une demande d'état,
+        et l'état est atteint. Un refus obligerait le client à traiter un cas sans conséquence, et
+        dirait à qui teste un cookie s'il vaut encore quelque chose. C'est aussi le moment où
+        l'opérateur veut le plus que ce bouton marche — sur une session déjà morte.
+
+        Aucun corps : rien à dire que le statut ne dise. Le cookie d'expiration n'est pas déclaré
+        ici, pour la même raison qu'à la connexion — il est `HttpOnly`, le client ne le lit pas.
+      responses:
+        '204':
+          description: La session est fermée, qu'elle ait existé ou non.
+
 components:
   schemas:
     Health:

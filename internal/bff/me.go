@@ -2,6 +2,8 @@ package bff
 
 import (
 	"context"
+
+	"github.com/martialanouman/go-gateway-bo/internal/session"
 )
 
 // Me rend l'opérateur connecté et **ce qu'il a le droit de faire**.
@@ -40,6 +42,40 @@ func (a API) Me(ctx context.Context, _ MeRequestObject) (MeResponseObject, error
 		Elevated:    resolved.Elevated,
 		ExpiresAt:   resolved.ExpiresAt,
 	}, nil
+}
+
+// Logout ferme la session.
+//
+// **Ce qui protège est la suppression de la ligne**, pas le cookie expiré : un cookie qu'on garde se
+// rejoue, et le navigateur n'est pas le seul à en détenir une copie.
+//
+// Sans session, le même 204. Se déconnecter est une demande d'état, et l'état est atteint — refuser
+// obligerait le client à traiter un cas sans conséquence, dirait à qui teste un cookie ce qu'il vaut
+// encore, et casserait le bouton au moment précis où l'opérateur en a besoin.
+//
+// Le cookie d'expiration part quand même : c'est ce qui nettoie un cookie périmé que le serveur ne
+// connaît même plus.
+//
+// `Logout204Response` est un struct **sans champ**, que la porte `TestResponseTypesDeclareTheirFields`
+// traverse en vert faute d'avoir quoi que ce soit à examiner. Ce qui garde cette réponse est le
+// scénario, qui la confronte au contrat.
+func (a API) Logout(ctx context.Context, _ LogoutRequestObject) (LogoutResponseObject, error) {
+	postCookie(ctx, session.Cleared())
+
+	resolved, alive, err := sessionFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !alive {
+		return Logout204Response{}, nil
+	}
+
+	if err = a.Sessions.Close(ctx, resolved.ID); err != nil {
+		return nil, err
+	}
+
+	return Logout204Response{}, nil
 }
 
 // notAuthenticated est le refus **unique** d'une session absente. Un seul constructeur, comme le

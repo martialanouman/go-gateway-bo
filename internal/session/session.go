@@ -97,15 +97,10 @@ func (m *Manager) Elevate(ctx context.Context, value string) (string, bool, erro
 	return renewed, true, nil
 }
 
-// Destroy ferme la session. C'est **la** protection du logout : expirer le cookie ne suffirait pas,
-// il se rejoue.
-func (m *Manager) Destroy(ctx context.Context, value string) error {
-	tokenHash, ok := Unseal(m.secret, value)
-	if !ok {
-		return nil
-	}
-
-	return m.sessions.Delete(ctx, tokenHash)
+// Close ferme la session qu'on vient de résoudre. C'est **la** protection du logout : expirer le
+// cookie ne suffirait pas, il se rejoue.
+func (m *Manager) Close(ctx context.Context, id string) error {
+	return m.sessions.Delete(ctx, id)
 }
 
 // Grants rend de quoi nommer l'opérateur et l'union des permissions de ses rôles.

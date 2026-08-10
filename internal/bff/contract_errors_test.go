@@ -43,6 +43,10 @@ func (failingAPI) Me(_ context.Context, _ MeRequestObject) (MeResponseObject, er
 	return nil, errors.New("appel de " + internalTopology + "/admin/v1/me: connexion refusée")
 }
 
+func (failingAPI) Logout(_ context.Context, _ LogoutRequestObject) (LogoutResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/logout: connexion refusée")
+}
+
 // Une implémentation qui rend une erreur ne fait pas partir le message Go au navigateur.
 //
 // Le défaut que ce test rejoue est celui des défauts d'oapi-codegen (`bff.gen.go`,

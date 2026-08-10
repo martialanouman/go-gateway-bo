@@ -111,9 +111,9 @@ func TestUnCookieMalScelleNAtteintPasLaBase(t *testing.T) {
 	require.Error(t, err, "témoin : un cookie authentique doit, lui, atteindre la base")
 }
 
-// Même ordre pour les deux autres gestes : ni la fermeture ni l'élévation ne doivent partir en base
-// sur un cookie que personne n'a signé.
-func TestNiLaFermetureNiLElevationNAtteignentLaBaseSurUnCookieForge(t *testing.T) {
+// Même ordre pour l'élévation, qui part elle aussi d'un cookie. La fermeture, elle, ne prend plus de
+// cookie du tout — elle ferme la session **déjà résolue**, par sa clé primaire.
+func TestLElevationNAtteintPasLaBaseSurUnCookieForge(t *testing.T) {
 	t.Parallel()
 
 	authentic, _, err := newSealedToken(testSecret)
@@ -122,14 +122,12 @@ func TestNiLaFermetureNiLElevationNAtteignentLaBaseSurUnCookieForge(t *testing.T
 	manager := NewManager(store.NewSessions(closedPool(t)), testSecret)
 	forged := alter(authentic)
 
-	require.NoError(t, manager.Destroy(context.Background(), forged))
-
 	_, elevated, err := manager.Elevate(context.Background(), forged)
 	require.NoError(t, err)
 	assert.False(t, elevated)
 
-	require.Error(t, manager.Destroy(context.Background(), authentic),
-		"témoin : fermer une session authentique doit atteindre la base")
+	_, _, err = manager.Elevate(context.Background(), authentic)
+	require.Error(t, err, "témoin : un cookie authentique doit, lui, atteindre la base")
 }
 
 // Les cinq attributs sont ce qui remplace, ici, ce que le contrat ne peut pas déclarer : `HttpOnly`

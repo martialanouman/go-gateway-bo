@@ -81,6 +81,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fermer la session
+         * @description La ligne de session est **supprimée**, et le cookie expiré. Le second sans le premier ne
+         *     protège rien : un cookie qu'on garde se rejoue.
+         *
+         *     **Le même statut sans session**, et c'est délibéré : se déconnecter est une demande d'état,
+         *     et l'état est atteint. Un refus obligerait le client à traiter un cas sans conséquence, et
+         *     dirait à qui teste un cookie s'il vaut encore quelque chose. C'est aussi le moment où
+         *     l'opérateur veut le plus que ce bouton marche — sur une session déjà morte.
+         *
+         *     Aucun corps : rien à dire que le statut ne dise. Le cookie d'expiration n'est pas déclaré
+         *     ici, pour la même raison qu'à la connexion — il est `HttpOnly`, le client ne le lit pas.
+         */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -254,6 +283,24 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La session est fermée, qu'elle ait existé ou non. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

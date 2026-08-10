@@ -165,7 +165,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 24
+const minimumScenarios = 26
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -205,6 +205,10 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.When(`^la session reste (\d+) heures sans requête$`, sessions.idleFor)
 	ctx.When(`^la session dépasse son échéance absolue$`, sessions.expireAbsolutely)
 	ctx.When(`^la table des sessions devient illisible$`, sessions.breakSessionsTable)
+	ctx.When(`^le navigateur se déconnecte$`, sessions.signOut)
+	ctx.When(`^le navigateur rejoue le cookie qu'il portait avant la déconnexion$`,
+		sessions.replayThePreviousCookie)
+	ctx.Then(`^le cookie de session est expiré$`, sessions.sessionCookieIsCleared)
 	ctx.Then(`^la réponse nomme l'opérateur connecté$`, sessions.namesTheOperator)
 	ctx.Then(`^la réponse annonce que le second facteur n'est pas vérifié$`,
 		sessions.secondFactorIsNotVerified)

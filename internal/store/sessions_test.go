@@ -321,10 +321,10 @@ func TestFermerUneSessionEmpecheDeLaRejouer(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
 	require.NoError(t, err)
 
-	require.NoError(t, sessions.Delete(t.Context(), tokenHash("jeton")))
+	require.NoError(t, sessions.Delete(t.Context(), opened.ID))
 
 	_, alive, err := sessions.Resolve(t.Context(), tokenHash("jeton"), testIdle)
 	require.NoError(t, err)
@@ -352,7 +352,7 @@ func TestDeuxPoolsDistinctsResolventLaMemeSession(t *testing.T) {
 	require.True(t, alive)
 	assert.Equal(t, opened.ID, resolved.ID)
 
-	require.NoError(t, second.Delete(t.Context(), tokenHash("jeton")))
+	require.NoError(t, second.Delete(t.Context(), opened.ID))
 
 	_, alive, err = first.Resolve(t.Context(), tokenHash("jeton"), testIdle)
 	require.NoError(t, err)

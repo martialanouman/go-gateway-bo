@@ -151,10 +151,15 @@ func (s *Sessions) Elevate(ctx context.Context, tokenHash, renewedTokenHash []by
 
 // Delete ferme la session. C'est ce que le logout fait vraiment : expirer le cookie ne protège rien,
 // il suffit de le rejouer.
-func (s *Sessions) Delete(ctx context.Context, tokenHash []byte) error {
-	const query = `DELETE FROM sessions WHERE token_hash = $1`
+//
+// Par identifiant et non par empreinte : l'appelant vient de résoudre la session, donc il tient déjà
+// sa clé primaire. Repasser par l'empreinte demanderait de resceller le cookie pour retrouver ce
+// qu'on a sous la main, et fermerait « la session que porte ce jeton » là où on veut fermer « la
+// session qu'on vient de résoudre ».
+func (s *Sessions) Delete(ctx context.Context, id string) error {
+	const query = `DELETE FROM sessions WHERE id = $1`
 
-	if _, err := s.pool.Exec(ctx, query, tokenHash); err != nil {
+	if _, err := s.pool.Exec(ctx, query, id); err != nil {
 		return fmt.Errorf("fermer la session : %w", err)
 	}
 

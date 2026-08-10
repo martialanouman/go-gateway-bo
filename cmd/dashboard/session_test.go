@@ -23,6 +23,8 @@ type sessionWorld struct {
 	// roles retient ce que le scénario a attribué, pour que l'assertion sur l'union lise la base
 	// plutôt qu'une liste recopiée dans le test.
 	roles []string
+	// replayed est le cookie d'avant la déconnexion, que le scénario du rejeu renvoie.
+	replayed string
 }
 
 // grantRoles attribue à l'opérateur du scénario des rôles **du catalogue semé**, jamais des rôles
@@ -104,6 +106,49 @@ func (w *sessionWorld) alterSessionSeal() error {
 	}
 
 	w.login.process.cookies[session.CookieName] = token + "." + string(replacement) + seal[1:]
+
+	return nil
+}
+
+// signOut mémorise le cookie **avant** de se déconnecter : le scénario a besoin de le rejouer, et le
+// harnais l'oublie dès que le serveur l'expire, exactement comme un navigateur.
+func (w *sessionWorld) signOut() error {
+	w.replayed = w.login.process.cookies[session.CookieName]
+
+	return w.login.process.post("/api/auth/logout", "")
+}
+
+func (w *sessionWorld) replayThePreviousCookie() error {
+	if w.replayed == "" {
+		return errors.New("aucun cookie mémorisé : la déconnexion n'a pas eu lieu")
+	}
+
+	if _, still := w.login.process.cookies[session.CookieName]; still {
+		return errors.New("le navigateur porte encore son cookie : la déconnexion ne l'a pas expiré, " +
+			"et le rejeu ne prouverait rien")
+	}
+
+	w.login.process.cookies[session.CookieName] = w.replayed
+
+	return nil
+}
+
+// sessionCookieIsCleared exige que le serveur ait **recouvert** le cookie, pas seulement qu'il ait
+// cessé de l'envoyer. Un `Set-Cookie` d'expiration est ce qui fait oublier au navigateur une valeur
+// qui ne vaut plus rien.
+func (w *sessionWorld) sessionCookieIsCleared() error {
+	cookie, err := w.login.process.sessionCookie()
+	if err != nil {
+		return err
+	}
+
+	if cookie.MaxAge >= 0 {
+		return fmt.Errorf("le cookie est servi avec Max-Age=%d : le navigateur le garde", cookie.MaxAge)
+	}
+
+	if _, still := w.login.process.cookies[session.CookieName]; still {
+		return errors.New("le navigateur a gardé le cookie malgré son expiration")
+	}
 
 	return nil
 }
