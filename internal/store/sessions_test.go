@@ -92,18 +92,51 @@ func grantRole(t *testing.T, dsn, operatorID, role string, keys ...string) {
 	require.NoError(t, err)
 }
 
-// age recule les deux horodatages mobiles d'une session, comme le ferait le temps. Le compte de
-// lignes touchées est asserté : un cas qui n'a rien vieilli passerait en silence.
-func age(t *testing.T, dsn string, hash []byte, elapsed time.Duration) {
+// **Les deux vieillissements sont séparés, et c'est le cœur de ces tests.** Reculer les deux
+// horodatages ensemble faisait refuser la fenêtre glissante dans tous les cas : la mutation « borne
+// absolue retirée du `WHERE` » laissait alors la suite entièrement verte, mesuré le 10/08/2026. Un
+// test qui ne peut pas rougir pour la borne qu'il nomme est un test vert pour la mauvaise borne.
+//
+// Le compte de lignes touchées est asserté : un cas qui n'a rien vieilli passerait en silence.
+
+// idleFor recule la dernière vue **seule** : la session reste largement en deçà de son échéance
+// absolue, donc seule la fenêtre glissante peut la refuser.
+func idleFor(t *testing.T, dsn string, hash []byte, elapsed time.Duration) {
+	t.Helper()
+
+	touched := execOn(t, dsn, `
+		UPDATE sessions SET last_seen_at = last_seen_at - make_interval(secs => $2)
+		WHERE token_hash = $1`, hash, elapsed.Seconds())
+	require.EqualValues(t, 1, touched, "aucune session vieillie : le cas ne prouverait rien")
+}
+
+// openedAgo recule la naissance et l'échéance absolue, **et laisse la dernière vue** : la session est
+// celle d'un opérateur connecté il y a un moment et qui vient de faire une requête. C'est ce qui rend
+// l'échéance absolue observable — sans recul, la session ouverte et la session résolue le sont à la
+// même milliseconde, et « ne pas repousser » ne se distingue pas de « repousser » (mesuré le
+// 10/08/2026 : la mutation « Resolve repousse aussi l'échéance absolue » laissait la suite verte).
+func openedAgo(t *testing.T, dsn string, hash []byte, elapsed time.Duration) {
 	t.Helper()
 
 	touched := execOn(t, dsn, `
 		UPDATE sessions
-		SET last_seen_at = last_seen_at - make_interval(secs => $2),
-		    created_at   = created_at   - make_interval(secs => $2),
-		    expires_at   = expires_at   - make_interval(secs => $2)
+		SET created_at = created_at - make_interval(secs => $2),
+		    expires_at = expires_at - make_interval(secs => $2)
 		WHERE token_hash = $1`, hash, elapsed.Seconds())
 	require.EqualValues(t, 1, touched, "aucune session vieillie : le cas ne prouverait rien")
+}
+
+// expire fait passer l'échéance absolue **sans toucher la dernière vue** : la session vient d'être
+// utilisée, donc seule l'échéance absolue peut la refuser.
+func expire(t *testing.T, dsn string, hash []byte) {
+	t.Helper()
+
+	touched := execOn(t, dsn, `
+		UPDATE sessions
+		SET created_at = now() - interval '13 hours', expires_at = now() - interval '1 minute',
+		    last_seen_at = now()
+		WHERE token_hash = $1`, hash)
+	require.EqualValues(t, 1, touched, "aucune session échue : le cas ne prouverait rien")
 }
 
 func TestUneSessionOuverteSeRetrouveParSonEmpreinte(t *testing.T) {
@@ -146,7 +179,7 @@ func TestUneSessionAuDelaDeSonEcheanceAbsolueNEstPlusVivante(t *testing.T) {
 	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
 	require.NoError(t, err)
 
-	age(t, dsn, tokenHash("jeton"), testLifetime+time.Minute)
+	expire(t, dsn, tokenHash("jeton"))
 
 	_, alive, err := sessions.Resolve(t.Context(), tokenHash("jeton"), testIdle)
 	require.NoError(t, err)
@@ -154,7 +187,7 @@ func TestUneSessionAuDelaDeSonEcheanceAbsolueNEstPlusVivante(t *testing.T) {
 }
 
 // La fenêtre glissante est ce qui ferme le poste qu'on a quitté. L'absolue ne le fait pas : elle
-// tiendrait encore dix heures.
+// tiendrait encore neuf heures.
 func TestUneSessionOisiveAuDelaDeLaFenetreNEstPlusVivante(t *testing.T) {
 	t.Parallel()
 
@@ -164,9 +197,7 @@ func TestUneSessionOisiveAuDelaDeLaFenetreNEstPlusVivante(t *testing.T) {
 	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
 	require.NoError(t, err)
 
-	// Reculer de trois heures laisse l'échéance absolue à neuf heures devant : seule la fenêtre
-	// glissante peut refuser.
-	age(t, dsn, tokenHash("jeton"), testIdle+time.Hour)
+	idleFor(t, dsn, tokenHash("jeton"), testIdle+time.Hour)
 
 	_, alive, err := sessions.Resolve(t.Context(), tokenHash("jeton"), testIdle)
 	require.NoError(t, err)
@@ -184,7 +215,7 @@ func TestUnRefusNeProlongeJamaisLaSession(t *testing.T) {
 	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
 	require.NoError(t, err)
 
-	age(t, dsn, tokenHash("jeton"), testIdle+time.Hour)
+	idleFor(t, dsn, tokenHash("jeton"), testIdle+time.Hour)
 
 	for range 3 {
 		_, alive, resolveErr := sessions.Resolve(t.Context(), tokenHash("jeton"), testIdle)
@@ -218,21 +249,23 @@ func TestLEcheanceAbsolueNEstJamaisRepoussee(t *testing.T) {
 	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
 	require.NoError(t, err)
 
-	age(t, dsn, tokenHash("jeton"), time.Hour)
+	// La session est celle d'un opérateur connecté il y a quatre heures. Il lui en reste huit, et
+	// c'est ce qu'aucune activité ne doit lui rendre.
+	openedAgo(t, dsn, tokenHash("jeton"), 4*time.Hour)
 
 	first, alive, err := sessions.Resolve(t.Context(), tokenHash("jeton"), testIdle)
 	require.NoError(t, err)
 	require.True(t, alive)
 
-	age(t, dsn, tokenHash("jeton"), time.Hour)
+	idleFor(t, dsn, tokenHash("jeton"), time.Hour)
 
 	second, alive, err := sessions.Resolve(t.Context(), tokenHash("jeton"), testIdle)
 	require.NoError(t, err)
 	require.True(t, alive, "une heure d'inactivité tient dans la fenêtre de deux heures")
 
-	assert.WithinDuration(t, opened.ExpiresAt.Add(-2*time.Hour), second.ExpiresAt, time.Second,
+	assert.WithinDuration(t, opened.ExpiresAt.Add(-4*time.Hour), second.ExpiresAt, time.Second,
 		"l'échéance absolue a bougé : la session n'expirera jamais tant qu'on s'en sert")
-	assert.WithinDuration(t, first.ExpiresAt.Add(-time.Hour), second.ExpiresAt, time.Second)
+	assert.WithinDuration(t, first.ExpiresAt, second.ExpiresAt, time.Second)
 }
 
 // Sans régénération, un jeton obtenu avant le second facteur reste valable après : celui qui l'a
@@ -273,7 +306,7 @@ func TestUneSessionMorteNeSEleveJamais(t *testing.T) {
 	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
 	require.NoError(t, err)
 
-	age(t, dsn, tokenHash("jeton"), testLifetime+time.Minute)
+	expire(t, dsn, tokenHash("jeton"))
 
 	elevated, err := sessions.Elevate(t.Context(), tokenHash("jeton"), tokenHash("neuf"), testIdle)
 	require.NoError(t, err)
