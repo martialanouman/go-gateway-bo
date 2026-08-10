@@ -47,18 +47,14 @@ func (a API) Me(ctx context.Context, _ MeRequestObject) (MeResponseObject, error
 // Logout ferme la session.
 //
 // **Ce qui protège est la suppression de la ligne**, pas le cookie expiré : un cookie qu'on garde se
-// rejoue, et le navigateur n'est pas le seul à en détenir une copie.
+// rejoue, et le navigateur n'est pas le seul à en détenir une copie. Le cookie part quand même — il
+// nettoie une valeur que le serveur ne connaît plus.
 //
-// Sans session, le même 204. Se déconnecter est une demande d'état, et l'état est atteint — refuser
-// obligerait le client à traiter un cas sans conséquence, dirait à qui teste un cookie ce qu'il vaut
-// encore, et casserait le bouton au moment précis où l'opérateur en a besoin.
+// Sans session, le même 204 ; la raison est dans la description de l'opération au contrat.
 //
-// Le cookie d'expiration part quand même : c'est ce qui nettoie un cookie périmé que le serveur ne
-// connaît même plus.
-//
-// `Logout204Response` est un struct **sans champ**, que la porte `TestResponseTypesDeclareTheirFields`
-// traverse en vert faute d'avoir quoi que ce soit à examiner. Ce qui garde cette réponse est le
-// scénario, qui la confronte au contrat.
+// `Logout204Response` est un struct **sans champ**, que `TestResponseTypesDeclareTheirFields`
+// traverse en vert faute d'avoir quoi que ce soit à examiner : ce qui garde cette réponse est le
+// scénario qui la confronte au contrat.
 func (a API) Logout(ctx context.Context, _ LogoutRequestObject) (LogoutResponseObject, error) {
 	postCookie(ctx, session.Cleared())
 

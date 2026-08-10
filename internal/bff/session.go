@@ -25,16 +25,11 @@ type pendingCookie struct {
 // writePendingCookie pose sur la réponse le cookie que le handler a déposé.
 //
 // **Un middleware strict et non un middleware chi**, et ce n'est pas un détail de style : le statut
-// et les en-têtes partent dans `Visit…Response(w)`, à l'intérieur du handler engendré
-// (`bff.gen.go`, `strictHandler.Login`). Un middleware chi ne reprendrait la main qu'après, sur une
-// réponse déjà écrite. Celui-ci est appelé **autour** du handler, donc avant. C'est le même
-// mécanisme que step-025 emploiera pour ses gardes de permission.
-//
-// Le cookie n'est pas déclaré au contrat, délibérément : `openapi-typescript` en ferait un en-tête
-// que le client croit pouvoir lire, alors que `HttpOnly` le lui interdit — le contrat mentirait. Et
-// le code engendré poserait l'en-tête avec `Set`, ce qui écraserait un second cookie au lieu de
-// l'ajouter. Ce qu'on perd, c'est de pouvoir exiger sa présence par la validation `kin-openapi` ; ce
-// qui le remplace est un pas de scénario qui vérifie les cinq attributs, donc davantage.
+// et les en-têtes partent dans `Visit…Response(w)`, à l'intérieur du handler engendré (`bff.gen.go`,
+// `strictHandler.Login`). Un middleware chi ne reprendrait la main qu'après, sur une réponse déjà
+// écrite ; celui-ci est appelé **autour** du handler. C'est le mécanisme que step-025 emploiera pour
+// ses gardes de permission. Pourquoi le cookie n'est pas déclaré au contrat : voir la description de
+// `/auth/login` dans `api/openapi-bff.yaml`.
 //
 // Rien n'est posé sur une erreur : un 500 accompagné d'un `Set-Cookie` ouvrirait une session que le
 // client croirait échouée.
