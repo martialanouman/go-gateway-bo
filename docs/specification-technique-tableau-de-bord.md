@@ -114,6 +114,18 @@ role_permissions                     -- many-to-many: this is what makes authori
 operator_roles                       -- many-to-many: an operator can hold more than one role
   operator_id (fk), role_id (fk)
 
+mfa_challenges                       -- (Amendement step-021) second-factor challenge issued by POST /auth/login
+  id (uuidv7, pk)
+  operator_id (fk)
+  token_hash                             -- SHA-256 du jeton ; le jeton lui-même n'est jamais stocké
+  created_at, expires_at
+  consumed_at            (nullable)      -- anti-rejeu : un challenge consommé ne se rejoue pas
+
+login_attempt_counters               -- (Amendement step-021) anti-brute-force partagé entre instances
+  scope                  (email|source) -- l'adresse soumise, ou le HMAC de l'adresse source
+  subject                (pk avec scope)
+  failures, last_failure_at              -- l'état de verrou se DÉRIVE des deux ; pas de locked_until
+
 audit_log
   id (uuidv7, pk)
   operator_id (fk)

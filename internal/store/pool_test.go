@@ -193,6 +193,49 @@ func TestClosingThePoolDirectlyLeavesNoGoroutineBehind(t *testing.T) {
 		before, runtime.NumGoroutine(), pools)
 }
 
+// La borne de `ClosePool` : `Close` attend sans limite qu'une connexion **empruntée** revienne, et un
+// handler qui ne la rendrait jamais ferait pendre le binaire à l'instant où il doit sortir.
+//
+// Le verdict est relevé sur un canal plutôt qu'affirmé après l'appel : c'est la seule forme qui
+// rougit au lieu de pendre quand la borne disparaît. Même leçon que la connexion de trop de
+// `TestTheDSNCannotLoosenThePoolBounds`.
+func TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	dsn := freshDatabase(ctx, t)
+
+	pool, err := store.NewPool(ctx, dsn)
+	require.NoError(t, err, "construire le pool")
+
+	// Empruntée et pas rendue avant l'appel : la requête que le délai de grâce n'a pas vu finir.
+	held, err := pool.Acquire(ctx)
+	require.NoError(t, err, "acquérir la connexion que rien ne rendra")
+
+	returned := make(chan struct{})
+
+	go func() {
+		defer close(returned)
+
+		store.ClosePool(pool, 200*time.Millisecond)
+	}()
+
+	select {
+	case <-returned:
+	case <-time.After(10 * time.Second):
+		assert.Fail(t, "ClosePool attend encore une connexion que personne ne rendra : l'arrêt ne se "+
+			"termine plus, et l'orchestrateur finira par envoyer SIGKILL — auquel cas ce sont toutes "+
+			"les connexions qui partent sans se fermer")
+	}
+
+	// La connexion rendue débloque le `Close` resté en arrière-plan, et le second `Close` attend qu'il
+	// ait fini — `sync.Once.Do` ne rend la main qu'après la première exécution. Sans ces deux lignes,
+	// ce test laisserait une goroutine et un pool ouverts derrière lui, sous le nez du voisin qui
+	// compte les goroutines du processus.
+	held.Release()
+	pool.Close()
+}
+
 // maxConnectionsPerInstance duplique la borne de `pool.go` plutôt que de l'exporter : une constante
 // exportée pour le seul confort d'un test est une part d'API que rien ne demande, et si les deux
 // divergent le test tombe — c'est précisément ce qu'on lui demande de faire.

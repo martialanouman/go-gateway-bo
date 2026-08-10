@@ -9,21 +9,50 @@ package bff
 import (
 	"io/fs"
 	"net/http"
+	"net/netip"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/martialanouman/go-gateway-bo/internal/auth"
 )
 
-// NewRouter assemble les routes du BFF et le service des assets de la SPA. `assets` a pour racine la
-// racine du site : la coquille y est `index.html`, les fichiers hachés sous `assets/`. Le prendre en
-// `fs.FS` plutôt qu'en `embed.FS` est ce qui permet de tester le repli sans build client.
+// Dependencies porte ce que les routes du BFF ne savent pas fabriquer.
+//
+// Une struct plutôt que des options variadiques, et c'est un choix : des options laisseraient
+// compiler un routeur amputé de sa dépendance, qui rendrait 500 sur la seule route qui compte, en
+// production, sans que rien ne l'ait dit au démarrage. La struct force le compilateur à revisiter
+// chaque site d'appel le jour où une dépendance obligatoire apparaît — ce qui est arrivé ici.
+type Dependencies struct {
+	// Assets a pour racine la racine du site : la coquille y est `index.html`, les fichiers hachés
+	// sous `assets/`. Le prendre en `fs.FS` plutôt qu'en `embed.FS` est ce qui permet de tester le
+	// repli sans build client.
+	Assets fs.FS
+	// Authenticator porte le premier facteur. Ce paquet ne connaît ni le pool ni la configuration : il
+	// reçoit un collaborateur déjà construit, ce qui le garde à l'écart de `pgxpool` et de
+	// `internal/config`.
+	Authenticator *auth.Authenticator
+	// TrustedProxies alimente la dérivation de l'adresse cliente. Vide est une valeur sûre : voir
+	// `withClientAddress` et `internal/auth.ClientAddress`.
+	TrustedProxies []netip.Prefix
+}
+
+// NewRouter assemble les routes du BFF et le service des assets de la SPA.
 //
 // Le repli n'est monté qu'en GET et HEAD : une écriture sur une route non montée est une erreur
 // d'appelant, à qui chi rend alors 405 plutôt que la coquille en 200.
-func NewRouter(assets fs.FS) http.Handler {
+func NewRouter(deps Dependencies) http.Handler {
+	assets := deps.Assets
+
 	r := chi.NewRouter()
 
 	r.Route("/api", func(api chi.Router) {
-		mountContract(api, API{})
+		// Borne la lecture du corps **avant** le décodage : la `maxLength` du contrat s'applique après,
+		// donc sur une valeur déjà entièrement chargée en mémoire.
+		api.Use(middleware.RequestSize(maximumLoginBodyBytes))
+		api.Use(withClientAddress(deps.TrustedProxies))
+
+		mountContract(api, API{Authenticator: deps.Authenticator})
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
@@ -85,17 +114,22 @@ func mountContract(api chi.Router, impl StrictServerInterface) {
 // Ce que ces deux-là couvrent exactement, lu dans le gabarit plutôt que supposé
 // (`strict-http.tmpl` d'oapi-codegen v2.8.0) : `RequestErrorHandlerFunc` n'a que huit sites d'appel,
 // **tous** dans le décodage du **corps** de la requête — JSON, formdata, multipart, texte brut. Il ne
-// voit ni paramètre, ni en-tête, ni cookie, et il est donc sans site d'appel dans `bff.gen.go`
-// aujourd'hui, `GET /health` n'ayant pas de corps. `ResponseErrorHandlerFunc`, lui, est atteint dès
+// voit ni paramètre, ni en-tête, ni cookie. Il était sans site d'appel jusqu'à step-021 : `POST
+// /auth/login` est la **première** opération du contrat à porter un corps de requête, donc la
+// première à l'atteindre — un JSON illisible envoyé sur cette route rend son 400. C'est pourquoi le
+// contrat déclare ce statut : sans lui, le scénario qui valide la réponse échouerait sur un statut
+// que le YAML ne connaît pas. `ResponseErrorHandlerFunc`, lui, est atteint dès
 // qu'une implémentation rend une erreur — le seul des trois qu'une requête exerce pour de bon ici,
 // par `TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser`. Une route future qui enveloppe son
 // erreur — `fmt.Errorf("appel de %s: %w", cfg.Gateway.BaseURL, err)` — servirait sans lui l'adresse
 // interne de l'API Admin au navigateur.
 //
 // L'erreur n'est ni journalisée ni propagée, et c'est un manque assumé plutôt qu'un oubli : aucun
-// journal n'atteint ce paquet aujourd'hui — `NewRouter` ne prend que les assets, et le `*slog.Logger`
-// s'arrête à `cmd/dashboard`. Un 500 servi ici ne laisse donc **aucune trace côté serveur**. Le
-// premier appel réel à la passerelle (step-060) devra apporter les deux à la fois.
+// journal n'atteint ce paquet aujourd'hui. `NewRouter` prend depuis step-021 une struct de
+// dépendances — mais elle ne porte pas de `*slog.Logger`, qui s'arrête toujours à `cmd/dashboard`. Un
+// 500 servi ici ne laisse donc **aucune trace côté serveur**, et c'est désormais vrai d'une route qui
+// travaille : un `password_hash` corrompu en base fait refuser la connexion sans que rien ne le dise.
+// Le premier appel réel à la passerelle (step-060) devra apporter les deux à la fois.
 func newContractHandler(impl StrictServerInterface) ServerInterface {
 	return NewStrictHandlerWithOptions(impl, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  rejectRequest,

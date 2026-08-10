@@ -37,7 +37,7 @@ pnpm -C web install
 cp .env.example .env       # puis remplir les secrets — voir plus bas
 docker compose up -d       # PostgreSQL 18 + Redis
 make migrate               # applique les migrations
-make bootstrap             # sème les permissions et les rôles par défaut
+make bootstrap             # sème les permissions et les rôles ; crée le compte propriétaire
 make mock                  # Prism sert le contrat sur :4010, autre terminal
 make dev                   # BFF (:3001) + Vite (:3000) — l'application est sur :3000
 ```
@@ -59,6 +59,11 @@ La signature de session, le sel d'anti-brute-force et le chiffrement des secrets
 repli**, et c'est délibéré — une clé codée en dur serait publique, donc n'importe qui signerait une
 session. `openssl rand -base64 48` fait le travail.
 
+**Un seul des trois existe aujourd'hui** : `DASHBOARD_BRUTEFORCE_SALT` (step-021), qui masque les
+adresses sources dans la table des compteurs d'échecs. La signature de session arrive en step-022 et
+le chiffrement TOTP en step-023 ; les chercher dans `.env.example` avant leur step serait les
+chercher en vain.
+
 Contrairement à la v1.0, **le serveur refuse de démarrer** si une variable obligatoire manque, en la
 nommant (step-000). Un démarrage réussi suivi d'une erreur à la première requête d'authentification
 laissait croire que l'installation était bonne.
@@ -77,10 +82,14 @@ retard, en nommant la version trouvée et la version attendue.
 Elle lit le DSN sur l'entrée standard, et non en argument qu'un `ps aux` afficherait ; `make
 bootstrap` s'en charge depuis `DASHBOARD_DATABASE_URL`.
 
-**La création du premier compte n'y est pas encore** (step-021). À l'issue de cette commande, une
-installation neuve a donc un vocabulaire complet et personne pour l'exercer. Ce sera la seule façon
-d'entrer dans une installation neuve — les comptes suivants se créeront depuis l'écran de gestion des
-opérateurs, sous une permission et avec un audit.
+**Elle crée aussi le compte propriétaire** (step-021) — mais seulement s'il n'y a aucun opérateur,
+et elle le dit quand elle n'en crée pas. C'est la création du compte qui ne se rejoue pas, pas la
+commande. Ses trois valeurs se lisent dans l'environnement, `DASHBOARD_BOOTSTRAP_OPERATOR_EMAIL`,
+`_NAME` et `_PASSWORD` — et non en argument qu'un `ps aux` afficherait. Elles ne sont exigées que sur
+une base sans opérateur ; le refus les nomme, sans jamais citer leur valeur.
+
+C'est la seule façon d'entrer dans une installation neuve — les comptes suivants se créent depuis
+l'écran de gestion des opérateurs, sous une permission et avec un audit.
 
 Un `pnpm install` qui échoue en **401 ou 403 sur `npm.pkg.github.com`** a toujours l'une de ces deux
 causes : le jeton local n'a pas le scope `read:packages`, ou le package n'accorde pas la lecture à ce
@@ -102,8 +111,9 @@ make mock       # Prism sur openapi-admin.yaml, sur :4010
 make migrate    # migrations goose. Le DSN de l'appelant l'emporte sur .env — c'est ce qui rend
                 # DASHBOARD_DATABASE_URL=…/staging make migrate sûr — et passe par stdin, jamais
                 # par argv : `ps aux` afficherait le mot de passe de la base
-make bootstrap  # sème le catalogue de permissions et les rôles par défaut, sur une base déjà
-                # migrée. Rejouable ; même précédence de DSN que migrate
+make bootstrap  # sème le catalogue de permissions et les rôles par défaut, puis crée le compte
+                # propriétaire s'il n'y en a aucun. Sur une base déjà migrée. Rejouable ; même
+                # précédence de DSN que migrate
 
 make test-go           # unitaires Go + scénarios godog, avec -race
 make lint-go           # golangci-lint · make fmt-go applique le formatage

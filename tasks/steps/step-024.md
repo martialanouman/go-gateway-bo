@@ -18,7 +18,8 @@ entièrement côté serveur ; le client ne fait que relayer ce que le navigateur
 - `rpID` et `origin` **de configuration serveur** (`DASHBOARD_WEBAUTHN_RP_ID`,
   `DASHBOARD_WEBAUTHN_ORIGIN`), vérifiés à chaque cérémonie.
 - Défis à **usage unique**, de courte durée, liés à la session — même nature d'objet que le challenge
-  de step-021, et comme lui absent du §3.1 : la migration qui les porte s'écrit ici.
+  de step-021 ; comme lui, la migration qui les porte s'écrit ici — et **le §3.1 s'amende dans la
+  même PR**, comme step-021 l'a fait pour `mfa_challenges` et `login_attempt_counters`.
 - Stockage des authentificateurs dans `operators.mfa_webauthn_credentials` (colonne `jsonb` déjà
   créée par step-005), avec le **compteur de signature**.
 - Plusieurs passkeys par opérateur ; suppression d'une passkey.

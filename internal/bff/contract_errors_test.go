@@ -31,6 +31,13 @@ func (failingAPI) Health(_ context.Context, _ HealthRequestObject) (HealthRespon
 	return nil, errors.New("appel de " + internalTopology + "/admin/v1/health: connexion refusée")
 }
 
+// Login n'est pas exercé par cette suite : ce qu'elle observe est le gestionnaire d'erreur du
+// montage, et `Health` suffit à le déclencher. La méthode est là parce que l'interface stricte
+// l'exige — c'est précisément ce qu'on lui demande, refuser de compiler une implémentation partielle.
+func (failingAPI) Login(_ context.Context, _ LoginRequestObject) (LoginResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/login: connexion refusée")
+}
+
 // Une implémentation qui rend une erreur ne fait pas partir le message Go au navigateur.
 //
 // Le défaut que ce test rejoue est celui des défauts d'oapi-codegen (`bff.gen.go`,

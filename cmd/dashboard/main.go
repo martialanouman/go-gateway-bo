@@ -10,12 +10,21 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
 	"github.com/martialanouman/go-gateway-bo/internal/config"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 	"github.com/martialanouman/go-gateway-bo/internal/webassets"
 )
+
+// poolCloseGrace borne l'attente de la fermeture du pool, **et n'est pas le délai de grâce**. Celui-ci
+// est déjà consommé quand `serve` rend la main ; le rejouer porterait le pire cas d'arrêt à 30 s, soit
+// le budget par défaut d'un orchestrateur avant SIGKILL. Ce qui reste à attendre ici est court :
+// `serve` ferme les connexions client, ce qui annule le contexte des requêtes en vol et fait rendre
+// leurs connexions à la base.
+const poolCloseGrace = 2 * time.Second
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -42,9 +51,11 @@ func start(logger *slog.Logger) error {
 }
 
 func run(ctx context.Context, logger *slog.Logger) error {
-	//nolint:forbidigo // La seule lecture d'environnement du dépôt, et elle ne fait que la passer au
-	// chargeur. L'exemption est posée sur la ligne, pas sur le fichier : sinon toute lecture ajoutée
-	// plus tard dans main passerait avec elle.
+	//nolint:forbidigo // La seule lecture d'environnement **du serveur**, et elle ne fait que la
+	// passer au chargeur. Elle n'est plus la seule du dépôt depuis step-021 : `cmd/bootstrap` en porte
+	// une, pour ses propres variables, avec la même exemption sur la ligne. Une par programme, aucune
+	// ailleurs. L'exemption reste posée sur la ligne et non sur le fichier : sinon toute lecture
+	// ajoutée plus tard dans main passerait avec elle.
 	cfg, err := config.Load(os.LookupEnv)
 	if err != nil {
 		return err
@@ -78,6 +89,22 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("assets embarqués : %w", err)
 	}
 
+	// **Le pool ne reçoit pas `ctx`.** `NewPool` attacherait sa fermeture à l'annulation, donc au
+	// SIGTERM : le pool se fermerait **au début** du délai de grâce, et les requêtes que ce délai
+	// existe pour laisser finir tomberaient sur un pool fermé. `WithoutCancel` rend un contexte sans
+	// `Done`, auprès duquel `AfterFunc` n'inscrit rien.
+	pool, err := store.NewPool(context.WithoutCancel(ctx), cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+
+	// Rien ne garde cette ligne, et c'est mesuré : la retirer laisse tout vert, parce que le processus
+	// s'arrête juste après et que l'OS ferme ses sockets. Ce qu'elle change — une déconnexion annoncée
+	// plutôt que découverte — n'est visible d'aucun test d'ici.
+	defer store.ClosePool(pool, poolCloseGrace)
+
+	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt)
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", cfg.Addr, err)
@@ -85,5 +112,11 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 	logger.Info("le serveur écoute", "addr", ln.Addr().String())
 
-	return serve(ctx, ln, bff.NewRouter(assets), cfg.ShutdownTimeout, logger)
+	router := bff.NewRouter(bff.Dependencies{
+		Assets:         assets,
+		Authenticator:  authenticator,
+		TrustedProxies: cfg.Auth.TrustedProxies,
+	})
+
+	return serve(ctx, ln, router, cfg.ShutdownTimeout, logger)
 }

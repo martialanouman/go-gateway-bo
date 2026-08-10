@@ -1,5 +1,8 @@
 // Package config charge la configuration du tableau de bord depuis l'environnement et la valide une
-// fois pour toutes, au démarrage.
+// fois pour toutes, au lancement.
+//
+// « Au lancement » et non « au démarrage du serveur » : il y a deux programmes et deux chargeurs
+// depuis step-021 — `Load` pour le serveur, `LoadBootstrap` pour la commande d'installation.
 //
 // Aucun autre package ne lit l'environnement : une variable lue ailleurs se découvrirait manquante à
 // la première requête qui l'emprunte, c'est-à-dire en production, sur un serveur qu'on croyait en
@@ -10,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"slices"
 	"strconv"
@@ -36,7 +40,16 @@ const (
 	EnvGatewayTimeout      = "DASHBOARD_GATEWAY_TIMEOUT"
 
 	EnvDatabaseURL = "DASHBOARD_DATABASE_URL"
+
+	EnvBruteForceSalt = "DASHBOARD_BRUTEFORCE_SALT"
+	EnvTrustedProxies = "DASHBOARD_TRUSTED_PROXIES"
 )
+
+// minimumBruteForceSaltLength borne le sel d'anti-brute-force. Trente-deux caractères : ce que rend
+// `openssl rand -base64 24`, et le README propose 48 octets. Ce que la borne empêche vraiment est un
+// sel posé « pour faire démarrer » — `changeme`, `dev`, le nom du projet — qui rendrait le HMAC des
+// adresses sources devinable, donc la table de compteurs relisible par qui la vole.
+const minimumBruteForceSaltLength = 32
 
 // defaultShutdownTimeout laisse aux requêtes en vol de quoi se terminer pendant un déploiement
 // roulant. Un délai a une valeur par défaut, un secret n'en a jamais.
@@ -67,6 +80,23 @@ type Config struct {
 	// DatabaseURL est le DSN du schéma propre au BFF. Il porte un mot de passe : il ne sort ni dans un
 	// message d'erreur, ni dans un journal.
 	DatabaseURL string
+	// Auth porte ce dont le premier facteur a besoin au démarrage.
+	Auth AuthConfig
+}
+
+// AuthConfig décrit ce que l'authentification lit dans l'environnement.
+type AuthConfig struct {
+	// BruteForceSalt est la clé du HMAC qui masque les adresses sources dans la table de compteurs.
+	// C'est un secret : il ne sort ni dans un message d'erreur, ni dans un journal.
+	BruteForceSalt []byte
+	// TrustedProxies énumère les réseaux dont on croit l'en-tête `X-Forwarded-For`.
+	//
+	// **Vide est une valeur sûre et non un défaut manquant** : sans liste, l'en-tête est ignoré et le
+	// compteur porte sur l'adresse de pair. C'est exact en développement, où rien ne s'interpose. En
+	// production, ne pas la renseigner ferait compter toutes les tentatives sur l'adresse du load
+	// balancer — le verrou se refermerait alors sur tout le monde d'un coup, ce qui se remarque, au
+	// lieu de laisser passer, ce qui ne se remarque pas.
+	TrustedProxies []netip.Prefix
 }
 
 // GatewayConfig décrit la connexion sortante vers l'API Admin. Hors du mode `real`, seule BaseURL
@@ -111,6 +141,10 @@ func Load(lookup Lookup) (Config, error) {
 			Timeout:      r.positiveDuration(EnvGatewayTimeout, defaultGatewayTimeout),
 		},
 		DatabaseURL: r.requiredDatabaseURL(EnvDatabaseURL),
+		Auth: AuthConfig{
+			BruteForceSalt: r.requiredSecret(EnvBruteForceSalt, minimumBruteForceSaltLength),
+			TrustedProxies: r.prefixList(EnvTrustedProxies),
+		},
 	}
 
 	r.requireRealGatewayMaterial(cfg.Gateway.Mode)
@@ -123,9 +157,17 @@ func Load(lookup Lookup) (Config, error) {
 	return cfg, nil
 }
 
-// Variables énumère les variables que lit Load, en la sondant avec un environnement vide plutôt
-// qu'en tenant une seconde liste — laquelle finirait par diverger du chargeur, et c'est d'elle que
-// dépend le test de `.env.example`.
+// Variables énumère les variables que lit **le dépôt**, en sondant les chargeurs avec un
+// environnement vide plutôt qu'en tenant une seconde liste — laquelle finirait par diverger d'eux, et
+// c'est d'elle que dépend le test de `.env.example`.
+//
+// « Le dépôt » et non « Load » depuis step-021 : il y a désormais **deux** chargeurs, parce qu'il y a
+// deux programmes. `Load` est la configuration du serveur ; `LoadBootstrap` celle de la commande
+// d'installation, dont les trois variables ne servent qu'une fois et qu'un serveur n'a aucune raison
+// d'exiger. Les sonder tous les deux ici est ce qui garde la porte de `.env.example` **exacte** : la
+// version qui n'en sondait qu'un aurait reproché au fichier trois variables qu'il documente à raison.
+// L'alternative — une seconde fonction que le test concatène — déplaçait la porte dans le test, où
+// une step future oublierait d'ajouter la sienne.
 //
 // La contrainte que cela impose au chargeur : **toute lecture est inconditionnelle**, faite dans le
 // littéral Config ci-dessus. Une variable lue seulement quand une autre est renseignée resterait
@@ -142,14 +184,17 @@ func Variables() []string {
 	// leur absence sur l'environnement. Sans lui, `.env.example` se verrait reprocher une divergence
 	// qui n'existe pas. Vérifié en le retirant : `TestDotenvExampleListsExactlyWhatLoadReads` tombe,
 	// en réclamant neuf noms de passerelle déjà documentés.
-	_, _ = Load(func(name string) (string, bool) {
+	probe := func(name string) (string, bool) {
 		if !seen[name] {
 			seen[name] = true
 			names = append(names, name)
 		}
 
 		return "", false
-	})
+	}
+
+	_, _ = Load(probe)
+	_, _ = LoadBootstrap(probe)
 
 	return names
 }
@@ -249,6 +294,56 @@ func (r *reader) requiredDatabaseURL(name string) string {
 	}
 
 	return value
+}
+
+// requiredSecret exige une valeur d'au moins `minimum` caractères, sans jamais citer ce qu'elle a
+// trouvé — ni sa longueur, qui est déjà une information sur le secret.
+func (r *reader) requiredSecret(name string, minimum int) []byte {
+	value, ok := r.required(name)
+	if !ok {
+		return nil
+	}
+
+	if len([]rune(value)) < minimum {
+		r.reject(name, "secret d'au moins %d caractères attendu ; la valeur n'est pas citée. "+
+			"`openssl rand -base64 48` fait le travail", minimum)
+
+		return nil
+	}
+
+	return []byte(value)
+}
+
+// prefixList lit une liste de réseaux CIDR séparés par des virgules.
+//
+// Une adresse nue est **refusée** plutôt que promue en /32 : `10.0.0.1` et `10.0.0.1/32` se lisent
+// pareil pour un humain, et accepter les deux ferait passer `10.0.0.0` pour un hôte là où l'auteur
+// pensait à un réseau. Exiger le préfixe force à écrire ce qu'on veut dire.
+func (r *reader) prefixList(name string) []netip.Prefix {
+	value := r.optional(name)
+	if value == "" {
+		return nil
+	}
+
+	var prefixes []netip.Prefix
+
+	for _, field := range strings.Split(value, ",") {
+		field = strings.TrimSpace(field)
+		if field == "" {
+			continue
+		}
+
+		prefix, err := netip.ParsePrefix(field)
+		if err != nil {
+			r.reject(name, "réseau CIDR attendu (par exemple 10.0.0.0/8), reçu %q", field)
+
+			return nil
+		}
+
+		prefixes = append(prefixes, prefix)
+	}
+
+	return prefixes
 }
 
 func (r *reader) requiredAbsoluteURL(name string, schemes ...string) string {

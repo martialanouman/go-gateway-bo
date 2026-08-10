@@ -41,3 +41,39 @@ expectTypeOf<keyof HealthOperation['responses']>().toEqualTypeOf<200>()
 // personne ne le remarque ferait de cet appel une requête que le client n'écrit nulle part.
 expectTypeOf<HealthOperation['requestBody']>().toEqualTypeOf<undefined>()
 expectTypeOf<HealthOperation['parameters']['query']>().toEqualTypeOf<undefined>()
+
+/**
+ * `POST /api/auth/login` — step-021. Ce que l'écran de connexion (step-027) tiendra pour vrai.
+ *
+ * La raison d'écrire ces quatre assertions plutôt qu'une : le client doit traiter **quatre**
+ * réponses, et trois sont des refus qui ne se ressemblent pas — l'un se réessaie tout de suite,
+ * l'autre après un délai, le troisième jamais. Un client qui n'en connaîtrait que deux découvrirait
+ * la troisième en production, sur l'écran de connexion, c'est-à-dire au pire endroit.
+ */
+
+type LoginOperation = paths['/auth/login']['post']
+
+// Le corps envoyé. `toEqualTypeOf` : un champ ajouté au schéma doit rougir ici plutôt que d'être
+// ignoré en silence par un formulaire qui ne le remplirait pas.
+expectTypeOf<LoginOperation['requestBody']['content']['application/json']>().toEqualTypeOf<{
+  email: string
+  password: string
+}>()
+
+// Le challenge, rendu une seule fois. `expiresAt` est une chaîne : le contrat dit `date-time`, et
+// `openapi-typescript` ne fabrique pas de `Date` — c'est au client de la lire.
+expectTypeOf<LoginOperation['responses'][200]['content']['application/json']>().toEqualTypeOf<{
+  challenge: string
+  expiresAt: string
+}>()
+
+// Les trois refus partagent la même forme. C'est ce qui interdit au client de distinguer « adresse
+// inconnue » de « mot de passe faux » : il n'y a rien dans le type qui le lui permette.
+expectTypeOf<LoginOperation['responses'][401]['content']['application/json']>().toEqualTypeOf<{
+  code: string
+  message: string
+}>()
+
+// Les quatre statuts, et le 400 en fait partie : login est la première opération à porter un corps,
+// donc la première dont le décodage peut échouer avant d'atteindre le handler.
+expectTypeOf<keyof LoginOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 429>()
