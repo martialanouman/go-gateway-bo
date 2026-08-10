@@ -208,11 +208,9 @@ func TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack(t *testing.T) {
 	pool, err := store.NewPool(ctx, dsn)
 	require.NoError(t, err, "construire le pool")
 
-	// Empruntée et jamais rendue : la requête que le délai de grâce n'a pas vu finir.
+	// Empruntée et pas rendue avant l'appel : la requête que le délai de grâce n'a pas vu finir.
 	held, err := pool.Acquire(ctx)
 	require.NoError(t, err, "acquérir la connexion que rien ne rendra")
-
-	defer held.Release()
 
 	returned := make(chan struct{})
 
@@ -229,6 +227,13 @@ func TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack(t *testing.T) {
 			"termine plus, et l'orchestrateur finira par envoyer SIGKILL — auquel cas ce sont toutes "+
 			"les connexions qui partent sans se fermer")
 	}
+
+	// La connexion rendue débloque le `Close` resté en arrière-plan, et le second `Close` attend qu'il
+	// ait fini — `sync.Once.Do` ne rend la main qu'après la première exécution. Sans ces deux lignes,
+	// ce test laisserait une goroutine et un pool ouverts derrière lui, sous le nez du voisin qui
+	// compte les goroutines du processus.
+	held.Release()
+	pool.Close()
 }
 
 // maxConnectionsPerInstance duplique la borne de `pool.go` plutôt que de l'exporter : une constante

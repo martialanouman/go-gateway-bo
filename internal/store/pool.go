@@ -73,37 +73,13 @@ const (
 // `<-ctx.Done()` ne se réveille pas d'un `Close` direct : mesurée le 02/08/2026, elle retenait le
 // pool entier pour la vie du binaire, à raison d'une par pool construit.
 //
-// # Ce que ce package ne câble pas, et pourquoi
+// **Le contexte passé ici ne doit pas être celui de l'arrêt** : `AfterFunc` fermerait alors le pool
+// au SIGTERM, c'est-à-dire au début du délai de grâce, et les requêtes que ce délai existe pour
+// laisser finir tomberaient sur un pool fermé. `cmd/dashboard` passe un contexte que rien n'annulera
+// et appelle `ClosePool` lui-même.
 //
-// Rien n'appelle encore `NewPool` dans `cmd/dashboard`, et c'est délibéré.
-//
-// DN-7 annonçait que le câblage du pool dans le binaire serait rendu falsifiable par le scénario
-// « un DSN mal formé empêche le démarrage » : en retirer le câblage aurait fait démarrer le binaire.
-// **Mesuré le 02/08/2026, ce n'est plus vrai** : la validation du DSN vit dans `internal/config`
-// (`requiredDatabaseURL`, sur `pgxpool.ParseConfig`), et le scénario est vert aujourd'hui alors que
-// `cmd/dashboard` ne mentionne `store` nulle part. Retirer un câblage ne ferait donc rougir aucune
-// porte, et en ajouter un ne serait observable par rien : un pool paresseux qui ne se connecte pas
-// n'a aucun effet qu'un scénario puisse voir. (Cette phrase disait « qu'un scénario **sans Docker**
-// puisse voir » : depuis step-020, les scénarios de `cmd/dashboard` ont un PostgreSQL réel. La
-// prémisse a changé, la conclusion non — un pool que rien n'atteint reste invisible.)
-//
-// Le câbler quand même livrerait exactement ce que ce dépôt a déjà refusé deux fois — un artefact
-// qu'aucun appelant n'atteint, un client instancié que rien n'appelle. Ce que la fiche demande —
-// cycle de vie attaché au `context` racine, arrêt propre — est tenu **par cette fonction** et exercé
-// par `pool_test.go` contre un PostgreSQL réel ; seul le site d'appel attend.
-//
-// **Ce paragraphe décrivait une attente ; elle a pris fin en step-021.** `cmd/dashboard` appelle
-// désormais `NewPool`, entre le contrôle de schéma et `net.Listen`, et `store.Logins` s'en sert pour
-// servir `POST /auth/login`. Ce qui reste vrai de ce qui précède : ni le contrôle de version ni la
-// commande d'installation ne l'empruntent, chacun pour la raison écrite plus haut.
-//
-// Ce que le câblage a appris, et qui n'était écrit nulle part : **le contexte qu'on passe ici ne doit
-// pas être celui de l'arrêt**. `context.AfterFunc` ci-dessous ferme le pool à l'annulation, donc lui
-// donner le contexte annulé par SIGTERM fermerait le pool **au début** du délai de grâce, et les
-// requêtes que ce délai existe pour laisser finir tomberaient sur un pool fermé. `cmd/dashboard` lui
-// passe un contexte que rien n'annulera et ferme lui-même, en `defer`, après le délai de grâce —
-// aucune porte ne le garde, et c'est mesuré : `arret-propre.feature` n'a aucune requête assez lente
-// pour ouvrir la fenêtre.
+// Seul le serveur emprunte ce pool : `VerifySchema` et `cmd/bootstrap` ouvrent leur propre connexion,
+// le temps d'une commande.
 func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
