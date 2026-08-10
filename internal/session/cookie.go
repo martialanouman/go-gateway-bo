@@ -14,6 +14,13 @@ import (
 // exige par écrit : `Secure`, `Path=/`, et aucun `Domain`. Un navigateur refuse un cookie ainsi
 // nommé qui n'aurait pas les trois. Ce que ça achète : un sous-domaine compromis ne peut plus
 // écraser le cookie de session, ce que `Domain` seul n'empêche pas.
+//
+// Le risque était le développement, où le serveur répond en clair : un cookie `Secure` y serait-il
+// refusé ? **Mesuré le 10/08/2026** dans Chromium plutôt que supposé — un serveur d'essai posant ce
+// cookie sur `http://localhost` le voit accepté, avec ses cinq attributs, aux côtés d'un témoin sans
+// préfixe qui écarte l'hypothèse d'une sonde cassée. Les navigateurs traitent `localhost` comme une
+// origine sûre. Rien dans ce dépôt ne garde cette propriété : le harnais godog porte ses cookies à la
+// main et accepterait n'importe quel nom.
 const CookieName = "__Host-dashboard_session"
 
 // tokenBytes : 256 bits tirés d'un CSPRNG. C'est ce qui dispense d'argon2 côté base — il n'y a aucun
