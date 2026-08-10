@@ -99,8 +99,10 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	// Après `serve`, donc après le délai de grâce : les requêtes que ce délai laisse finir ont rendu
-	// leurs connexions, et `Close` n'a plus qu'à les fermer.
-	defer pool.Close()
+	// leurs connexions, et il ne reste qu'à les fermer. Le **même** délai borne l'attente, parce que
+	// le cas qui reste est celui où la grâce a expiré sans que tout soit fini — et là, attendre sans
+	// borne ferait pendre le binaire. `ClosePool` porte l'arbitrage.
+	defer store.ClosePool(pool, cfg.ShutdownTimeout)
 
 	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt)
 

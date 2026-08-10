@@ -159,3 +159,30 @@ func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 
 	return pool, nil
 }
+
+// ClosePool ferme le pool et attend, **au plus `within`**, que les connexions empruntées reviennent.
+//
+// La borne est ce qui distingue cette fonction d'un `defer pool.Close()` écrit par réflexe. `Close`
+// attend sans limite que chaque connexion prêtée soit rendue : après un délai de grâce expiré — cas
+// que `serve` rapporte, et qu'un test exerce — une requête en détient encore une, et l'attendre sans
+// borne ferait **pendre** le binaire à l'instant précis où il doit sortir. Un arrêt qui ne se termine
+// pas est pire que l'abandon qu'il voulait éviter : l'orchestrateur finit par envoyer SIGKILL, et
+// c'est alors *toutes* les connexions qui partent sans se fermer.
+//
+// Ce qu'on perd en abandonnant l'attente est petit et connu : la fin du processus ferme ses sockets,
+// et PostgreSQL retire les backends en le constatant. Ce que `Close` achète est de le lui **dire**
+// plutôt que de le lui laisser découvrir.
+func ClosePool(pool *pgxpool.Pool, within time.Duration) {
+	closed := make(chan struct{})
+
+	go func() {
+		defer close(closed)
+
+		pool.Close()
+	}()
+
+	select {
+	case <-closed:
+	case <-time.After(within):
+	}
+}

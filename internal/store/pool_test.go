@@ -193,6 +193,47 @@ func TestClosingThePoolDirectlyLeavesNoGoroutineBehind(t *testing.T) {
 		before, runtime.NumGoroutine(), pools)
 }
 
+// La borne de `ClosePool`, et la raison pour laquelle un `defer pool.Close()` nu ne suffisait pas :
+// `Close` attend sans limite que les connexions **empruntées** reviennent. Après un délai de grâce
+// expiré — ce que `serve` rapporte — une requête en détient encore une, et le binaire pendrait à
+// l'instant où il doit sortir.
+//
+// Le verdict est relevé sur un canal plutôt qu'affirmé après l'appel : c'est la seule forme qui
+// **rougit** au lieu de pendre. Constaté sur la mutation « borne retirée » — un test qui appelle
+// directement `ClosePool` sans borne ne revient jamais, et un rouge qui n'arrive pas ne prouve rien.
+// La même leçon que la connexion de trop de `TestTheDSNCannotLoosenThePoolBounds`.
+func TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	dsn := freshDatabase(ctx, t)
+
+	pool, err := store.NewPool(ctx, dsn)
+	require.NoError(t, err, "construire le pool")
+
+	// Empruntée et **jamais rendue** : c'est la requête que le délai de grâce n'a pas vu finir.
+	held, err := pool.Acquire(ctx)
+	require.NoError(t, err, "acquérir la connexion que rien ne rendra")
+
+	defer held.Release()
+
+	returned := make(chan struct{})
+
+	go func() {
+		defer close(returned)
+
+		store.ClosePool(pool, 200*time.Millisecond)
+	}()
+
+	select {
+	case <-returned:
+	case <-time.After(10 * time.Second):
+		assert.Fail(t, "ClosePool attend encore une connexion que personne ne rendra : l'arrêt ne se "+
+			"termine plus, et l'orchestrateur finira par envoyer SIGKILL — auquel cas ce sont toutes "+
+			"les connexions qui partent sans se fermer")
+	}
+}
+
 // maxConnectionsPerInstance duplique la borne de `pool.go` plutôt que de l'exporter : une constante
 // exportée pour le seul confort d'un test est une part d'API que rien ne demande, et si les deux
 // divergent le test tombe — c'est précisément ce qu'on lui demande de faire.
