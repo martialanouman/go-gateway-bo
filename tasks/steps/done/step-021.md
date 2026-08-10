@@ -255,16 +255,34 @@ savoir s'il y a un opérateur avant d'exiger les variables — l'autre est la se
 exécutions se croisent. Ce cas-là n'est exercé par rien, exactement comme le verrou du seed
 (step-020, DN-9).
 
+### Les corrections d'après-revue
+
+| Mutation appliquée | Ce qui tombe |
+|---|---|
+| la borne de `ClosePool` retirée | `TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack` — en 10 s et non en pendant, le verdict étant relevé sur un canal |
+| `defer store.ClosePool` retiré du binaire | **rien** : le processus s'arrête juste après et l'OS ferme ses sockets. Constat écrit au-dessus de la ligne |
+| le cap de `maxForwardedHops` retiré | `TestUneChaineDeSautsPlusLongueQueLaBorneNEstPasRemontee` et `TestLaBornePorteSurLesLignesReuniesEtNonSurChacune` |
+| le cap remis à zéro à chaque **ligne** de l'en-tête | `TestLaBornePorteSurLesLignesReuniesEtNonSurChacune` seul — chaque test garde bien une chose distincte |
+| `maximumPasswordLength` retirée | `TestUnMotDePasseDemesureNAtteintPasLeHachage`, qui bascule de 400 à 500 |
+| `maximumEmailLength` retirée | `TestUneAdresseDemesureeNeDevientPasUneCleDeCompteur` |
+| le compte passé en **octets** | `TestUneAdresseDAccentsSousLaBorneNEstPasRefusee` |
+| `middleware.RequestSize` retiré du routeur | `TestUnCorpsPlusGrandQueLaBorneNEstPasDecode` — **après correction du test**, qui était vert pour la mauvaise raison : son corps franchissait d'abord la borne du mot de passe. La mutation l'a dit |
+| l'erreur de l'authenticator traduite en 401 | `TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants` |
+
 ### Ce qui n'est gardé par rien, vérifié plutôt que supposé
+
+Ce tableau est tenu **après** la revue : quatre de ses lignes ont été refermées depuis, et elles
+restent écrites avec ce qui les referme — une ligne qu'on efface se réouvre en silence.
 
 | Ligne | Constat |
 |---|---|
 | `subtle.ConstantTimeCompare` | aucune porte — voir ci-dessus |
 | le hachage factice, en tant qu'**appel** | aucune porte ; sa paramétrisation, elle, suit `currentParams` par construction |
-| la cible de durée d'argon2id | aucune porte. Ce qui est gardé est le **plancher** des paramètres (`TestLesParametresNeDescendentPasSousLePlancher`), pas la durée — celle-ci est écrite avec sa date, sa machine et sa commande |
-| `poolCtx` détaché du contexte d'arrêt | aucune porte, faute d'une requête assez lente pour traverser SIGTERM |
+| la cible de durée d'argon2id | aucune porte. Ce qui est gardé est le **plancher** des paramètres (`TestLesParametresNeDescendentPasSousLePlancher`), pas la durée — celle-ci est écrite avec sa date, sa machine et sa commande, et les dix profils mesurés sont au-dessus de `currentParams` |
+| le pool détaché du contexte d'arrêt | aucune porte, faute d'une requête assez lente pour traverser SIGTERM. **Sa fermeture non plus** : la retirer laisse tout vert, parce que le processus s'arrête juste après et que l'OS ferme ses sockets. Ce que la ligne change — une déconnexion annoncée plutôt que découverte — n'est visible d'aucun test de ce dépôt, et c'est écrit au-dessus d'elle. Ce qui **est** gardé est la **borne** de l'attente : `TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack` |
 | `pg_advisory_xact_lock` en tête de `CreateFirstOperator` | aucune porte — deux exécutions concurrentes se croisent trop rarement pour qu'un test qui les lance prouve quoi que ce soit |
-| l'**appel** à `VerifyDummy` dans `passwordMatches` | aucune porte, et pas de propriété structurelle non plus. Une porte du type-checker est possible — `internal/bff/dto_test.go` descend déjà dans les corps de fonction — et appartient à la step qui reprendra ce chemin |
-| les trois `CHECK` et le `ON DELETE CASCADE` de la migration `00004` | aucune porte : `constraints_test.go` couvre `00001`–`00003` et n'a pas été étendu. Deux d'entre eux sont d'ailleurs **inatteignables depuis le produit** — à trancher par un test, une suppression, ou une exemption commentée |
-| les bornes d'entrée `maximumPasswordLength`, `maximumEmailLength` et `RequestSize` | aucune porte : aucun test n'appelle `API.Login` et aucun scénario n'envoie de corps démesuré |
-| le chemin d'erreur base pendant un login | aucune porte : la plomberie du 500 est gardée sur `Health`, jamais sur `Login` |
+| l'**appel** à `VerifyDummy` dans `passwordMatches` | ~~aucune porte~~ **refermé** : `oracle_test.go` résout l'identifiant appelé en objet du type-checker et exige qu'il soit dans la branche « opérateur absent ». Trois mutations le font rougir — l'appel retiré, l'appel déplacé hors de la branche, la fonction renommée |
+| les trois `CHECK` et le `ON DELETE CASCADE` de la migration `00004` | ~~aucune porte~~ **refermé** : trois refus ajoutés à `constraints_test.go`, chacun vérifié en retirant **sa** contrainte isolément. Les deux inatteignables depuis le produit portent sur place ce qu'elles gardent |
+| les bornes d'entrée `maximumPasswordLength`, `maximumEmailLength` et `RequestSize` | ~~aucune porte~~ **refermé** : `bornes_test.go` monte le routeur entier sur un pool fermé, où 400 (refusé à la porte) se distingue de 500 (arrivé jusqu'à la base). Le compte en runes est gardé avec elles |
+| le chemin d'erreur base pendant un login | ~~aucune porte~~ **refermé** : `TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants`, qui vérifie le corps autant que le statut — faute de journal dans `internal/bff`, ce que le navigateur reçoit est tout ce qui existe |
+| `request.Body == nil` dans `API.Login` | aucune porte, et **inatteignable par le routeur** : `strictHandler.Login` assigne le pointeur sans condition. Lui écrire un test demanderait d'appeler la méthode hors de son routeur — il prouverait la garde et rien du produit. Le constat est au-dessus de la ligne |
