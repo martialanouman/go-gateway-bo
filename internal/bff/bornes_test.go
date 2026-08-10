@@ -125,10 +125,17 @@ func TestUneAdresseDAccentsSousLaBorneNEstPasRefusee(t *testing.T) {
 func TestUnCorpsPlusGrandQueLaBorneNEstPasDecode(t *testing.T) {
 	t.Parallel()
 
-	// Le mot de passe reste sous sa propre borne en runes : ce qui doit refuser cette requête est la
-	// taille du corps, et rien d'autre.
-	oversized := credentials(t, "camille@exemple.test", strings.Repeat("é", maximumLoginBodyBytes))
-	require.Greater(t, len(oversized), maximumLoginBodyBytes)
+	// **Chaque champ reste sous sa propre borne**, et c'est toute la difficulté de ce test : des runes
+	// de deux octets font tenir 4 096 caractères — la borne exacte du mot de passe — dans 8 192 octets,
+	// que l'adresse et la syntaxe JSON portent au-delà de la borne du corps. Ce qui doit refuser cette
+	// requête est donc la taille du corps, et rien d'autre.
+	//
+	// Une première rédaction répétait `maximumLoginBodyBytes` runes : le mot de passe franchissait sa
+	// propre borne, le test était vert et le restait `RequestSize` retiré. C'est la mutation qui l'a
+	// dit.
+	oversized := credentials(t, "camille@exemple.test", strings.Repeat("é", maximumPasswordLength))
+	require.Greater(t, len(oversized), maximumLoginBodyBytes,
+		"ce corps tient sous la borne : la mutation qui retire RequestSize resterait verte")
 
 	status, _ := postLogin(t, oversized)
 
