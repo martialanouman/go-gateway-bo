@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"net/netip"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -19,7 +20,7 @@ var lanOnly = []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
 func TestUnEnTeteForgeEstIgnoreQuandAucunProxyNEstDeConfiance(t *testing.T) {
 	t.Parallel()
 
-	address, err := auth.ClientAddress("203.0.113.7:54321", "1.2.3.4", nil)
+	address, err := auth.ClientAddress("203.0.113.7:54321", []string{"1.2.3.4"}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "203.0.113.7", address,
 		"l'en-tête a été cru sans réseau de confiance : le compteur de source se contourne en le forgeant")
@@ -30,7 +31,7 @@ func TestUnEnTeteForgeEstIgnoreQuandAucunProxyNEstDeConfiance(t *testing.T) {
 func TestDerriereUnProxyDeConfianceCEstLAdresseDuClientQuiCompte(t *testing.T) {
 	t.Parallel()
 
-	address, err := auth.ClientAddress("10.0.0.5:443", "203.0.113.7", lanOnly)
+	address, err := auth.ClientAddress("10.0.0.5:443", []string{"203.0.113.7"}, lanOnly)
 	require.NoError(t, err)
 	assert.Equal(t, "203.0.113.7", address)
 }
@@ -40,7 +41,7 @@ func TestDerriereUnProxyDeConfianceCEstLAdresseDuClientQuiCompte(t *testing.T) {
 func TestLaChaineSeRemonteDeDroiteAGaucheEtSArreteAuPremierSautInconnu(t *testing.T) {
 	t.Parallel()
 
-	address, err := auth.ClientAddress("10.0.0.5:443", "198.51.100.9, 203.0.113.7, 10.0.0.9", lanOnly)
+	address, err := auth.ClientAddress("10.0.0.5:443", []string{"198.51.100.9, 203.0.113.7, 10.0.0.9"}, lanOnly)
 	require.NoError(t, err)
 	assert.Equal(t, "203.0.113.7", address,
 		"la remontée a pris le saut le plus à gauche, celui que le client écrit")
@@ -51,7 +52,7 @@ func TestLaChaineSeRemonteDeDroiteAGaucheEtSArreteAuPremierSautInconnu(t *testin
 func TestUneChaineIllisibleFaitRetomberSurLAdresseDePair(t *testing.T) {
 	t.Parallel()
 
-	address, err := auth.ClientAddress("10.0.0.5:443", "203.0.113.7, pas-une-adresse, 10.0.0.9", lanOnly)
+	address, err := auth.ClientAddress("10.0.0.5:443", []string{"203.0.113.7, pas-une-adresse, 10.0.0.9"}, lanOnly)
 	require.NoError(t, err)
 	assert.Equal(t, "10.0.0.5", address)
 }
@@ -61,7 +62,7 @@ func TestUneChaineIllisibleFaitRetomberSurLAdresseDePair(t *testing.T) {
 func TestUneChaineEntierementInterneFaitRetomberSurLAdresseDePair(t *testing.T) {
 	t.Parallel()
 
-	address, err := auth.ClientAddress("10.0.0.5:443", "10.0.0.8, 10.0.0.9", lanOnly)
+	address, err := auth.ClientAddress("10.0.0.5:443", []string{"10.0.0.8, 10.0.0.9"}, lanOnly)
 	require.NoError(t, err)
 	assert.Equal(t, "10.0.0.5", address)
 }
@@ -71,7 +72,7 @@ func TestUneChaineEntierementInterneFaitRetomberSurLAdresseDePair(t *testing.T) 
 func TestUnPairHorsDesReseauxDeConfianceNeFaitPasLireSonEnTete(t *testing.T) {
 	t.Parallel()
 
-	address, err := auth.ClientAddress("198.51.100.9:1234", "1.2.3.4", lanOnly)
+	address, err := auth.ClientAddress("198.51.100.9:1234", []string{"1.2.3.4"}, lanOnly)
 	require.NoError(t, err)
 	assert.Equal(t, "198.51.100.9", address)
 }
@@ -81,10 +82,79 @@ func TestUnPairHorsDesReseauxDeConfianceNeFaitPasLireSonEnTete(t *testing.T) {
 func TestUneAdresseIpv4MappeeEnIpv6EstReconnueDansUnPrefixeIpv4(t *testing.T) {
 	t.Parallel()
 
-	address, err := auth.ClientAddress("[::ffff:10.0.0.5]:443", "203.0.113.7", lanOnly)
+	address, err := auth.ClientAddress("[::ffff:10.0.0.5]:443", []string{"203.0.113.7"}, lanOnly)
 	require.NoError(t, err)
 	assert.Equal(t, "203.0.113.7", address,
 		"le proxy déclaré n'a pas été reconnu sous sa forme mappée : son en-tête est ignoré")
+}
+
+// La borne de la remontée. Sans elle, la taille du travail est choisie par le client : `net/http`
+// accepte un mébioctet d'en-têtes, soit un demi-million de sauts à analyser sur la seule route
+// ouverte sans session.
+//
+// Ce que le test affirme est l'abandon — l'adresse de pair, pas le saut lointain. C'est le même repli
+// que « chaîne entièrement interne » et que « chaîne illisible » : au-delà de ce qu'on consent à
+// lire, on ne croit plus l'en-tête. Une chaîne légitime ne l'atteint jamais, le saut le plus à droite
+// étant celui qu'écrit notre propre proxy.
+func TestUneChaineDeSautsPlusLongueQueLaBorneNEstPasRemontee(t *testing.T) {
+	t.Parallel()
+
+	const beyondTheBound = 17
+
+	hops := make([]string, 0, beyondTheBound+1)
+	// Le saut du client, tout à gauche : c'est lui que la remontée atteindrait sans borne.
+	hops = append(hops, "198.51.100.9")
+
+	for index := range beyondTheBound {
+		hops = append(hops, "10.0.0."+strconv.Itoa(index+1))
+	}
+
+	address, err := auth.ClientAddress("10.0.0.5:443", []string{strings.Join(hops, ", ")}, lanOnly)
+	require.NoError(t, err)
+	assert.Equal(t, "10.0.0.5", address,
+		"la remontée a franchi %d sauts pour atteindre celui du client : la longueur de l'en-tête décide "+
+			"du travail que le serveur accepte, et personne ne s'est authentifié pour l'exiger",
+		beyondTheBound)
+}
+
+// Le pendant, sans lequel le test ci-dessus serait vrai d'une remontée qui n'irait jamais plus loin
+// que le premier saut : juste sous la borne, la chaîne se remonte pour de bon.
+func TestUneChaineJusteSousLaBorneSeRemonteEntierement(t *testing.T) {
+	t.Parallel()
+
+	const withinTheBound = 15
+
+	hops := make([]string, 0, withinTheBound+1)
+	hops = append(hops, "198.51.100.9")
+
+	for index := range withinTheBound {
+		hops = append(hops, "10.0.0."+strconv.Itoa(index+1))
+	}
+
+	address, err := auth.ClientAddress("10.0.0.5:443", []string{strings.Join(hops, ", ")}, lanOnly)
+	require.NoError(t, err)
+	assert.Equal(t, "198.51.100.9", address,
+		"la remontée s'est arrêtée avant le saut du client alors que la chaîne tient sous la borne")
+}
+
+// Les lignes répétées comptent dans la **même** remontée : deux lignes de neuf sauts en font
+// dix-huit, et un proxy qui ajoute la sienne ne rouvre pas le budget de celle du client.
+func TestLaBornePorteSurLesLignesReuniesEtNonSurChacune(t *testing.T) {
+	t.Parallel()
+
+	nine := make([]string, 0, 9)
+	for index := range 9 {
+		nine = append(nine, "10.0.0."+strconv.Itoa(index+1))
+	}
+
+	joined := strings.Join(nine, ", ")
+
+	address, err := auth.ClientAddress("10.0.0.5:443",
+		[]string{"198.51.100.9, " + joined, joined}, lanOnly)
+	require.NoError(t, err)
+	assert.Equal(t, "10.0.0.5", address,
+		"chaque ligne a eu sa propre borne : un proxy qui ajoute la sienne rouvrirait le budget que la "+
+			"ligne du client a déjà consommé")
 }
 
 // Une requête sans adresse de pair est une erreur et **non** une chaîne vide : compter sur `""`
@@ -93,7 +163,7 @@ func TestUneAdresseIpv4MappeeEnIpv6EstReconnueDansUnPrefixeIpv4(t *testing.T) {
 func TestUneRequeteSansAdresseDePairEstUneErreur(t *testing.T) {
 	t.Parallel()
 
-	_, err := auth.ClientAddress("", "", nil)
+	_, err := auth.ClientAddress("", nil, nil)
 	require.Error(t, err)
 }
 

@@ -6,7 +6,6 @@ import (
 	"math"
 	"net/http"
 	"net/netip"
-	"strings"
 	"time"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
@@ -53,8 +52,11 @@ func withClientAddress(trusted []netip.Prefix) func(http.Handler) http.Handler {
 			// `option forwardfor` en écrit une seconde ligne. Chez un tel proxy, `Get` rendrait la ligne
 			// écrite par le **client**, et la remontée de droite à gauche s'appliquerait à une chaîne
 			// entièrement forgée : l'attaquant choisirait sa clé de compteur, ou celle d'un tiers.
-			address, err := auth.ClientAddress(r.RemoteAddr,
-				strings.Join(r.Header.Values("X-Forwarded-For"), ","), trusted)
+			//
+			// Les lignes passent telles quelles, sans être jointes : `ClientAddress` les remonte de la
+			// dernière à la première et borne ce qu'il examine. Les joindre aurait recopié tout ce que
+			// le client a bien voulu envoyer, avant même de décider s'il fallait le lire.
+			address, err := auth.ClientAddress(r.RemoteAddr, r.Header.Values("X-Forwarded-For"), trusted)
 			if err != nil {
 				next.ServeHTTP(w, r)
 

@@ -62,7 +62,26 @@ func sourceScope(address string) string {
 	return netip.PrefixFrom(parsed, ipv6SourcePrefix).Masked().String()
 }
 
+// maxForwardedHops borne le nombre de sauts que la remontée examine.
+//
+// **Sans borne, la taille du travail est choisie par le client.** `net/http` accepte un mébioctet
+// d'en-têtes par requête : un demi-million de sauts à analyser, sur la seule route que le produit
+// ouvre sans session, pour un attaquant qui n'a rien eu à prouver. C'est un amplificateur offert au
+// premier venu.
+//
+// Seize est très au-dessus du réel — un proxy en production, deux avec un ingress. Une chaîne
+// légitime n'approche jamais cette borne, et pour une raison plus forte qu'un ordre de grandeur : le
+// saut le plus à droite est celui qu'écrit **notre** proxy, il porte l'adresse publique du client,
+// elle n'est pas de confiance, et la remontée s'arrête donc au premier. La borne ne décide de rien
+// en exploitation ; elle borne le pire cas.
+const maxForwardedHops = 16
+
 // ClientAddress dérive l'adresse à compter à partir de l'adresse de pair et de `X-Forwarded-For`.
+//
+// `forwardedFor` porte les **lignes** de l'en-tête, telles que `http.Header.Values` les rend et non
+// telles que `Get` les résumerait : Go ne fusionne pas les lignes répétées, et tous les proxys
+// n'ajoutent pas à la même — HAProxy `option forwardfor` en écrit une seconde. Les recevoir séparées
+// plutôt que jointes évite aussi de recopier l'en-tête entier avant de le lire.
 //
 // **Sans réseau de confiance, l'en-tête est ignoré**, et c'est la moitié qui compte : `X-Forwarded-For`
 // est écrit par le client, donc le croire sans condition offrirait à quiconque une évasion du
@@ -73,39 +92,64 @@ func sourceScope(address string) string {
 // écartant les sauts qu'on a nous-même déployés, et on s'arrête au premier qu'on ne contrôle pas.
 // Lire de gauche à droite prendrait la première valeur de la liste, qui est précisément celle que le
 // client a pu écrire.
-func ClientAddress(remoteAddr, forwardedFor string, trusted []netip.Prefix) (string, error) {
+func ClientAddress(remoteAddr string, forwardedFor []string, trusted []netip.Prefix) (string, error) {
 	peer, err := peerAddress(remoteAddr)
 	if err != nil {
 		return "", err
 	}
 
-	if len(trusted) == 0 || forwardedFor == "" || !isTrusted(peer, trusted) {
+	if len(trusted) == 0 || len(forwardedFor) == 0 || !isTrusted(peer, trusted) {
 		return peer.String(), nil
 	}
 
-	if client, found := firstUntrustedHop(strings.Split(forwardedFor, ","), trusted); found {
+	if client, found := firstUntrustedHop(forwardedFor, trusted); found {
 		return client.String(), nil
 	}
 
 	// Aucun saut à désigner : ou bien ils sont tous à nous — sonde interne, chaîne mal configurée — ou
-	// bien la chaîne est illisible. L'adresse de pair est alors ce qu'on sait de vrai.
+	// bien la chaîne est illisible, ou bien elle est plus longue que ce qu'on consent à lire.
+	// L'adresse de pair est alors ce qu'on sait de vrai.
 	return peer.String(), nil
 }
 
 // firstUntrustedHop remonte la chaîne **de droite à gauche** et rend le premier saut qui n'est pas
 // l'un des nôtres. Il ne rend pas d'erreur : une chaîne illisible n'est pas une panne, c'est un
 // en-tête auquel on cesse de croire, et l'appelant retombe sur l'adresse de pair.
-func firstUntrustedHop(hops []string, trusted []netip.Prefix) (netip.Addr, bool) {
-	for index := len(hops) - 1; index >= 0; index-- {
-		hop, err := netip.ParseAddr(strings.TrimSpace(hops[index]))
-		if err != nil {
-			// On s'arrête plutôt que de sauter la valeur : continuer laisserait un client insérer du
-			// bruit pour faire désigner le saut qui l'arrange.
-			return netip.Addr{}, false
-		}
+//
+// Le découpage se fait **saut par saut**, depuis la fin, plutôt qu'en tranchant la chaîne entière :
+// c'est ce qui fait que la borne borne pour de bon. Un `strings.Split` aurait alloué le demi-million
+// de sous-chaînes avant que le compteur ait le temps de les refuser.
+func firstUntrustedHop(lines []string, trusted []netip.Prefix) (netip.Addr, bool) {
+	examined := 0
 
-		if !isTrusted(hop, trusted) {
-			return hop, true
+	for index := len(lines) - 1; index >= 0; index-- {
+		remaining := lines[index]
+
+		for remaining != "" {
+			if examined == maxForwardedHops {
+				return netip.Addr{}, false
+			}
+
+			examined++
+
+			hop := remaining
+
+			if comma := strings.LastIndexByte(remaining, ','); comma >= 0 {
+				hop, remaining = remaining[comma+1:], remaining[:comma]
+			} else {
+				remaining = ""
+			}
+
+			address, err := netip.ParseAddr(strings.TrimSpace(hop))
+			if err != nil {
+				// On s'arrête plutôt que de sauter la valeur : continuer laisserait un client insérer du
+				// bruit pour faire désigner le saut qui l'arrange.
+				return netip.Addr{}, false
+			}
+
+			if !isTrusted(address, trusted) {
+				return address, true
+			}
 		}
 	}
 
