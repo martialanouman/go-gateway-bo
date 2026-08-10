@@ -28,12 +28,16 @@ func minimalEnv() map[string]string {
 		config.EnvGatewayBaseURL: "http://127.0.0.1:4010",
 		config.EnvDatabaseURL:    localDatabaseURL,
 		config.EnvBruteForceSalt: testBruteForceSalt,
+		config.EnvSessionSecret:  testSessionSecret,
 	}
 }
 
-// testBruteForceSalt a la longueur qu'exige Load, et rien d'un secret d'installation : ces tests ne
-// hachent rien, ils vérifient que la variable est exigée et bornée.
-const testBruteForceSalt = "un-sel-de-test-assez-long-pour-passer-la-borne"
+// testBruteForceSalt et testSessionSecret ont la longueur qu'exige Load, et rien d'un secret
+// d'installation : ces tests ne signent rien, ils vérifient que la variable est exigée et bornée.
+const (
+	testBruteForceSalt = "un-sel-de-test-assez-long-pour-passer-la-borne"
+	testSessionSecret  = "une-cle-de-test-assez-longue-pour-passer-la-borne"
+)
 
 // localDatabaseURL est le DSN du `docker-compose.yml` de développement : ni un secret d'installation,
 // ni une base que ces tests joignent — rien ici n'ouvre de connexion.
@@ -56,6 +60,7 @@ func realGatewayEnv() map[string]string {
 		config.EnvShutdownTimeout:     "30s",
 		config.EnvDatabaseURL:         localDatabaseURL,
 		config.EnvBruteForceSalt:      testBruteForceSalt,
+		config.EnvSessionSecret:       testSessionSecret,
 	}
 }
 
@@ -512,6 +517,7 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvGatewayTimeout,
 		config.EnvDatabaseURL,
 		config.EnvBruteForceSalt,
+		config.EnvSessionSecret,
 		config.EnvTrustedProxies,
 		config.EnvBootstrapOperatorEmail,
 		config.EnvBootstrapOperatorName,

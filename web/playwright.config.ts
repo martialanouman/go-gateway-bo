@@ -69,6 +69,8 @@ export default defineConfig({
       // refus arrive avant qu'il ne lie son port — un parcours démarrerait donc sur un serveur qui
       // n'écoute pas. Rien d'un secret : aucun parcours ne relit un HMAC.
       DASHBOARD_BRUTEFORCE_SALT: 'un-sel-de-parcours-assez-long-pour-passer-la-borne',
+      // Obligatoire depuis step-022, sans repli de même, et refusée avant la liaison du port.
+      DASHBOARD_SESSION_SECRET: 'une-cle-de-parcours-assez-longue-pour-passer-la-borne',
     },
   },
 })

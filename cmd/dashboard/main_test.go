@@ -249,6 +249,9 @@ func completeConfiguration() map[string]string {
 		// Obligatoire depuis step-021, et sans repli : le binaire refuse de démarrer sans elle. Sa
 		// valeur ici n'a rien d'un secret — aucun scénario ne relit un HMAC, ils observent le verrou.
 		"DASHBOARD_BRUTEFORCE_SALT": "un-sel-de-scenario-assez-long-pour-la-borne",
+		// Obligatoire depuis step-022, et sans repli de même. Les scénarios de session, eux, relisent
+		// bien ce que cette clé scelle : c'est le serveur qui signe et vérifie, jamais le harnais.
+		"DASHBOARD_SESSION_SECRET": "une-cle-de-scenario-assez-longue-pour-la-borne",
 	}
 }
 

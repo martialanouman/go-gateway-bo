@@ -59,10 +59,14 @@ La signature de session, le sel d'anti-brute-force et le chiffrement des secrets
 repli**, et c'est délibéré — une clé codée en dur serait publique, donc n'importe qui signerait une
 session. `openssl rand -base64 48` fait le travail.
 
-**Un seul des trois existe aujourd'hui** : `DASHBOARD_BRUTEFORCE_SALT` (step-021), qui masque les
-adresses sources dans la table des compteurs d'échecs. La signature de session arrive en step-022 et
-le chiffrement TOTP en step-023 ; les chercher dans `.env.example` avant leur step serait les
-chercher en vain.
+**Deux des trois existent aujourd'hui** : `DASHBOARD_BRUTEFORCE_SALT` (step-021), qui masque les
+adresses sources dans la table des compteurs d'échecs, et `DASHBOARD_SESSION_SECRET` (step-022), qui
+scelle le cookie de session. Le chiffrement TOTP arrive en step-023 ; le chercher dans `.env.example`
+avant sa step serait le chercher en vain.
+
+Les deux ne se remplacent pas de la même façon : changer le sel n'invalide aucun compte, changer la
+clé de session **déconnecte tout le monde** — et toutes les instances doivent porter la même, sans
+quoi le cookie émis par l'une serait refusé par l'autre.
 
 Contrairement à la v1.0, **le serveur refuse de démarrer** si une variable obligatoire manque, en la
 nommant (step-000). Un démarrage réussi suivi d'une erreur à la première requête d'authentification
