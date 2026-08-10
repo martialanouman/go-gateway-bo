@@ -92,7 +92,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// elle n'existe pas ici — et c'est voulu, parce qu'elle **n'attend pas**. `AfterFunc` lance `Close`
 	// dans sa propre goroutine, si bien qu'un binaire qui compterait sur elle sortirait de `main`
 	// pendant que ses connexions se ferment, en laissant derrière lui des backends que PostgreSQL
-	// compte encore dans `max_connections`. La fermeture est écrite ici, où elle bloque.
+	// compte encore dans `max_connections`. La fermeture est écrite ici, où elle est attendue.
 	pool, err := store.NewPool(context.WithoutCancel(ctx), cfg.DatabaseURL)
 	if err != nil {
 		return err
@@ -101,7 +101,14 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// Après `serve`, donc après le délai de grâce : les requêtes que ce délai laisse finir ont rendu
 	// leurs connexions, et il ne reste qu'à les fermer. Le **même** délai borne l'attente, parce que
 	// le cas qui reste est celui où la grâce a expiré sans que tout soit fini — et là, attendre sans
-	// borne ferait pendre le binaire. `ClosePool` porte l'arbitrage.
+	// borne ferait pendre le binaire. `ClosePool` porte l'arbitrage, et son test la borne.
+	//
+	// **Rien ne garde cette ligne-ci, et c'est mesuré** : la retirer laisse les 18 scénarios et les
+	// tests de `serve` verts. La raison est structurelle et vaut d'être écrite plutôt que retentée —
+	// le processus s'arrête juste après, l'OS ferme ses sockets, et PostgreSQL retire les backends en
+	// le constatant. Ce que cette ligne change est que la déconnexion est **annoncée** au lieu d'être
+	// découverte : le backend part sans passer par le journal du serveur, et une transaction ouverte
+	// est annulée proprement. Aucune de ces deux différences n'est visible depuis ce dépôt.
 	defer store.ClosePool(pool, cfg.ShutdownTimeout)
 
 	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt)
