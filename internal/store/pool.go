@@ -144,17 +144,10 @@ func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	// au lieu de parquer une goroutine, donc un pool fermé directement ne retient plus rien — et un
 	// `ctx` que rien n'annulera jamais (`context.Background()`) ne fait même pas naître d'inscription.
 	//
-	// `Close` bloque jusqu'à ce que les connexions empruntées soient rendues et fermées. **Cette
-	// voie-ci ne le fait pas pour autant attendre** : `AfterFunc` l'appelle depuis la goroutine qu'il
-	// réveille, donc celui qui annule le contexte reprend la main aussitôt et peut sortir pendant que
-	// les connexions se ferment. Un arrêt *propre* — sans backends que PostgreSQL compterait encore
-	// dans `max_connections` — demande que le propriétaire du pool appelle `Close` lui-même : c'est ce
-	// que fait `cmd/dashboard`, qui pour cette raison passe ici un contexte que rien n'annulera.
-	//
-	// Le lien subsiste et **plus aucun appelant de production ne s'en sert** : `cmd/dashboard` passe un
-	// contexte sans `Done`, auprès duquel `AfterFunc` n'inscrit rien. Ce qui l'exerce est
-	// `pool_test.go`. Le retirer serait une simplification à part entière — un seul chemin de
-	// fermeture, celui qui attend — et elle emporterait ce test avec elle.
+	// Cette voie **n'attend pas** : `AfterFunc` appelle `Close` depuis la goroutine qu'il réveille, donc
+	// celui qui annule reprend la main aussitôt. Qui veut un arrêt attendu appelle `ClosePool`, ce que
+	// fait `cmd/dashboard` — plus aucun appelant de production ne dépend donc de l'inscription
+	// ci-dessous, seul `pool_test.go` l'exerce.
 	context.AfterFunc(ctx, pool.Close)
 
 	return pool, nil
@@ -162,16 +155,14 @@ func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 
 // ClosePool ferme le pool et attend, **au plus `within`**, que les connexions empruntées reviennent.
 //
-// La borne est ce qui distingue cette fonction d'un `defer pool.Close()` écrit par réflexe. `Close`
-// attend sans limite que chaque connexion prêtée soit rendue : après un délai de grâce expiré — cas
-// que `serve` rapporte, et qu'un test exerce — une requête en détient encore une, et l'attendre sans
-// borne ferait **pendre** le binaire à l'instant précis où il doit sortir. Un arrêt qui ne se termine
-// pas est pire que l'abandon qu'il voulait éviter : l'orchestrateur finit par envoyer SIGKILL, et
-// c'est alors *toutes* les connexions qui partent sans se fermer.
+// La borne est une assurance, et non la parade à un danger courant : `Close` attend sans limite
+// qu'une connexion prêtée soit rendue, or un handler qui ignorerait son contexte n'en rendrait jamais
+// — et un arrêt qui ne se termine pas finit en SIGKILL, auquel cas *toutes* les connexions partent
+// sans se fermer. La goroutine laissée derrière retient le pool ; elle ne coûte rien à un processus
+// qui s'arrête, et interdit à ClosePool de servir ailleurs.
 //
-// Ce qu'on perd en abandonnant l'attente est petit et connu : la fin du processus ferme ses sockets,
-// et PostgreSQL retire les backends en le constatant. Ce que `Close` achète est de le lui **dire**
-// plutôt que de le lui laisser découvrir.
+// Ce qu'on perd en abandonnant est petit : la fin du processus ferme ses sockets, et PostgreSQL
+// retire les backends en le constatant. Ce que `Close` achète est de le lui **dire**.
 func ClosePool(pool *pgxpool.Pool, within time.Duration) {
 	closed := make(chan struct{})
 

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
@@ -17,6 +18,13 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 	"github.com/martialanouman/go-gateway-bo/internal/webassets"
 )
+
+// poolCloseGrace borne l'attente de la fermeture du pool, **et n'est pas le délai de grâce**. Celui-ci
+// est déjà consommé quand `serve` rend la main ; le rejouer porterait le pire cas d'arrêt à 30 s, soit
+// le budget par défaut d'un orchestrateur avant SIGKILL. Ce qui reste à attendre ici est court :
+// `serve` ferme les connexions client, ce qui annule le contexte des requêtes en vol et fait rendre
+// leurs connexions à la base.
+const poolCloseGrace = 2 * time.Second
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -81,35 +89,19 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("assets embarqués : %w", err)
 	}
 
-	// **Le pool ne reçoit pas `ctx`**, et l'écart mérite d'être lu deux fois. `NewPool` attache
-	// `pool.Close` à l'annulation du contexte qu'on lui passe (`context.AfterFunc`) : lui donner `ctx`
-	// fermerait le pool à l'instant du SIGTERM, c'est-à-dire **au début** du délai de grâce — et les
-	// requêtes que ce délai existe pour laisser finir tomberaient sur un pool fermé. Le pool survit
-	// donc à l'annulation et meurt quand `serve` a rendu la main.
-	//
-	// `context.WithoutCancel` rend un contexte dont `Done()` est nil, et `AfterFunc` n'inscrit rien
-	// auprès d'un contexte que rien n'annulera. Cette voie-là ne se contente donc pas de se taire :
-	// elle n'existe pas ici — et c'est voulu, parce qu'elle **n'attend pas**. `AfterFunc` lance `Close`
-	// dans sa propre goroutine, si bien qu'un binaire qui compterait sur elle sortirait de `main`
-	// pendant que ses connexions se ferment, en laissant derrière lui des backends que PostgreSQL
-	// compte encore dans `max_connections`. La fermeture est écrite ici, où elle est attendue.
+	// **Le pool ne reçoit pas `ctx`.** `NewPool` attacherait sa fermeture à l'annulation, donc au
+	// SIGTERM : le pool se fermerait **au début** du délai de grâce, et les requêtes que ce délai
+	// existe pour laisser finir tomberaient sur un pool fermé. `WithoutCancel` rend un contexte sans
+	// `Done`, auprès duquel `AfterFunc` n'inscrit rien.
 	pool, err := store.NewPool(context.WithoutCancel(ctx), cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 
-	// Après `serve`, donc après le délai de grâce : les requêtes que ce délai laisse finir ont rendu
-	// leurs connexions, et il ne reste qu'à les fermer. Le **même** délai borne l'attente, parce que
-	// le cas qui reste est celui où la grâce a expiré sans que tout soit fini — et là, attendre sans
-	// borne ferait pendre le binaire. `ClosePool` porte l'arbitrage, et son test la borne.
-	//
-	// **Rien ne garde cette ligne-ci, et c'est mesuré** : la retirer laisse les 18 scénarios et les
-	// tests de `serve` verts. La raison est structurelle et vaut d'être écrite plutôt que retentée —
-	// le processus s'arrête juste après, l'OS ferme ses sockets, et PostgreSQL retire les backends en
-	// le constatant. Ce que cette ligne change est que la déconnexion est **annoncée** au lieu d'être
-	// découverte : le backend part sans passer par le journal du serveur, et une transaction ouverte
-	// est annulée proprement. Aucune de ces deux différences n'est visible depuis ce dépôt.
-	defer store.ClosePool(pool, cfg.ShutdownTimeout)
+	// Rien ne garde cette ligne, et c'est mesuré : la retirer laisse tout vert, parce que le processus
+	// s'arrête juste après et que l'OS ferme ses sockets. Ce qu'elle change — une déconnexion annoncée
+	// plutôt que découverte — n'est visible d'aucun test d'ici.
+	defer store.ClosePool(pool, poolCloseGrace)
 
 	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt)
 
