@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
+	"github.com/martialanouman/go-gateway-bo/internal/session"
 )
 
 // API implémente l'interface **stricte** qu'engendre `api/openapi-bff.yaml`. Ce que l'interface
@@ -41,6 +42,9 @@ type API struct {
 	// ci-dessus sur les portes structurelles reste vraie, elle parle simplement d'un type qui a
 	// désormais un champ.
 	Authenticator *auth.Authenticator
+	// Sessions ouvre, résout et ferme les sessions. Le premier facteur et la session sont deux
+	// collaborateurs distincts : c'est ici qu'ils se composent, et nulle part plus bas.
+	Sessions *session.Manager
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le

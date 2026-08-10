@@ -4,8 +4,10 @@ Fonctionnalité: Le premier facteur, et la porte qui le limite
   échoué : une adresse inconnue et un mot de passe faux rendent le même code et le même corps — et
   la même durée, que ces scénarios ne mesurent pas.
 
-  Rien n'est ouvert à l'issue de ces scénarios. Le challenge est une promesse de session, pas une
-  session : le cookie appartient à step-022, la vérification du second facteur à step-023.
+  Une connexion réussie ouvre une session de **premier facteur** et pose son cookie. Elle n'est pas
+  élevée : la vérification du second facteur appartient à step-023 et step-024, et c'est step-025 qui
+  décidera ce qu'une session non élevée n'atteint pas. Ce que le challenge promet est cette
+  vérification, pas la session — les deux voyagent ensemble mais ne disent pas la même chose.
 
   Ce que ces scénarios n'observent pas : l'égalité des **durées** entre « adresse inconnue » et
   « mot de passe faux ». Un test de temps est instable en CI, et la fiche l'écarte. Ce qui la tient
@@ -19,6 +21,7 @@ Fonctionnalité: Le premier facteur, et la porte qui le limite
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 200
     Et un challenge est émis avec son échéance
+    Et le navigateur reçoit un cookie de session
 
   Scénario: un mot de passe faux est refusé sans nommer ce qui a échoué
     Étant donné une installation avec un opérateur

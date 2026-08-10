@@ -190,6 +190,7 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.When(`^le verrou arrive à échéance$`, login.lockExpires)
 	ctx.When(`^le navigateur envoie un corps qui n'est pas du JSON à la connexion$`, login.postMalformedBody)
 	ctx.Then(`^un challenge est émis avec son échéance$`, login.challengeIsIssued)
+	ctx.Then(`^le navigateur reçoit un cookie de session$`, p.receivedASessionCookie)
 	ctx.Then(`^le refus ne nomme ni l'adresse ni le facteur en cause$`, login.refusalNamesNothing)
 	ctx.Then(`^les deux refus sont indiscernables$`, login.refusalsAreIndistinguishable)
 	ctx.Then(`^la réponse porte l'en-tête "([^"]+)"$`, login.responseCarriesHeader)
