@@ -37,15 +37,44 @@ export interface paths {
         put?: never;
         /**
          * Premier facteur — adresse et mot de passe
-         * @description Vérifie l'adresse et le mot de passe, et rend un **challenge de second facteur** à usage
-         *     unique et de courte durée. Rien n'est ouvert à ce stade : le cookie de session appartient à
-         *     step-022, la vérification du second facteur à step-023 et step-024.
+         * @description Vérifie l'adresse et le mot de passe, ouvre une session de **premier facteur** et rend un
+         *     **challenge de second facteur** à usage unique et de courte durée. La session n'est pas
+         *     élevée : c'est step-023 et step-024 qui vérifieront ce second facteur.
+         *
+         *     Le cookie de session n'est pas déclaré ici, et c'est délibéré : il est `HttpOnly`, donc le
+         *     navigateur **interdit** au client de le lire. Le déclarer en en-tête de réponse le ferait
+         *     apparaître dans les types engendrés comme une valeur lisible, ce qu'il n'est pas.
          *
          *     Le refus ne dit jamais lequel des deux facteurs a échoué. Même code, même corps et **même
          *     durée** pour « adresse inconnue », « mot de passe faux » et « compte désactivé » : les
          *     distinguer dirait à une machine quelles adresses existent.
          */
         post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * L'opérateur connecté et ce qu'il a le droit de faire
+         * @description Le **seul** endroit d'où le client apprend ses droits. L'interface se rend sur des
+         *     permissions, jamais sur un rôle codé en dur (§4.2).
+         *
+         *     Aucun rôle dans le corps, et c'est la raison même : une liste de rôles rendue au navigateur
+         *     invite à réintroduire le contrôle de rôle côté client, que la spec interdit. Les permissions
+         *     décident ; les rôles restent au serveur tant qu'aucun écran n'a besoin de les afficher.
+         */
+        get: operations["me"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -75,6 +104,25 @@ export interface components {
             challenge: string;
             /** Format: date-time */
             expiresAt: string;
+        };
+        /** @description Ce qu'une session vivante apprend au client. */
+        Me: {
+            operator: components["schemas"]["CurrentOperator"];
+            permissions: string[];
+            elevated: boolean;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        /**
+         * @description De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
+         *     `mfa_totp_secret`, ni les identifiants WebAuthn : le type de domaine du store ne traverse pas
+         *     cette frontière (§1.11), et `additionalProperties: false` fait refuser tout champ qu'un
+         *     serveur ajouterait par mégarde.
+         */
+        CurrentOperator: {
+            id: string;
+            email: string;
+            displayName: string;
         };
         /**
          * @description La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
@@ -168,6 +216,39 @@ export interface operations {
                      *     client à faire confiance à sa propre horloge pour la soustraire.
                      */
                     "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Une session vit, et voici ce qu'elle ouvre. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            /**
+             * @description Aucune session vivante. Le corps est le même qu'il n'y ait pas de cookie, que son sceau
+             *     ne colle pas, que la session soit échue, oisive, fermée, ou que le compte ait été
+             *     désactivé : les distinguer dirait à qui teste un cookie ce qu'il vaut encore.
+             */
+            401: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

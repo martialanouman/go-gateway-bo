@@ -24,4 +24,9 @@ func (API) Login(_ context.Context, _ bff.LoginRequestObject) (bff.LoginResponse
 	return bff.Login401JSONResponse{Code: "invalid_credentials", Message: "Refusé."}, nil
 }
 
+// Me est identique dans les deux fixtures, pour la même raison que `Login`.
+func (API) Me(_ context.Context, _ bff.MeRequestObject) (bff.MeResponseObject, error) {
+	return bff.Me401JSONResponse{Code: "unauthenticated", Message: "Reconnectez-vous."}, nil
+}
+
 var _ = bff.NewStrictHandler(API{}, nil)

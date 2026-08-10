@@ -77,3 +77,28 @@ expectTypeOf<LoginOperation['responses'][401]['content']['application/json']>().
 // Les quatre statuts, et le 400 en fait partie : login est la première opération à porter un corps,
 // donc la première dont le décodage peut échouer avant d'atteindre le handler.
 expectTypeOf<keyof LoginOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 429>()
+
+/**
+ * `GET /api/auth/me` — step-022. Le **seul** endroit d'où le client apprend ses droits.
+ *
+ * Deux assertions portent tout le poids : la première dit que les permissions sont une liste plate
+ * de chaînes, la seconde qu'aucun rôle n'accompagne le corps. C'est cette absence qui empêche
+ * step-040 de réintroduire un contrôle de rôle côté client — un champ `roles` ici, et le `if` qui
+ * s'en sert s'écrit tout seul le mois suivant.
+ */
+
+type MeOperation = paths['/auth/me']['get']
+
+// `permissions` est `string[]` et non une union des 44 clés : le catalogue vit dans
+// `permissions.gen.ts`, engendré depuis `internal/permissions`. C'est au client de croiser les deux,
+// et le type `PermissionKey` est là pour ça.
+expectTypeOf<MeOperation['responses'][200]['content']['application/json']>().toEqualTypeOf<{
+  operator: { id: string; email: string; displayName: string }
+  permissions: string[]
+  elevated: boolean
+  expiresAt: string
+}>()
+
+// Deux statuts seulement. Le client n'a que deux cas à traiter : il est connecté, ou il ne l'est
+// plus — et la seconde branche mène à l'écran de connexion, sans qu'il ait à savoir pourquoi.
+expectTypeOf<keyof MeOperation['responses']>().toEqualTypeOf<200 | 401>()

@@ -97,3 +97,14 @@ func withSession(manager *session.Manager) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+// sessionFrom rend la session vivante de la requête. L'erreur remonte au handler, qui la propage :
+// le gestionnaire du handler strict la traduit alors en 500 sans en citer le message.
+func sessionFrom(ctx context.Context) (store.Session, bool, error) {
+	resolved, ok := ctx.Value(sessionKey{}).(resolution)
+	if !ok {
+		return store.Session{}, false, nil
+	}
+
+	return resolved.session, resolved.alive, resolved.err
+}
