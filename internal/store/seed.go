@@ -226,8 +226,13 @@ func seedPermissions(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error
 
 // `created_by` reste NULL, et la colonne est nullable pour cette raison autant que pour le départ
 // d'un auteur : ces neuf rôles sont posés par le déploiement, pas par un humain, et c'est ce qui les
-// distingue d'un rôle créé depuis l'écran de step-029. Le renseigner ferait d'ailleurs échouer la
-// clé étrangère — aucun opérateur n'existe encore, step-021 crée le premier.
+// distingue d'un rôle créé depuis l'écran de step-029. Il n'y a donc **personne à nommer**, et cela
+// reste vrai quand la base porte des opérateurs : aucun d'eux n'est l'auteur de ces rôles.
+//
+// (Cette phrase disait que le renseigner ferait échouer la clé étrangère, faute d'opérateur en base.
+// Ce n'est vrai que de la première installation : depuis step-021, `bootstrap` sème puis crée le
+// compte propriétaire, et dès le second passage la référence aboutirait. C'est la raison ci-dessus
+// qui tient, pas celle-là.)
 //
 // `is_default = true` est écrit explicitement : le défaut de la colonne est `false`, et un rôle par
 // défaut qui ne se déclarerait pas comme tel échapperait à la révocation ci-dessous comme à
