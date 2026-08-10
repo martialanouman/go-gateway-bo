@@ -126,6 +126,18 @@ login_attempt_counters               -- (Amendement step-021) anti-brute-force p
   subject                (pk avec scope)
   failures, last_failure_at              -- l'état de verrou se DÉRIVE des deux ; pas de locked_until
 
+sessions                             -- (Amendement step-022) la session du tableau de bord, AVEC ÉTAT
+  id (uuidv7, pk)                        -- stable à travers l'élévation ; step-024 y liera ses défis
+  operator_id (fk)
+  token_hash                             -- SHA-256 du jeton du cookie ; RÉGÉNÉRÉ à l'élévation
+  created_at
+  expires_at                             -- échéance absolue, que rien ne repousse (12 h)
+  last_seen_at                           -- échéance glissante, repoussée à chaque requête (2 h)
+  elevated_at            (nullable)      -- second facteur vérifié ; pas de seconde échéance
+                                         -- vivante <=> now() < expires_at ET now() < last_seen_at + 2 h
+                                         -- avec état parce que le logout, step-029 et l'élévation
+                                         -- exigent une révocation avant l'échéance
+
 audit_log
   id (uuidv7, pk)
   operator_id (fk)

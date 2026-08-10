@@ -54,8 +54,8 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Given(`^les migrations déjà jouées$`, schema.migrateThenRecordSchema)
 	ctx.When(`^les migrations sont jouées$`, schema.migrate)
 	ctx.When(`^les migrations sont rejouées$`, schema.migrate)
-	ctx.Then(`^les quatre migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
-	ctx.Then(`^les onze tables du schéma existent$`, schema.everyTableExists)
+	ctx.Then(`^les cinq migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
+	ctx.Then(`^les douze tables du schéma existent$`, schema.everyTableExists)
 	ctx.Then(`^le journal d'audit accepte un événement daté du (mois courant|mois suivant)$`,
 		schema.auditLogAcceptsEventDated)
 	ctx.Then(`^la seconde exécution n'a rien appliqué$`, schema.lastRunAppliedNothing)
@@ -120,9 +120,10 @@ var initialMigrations = []string{
 	"00002_audit_log.sql",
 	"00003_alerts_notifications_saved_views.sql",
 	"00004_login_challenges_and_throttling.sql",
+	"00005_sessions.sql",
 }
 
-const latestSchemaVersion = 4
+const latestSchemaVersion = 5
 
 func (w *schemaWorld) everyMigrationWasReported() error {
 	if !slices.Equal(w.lastOutcome.Applied, initialMigrations) {
@@ -139,12 +140,13 @@ func (w *schemaWorld) everyMigrationWasReported() error {
 	return nil
 }
 
-// dashboardTables est l'inventaire du §3.1 — onze tables, ni plus ni moins. Il est écrit ici en
+// dashboardTables est l'inventaire du §3.1 — douze tables, ni plus ni moins. Il est écrit ici en
 // toutes lettres plutôt que dérivé des fichiers de migration : une liste dérivée du SQL dirait
 // seulement que le SQL fait ce que le SQL dit.
 //
-// Les deux dernières viennent de step-021, qui a **amendé le §3.1** : il n'en déclarait que neuf, et
-// livrer deux tables que la spec ignore les rendrait invisibles à quiconque la relit.
+// Les trois dernières ne venaient pas du §3.1, qui n'en déclarait que neuf : step-021 et step-022
+// l'ont **amendé**, chacune dans sa PR. Livrer une table que la spec ignore la rendrait invisible à
+// quiconque la relit.
 var dashboardTables = []string{
 	"operators",
 	"permissions",
@@ -157,12 +159,13 @@ var dashboardTables = []string{
 	"saved_views",
 	"mfa_challenges",
 	"login_attempt_counters",
+	"sessions",
 }
 
 // dashboardTableCount est le plancher de l'inventaire ci-dessus. Il n'est pas décoratif : mesuré le
 // 02/08/2026, `dashboardTables = []string{}` laissait cette suite **verte** — le scénario « les neuf
 // tables existent » passait en n'ayant cherché aucune table.
-const dashboardTableCount = 11
+const dashboardTableCount = 12
 
 func (w *schemaWorld) everyTableExists(ctx context.Context) error {
 	if len(dashboardTables) != dashboardTableCount {

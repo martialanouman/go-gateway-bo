@@ -69,7 +69,10 @@ const seedSQL = `
 	VALUES ('` + seedAlertRule + `', 'bff_evaluator', 'warning', 'Le débit du connecteur a chuté');
 
 	INSERT INTO saved_views (operator_id, view_type, filters_json, name)
-	VALUES ('` + seedOperator + `', 'cdr_search', '{"status": "failed"}'::jsonb, 'Échecs du jour');`
+	VALUES ('` + seedOperator + `', 'cdr_search', '{"status": "failed"}'::jsonb, 'Échecs du jour');
+
+	INSERT INTO sessions (operator_id, token_hash, expires_at)
+	VALUES ('` + seedOperator + `', '\\x01'::bytea, now() + interval '12 hours');`
 
 func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 	t.Parallel()
@@ -127,6 +130,24 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			name: "un challenge n'expire pas avant d'avoir été émis",
 			act: `INSERT INTO mfa_challenges (operator_id, token_hash, created_at, expires_at)
 				VALUES ('` + seedOperator + `', '\\x00'::bytea, now(), now() - interval '1 second')`,
+			sqlstate: checkViolation,
+		},
+		{
+			// L'unicité est ce que la résolution emprunte — on retrouve une session **par son jeton**.
+			// Elle est aussi ce qui ferait éclater bruyamment un générateur qui répéterait une valeur,
+			// plutôt que de laisser deux opérateurs partager un cookie.
+			name: "deux sessions ne partagent pas une empreinte de jeton",
+			act: `INSERT INTO sessions (operator_id, token_hash, expires_at)
+				VALUES ('` + seedOperator + `', '\\x01'::bytea, now() + interval '1 hour')`,
+			sqlstate: uniqueViolation,
+		},
+		{
+			// Inatteignable depuis le produit — `Create` ajoute un intervalle positif. Elle garde
+			// contre une durée de vie devenue nulle ou négative, dont le symptôme serait un opérateur
+			// qui se reconnecte en boucle, sans rien dans les journaux.
+			name: "une session n'expire pas avant d'avoir été ouverte",
+			act: `INSERT INTO sessions (operator_id, token_hash, created_at, expires_at)
+				VALUES ('` + seedOperator + `', '\\x02'::bytea, now(), now() - interval '1 second')`,
 			sqlstate: checkViolation,
 		},
 		{
@@ -226,11 +247,12 @@ func TestWhatADeletionCarriesAway(t *testing.T) {
 		probe   string
 	}{
 		{
-			name:    "le départ d'un opérateur emporte ses vues et ses rôles détenus, jamais ce qu'il a créé",
+			name:    "le départ d'un opérateur emporte ses vues, ses rôles et ses sessions, jamais ce qu'il a créé",
 			arrange: `DELETE FROM audit_log`,
 			act:     `DELETE FROM operators WHERE id = '` + seedOperator + `'`,
 			probe: `SELECT (SELECT count(*) FROM saved_views) = 0
 				AND (SELECT count(*) FROM operator_roles) = 0
+				AND (SELECT count(*) FROM sessions) = 0
 				AND (SELECT created_by IS NULL FROM roles WHERE id = '` + seedRole + `')
 				AND (SELECT created_by IS NULL FROM alert_rules WHERE id = '` + seedAlertRule + `')`,
 		},
