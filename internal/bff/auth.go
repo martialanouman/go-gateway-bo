@@ -90,6 +90,16 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 		return nil, errNoClientAddress
 	}
 
+	// Les deux bornes sont gardées par `bornes_test.go`, sur une base morte : ce qui les franchit y
+	// tombe, donc 400 s'y distingue de 500 et une borne retirée bascule de l'un à l'autre.
+	//
+	// **`request.Body == nil` est inatteignable par le routeur**, et c'est mesuré plutôt que supposé :
+	// `strictHandler.Login` décode le corps puis assigne le pointeur **sans condition** (gabarit
+	// `strict-http.tmpl` d'oapi-codegen v2.8.0) — un corps illisible rend 400 avant d'arriver ici, un
+	// corps lisible donne toujours un pointeur. Aucun test ne la garde, et lui en écrire un demanderait
+	// d'appeler cette méthode hors de son routeur : il prouverait la garde et rien du produit. Elle
+	// reste parce que c'est la régénération du contrat qui décide de cette forme, pas nous — un corps
+	// déclaré optionnel demain la rendrait atteignable, et son absence serait alors un panic.
 	if request.Body == nil ||
 		len([]rune(request.Body.Password)) > maximumPasswordLength ||
 		len([]rune(request.Body.Email)) > maximumEmailLength {
