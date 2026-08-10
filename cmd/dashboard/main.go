@@ -87,16 +87,20 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// requêtes que ce délai existe pour laisser finir tomberaient sur un pool fermé. Le pool survit
 	// donc à l'annulation et meurt quand `serve` a rendu la main.
 	//
-	// Aucune porte ne garde cette ligne, et ça a été vérifié plutôt que supposé : `arret-propre.feature`
-	// n'a aucune requête assez lente pour ouvrir la fenêtre, donc le câbler sur `ctx` laisse la suite
-	// verte. Ce qui la garde est ce commentaire.
-	poolCtx, closePool := context.WithCancel(context.WithoutCancel(ctx))
-	defer closePool()
-
-	pool, err := store.NewPool(poolCtx, cfg.DatabaseURL)
+	// `context.WithoutCancel` rend un contexte dont `Done()` est nil, et `AfterFunc` n'inscrit rien
+	// auprès d'un contexte que rien n'annulera. Cette voie-là ne se contente donc pas de se taire :
+	// elle n'existe pas ici — et c'est voulu, parce qu'elle **n'attend pas**. `AfterFunc` lance `Close`
+	// dans sa propre goroutine, si bien qu'un binaire qui compterait sur elle sortirait de `main`
+	// pendant que ses connexions se ferment, en laissant derrière lui des backends que PostgreSQL
+	// compte encore dans `max_connections`. La fermeture est écrite ici, où elle bloque.
+	pool, err := store.NewPool(context.WithoutCancel(ctx), cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
+
+	// Après `serve`, donc après le délai de grâce : les requêtes que ce délai laisse finir ont rendu
+	// leurs connexions, et `Close` n'a plus qu'à les fermer.
+	defer pool.Close()
 
 	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt)
 

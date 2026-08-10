@@ -101,8 +101,9 @@ const (
 // pas être celui de l'arrêt**. `context.AfterFunc` ci-dessous ferme le pool à l'annulation, donc lui
 // donner le contexte annulé par SIGTERM fermerait le pool **au début** du délai de grâce, et les
 // requêtes que ce délai existe pour laisser finir tomberaient sur un pool fermé. `cmd/dashboard` lui
-// passe un contexte détaché, et aucune porte ne le garde — mesuré : `arret-propre.feature` n'a
-// aucune requête assez lente pour ouvrir la fenêtre.
+// passe un contexte que rien n'annulera et ferme lui-même, en `defer`, après le délai de grâce —
+// aucune porte ne le garde, et c'est mesuré : `arret-propre.feature` n'a aucune requête assez lente
+// pour ouvrir la fenêtre.
 func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -143,10 +144,17 @@ func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	// au lieu de parquer une goroutine, donc un pool fermé directement ne retient plus rien — et un
 	// `ctx` que rien n'annulera jamais (`context.Background()`) ne fait même pas naître d'inscription.
 	//
-	// `Close` bloque jusqu'à ce que les connexions empruntées soient rendues et fermées : c'est ce qui
-	// fait de l'arrêt un arrêt *propre*, et non un abandon de backends que PostgreSQL compterait
-	// encore dans `max_connections`. Il est appelé ici depuis la goroutine que le contexte réveille à
-	// son annulation, jamais depuis l'appelant de `NewPool`.
+	// `Close` bloque jusqu'à ce que les connexions empruntées soient rendues et fermées. **Cette
+	// voie-ci ne le fait pas pour autant attendre** : `AfterFunc` l'appelle depuis la goroutine qu'il
+	// réveille, donc celui qui annule le contexte reprend la main aussitôt et peut sortir pendant que
+	// les connexions se ferment. Un arrêt *propre* — sans backends que PostgreSQL compterait encore
+	// dans `max_connections` — demande que le propriétaire du pool appelle `Close` lui-même : c'est ce
+	// que fait `cmd/dashboard`, qui pour cette raison passe ici un contexte que rien n'annulera.
+	//
+	// Le lien subsiste et **plus aucun appelant de production ne s'en sert** : `cmd/dashboard` passe un
+	// contexte sans `Done`, auprès duquel `AfterFunc` n'inscrit rien. Ce qui l'exerce est
+	// `pool_test.go`. Le retirer serait une simplification à part entière — un seul chemin de
+	// fermeture, celui qui attend — et elle emporterait ce test avec elle.
 	context.AfterFunc(ctx, pool.Close)
 
 	return pool, nil
