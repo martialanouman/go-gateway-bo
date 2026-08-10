@@ -54,22 +54,27 @@ type Params struct {
 
 // currentParams est le profil « seconde option » de la RFC 9106 §4 à la lettre — m=64 MiB, t=3, p=4.
 //
-// **Mesuré le 09/08/2026**, Apple M4 Pro (14 cœurs), Go 1.26.5, par `BenchmarkVerification` de
-// `mesure_test.go`, qui porte la commande exacte. Ce que la mesure a rendu, et qui **contredisait la
-// cible initiale de la fiche** :
+// **Mesuré le 10/08/2026**, Apple M4 Pro (14 cœurs), Go 1.26.5, par `BenchmarkVerification` de
+// `mesure_test.go`, qui porte la commande exacte. Les **dix** profils qu'il mesure, tous, parce qu'un
+// tableau qui choisit ses lignes n'étaye plus le choix qu'il justifie :
 //
-//	19 MiB · t=2 · p=1     16,7 ms
-//	64 MiB · t=3 · p=4     26,2 ms   ← retenu
-//	128 MiB · t=3 · p=4    57,4 ms
-//	256 MiB · t=3 · p=4   122,9 ms
-//	256 MiB · t=6 · p=4   250,8 ms
-//	512 MiB · t=3 · p=4   255,8 ms
+//	 64 MiB · t=1  · p=4     8,5 ms
+//	 19 MiB · t=2  · p=1    16,8 ms
+//	 64 MiB · t=2  · p=4    17,7 ms
+//	 64 MiB · t=3  · p=4    26,3 ms   ← retenu
+//	 64 MiB · t=4  · p=4    35,4 ms
+//	128 MiB · t=3  · p=4    57,9 ms
+//	 64 MiB · t=12 · p=4   108,3 ms
+//	256 MiB · t=3  · p=4   123,8 ms
+//	256 MiB · t=6  · p=4   252,1 ms
+//	512 MiB · t=3  · p=4   258,7 ms
 //
-// La step visait « ≈250 ms à 64 MiB ». **Les deux ne coexistent pas** : à 64 MiB, 250 ms demanderait
-// une trentaine de passes, un profil que la RFC ne décrit nulle part. Il fallait choisir, et c'est la
-// mémoire qui a été gardée — parce que c'est elle qui défend, pas le temps. Une carte graphique
-// aligne des milliers de cœurs mais pas des milliers de fois 64 MiB de mémoire rapide ; ajouter des
-// passes n'achète qu'un facteur linéaire, que le même matériel rattrape.
+// La step visait « ≈250 ms à 64 MiB ». **Les deux ne coexistent pas**, et la colonne des passes le
+// montre : à 64 MiB le temps est linéaire en `t` — 8,5 ms la passe, 108,3 ms à t=12 — donc 250 ms
+// demanderait une trentaine de passes, un profil que la RFC ne décrit nulle part. Il fallait choisir,
+// et c'est la mémoire qui a été gardée — parce que c'est elle qui défend, pas le temps. Une carte
+// graphique aligne des milliers de cœurs mais pas des milliers de fois 64 MiB de mémoire rapide ;
+// ajouter des passes n'achète que ce facteur linéaire, que le même matériel rattrape.
 //
 // Le prix assumé, écrit plutôt que tu : une base volée s'attaque à 26 ms le candidat. C'est
 // exactement ce que le relèvement existe pour corriger, et il ne coûte que ces trois nombres — les

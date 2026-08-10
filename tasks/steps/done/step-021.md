@@ -127,9 +127,11 @@ l'oracle d'énumération que le hachage factice ferme par ailleurs.
 ### DN-4 — argon2id à 64 MiB, t=3, p=4 — et la cible de la fiche était infaisable
 
 La fiche visait « ≈250 ms, mesurés sur la machine cible ». La mesure (`BenchmarkVerification`,
-09/08/2026, Apple M4 Pro) a rendu **26,2 ms** pour le profil RFC 9106 §4 « seconde option ». Atteindre
-250 ms à 64 MiB demanderait une trentaine de passes, un profil que la RFC ne décrit nulle part ; les
-seuls jeux à 250 ms sont 256 MiB · t=6 et 512 MiB · t=3.
+10/08/2026, Apple M4 Pro) a rendu **26,3 ms** pour le profil RFC 9106 §4 « seconde option ». Atteindre
+250 ms à 64 MiB demanderait une trentaine de passes — le temps y est linéaire en `t`, 8,5 ms la passe
+et 108,3 ms à t=12 —, un profil que la RFC ne décrit nulle part ; les seuls jeux à 250 ms sont
+256 MiB · t=6 et 512 MiB · t=3. Les **dix** profils mesurés sont au-dessus de `currentParams` ; une
+première rédaction n'en montrait que six, ce qui laissait la linéarité en affirmation.
 
 C'est la **mémoire** qui a été gardée, pas la durée. Une carte graphique aligne des milliers de cœurs
 mais pas des milliers de fois 64 MiB de mémoire rapide ; des passes supplémentaires n'achètent qu'un
