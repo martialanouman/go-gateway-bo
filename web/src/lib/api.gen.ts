@@ -140,7 +140,7 @@ export interface components {
             permissions: string[];
             elevated: boolean;
             /** Format: date-time */
-            expiresAt: string;
+            absoluteExpiresAt: string;
         };
         /**
          * @description De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni

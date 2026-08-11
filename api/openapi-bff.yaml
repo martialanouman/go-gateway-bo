@@ -232,12 +232,17 @@ components:
           # Le second facteur a-t-il été vérifié dans cette session. Il ne l'est jamais à ce jalon —
           # step-023 et step-024 apportent la vérification, step-025 ce qu'elle ouvre.
           type: boolean
-        expiresAt:
-          # L'échéance **absolue**, que rien ne repousse. L'échéance glissante n'est pas rendue :
-          # elle se déplace à chaque requête et serait périmée à l'instant où le client la lit.
+        absoluteExpiresAt:
+          # Le nom porte « absolute » parce que **la session meurt souvent avant** : elle expire aussi
+          # après deux heures sans requête, et l'écart atteint dix heures dans le cas courant. Nommé
+          # `expiresAt`, ce champ invitait step-027 à en faire un décompte qui aurait menti.
+          #
+          # L'échéance glissante n'est pas rendue : elle se déplace à chaque requête et serait périmée
+          # à l'instant où le client la lit. Ce champ est donc une **borne haute**, pas une date de
+          # déconnexion.
           type: string
           format: date-time
-      required: [operator, permissions, elevated, expiresAt]
+      required: [operator, permissions, elevated, absoluteExpiresAt]
 
     CurrentOperator:
       type: object

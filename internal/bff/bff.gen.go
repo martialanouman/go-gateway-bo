@@ -63,8 +63,8 @@ type LoginRequest struct {
 
 // Me Ce qu'une session vivante apprend au client.
 type Me struct {
-	Elevated  bool      `json:"elevated"`
-	ExpiresAt time.Time `json:"expiresAt"`
+	AbsoluteExpiresAt time.Time `json:"absoluteExpiresAt"`
+	Elevated          bool      `json:"elevated"`
 
 	// Operator De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
 	// `mfa_totp_secret`, ni les identifiants WebAuthn : le type de domaine du store ne traverse pas

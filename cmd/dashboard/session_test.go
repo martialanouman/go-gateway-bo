@@ -232,9 +232,9 @@ type me struct {
 		Email       string `json:"email"`
 		DisplayName string `json:"displayName"`
 	} `json:"operator"`
-	Permissions []string  `json:"permissions"`
-	Elevated    bool      `json:"elevated"`
-	ExpiresAt   time.Time `json:"expiresAt"`
+	Permissions       []string  `json:"permissions"`
+	Elevated          bool      `json:"elevated"`
+	AbsoluteExpiresAt time.Time `json:"absoluteExpiresAt"`
 }
 
 func (w *sessionWorld) decode() (me, error) {
@@ -266,7 +266,7 @@ func (w *sessionWorld) namesTheOperator() error {
 			decoded.Operator)
 	}
 
-	if decoded.ExpiresAt.IsZero() {
+	if decoded.AbsoluteExpiresAt.IsZero() {
 		return errors.New("la session est rendue sans échéance : le client ne sait pas quand elle meurt")
 	}
 

@@ -96,7 +96,7 @@ expectTypeOf<MeOperation['responses'][200]['content']['application/json']>().toE
   operator: { id: string; email: string; displayName: string }
   permissions: string[]
   elevated: boolean
-  expiresAt: string
+  absoluteExpiresAt: string
 }>()
 
 // Deux statuts seulement. Le client n'a que deux cas à traiter : il est connecté, ou il ne l'est

@@ -38,9 +38,9 @@ func (a API) Me(ctx context.Context, _ MeRequestObject) (MeResponseObject, error
 			Email:       grants.Email,
 			DisplayName: grants.DisplayName,
 		},
-		Permissions: grants.Permissions,
-		Elevated:    resolved.Elevated,
-		ExpiresAt:   resolved.ExpiresAt,
+		Permissions:       grants.Permissions,
+		Elevated:          resolved.Elevated,
+		AbsoluteExpiresAt: resolved.ExpiresAt,
 	}, nil
 }
 
