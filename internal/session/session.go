@@ -2,9 +2,11 @@
 // les gestes qui les composent avec le stockage.
 //
 // Il est distinct d'`internal/auth`, qui porte le **premier facteur** — argon2id, les compteurs
-// d'échecs, l'adresse source. La direction d'import va d'`auth` vers ici et jamais l'inverse :
-// step-023 élèvera la session depuis le chemin d'authentification, et step-025 résoudra une session
-// sans avoir aucune raison d'emporter le hachage des mots de passe avec elle.
+// d'échecs, l'adresse source. Aujourd'hui les deux sont **frères** : ni l'un ni l'autre ne s'importe,
+// c'est `internal/bff` qui les compose. Ce que la séparation achète dès maintenant est qu'un
+// importeur de la session n'emporte pas le hachage des mots de passe — ce dont step-025 profitera —
+// et step-023 posera la seule direction possible, d'`auth` vers ici, quand elle élèvera la session
+// depuis le chemin d'authentification.
 package session
 
 import (
@@ -32,8 +34,9 @@ const (
 	IdleWindow       = 2 * time.Hour
 )
 
-// Manager compose le sceau du cookie et le stockage. C'est le seul type que le reste du serveur
-// manipule : rien hors de ce paquet ne voit un jeton ni une empreinte.
+// Manager compose le sceau du cookie et le stockage. Rien hors de ce paquet ne voit un jeton ni une
+// empreinte — `internal/bff` manipule bien `store.Session` et `store.Grants`, mais jamais de quoi
+// fabriquer ou rejouer un cookie.
 type Manager struct {
 	sessions *store.Sessions
 	secret   []byte

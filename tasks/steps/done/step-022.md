@@ -129,12 +129,16 @@ Ce qu'on perd : `kin-openapi` aurait pu exiger la présence du cookie via un `re
 remplace exige **davantage** — le pas « le navigateur reçoit un cookie de session » vérifie les cinq
 attributs.
 
-### DN-5 — Un paquet `internal/session`, et la raison est une direction d'import
+### DN-5 — Un paquet `internal/session`, pour la cohésion aujourd'hui et une direction d'import demain
 
-`internal/auth` porte le premier facteur : argon2id, les compteurs, l'adresse source. step-023 élèvera
-la session **depuis** ce chemin (`auth → session`), et step-025 résoudra une session sans avoir aucune
-raison d'emporter le hachage des mots de passe. Fondu dans `internal/auth`, chaque importeur emporterait
-l'un avec l'autre et la direction deviendrait inobservable.
+`internal/auth` porte le premier facteur : argon2id, les compteurs, l'adresse source.
+
+**Correction de revue (11/08/2026)** : la première rédaction affirmait au présent une direction
+`auth → session` qui n'existe pas — `go list` montre qu'`internal/auth` n'importe pas `internal/session`,
+les deux sont frères et c'est `internal/bff` qui les compose. Ce que la séparation achète **dès
+maintenant** est qu'un importeur de la session n'emporte pas le hachage des mots de passe, ce dont
+step-025 profitera. La direction viendra avec step-023, quand elle élèvera la session depuis le chemin
+d'authentification.
 
 ### DN-6 — L'identifiant régénéré à l'élévation, la ligne conservée
 
@@ -219,6 +223,10 @@ naissance sans toucher la dernière vue.
 | `LEFT JOIN` durci en `JOIN` | `TestUnOperateurSansAucunRoleRendUnEnsembleVide` |
 | garde du statut élargie aux comptes désactivés | `TestUnOperateurDesactiveNeResoutPlusSaSession` |
 | `Delete` ne supprime rien | `TestFermerUneSessionEmpecheDeLaRejouer`, `TestDeuxPoolsDistinctsResolventLaMemeSession` |
+| `Elevate` : fenêtre glissante neutralisée | `TestUneSessionOisiveNeSEleveJamais` *(ajouté en revue)* |
+| `Elevate` : garde du statut élargie | `TestUnOperateurDesactiveNEleveJamaisSaSession` *(ajouté en revue)* |
+| `Manager.Elevate` rend le cookie présenté | **ne compile pas** — `rotate` n'a pas ce cookie en portée *(garde par construction, ajoutée en revue)* |
+| `GrantsOf` ne garde que le rôle le plus fourni | le scénario de l'union, qui ne le voyait pas avant la revue |
 
 ### Les routes
 
@@ -227,13 +235,17 @@ naissance sans toucher la dernière vue.
 | le login ne pose plus le cookie | le pas « le navigateur reçoit un cookie de session » |
 | le middleware strict n'écrit pas le cookie déposé | le même pas |
 | le cookie est posé **même sur une erreur** | `TestUnHandlerEnEchecNePoseAucunCookie` — écrit **parce que** cette mutation ne faisait rougir personne |
-| `/auth/me` rend 200 sans session | trois scénarios de `session.feature` |
+| `/auth/me` rend 200 sans session | quatre scénarios de `session.feature` *(la première rédaction disait trois ; recompté en revue)* |
 | le DTO annonce le second facteur comme vérifié | le pas « le second facteur n'est pas vérifié » |
 | le middleware tient toute session pour vivante | quatre scénarios |
 | l'erreur de base se lit comme une session absente | le scénario « une base en panne ne se lit pas comme une session fermée » |
 | **le logout ne supprime pas la ligne** *(la DoD la nomme)* | le scénario du rejeu — le cookie renvoyé rouvre la session |
 | le logout ne pose pas le cookie d'expiration | le pas « le cookie de session est expiré » |
 | `401` retiré des statuts de `/auth/me` côté client | `pnpm typecheck` sur `api.test-d.ts` |
+| le re-login ne ferme plus la session présentée | le scénario « se reconnecter ferme la session que le navigateur présentait » *(ajouté en revue)* |
+| `withoutCaching` retiré du groupe `/api`, ou `Vary` sans `Cookie` | le pas « la réponse interdit toute mise en cache » *(ajouté en revue)* |
+| décodage du sceau rendu non strict | `TestUnSceauNonCanoniqueEstRefuse` *(ajouté en revue)* |
+| `sessionFrom` tient toute requête pour authentifiée | le scénario « sans cookie, la route de session refuse » *(ajouté en revue)* |
 
 ### Ce que la mutation a corrigé dans les **tests**, pas dans le produit
 
@@ -248,9 +260,29 @@ naissance sans toucher la dernière vue.
 | Ligne | Constat |
 |---|---|
 | `hmac.Equal` | aucune porte — voir ci-dessus, le constat est écrit au-dessus de la ligne |
-| le préfixe `__Host-` lui-même | aucune porte **du dépôt** : le harnais godog porte ses cookies à la main, donc il accepterait n'importe quel nom. Ce qui le tient est la mesure navigateur ci-dessous, et le fait que les cinq attributs qu'il exige sont, eux, gardés |
-| `Elevate`, en tant que geste **atteignable depuis une route** | aucune, et c'est DN-11 : il n'a pas d'appelant de production avant step-023. Ses deux niveaux sont gardés par des tests |
+| le préfixe `__Host-` lui-même | ~~aucune porte du dépôt~~ **faux, corrigé en revue** : `TestLeCookieDeSessionPorteSesCinqAttributs` exige le préfixe, et le remplacer par `dashboard_session` fait rougir. Ce qui reste vrai est que les **scénarios** ne le voient pas — le harnais porte ses cookies à la main et accepterait n'importe quel nom |
+| `Elevate`, en tant que geste **atteignable depuis une route** | aucune, et c'est DN-11 : il n'a pas d'appelant de production avant step-023. Ses gardes, elles, sont désormais tenues — voir la section suivante |
 | la valeur des durées (12 h, 2 h) | aucune porte : ce qui est gardé est que les **deux bornes existent et mordent**, pas leur valeur. Les changer laisse tout vert — c'est une décision, pas un invariant |
+
+### Ce que la revue a trouvé, et ce qu'elle a fermé
+
+Trois lentilles indépendantes, dont une qui a **rejoué 23 lignes du tableau ci-dessus** : 22 exactes,
+une fausse. Ce qui suit est ce qu'aucune n'aurait dû avoir à trouver.
+
+| Trouvé | Comment il tenait avant | Ce qui le tient maintenant |
+|---|---|---|
+| **Se reconnecter ne fermait pas la session présentée.** Un opérateur qui croit son cookie compromis n'avait aucune remédiation avant step-029 : le navigateur échange sa valeur, donc plus rien n'atteint l'ancienne — valable 12 h, et celui qui en détient la copie avec elle | rien ; le cas n'était pas envisagé | `closePresentedSession` + le scénario « se reconnecter ferme la session que le navigateur présentait » |
+| **Les trois gardes d'`Elevate` n'étaient tenues par rien** — fenêtre glissante, statut de l'opérateur, et le cookie rendu. Les tests de `Resolve` ne disent rien d'une seconde méthode qui lui ressemble | rien : les trois mutations étaient vertes | deux tests de store, et le compilateur pour la troisième (`rotate` n'a pas le cookie présenté en portée) |
+| **Le scénario de l'union ne prouvait pas l'union** : `billing_readonly` ⊂ `billing_admin`, donc un serveur qui ne garde que le rôle le plus fourni restait vert | rien | `billing_admin` + `account_manager` — six clés propres à chacun, six partagées |
+| **`/auth/me` sans aucun cookie** n'était exercé par rien : tous les scénarios passaient par une connexion | rien | un scénario dédié ; un `sessionFrom` qui tiendrait toute requête pour authentifiée fait rougir |
+| **Aucun en-tête de cache sur `/api`** alors que `/auth/me` rend l'identité et l'ensemble des permissions | rien | `no-store` + `Vary: Cookie` sur le groupe, avec leur pas de scénario |
+| **Quatre encodages acceptés pour un même sceau** — les bits de remplissage du dernier caractère base64 | rien, et c'est le piège déjà payé une fois par un pas de scénario | `RawURLEncoding.Strict()` + `TestUnSceauNonCanoniqueEstRefuse` |
+| **`expiresAt` annonçait une échéance que la session n'atteint pas** dans le cas courant | le contrat le documentait, le nom disait le contraire | renommé `absoluteExpiresAt` avant que step-027 en fasse un décompte |
+
+**Quatre affirmations fausses**, toutes de la même famille — un texte qui décrit un mécanisme et que
+personne ne relit contre lui : la sonde `/health` « ne touche pas la base » (fausse dès qu'un cookie
+accompagne la requête), la direction d'import de DN-5, « le seul type que le reste du serveur
+manipule », et « `__Host-` n'est gardé par aucune porte » alors que le test que j'avais écrit l'exige.
 
 ## Ce qui a été mesuré
 

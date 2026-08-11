@@ -95,11 +95,17 @@ type resolution struct {
 
 // withSession résout la session que porte le cookie et la pose dans le contexte.
 //
-// **Il résout, il ne refuse jamais**, et c'est ce qui garde `GET /health` conforme à sa fiche : la
-// sonde ne touche ni la base ni la passerelle. Une requête sans cookie n'entraîne aucune requête SQL,
-// et la sonde répond même sur une base tombée — un middleware qui refuserait ferait redémarrer un
-// process sain. Le refus appartient aux routes qui exigent une session : `GET /auth/me` aujourd'hui,
-// la garde de permission de step-025 demain.
+// **Il résout, il ne refuse jamais.** C'est ce qui garde `GET /health` utilisable : une requête sans
+// cookie n'entraîne aucune requête SQL, donc la sonde répond même sur une base tombée — un middleware
+// qui refuserait ferait redémarrer un process sain.
+//
+// « Ne touche pas la base » est vrai de la **sonde**, pas de la route : montée dans le groupe `/api`,
+// `GET /health` accompagnée d'un cookie valide fait une lecture, comme les autres. Ce que la fiche de
+// `/health` exige — ne pas dépendre d'une autre brique pour répondre — tient parce que rien n'y
+// refuse, et parce que l'orchestrateur qui la sonde n'envoie pas de cookie.
+//
+// Le refus appartient aux routes qui exigent une session : `GET /auth/me` aujourd'hui, la garde de
+// permission de step-025 demain.
 func withSession(manager *session.Manager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
