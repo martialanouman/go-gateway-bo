@@ -12,6 +12,16 @@ Fonctionnalité: La session, d'une requête à l'autre
   requête servie ne dit pas dans quel ordre elle a travaillé — c'est `internal/session` qui l'observe,
   sur un pool fermé où « refusé au sceau » et « arrivé jusqu'à la base » se distinguent.
 
+  # La borne d'entrée de la route : sans cookie du tout, il n'y a rien à résoudre et rien à ouvrir.
+  # Tous les autres scénarios passent par une connexion, donc aucun ne l'exerçait.
+  Scénario: sans cookie, la route de session refuse
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Quand le navigateur demande "/api/auth/me"
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 401
+    Et le refus ne dit pas ce qui manque à la session
+
   Scénario: une connexion ouvre une session que la requête suivante retrouve
     Étant donné une installation avec un opérateur
     Et un serveur démarré
@@ -22,9 +32,13 @@ Fonctionnalité: La session, d'une requête à l'autre
     Et la réponse nomme l'opérateur connecté
     Et la réponse annonce que le second facteur n'est pas vérifié
 
+  # Les deux rôles sont choisis **non emboîtés** : six clés propres à chacun, six partagées. Avec une
+  # paire emboîtée — `billing_readonly` est inclus dans `billing_admin` — ce scénario ne distinguait
+  # pas une union d'un « garder le plus fourni des deux », et restait vert sur un serveur qui ignore
+  # un rôle sur deux. Mesuré en revue le 11/08/2026.
   Scénario: les permissions rendues réunissent les rôles détenus, sans répéter celles qu'ils partagent
     Étant donné une installation avec un opérateur
-    Et l'opérateur détient les rôles "billing_admin" et "billing_readonly"
+    Et l'opérateur détient les rôles "billing_admin" et "account_manager"
     Et un serveur démarré
     Quand l'opérateur se connecte avec son mot de passe
     Et le navigateur demande "/api/auth/me"
