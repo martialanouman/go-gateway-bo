@@ -57,6 +57,32 @@ func postCookie(ctx context.Context, cookie *http.Cookie) {
 	}
 }
 
+// apiCacheControl : `no-store` et non `no-cache`. `no-cache` autorise le stockage et n'exige qu'une
+// revalidation ; `no-store` interdit d'écrire la réponse où que ce soit.
+//
+// Ce que ça ferme : `GET /auth/me` rend l'identité de l'opérateur et **l'ensemble de ses
+// permissions**. Sans en-tête, un retour arrière sur un poste partagé peut ressortir la réponse d'un
+// autre opérateur du cache d'historique, et un intermédiaire qui met en cache la servirait à un
+// tiers. `Vary: Cookie` l'accompagne pour les caches qui négocient : deux sessions ne sont jamais la
+// même réponse.
+//
+// Posé sur **tout** le groupe `/api` plutôt que sur cette route : les routes que step-025 ajoutera
+// rendront des données d'exploitation, et hériter d'une garde vaut mieux que devoir y penser.
+const apiCacheControl = "no-store"
+
+// withoutCaching pose ces deux en-têtes sur les réponses de l'API.
+//
+// Un middleware chi convient ici, là où le cookie exigeait un middleware strict : les en-têtes sont
+// posés **avant** d'appeler la suite, donc avant que le handler engendré n'écrive son statut.
+func withoutCaching(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", apiCacheControl)
+		w.Header().Add("Vary", "Cookie")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // resolution est ce que le middleware apprend, y compris quand il n'apprend rien. L'échec est porté
 // plutôt qu'avalé : une base injoignable ne doit pas se lire comme une session expirée, sans quoi
 // l'opérateur se reconnecte en boucle pendant que la panne est ailleurs. Même arbitrage qu'en

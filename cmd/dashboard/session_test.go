@@ -273,6 +273,23 @@ func (w *sessionWorld) namesTheOperator() error {
 	return nil
 }
 
+// forbidsCaching lit les deux en-têtes sur la réponse **servie**, pas sur l'intention du middleware.
+func (w *sessionWorld) forbidsCaching() error {
+	header := w.login.process.received.header
+
+	if cache := header.Get("Cache-Control"); cache != "no-store" {
+		return fmt.Errorf("la réponse porte Cache-Control %q et non \"no-store\" : le corps peut être "+
+			"écrit dans un cache", cache)
+	}
+
+	if vary := header.Get("Vary"); !strings.Contains(vary, "Cookie") {
+		return fmt.Errorf("la réponse porte Vary %q, qui ne nomme pas Cookie : un cache qui négocie "+
+			"servirait la réponse d'une session à une autre", vary)
+	}
+
+	return nil
+}
+
 func (w *sessionWorld) secondFactorIsNotVerified() error {
 	decoded, err := w.decode()
 	if err != nil {

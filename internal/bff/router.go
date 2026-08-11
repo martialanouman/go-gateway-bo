@@ -52,6 +52,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Route("/api", func(api chi.Router) {
 		// Borne la lecture du corps **avant** le décodage : la `maxLength` du contrat s'applique après,
 		// donc sur une valeur déjà entièrement chargée en mémoire.
+		api.Use(withoutCaching)
 		api.Use(middleware.RequestSize(maximumLoginBodyBytes))
 		api.Use(withClientAddress(deps.TrustedProxies))
 		// Après les deux précédents : celui-ci est le seul qui puisse interroger la base, et il ne le

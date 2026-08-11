@@ -212,6 +212,7 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.Then(`^la réponse nomme l'opérateur connecté$`, sessions.namesTheOperator)
 	ctx.Then(`^la réponse annonce que le second facteur n'est pas vérifié$`,
 		sessions.secondFactorIsNotVerified)
+	ctx.Then(`^la réponse interdit toute mise en cache$`, sessions.forbidsCaching)
 	ctx.Then(`^les permissions rendues sont celles des deux rôles réunis$`,
 		sessions.permissionsAreTheUnionOfHeldRoles)
 	ctx.Then(`^aucune permission n'est rendue deux fois$`, sessions.noPermissionIsRenderedTwice)

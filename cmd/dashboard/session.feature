@@ -31,6 +31,9 @@ Fonctionnalité: La session, d'une requête à l'autre
     Et le serveur répond 200
     Et la réponse nomme l'opérateur connecté
     Et la réponse annonce que le second facteur n'est pas vérifié
+    # Ce corps porte l'identité et l'ensemble des permissions : rien ne doit l'écrire ailleurs, ni le
+    # cache d'historique d'un poste partagé, ni un intermédiaire qui met en cache.
+    Et la réponse interdit toute mise en cache
 
   # Les deux rôles sont choisis **non emboîtés** : six clés propres à chacun, six partagées. Avec une
   # paire emboîtée — `billing_readonly` est inclus dans `billing_admin` — ce scénario ne distinguait

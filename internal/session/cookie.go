@@ -59,7 +59,12 @@ func Unseal(secret []byte, value string) (tokenHash []byte, ok bool) {
 		return nil, false
 	}
 
-	provided, err := base64.RawURLEncoding.DecodeString(signature)
+	// `Strict()` refuse les bits de remplissage non nuls du dernier caractère. Sans lui, quatre
+	// caractères de fin différents décodent vers les mêmes octets, donc quatre cookies distincts sont
+	// acceptés pour un même sceau. Aucune conséquence de sécurité — le jeton est intégralement couvert
+	// par le HMAC — mais c'est le piège que cette step a déjà payé une fois : un pas de scénario
+	// altérait ce caractère et restait vert contre un serveur correct.
+	provided, err := base64.RawURLEncoding.Strict().DecodeString(signature)
 	if err != nil {
 		return nil, false
 	}
@@ -72,7 +77,7 @@ func Unseal(secret []byte, value string) (tokenHash []byte, ok bool) {
 		return nil, false
 	}
 
-	token, err := base64.RawURLEncoding.DecodeString(text)
+	token, err := base64.RawURLEncoding.Strict().DecodeString(text)
 	if err != nil {
 		return nil, false
 	}

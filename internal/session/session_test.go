@@ -75,6 +75,35 @@ func TestUnCookieScelleAvecUneAutreCleEstRefuse(t *testing.T) {
 	assert.False(t, ok)
 }
 
+// Le dernier caractère d'un base64 de 32 octets ne porte que deux bits significatifs sur six. Sans
+// décodage strict, quatre valeurs de cookie distinctes sont acceptées pour un même sceau — et c'est
+// exactement ce qui a fait passer un pas de scénario contre un serveur correct pendant cette step.
+func TestUnSceauNonCanoniqueEstRefuse(t *testing.T) {
+	t.Parallel()
+
+	value, _, err := newSealedToken(testSecret)
+	require.NoError(t, err)
+
+	text, seal, _ := strings.Cut(value, separator)
+
+	variants := 0
+
+	for _, replacement := range []byte("ABCDEFGHIJKLMNOP") {
+		candidate := text + separator + seal[:len(seal)-1] + string(replacement)
+		if candidate == value {
+			continue
+		}
+
+		if _, ok := Unseal(testSecret, candidate); ok {
+			variants++
+		}
+	}
+
+	assert.Zero(t, variants,
+		"%d encodage(s) non canonique(s) du même sceau sont acceptés : le cookie n'a pas une seule "+
+			"forme valide", variants)
+}
+
 func TestDeuxSessionsNePartagentPasLeurJeton(t *testing.T) {
 	t.Parallel()
 
