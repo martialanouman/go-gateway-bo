@@ -268,6 +268,51 @@ func TestLEcheanceAbsolueNEstJamaisRepoussee(t *testing.T) {
 	assert.WithinDuration(t, first.ExpiresAt, second.ExpiresAt, time.Second)
 }
 
+// **`Elevate` porte les mêmes trois gardes que `Resolve`, et chacune se teste séparément.** Mesuré le
+// 11/08/2026 en revue : les retirer une par une d'`Elevate` laissait la suite entièrement verte, parce
+// que les tests de `Resolve` ne disent rien de la seconde requête. C'est le motif « deux gardes,
+// chacune invisible seule », transposé à deux méthodes qui se ressemblent.
+
+// Sans cette garde, une session oisive depuis des jours s'élève encore — et l'élévation repousse
+// `last_seen_at`, donc la **ressuscite** au passage.
+func TestUneSessionOisiveNeSEleveJamais(t *testing.T) {
+	t.Parallel()
+
+	sessions, dsn := sessionsOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	_, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
+	require.NoError(t, err)
+
+	idleFor(t, dsn, tokenHash("avant"), testIdle+time.Hour)
+
+	elevated, err := sessions.Elevate(t.Context(), tokenHash("avant"), tokenHash("après"), testIdle)
+	require.NoError(t, err)
+	require.False(t, elevated)
+
+	_, alive, err := sessions.Resolve(t.Context(), tokenHash("avant"), testIdle)
+	require.NoError(t, err)
+	assert.False(t, alive, "l'élévation refusée a quand même repoussé la fenêtre")
+}
+
+// Le second facteur d'un compte désactivé ne doit rien ouvrir : step-029 révoquera activement, mais
+// la porte passive vaut pour les deux méthodes, pas seulement pour `Resolve`.
+func TestUnOperateurDesactiveNEleveJamaisSaSession(t *testing.T) {
+	t.Parallel()
+
+	sessions, dsn := sessionsOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	_, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
+	require.NoError(t, err)
+
+	execOn(t, dsn, `UPDATE operators SET status = 'disabled' WHERE id = $1`, operator)
+
+	elevated, err := sessions.Elevate(t.Context(), tokenHash("avant"), tokenHash("après"), testIdle)
+	require.NoError(t, err)
+	assert.False(t, elevated)
+}
+
 // Sans régénération, un jeton obtenu avant le second facteur reste valable après : celui qui l'a
 // intercepté hérite de l'élévation qu'un autre vient de franchir.
 func TestLElevationInvalideLeJetonPrecedent(t *testing.T) {

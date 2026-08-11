@@ -78,12 +78,24 @@ func (m *Manager) Resolve(ctx context.Context, value string) (store.Session, boo
 //
 // **Aucun appelant en production avant step-023**, qui vérifiera ce second facteur. Ce qui se décide
 // ici est la régénération, qui appartient au geste de session et non à celui de la vérification.
-func (m *Manager) Elevate(ctx context.Context, value string) (string, bool, error) {
-	tokenHash, ok := Unseal(m.secret, value)
+func (m *Manager) Elevate(ctx context.Context, presented string) (string, bool, error) {
+	tokenHash, ok := Unseal(m.secret, presented)
 	if !ok {
 		return "", false, nil
 	}
 
+	return m.rotate(ctx, tokenHash)
+}
+
+// rotate existe pour que le cookie **présenté** soit hors de portée au moment où l'on rend le
+// nouveau. Rendre l'ancien laisserait le client sur un jeton que la base ne connaît plus — il serait
+// déconnecté à la requête suivante, et la fixation de session que la régénération doit fermer se
+// rouvrirait à l'identique.
+//
+// C'est une garde par construction plutôt qu'un test, et c'est délibéré : la prouver par un test
+// demanderait un PostgreSQL dans ce paquet, pour une propriété que le compilateur tient seul —
+// `presented` n'existe pas ici, donc `return presented` ne compile pas.
+func (m *Manager) rotate(ctx context.Context, tokenHash []byte) (string, bool, error) {
 	renewed, renewedHash, err := newSealedToken(m.secret)
 	if err != nil {
 		return "", false, err
