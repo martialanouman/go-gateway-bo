@@ -46,10 +46,7 @@ func (a API) Me(ctx context.Context, _ MeRequestObject) (MeResponseObject, error
 
 // Logout ferme la session.
 //
-// **Ce qui protège est la suppression de la ligne**, pas le cookie expiré : un cookie qu'on garde se
-// rejoue, et le navigateur n'est pas le seul à en détenir une copie. Le cookie part quand même — il
-// nettoie une valeur que le serveur ne connaît plus.
-//
+// Ce qui protège est la suppression de la ligne, pas le cookie expiré — voir `store.Sessions.Delete`.
 // Sans session, le même 204 ; la raison est dans la description de l'opération au contrat.
 //
 // `Logout204Response` est un struct **sans champ**, que `TestResponseTypesDeclareTheirFields`

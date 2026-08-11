@@ -73,9 +73,8 @@ func (s *Sessions) Create(ctx context.Context, operatorID string, tokenHash []by
 
 // Resolve rend la session vivante que porte cette empreinte, et fait glisser sa fenêtre au passage.
 //
-// **Les deux échéances tiennent ensemble et sont vérifiées ensemble** : l'absolue borne ce qu'un
-// cookie volé vaut au maximum, la glissante ferme le poste qu'on a quitté. Aucune des deux ne garde
-// ce que garde l'autre.
+// Les deux échéances sont vérifiées ensemble ; l'arbitrage qui les fixe est sur
+// `session.AbsoluteLifetime` et `session.IdleWindow`.
 //
 // Une ligne qui échoue au `WHERE` n'est pas touchée : un refus ne repousse jamais rien, donc une
 // session morte ne ressuscite pas en se faisant refuser.
@@ -125,9 +124,7 @@ func (s *Sessions) Resolve(ctx context.Context, tokenHash []byte, idle time.Dura
 // `expires_at` n'est pas repoussée : l'élévation n'achète pas du temps, elle change ce que la session
 // autorise.
 //
-// **Aucun appelant en production avant step-023**, qui vérifiera le second facteur. Le geste est
-// livré parce que le schéma et la régénération se décident ici ; l'exposer par une route serait
-// livrer la vérification, qui est hors du périmètre de cette step.
+// Aucun appelant en production avant step-023 — la raison est écrite sur `session.Manager.Elevate`.
 func (s *Sessions) Elevate(ctx context.Context, tokenHash, renewedTokenHash []byte,
 	idle time.Duration,
 ) (bool, error) {

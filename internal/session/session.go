@@ -25,10 +25,6 @@ import (
 //
 // IdleWindow ferme le poste qu'on a quitté : sans elle, un cockpit laissé ouvert à midi reste
 // exploitable le soir. Deux heures, c'est plus long qu'une réunion et plus court qu'une demi-journée.
-//
-// Elles sont des constantes et non des variables d'environnement : une durée de session n'est pas un
-// réglage de déploiement, et en faire un obligerait à décrire dans `.env.example` un arbitrage qui se
-// lit mieux ici, à côté de ce qu'il protège.
 const (
 	AbsoluteLifetime = 12 * time.Hour
 	IdleWindow       = 2 * time.Hour
@@ -46,10 +42,8 @@ func NewManager(sessions *store.Sessions, secret []byte) *Manager {
 	return &Manager{sessions: sessions, secret: secret}
 }
 
-// Issue ouvre une session de **premier facteur** et rend la valeur à mettre dans le cookie.
-//
-// Elle n'est pas élevée : c'est step-023 et step-024 qui vérifieront le second facteur. Ce que cette
-// session ouvre est ce que step-025 décidera d'ouvrir à une session non élevée.
+// Issue ouvre une session de **premier facteur** — non élevée — et rend la valeur à mettre dans le
+// cookie. Pourquoi elle naît là plutôt qu'après le second facteur : voir `API.Login`.
 func (m *Manager) Issue(ctx context.Context, operatorID string) (string, error) {
 	value, tokenHash, err := newSealedToken(m.secret)
 	if err != nil {
@@ -112,8 +106,7 @@ func (m *Manager) rotate(ctx context.Context, tokenHash []byte) (string, bool, e
 	return renewed, true, nil
 }
 
-// Close ferme la session qu'on vient de résoudre. C'est **la** protection du logout : expirer le
-// cookie ne suffirait pas, il se rejoue.
+// Close ferme la session qu'on vient de résoudre.
 func (m *Manager) Close(ctx context.Context, id string) error {
 	return m.sessions.Delete(ctx, id)
 }

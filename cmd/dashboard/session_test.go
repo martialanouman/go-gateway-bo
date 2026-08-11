@@ -84,11 +84,10 @@ func (w *sessionWorld) permissionsOfRoles(ctx context.Context, roles ...string) 
 // entièrement inventé serait refusé même sans vérification du sceau, faute d'empreinte connue en
 // base : il ne prouverait rien.
 //
-// Le premier caractère et non le dernier : mesuré le 10/08/2026, altérer le dernier laissait le
-// scénario **vert** avec un serveur correct. Le sceau fait 32 octets, donc 43 caractères en base64
-// sans remplissage, dont le dernier ne porte que deux bits significatifs — le décodeur de Go ignore
-// les quatre autres, et rendait les mêmes octets. Une altération qui ne change pas ce qu'on compare
-// ne prouve rien.
+// Le premier caractère et non le dernier, pour que ce scénario éprouve la **comparaison du sceau** et
+// non le décodage : le dernier caractère ne porte que deux bits significatifs sur six, et c'est
+// désormais `Strict()` qui refuse les autres formes (`TestUnSceauNonCanoniqueEstRefuse`). Avant lui,
+// le viser laissait ce scénario vert contre un serveur correct — mesuré le 10/08/2026.
 func (w *sessionWorld) alterSessionSeal() error {
 	value, ok := w.login.process.cookies[session.CookieName]
 	if !ok {

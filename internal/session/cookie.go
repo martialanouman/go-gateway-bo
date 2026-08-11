@@ -118,9 +118,8 @@ func Issued(value string) *http.Cookie {
 // Cleared recouvre le cookie précédent. Les attributs doivent coïncider avec ceux d'`Issued`, sinon
 // le navigateur pose un second cookie au lieu de remplacer le premier.
 //
-// Il ne protège rien à lui seul — c'est la suppression de la ligne qui ferme la session, un cookie
-// expiré se rejouant à volonté. Il existe pour que le navigateur cesse d'envoyer une valeur qui ne
-// vaut plus rien, et pour nettoyer un cookie périmé que le serveur ne connaît même plus.
+// Il ne ferme rien à lui seul : il fait cesser l'envoi d'une valeur qui ne vaut plus rien, et nettoie
+// un cookie périmé que le serveur ne connaît même plus.
 func Cleared() *http.Cookie {
 	// G124 ne suit pas l'appel et croit le cookie construit sans attributs. Les redire ici pour
 	// satisfaire l'analyseur rétablirait précisément le défaut que ce cookie doit éviter : deux jeux
