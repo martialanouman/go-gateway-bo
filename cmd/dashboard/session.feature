@@ -58,11 +58,28 @@ Fonctionnalité: La session, d'une requête à l'autre
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
+    Et le navigateur retient son cookie de session
     Quand le navigateur se déconnecte
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 204
     Et le cookie de session est expiré
-    Quand le navigateur rejoue le cookie qu'il portait avant la déconnexion
+    Quand le navigateur rejoue le cookie qu'il avait retenu
+    Et le navigateur demande "/api/auth/me"
+    Alors le serveur répond 401
+
+  # C'est la seule remédiation dont un opérateur dispose avant step-029. S'il croit son cookie
+  # compromis, se reconnecter doit fermer la session que ce cookie porte — sinon le navigateur échange
+  # sa valeur contre la nouvelle, plus personne n'atteint l'ancienne, et celui qui en détient la copie
+  # garde douze heures d'accès.
+  Scénario: se reconnecter ferme la session que le navigateur présentait
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et le navigateur retient son cookie de session
+    Quand l'opérateur se connecte avec son mot de passe
+    Alors le serveur répond 200
+    Et le navigateur reçoit un cookie de session
+    Quand le navigateur rejoue le cookie qu'il avait retenu
     Et le navigateur demande "/api/auth/me"
     Alors le serveur répond 401
 

@@ -110,22 +110,34 @@ func (w *sessionWorld) alterSessionSeal() error {
 	return nil
 }
 
-// signOut mémorise le cookie **avant** de se déconnecter : le scénario a besoin de le rejouer, et le
-// harnais l'oublie dès que le serveur l'expire, exactement comme un navigateur.
-func (w *sessionWorld) signOut() error {
-	w.replayed = w.login.process.cookies[session.CookieName]
+// rememberCookie met de côté ce que le navigateur porte, pour le rejouer plus tard. Le harnais
+// l'oublie dès que le serveur l'expire ou le remplace, exactement comme un navigateur — c'est
+// pourquoi le retenir est un pas explicite du scénario.
+func (w *sessionWorld) rememberCookie() error {
+	value, ok := w.login.process.cookies[session.CookieName]
+	if !ok {
+		return errors.New("aucun cookie de session à retenir : la connexion n'en a pas posé")
+	}
 
+	w.replayed = value
+
+	return nil
+}
+
+func (w *sessionWorld) signOut() error {
 	return w.login.process.post("/api/auth/logout", "")
 }
 
-func (w *sessionWorld) replayThePreviousCookie() error {
+// replayTheRememberedCookie exige que le navigateur ne porte plus la valeur retenue — sinon le rejeu
+// ne prouverait rien, il rejouerait le cookie courant.
+func (w *sessionWorld) replayTheRememberedCookie() error {
 	if w.replayed == "" {
-		return errors.New("aucun cookie mémorisé : la déconnexion n'a pas eu lieu")
+		return errors.New("aucun cookie retenu : le scénario n'a rien à rejouer")
 	}
 
-	if _, still := w.login.process.cookies[session.CookieName]; still {
-		return errors.New("le navigateur porte encore son cookie : la déconnexion ne l'a pas expiré, " +
-			"et le rejeu ne prouverait rien")
+	if w.login.process.cookies[session.CookieName] == w.replayed {
+		return errors.New("le navigateur porte encore la valeur retenue : elle n'a été ni expirée " +
+			"ni remplacée, et le rejeu ne prouverait rien")
 	}
 
 	w.login.process.cookies[session.CookieName] = w.replayed
