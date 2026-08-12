@@ -165,7 +165,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 18
+const minimumScenarios = 28
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -190,11 +190,35 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.When(`^le verrou arrive à échéance$`, login.lockExpires)
 	ctx.When(`^le navigateur envoie un corps qui n'est pas du JSON à la connexion$`, login.postMalformedBody)
 	ctx.Then(`^un challenge est émis avec son échéance$`, login.challengeIsIssued)
+	ctx.Then(`^le navigateur reçoit un cookie de session$`, p.receivedASessionCookie)
 	ctx.Then(`^le refus ne nomme ni l'adresse ni le facteur en cause$`, login.refusalNamesNothing)
 	ctx.Then(`^les deux refus sont indiscernables$`, login.refusalsAreIndistinguishable)
 	ctx.Then(`^la réponse porte l'en-tête "([^"]+)"$`, login.responseCarriesHeader)
 	ctx.Then(`^le message annonce la durée restante$`, login.messageAnnouncesTheRemainingDelay)
 	ctx.Then(`^la réponse est conforme au contrat du BFF$`, p.responseMatchesTheContract)
+
+	sessions := &sessionWorld{login: login}
+
+	ctx.Given(`^l'opérateur détient les rôles "([^"]*)" et "([^"]*)"$`, sessions.grantRoles)
+	ctx.Given(`^l'opérateur se connecte avec son mot de passe$`, login.signInWithTheRightPassword)
+	ctx.When(`^le sceau du cookie de session est altéré$`, sessions.alterSessionSeal)
+	ctx.When(`^la session reste (\d+) heures sans requête$`, sessions.idleFor)
+	ctx.When(`^la session dépasse son échéance absolue$`, sessions.expireAbsolutely)
+	ctx.When(`^la table des sessions devient illisible$`, sessions.breakSessionsTable)
+	ctx.When(`^le navigateur se déconnecte$`, sessions.signOut)
+	ctx.Given(`^le navigateur retient son cookie de session$`, sessions.rememberCookie)
+	ctx.When(`^le navigateur rejoue le cookie qu'il avait retenu$`, sessions.replayTheRememberedCookie)
+	ctx.Then(`^le cookie de session est expiré$`, sessions.sessionCookieIsCleared)
+	ctx.Then(`^la réponse nomme l'opérateur connecté$`, sessions.namesTheOperator)
+	ctx.Then(`^la réponse annonce que le second facteur n'est pas vérifié$`,
+		sessions.secondFactorIsNotVerified)
+	ctx.Then(`^la réponse interdit toute mise en cache$`, sessions.forbidsCaching)
+	ctx.Then(`^les permissions rendues sont celles des deux rôles réunis$`,
+		sessions.permissionsAreTheUnionOfHeldRoles)
+	ctx.Then(`^aucune permission n'est rendue deux fois$`, sessions.noPermissionIsRenderedTwice)
+	ctx.Then(`^le refus ne dit pas ce qui manque à la session$`,
+		sessions.refusalSaysNothingAboutTheSession)
+	ctx.Then(`^redemander "([^"]*)" est refusé de même$`, sessions.refusedAgain)
 
 	ctx.Given(`^une base dont le schéma est en retard d'une migration$`, schema.outdatedSchema)
 	ctx.Given(`^une base vierge$`, schema.freshSchema)
@@ -249,6 +273,9 @@ func completeConfiguration() map[string]string {
 		// Obligatoire depuis step-021, et sans repli : le binaire refuse de démarrer sans elle. Sa
 		// valeur ici n'a rien d'un secret — aucun scénario ne relit un HMAC, ils observent le verrou.
 		"DASHBOARD_BRUTEFORCE_SALT": "un-sel-de-scenario-assez-long-pour-la-borne",
+		// Obligatoire depuis step-022, et sans repli de même. Les scénarios de session, eux, relisent
+		// bien ce que cette clé scelle : c'est le serveur qui signe et vérifie, jamais le harnais.
+		"DASHBOARD_SESSION_SECRET": "une-cle-de-scenario-assez-longue-pour-la-borne",
 	}
 }
 
@@ -260,6 +287,9 @@ type process struct {
 	exited   chan error
 	addr     string
 	received *response
+	// cookies est ce que le navigateur du scénario porte d'une requête à l'autre. Voir `send` pour la
+	// raison de ne pas employer un `cookiejar`.
+	cookies map[string]string
 }
 
 // response est ce qu'un navigateur voit d'une réponse : son code, ses en-têtes et son corps. Le
@@ -419,33 +449,29 @@ func (p *process) url(path string) string {
 }
 
 func (p *process) fetch(path string) error {
-	resp, err := browser.Get(p.url(path))
-	if err != nil {
-		return fmt.Errorf("la requête vers %s a échoué: %w", path, err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("lecture de la réponse de %s: %w", path, err)
-	}
-
-	p.received = &response{
-		method: http.MethodGet,
-		path:   path,
-		status: resp.StatusCode,
-		header: resp.Header,
-		body:   string(body),
-	}
-
-	return nil
+	return p.send(http.MethodGet, path, "", "")
 }
 
-// post envoie un corps JSON. Le harnais n'avait que `fetch`, en GET : `POST /auth/login` est la
-// première opération du contrat à porter un corps, et `responseMatchesTheContract` a besoin de la
-// **méthode** pour retrouver la route dans le YAML.
-func (p *process) post(path, body string) error {
-	resp, err := browser.Post(p.url(path), "application/json", strings.NewReader(body))
+// send porte les cookies **à la main** plutôt que par un `net/http/cookiejar`. Un jar refuserait tout
+// cookie `Secure` servi en clair sur `127.0.0.1`, donc les scénarios de session échoueraient tous sur
+// une cause étrangère au produit. Et le rejeu après déconnexion a besoin de renvoyer un cookie qu'un
+// jar aurait justement supprimé.
+func (p *process) send(method, path, contentType, body string) error {
+	request, err := http.NewRequestWithContext(context.Background(), method, p.url(path),
+		strings.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("composer la requête vers %s: %w", path, err)
+	}
+
+	if contentType != "" {
+		request.Header.Set("Content-Type", contentType)
+	}
+
+	for name, value := range p.cookies {
+		request.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
+
+	resp, err := browser.Do(request)
 	if err != nil {
 		return fmt.Errorf("la requête vers %s a échoué: %w", path, err)
 	}
@@ -456,8 +482,10 @@ func (p *process) post(path, body string) error {
 		return fmt.Errorf("lecture de la réponse de %s: %w", path, err)
 	}
 
+	p.remember(resp.Cookies())
+
 	p.received = &response{
-		method: http.MethodPost,
+		method: method,
 		path:   path,
 		status: resp.StatusCode,
 		header: resp.Header,
@@ -465,6 +493,31 @@ func (p *process) post(path, body string) error {
 	}
 
 	return nil
+}
+
+// remember imite ce qu'un navigateur retient : un cookie dont l'échéance est passée est **oublié**,
+// il n'est pas conservé avec une valeur vide.
+func (p *process) remember(cookies []*http.Cookie) {
+	for _, cookie := range cookies {
+		if p.cookies == nil {
+			p.cookies = map[string]string{}
+		}
+
+		if cookie.MaxAge < 0 {
+			delete(p.cookies, cookie.Name)
+
+			continue
+		}
+
+		p.cookies[cookie.Name] = cookie.Value
+	}
+}
+
+// post envoie un corps JSON. Le harnais n'avait que `fetch`, en GET : `POST /auth/login` est la
+// première opération du contrat à porter un corps, et `responseMatchesTheContract` a besoin de la
+// **méthode** pour retrouver la route dans le YAML.
+func (p *process) post(path, body string) error {
+	return p.send(http.MethodPost, path, "application/json", body)
 }
 
 // La coquille référence ses fichiers hachés en absolu : les relire dans le corps rendu, plutôt que

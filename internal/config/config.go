@@ -42,6 +42,9 @@ const (
 	EnvDatabaseURL = "DASHBOARD_DATABASE_URL"
 
 	EnvBruteForceSalt = "DASHBOARD_BRUTEFORCE_SALT"
+	// G101 lit un nom de variable d'environnement comme un identifiant en dur. C'en est l'exact
+	// contraire : cette constante nomme la variable dont la valeur n'est **jamais** écrite ici.
+	EnvSessionSecret  = "DASHBOARD_SESSION_SECRET" //nolint:gosec
 	EnvTrustedProxies = "DASHBOARD_TRUSTED_PROXIES"
 )
 
@@ -50,6 +53,12 @@ const (
 // sel posé « pour faire démarrer » — `changeme`, `dev`, le nom du projet — qui rendrait le HMAC des
 // adresses sources devinable, donc la table de compteurs relisible par qui la vole.
 const minimumBruteForceSaltLength = 32
+
+// minimumSessionSecretLength borne la clé qui signe les cookies de session. Même seuil et même
+// raison que ci-dessus, mais la conséquence d'une clé faible n'est pas la même : elle ne rend pas une
+// table relisible, elle laisse **signer une session**. Qui devine cette clé se connecte sous
+// n'importe quelle identité sans jamais présenter de mot de passe.
+const minimumSessionSecretLength = 32
 
 // defaultShutdownTimeout laisse aux requêtes en vol de quoi se terminer pendant un déploiement
 // roulant. Un délai a une valeur par défaut, un secret n'en a jamais.
@@ -89,6 +98,13 @@ type AuthConfig struct {
 	// BruteForceSalt est la clé du HMAC qui masque les adresses sources dans la table de compteurs.
 	// C'est un secret : il ne sort ni dans un message d'erreur, ni dans un journal.
 	BruteForceSalt []byte
+	// SessionSecret est la clé du HMAC qui scelle le cookie de session. Elle n'a **aucun repli** : une
+	// clé par défaut serait publique, donc n'importe qui signerait une session.
+	//
+	// Toutes les instances portent la même, sans quoi le cookie émis par l'une serait refusé par
+	// l'autre. La changer déconnecte tout le monde — c'est l'inverse du sel ci-dessus, dont la
+	// rotation n'invalide aucun compte.
+	SessionSecret []byte
 	// TrustedProxies énumère les réseaux dont on croit l'en-tête `X-Forwarded-For`.
 	//
 	// **Vide est une valeur sûre et non un défaut manquant** : sans liste, l'en-tête est ignoré et le
@@ -143,6 +159,7 @@ func Load(lookup Lookup) (Config, error) {
 		DatabaseURL: r.requiredDatabaseURL(EnvDatabaseURL),
 		Auth: AuthConfig{
 			BruteForceSalt: r.requiredSecret(EnvBruteForceSalt, minimumBruteForceSaltLength),
+			SessionSecret:  r.requiredSecret(EnvSessionSecret, minimumSessionSecretLength),
 			TrustedProxies: r.prefixList(EnvTrustedProxies),
 		},
 	}

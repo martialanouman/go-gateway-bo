@@ -268,6 +268,7 @@ jobs:
           DASHBOARD_GATEWAY_BASE_URL=http://127.0.0.1:4010 \
           DASHBOARD_DATABASE_URL="$DASHBOARD_DATABASE_URL" \
           DASHBOARD_BRUTEFORCE_SALT=un-sel-de-ci-assez-long-pour-passer-la-borne \
+          DASHBOARD_SESSION_SECRET=une-cle-de-ci-assez-longue-pour-passer-la-borne \
             ./bin/dashboard &
           bff=$!
           # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de

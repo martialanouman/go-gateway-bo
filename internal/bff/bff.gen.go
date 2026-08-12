@@ -29,6 +29,16 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// CurrentOperator De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
+// `mfa_totp_secret`, ni les identifiants WebAuthn : le type de domaine du store ne traverse pas
+// cette frontière (§1.11), et `additionalProperties: false` fait refuser tout champ qu'un
+// serveur ajouterait par mégarde.
+type CurrentOperator struct {
+	DisplayName string `json:"displayName"`
+	Email       string `json:"email"`
+	Id          string `json:"id"`
+}
+
 // Error La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
 // première route qui relaie la passerelle (step-060).
@@ -51,6 +61,19 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+// Me Ce qu'une session vivante apprend au client.
+type Me struct {
+	AbsoluteExpiresAt time.Time `json:"absoluteExpiresAt"`
+	Elevated          bool      `json:"elevated"`
+
+	// Operator De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
+	// `mfa_totp_secret`, ni les identifiants WebAuthn : le type de domaine du store ne traverse pas
+	// cette frontière (§1.11), et `additionalProperties: false` fait refuser tout champ qu'un
+	// serveur ajouterait par mégarde.
+	Operator    CurrentOperator `json:"operator"`
+	Permissions []string        `json:"permissions"`
+}
+
 // MfaChallenge Le challenge de second facteur. C'est un objet en base et non un jeton signé : il doit être
 // révocable à la seconde où il est consommé, ce qu'un jeton sans état ne permet pas. Le serveur
 // n'en garde que l'empreinte — cette valeur n'est rendue qu'une fois.
@@ -67,6 +90,12 @@ type ServerInterface interface {
 	// Login Premier facteur — adresse et mot de passe
 	// (POST /auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
+	// Logout Fermer la session
+	// (POST /auth/logout)
+	Logout(w http.ResponseWriter, r *http.Request)
+	// Me L'opérateur connecté et ce qu'il a le droit de faire
+	// (GET /auth/me)
+	Me(w http.ResponseWriter, r *http.Request)
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
@@ -79,6 +108,18 @@ type Unimplemented struct{}
 // Login Premier facteur — adresse et mot de passe
 // (POST /auth/login)
 func (_ Unimplemented) Login(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Logout Fermer la session
+// (POST /auth/logout)
+func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Me L'opérateur connecté et ce qu'il a le droit de faire
+// (GET /auth/me)
+func (_ Unimplemented) Me(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -102,6 +143,34 @@ func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Login(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Logout operation middleware
+func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Logout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Me operation middleware
+func (siw *ServerInterfaceWrapper) Me(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Me(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -244,6 +313,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/login", wrapper.Login)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/me", wrapper.Me)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/logout", wrapper.Logout)
+	})
 
 	return r
 }
@@ -320,6 +395,56 @@ func (response Login429JSONResponse) VisitLoginResponse(w http.ResponseWriter) e
 	return err
 }
 
+type LogoutRequestObject struct {
+}
+
+type LogoutResponseObject interface {
+	VisitLogoutResponse(w http.ResponseWriter) error
+}
+
+type Logout204Response struct {
+}
+
+func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type MeRequestObject struct {
+}
+
+type MeResponseObject interface {
+	VisitMeResponse(w http.ResponseWriter) error
+}
+
+type Me200JSONResponse Me
+
+func (response Me200JSONResponse) VisitMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Me401JSONResponse Error
+
+func (response Me401JSONResponse) VisitMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type HealthRequestObject struct {
 }
 
@@ -346,6 +471,12 @@ type StrictServerInterface interface {
 	// Login Premier facteur — adresse et mot de passe
 	// (POST /auth/login)
 	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
+	// Logout Fermer la session
+	// (POST /auth/logout)
+	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
+	// Me L'opérateur connecté et ce qu'il a le droit de faire
+	// (GET /auth/me)
+	Me(ctx context.Context, request MeRequestObject) (MeResponseObject, error)
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -414,6 +545,54 @@ func (sh *strictHandler) Login(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(LoginResponseObject); ok {
 		if err := validResponse.VisitLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Logout operation middleware
+func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	var request LogoutRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Logout(ctx, request.(LogoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Logout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LogoutResponseObject); ok {
+		if err := validResponse.VisitLogoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Me operation middleware
+func (sh *strictHandler) Me(w http.ResponseWriter, r *http.Request) {
+	var request MeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Me(ctx, request.(MeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Me")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MeResponseObject); ok {
+		if err := validResponse.VisitMeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

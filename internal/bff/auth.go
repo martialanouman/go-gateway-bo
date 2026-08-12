@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
+	"github.com/martialanouman/go-gateway-bo/internal/session"
 )
 
 // maximumPasswordLength et maximumEmailLength redisent en Go les bornes que le contrat déclare. Le
@@ -103,6 +104,21 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 
 	switch verdict.Outcome {
 	case auth.OutcomeChallenged:
+		// La session naît ici, au franchissement du premier facteur, et **non élevée** : c'est
+		// step-023 et step-024 qui vérifieront le second. L'ouvrir plus tard laisserait l'enrôlement
+		// d'un authentificateur (step-023) sans rien pour dire de qui il s'agit, donc permettrait
+		// d'attacher une clé à un compte qu'on ne détient pas.
+		if sessionErr := a.closePresentedSession(ctx); sessionErr != nil {
+			return nil, sessionErr
+		}
+
+		value, sessionErr := a.Sessions.Issue(ctx, verdict.OperatorID)
+		if sessionErr != nil {
+			return nil, sessionErr
+		}
+
+		postCookie(ctx, session.Issued(value))
+
 		return Login200JSONResponse{Challenge: verdict.Challenge, ExpiresAt: verdict.ExpiresAt}, nil
 	case auth.OutcomeLocked:
 		return lockedResponse(verdict.RetryAfter), nil
@@ -113,6 +129,28 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 		// le langage n'en sait rien, et elle refuse plutôt qu'elle n'ouvre.
 		return Login401JSONResponse(refusedCredentials()), nil
 	}
+}
+
+// closePresentedSession ferme la session que **cette requête** portait, avant d'en ouvrir une neuve.
+//
+// C'est ce qui fait de « se reconnecter » une remédiation, et pas seulement une commodité. Sans elle,
+// un opérateur qui croit son cookie compromis n'a aucun moyen de le révoquer avant step-029 : le
+// navigateur échange sa valeur contre la nouvelle, donc `/auth/logout` n'atteindra plus jamais
+// l'ancienne, qui reste valable jusqu'à douze heures — et celui qui en détient la copie avec elle.
+//
+// Elle ne ferme **que** celle-ci. Les autres postes du même opérateur gardent la leur, ce qu'un
+// cockpit doit permettre.
+func (a API) closePresentedSession(ctx context.Context) error {
+	presented, alive, err := sessionFrom(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !alive {
+		return nil
+	}
+
+	return a.Sessions.Close(ctx, presented.ID)
 }
 
 // refusedCredentials est le refus **unique** du premier facteur. Un seul constructeur, appelé d'un

@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
+	"github.com/martialanouman/go-gateway-bo/internal/session"
 )
 
 // Dependencies porte ce que les routes du BFF ne savent pas fabriquer.
@@ -32,6 +33,8 @@ type Dependencies struct {
 	// reçoit un collaborateur déjà construit, ce qui le garde à l'écart de `pgxpool` et de
 	// `internal/config`.
 	Authenticator *auth.Authenticator
+	// Sessions ouvre, résout et ferme les sessions du tableau de bord.
+	Sessions *session.Manager
 	// TrustedProxies alimente la dérivation de l'adresse cliente. Vide est une valeur sûre : voir
 	// `withClientAddress` et `internal/auth.ClientAddress`.
 	TrustedProxies []netip.Prefix
@@ -49,10 +52,14 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Route("/api", func(api chi.Router) {
 		// Borne la lecture du corps **avant** le décodage : la `maxLength` du contrat s'applique après,
 		// donc sur une valeur déjà entièrement chargée en mémoire.
+		api.Use(withoutCaching)
 		api.Use(middleware.RequestSize(maximumLoginBodyBytes))
 		api.Use(withClientAddress(deps.TrustedProxies))
+		// Après les deux précédents : celui-ci est le seul qui puisse interroger la base, et il ne le
+		// fait que sur une requête déjà bornée et porteuse d'un cookie scellé.
+		api.Use(withSession(deps.Sessions))
 
-		mountContract(api, API{Authenticator: deps.Authenticator})
+		mountContract(api, API{Authenticator: deps.Authenticator, Sessions: deps.Sessions})
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
@@ -131,10 +138,11 @@ func mountContract(api chi.Router, impl StrictServerInterface) {
 // travaille : un `password_hash` corrompu en base fait refuser la connexion sans que rien ne le dise.
 // Le premier appel réel à la passerelle (step-060) devra apporter les deux à la fois.
 func newContractHandler(impl StrictServerInterface) ServerInterface {
-	return NewStrictHandlerWithOptions(impl, nil, StrictHTTPServerOptions{
-		RequestErrorHandlerFunc:  rejectRequest,
-		ResponseErrorHandlerFunc: reportFailedResponse,
-	})
+	return NewStrictHandlerWithOptions(impl, []StrictMiddlewareFunc{writePendingCookie()},
+		StrictHTTPServerOptions{
+			RequestErrorHandlerFunc:  rejectRequest,
+			ResponseErrorHandlerFunc: reportFailedResponse,
+		})
 }
 
 // rejectRequest répond à une requête que le code engendré n'a pas su lier au contrat. Il sert les deux

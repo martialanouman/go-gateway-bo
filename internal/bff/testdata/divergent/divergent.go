@@ -4,6 +4,7 @@
 package divergent
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
@@ -21,6 +22,16 @@ func (API) Health(_ http.ResponseWriter, _ *http.Request) {}
 // une méthode qui différerait ici brouillerait la mesure.
 func (API) Login(_ context.Context, _ bff.LoginRequestObject) (bff.LoginResponseObject, error) {
 	return bff.Login401JSONResponse{Code: "invalid_credentials", Message: "Refusé."}, nil
+}
+
+// Me est identique dans les deux fixtures, pour la même raison que `Login`.
+func (API) Me(_ context.Context, _ bff.MeRequestObject) (bff.MeResponseObject, error) {
+	return bff.Me401JSONResponse{Code: "unauthenticated", Message: "Reconnectez-vous."}, nil
+}
+
+// Logout est identique dans les deux fixtures, pour la même raison que `Login`.
+func (API) Logout(_ context.Context, _ bff.LogoutRequestObject) (bff.LogoutResponseObject, error) {
+	return bff.Logout204Response{}, nil
 }
 
 var _ = bff.NewStrictHandler(API{}, nil)

@@ -52,6 +52,11 @@ const (
 // Verdict est ce que le handler traduit en réponse HTTP.
 type Verdict struct {
 	Outcome Outcome
+	// OperatorID n'est renseigné que sur OutcomeChallenged, et n'a de sens que là : c'est le seul cas
+	// où quelqu'un a été identifié. Il sert à ouvrir la session de premier facteur — que ce paquet
+	// n'ouvre pas lui-même, pour ne pas faire dépendre le premier facteur de la session une step trop
+	// tôt (step-023 fera l'inverse, et c'est le bon sens de dépendance).
+	OperatorID string
 	// Challenge est le jeton opaque, rendu **une seule fois** : la base n'en garde que l'empreinte.
 	Challenge string
 	ExpiresAt time.Time
@@ -172,7 +177,8 @@ func (a *Authenticator) challenge(ctx context.Context, emailKey, operatorID stri
 	}
 
 	return Verdict{
-		Outcome: OutcomeChallenged,
+		Outcome:    OutcomeChallenged,
+		OperatorID: operatorID,
 		// base64 URL, sans remplissage : ce jeton voyagera dans un corps JSON aujourd'hui et
 		// possiblement dans une URL demain (step-023), et les `+`, `/` et `=` s'y encodent mal.
 		Challenge: base64.RawURLEncoding.EncodeToString(token),

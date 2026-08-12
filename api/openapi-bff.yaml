@@ -12,7 +12,8 @@
 #
 # Ce qui l'acquitte devant la porte anti-copie de `internal/gateway` est le **compte d'opérations
 # qu'il déclare en commun avec les contrats de la passerelle**, et rien d'autre. **Re-sondé le
-# 09/08/2026** à l'ajout de `POST /auth/login`, plutôt que recopié :
+# 10/08/2026** à l'ajout de `GET /auth/me` et `POST /auth/logout`, en rejouant la mesure plutôt qu'en
+# la déduisant :
 #
 #   openapi-admin.yaml   0 signature sur 28  → sous le seuil
 #   openapi-public.yaml  1 signature sur 5   → sous le seuil
@@ -65,9 +66,13 @@ paths:
       operationId: login
       summary: Premier facteur — adresse et mot de passe
       description: |
-        Vérifie l'adresse et le mot de passe, et rend un **challenge de second facteur** à usage
-        unique et de courte durée. Rien n'est ouvert à ce stade : le cookie de session appartient à
-        step-022, la vérification du second facteur à step-023 et step-024.
+        Vérifie l'adresse et le mot de passe, ouvre une session de **premier facteur** et rend un
+        **challenge de second facteur** à usage unique et de courte durée. La session n'est pas
+        élevée : c'est step-023 et step-024 qui vérifieront ce second facteur.
+
+        Le cookie de session n'est pas déclaré ici, et c'est délibéré : il est `HttpOnly`, donc le
+        navigateur **interdit** au client de le lire. Le déclarer en en-tête de réponse le ferait
+        apparaître dans les types engendrés comme une valeur lisible, ce qu'il n'est pas.
 
         Le refus ne dit jamais lequel des deux facteurs a échoué. Même code, même corps et **même
         durée** pour « adresse inconnue », « mot de passe faux » et « compte désactivé » : les
@@ -114,6 +119,51 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/me:
+    get:
+      operationId: me
+      summary: L'opérateur connecté et ce qu'il a le droit de faire
+      description: |
+        Le **seul** endroit d'où le client apprend ses droits. L'interface se rend sur des
+        permissions, jamais sur un rôle codé en dur (§4.2).
+
+        Aucun rôle dans le corps, et c'est la raison même : une liste de rôles rendue au navigateur
+        invite à réintroduire le contrôle de rôle côté client, que la spec interdit. Les permissions
+        décident ; les rôles restent au serveur tant qu'aucun écran n'a besoin de les afficher.
+      responses:
+        '200':
+          description: Une session vit, et voici ce qu'elle ouvre.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401':
+          description: |
+            Aucune session vivante. Le corps est le même qu'il n'y ait pas de cookie, que son sceau
+            ne colle pas, que la session soit échue, oisive, fermée, ou que le compte ait été
+            désactivé : les distinguer dirait à qui teste un cookie ce qu'il vaut encore.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Fermer la session
+      description: |
+        La ligne de session est **supprimée**, et le cookie expiré. Le second sans le premier ne
+        protège rien : un cookie qu'on garde se rejoue.
+
+        **Le même statut sans session**, et c'est délibéré : se déconnecter est une demande d'état,
+        et l'état est atteint. Un refus obligerait le client à traiter un cas sans conséquence, et
+        dirait à qui teste un cookie s'il vaut encore quelque chose. C'est aussi le moment où
+        l'opérateur veut le plus que ce bouton marche — sur une session déjà morte.
+
+        Aucun corps : rien à dire que le statut ne dise. Le cookie d'expiration n'est pas déclaré
+        ici, pour la même raison qu'à la connexion — il est `HttpOnly`, le client ne le lit pas.
+      responses:
+        '204':
+          description: La session est fermée, qu'elle ait existé ou non.
 
 components:
   schemas:
@@ -163,6 +213,55 @@ components:
           type: string
           format: date-time
       required: [challenge, expiresAt]
+
+    Me:
+      type: object
+      description: Ce qu'une session vivante apprend au client.
+      additionalProperties: false
+      properties:
+        operator:
+          $ref: '#/components/schemas/CurrentOperator'
+        permissions:
+          # L'union des permissions des rôles détenus, sans doublon et triée. Les 44 clés ne sont
+          # **pas** énumérées en `enum` : le catalogue de `internal/permissions` fait foi et engendre
+          # déjà `web/src/lib/permissions.gen.ts`. Deux listes pour un seul vocabulaire finiraient
+          # figées chacune par sa propre porte, puis divergeraient.
+          type: array
+          items: { type: string }
+        elevated:
+          # Le second facteur a-t-il été vérifié dans cette session. Il ne l'est jamais à ce jalon —
+          # step-023 et step-024 apportent la vérification, step-025 ce qu'elle ouvre.
+          type: boolean
+        absoluteExpiresAt:
+          # Le nom porte « absolute » parce que **la session meurt souvent avant** : elle expire aussi
+          # après deux heures sans requête, et l'écart atteint dix heures dans le cas courant. Nommé
+          # `expiresAt`, ce champ invitait step-027 à en faire un décompte qui aurait menti.
+          #
+          # L'échéance glissante n'est pas rendue : elle se déplace à chaque requête et serait périmée
+          # à l'instant où le client la lit. Ce champ est donc une **borne haute**, pas une date de
+          # déconnexion.
+          type: string
+          format: date-time
+      required: [operator, permissions, elevated, absoluteExpiresAt]
+
+    CurrentOperator:
+      type: object
+      description: |
+        De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
+        `mfa_totp_secret`, ni les identifiants WebAuthn : le type de domaine du store ne traverse pas
+        cette frontière (§1.11), et `additionalProperties: false` fait refuser tout champ qu'un
+        serveur ajouterait par mégarde.
+      additionalProperties: false
+      properties:
+        # `format: uuid` n'est pas déclaré, et c'est un arbitrage plutôt qu'un oubli. Il n'achèterait
+        # aucune validation — `kin-openapi` ignore les formats qu'on ne lui a pas enregistrés — mais
+        # ferait engendrer un `openapi_types.UUID`, donc une conversion depuis le `uuid::text` que la
+        # base rend, dont la branche d'erreur serait inatteignable. Que ce soit un UUIDv7 est dit par
+        # le §1.5 et tenu par le `DEFAULT uuidv7()` de la migration, pas par un type sur le fil.
+        id: { type: string }
+        email: { type: string }
+        displayName: { type: string }
+      required: [id, email, displayName]
 
     Error:
       type: object

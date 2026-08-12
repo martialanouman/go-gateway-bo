@@ -15,6 +15,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
 	"github.com/martialanouman/go-gateway-bo/internal/config"
+	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 	"github.com/martialanouman/go-gateway-bo/internal/webassets"
 )
@@ -104,6 +105,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	defer store.ClosePool(pool, poolCloseGrace)
 
 	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt)
+	sessions := session.NewManager(store.NewSessions(pool), cfg.Auth.SessionSecret)
 
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
@@ -115,6 +117,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	router := bff.NewRouter(bff.Dependencies{
 		Assets:         assets,
 		Authenticator:  authenticator,
+		Sessions:       sessions,
 		TrustedProxies: cfg.Auth.TrustedProxies,
 	})
 

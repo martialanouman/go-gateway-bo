@@ -38,6 +38,44 @@ func TestUnSelTropCourtEstRefuseSansEtreCite(t *testing.T) {
 	assert.NotContains(t, err.Error(), "changeme", "le refus recopie le secret qu'il refuse")
 }
 
+// Sans repli : une clé par défaut serait publique, donc n'importe qui signerait une session et
+// entrerait sous n'importe quelle identité sans jamais présenter de mot de passe.
+func TestLaCleDeSignatureDeSessionEstObligatoire(t *testing.T) {
+	t.Parallel()
+
+	env := minimalEnv()
+	delete(env, config.EnvSessionSecret)
+
+	_, err := config.Load(lookupFrom(env))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvSessionSecret,
+		"le refus ne nomme pas la variable manquante : l'exploitant ne sait pas quoi poser")
+}
+
+func TestUneCleDeSessionTropCourteEstRefuseeSansEtreCitee(t *testing.T) {
+	t.Parallel()
+
+	env := minimalEnv()
+	env[config.EnvSessionSecret] = "changeme"
+
+	_, err := config.Load(lookupFrom(env))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvSessionSecret)
+	assert.NotContains(t, err.Error(), "changeme", "le refus recopie le secret qu'il refuse")
+}
+
+// Les deux secrets sont distincts et le restent. Réutiliser l'un pour l'autre ferait qu'une fuite
+// de la table des compteurs — qui ne porte que des HMAC — livrerait de quoi signer des sessions.
+func TestLeSelEtLaCleDeSessionNeSeConfondentPas(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load(lookupFrom(minimalEnv()))
+	require.NoError(t, err)
+
+	assert.Equal(t, []byte(testBruteForceSalt), cfg.Auth.BruteForceSalt)
+	assert.Equal(t, []byte(testSessionSecret), cfg.Auth.SessionSecret)
+}
+
 func TestLesProxysDeConfianceSeLisentEnCidr(t *testing.T) {
 	t.Parallel()
 
