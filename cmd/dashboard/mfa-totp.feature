@@ -40,7 +40,12 @@ Fonctionnalité: Le second facteur TOTP
     Quand l'opérateur présente le code du pas courant
     Alors le serveur répond 204
     Quand l'opérateur se connecte avec son mot de passe
-    Et l'opérateur présente le code du pas courant
+    # **Le même**, à la lettre, et non un code recalculé au pas courant. Recalculer rendait ce
+    # scénario dépendant d'une frontière de pas : si les trente secondes basculaient entre les deux
+    # présentations — une reconnexion coûte son argon2id — le second code était celui du pas suivant,
+    # que l'anti-rejeu accepte à juste titre, et le scénario tombait en accusant la garde. C'est aussi
+    # ce que fait celui qui intercepte un code : il renvoie celui qu'il a vu, il n'en calcule pas.
+    Et l'opérateur représente le même code
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 401
     Et le refus ne dit pas ce qui a été refusé

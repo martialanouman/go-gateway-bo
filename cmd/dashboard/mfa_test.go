@@ -32,6 +32,9 @@ type mfaWorld struct {
 	// otherChallenge est celui d'un **autre** opérateur, que le scénario de l'appartenance présente sur
 	// sa propre session.
 	otherChallenge string
+	// presented est le dernier code envoyé, tel quel. Le rejeu le renvoie **à la lettre** plutôt que
+	// d'en recalculer un : recalculer ferait dépendre le scénario du rejeu d'une frontière de pas.
+	presented string
 }
 
 // secondOperatorEmail est l'adresse du comparse. Il n'a ni rôle ni second facteur : ce que le
@@ -59,6 +62,7 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur présente un code faux$`, w.presentWrongCode)
 	ctx.When(`^l'opérateur présente (\d+) codes faux$`, w.presentWrongCodes)
 	ctx.When(`^l'opérateur présente son premier code de récupération$`, w.presentFirstRecoveryCode)
+	ctx.When(`^l'opérateur représente le même code$`, w.presentTheSameCodeAgain)
 	ctx.Given(`^un second opérateur qui vient de se connecter$`, w.secondOperatorSignsIn)
 	ctx.When(`^l'opérateur présente son code sur le challenge du second opérateur$`,
 		w.presentOnTheOtherChallenge)
@@ -262,7 +266,18 @@ func (w *mfaWorld) verify(method, code string) error {
 	return w.verifyOn(w.login.challenge, method, code)
 }
 
+// presentTheSameCodeAgain rejoue **exactement** ce qui vient d'être envoyé.
+func (w *mfaWorld) presentTheSameCodeAgain() error {
+	if w.presented == "" {
+		return errors.New("aucun code déjà présenté : le scénario n'a rien à rejouer")
+	}
+
+	return w.verify("totp", w.presented)
+}
+
 func (w *mfaWorld) verifyOn(challenge, method, code string) error {
+	w.presented = code
+
 	body, err := json.Marshal(map[string]string{
 		"challenge": challenge,
 		"method":    method,
