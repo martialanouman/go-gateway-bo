@@ -71,8 +71,10 @@ base ne se déchiffrent plus, codes de récupération compris, et la seule sorti
 chaque opérateur par un détenteur d'`operators:manage` (step-029). La perdre a exactement le même
 effet que la changer.
 
-Les trois doivent être **identiques sur toutes les instances**, sans quoi un cookie émis par l'une
-serait refusé par l'autre, et un second facteur vérifiable ici et pas là.
+Les trois doivent être **identiques sur toutes les instances**, mais pour trois symptômes distincts :
+un cookie émis par l'une serait refusé par l'autre, un second facteur vérifiable ici et pas là, et —
+pour le sel — des compteurs d'anti-brute-force qui se scindent **sans qu'aucun refus ne le signale**,
+donc un verrouillage qui s'affaiblit en silence.
 
 Contrairement à la v1.0, **le serveur refuse de démarrer** si une variable obligatoire manque, en la
 nommant (step-000). Un démarrage réussi suivi d'une erreur à la première requête d'authentification

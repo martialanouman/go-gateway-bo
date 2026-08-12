@@ -2,8 +2,10 @@
 // confrontation d'un code au pas de temps qu'on lui donne, le chiffrement du secret au repos et les
 // codes de récupération.
 //
-// Il est frère d'`internal/auth`, qui porte le premier facteur, et d'`internal/session`, qui porte la
-// session : aucun des trois ne s'importe, c'est `internal/bff` qui les compose.
+// Il est frère d'`internal/session`, qui porte la session : ni l'un ni l'autre ne s'importe, et c'est
+// `internal/bff` qui les compose. Il **emprunte** en revanche à `internal/auth`, qui porte le premier
+// facteur : le hachage des codes de récupération et l'empreinte du challenge y vivent déjà, et les
+// réécrire ici en ferait deux rédactions du même format.
 //
 // **Il ne lit aucune horloge.** Le pas de temps lui est passé en argument, et il vient de
 // PostgreSQL : deux instances aux horloges décalées accepteraient sinon un code que l'autre refuse,
@@ -29,9 +31,15 @@ const PeriodSeconds = 30
 // driftSteps est la tolérance de dérive, de chaque côté du pas courant : une fenêtre d'acceptation de
 // 90 secondes en tout.
 //
-// La valeur par défaut de la bibliothèque est **zéro** (relevée sur v1.5.0, `totp.Validate`), qui
-// refuserait un téléphone en avance d'une seconde. Deux pas doubleraient la durée pendant laquelle un
-// code intercepté vaut encore, pour couvrir des horloges qu'aucun téléphone moderne n'a.
+// C'est exactement ce que `totp.Validate` de la bibliothèque emploie — `Skew: 1`, lu dans
+// `totp/totp.go:34-49` de la v1.5.0 — et donc ce que les applications compatibles Google
+// Authenticator supposent. **Une rédaction précédente affirmait le contraire**, « le défaut de la
+// bibliothèque est zéro » : ce zéro-là est la valeur zéro du **champ** `ValidateOpts.Skew`, que la
+// documentation décrit, et non ce que la fonction fait. Le chiffre était juste, l'objet mesuré ne
+// l'était pas.
+//
+// Zéro refuserait un téléphone en avance d'une seconde ; deux doubleraient la durée pendant laquelle
+// un code intercepté vaut encore, pour couvrir des horloges qu'aucun téléphone moderne n'a.
 const driftSteps = 1
 
 // digits et algorithm ne sont pas des arbitrages de sécurité mais d'interopérabilité : beaucoup

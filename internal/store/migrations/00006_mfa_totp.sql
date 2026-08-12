@@ -14,8 +14,10 @@
 -- de ±1 pas : le même code intercepté redeviendrait utilisable trente secondes plus tard. Un `<`
 -- ferme les deux d'un coup.
 --
--- `bigint` : le pas est `epoch / 30`, soit ~7,3 × 10⁷ aujourd'hui. Un `integer` déborderait en 2038,
--- ce qui n'est pas une échéance qu'on choisit.
+-- `bigint` plutôt qu'`integer`, par cohérence avec l'`int64` que le code manipule. Ce n'est **pas**
+-- une question de débordement : le pas vaut `epoch / 30`, soit ~6,0 × 10⁷ au 12/08/2026, et un
+-- `integer` ne déborderait qu'en 4011. (Une rédaction précédente disait 7,3 × 10⁷ et 2038 : les deux
+-- chiffres décrivent l'epoch en secondes, pas le pas — la mesure portait sur l'objet voisin.)
 --
 -- Le pas est calculé sur l'horloge de **ce serveur de base** (`extract(epoch from now())`), jamais en
 -- Go : deux instances aux horloges décalées accepteraient un code que l'autre refuse, et compareraient

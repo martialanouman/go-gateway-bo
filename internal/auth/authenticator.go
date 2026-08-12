@@ -55,8 +55,9 @@ type Verdict struct {
 	Outcome Outcome
 	// OperatorID n'est renseigné que sur OutcomeChallenged, et n'a de sens que là : c'est le seul cas
 	// où quelqu'un a été identifié. Il sert à ouvrir la session de premier facteur — que ce paquet
-	// n'ouvre pas lui-même, pour ne pas faire dépendre le premier facteur de la session une step trop
-	// tôt (step-023 fera l'inverse, et c'est le bon sens de dépendance).
+	// n'ouvre pas lui-même, pour ne pas faire dépendre le premier facteur de la session. step-023 n'a
+	// pas inversé cette dépendance non plus : `internal/mfa` emprunte à ce paquet-ci, et c'est
+	// `internal/bff` qui compose les trois.
 	OperatorID string
 	// Challenge est le jeton opaque, rendu **une seule fois** : la base n'en garde que l'empreinte.
 	Challenge string

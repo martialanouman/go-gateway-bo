@@ -489,8 +489,10 @@ func (w *mfaWorld) announcesAnEnrolledFactor() error {
 	return nil
 }
 
-// refusalNamesNothing tient ce que le contrat promet : les cinq motifs de refus lisent la même
-// phrase. Elle ne cite ni le code, ni le challenge, ni ce qui manque.
+// refusalNamesNothing tient ce que le contrat promet : tous les motifs de refus lisent la même
+// phrase — le code faux ou déjà servi, le challenge inconnu, échu, consommé ou appartenant à un
+// autre, l'absence de session et sa mort en cours de route. Elle ne cite ni le code, ni le challenge,
+// ni ce qui manque.
 func (w *mfaWorld) refusalNamesNothing() error {
 	body := w.login.process.received.body
 

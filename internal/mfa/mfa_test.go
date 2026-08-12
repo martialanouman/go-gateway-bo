@@ -71,9 +71,8 @@ func TestUnCodeDuPasCourantEstAccepte(t *testing.T) {
 	assert.Equal(t, int64(testStep), matched, "le pas rendu n'est pas celui qui a validé le code")
 }
 
-// La fenêtre existe pour le téléphone qui dérive de quelques secondes. Sans elle — c'est le défaut
-// de la bibliothèque — un opérateur dont l'horloge avance d'une seconde serait refusé une fois sur
-// trente.
+// La fenêtre existe pour le téléphone qui dérive de quelques secondes. Sans elle, un opérateur dont
+// l'horloge avance d'une seconde serait refusé une fois sur trente.
 func TestUnCodeDuPasVoisinEstAccepte(t *testing.T) {
 	t.Parallel()
 

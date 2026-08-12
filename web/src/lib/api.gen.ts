@@ -39,7 +39,7 @@ export interface paths {
          * Premier facteur — adresse et mot de passe
          * @description Vérifie l'adresse et le mot de passe, ouvre une session de **premier facteur** et rend un
          *     **challenge de second facteur** à usage unique et de courte durée. La session n'est pas
-         *     élevée : c'est step-023 et step-024 qui vérifieront ce second facteur.
+         *     élevée : c'est `POST /auth/mfa/verify` qui l'élève, avec le code que ce challenge accompagne.
          *
          *     Le cookie de session n'est pas déclaré ici, et c'est délibéré : il est `HttpOnly`, donc le
          *     navigateur **interdit** au client de le lire. Le déclarer en en-tête de réponse le ferait

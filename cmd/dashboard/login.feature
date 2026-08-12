@@ -5,7 +5,7 @@ Fonctionnalité: Le premier facteur, et la porte qui le limite
   la même durée, que ces scénarios ne mesurent pas.
 
   Une connexion réussie ouvre une session de **premier facteur** et pose son cookie. Elle n'est pas
-  élevée : la vérification du second facteur appartient à step-023 et step-024, et c'est step-025 qui
+  élevée : la vérification du second facteur vit dans `mfa-totp.feature`, et c'est step-025 qui
   décidera ce qu'une session non élevée n'atteint pas. Ce que le challenge promet est cette
   vérification, pas la session — les deux voyagent ensemble mais ne disent pas la même chose.
 

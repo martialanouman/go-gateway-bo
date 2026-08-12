@@ -41,8 +41,8 @@ type Lock struct {
 func (l Lock) Locked() bool { return l.Remaining > 0 }
 
 // Operator est ce que le premier facteur a besoin de savoir, et rien de plus. Ni le secret TOTP, ni
-// les identifiants WebAuthn : step-023 et step-024 les liront quand elles auront de quoi les
-// exercer, et les charger ici les ferait traverser une frontière pour rien.
+// les identifiants WebAuthn : le second facteur les lit dans `mfa.go`, et les charger ici les ferait
+// traverser une frontière pour rien.
 type Operator struct {
 	// ID est l'UUID en texte. Le paquet n'introduit pas de type UUID : rien dans ce dépôt n'en
 	// manipule un, et pgx rend l'aller-retour `text` ↔ `uuid` sans conversion à écrire.

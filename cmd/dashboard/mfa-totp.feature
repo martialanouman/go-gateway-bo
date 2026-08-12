@@ -64,7 +64,7 @@ Fonctionnalité: Le second facteur TOTP
     Et l'opérateur présente le code du pas précédent
     Alors le serveur répond 401
 
-  Scénario: un code faux est refusé sans dire lequel des cinq motifs s'applique
+  Scénario: un code faux est refusé sans dire lequel des motifs s'applique
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
@@ -75,8 +75,8 @@ Fonctionnalité: Le second facteur TOTP
     Et le refus ne dit pas ce qui a été refusé
     Et le second facteur n'est pas encore vérifié
 
-  # La fenêtre existe pour le téléphone qui dérive de quelques secondes. Sans elle — c'est le défaut
-  # de la bibliothèque — un opérateur en avance d'une seconde serait refusé une fois sur trente.
+  # La fenêtre existe pour le téléphone qui dérive de quelques secondes. C'est celle que les
+  # applications compatibles Google Authenticator supposent — un pas de chaque côté.
   Scénario: le code du pas voisin est accepté
     Étant donné une installation avec un opérateur
     Et un serveur démarré
