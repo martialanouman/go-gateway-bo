@@ -140,24 +140,11 @@ func TestUnCookieMalScelleNAtteintPasLaBase(t *testing.T) {
 	require.Error(t, err, "témoin : un cookie authentique doit, lui, atteindre la base")
 }
 
-// Même ordre pour l'élévation, qui part elle aussi d'un cookie. La fermeture, elle, ne prend plus de
-// cookie du tout — elle ferme la session **déjà résolue**, par sa clé primaire.
-func TestLElevationNAtteintPasLaBaseSurUnCookieForge(t *testing.T) {
-	t.Parallel()
-
-	authentic, _, err := newSealedToken(testSecret)
-	require.NoError(t, err)
-
-	manager := NewManager(store.NewSessions(closedPool(t)), testSecret)
-	forged := alter(authentic)
-
-	_, elevated, err := manager.Elevate(context.Background(), forged)
-	require.NoError(t, err)
-	assert.False(t, elevated)
-
-	_, _, err = manager.Elevate(context.Background(), authentic)
-	require.Error(t, err, "témoin : un cookie authentique doit, lui, atteindre la base")
-}
+// **Il n'y a plus de jumeau de ce test pour l'élévation, et c'est une garde plus forte, pas un trou.**
+// Jusqu'à step-023, `Elevate` prenait le cookie présenté et devait le desceller avant d'interroger la
+// base — un ordre qu'un test devait tenir. Elle prend désormais l'identifiant de la session **déjà
+// résolue**, comme `Close` : il n'y a plus de cookie sur ce chemin, donc plus d'ordre à respecter, et
+// le sceau reste vérifié à l'endroit unique où il l'a toujours été — ci-dessus.
 
 // Les cinq attributs sont ce qui remplace, ici, ce que le contrat ne peut pas déclarer : `HttpOnly`
 // tient le cookie hors de portée d'un script, `Secure` hors d'un transport en clair, `SameSite` hors

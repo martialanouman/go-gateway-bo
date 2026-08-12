@@ -73,32 +73,18 @@ func (m *Manager) Resolve(ctx context.Context, value string) (store.Session, boo
 // Elevate marque le second facteur vérifié et rend la **nouvelle** valeur de cookie : l'ancienne ne
 // vaut plus rien dès cet instant, contre la fixation de session.
 //
-// **Aucun appelant en production avant step-023**, qui vérifiera ce second facteur. Ce qui se décide
-// ici est la régénération, qui appartient au geste de session et non à celui de la vérification.
-func (m *Manager) Elevate(ctx context.Context, presented string) (string, bool, error) {
-	tokenHash, ok := Unseal(m.secret, presented)
-	if !ok {
-		return "", false, nil
-	}
-
-	return m.rotate(ctx, tokenHash)
-}
-
-// rotate existe pour que le cookie **présenté** soit hors de portée au moment où l'on rend le
-// nouveau. Rendre l'ancien laisserait le client sur un jeton que la base ne connaît plus — il serait
-// déconnecté à la requête suivante, et la fixation de session que la régénération doit fermer se
-// rouvrirait à l'identique.
-//
-// C'est une garde par construction plutôt qu'un test, et c'est délibéré : la prouver par un test
-// demanderait un PostgreSQL dans ce paquet, pour une propriété que le compilateur tient seul —
-// `presented` n'existe pas ici, donc `return presented` ne compile pas.
-func (m *Manager) rotate(ctx context.Context, tokenHash []byte) (string, bool, error) {
+// Il prend l'identifiant de la session que l'appelant vient de résoudre, et non le cookie présenté.
+// Ce que ça achète est écrit sur `store.Sessions.Elevate` — et, accessoirement, que le cookie
+// présenté n'existe **nulle part** sur ce chemin : rendre l'ancien laisserait le client sur un jeton
+// que la base ne connaît plus, donc déconnecté à la requête suivante, et rouvrirait à l'identique la
+// fixation de session que la régénération doit fermer. Le compilateur le tient seul, sans test.
+func (m *Manager) Elevate(ctx context.Context, sessionID string) (string, bool, error) {
 	renewed, renewedHash, err := newSealedToken(m.secret)
 	if err != nil {
 		return "", false, err
 	}
 
-	elevated, err := m.sessions.Elevate(ctx, tokenHash, renewedHash, IdleWindow)
+	elevated, err := m.sessions.Elevate(ctx, sessionID, renewedHash, IdleWindow)
 	if err != nil || !elevated {
 		return "", false, err
 	}

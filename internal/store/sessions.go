@@ -118,14 +118,20 @@ func (s *Sessions) Resolve(ctx context.Context, tokenHash []byte, idle time.Dura
 // Elevate marque le second facteur vérifié **et régénère le jeton**, contre la fixation de session :
 // sans ça, un jeton obtenu avant le second facteur reste valable après.
 //
+// **Par identifiant et non par empreinte**, comme `Delete` juste en dessous : l'appelant vient de
+// résoudre la session, donc il tient déjà sa clé primaire. Passer par l'empreinte obligerait à faire
+// voyager le cookie présenté jusqu'au handler, qui n'a pas la requête en mode strict — donc à le
+// poser dans le contexte, c'est-à-dire à promener un secret plus loin qu'il n'a besoin d'aller.
+//
+// Les trois gardes de `Resolve` sont **redites** ici plutôt qu'empruntées : entre la résolution et
+// l'élévation, la session peut être fermée par un logout concurrent ou son opérateur désactivé.
+//
 // La ligne, elle, est conservée — step-024 liera ses défis à `id`, qui ne doit pas disparaître sous
 // eux.
 //
 // `expires_at` n'est pas repoussée : l'élévation n'achète pas du temps, elle change ce que la session
 // autorise.
-//
-// Aucun appelant en production avant step-023 — la raison est écrite sur `session.Manager.Elevate`.
-func (s *Sessions) Elevate(ctx context.Context, tokenHash, renewedTokenHash []byte,
+func (s *Sessions) Elevate(ctx context.Context, id string, renewedTokenHash []byte,
 	idle time.Duration,
 ) (bool, error) {
 	const query = `
@@ -134,11 +140,11 @@ func (s *Sessions) Elevate(ctx context.Context, tokenHash, renewedTokenHash []by
 		FROM operators AS o
 		WHERE o.id = s.operator_id
 		  AND o.status = $4
-		  AND s.token_hash = $1
+		  AND s.id = $1
 		  AND now() < s.expires_at
 		  AND now() < s.last_seen_at + make_interval(secs => $3)`
 
-	tag, err := s.pool.Exec(ctx, query, tokenHash, renewedTokenHash, idle.Seconds(), StatusActive)
+	tag, err := s.pool.Exec(ctx, query, id, renewedTokenHash, idle.Seconds(), StatusActive)
 	if err != nil {
 		return false, fmt.Errorf("élever la session : %w", err)
 	}

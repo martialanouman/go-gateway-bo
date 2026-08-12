@@ -21,19 +21,10 @@ const (
 	testIdle     = 2 * time.Hour
 )
 
-// sessionsOn taille une base neuve, la migre, et rend un accès prêt à servir avec le DSN qui a servi
-// à l'ouvrir — les cas en ont besoin pour vieillir une ligne ou désactiver un compte.
 func sessionsOn(t *testing.T) (*store.Sessions, string) {
 	t.Helper()
 
-	dsn, err := createDatabase(t.Context())
-	require.NoError(t, err)
-
-	_, err = store.Migrate(t.Context(), dsn)
-	require.NoError(t, err)
-
-	pool, err := store.NewPool(t.Context(), dsn)
-	require.NoError(t, err)
+	pool, dsn := migratedPool(t)
 
 	return store.NewSessions(pool), dsn
 }
@@ -281,12 +272,12 @@ func TestUneSessionOisiveNeSEleveJamais(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	_, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
 	require.NoError(t, err)
 
 	idleFor(t, dsn, tokenHash("avant"), testIdle+time.Hour)
 
-	elevated, err := sessions.Elevate(t.Context(), tokenHash("avant"), tokenHash("après"), testIdle)
+	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("après"), testIdle)
 	require.NoError(t, err)
 	require.False(t, elevated)
 
@@ -303,12 +294,12 @@ func TestUnOperateurDesactiveNEleveJamaisSaSession(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	_, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
 	require.NoError(t, err)
 
 	execOn(t, dsn, `UPDATE operators SET status = 'disabled' WHERE id = $1`, operator)
 
-	elevated, err := sessions.Elevate(t.Context(), tokenHash("avant"), tokenHash("après"), testIdle)
+	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("après"), testIdle)
 	require.NoError(t, err)
 	assert.False(t, elevated)
 }
@@ -324,7 +315,7 @@ func TestLElevationInvalideLeJetonPrecedent(t *testing.T) {
 	opened, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
 	require.NoError(t, err)
 
-	elevated, err := sessions.Elevate(t.Context(), tokenHash("avant"), tokenHash("après"), testIdle)
+	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("après"), testIdle)
 	require.NoError(t, err)
 	require.True(t, elevated)
 
@@ -348,12 +339,12 @@ func TestUneSessionMorteNeSEleveJamais(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
 	require.NoError(t, err)
 
 	expire(t, dsn, tokenHash("jeton"))
 
-	elevated, err := sessions.Elevate(t.Context(), tokenHash("jeton"), tokenHash("neuf"), testIdle)
+	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("neuf"), testIdle)
 	require.NoError(t, err)
 	assert.False(t, elevated)
 }

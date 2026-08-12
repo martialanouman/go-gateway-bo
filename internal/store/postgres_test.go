@@ -9,9 +9,12 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
+
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // Les suites de ce package tournent contre un **PostgreSQL réel**, jeté à la fin. C'est la seule
@@ -104,6 +107,39 @@ func freshDatabase(ctx context.Context, t *testing.T) string {
 	require.NoError(t, err)
 
 	return dsn
+}
+
+// migratedPool taille une base neuve, la migre, et rend un pool avec le DSN qui a servi à l'ouvrir —
+// les cas en ont besoin pour vieillir une ligne, désactiver un compte ou relire une colonne.
+//
+// Il est ici et non recopié dans chaque suite : `loginsOn`, `sessionsOn` et `mfaOn` n'étaient que ces
+// quatre appels et un constructeur. À deux copies c'était une redite, à trois c'était l'endroit où
+// une divergence se serait installée sans se voir.
+func migratedPool(t *testing.T) (*pgxpool.Pool, string) {
+	t.Helper()
+
+	dsn := freshDatabase(t.Context(), t)
+
+	_, err := store.Migrate(t.Context(), dsn)
+	require.NoError(t, err)
+
+	pool, err := store.NewPool(t.Context(), dsn)
+	require.NoError(t, err)
+
+	return pool, dsn
+}
+
+// queryOn relit une valeur unique dans la base, pour les cas qui doivent confronter ce que le store
+// rend à ce que la colonne porte vraiment.
+func queryOn(t *testing.T, dsn, query string, into any, args ...any) {
+	t.Helper()
+
+	conn, err := pgx.Connect(t.Context(), dsn)
+	require.NoError(t, err)
+
+	defer func() { _ = conn.Close(context.WithoutCancel(t.Context())) }()
+
+	require.NoError(t, conn.QueryRow(t.Context(), query, args...).Scan(into))
 }
 
 // createDatabase est la forme que les steps `godog` appellent : elles n'ont pas de `*testing.T` sous

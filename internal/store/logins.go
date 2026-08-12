@@ -230,10 +230,10 @@ func (l *Logins) ClearFailures(ctx context.Context, emailKey string) error {
 // décalées émettraient sinon des challenges qui n'expirent pas au même moment, et le second facteur
 // refuserait un jeton que l'autre instance tient encore pour valide.
 //
-// Ce paquet ne livre pas de quoi **consommer** un challenge, et c'est délibéré : la consommation est
-// le geste de `POST /auth/mfa/verify`, qui appartient à step-023. La livrer ici produirait ce que ce
-// dépôt a déjà refusé deux fois — un artefact qu'aucun appelant n'atteint. L'usage unique, lui, est
-// porté dès maintenant par le schéma : `consumed_at` et l'unicité de `token_hash` (migration 00004).
+// Ce fichier n'émet que le challenge. Le **consommer** est le geste de `POST /auth/mfa/verify`, donc
+// du second facteur : il vit dans `mfa.go`, avec la lecture qui vérifie qu'il est encore utilisable et
+// le compteur d'essais qui le borne. L'usage unique, lui, est porté par le schéma depuis le premier
+// jour : `consumed_at` et l'unicité de `token_hash` (migration 00004).
 func (l *Logins) IssueChallenge(ctx context.Context, operatorID string, tokenHash []byte,
 	ttl time.Duration,
 ) (time.Time, error) {

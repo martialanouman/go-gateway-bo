@@ -22,19 +22,12 @@ const (
 	testThreshold = 5
 )
 
-// loginsOn taille une base neuve, la migre, et rend un accès prêt à servir. Le pool est fermé par le
-// contexte du test — c'est le cycle de vie que `NewPool` attache lui-même.
+// loginsOn rend un accès prêt à servir sur une base neuve. Le pool est fermé par le contexte du
+// test — c'est le cycle de vie que `NewPool` attache lui-même.
 func loginsOn(t *testing.T) (*store.Logins, string) {
 	t.Helper()
 
-	dsn, err := createDatabase(t.Context())
-	require.NoError(t, err)
-
-	_, err = store.Migrate(t.Context(), dsn)
-	require.NoError(t, err)
-
-	pool, err := store.NewPool(t.Context(), dsn)
-	require.NoError(t, err)
+	pool, dsn := migratedPool(t)
 
 	return store.NewLogins(pool), dsn
 }
