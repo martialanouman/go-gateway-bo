@@ -34,6 +34,10 @@ type loginWorld struct {
 	process  *process
 	dsn      string
 	refusals []response
+	// challenge est le second facteur en attente que la dernière connexion réussie a émis. Il est
+	// retenu ici et non relu plus tard : `received` ne porte que la **dernière** réponse, et les
+	// scénarios du second facteur en émettent d'autres avant de s'en servir.
+	challenge string
 }
 
 func (w *loginWorld) installationWithOneOperator(ctx context.Context) error {
@@ -131,7 +135,26 @@ func (w *loginWorld) postCredentials(email, password string) error {
 		return fmt.Errorf("composer le corps de la requête : %w", err)
 	}
 
-	return w.process.post("/api/auth/login", string(body))
+	if err = w.process.post("/api/auth/login", string(body)); err != nil {
+		return err
+	}
+
+	w.rememberChallenge()
+
+	return nil
+}
+
+// rememberChallenge met de côté ce que la connexion vient d'émettre, s'il y a quelque chose. Un refus
+// ne porte pas de challenge, et le silence est alors le bon comportement : c'est le pas du second
+// facteur qui se plaindra de n'avoir rien à présenter.
+func (w *loginWorld) rememberChallenge() {
+	var issued struct {
+		Challenge string `json:"challenge"`
+	}
+
+	if json.Unmarshal([]byte(w.process.received.body), &issued) == nil && issued.Challenge != "" {
+		w.challenge = issued.Challenge
+	}
 }
 
 // lockExpires recule l'horodatage stocké plutôt que d'attendre un quart d'heure. C'est **l'état de la

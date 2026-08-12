@@ -1,0 +1,363 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/cucumber/godog"
+	"github.com/jackc/pgx/v5"
+	"github.com/pquerna/otp"
+	"github.com/pquerna/otp/hotp"
+
+	"github.com/martialanouman/go-gateway-bo/internal/mfa"
+)
+
+// mfaWorld porte ce qu'un scénario de second facteur manipule : l'enrôlement qu'il vient d'obtenir,
+// et de quoi fabriquer les codes que l'application de l'opérateur produirait.
+//
+// Il partage la base et le navigateur du `loginWorld`, comme `sessionWorld` — étendre le parcours
+// existant plutôt qu'en ouvrir un second.
+type mfaWorld struct {
+	login   *loginWorld
+	session *sessionWorld
+	// enrolled est ce que le dernier enrôlement a rendu. Le secret y est **en clair**, comme dans le
+	// téléphone de l'opérateur : le harnais ne déchiffre jamais la colonne.
+	enrolled enrollment
+	// previousSecret sert au seul scénario du remplacement, qui doit constater que le secret a changé.
+	previousSecret string
+}
+
+// enrollment est le corps de `POST /auth/mfa/totp/enroll`.
+type enrollment struct {
+	Secret        string   `json:"secret"`
+	OtpauthURI    string   `json:"otpauthUri"`
+	RecoveryCodes []string `json:"recoveryCodes"`
+}
+
+// registerSteps déclare les pas de ce monde. Il vit ici et non dans `initializeScenario` : le
+// registre de `main_test.go` grossissait d'une vingtaine de lignes à chaque step d'authentification,
+// et c'est la troisième d'affilée.
+func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
+	ctx.Given(`^l'opérateur enrôle une application d'authentification$`, w.enroll)
+	ctx.When(`^l'opérateur enrôle une application d'authentification$`, w.enroll)
+	ctx.Given(`^l'opérateur présente le code du pas courant$`, w.presentCodeAtOffset(0))
+	ctx.When(`^l'opérateur présente le code du pas courant$`, w.presentCodeAtOffset(0))
+	ctx.When(`^l'opérateur présente le code du pas précédent$`, w.presentCodeAtOffset(-1))
+	ctx.When(`^l'opérateur présente le code du pas suivant$`, w.presentCodeAtOffset(1))
+	ctx.When(`^l'opérateur présente le code à deux pas$`, w.presentCodeAtOffset(2))
+	ctx.When(`^l'opérateur présente un code faux$`, w.presentWrongCode)
+	ctx.When(`^l'opérateur présente (\d+) codes faux$`, w.presentWrongCodes)
+	ctx.When(`^l'opérateur présente son premier code de récupération$`, w.presentFirstRecoveryCode)
+	ctx.Then(`^l'enrôlement rend l'URI, le secret et dix codes de récupération$`, w.enrollmentIsComplete)
+	ctx.Then(`^le secret rendu diffère du précédent$`, w.secretChanged)
+	ctx.Then(`^le second facteur est vérifié$`, w.secondFactorIsVerified)
+	ctx.Then(`^le second facteur n'est pas encore vérifié$`, w.secondFactorIsNotVerified)
+	ctx.Then(`^il lui reste (\d+) codes de récupération$`, w.recoveryCodesRemaining)
+	ctx.Then(`^le refus ne dit pas ce qui a été refusé$`, w.refusalNamesNothing)
+	ctx.Then(`^le refus dit par où passer$`, w.refusalNamesTheWayOut)
+	ctx.Then(`^la réponse ne porte ni le secret ni aucun code de récupération$`, w.responseHidesTheSecret)
+	ctx.Then(`^la réponse annonce un second facteur enrôlé$`, w.announcesAnEnrolledFactor)
+}
+
+func (w *mfaWorld) enroll() error {
+	w.previousSecret = w.enrolled.Secret
+
+	if err := w.login.process.post("/api/auth/mfa/totp/enroll", ""); err != nil {
+		return err
+	}
+
+	if w.login.process.received.status != 200 {
+		return nil
+	}
+
+	var enrolled enrollment
+	if err := json.Unmarshal([]byte(w.login.process.received.body), &enrolled); err != nil {
+		return fmt.Errorf("relire l'enrôlement : %w\n%s", err, w.login.process.received.body)
+	}
+
+	w.enrolled = enrolled
+
+	return nil
+}
+
+// currentStep lit le pas de temps **dans la base**, qui est l'horloge que le serveur emploie. Le
+// calculer à partir de celle du harnais ferait dépendre le scénario de deux horloges au lieu d'une,
+// et un décalage d'une seconde le rendrait rouge une fois sur trente.
+func (w *mfaWorld) currentStep(ctx context.Context) (int64, error) {
+	conn, err := pgx.Connect(ctx, w.login.dsn)
+	if err != nil {
+		return 0, fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var step int64
+
+	err = conn.QueryRow(ctx, `SELECT floor(extract(epoch FROM now()) / $1)::bigint`,
+		mfa.PeriodSeconds).Scan(&step)
+	if err != nil {
+		return 0, fmt.Errorf("lire le pas de temps courant : %w", err)
+	}
+
+	return step, nil
+}
+
+// presentCodeAtOffset fabrique le code d'un pas voisin comme le ferait une application dont l'horloge
+// dérive, et le présente.
+func (w *mfaWorld) presentCodeAtOffset(offset int64) func(context.Context) error {
+	return func(ctx context.Context) error {
+		if w.enrolled.Secret == "" {
+			return errors.New("aucun enrôlement : le scénario n'a pas de secret pour fabriquer un code")
+		}
+
+		step, err := w.currentStep(ctx)
+		if err != nil {
+			return err
+		}
+
+		code, err := hotp.GenerateCodeCustom(w.enrolled.Secret, uint64(step+offset), hotp.ValidateOpts{
+			Digits:    otp.DigitsSix,
+			Algorithm: otp.AlgorithmSHA1,
+		})
+		if err != nil {
+			return fmt.Errorf("fabriquer le code du pas %d : %w", step+offset, err)
+		}
+
+		return w.verify("totp", code)
+	}
+}
+
+// presentWrongCode présente un code de six chiffres qui n'est celui d'aucun pas. Six chiffres et non
+// une chaîne quelconque : ce qui doit être exercé est la comparaison, pas le refus de forme.
+func (w *mfaWorld) presentWrongCode(ctx context.Context) error {
+	step, err := w.currentStep(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Un pas très éloigné produit un code de la bonne forme que la fenêtre ne couvre pas — plus sûr
+	// qu'une constante, qui pourrait être le code du moment une fois sur un million.
+	code, err := hotp.GenerateCodeCustom(w.enrolled.Secret, uint64(step+1_000), hotp.ValidateOpts{
+		Digits:    otp.DigitsSix,
+		Algorithm: otp.AlgorithmSHA1,
+	})
+	if err != nil {
+		return fmt.Errorf("fabriquer un code faux : %w", err)
+	}
+
+	return w.verify("totp", code)
+}
+
+func (w *mfaWorld) presentWrongCodes(ctx context.Context, times int) error {
+	for range times {
+		if err := w.presentWrongCode(ctx); err != nil {
+			return err
+		}
+
+		if w.login.process.received.status != 401 {
+			return fmt.Errorf("un code faux a été accepté : le serveur a répondu %d",
+				w.login.process.received.status)
+		}
+	}
+
+	return nil
+}
+
+func (w *mfaWorld) presentFirstRecoveryCode() error {
+	if len(w.enrolled.RecoveryCodes) == 0 {
+		return errors.New("aucun code de récupération : le scénario n'a rien à présenter")
+	}
+
+	return w.verify("recovery_code", w.enrolled.RecoveryCodes[0])
+}
+
+func (w *mfaWorld) verify(method, code string) error {
+	if w.login.challenge == "" {
+		return errors.New("aucun challenge en attente : la connexion n'en a pas émis")
+	}
+
+	body, err := json.Marshal(map[string]string{
+		"challenge": w.login.challenge,
+		"method":    method,
+		"code":      code,
+	})
+	if err != nil {
+		return fmt.Errorf("composer le corps du second facteur : %w", err)
+	}
+
+	return w.login.process.post("/api/auth/mfa/verify", string(body))
+}
+
+func (w *mfaWorld) enrollmentIsComplete() error {
+	if w.enrolled.Secret == "" {
+		return errors.New("l'enrôlement ne rend aucun secret : la saisie manuelle est impossible")
+	}
+
+	if !strings.HasPrefix(w.enrolled.OtpauthURI, "otpauth://totp/") {
+		return fmt.Errorf("l'URI rendue est %q : ce n'est pas ce qu'une application scanne",
+			w.enrolled.OtpauthURI)
+	}
+
+	if !strings.Contains(w.enrolled.OtpauthURI, w.enrolled.Secret) {
+		return errors.New("l'URI et la saisie manuelle ne portent pas le même secret : une des deux " +
+			"voies d'enrôlement mènerait à des codes que le serveur refuse")
+	}
+
+	if len(w.enrolled.RecoveryCodes) != mfa.RecoveryCodeCount {
+		return fmt.Errorf("%d code(s) de récupération rendu(s) pour %d attendus",
+			len(w.enrolled.RecoveryCodes), mfa.RecoveryCodeCount)
+	}
+
+	return nil
+}
+
+func (w *mfaWorld) secretChanged() error {
+	if w.previousSecret == "" {
+		return errors.New("aucun enrôlement précédent : ce pas n'a rien à comparer")
+	}
+
+	if w.enrolled.Secret == w.previousSecret {
+		return errors.New("le remplacement a rendu le même secret : l'ancien authentificateur ouvre " +
+			"encore")
+	}
+
+	return nil
+}
+
+// secondFactorIsVerified et son contraire lisent `/auth/me`, donc l'état **servi** et non celui de la
+// ligne. C'est ce que step-025 lira pour garder les écritures.
+func (w *mfaWorld) secondFactorIsVerified() error {
+	elevated, err := w.elevation()
+	if err != nil {
+		return err
+	}
+
+	if !elevated {
+		return errors.New("la session n'est pas élevée : le second facteur n'a rien changé")
+	}
+
+	return nil
+}
+
+func (w *mfaWorld) secondFactorIsNotVerified() error {
+	elevated, err := w.elevation()
+	if err != nil {
+		return err
+	}
+
+	if elevated {
+		return errors.New("la session est élevée alors que rien n'a franchi le second facteur : " +
+			"step-025 la laisserait écrire")
+	}
+
+	return nil
+}
+
+// elevation interroge `/auth/me` **sans écraser** ce que le scénario venait d'observer : les pas qui
+// suivent portent encore sur la réponse du second facteur.
+func (w *mfaWorld) elevation() (bool, error) {
+	restored := w.login.process.received
+
+	if err := w.login.process.fetch("/api/auth/me"); err != nil {
+		return false, err
+	}
+
+	decoded, err := w.session.decode()
+	w.login.process.received = restored
+
+	if err != nil {
+		return false, err
+	}
+
+	return decoded.Elevated, nil
+}
+
+func (w *mfaWorld) recoveryCodesRemaining(expected int) error {
+	restored := w.login.process.received
+
+	if err := w.login.process.fetch("/api/auth/me"); err != nil {
+		return err
+	}
+
+	decoded, err := w.session.decode()
+	w.login.process.received = restored
+
+	if err != nil {
+		return err
+	}
+
+	if decoded.SecondFactors.RecoveryCodesRemaining != expected {
+		return fmt.Errorf("il reste %d code(s) de récupération et non %d",
+			decoded.SecondFactors.RecoveryCodesRemaining, expected)
+	}
+
+	return nil
+}
+
+func (w *mfaWorld) announcesAnEnrolledFactor() error {
+	decoded, err := w.session.decode()
+	if err != nil {
+		return err
+	}
+
+	if !decoded.SecondFactors.TOTP {
+		return errors.New("la réponse annonce un compte sans second facteur : l'écran renverrait vers " +
+			"l'enrôlement d'un authentificateur déjà en place")
+	}
+
+	return nil
+}
+
+// refusalNamesNothing tient ce que le contrat promet : les cinq motifs de refus lisent la même
+// phrase. Elle ne cite ni le code, ni le challenge, ni ce qui manque.
+func (w *mfaWorld) refusalNamesNothing() error {
+	body := w.login.process.received.body
+
+	for _, forbidden := range []string{"challenge", "rejou", "expir", "épuis", "session"} {
+		if strings.Contains(strings.ToLower(body), forbidden) {
+			return fmt.Errorf("le refus nomme %q : il dit à une machine où elle en est\n%s", forbidden,
+				body)
+		}
+	}
+
+	return nil
+}
+
+// refusalNamesTheWayOut est l'inverse, et c'est la charte : un contrôle qui refuse dit où s'arrête
+// l'accès et par où passer. Un 409 muet enverrait ouvrir un ticket.
+func (w *mfaWorld) refusalNamesTheWayOut() error {
+	body := strings.ToLower(w.login.process.received.body)
+
+	if !strings.Contains(body, "administrateur") {
+		return fmt.Errorf("le refus ne dit pas qui peut débloquer :\n%s", w.login.process.received.body)
+	}
+
+	return nil
+}
+
+// responseHidesTheSecret confronte le corps servi au secret que le harnais tient encore. C'est la
+// seule façon d'observer « il n'est plus rendu » : l'absence d'un champ ne se prouve pas en le
+// cherchant par son nom, elle se prouve en cherchant sa **valeur**.
+func (w *mfaWorld) responseHidesTheSecret() error {
+	if w.enrolled.Secret == "" {
+		return errors.New("aucun enrôlement : ce pas n'a rien à chercher")
+	}
+
+	body := w.login.process.received.body
+
+	if strings.Contains(body, w.enrolled.Secret) {
+		return errors.New("le secret du second facteur est rendu par une réponse postérieure à " +
+			"l'enrôlement")
+	}
+
+	for _, code := range w.enrolled.RecoveryCodes {
+		if strings.Contains(body, code) {
+			return fmt.Errorf("le code de récupération %q est rendu après l'enrôlement", code)
+		}
+	}
+
+	return nil
+}

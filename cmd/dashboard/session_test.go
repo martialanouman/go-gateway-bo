@@ -231,8 +231,12 @@ type me struct {
 		Email       string `json:"email"`
 		DisplayName string `json:"displayName"`
 	} `json:"operator"`
-	Permissions       []string  `json:"permissions"`
-	Elevated          bool      `json:"elevated"`
+	Permissions   []string `json:"permissions"`
+	Elevated      bool     `json:"elevated"`
+	SecondFactors struct {
+		TOTP                   bool `json:"totp"`
+		RecoveryCodesRemaining int  `json:"recoveryCodesRemaining"`
+	} `json:"secondFactors"`
 	AbsoluteExpiresAt time.Time `json:"absoluteExpiresAt"`
 }
 
