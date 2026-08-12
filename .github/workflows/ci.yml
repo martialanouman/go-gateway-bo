@@ -269,6 +269,7 @@ jobs:
           DASHBOARD_DATABASE_URL="$DASHBOARD_DATABASE_URL" \
           DASHBOARD_BRUTEFORCE_SALT=un-sel-de-ci-assez-long-pour-passer-la-borne \
           DASHBOARD_SESSION_SECRET=une-cle-de-ci-assez-longue-pour-passer-la-borne \
+          DASHBOARD_TOTP_ENCRYPTION_KEY=une-cle-de-chiffrement-de-ci-assez-longue \
             ./bin/dashboard &
           bff=$!
           # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de

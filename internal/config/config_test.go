@@ -23,20 +23,22 @@ func lookupFrom(vars map[string]string) config.Lookup {
 // ce qu'ils exercent, pour qu'ajouter une obligation demain ne demande pas de retoucher vingt cas.
 func minimalEnv() map[string]string {
 	return map[string]string{
-		config.EnvAddr:           ":3001",
-		config.EnvGatewayMode:    string(config.GatewayModeMock),
-		config.EnvGatewayBaseURL: "http://127.0.0.1:4010",
-		config.EnvDatabaseURL:    localDatabaseURL,
-		config.EnvBruteForceSalt: testBruteForceSalt,
-		config.EnvSessionSecret:  testSessionSecret,
+		config.EnvAddr:              ":3001",
+		config.EnvGatewayMode:       string(config.GatewayModeMock),
+		config.EnvGatewayBaseURL:    "http://127.0.0.1:4010",
+		config.EnvDatabaseURL:       localDatabaseURL,
+		config.EnvBruteForceSalt:    testBruteForceSalt,
+		config.EnvSessionSecret:     testSessionSecret,
+		config.EnvTOTPEncryptionKey: testTOTPEncryptionKey,
 	}
 }
 
-// testBruteForceSalt et testSessionSecret ont la longueur qu'exige Load, et rien d'un secret
-// d'installation : ces tests ne signent rien, ils vérifient que la variable est exigée et bornée.
+// Les trois ont la longueur qu'exige Load, et rien d'un secret d'installation : ces tests ne signent
+// ni ne chiffrent rien, ils vérifient que la variable est exigée et bornée.
 const (
-	testBruteForceSalt = "un-sel-de-test-assez-long-pour-passer-la-borne"
-	testSessionSecret  = "une-cle-de-test-assez-longue-pour-passer-la-borne"
+	testBruteForceSalt    = "un-sel-de-test-assez-long-pour-passer-la-borne"
+	testSessionSecret     = "une-cle-de-test-assez-longue-pour-passer-la-borne"
+	testTOTPEncryptionKey = "une-cle-de-chiffrement-de-test-assez-longue"
 )
 
 // localDatabaseURL est le DSN du `docker-compose.yml` de développement : ni un secret d'installation,
@@ -61,6 +63,7 @@ func realGatewayEnv() map[string]string {
 		config.EnvDatabaseURL:         localDatabaseURL,
 		config.EnvBruteForceSalt:      testBruteForceSalt,
 		config.EnvSessionSecret:       testSessionSecret,
+		config.EnvTOTPEncryptionKey:   testTOTPEncryptionKey,
 	}
 }
 
@@ -518,6 +521,7 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvDatabaseURL,
 		config.EnvBruteForceSalt,
 		config.EnvSessionSecret,
+		config.EnvTOTPEncryptionKey,
 		config.EnvTrustedProxies,
 		config.EnvBootstrapOperatorEmail,
 		config.EnvBootstrapOperatorName,

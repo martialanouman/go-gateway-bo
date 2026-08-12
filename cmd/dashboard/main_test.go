@@ -276,6 +276,10 @@ func completeConfiguration() map[string]string {
 		// Obligatoire depuis step-022, et sans repli de même. Les scénarios de session, eux, relisent
 		// bien ce que cette clé scelle : c'est le serveur qui signe et vérifie, jamais le harnais.
 		"DASHBOARD_SESSION_SECRET": "une-cle-de-scenario-assez-longue-pour-la-borne",
+		// Obligatoire depuis step-023, et sans repli de même. Le harnais ne la relit jamais : le secret
+		// TOTP lui arrive **en clair par la réponse d'enrôlement**, qui existe pour ça, donc aucun
+		// scénario n'a besoin de déchiffrer une colonne.
+		"DASHBOARD_TOTP_ENCRYPTION_KEY": "une-cle-de-chiffrement-de-scenario-assez-longue",
 	}
 }
 

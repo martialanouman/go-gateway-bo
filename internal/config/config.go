@@ -44,8 +44,10 @@ const (
 	EnvBruteForceSalt = "DASHBOARD_BRUTEFORCE_SALT"
 	// G101 lit un nom de variable d'environnement comme un identifiant en dur. C'en est l'exact
 	// contraire : cette constante nomme la variable dont la valeur n'est **jamais** écrite ici.
-	EnvSessionSecret  = "DASHBOARD_SESSION_SECRET" //nolint:gosec
-	EnvTrustedProxies = "DASHBOARD_TRUSTED_PROXIES"
+	EnvSessionSecret = "DASHBOARD_SESSION_SECRET" //nolint:gosec
+	// Même faux positif G101, même raison.
+	EnvTOTPEncryptionKey = "DASHBOARD_TOTP_ENCRYPTION_KEY" //nolint:gosec
+	EnvTrustedProxies    = "DASHBOARD_TRUSTED_PROXIES"
 )
 
 // minimumBruteForceSaltLength borne le sel d'anti-brute-force. Trente-deux caractères : ce que rend
@@ -59,6 +61,19 @@ const minimumBruteForceSaltLength = 32
 // table relisible, elle laisse **signer une session**. Qui devine cette clé se connecte sous
 // n'importe quelle identité sans jamais présenter de mot de passe.
 const minimumSessionSecretLength = 32
+
+// minimumTOTPEncryptionKeyLength borne la passphrase dont se dérive la clé qui chiffre les secrets
+// TOTP au repos. Même seuil et même recette que les deux ci-dessus, délibérément : trois secrets qui
+// s'obtiennent de trois façons différentes finissent par s'obtenir de la plus commode.
+//
+// Ce n'est **pas** la clé AES : celle-ci fait exactement trente-deux octets et se dérive par HKDF
+// dans `internal/mfa`. Exiger ici une valeur de trente-deux octets exactement aurait refusé la
+// recette que le README donne pour les deux autres.
+//
+// La conséquence d'une clé faible n'est encore pas la même : elle ne rend pas une table relisible et
+// ne laisse pas signer une session, elle rend **déchiffrables tous les seconds facteurs** de la base
+// — et qui les déchiffre produit les codes de n'importe quel opérateur.
+const minimumTOTPEncryptionKeyLength = 32
 
 // defaultShutdownTimeout laisse aux requêtes en vol de quoi se terminer pendant un déploiement
 // roulant. Un délai a une valeur par défaut, un secret n'en a jamais.
@@ -105,6 +120,14 @@ type AuthConfig struct {
 	// l'autre. La changer déconnecte tout le monde — c'est l'inverse du sel ci-dessus, dont la
 	// rotation n'invalide aucun compte.
 	SessionSecret []byte
+	// TOTPEncryptionKey est la passphrase dont se dérive la clé qui chiffre les secrets TOTP au repos.
+	// Ce n'est pas la clé elle-même : la dérivation vit dans `internal/mfa`, qui seul sait la longueur
+	// qu'AES-256 exige.
+	//
+	// **La perdre rend illisibles tous les seconds facteurs**, codes de récupération compris. La
+	// changer a le même effet : c'est le plus lourd des trois secrets à faire tourner, et la sortie
+	// est le réenrôlement de chaque opérateur.
+	TOTPEncryptionKey []byte
 	// TrustedProxies énumère les réseaux dont on croit l'en-tête `X-Forwarded-For`.
 	//
 	// **Vide est une valeur sûre et non un défaut manquant** : sans liste, l'en-tête est ignoré et le
@@ -160,6 +183,8 @@ func Load(lookup Lookup) (Config, error) {
 		Auth: AuthConfig{
 			BruteForceSalt: r.requiredSecret(EnvBruteForceSalt, minimumBruteForceSaltLength),
 			SessionSecret:  r.requiredSecret(EnvSessionSecret, minimumSessionSecretLength),
+			TOTPEncryptionKey: r.requiredSecret(EnvTOTPEncryptionKey,
+				minimumTOTPEncryptionKeyLength),
 			TrustedProxies: r.prefixList(EnvTrustedProxies),
 		},
 	}

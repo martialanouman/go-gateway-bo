@@ -71,6 +71,8 @@ export default defineConfig({
       DASHBOARD_BRUTEFORCE_SALT: 'un-sel-de-parcours-assez-long-pour-passer-la-borne',
       // Obligatoire depuis step-022, sans repli de même, et refusée avant la liaison du port.
       DASHBOARD_SESSION_SECRET: 'une-cle-de-parcours-assez-longue-pour-passer-la-borne',
+      // Obligatoire depuis step-023, aux mêmes conditions.
+      DASHBOARD_TOTP_ENCRYPTION_KEY: 'une-cle-de-chiffrement-de-parcours-assez-longue',
     },
   },
 })
