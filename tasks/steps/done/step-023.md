@@ -12,7 +12,7 @@ qui ne se réaffiche jamais.
 - `pquerna/otp` : génération du secret, URI `otpauth://`, vérification avec fenêtre de dérive
   **écrite et justifiée**.
 - `POST /auth/mfa/totp/enroll` et `POST /auth/mfa/verify` : le second facteur élève la session de
-  step-022.
+  step-022. Le verrou d'essais par opérateur (migration 00007) est venu de la revue, pas du plan.
 - Secret **chiffré au repos** (AES-GCM, `DASHBOARD_TOTP_ENCRYPTION_KEY`) dans
   `operators.mfa_totp_secret`.
 - **Anti-rejeu** : le dernier pas consommé est mémorisé par opérateur, un code déjà servi est refusé.
@@ -55,23 +55,66 @@ vérifications rendent le même 204, donc un corps discriminé suffit et l'opér
 aussi les permissions garantirait qu'ils divergent. C'est `Me` qui gagne `secondFactors` — un booléen
 et un compte, ce dont step-027 et step-028 ont besoin, et rien qui se rejoue.
 
-### DN-6 — Le ré-enrôlement exige une session **déjà élevée**
-Le premier enrôlement est libre : il faut bien pouvoir entrer une première fois. Le remplacer exige
-d'avoir franchi celui qui est en place, sans quoi quiconque détient le mot de passe contourne le
-second facteur en s'en attachant un neuf — et toute la step ne garderait rien. Pas d'état « en attente
-de confirmation » : le mode d'échec « je n'ai pas scanné » se rattrape par un code de récupération,
-montré au même écran et à la même seconde.
+### DN-6 — Le remplacement exige de **présenter le facteur qu'il détruit**
 
-### DN-7 — Le challenge meurt après cinq échecs
-`mfa_challenges.failures`. Combiné au verrou de step-021, un attaquant obtient ~25 essais par quart
-d'heure sur 10⁶ codes. C'est aussi ce qui borne le **coût** du chemin de récupération, où chaque essai
-paie dix argon2id — 260 ms et 64 MiB. Un challenge mort et un code faux rendent le même 401.
+Le premier enrôlement est libre : il faut bien pouvoir entrer une première fois, et il n'y a rien à
+prouver. Le remplacement détruit le secret en place **et ses dix codes de récupération** — il exige
+donc de présenter l'un ou l'autre.
+
+Le bit `elevated` seul n'y suffisait pas : il vaut douze heures, donc un cookie de session élevée capté
+suffisait à évincer définitivement l'opérateur. Le geste qui détruit un facteur était protégé moins que
+celui qui l'utilise, lequel exige un challenge frais de cinq minutes.
+
+**Et le challenge frais, qui était le correctif retenu d'abord, est inutilisable** : se reconnecter
+pour en obtenir un ferme la session présentée — c'est la remédiation de step-022 — donc la désélève.
+Exiger l'élévation *et* un challenge frais rendait le remplacement inatteignable. Mesuré : le scénario
+qui l'exerçait rendait 409 en boucle. C'est le scénario qui l'a dit, pas la relecture.
+
+Un code du facteur en place est par ailleurs une preuve **plus forte** que le mot de passe. Un code de
+récupération convient aussi : celui qui a perdu son téléphone est précisément celui qui veut
+réenrôler, et n'accepter qu'un code TOTP en ferait une impasse.
+
+Pas d'état « en attente de confirmation » : le mode d'échec « je n'ai pas scanné » se rattrape par un
+code de récupération, montré au même écran et à la même seconde.
+
+### DN-7 — Un verrou d'essais **par opérateur**, et la fausse arithmétique qui l'a fait manquer
+
+La première rédaction bornait les essais **par challenge** — cinq — et en déduisait « cinq tentatives
+de connexion par quart d'heure, donc cinq challenges, donc vingt-cinq essais ». **C'était faux**, et la
+source le disait : `RecordFailure` n'est appelé que depuis le chemin d'**échec** de `auth.Login`, et le
+chemin de succès appelle `ClearFailures`. Une connexion réussie n'incrémente aucun compteur. Qui
+détient le mot de passe émet donc autant de challenges qu'il veut, depuis une seule adresse, sans
+qu'aucun verrou ne le voie : de l'ordre de 231 000 essais pour une chance sur deux, soit quelques
+heures.
+
+La migration 00007 ajoute une troisième dimension à `login_attempt_counters`, sur l'identifiant de
+l'opérateur, et réutilise tel quel l'incrément atomique de step-021. Cinq essais par quart d'heure sur
+10⁶ codes dont trois sont valables à la fois : une chance sur deux demanderait de l'ordre de
+quatre-vingts ans. Le verrou est consulté **avant** toute dépense — sinon il protégerait le compte sans
+protéger le serveur — et son franchissement rend un 429 avec sa durée, comme la connexion.
+
+**Le compteur par challenge disparaît avec lui.** Au même seuil, celui de l'opérateur compte à travers
+toutes les connexions, donc il mord toujours le premier : celui du challenge n'était plus observable,
+ni par un test ni par une mutation. Deux gardes dont l'une masque l'autre valent une garde et une
+illusion.
+
+Le prix, écrit plutôt que tu : le verrou porte sur l'opérateur, donc qui détient son mot de passe peut
+le tenir hors de son propre second facteur, un quart d'heure à la fois. Ce n'est pas une capacité
+neuve — cinq mots de passe faux verrouillent déjà son adresse depuis 00004.
 
 ### DN-8 — Fenêtre de dérive : ±1 pas
-Le défaut de `pquerna/otp` est `Skew: 0`, **relevé sur v1.5.0 et non supposé** : il refuserait un
-téléphone en avance d'une seconde. Deux pas doubleraient la durée pendant laquelle un code intercepté
-vaut encore. SHA-1, six chiffres, 30 s, secret de 20 octets : arbitrage d'interopérabilité et non de
-sécurité — beaucoup d'applications ignorent les paramètres de l'URI. Ce qui protège est le secret.
+
+C'est exactement ce que `totp.Validate` emploie — `Skew: 1`, lu dans `totp/totp.go:34-49` de la
+v1.5.0 — donc ce que les applications compatibles Google Authenticator supposent.
+
+**Une rédaction précédente affirmait le contraire**, « le défaut de la bibliothèque est zéro, relevé et
+non supposé » : ce zéro est la valeur zéro du **champ** `ValidateOpts.Skew`, que la documentation
+décrit, et non ce que la fonction fait. Le chiffre était juste, l'objet mesuré ne l'était pas — le même
+défaut que « une mesure sur un proxy » en step-022. L'arbitrage ne bouge pas ; sa raison, si.
+
+Zéro refuserait un téléphone en avance d'une seconde ; deux doubleraient la durée pendant laquelle un
+code intercepté vaut encore. SHA-1, six chiffres, 30 s, secret de 20 octets : arbitrage
+d'interopérabilité et non de sécurité. Ce qui protège est le secret.
 
 ### DN-9 — AES-256-GCM, clé dérivée par HKDF, **identifiant d'opérateur en données associées**
 La passphrase est lue par le `requiredSecret` existant, même seuil et même recette que les deux autres
@@ -94,9 +137,10 @@ plus de cookie sur ce chemin.
 
 ---
 
-## Tableau des mutations — **mesurées, pas prévues** (12/08/2026)
+## Tableau des mutations — **mesurées, pas prévues**
 
-Chacune jouée sur un dépôt commité, une par une, avec `-count=1`.
+Vingt et une mutations, jouées une par une sur un dépôt commité, avec `-count=1`. Les treize premières
+à la livraison (12/08/2026), les huit dernières après la revue.
 
 | Mutation appliquée | Ce qui est tombé |
 |---|---|
@@ -106,51 +150,63 @@ Chacune jouée sur un dépôt commité, une par une, avec `-count=1`.
 | **secret stocké en clair** (chiffrement **et** déchiffrement) | `TestCeQuiVaEnBaseNEstPasLeSecretEnClair` + 3 |
 | **code de récupération marqué au lieu d'être détruit** | 2 unitaires + « un code de récupération ouvre une fois et une seule » |
 | **`ConsumeChallenge` rend vrai sans écrire** | `TestUnChallengeNeSeConsommeQuUneFois`, `TestUnChallengeConsommeResteEnBase` |
-| **le handler n'appelle plus `ConsumeChallenge`** | « un challenge déjà servi ne ressert pas » — *scénario écrit après la mutation, voir plus bas* |
-| **contrôle d'appartenance du challenge retiré** | « le challenge d'un autre opérateur n'élève rien » — *idem* |
+| **le handler n'appelle plus `ConsumeChallenge`** | « un challenge déjà servi ne ressert pas » |
+| **contrôle d'appartenance du challenge retiré** | « le challenge d'un autre opérateur n'élève rien » |
 | **données associées retirées** (des deux côtés) | `TestUnSecretDeplaceSurUneAutreLigneNeSeDechiffrePas`, et rien d'autre |
-| **borne d'essais retirée** | 2 unitaires + « cinq codes faux tuent le challenge » |
-| **exigence de session élevée retirée du ré-enrôlement** | « remplacer un second facteur depuis une session non élevée est refusé » |
+| **exigence de preuve retirée du remplacement** | « remplacer son authentificateur en présentant son code réussit » |
 | **jeton de session non régénéré à l'élévation** | `TestLElevationInvalideLeJetonPrecedent` + 6 scénarios |
+| **`.Strict()` retiré de `ChallengeDigest`** | `TestUnChallengeNonCanoniqueNEstPasLeMemeChallenge`, ses trois cas |
+| **nonce constant sous GCM** | `TestDeuxChiffrementsDuMemeSecretSousLaMemeCleDifferent` |
+| **`ConsumeChallenge` appelé *aussi* sur échec** | « une faute de frappe n'oblige pas à refaire la connexion » + 2 |
+| **`!state.Enrolled` retiré** | « présenter un code sans avoir enrôlé est refusé, pas une panne » |
+| **bornes de forme retirées** (`maximumCodeLength`, `Method.Valid()`) | « une requête de second facteur mal formée est refusée sur sa forme » |
+| **correspondance de Crockford altérée** (`I→7`, `O→9`) | `TestLesConfusionsDeCrockfordSontResolues`, ses trois cas |
+| **verrou d'essais non consulté** | « cinq codes faux verrouillent le second facteur » + « se reconnecter ne lève pas le verrou » |
 | **arrêt au premier code de récupération qui colle** | **rien — verte, et le constat est écrit au-dessus de la ligne** |
 
-## Ce que les mutations ont trouvé, et qui n'existait pas avant elles
+## Ce que les mutations et la revue ont trouvé
 
-**Deux gardes n'étaient tenues par rien**, et les deux ont été écrites après la mesure :
+**Onze gardes n'étaient tenues par rien**, et leurs tests ont tous été écrits *après* la mesure qui les
+a trouvées nues. Les cinq qui comptent :
 
-- **le contrôle d'appartenance du challenge.** Le retirer laissait les quarante scénarios et toutes
-  les suites unitaires verts. Sans lui, le challenge dirait « un mot de passe vient d'être présenté
-  quelque part » : quiconque en obtient un — le sien, en se connectant — élèverait la session d'un
-  autre avec son propre code.
+- **le contrôle d'appartenance du challenge.** Sans lui, le challenge dirait « un mot de passe vient
+  d'être présenté quelque part » : quiconque en obtient un élèverait la session d'un autre.
 - **l'appel du handler à `ConsumeChallenge`.** Le store savait refuser un challenge déjà servi, mais
-  rien n'exigeait que le handler l'appelle : un challenge de cinq minutes aurait valu douze heures.
+  rien n'exigeait qu'on l'appelle — un challenge de cinq minutes aurait valu douze heures.
+- **le `.Strict()` de `ChallengeDigest`.** Le jeton fait quarante-trois caractères base64url dont le
+  dernier ne porte que deux bits significatifs : sans lui, quatre valeurs distinctes ouvraient la même
+  ligne. C'est le piège déjà payé en step-022, sur le sceau du cookie.
+- **le nonce de GCM.** Le test qui prétendait le garder comparait les chiffrés de deux secrets
+  **différents** — vrai quel que soit le nonce. Douze zéros constants le laissaient vert. Le vrai test
+  vit dans le paquet, parce que `seal` n'est pas exporté.
+- **« le challenge n'est pas consommé sur échec »**, la propriété centrale de DN-1, qu'aucun scénario
+  n'observait — donc le produit pouvait régresser vers « une faute de frappe = refaire la connexion ».
 
-**Deux mutations étaient mal construites et se lisaient comme des succès.** Les deux sont refaites
-dans le tableau ci-dessus, et ce sont les deux formes du piège :
+**Quatre pièges de mesure**, consignés parce qu'ils se relisent tous comme des succès :
 
-- « stocker le secret en clair » et « retirer les données associées » ne mutaient qu'**un sens** du
-  chiffrement. Elles cassaient l'aller-retour — que n'importe quel test de vérification attrape — au
-  lieu de perdre la propriété visée. Le rouge disait « le déchiffrement ne marche plus », pas « la
-  garde a sauté ».
-- « le jeton non régénéré » écrivait `coalesce($2, token_hash)`, où `$2` n'est **jamais** nul : un
-  no-op qui rendait vert, donc un test qui semblait tenir.
+- deux mutations ne touchaient qu'**un sens** du chiffrement : elles cassaient l'aller-retour, que
+  n'importe quel test de vérification attrape, au lieu de perdre la propriété visée ;
+- « le jeton non régénéré » écrivait `coalesce($2, token_hash)`, où `$2` n'est jamais nul — un no-op ;
+- le **cache de `go test`** a rendu une mutation verte. Tout a été refait avec `-count=1` ;
+- `elevation()`, dans le harnais, ne lisait jamais le statut de `/auth/me` : un corps d'erreur se
+  démarshalait en zéros, donc « le second facteur n'est pas encore vérifié » — le pas négatif de six
+  scénarios — était vert sur *toute* réponse qui n'était pas un 200. C'est ce qui rendait invisible la
+  garde du challenge non consommé.
 
-**Et le cache de `go test` a rendu une mutation verte.** `appartenance-retiree` a d'abord été mesurée
-sans `-count=1` et a rendu `ok (cached)` sur `cmd/dashboard` alors que le défaut était bien là. Toutes
-les mesures ont été refaites avec `-count=1`. Un `ok` mis en cache est indiscernable d'un `ok` gagné.
+## Ce qui n'est pas testé, et pourquoi
 
-## Ce qui n'a pas été testé, et pourquoi
-
-- **L'arrêt au premier code de récupération** (le seul rouge manquant). Ce qui le garderait est un
-  test de durée sur un écart de 260 ms, que le dépôt écarte partout ailleurs pour instabilité en CI.
-  Le constat de la mesure est écrit au-dessus de la boucle, comme pour `hmac.Equal` et
-  `subtle.ConstantTimeCompare`.
-- **Un journal.** Un secret illisible en base et un hachage de code abîmé sont **silencieux** : aucun
-  journal n'atteint encore `internal/mfa` ni `internal/auth`. Le premier journal du BFF devra les
-  remonter — le manque est écrit sur les deux fonctions concernées.
+- **L'arrêt au premier code de récupération** — le seul rouge manquant. Ce qui le garderait est un test
+  de durée sur un écart de 260 ms, que le dépôt écarte partout pour instabilité en CI. Le constat de la
+  mesure est écrit au-dessus de la boucle, comme `hmac.Equal` en step-022.
+- **Un journal.** Un secret illisible en base et un hachage de code abîmé sont silencieux : aucun
+  journal n'atteint encore `internal/mfa` ni `internal/auth`.
+- **Trois branches de course** — `!consumed`, `!elevated` de `VerifyMfa`, `!found` de l'enrôlement — ne
+  sont atteignables que par deux requêtes en vol ou une désactivation entre le middleware et le
+  handler. Aucun test ne les exerce, et c'est écrit ici plutôt que couvert par un test qui ferait
+  semblant.
 
 ## Definition of Done
-- [x] `make check` vert
+- [x] `make check` vert et `make e2e` vert
 - [x] la fenêtre de dérive et le format de chiffrement sont écrits avec leur raison
 - [x] la mutation « retirer l'anti-rejeu » fait rougir
 - [x] la mutation « élargir la fenêtre à ±10 pas » fait rougir
@@ -163,10 +219,20 @@ le QR et le téléchargement des codes → step-028. La réinitialisation du sec
 opérateur → step-029.
 
 ## Suivis ouverts
-- **Aucun anti-brute-force sur `/auth/mfa/verify` au-delà du compteur par challenge.** Le calcul est
-  écrit en DN-7 et tient ; ce qu'il ne couvre pas est un attaquant qui relogue depuis des sources
-  variées pour renouveler ses challenges. La dimension `source` de `login_attempt_counters` le
-  bornerait — à trancher par step-025, qui reprend ce chemin.
+- **`POST /auth/mfa/totp/enroll` n'est borné par rien**, et chaque appel coûte au serveur 269 ms de
+  processeur et 64 MiB de pic — mesuré le 12/08/2026 par `BenchmarkEnrolement`, dix argon2id. Un
+  remplacement est borné par la preuve qu'il exige, mais le **premier** enrôlement d'un compte non
+  encore enrôlé ne l'est pas : une session de premier facteur suffit à le répéter. C'est le mode
+  d'échec que `internal/auth/argon2.go` invoque pour fermer les profils à 512 MiB, sur un chemin ajouté
+  ailleurs. À borner par step-025, qui reprend ce chemin.
+- **Le premier enrôlement est libre pour toute session de premier facteur.** Sur un déploiement neuf,
+  aucun opérateur n'est enrôlé : un mot de passe volé pendant cette fenêtre vaut un compte complet,
+  second facteur compris. C'est le problème d'amorçage classique du MFA, et DN-6 l'assume — mais la
+  fenêtre mérite d'être bornée le jour où step-029 saura enrôler pour le compte d'un autre.
 - **L'`issuer` de l'URI `otpauth://` est codé en dur.** Deux déploiements du même produit apparaissent
-  sous le même nom dans le téléphone d'un opérateur qui enrôle les deux. La sortie est une variable de
-  configuration, et elle appartient à la step qui aura une préproduction.
+  sous le même nom dans le téléphone d'un opérateur qui enrôle les deux.
+- **`minimumTOTPEncryptionKeyLength` compte des caractères, pas de l'entropie.** Trente-deux `a` de
+  suite passent. Le README recommande un CSPRNG ; rien ne l'applique.
+- **Le conteneur PostgreSQL des scénarios meurt parfois sous la charge** (`terminating connection due
+  to unexpected postmaster exit`), observé deux fois pendant les mesures de mutation. Ce n'est pas un
+  défaut du produit, mais ça rend une suite rouge sans cause lisible.
