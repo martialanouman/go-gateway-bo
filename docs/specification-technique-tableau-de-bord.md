@@ -80,7 +80,12 @@ operators
   id (uuidv7, pk)
   email, display_name
   password_hash                          -- email/password auth (§6.9)
-  mfa_totp_secret        (nullable)       -- enrolled authenticator (TOTP)
+  mfa_totp_secret        (nullable)       -- enrolled authenticator (TOTP), CHIFFRÉ au repos
+                                          -- (Amendement step-023) AES-256-GCM, clé dérivée de
+                                          -- DASHBOARD_TOTP_ENCRYPTION_KEY, identifiant de
+                                          -- l'opérateur en données associées
+  mfa_totp_last_step     (nullable)       -- (Amendement step-023) anti-rejeu : dernier pas de temps
+                                          -- consommé ; un code n'est accepté que strictement au-delà
   mfa_webauthn_credentials (jsonb/array)  -- registered passkeys/WebAuthn authenticators
   status                 (active|disabled)
   last_login_at
@@ -120,6 +125,16 @@ mfa_challenges                       -- (Amendement step-021) second-factor chal
   token_hash                             -- SHA-256 du jeton ; le jeton lui-même n'est jamais stocké
   created_at, expires_at
   consumed_at            (nullable)      -- anti-rejeu : un challenge consommé ne se rejoue pas
+  failures                               -- (Amendement step-023) essais de second facteur essuyés ;
+                                         -- au-delà du seuil le challenge est mort, ce qui borne la
+                                         -- recherche exhaustive d'un code à six chiffres
+
+mfa_recovery_codes                   -- (Amendement step-023) le chemin de sortie quand le téléphone est perdu
+  id (uuidv7, pk)
+  operator_id (fk)
+  code_hash                              -- argon2id (et non SHA-256 : un code se tape à la main,
+                                         -- donc il est court — cinquante bits à protéger)
+  created_at                             -- consommé = DÉTRUIT ; rien à réafficher, rien à fuir
 
 login_attempt_counters               -- (Amendement step-021) anti-brute-force partagé entre instances
   scope                  (email|source) -- l'adresse soumise, ou le HMAC de l'adresse source
@@ -263,7 +278,15 @@ GET    /health                         # sonde de VIVACITÉ : le process répond
 # Auth (email/password + MFA — TOTP + WebAuthn/passkey; §6.9)
 POST   /auth/login                     # email + password -> MFA challenge
 POST   /auth/mfa/verify                # TOTP code or WebAuthn assertion
-POST   /auth/mfa/enroll                # enroll an authenticator or register a passkey
+POST   /auth/mfa/totp/enroll           # (Amendement step-023) enroll a TOTP authenticator
+                                       # `/auth/mfa/enroll` annonçait UNE route pour les deux
+                                       # facteurs. Elle ne tient pas : les deux enrôlements rendent
+                                       # des formes différentes — un secret et une URI d'un côté,
+                                       # des options de cérémonie de l'autre — donc un `oneOf` de
+                                       # réponse dont le code engendré fait un type opaque. La
+                                       # VÉRIFICATION, elle, rend le même 204 des deux côtés : elle
+                                       # reste une seule opération, à corps discriminé.
+                                       # step-024 ajoutera POST /auth/mfa/webauthn/register.
 POST   /auth/logout
 GET    /auth/me                        # current operator + resolved permission set (union of held roles)
 
@@ -462,6 +485,16 @@ Email/mot de passe + **MFA** : application authenticator (TOTP) et **passkey/Web
 - La couche serveur (BFF) gère le hachage de mot de passe (protection anti-brute-force, verrouillage temporaire), l'enrôlement TOTP et les cérémonies WebAuthn, et émet sa propre session (cookie/JWT signé).
 - **MFA requis pour les rôles privilégiés** ; WebAuthn/passkey privilégié quand l'appareil le supporte.
 - Le client ne gère jamais les identifiants au-delà du formulaire de login ; toute la logique sensible vit côté serveur.
+
+**(Amendement step-023) Ce que le TOTP exige, et que les quatre lignes ci-dessus ne disaient pas.** Trois mécanismes portent la sécurité de ce facteur, et aucun n'est optionnel :
+
+- **Anti-rejeu.** TOTP accepte une fenêtre de dérive, donc un code intercepté reste valable plusieurs dizaines de secondes. Le dernier pas de temps consommé est mémorisé par opérateur (`operators.mfa_totp_last_step`) et un code n'est accepté que **strictement au-delà** — ce qui refuse aussi le code du pas précédent, encore dans la fenêtre. La fenêtre est de **±1 pas** de trente secondes : la valeur par défaut de la bibliothèque est zéro, et refuserait un téléphone en avance d'une seconde.
+- **Chiffrement au repos.** Le secret est chiffré en AES-256-GCM avant d'entrer en base, avec l'identifiant de l'opérateur en données associées — sans quoi une copie de la colonne d'une ligne sur une autre donnerait le second facteur d'un opérateur à un autre. **Perdre la clé rend illisibles tous les seconds facteurs**, codes de récupération compris ; la sortie est le réenrôlement par un `operators:manage` (§6.10).
+- **Codes de récupération.** Dix, remis une seule fois à l'enrôlement, hachés comme un mot de passe, à usage unique et **détruits** à la consommation. Le compte de ceux qui restent est rendu par `/auth/me`.
+
+Le secret et les codes ne se réaffichent **jamais** : aucune action « révéler » n'existe, dans l'esprit de la règle du §6.7 sur les identifiants de bind. Le serveur rend l'URI `otpauth://` et non une image — le QR est dessiné par le client.
+
+Un enrôlement exige au minimum une session de premier facteur ; **remplacer** un second facteur déjà en place exige une session dont le second facteur a été vérifié, sans quoi quiconque détient le mot de passe le contournerait en s'en enrôlant un neuf.
 
 ### 6.10 Modèle de permission & rôles par défaut
 

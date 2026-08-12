@@ -72,7 +72,10 @@ const seedSQL = `
 	VALUES ('` + seedOperator + `', 'cdr_search', '{"status": "failed"}'::jsonb, 'Échecs du jour');
 
 	INSERT INTO sessions (operator_id, token_hash, expires_at)
-	VALUES ('` + seedOperator + `', '\\x01'::bytea, now() + interval '12 hours');`
+	VALUES ('` + seedOperator + `', '\\x01'::bytea, now() + interval '12 hours');
+
+	INSERT INTO mfa_recovery_codes (operator_id, code_hash)
+	VALUES ('` + seedOperator + `', '$argon2id$v=19$m=65536,t=3,p=4$c2Vsc2Vsc2Vsc2Vsc2Vs$aGFzaA');`
 
 func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 	t.Parallel()
@@ -131,6 +134,25 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			act: `INSERT INTO mfa_challenges (operator_id, token_hash, created_at, expires_at)
 				VALUES ('` + seedOperator + `', '\\x00'::bytea, now(), now() - interval '1 second')`,
 			sqlstate: checkViolation,
+		},
+		{
+			// Inatteignable depuis le produit — le compteur n'est qu'incrémenté. La contrainte garde
+			// contre la step qui le remettrait à zéro sur un succès partiel : un compteur passé sous
+			// zéro rendrait le seuil inatteignable, donc les essais de second facteur illimités, sans
+			// erreur et sans symptôme.
+			name: "le compteur d'échecs d'un challenge ne descend pas sous zéro",
+			act: `INSERT INTO mfa_challenges (operator_id, token_hash, expires_at, failures)
+				VALUES ('` + seedOperator + `', '\\x03'::bytea, now() + interval '5 minutes', -1)`,
+			sqlstate: checkViolation,
+		},
+		{
+			// Un code de récupération qui ne désigne personne serait accepté par quiconque : la
+			// confrontation cherche les codes **d'un opérateur**, et une ligne orpheline n'appartient à
+			// aucun.
+			name: "un code de récupération appartient à un opérateur qui existe",
+			act: `INSERT INTO mfa_recovery_codes (operator_id, code_hash)
+				VALUES ('01900000-0000-7000-8000-0000000000ff', 'hash')`,
+			sqlstate: foreignKeyViolation,
 		},
 		{
 			// L'unicité est ce que la résolution emprunte — on retrouve une session **par son jeton**.

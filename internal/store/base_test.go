@@ -121,9 +121,10 @@ var initialMigrations = []string{
 	"00003_alerts_notifications_saved_views.sql",
 	"00004_login_challenges_and_throttling.sql",
 	"00005_sessions.sql",
+	"00006_mfa_totp.sql",
 }
 
-const latestSchemaVersion = 5
+const latestSchemaVersion = 6
 
 func (w *schemaWorld) everyMigrationWasReported() error {
 	if !slices.Equal(w.lastOutcome.Applied, initialMigrations) {
@@ -140,13 +141,13 @@ func (w *schemaWorld) everyMigrationWasReported() error {
 	return nil
 }
 
-// dashboardTables est l'inventaire du §3.1 — douze tables, ni plus ni moins. Il est écrit ici en
+// dashboardTables est l'inventaire du §3.1 — treize tables, ni plus ni moins. Il est écrit ici en
 // toutes lettres plutôt que dérivé des fichiers de migration : une liste dérivée du SQL dirait
 // seulement que le SQL fait ce que le SQL dit.
 //
-// Les trois dernières ne venaient pas du §3.1, qui n'en déclarait que neuf : step-021 et step-022
-// l'ont **amendé**, chacune dans sa PR. Livrer une table que la spec ignore la rendrait invisible à
-// quiconque la relit.
+// Les quatre dernières ne venaient pas du §3.1, qui n'en déclarait que neuf : step-021, step-022 et
+// step-023 l'ont **amendé**, chacune dans sa PR. Livrer une table que la spec ignore la rendrait
+// invisible à quiconque la relit.
 var dashboardTables = []string{
 	"operators",
 	"permissions",
@@ -160,12 +161,13 @@ var dashboardTables = []string{
 	"mfa_challenges",
 	"login_attempt_counters",
 	"sessions",
+	"mfa_recovery_codes",
 }
 
 // dashboardTableCount est le plancher de l'inventaire ci-dessus. Il n'est pas décoratif : mesuré le
 // 02/08/2026, `dashboardTables = []string{}` laissait cette suite **verte** — le scénario « les neuf
 // tables existent » passait en n'ayant cherché aucune table.
-const dashboardTableCount = 12
+const dashboardTableCount = 13
 
 func (w *schemaWorld) everyTableExists(ctx context.Context) error {
 	if len(dashboardTables) != dashboardTableCount {
