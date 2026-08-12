@@ -102,6 +102,13 @@ func NormalizeRecoveryCode(presented string) string {
 // premier pas : là-bas l'écart porte sur trois HMAC-SHA1 et ne dit rien de plus que l'heure du
 // téléphone.
 //
+// **Aucune porte ne garde cette boucle, et ça a été vérifié plutôt que supposé** (critère 4) : mesuré
+// le 12/08/2026, remplacer `matched = index` par un `return index` laisse `internal/mfa`,
+// `internal/store`, `internal/bff` et les quarante-et-un scénarios **verts**. Ce qui manquerait pour
+// la garder serait un test de durée, que le dépôt écarte partout ailleurs pour la même raison —
+// instable en CI. Ce qui garde ces trois lignes est la revue, comme `hmac.Equal` en step-022 et
+// `subtle.ConstantTimeCompare` en step-021.
+//
 // **Un hachage illisible ne matche pas et n'est pas rapporté**, et c'est un manque assumé plutôt
 // qu'un oubli : aucun journal n'atteint encore ce paquet, comme dans `auth.passwordMatches`. Une
 // ligne abîmée est donc silencieuse, et son symptôme est un code de récupération légitime qui échoue.

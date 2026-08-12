@@ -135,7 +135,7 @@ qui restait à payer au bump n'avait effectivement pas grossi.
 - [x] step-020 — Seed auth : les 44 clés de permission et les 9 rôles par défaut, idempotent ¶
 - [x] step-021 — Login email/mot de passe (**argon2id**) + anti-brute-force partagé entre instances
 - [x] step-022 — Session BFF (cookie signé) + `/auth/me` + `/auth/logout`
-- [ ] step-023 — MFA TOTP : enrôlement, vérification, codes de récupération
+- [x] step-023 — MFA TOTP : enrôlement, vérification, codes de récupération
 - [ ] step-024 — MFA WebAuthn / passkey
 - [ ] step-025 — `RequirePermission` + journal d'audit + MFA obligatoire  *(invariant c)*
 - [ ] step-026 — DTO de sortie déclarés partout + test bloquant  *(invariant a, moitié structurelle)*
