@@ -147,6 +147,21 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 401
     Et le second facteur n'est pas encore vérifié
 
+  # Le challenge est à usage unique, et ce que ce scénario tient est que le **handler** le consomme —
+  # pas seulement que la requête SQL sache le faire. Le second code appartient au pas suivant, donc
+  # l'anti-rejeu le laisserait passer : ce qui refuse ici est le challenge déjà servi, et rien d'autre.
+  #
+  # Sans cette consommation, un challenge de cinq minutes vaudrait pour les douze heures de la session.
+  Scénario: un challenge déjà servi ne ressert pas
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Quand l'opérateur présente le code du pas courant
+    Alors le serveur répond 204
+    Quand l'opérateur présente le code du pas suivant
+    Alors le serveur répond 401
+
   # Le challenge dit « le mot de passe de **cet** opérateur vient d'être présenté ». Sans le contrôle
   # d'appartenance, il ne dirait plus que « un mot de passe vient d'être présenté quelque part », et
   # celui qui obtient un challenge — le sien, en se connectant — élèverait la session d'un autre avec
