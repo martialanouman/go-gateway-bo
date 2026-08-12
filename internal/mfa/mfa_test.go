@@ -20,6 +20,9 @@ const (
 	testOperatorID = "01900000-0000-7000-8000-000000000001"
 	testAccount    = "alice@exemple.test"
 	testStep       = 58_000_000
+	// canonicalChallenge a la forme d'un challenge émis par `auth.Login` : trente-deux octets en
+	// base64url sans remplissage.
+	canonicalChallenge = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 )
 
 func testAuthenticator(t *testing.T) *mfa.Authenticator {

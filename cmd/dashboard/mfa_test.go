@@ -66,6 +66,10 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur représente le même code$`, w.presentTheSameCodeAgain)
 	ctx.When(`^l'opérateur remplace son authentificateur en présentant son code$`,
 		w.replaceProvingTheCurrentCode)
+	ctx.When(`^l'opérateur présente un code qui n'est celui d'aucun authentificateur$`,
+		w.presentCodeWithoutEnrolment)
+	ctx.When(`^l'opérateur présente un code démesuré$`, w.presentOversizedCode)
+	ctx.When(`^l'opérateur présente une méthode que le contrat ne déclare pas$`, w.presentUnknownMethod)
 	ctx.Given(`^un second opérateur qui vient de se connecter$`, w.secondOperatorSignsIn)
 	ctx.When(`^l'opérateur présente son code sur le challenge du second opérateur$`,
 		w.presentOnTheOtherChallenge)
@@ -222,6 +226,24 @@ func (w *mfaWorld) presentWrongCodes(ctx context.Context, times int) error {
 	}
 
 	return nil
+}
+
+// presentCodeWithoutEnrolment présente un code de six chiffres sur un compte qui n'a rien enrôlé.
+// Ce que le scénario observe est que le refus est un **401** et non un 500 : sans la garde
+// `!state.Enrolled`, la vérification partirait déchiffrer une colonne vide.
+func (w *mfaWorld) presentCodeWithoutEnrolment() error {
+	return w.verify("totp", "123456")
+}
+
+// Les deux refus de forme. Le corps entier est déjà borné à huit kibioctets par le routeur : ce que
+// ces deux cas exercent est la borne du **champ**, redite en Go parce que rien ne valide une requête
+// contre le YAML à l'exécution.
+func (w *mfaWorld) presentOversizedCode() error {
+	return w.verify("totp", strings.Repeat("1", 5_000))
+}
+
+func (w *mfaWorld) presentUnknownMethod() error {
+	return w.verify("webauthn", "123456")
 }
 
 func (w *mfaWorld) presentFirstRecoveryCode() error {
@@ -401,15 +423,7 @@ func (w *mfaWorld) secondFactorIsNotVerified() error {
 // elevation interroge `/auth/me` **sans écraser** ce que le scénario venait d'observer : les pas qui
 // suivent portent encore sur la réponse du second facteur.
 func (w *mfaWorld) elevation() (bool, error) {
-	restored := w.login.process.received
-
-	if err := w.login.process.fetch("/api/auth/me"); err != nil {
-		return false, err
-	}
-
-	decoded, err := w.session.decode()
-	w.login.process.received = restored
-
+	decoded, err := w.currentOperator()
 	if err != nil {
 		return false, err
 	}
@@ -417,16 +431,38 @@ func (w *mfaWorld) elevation() (bool, error) {
 	return decoded.Elevated, nil
 }
 
-func (w *mfaWorld) recoveryCodesRemaining(expected int) error {
+// currentOperator relit `/auth/me` et **exige un 200**.
+//
+// Sans cette exigence, un corps d'erreur se démarshalait en zéros : « le second facteur n'est pas
+// encore vérifié » était donc vert sur *toute* réponse qui n'était pas un 200 disant `elevated:true` —
+// y compris « il n'y a plus de session » et « le serveur a cassé ». Mesuré en revue le 12/08/2026 :
+// c'est ce qui rendait invisible la garde « le challenge n'est pas consommé sur échec ».
+func (w *mfaWorld) currentOperator() (me, error) {
 	restored := w.login.process.received
 
 	if err := w.login.process.fetch("/api/auth/me"); err != nil {
-		return err
+		return me{}, err
 	}
+
+	status, body := w.login.process.received.status, w.login.process.received.body
 
 	decoded, err := w.session.decode()
 	w.login.process.received = restored
 
+	if err != nil {
+		return me{}, err
+	}
+
+	if status != 200 {
+		return me{}, fmt.Errorf("/auth/me a répondu %d : ce pas ne peut rien affirmer de la session\n%s",
+			status, body)
+	}
+
+	return decoded, nil
+}
+
+func (w *mfaWorld) recoveryCodesRemaining(expected int) error {
+	decoded, err := w.currentOperator()
 	if err != nil {
 		return err
 	}

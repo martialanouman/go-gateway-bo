@@ -122,10 +122,14 @@ func TestUneAutrePassphraseNeRelitRien(t *testing.T) {
 	require.ErrorAs(t, err, &unreadable)
 }
 
-// Le nonce est tiré à chaque chiffrement : deux chiffrés du même secret sous la même clé ne se
-// ressemblent pas. Un nonce constant sous GCM est la façon la plus courte de perdre la confidentialité
-// **et** l'authenticité.
-func TestDeuxChiffrementsDuMemeSecretDifferent(t *testing.T) {
+// Deux enrôlements ne produisent pas la même valeur stockée. **Ce test ne garde pas le nonce** — il
+// compare les chiffrés de deux secrets **différents**, ce qui est vrai quel que soit le nonce : mesuré
+// le 12/08/2026, douze zéros constants le laissaient vert. Le nonce est gardé par
+// `TestDeuxChiffrementsDuMemeSecretSousLaMemeCleDifferent`, qui vit dans le paquet parce que `seal`
+// n'est pas exporté.
+//
+// Ce qu'il garde, lui : que l'enrôlement tire bien un secret neuf à chaque fois.
+func TestDeuxEnrolementsNeStockentPasLaMemeValeur(t *testing.T) {
 	t.Parallel()
 
 	authenticator := testAuthenticator(t)

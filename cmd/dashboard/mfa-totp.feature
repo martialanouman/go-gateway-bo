@@ -173,6 +173,44 @@ Fonctionnalité: Le second facteur TOTP
     Quand l'opérateur présente le code du pas courant
     Alors le serveur répond 429
 
+  # **Le pendant du scénario ci-dessus, et il tient l'inverse** : le challenge n'est PAS consommé sur
+  # échec. Sans cette propriété, une faute de frappe obligerait à refaire toute la connexion — et une
+  # garde qui refuse du légitime finit retirée. Mesuré en revue : ajouter la consommation au chemin
+  # d'échec laissait tous les scénarios verts.
+  Scénario: une faute de frappe n'oblige pas à refaire la connexion
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Quand l'opérateur présente un code faux
+    Alors le serveur répond 401
+    Quand l'opérateur présente le code du pas courant
+    Alors le serveur répond 204
+    Et le second facteur est vérifié
+
+  # Sans cette garde, `Verify` partirait déchiffrer une colonne vide et rendrait 500 : une panne là où
+  # il n'y a qu'un compte à qui il reste à enrôler.
+  Scénario: présenter un code sans avoir enrôlé est refusé, pas une panne
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur présente un code qui n'est celui d'aucun authentificateur
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 401
+    Et le refus ne dit pas ce qui a été refusé
+
+  # Les bornes que le contrat déclare sont redites en Go, parce que rien dans ce dépôt ne valide une
+  # requête à l'exécution contre le YAML. Sans ces deux cas, les redire ne serait qu'un commentaire.
+  Scénario: une requête de second facteur mal formée est refusée sur sa forme
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur présente un code démesuré
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 400
+    Quand l'opérateur présente une méthode que le contrat ne déclare pas
+    Alors le serveur répond 400
+
   # Le challenge est à usage unique, et ce que ce scénario tient est que le **handler** le consomme —
   # pas seulement que la requête SQL sache le faire. Le second code appartient au pas suivant, donc
   # l'anti-rejeu le laisserait passer : ce qui refuse ici est le challenge déjà servi, et rien d'autre.

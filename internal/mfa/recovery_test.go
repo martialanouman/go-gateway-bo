@@ -82,20 +82,21 @@ func TestUnCodeEstAccepteQuelleQueSoitSaMiseEnForme(t *testing.T) {
 func TestLesConfusionsDeCrockfordSontResolues(t *testing.T) {
 	t.Parallel()
 
-	for name, presented := range map[string]string{
-		"I pour 1": "IJKMN-PQRST",
-		"L pour 1": "LJKMN-PQRST",
-		"O pour 0": "0JKMN-PQRSO",
+	for name, cas := range map[string]struct{ presented, expected string }{
+		"I pour 1": {"IJKMN-PQRST", "1JKMNPQRST"},
+		"L pour 1": {"LJKMN-PQRST", "1JKMNPQRST"},
+		"O pour 0": {"0JKMN-PQRSO", "0JKMNPQRS0"},
 	} {
+		presented, expected := cas.presented, cas.expected
+
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			normalized := mfa.NormalizeRecoveryCode(presented)
-
-			assert.NotContains(t, normalized, "I")
-			assert.NotContains(t, normalized, "L")
-			assert.NotContains(t, normalized, "O")
-			assert.Len(t, normalized, 10)
+			// **La correspondance, et pas seulement l'absence.** Une version précédente n'exigeait que
+			// « ni I, ni L, ni O » et une longueur de dix : mesuré le 12/08/2026, `I,L → 7` et `O → 9` la
+			// laissaient verte. Or ce que ces lettres deviennent est tout l'objet — un opérateur qui lit
+			// `1` et tape `I` doit entrer.
+			assert.Equal(t, expected, mfa.NormalizeRecoveryCode(presented))
 		})
 	}
 }
