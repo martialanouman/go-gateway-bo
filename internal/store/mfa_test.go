@@ -25,6 +25,20 @@ func mfaOn(t *testing.T) (*store.MFA, string) {
 	return store.NewMFA(pool), dsn
 }
 
+// enroll pose un second facteur pour le décor, et exige que l'écriture ait bien eu lieu. Sans cette
+// exigence, un `Enroll` qui rendrait `false` — c'est désormais possible, la garde du remplacement
+// vivant dans son `WHERE` — laisserait chaque cas suivant observer une base vide en croyant observer
+// un enrôlement.
+//
+// `replace` vaut toujours `true` ici : ces cas observent l'écriture, et la garde a son propre cas.
+func enroll(t *testing.T, m *store.MFA, operatorID, sealed string, hashes []string) {
+	t.Helper()
+
+	written, err := m.Enroll(t.Context(), operatorID, sealed, hashes, true)
+	require.NoError(t, err)
+	require.True(t, written, "l'enrôlement n'a rien écrit")
+}
+
 // issueChallenge pose un challenge vivant sans passer par le premier facteur : ce que ces cas
 // observent est sa consommation, pas son émission.
 func issueChallenge(t *testing.T, dsn, operatorID, token string) {
@@ -82,7 +96,7 @@ func TestUnOperateurDesactiveNaPlusDeSecondFacteurALire(t *testing.T) {
 	mfa, dsn := mfaOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.chiffré", []string{"hash-1"}))
+	enroll(t, mfa, operator, "v1.chiffré", []string{"hash-1"})
 
 	_, found, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
 	require.NoError(t, err)
@@ -104,7 +118,7 @@ func TestLEnrolementPoseLeSecretEtSesCodes(t *testing.T) {
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
 	hashes := []string{"hash-1", "hash-2", "hash-3"}
-	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.chiffré", hashes))
+	enroll(t, mfa, operator, "v1.chiffré", hashes)
 
 	state, found, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
 	require.NoError(t, err)
@@ -131,13 +145,42 @@ func TestUnReenrolementRemplaceLesCodesPrecedents(t *testing.T) {
 	mfa, dsn := mfaOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.premier", []string{"ancien-1", "ancien-2"}))
-	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.second", []string{"neuf-1"}))
+	enroll(t, mfa, operator, "v1.premier", []string{"ancien-1", "ancien-2"})
+	enroll(t, mfa, operator, "v1.second", []string{"neuf-1"})
 
 	codes, err := mfa.RecoveryCodesOf(t.Context(), operator)
 	require.NoError(t, err)
 	require.Len(t, codes, 1)
 	assert.Equal(t, "neuf-1", codes[0].Hash)
+}
+
+// **La garde du remplacement, et elle vit dans l'écriture.** L'appelant sait déjà s'il y a un facteur
+// en place, mais entre sa lecture et celle-ci il y a le tirage du secret et le hachage des codes — un
+// quart de seconde dont l'appelant choisit le cadencement. Un booléen lu avant ne garde rien.
+func TestUnEnrolementSansRemplacementNEcrasePasUnFacteurEnPlace(t *testing.T) {
+	t.Parallel()
+
+	mfa, dsn := mfaOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	// Le témoin : sur une base sans facteur, le même appel écrit. Sans lui, ce cas serait vert sur un
+	// `Enroll` qui n'écrirait jamais rien.
+	written, err := mfa.Enroll(t.Context(), operator, "v1.premier", []string{"ancien"}, false)
+	require.NoError(t, err)
+	require.True(t, written)
+
+	written, err = mfa.Enroll(t.Context(), operator, "v1.second", []string{"neuf"}, false)
+	require.NoError(t, err)
+	assert.False(t, written)
+
+	state, _, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
+	require.NoError(t, err)
+	assert.Equal(t, "v1.premier", state.SealedSecret, "le secret en place a été écrasé")
+
+	codes, err := mfa.RecoveryCodesOf(t.Context(), operator)
+	require.NoError(t, err)
+	require.Len(t, codes, 1)
+	assert.Equal(t, "ancien", codes[0].Hash, "les codes en place ont été détruits par un refus")
 }
 
 // L'anti-rejeu porte sur les codes d'un secret. Le précédent vient de disparaître, donc son dernier
@@ -149,13 +192,13 @@ func TestUnReenrolementRemetLAntiRejeuAZero(t *testing.T) {
 	mfa, dsn := mfaOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.premier", nil))
+	enroll(t, mfa, operator, "v1.premier", nil)
 
 	accepted, err := mfa.ConsumeStep(t.Context(), operator, 58_000_010)
 	require.NoError(t, err)
 	require.True(t, accepted)
 
-	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.second", nil))
+	enroll(t, mfa, operator, "v1.second", nil)
 
 	accepted, err = mfa.ConsumeStep(t.Context(), operator, 58_000_005)
 	require.NoError(t, err)
@@ -361,7 +404,7 @@ func TestUnCodeDeRecuperationConsommeDisparait(t *testing.T) {
 	mfa, dsn := mfaOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.chiffré", []string{"hash-1", "hash-2"}))
+	enroll(t, mfa, operator, "v1.chiffré", []string{"hash-1", "hash-2"})
 
 	codes, err := mfa.RecoveryCodesOf(t.Context(), operator)
 	require.NoError(t, err)
@@ -393,8 +436,8 @@ func TestLesFacteursRenduSontUnBooleenEtUnCompte(t *testing.T) {
 	assert.False(t, factors.TOTPEnrolled)
 	assert.Equal(t, 0, factors.RecoveryCodesRemaining)
 
-	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.chiffré",
-		[]string{"hash-1", "hash-2", "hash-3"}))
+	enroll(t, mfa, operator, "v1.chiffré",
+		[]string{"hash-1", "hash-2", "hash-3"})
 
 	factors, err = mfa.FactorsOf(t.Context(), operator)
 	require.NoError(t, err)

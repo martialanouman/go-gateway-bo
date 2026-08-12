@@ -117,47 +117,61 @@ func (m *MFA) ConsumeStep(ctx context.Context, operatorID string, step int64) (b
 	return tag.RowsAffected() > 0, nil
 }
 
-// Enroll pose le secret chiffré et **remplace** les codes de récupération.
+// Enroll pose le secret chiffré et **remplace** les codes de récupération. `false` dit qu'un second
+// facteur était déjà en place et que `replace` ne l'autorisait pas.
 //
 // En une transaction, parce que les trois écritures ne sont pas séparables : un secret neuf avec les
 // anciens codes laisserait entrer avec une liste que l'opérateur croit périmée, et des codes neufs
 // sans secret ne déverrouilleraient rien.
 //
+// **`replace` est appliqué dans le `WHERE`, et c'est là que la garde vit.** L'appelant sait déjà, en
+// entrant, si un facteur est en place — mais entre sa lecture et cette écriture il y a le tirage du
+// secret et le hachage des codes, soit un quart de seconde dont l'appelant choisit le cadencement.
+// Deux enrôlements concurrents lus tous deux « pas de facteur » écriraient tous deux, et le second
+// écraserait le premier en silence. `RowsAffected()` tranche à l'instant de l'écriture.
+//
 // `mfa_totp_last_step` est remis à zéro : l'anti-rejeu porte sur les codes d'un secret, et le
 // précédent vient de disparaître. Le garder pourrait refuser pendant une demi-minute le premier code
 // du secret neuf, si l'ancien avait été validé par un téléphone en avance.
-func (m *MFA) Enroll(ctx context.Context, operatorID, sealedSecret string, codeHashes []string) error {
+func (m *MFA) Enroll(ctx context.Context, operatorID, sealedSecret string, codeHashes []string,
+	replace bool,
+) (bool, error) {
 	tx, err := m.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
-		return fmt.Errorf("ouvrir la transaction d'enrôlement : %w", err)
+		return false, fmt.Errorf("ouvrir la transaction d'enrôlement : %w", err)
 	}
 
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 
-	_, err = tx.Exec(ctx, `
-		UPDATE operators SET mfa_totp_secret = $2, mfa_totp_last_step = NULL WHERE id = $1`,
-		operatorID, sealedSecret)
+	tag, err := tx.Exec(ctx, `
+		UPDATE operators SET mfa_totp_secret = $2, mfa_totp_last_step = NULL
+		WHERE id = $1 AND ($3 OR mfa_totp_secret IS NULL)`,
+		operatorID, sealedSecret, replace)
 	if err != nil {
-		return fmt.Errorf("écrire le secret de second facteur : %w", err)
+		return false, fmt.Errorf("écrire le secret de second facteur : %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return false, nil
 	}
 
 	if _, err = tx.Exec(ctx, `DELETE FROM mfa_recovery_codes WHERE operator_id = $1`, operatorID); err != nil {
-		return fmt.Errorf("retirer les anciens codes de récupération : %w", err)
+		return false, fmt.Errorf("retirer les anciens codes de récupération : %w", err)
 	}
 
 	for _, hash := range codeHashes {
 		_, err = tx.Exec(ctx,
 			`INSERT INTO mfa_recovery_codes (operator_id, code_hash) VALUES ($1, $2)`, operatorID, hash)
 		if err != nil {
-			return fmt.Errorf("écrire un code de récupération : %w", err)
+			return false, fmt.Errorf("écrire un code de récupération : %w", err)
 		}
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		return fmt.Errorf("valider l'enrôlement : %w", err)
+		return false, fmt.Errorf("valider l'enrôlement : %w", err)
 	}
 
-	return nil
+	return true, nil
 }
 
 // RecoveryCode est une ligne telle que la confrontation en a besoin : de quoi comparer, et de quoi
@@ -256,7 +270,7 @@ func (m *MFA) LiveChallenge(ctx context.Context, tokenHash []byte, maxFailures i
 }
 
 // RecordChallengeFailure compte un essai raté. C'est ce qui borne la recherche exhaustive d'un code à
-// six chiffres pendant les cinq minutes de vie du challenge, et le coût des dix argon2id que chaque
+// six chiffres pendant les cinq minutes de vie du challenge, et le coût des argon2id que chaque
 // essai du chemin de récupération fait payer au serveur.
 func (m *MFA) RecordChallengeFailure(ctx context.Context, id string) error {
 	const query = `UPDATE mfa_challenges SET failures = failures + 1 WHERE id = $1`

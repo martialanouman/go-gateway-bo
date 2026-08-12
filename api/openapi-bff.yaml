@@ -392,7 +392,7 @@ components:
           minLength: 43
         method:
           # Un discriminant explicite plutôt qu'un « essayer l'un puis l'autre » : essayer les deux
-          # ferait payer les dix argon2id du chemin de récupération à chaque code TOTP faux, et la
+          # ferait payer les argon2id du chemin de récupération à chaque code TOTP faux, et la
           # durée de la réponse dirait alors laquelle des deux voies a été prise.
           #
           # step-024 y ajoutera `webauthn`, avec le champ d'assertion qui va avec.
@@ -400,7 +400,8 @@ components:
           enum: [totp, recovery_code]
         code:
           # La borne haute vaut pour les deux méthodes : six chiffres d'un côté, onze caractères de
-          # l'autre. Elle n'est pas cosmétique — le chemin de récupération coûte dix argon2id, et un
+          # l'autre. Elle n'est pas cosmétique — le chemin de récupération coûte un argon2id par
+          # code restant, et un
           # corps sans borne en ferait une arme.
           type: string
           minLength: 1

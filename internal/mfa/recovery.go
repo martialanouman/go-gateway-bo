@@ -95,12 +95,17 @@ func NormalizeRecoveryCode(presented string) string {
 
 // MatchRecoveryCode rend l'index du code qui colle, ou `-1`.
 //
-// **Il parcourt les dix hachages jusqu'au bout, même après en avoir trouvé un qui colle.** Sortir au
+// **Il parcourt tous les hachages jusqu'au bout, même après en avoir trouvé un qui colle.** Sortir au
 // premier ferait de la durée de la réponse un indicateur du rang du code employé — vingt-six
-// millisecondes par hachage, donc un écart de deux cent soixante millisecondes entre le premier et le
-// dixième, largement au-dessus du bruit d'une requête. C'est l'inverse de `Verify`, qui sort au
+// millisecondes par hachage, donc jusqu'à deux cent soixante millisecondes d'écart entre le premier
+// et le dernier, largement au-dessus du bruit d'une requête. C'est l'inverse de `Verify`, qui sort au
 // premier pas : là-bas l'écart porte sur trois HMAC-SHA1 et ne dit rien de plus que l'heure du
 // téléphone.
+//
+// « Tous » et non « les dix » : chaque code consommé est **détruit**, donc la boucle rétrécit. La
+// durée trahit alors le nombre de codes restants — ce que `GET /auth/me` rend de toute façon au même
+// porteur de session, donc sans rien divulguer de neuf. Ce qui est protégé ici est *lequel* a servi,
+// et ça, la boucle le tient quelle que soit sa longueur.
 //
 // **Aucune porte ne garde cette boucle, et ça a été vérifié plutôt que supposé** (critère 4) : mesuré
 // le 12/08/2026, remplacer `matched = index` par un `return index` laisse `internal/mfa`,

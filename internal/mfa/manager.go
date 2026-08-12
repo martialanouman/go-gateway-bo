@@ -7,15 +7,24 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// MaxChallengeFailures borne les essais qu'un même challenge encaisse.
+// MaxChallengeFailures borne les essais qu'un même challenge encaisse. Cinq, comme le seuil du
+// premier facteur.
 //
-// Cinq, comme le seuil du premier facteur, et le calcul est le même à l'échelle près : le verrou de
-// connexion laisse cinq tentatives par quart d'heure, donc cinq challenges, donc vingt-cinq essais —
-// sur un espace de 10⁶ codes dont trois sont valables à la fois. Sans cette borne, les cinq minutes
-// de vie d'un challenge suffiraient à en essayer des dizaines de milliers.
+// **Elle ne borne PAS la recherche exhaustive d'un code à six chiffres, et une rédaction précédente
+// affirmait le contraire.** Elle déduisait « cinq tentatives de connexion par quart d'heure, donc
+// cinq challenges, donc vingt-cinq essais » du verrou de step-021. C'est faux, et la source le dit :
+// `RecordFailure` n'est appelé que depuis le chemin d'**échec** de `auth.Login`, et le chemin de
+// succès appelle `ClearFailures`. Une connexion réussie n'incrémente donc **aucun** des deux
+// compteurs. Qui détient le mot de passe mint autant de challenges qu'il veut, depuis une seule
+// adresse, sans qu'aucun verrou ne le voie.
 //
-// Elle borne aussi le **coût** du chemin de récupération, où chaque essai paie dix argon2id, soit
-// environ 260 ms et 64 MiB au serveur.
+// Ce que la borne tient réellement : elle empêche un **unique** challenge de servir des dizaines de
+// milliers d'essais pendant ses cinq minutes de vie, et elle borne le coût du chemin de récupération,
+// où chaque essai paie un argon2id par code restant — jusqu'à 260 ms et 64 MiB.
+//
+// Ce qu'il manque est un compteur d'échecs de second facteur **par opérateur**, dans une fenêtre
+// glissante, comme celui du premier facteur. Le manque est nommé dans la fiche de step-023 avec son
+// arithmétique ; il n'est pas comblé ici.
 const MaxChallengeFailures = 5
 
 // Manager compose l'authentificateur et le stockage, comme `session.Manager` compose le sceau du
@@ -45,19 +54,24 @@ func (m *Manager) Factors(ctx context.Context, operatorID string) (store.SecondF
 	return m.factors.FactorsOf(ctx, operatorID)
 }
 
-// Enroll tire un authentificateur, l'écrit, et rend ce qui n'est montré qu'une fois.
-func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string) (Enrollment, error) {
+// Enroll tire un authentificateur, l'écrit, et rend ce qui n'est montré qu'une fois. `false` dit
+// qu'un second facteur était déjà en place et que `replace` ne l'autorisait pas — la garde est
+// appliquée par l'écriture elle-même, voir `store.MFA.Enroll`.
+func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, replace bool) (Enrollment,
+	bool, error,
+) {
 	enrollment, err := m.authenticator.Enroll(operatorID, accountName)
 	if err != nil {
-		return Enrollment{}, err
+		return Enrollment{}, false, err
 	}
 
-	err = m.factors.Enroll(ctx, operatorID, enrollment.SealedSecret, enrollment.RecoveryCodeHashes)
-	if err != nil {
-		return Enrollment{}, err
+	written, err := m.factors.Enroll(ctx, operatorID, enrollment.SealedSecret,
+		enrollment.RecoveryCodeHashes, replace)
+	if err != nil || !written {
+		return Enrollment{}, false, err
 	}
 
-	return enrollment, nil
+	return enrollment, true, nil
 }
 
 // VerifyTOTP confronte un code à la fenêtre de dérive **puis** consomme le pas qui l'a validé.
@@ -79,7 +93,7 @@ func (m *Manager) VerifyTOTP(ctx context.Context, operatorID, code string) (bool
 	return m.factors.ConsumeStep(ctx, operatorID, step)
 }
 
-// VerifyRecoveryCode confronte le code aux dix hachages **puis** détruit celui qui a servi.
+// VerifyRecoveryCode confronte le code aux hachages restants **puis** détruit celui qui a servi.
 //
 // La suppression est le point de sérialisation : deux requêtes concurrentes portant le même code n'en
 // voient qu'une réussir.

@@ -9,7 +9,8 @@ import (
 
 // maximumCodeLength redit en Go la borne que le contrat déclare, pour la même raison que celles de
 // `Login` : rien dans ce dépôt ne valide une requête à l'exécution contre le YAML. Elle n'est pas
-// cosmétique — le chemin des codes de récupération paie dix argon2id, donc un champ sans borne en
+// cosmétique — le chemin des codes de récupération paie un argon2id par code restant, donc un champ
+// sans borne en
 // ferait une arme.
 const maximumCodeLength = 64
 
@@ -42,13 +43,22 @@ func (a API) EnrollTotp(ctx context.Context, _ EnrollTotpRequestObject) (EnrollT
 	// **La garde de la step.** Le premier enrôlement est libre — il faut bien pouvoir entrer une
 	// première fois. Le remplacer exige d'avoir franchi celui qui est en place, sans quoi quiconque
 	// détient le mot de passe contourne le second facteur en s'en attachant un autre.
+	//
+	// Ce `if` est un raccourci de **coût**, pas la garde : il évite le quart de seconde de hachage
+	// quand le refus est déjà certain. La garde, elle, est appliquée par l'écriture — sans quoi deux
+	// enrôlements concurrents la traverseraient tous les deux.
 	if state.Enrolled && !resolved.Elevated {
 		return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
 	}
 
-	enrollment, err := a.SecondFactor.Enroll(ctx, resolved.OperatorID, state.Email)
+	enrollment, written, err := a.SecondFactor.Enroll(ctx, resolved.OperatorID, state.Email,
+		resolved.Elevated)
 	if err != nil {
 		return nil, err
+	}
+
+	if !written {
+		return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
 	}
 
 	// Le DTO se compose champ par champ. `Enrollment` porte aussi le secret **chiffré** et les
@@ -146,7 +156,7 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 
 // verifyPresentedFactor aiguille sur la méthode déclarée plutôt que d'essayer les deux.
 //
-// Essayer les deux ferait payer les dix argon2id du chemin de récupération à chaque code TOTP faux,
+// Essayer les deux ferait payer les argon2id du chemin de récupération à chaque code TOTP faux,
 // et la durée de la réponse dirait alors laquelle des deux voies a répondu.
 func (a API) verifyPresentedFactor(ctx context.Context, operatorID string,
 	verification MfaVerification,
