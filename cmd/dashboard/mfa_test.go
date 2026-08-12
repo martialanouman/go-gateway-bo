@@ -12,6 +12,7 @@ import (
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/hotp"
 
+	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 )
 
@@ -28,7 +29,14 @@ type mfaWorld struct {
 	enrolled enrollment
 	// previousSecret sert au seul scénario du remplacement, qui doit constater que le secret a changé.
 	previousSecret string
+	// otherChallenge est celui d'un **autre** opérateur, que le scénario de l'appartenance présente sur
+	// sa propre session.
+	otherChallenge string
 }
+
+// secondOperatorEmail est l'adresse du comparse. Il n'a ni rôle ni second facteur : ce que le
+// scénario emprunte de lui est son challenge, rien de plus.
+const secondOperatorEmail = "martin.leroy@exemple.test"
 
 // enrollment est le corps de `POST /auth/mfa/totp/enroll`.
 type enrollment struct {
@@ -51,6 +59,9 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur présente un code faux$`, w.presentWrongCode)
 	ctx.When(`^l'opérateur présente (\d+) codes faux$`, w.presentWrongCodes)
 	ctx.When(`^l'opérateur présente son premier code de récupération$`, w.presentFirstRecoveryCode)
+	ctx.Given(`^un second opérateur qui vient de se connecter$`, w.secondOperatorSignsIn)
+	ctx.When(`^l'opérateur présente son code sur le challenge du second opérateur$`,
+		w.presentOnTheOtherChallenge)
 	ctx.Then(`^l'enrôlement rend l'URI, le secret et dix codes de récupération$`, w.enrollmentIsComplete)
 	ctx.Then(`^le secret rendu diffère du précédent$`, w.secretChanged)
 	ctx.Then(`^le second facteur est vérifié$`, w.secondFactorIsVerified)
@@ -174,13 +185,86 @@ func (w *mfaWorld) presentFirstRecoveryCode() error {
 	return w.verify("recovery_code", w.enrolled.RecoveryCodes[0])
 }
 
+// secondOperatorSignsIn pose un comparse et le connecte, pour mettre de côté **son** challenge.
+//
+// Le navigateur du harnais n'a qu'un jeu de cookies, comme un vrai : après ce pas il porte la session
+// du comparse, et c'est le scénario qui fait revenir le premier opérateur en le reconnectant. Ce que
+// ça reproduit est exactement l'attaque — deux comptes, deux challenges, et l'un présenté avec la
+// session de l'autre.
+func (w *mfaWorld) secondOperatorSignsIn(ctx context.Context) error {
+	hash, err := auth.Hash(scenarioPassword)
+	if err != nil {
+		return fmt.Errorf("hacher le mot de passe du second opérateur : %w", err)
+	}
+
+	conn, err := pgx.Connect(ctx, w.login.dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	_, err = conn.Exec(ctx,
+		`INSERT INTO operators (email, display_name, password_hash) VALUES ($1, $2, $3)`,
+		secondOperatorEmail, "Martin Leroy", hash)
+	if err != nil {
+		return fmt.Errorf("créer le second opérateur : %w", err)
+	}
+
+	if err = w.login.postCredentials(secondOperatorEmail, scenarioPassword); err != nil {
+		return err
+	}
+
+	if w.login.process.received.status != 200 {
+		return fmt.Errorf("le second opérateur n'a pas pu se connecter : %d",
+			w.login.process.received.status)
+	}
+
+	w.otherChallenge = w.login.challenge
+
+	return nil
+}
+
+// presentOnTheOtherChallenge présente un code **valide** — celui du pas courant, pour la session
+// courante — sur le challenge de quelqu'un d'autre. Un code faux ne prouverait rien : c'est
+// l'appartenance du challenge qui est en cause, pas le code.
+func (w *mfaWorld) presentOnTheOtherChallenge(ctx context.Context) error {
+	if w.otherChallenge == "" {
+		return errors.New("aucun challenge d'un autre opérateur : le scénario n'a rien à emprunter")
+	}
+
+	if w.otherChallenge == w.login.challenge {
+		return errors.New("le challenge emprunté est celui de la session courante : le scénario " +
+			"n'éprouverait pas l'appartenance")
+	}
+
+	step, err := w.currentStep(ctx)
+	if err != nil {
+		return err
+	}
+
+	code, err := hotp.GenerateCodeCustom(w.enrolled.Secret, uint64(step), hotp.ValidateOpts{
+		Digits:    otp.DigitsSix,
+		Algorithm: otp.AlgorithmSHA1,
+	})
+	if err != nil {
+		return fmt.Errorf("fabriquer le code du pas courant : %w", err)
+	}
+
+	return w.verifyOn(w.otherChallenge, "totp", code)
+}
+
 func (w *mfaWorld) verify(method, code string) error {
 	if w.login.challenge == "" {
 		return errors.New("aucun challenge en attente : la connexion n'en a pas émis")
 	}
 
+	return w.verifyOn(w.login.challenge, method, code)
+}
+
+func (w *mfaWorld) verifyOn(challenge, method, code string) error {
 	body, err := json.Marshal(map[string]string{
-		"challenge": w.login.challenge,
+		"challenge": challenge,
 		"method":    method,
 		"code":      code,
 	})

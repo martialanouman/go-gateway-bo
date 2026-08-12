@@ -147,6 +147,27 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 401
     Et le second facteur n'est pas encore vérifié
 
+  # Le challenge dit « le mot de passe de **cet** opérateur vient d'être présenté ». Sans le contrôle
+  # d'appartenance, il ne dirait plus que « un mot de passe vient d'être présenté quelque part », et
+  # celui qui obtient un challenge — le sien, en se connectant — élèverait la session d'un autre avec
+  # son propre code.
+  Scénario: le challenge d'un autre opérateur n'élève rien
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et un second opérateur qui vient de se connecter
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur présente son code sur le challenge du second opérateur
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 401
+    Et le second facteur n'est pas encore vérifié
+    # Le témoin : le même code, sur son propre challenge, ouvre. Sans lui, un serveur qui refuserait
+    # tout passerait ce scénario.
+    Quand l'opérateur présente le code du pas courant
+    Alors le serveur répond 204
+    Et le second facteur est vérifié
+
   Scénario: après l'enrôlement, plus aucune réponse ne porte le secret
     Étant donné une installation avec un opérateur
     Et un serveur démarré
