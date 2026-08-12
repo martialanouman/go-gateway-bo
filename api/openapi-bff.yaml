@@ -12,16 +12,17 @@
 #
 # Ce qui l'acquitte devant la porte anti-copie de `internal/gateway` est le **compte d'opérations
 # qu'il déclare en commun avec les contrats de la passerelle**, et rien d'autre. **Re-sondé le
-# 10/08/2026** à l'ajout de `GET /auth/me` et `POST /auth/logout`, en rejouant la mesure plutôt qu'en
-# la déduisant :
+# 12/08/2026** à l'ajout de `POST /auth/mfa/totp/enroll` et `POST /auth/mfa/verify`, en rejouant la
+# mesure plutôt qu'en la déduisant :
 #
 #   openapi-admin.yaml   0 signature sur 28  → sous le seuil
 #   openapi-public.yaml  1 signature sur 5   → sous le seuil
 #
-# Inchangé, et la raison est vérifiable : le dénominateur est l'échantillon **de la passerelle**, pas
-# le nombre d'opérations de ce fichier. La seule signature commune est `/health`, que le contrat
-# public déclare aussi ; `/auth/*` n'existe dans aucun des deux contrats amont, dont les opérations
-# sont toutes sous `/admin/…` ou parmi `/messages`, `/account`, `/health`.
+# Inchangé pour la troisième mesure d'affilée, et la raison est vérifiable : le dénominateur est
+# l'échantillon **de la passerelle**, pas le nombre d'opérations de ce fichier. La seule signature
+# commune est `/health`, que le contrat public déclare aussi ; `/auth/*` n'existe dans aucun des deux
+# contrats amont, dont les opérations sont toutes sous `/admin/…` ou parmi `/messages`, `/account`,
+# `/health`.
 #
 # Le seuil est la moitié. Deux versions successives de ce commentaire ont désigné une autre cause —
 # les chemins relatifs, puis l'absence de marque d'identité — et les deux étaient fausses : la marque
@@ -165,6 +166,94 @@ paths:
         '204':
           description: La session est fermée, qu'elle ait existé ou non.
 
+  /auth/mfa/totp/enroll:
+    post:
+      operationId: enrollTotp
+      summary: Enrôler une application d'authentification
+      description: |
+        Tire un secret TOTP, le chiffre au repos, et rend **une seule fois** de quoi le configurer :
+        l'URI `otpauth://` que l'écran dessinera en QR, le secret en clair pour la saisie manuelle, et
+        dix codes de récupération. Rien de tout cela n'est réaffichable ensuite — aucune action
+        « révéler » n'existe, et la seule sortie est un réenrôlement.
+
+        Le serveur rend l'**URI** et non une image : dessiner le QR appartient au client (step-028), et
+        l'inverse ferait dépendre le serveur d'une bibliothèque de rendu.
+
+        L'enrôlement n'élève pas la session : c'est `POST /auth/mfa/verify` qui le fait, avec le
+        premier code. Tant qu'il n'a pas eu lieu, la session reste au premier facteur.
+
+        **Deux chemins d'enrôlement et non un seul**, contrairement à ce que le §5.1 annonçait : la
+        cérémonie WebAuthn de step-024 rendra une forme entièrement différente, et les réunir sous une
+        opération obligerait à un `oneOf` de réponse dont le code engendré fait un type opaque. La
+        vérification, elle, rend le même 204 des deux côtés et reste une seule opération.
+      responses:
+        '200':
+          description: L'authentificateur est enrôlé ; voici ce qui ne sera plus jamais montré.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TotpEnrollment' }
+        '401':
+          description: |
+            Aucune session vivante. Un enrôlement anonyme permettrait d'attacher un authentificateur à
+            un compte qu'on ne détient pas.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            Un second facteur est déjà en place et la session n'a pas franchi le sien. Le remplacer
+            depuis une session de premier facteur reviendrait à le contourner : quiconque détient le
+            mot de passe s'en enrôlerait un neuf.
+
+            Le refus dit ce qu'il faut faire — franchir le second facteur en cours, ou passer par un
+            détenteur d'`operators:manage` s'il est perdu. Un contrôle qui refuse dit où s'arrête
+            l'accès.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/mfa/verify:
+    post:
+      operationId: verifyMfa
+      summary: Second facteur — code TOTP ou code de récupération
+      description: |
+        Vérifie le second facteur et **élève** la session ouverte par `POST /auth/login`. Le jeton de
+        session est régénéré au passage : sans cela, un cookie obtenu avant le second facteur resterait
+        valable après, ce qui est la fixation de session.
+
+        Il exige **les deux** : le cookie de session, qui dit de qui il s'agit, et le challenge rendu
+        par la connexion, qui dit que le mot de passe vient d'être présenté il y a moins de cinq
+        minutes. Aucun des deux ne dit ce que dit l'autre — sans le challenge, une session de premier
+        facteur volée resterait élevable pendant douze heures par qui obtient un code.
+
+        Le challenge n'est consommé qu'en cas de **succès** : une faute de frappe ne doit pas obliger à
+        refaire toute la connexion. Il compte en revanche ses échecs, et meurt au-delà d'un petit
+        nombre — c'est ce qui borne la recherche exhaustive d'un code à six chiffres.
+
+        Aucun corps en retour : ce que la session ouvre désormais se lit sur `GET /auth/me`, qui reste
+        le seul endroit d'où le client apprend ses droits.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MfaVerification' }
+      responses:
+        '204':
+          description: Le second facteur est vérifié ; la session est élevée.
+        '400':
+          description: La requête n'a pas la forme que la route attend.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: |
+            Le second facteur n'a pas été accepté. Le corps est le même que le code soit faux, déjà
+            servi, que le challenge soit inconnu, échu, consommé ou qu'il ait épuisé ses essais, ou
+            qu'aucune session ne vive : les distinguer dirait à une machine où elle en est.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
 components:
   schemas:
     Health:
@@ -229,9 +318,13 @@ components:
           type: array
           items: { type: string }
         elevated:
-          # Le second facteur a-t-il été vérifié dans cette session. Il ne l'est jamais à ce jalon —
-          # step-023 et step-024 apportent la vérification, step-025 ce qu'elle ouvre.
+          # Le second facteur a-t-il été vérifié dans cette session. `POST /auth/mfa/verify` le fait
+          # passer à `true` — et pour toute la durée de la session, sans seconde échéance : redemander
+          # un code au milieu d'une opération est ce qui fait desserrer une garde. step-025 exigera
+          # cet état pour toute écriture.
           type: boolean
+        secondFactors:
+          $ref: '#/components/schemas/SecondFactors'
         absoluteExpiresAt:
           # Le nom porte « absolute » parce que **la session meurt souvent avant** : elle expire aussi
           # après deux heures sans requête, et l'écart atteint dix heures dans le cas courant. Nommé
@@ -242,7 +335,77 @@ components:
           # déconnexion.
           type: string
           format: date-time
-      required: [operator, permissions, elevated, absoluteExpiresAt]
+      required: [operator, permissions, elevated, absoluteExpiresAt, secondFactors]
+
+    SecondFactors:
+      type: object
+      description: |
+        Ce que l'opérateur détient comme second facteur — jamais ce qu'il vaut. Un booléen et un
+        compte ne se rejouent pas, là où le secret et les codes eux-mêmes ne sont montrés qu'une fois,
+        à l'enrôlement.
+
+        C'est ce qui permet à l'écran de savoir s'il conduit à l'enrôlement ou au challenge, sans
+        essayer l'un pour découvrir qu'il fallait l'autre. step-024 y ajoutera le compte de passkeys.
+      additionalProperties: false
+      properties:
+        totp:
+          type: boolean
+        recoveryCodesRemaining:
+          # Le rappel que la fiche exige : dix codes remis, et l'opérateur doit voir fondre sa réserve
+          # avant qu'elle ne soit vide, pas au moment où elle l'est.
+          type: integer
+          minimum: 0
+      required: [totp, recoveryCodesRemaining]
+
+    TotpEnrollment:
+      type: object
+      description: |
+        Rendu **une seule fois**, à l'enrôlement. Aucune route ne le rend ensuite : le secret est
+        chiffré au repos et les codes sont hachés, donc le serveur lui-même ne saurait plus les
+        recomposer.
+      additionalProperties: false
+      properties:
+        secret:
+          # En base32, pour la saisie manuelle sur un poste sans caméra. C'est la même valeur que
+          # l'URI porte — deux valeurs différentes feraient qu'une des deux voies d'enrôlement
+          # marcherait et pas l'autre.
+          type: string
+        otpauthUri:
+          # `otpauth://totp/…`, avec ses quatre paramètres écrits plutôt que laissés au défaut.
+          # L'image est dessinée par le client (step-028) : le serveur ne dépend d'aucune
+          # bibliothèque de rendu.
+          type: string
+        recoveryCodes:
+          type: array
+          items: { type: string }
+      required: [secret, otpauthUri, recoveryCodes]
+
+    MfaVerification:
+      type: object
+      description: |
+        Ce que le formulaire du second facteur envoie. Le challenge vient de la réponse à
+        `POST /auth/login` ; le cookie de session, lui, voyage tout seul.
+      additionalProperties: false
+      properties:
+        challenge:
+          type: string
+          minLength: 43
+        method:
+          # Un discriminant explicite plutôt qu'un « essayer l'un puis l'autre » : essayer les deux
+          # ferait payer les dix argon2id du chemin de récupération à chaque code TOTP faux, et la
+          # durée de la réponse dirait alors laquelle des deux voies a été prise.
+          #
+          # step-024 y ajoutera `webauthn`, avec le champ d'assertion qui va avec.
+          type: string
+          enum: [totp, recovery_code]
+        code:
+          # La borne haute vaut pour les deux méthodes : six chiffres d'un côté, onze caractères de
+          # l'autre. Elle n'est pas cosmétique — le chemin de récupération coûte dix argon2id, et un
+          # corps sans borne en ferait une arme.
+          type: string
+          minLength: 1
+          maxLength: 64
+      required: [challenge, method, code]
 
     CurrentOperator:
       type: object

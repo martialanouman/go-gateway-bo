@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -169,9 +170,20 @@ func (a *Authenticator) challenge(ctx context.Context, emailKey, operatorID stri
 		return Verdict{}, fmt.Errorf("tirer le jeton du challenge : %w", err)
 	}
 
-	digest := sha256.Sum256(token)
+	// base64 URL, sans remplissage : ce jeton voyage dans un corps JSON, et les `+`, `/` et `=` s'y
+	// encodent mal.
+	challenge := base64.RawURLEncoding.EncodeToString(token)
 
-	expiresAt, err := a.logins.IssueChallenge(ctx, operatorID, digest[:], ChallengeTTL)
+	// L'empreinte est dérivée de la **valeur émise** et non du jeton brut, alors que les deux sont sous
+	// la main. Ce détour n'est pas décoratif : il fait passer l'émission par la fonction que la
+	// vérification emprunte, donc les deux ne peuvent pas diverger sur l'encodage. Écrit autrement, un
+	// changement de `RawURLEncoding` ici aurait laissé la recherche chercher une autre empreinte.
+	digest, ok := ChallengeDigest(challenge)
+	if !ok {
+		return Verdict{}, errChallengeEncoding
+	}
+
+	expiresAt, err := a.logins.IssueChallenge(ctx, operatorID, digest, ChallengeTTL)
 	if err != nil {
 		return Verdict{}, err
 	}
@@ -179,11 +191,35 @@ func (a *Authenticator) challenge(ctx context.Context, emailKey, operatorID stri
 	return Verdict{
 		Outcome:    OutcomeChallenged,
 		OperatorID: operatorID,
-		// base64 URL, sans remplissage : ce jeton voyagera dans un corps JSON aujourd'hui et
-		// possiblement dans une URL demain (step-023), et les `+`, `/` et `=` s'y encodent mal.
-		Challenge: base64.RawURLEncoding.EncodeToString(token),
-		ExpiresAt: expiresAt,
+		Challenge:  challenge,
+		ExpiresAt:  expiresAt,
 	}, nil
+}
+
+// errChallengeEncoding est inatteignable : la valeur vient d'être produite par le même encodeur que
+// `ChallengeDigest` relit. Elle existe parce que le langage n'en sait rien, et elle refuse plutôt
+// qu'elle n'émet un challenge dont l'empreinte serait fausse.
+var errChallengeEncoding = errors.New("le challenge émis ne se relit pas")
+
+// ChallengeDigest rend l'empreinte que la base porte pour ce challenge, ou `false` si la valeur
+// présentée n'a pas la forme d'un challenge émis ici.
+//
+// **C'est le seul endroit qui connaît l'encodage du challenge**, et les deux moitiés du format y
+// passent : `challenge` ci-dessus pour l'émettre, `internal/mfa` pour le vérifier. Les séparer ferait
+// qu'un changement d'encodage d'un côté serait relu de l'autre sans que rien ne le dise.
+//
+// `Strict()` refuse les bits de remplissage non nuls du dernier caractère : sans lui, quatre valeurs
+// distinctes décodent vers les mêmes octets, donc quatre challenges différents seraient acceptés pour
+// une seule ligne.
+func ChallengeDigest(presented string) ([]byte, bool) {
+	token, err := base64.RawURLEncoding.Strict().DecodeString(presented)
+	if err != nil || len(token) != challengeTokenBytes {
+		return nil, false
+	}
+
+	digest := sha256.Sum256(token)
+
+	return digest[:], true
 }
 
 // normalizeEmail produit la clé unique d'une adresse : espaces de bord retirés, minuscules.

@@ -29,6 +29,24 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// Defines values for MfaVerificationMethod.
+const (
+	MfaVerificationMethodRecoveryCode MfaVerificationMethod = "recovery_code"
+	MfaVerificationMethodTotp         MfaVerificationMethod = "totp"
+)
+
+// Valid indicates whether the value is a known member of the MfaVerificationMethod enum.
+func (e MfaVerificationMethod) Valid() bool {
+	switch e {
+	case MfaVerificationMethodRecoveryCode:
+		return true
+	case MfaVerificationMethodTotp:
+		return true
+	default:
+		return false
+	}
+}
+
 // CurrentOperator De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
 // `mfa_totp_secret`, ni les identifiants WebAuthn : le type de domaine du store ne traverse pas
 // cette frontière (§1.11), et `additionalProperties: false` fait refuser tout champ qu'un
@@ -72,6 +90,14 @@ type Me struct {
 	// serveur ajouterait par mégarde.
 	Operator    CurrentOperator `json:"operator"`
 	Permissions []string        `json:"permissions"`
+
+	// SecondFactors Ce que l'opérateur détient comme second facteur — jamais ce qu'il vaut. Un booléen et un
+	// compte ne se rejouent pas, là où le secret et les codes eux-mêmes ne sont montrés qu'une fois,
+	// à l'enrôlement.
+	//
+	// C'est ce qui permet à l'écran de savoir s'il conduit à l'enrôlement ou au challenge, sans
+	// essayer l'un pour découvrir qu'il fallait l'autre. step-024 y ajoutera le compte de passkeys.
+	SecondFactors SecondFactors `json:"secondFactors"`
 }
 
 // MfaChallenge Le challenge de second facteur. C'est un objet en base et non un jeton signé : il doit être
@@ -82,8 +108,42 @@ type MfaChallenge struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
+// MfaVerification Ce que le formulaire du second facteur envoie. Le challenge vient de la réponse à
+// `POST /auth/login` ; le cookie de session, lui, voyage tout seul.
+type MfaVerification struct {
+	Challenge string                `json:"challenge"`
+	Code      string                `json:"code"`
+	Method    MfaVerificationMethod `json:"method"`
+}
+
+// MfaVerificationMethod defines model for MfaVerification.Method.
+type MfaVerificationMethod string
+
+// SecondFactors Ce que l'opérateur détient comme second facteur — jamais ce qu'il vaut. Un booléen et un
+// compte ne se rejouent pas, là où le secret et les codes eux-mêmes ne sont montrés qu'une fois,
+// à l'enrôlement.
+//
+// C'est ce qui permet à l'écran de savoir s'il conduit à l'enrôlement ou au challenge, sans
+// essayer l'un pour découvrir qu'il fallait l'autre. step-024 y ajoutera le compte de passkeys.
+type SecondFactors struct {
+	RecoveryCodesRemaining int  `json:"recoveryCodesRemaining"`
+	Totp                   bool `json:"totp"`
+}
+
+// TotpEnrollment Rendu **une seule fois**, à l'enrôlement. Aucune route ne le rend ensuite : le secret est
+// chiffré au repos et les codes sont hachés, donc le serveur lui-même ne saurait plus les
+// recomposer.
+type TotpEnrollment struct {
+	OtpauthUri    string   `json:"otpauthUri"`
+	RecoveryCodes []string `json:"recoveryCodes"`
+	Secret        string   `json:"secret"`
+}
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// VerifyMfaJSONRequestBody defines body for VerifyMfa for application/json ContentType.
+type VerifyMfaJSONRequestBody = MfaVerification
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -96,6 +156,12 @@ type ServerInterface interface {
 	// Me L'opérateur connecté et ce qu'il a le droit de faire
 	// (GET /auth/me)
 	Me(w http.ResponseWriter, r *http.Request)
+	// EnrollTotp Enrôler une application d'authentification
+	// (POST /auth/mfa/totp/enroll)
+	EnrollTotp(w http.ResponseWriter, r *http.Request)
+	// VerifyMfa Second facteur — code TOTP ou code de récupération
+	// (POST /auth/mfa/verify)
+	VerifyMfa(w http.ResponseWriter, r *http.Request)
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
@@ -120,6 +186,18 @@ func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
 // Me L'opérateur connecté et ce qu'il a le droit de faire
 // (GET /auth/me)
 func (_ Unimplemented) Me(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// EnrollTotp Enrôler une application d'authentification
+// (POST /auth/mfa/totp/enroll)
+func (_ Unimplemented) EnrollTotp(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// VerifyMfa Second facteur — code TOTP ou code de récupération
+// (POST /auth/mfa/verify)
+func (_ Unimplemented) VerifyMfa(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -171,6 +249,34 @@ func (siw *ServerInterfaceWrapper) Me(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Me(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnrollTotp operation middleware
+func (siw *ServerInterfaceWrapper) EnrollTotp(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnrollTotp(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VerifyMfa operation middleware
+func (siw *ServerInterfaceWrapper) VerifyMfa(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyMfa(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -319,6 +425,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/logout", wrapper.Logout)
 	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/mfa/totp/enroll", wrapper.EnrollTotp)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/mfa/verify", wrapper.VerifyMfa)
+	})
 
 	return r
 }
@@ -445,6 +557,99 @@ func (response Me401JSONResponse) VisitMeResponse(w http.ResponseWriter) error {
 	return err
 }
 
+type EnrollTotpRequestObject struct {
+}
+
+type EnrollTotpResponseObject interface {
+	VisitEnrollTotpResponse(w http.ResponseWriter) error
+}
+
+type EnrollTotp200JSONResponse TotpEnrollment
+
+func (response EnrollTotp200JSONResponse) VisitEnrollTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrollTotp401JSONResponse Error
+
+func (response EnrollTotp401JSONResponse) VisitEnrollTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrollTotp409JSONResponse Error
+
+func (response EnrollTotp409JSONResponse) VisitEnrollTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyMfaRequestObject struct {
+	Body *VerifyMfaJSONRequestBody
+}
+
+type VerifyMfaResponseObject interface {
+	VisitVerifyMfaResponse(w http.ResponseWriter) error
+}
+
+type VerifyMfa204Response struct {
+}
+
+func (response VerifyMfa204Response) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type VerifyMfa400JSONResponse Error
+
+func (response VerifyMfa400JSONResponse) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyMfa401JSONResponse Error
+
+func (response VerifyMfa401JSONResponse) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type HealthRequestObject struct {
 }
 
@@ -477,6 +682,12 @@ type StrictServerInterface interface {
 	// Me L'opérateur connecté et ce qu'il a le droit de faire
 	// (GET /auth/me)
 	Me(ctx context.Context, request MeRequestObject) (MeResponseObject, error)
+	// EnrollTotp Enrôler une application d'authentification
+	// (POST /auth/mfa/totp/enroll)
+	EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (EnrollTotpResponseObject, error)
+	// VerifyMfa Second facteur — code TOTP ou code de récupération
+	// (POST /auth/mfa/verify)
+	VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (VerifyMfaResponseObject, error)
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -593,6 +804,61 @@ func (sh *strictHandler) Me(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(MeResponseObject); ok {
 		if err := validResponse.VisitMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnrollTotp operation middleware
+func (sh *strictHandler) EnrollTotp(w http.ResponseWriter, r *http.Request) {
+	var request EnrollTotpRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EnrollTotp(ctx, request.(EnrollTotpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EnrollTotp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EnrollTotpResponseObject); ok {
+		if err := validResponse.VisitEnrollTotpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// VerifyMfa operation middleware
+func (sh *strictHandler) VerifyMfa(w http.ResponseWriter, r *http.Request) {
+	var request VerifyMfaRequestObject
+
+	var body VerifyMfaJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyMfa(ctx, request.(VerifyMfaRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyMfa")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyMfaResponseObject); ok {
+		if err := validResponse.VisitVerifyMfaResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

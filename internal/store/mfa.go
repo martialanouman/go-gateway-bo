@@ -23,8 +23,11 @@ func NewMFA(pool *pgxpool.Pool) *MFA {
 	return &MFA{pool: pool}
 }
 
-// TOTPState est ce qu'une vérification a besoin de lire, en un seul aller-retour.
+// TOTPState est ce qu'une vérification et un enrôlement ont besoin de lire, en un seul aller-retour.
 type TOTPState struct {
+	// Email est ce que l'application d'authentification affichera comme nom de compte. Il vient de la
+	// même ligne que le reste : le lire ailleurs serait une seconde requête pour une seule colonne.
+	Email string
 	// SealedSecret est vide quand aucun authentificateur n'est enrôlé.
 	SealedSecret string
 	Enrolled     bool
@@ -35,11 +38,15 @@ type TOTPState struct {
 }
 
 // TOTPStateOf lit le secret chiffré et le pas de temps courant.
+//
+// `false` dit qu'aucun opérateur **actif** ne porte cet identifiant. Le distinguer d'un opérateur
+// sans enrôlement n'est pas une coquetterie : une session résolue puis un compte désactivé dans
+// l'intervalle ne doit pas se lire comme « il lui reste à enrôler un authentificateur ».
 func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds int) (TOTPState,
-	error,
+	bool, error,
 ) {
 	const query = `
-		SELECT coalesce(mfa_totp_secret, ''), mfa_totp_secret IS NOT NULL,
+		SELECT email, coalesce(mfa_totp_secret, ''), mfa_totp_secret IS NOT NULL,
 		       floor(extract(epoch FROM now()) / $2)::bigint
 		FROM operators
 		WHERE id = $1 AND status = $3`
@@ -47,17 +54,17 @@ func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds 
 	var state TOTPState
 
 	err := m.pool.QueryRow(ctx, query, operatorID, periodSeconds, StatusActive).
-		Scan(&state.SealedSecret, &state.Enrolled, &state.CurrentStep)
+		Scan(&state.Email, &state.SealedSecret, &state.Enrolled, &state.CurrentStep)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return TOTPState{}, nil
+		return TOTPState{}, false, nil
 	}
 
 	if err != nil {
-		return TOTPState{}, fmt.Errorf("lire le second facteur de l'opérateur : %w", err)
+		return TOTPState{}, false, fmt.Errorf("lire le second facteur de l'opérateur : %w", err)
 	}
 
-	return state, nil
+	return state, true, nil
 }
 
 // SecondFactors est ce que `GET /auth/me` rend de l'état du second facteur. Ni secret, ni code : un

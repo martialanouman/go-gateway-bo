@@ -42,8 +42,9 @@ func TestUnOperateurSansEnrolementNaPasDeSecondFacteur(t *testing.T) {
 	mfa, dsn := mfaOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	state, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
+	state, found, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
 	require.NoError(t, err)
+	require.True(t, found)
 
 	assert.False(t, state.Enrolled)
 	assert.Empty(t, state.SealedSecret)
@@ -59,8 +60,9 @@ func TestLePasCourantEstCeluiDeLHorlogeDeLaBase(t *testing.T) {
 	mfa, dsn := mfaOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	state, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
+	state, found, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
 	require.NoError(t, err)
+	require.True(t, found)
 
 	var expected int64
 
@@ -70,6 +72,10 @@ func TestLePasCourantEstCeluiDeLHorlogeDeLaBase(t *testing.T) {
 
 // Un compte désactivé ne rend aucun second facteur : le refus est passif, comme pour la session.
 // step-029 révoquera activement.
+//
+// L'absence est **distincte** de « pas encore enrôlé », et pas par coquetterie : une session résolue
+// puis un compte désactivé dans l'intervalle se lirait sinon comme « il lui reste à enrôler un
+// authentificateur », et l'enrôlement d'un compte désactivé lui rouvrirait la porte.
 func TestUnOperateurDesactiveNaPlusDeSecondFacteurALire(t *testing.T) {
 	t.Parallel()
 
@@ -77,11 +83,16 @@ func TestUnOperateurDesactiveNaPlusDeSecondFacteurALire(t *testing.T) {
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
 	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.chiffré", []string{"hash-1"}))
+
+	_, found, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
+	require.NoError(t, err)
+	require.True(t, found, "témoin : l'opérateur actif est bien lu")
+
 	execOn(t, dsn, `UPDATE operators SET status = 'disabled' WHERE id = $1`, operator)
 
-	state, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
+	_, found, err = mfa.TOTPStateOf(t.Context(), operator, testPeriod)
 	require.NoError(t, err)
-	assert.False(t, state.Enrolled)
+	assert.False(t, found)
 }
 
 // Le compte de codes appartient à `internal/mfa`, qui les tire ; ce que ce cas observe est que ce
@@ -95,10 +106,13 @@ func TestLEnrolementPoseLeSecretEtSesCodes(t *testing.T) {
 	hashes := []string{"hash-1", "hash-2", "hash-3"}
 	require.NoError(t, mfa.Enroll(t.Context(), operator, "v1.chiffré", hashes))
 
-	state, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
+	state, found, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
 	require.NoError(t, err)
+	require.True(t, found)
 	assert.True(t, state.Enrolled)
 	assert.Equal(t, "v1.chiffré", state.SealedSecret)
+	// L'adresse vient de la même ligne : c'est elle que l'application d'authentification affichera.
+	assert.Equal(t, "camille@exemple.test", state.Email)
 
 	codes, err := mfa.RecoveryCodesOf(t.Context(), operator)
 	require.NoError(t, err)

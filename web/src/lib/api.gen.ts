@@ -110,6 +110,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/mfa/totp/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrôler une application d'authentification
+         * @description Tire un secret TOTP, le chiffre au repos, et rend **une seule fois** de quoi le configurer :
+         *     l'URI `otpauth://` que l'écran dessinera en QR, le secret en clair pour la saisie manuelle, et
+         *     dix codes de récupération. Rien de tout cela n'est réaffichable ensuite — aucune action
+         *     « révéler » n'existe, et la seule sortie est un réenrôlement.
+         *
+         *     Le serveur rend l'**URI** et non une image : dessiner le QR appartient au client (step-028), et
+         *     l'inverse ferait dépendre le serveur d'une bibliothèque de rendu.
+         *
+         *     L'enrôlement n'élève pas la session : c'est `POST /auth/mfa/verify` qui le fait, avec le
+         *     premier code. Tant qu'il n'a pas eu lieu, la session reste au premier facteur.
+         *
+         *     **Deux chemins d'enrôlement et non un seul**, contrairement à ce que le §5.1 annonçait : la
+         *     cérémonie WebAuthn de step-024 rendra une forme entièrement différente, et les réunir sous une
+         *     opération obligerait à un `oneOf` de réponse dont le code engendré fait un type opaque. La
+         *     vérification, elle, rend le même 204 des deux côtés et reste une seule opération.
+         */
+        post: operations["enrollTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second facteur — code TOTP ou code de récupération
+         * @description Vérifie le second facteur et **élève** la session ouverte par `POST /auth/login`. Le jeton de
+         *     session est régénéré au passage : sans cela, un cookie obtenu avant le second facteur resterait
+         *     valable après, ce qui est la fixation de session.
+         *
+         *     Il exige **les deux** : le cookie de session, qui dit de qui il s'agit, et le challenge rendu
+         *     par la connexion, qui dit que le mot de passe vient d'être présenté il y a moins de cinq
+         *     minutes. Aucun des deux ne dit ce que dit l'autre — sans le challenge, une session de premier
+         *     facteur volée resterait élevable pendant douze heures par qui obtient un code.
+         *
+         *     Le challenge n'est consommé qu'en cas de **succès** : une faute de frappe ne doit pas obliger à
+         *     refaire toute la connexion. Il compte en revanche ses échecs, et meurt au-delà d'un petit
+         *     nombre — c'est ce qui borne la recherche exhaustive d'un code à six chiffres.
+         *
+         *     Aucun corps en retour : ce que la session ouvre désormais se lit sur `GET /auth/me`, qui reste
+         *     le seul endroit d'où le client apprend ses droits.
+         */
+        post: operations["verifyMfa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -139,8 +207,41 @@ export interface components {
             operator: components["schemas"]["CurrentOperator"];
             permissions: string[];
             elevated: boolean;
+            secondFactors: components["schemas"]["SecondFactors"];
             /** Format: date-time */
             absoluteExpiresAt: string;
+        };
+        /**
+         * @description Ce que l'opérateur détient comme second facteur — jamais ce qu'il vaut. Un booléen et un
+         *     compte ne se rejouent pas, là où le secret et les codes eux-mêmes ne sont montrés qu'une fois,
+         *     à l'enrôlement.
+         *
+         *     C'est ce qui permet à l'écran de savoir s'il conduit à l'enrôlement ou au challenge, sans
+         *     essayer l'un pour découvrir qu'il fallait l'autre. step-024 y ajoutera le compte de passkeys.
+         */
+        SecondFactors: {
+            totp: boolean;
+            recoveryCodesRemaining: number;
+        };
+        /**
+         * @description Rendu **une seule fois**, à l'enrôlement. Aucune route ne le rend ensuite : le secret est
+         *     chiffré au repos et les codes sont hachés, donc le serveur lui-même ne saurait plus les
+         *     recomposer.
+         */
+        TotpEnrollment: {
+            secret: string;
+            otpauthUri: string;
+            recoveryCodes: string[];
+        };
+        /**
+         * @description Ce que le formulaire du second facteur envoie. Le challenge vient de la réponse à
+         *     `POST /auth/login` ; le cookie de session, lui, voyage tout seul.
+         */
+        MfaVerification: {
+            challenge: string;
+            /** @enum {string} */
+            method: "totp" | "recovery_code";
+            code: string;
         };
         /**
          * @description De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
@@ -301,6 +402,99 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    enrollTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description L'authentificateur est enrôlé ; voici ce qui ne sera plus jamais montré. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpEnrollment"];
+                };
+            };
+            /**
+             * @description Aucune session vivante. Un enrôlement anonyme permettrait d'attacher un authentificateur à
+             *     un compte qu'on ne détient pas.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Un second facteur est déjà en place et la session n'a pas franchi le sien. Le remplacer
+             *     depuis une session de premier facteur reviendrait à le contourner : quiconque détient le
+             *     mot de passe s'en enrôlerait un neuf.
+             *
+             *     Le refus dit ce qu'il faut faire — franchir le second facteur en cours, ou passer par un
+             *     détenteur d'`operators:manage` s'il est perdu. Un contrôle qui refuse dit où s'arrête
+             *     l'accès.
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    verifyMfa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaVerification"];
+            };
+        };
+        responses: {
+            /** @description Le second facteur est vérifié ; la session est élevée. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description La requête n'a pas la forme que la route attend. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Le second facteur n'a pas été accepté. Le corps est le même que le code soit faux, déjà
+             *     servi, que le challenge soit inconnu, échu, consommé ou qu'il ait épuisé ses essais, ou
+             *     qu'aucune session ne vive : les distinguer dirait à une machine où elle en est.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };

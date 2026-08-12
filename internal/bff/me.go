@@ -32,6 +32,11 @@ func (a API) Me(ctx context.Context, _ MeRequestObject) (MeResponseObject, error
 		return nil, err
 	}
 
+	factors, err := secondFactorsOf(ctx, a.SecondFactor, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
 	return Me200JSONResponse{
 		Operator: CurrentOperator{
 			Id:          resolved.OperatorID,
@@ -40,6 +45,7 @@ func (a API) Me(ctx context.Context, _ MeRequestObject) (MeResponseObject, error
 		},
 		Permissions:       grants.Permissions,
 		Elevated:          resolved.Elevated,
+		SecondFactors:     factors,
 		AbsoluteExpiresAt: resolved.ExpiresAt,
 	}, nil
 }

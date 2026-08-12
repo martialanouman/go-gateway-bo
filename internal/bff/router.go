@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
+	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 )
 
@@ -35,6 +36,9 @@ type Dependencies struct {
 	Authenticator *auth.Authenticator
 	// Sessions ouvre, résout et ferme les sessions du tableau de bord.
 	Sessions *session.Manager
+	// SecondFactor enrôle et vérifie le second facteur, et porte la clé qui chiffre les secrets au
+	// repos. Comme les deux ci-dessus, il arrive déjà construit.
+	SecondFactor *mfa.Manager
 	// TrustedProxies alimente la dérivation de l'adresse cliente. Vide est une valeur sûre : voir
 	// `withClientAddress` et `internal/auth.ClientAddress`.
 	TrustedProxies []netip.Prefix
@@ -59,7 +63,11 @@ func NewRouter(deps Dependencies) http.Handler {
 		// fait que sur une requête déjà bornée et porteuse d'un cookie scellé.
 		api.Use(withSession(deps.Sessions))
 
-		mountContract(api, API{Authenticator: deps.Authenticator, Sessions: deps.Sessions})
+		mountContract(api, API{
+			Authenticator: deps.Authenticator,
+			Sessions:      deps.Sessions,
+			SecondFactor:  deps.SecondFactor,
+		})
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
