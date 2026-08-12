@@ -2,30 +2,30 @@ package mfa
 
 import (
 	"context"
+	"time"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// MaxChallengeFailures borne les essais qu'un même challenge encaisse. Cinq, comme le seuil du
-// premier facteur.
+// MaxFailures et LockWindow bornent les essais de second facteur d'un opérateur, **toutes connexions
+// confondues**. C'est la seule chose qui rende la recherche exhaustive d'un code à six chiffres
+// infaisable, et elle a manqué : le compteur du premier facteur ne borne rien ici, puisque
+// `RecordFailure` n'est appelé que sur le chemin d'échec de `auth.Login` et que le chemin de succès
+// appelle `ClearFailures`. Une connexion réussie n'incrémente donc aucun compteur, et qui détient le
+// mot de passe émet autant de challenges qu'il veut. L'arithmétique est dans la migration 00007.
 //
-// **Elle ne borne PAS la recherche exhaustive d'un code à six chiffres, et une rédaction précédente
-// affirmait le contraire.** Elle déduisait « cinq tentatives de connexion par quart d'heure, donc
-// cinq challenges, donc vingt-cinq essais » du verrou de step-021. C'est faux, et la source le dit :
-// `RecordFailure` n'est appelé que depuis le chemin d'**échec** de `auth.Login`, et le chemin de
-// succès appelle `ClearFailures`. Une connexion réussie n'incrémente donc **aucun** des deux
-// compteurs. Qui détient le mot de passe mint autant de challenges qu'il veut, depuis une seule
-// adresse, sans qu'aucun verrou ne le voie.
+// Les mêmes valeurs qu'au premier facteur, et pour les mêmes raisons : cinq parce qu'un opérateur qui
+// hésite entre deux téléphones ou tape à côté en consomme trois sans être un attaquant ; un quart
+// d'heure qui est **à la fois** la durée du verrou et la fenêtre d'oubli, sans quoi un verrou qui
+// vient d'expirer se refermerait au premier essai suivant.
 //
-// Ce que la borne tient réellement : elle empêche un **unique** challenge de servir des dizaines de
-// milliers d'essais pendant ses cinq minutes de vie, et elle borne le coût du chemin de récupération,
-// où chaque essai paie un argon2id par code restant — jusqu'à 260 ms et 64 MiB.
-//
-// Ce qu'il manque est un compteur d'échecs de second facteur **par opérateur**, dans une fenêtre
-// glissante, comme celui du premier facteur. Le manque est nommé dans la fiche de step-023 avec son
-// arithmétique ; il n'est pas comblé ici.
-const MaxChallengeFailures = 5
+// Ce qu'elles coûtent : cinq essais par quart d'heure, sur 10⁶ codes dont trois sont valables à la
+// fois. Une chance sur deux demanderait de l'ordre de quatre-vingts ans.
+const (
+	MaxFailures = 5
+	LockWindow  = 15 * time.Minute
+)
 
 // Manager compose l'authentificateur et le stockage, comme `session.Manager` compose le sceau du
 // cookie et sa table. Rien hors de ce paquet ne voit un secret déchiffré ni un code en clair — sauf
@@ -129,17 +129,28 @@ func (m *Manager) Challenge(ctx context.Context, presented string) (store.Pendin
 		return store.PendingChallenge{}, false, nil
 	}
 
-	return m.factors.LiveChallenge(ctx, digest, MaxChallengeFailures)
-}
-
-// FailChallenge compte un essai raté. Le challenge survit jusqu'au seuil : un opérateur qui s'est
-// trompé quatre fois doit encore pouvoir entrer, sinon la garde refuserait du légitime et finirait
-// retirée.
-func (m *Manager) FailChallenge(ctx context.Context, id string) error {
-	return m.factors.RecordChallengeFailure(ctx, id)
+	return m.factors.LiveChallenge(ctx, digest)
 }
 
 // ConsumeChallenge le marque servi, et une seule fois.
 func (m *Manager) ConsumeChallenge(ctx context.Context, id string) (bool, error) {
 	return m.factors.ConsumeChallenge(ctx, id)
+}
+
+// Lock rend le verrou d'essais qui pèse sur cet opérateur. L'appelant le consulte **avant** toute
+// dépense : sinon le verrou protégerait le compte sans protéger le serveur.
+func (m *Manager) Lock(ctx context.Context, operatorID string) (store.Lock, error) {
+	return m.factors.LockFor(ctx, operatorID, LockWindow, MaxFailures)
+}
+
+// Fail compte un essai raté et rend le verrou qui en résulte. Il annonce le verrou **à l'échec qui le
+// franchit**, plutôt que de rendre un refus nu et de surprendre à l'essai suivant : la charte exige
+// qu'un contrôle qui refuse dise jusqu'à quand.
+func (m *Manager) Fail(ctx context.Context, operatorID string) (store.Lock, error) {
+	return m.factors.RecordFailure(ctx, operatorID, LockWindow, MaxFailures)
+}
+
+// Succeed efface le compteur d'un opérateur qui vient de franchir son second facteur.
+func (m *Manager) Succeed(ctx context.Context, operatorID string) error {
+	return m.factors.ClearFailures(ctx, operatorID)
 }

@@ -112,45 +112,66 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 401
     Et il lui reste 9 codes de récupération
 
-  # Sans cette garde, quiconque détient le mot de passe contourne le second facteur en s'en attachant
-  # un neuf, et toute la step ne garde rien.
-  Scénario: remplacer un second facteur depuis une session non élevée est refusé
+  # **Le remplacement détruit ce qu'il remplace** — le secret en place et les dix codes de
+  # récupération partent ensemble. Il exige donc de présenter ce qu'on détruit, et ni le mot de passe
+  # ni un cookie de session élevée ne suffisent : sans cela, un cookie capté évincerait définitivement
+  # l'opérateur.
+  Scénario: remplacer son authentificateur sans le présenter est refusé
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
     Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
     Quand l'opérateur enrôle une application d'authentification
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 409
     Et le refus dit par où passer
     # L'enrôlement en place n'a pas bougé : un refus qui écraserait quand même le secret enfermerait
     # l'opérateur dehors, ce que le statut seul ne dirait pas.
-    Quand l'opérateur présente le code du pas courant
-    Alors le serveur répond 204
+    Et il lui reste 10 codes de récupération
 
   # Le témoin de la garde ci-dessus. Sans lui, un enrôlement qui refuserait **toujours** passerait le
   # scénario précédent — et l'opérateur qui change de téléphone n'aurait aucune sortie.
-  Scénario: une session élevée peut remplacer son second facteur
+  Scénario: remplacer son authentificateur en présentant son code réussit
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
     Et l'opérateur enrôle une application d'authentification
     Et l'opérateur présente le code du pas courant
-    Quand l'opérateur enrôle une application d'authentification
-    Alors le serveur répond 200
+    Quand l'opérateur remplace son authentificateur en présentant son code
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 200
     Et le secret rendu diffère du précédent
 
-  # Cinq minutes de challenge, six chiffres de code, trois pas valables à la fois : sans compteur, la
-  # recherche exhaustive n'est bornée par rien.
-  Scénario: cinq codes faux tuent le challenge, et le bon code qui suit ne rouvre rien
+  # Six chiffres de code, trois pas valables à la fois : sans compteur, la recherche exhaustive n'est
+  # bornée par rien. Et le compteur du **premier** facteur n'y suffit pas — une connexion réussie
+  # n'incrémente rien, donc qui détient le mot de passe émet autant de challenges qu'il veut.
+  Scénario: cinq codes faux verrouillent le second facteur, et le bon code qui suit ne rouvre rien
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
     Et l'opérateur enrôle une application d'authentification
     Quand l'opérateur présente 5 codes faux
-    Et l'opérateur présente le code du pas courant
-    Alors le serveur répond 401
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 429
+    Et la réponse porte l'en-tête "Retry-After"
+    Et le message annonce la durée restante
+    Quand l'opérateur présente le code du pas courant
+    Alors le serveur répond 429
     Et le second facteur n'est pas encore vérifié
+
+  # Le verrou porte sur l'opérateur et pas sur la connexion : se reconnecter ne le lève pas. Sans quoi
+  # il ne bornerait rien — c'est exactement le trou que le compteur du premier facteur laissait.
+  Scénario: se reconnecter ne lève pas le verrou du second facteur
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente 5 codes faux
+    Quand l'opérateur se connecte avec son mot de passe
+    Alors le serveur répond 200
+    Quand l'opérateur présente le code du pas courant
+    Alors le serveur répond 429
 
   # Le challenge est à usage unique, et ce que ce scénario tient est que le **handler** le consomme —
   # pas seulement que la requête SQL sache le faire. Le second code appartient au pas suivant, donc

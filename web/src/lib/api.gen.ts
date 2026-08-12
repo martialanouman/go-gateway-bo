@@ -132,6 +132,12 @@ export interface paths {
          *     L'enrôlement n'élève pas la session : c'est `POST /auth/mfa/verify` qui le fait, avec le
          *     premier code. Tant qu'il n'a pas eu lieu, la session reste au premier facteur.
          *
+         *     **Remplacer un authentificateur exige de présenter celui qu'on remplace.** Sans cette
+         *     exigence, le geste qui détruit un facteur serait protégé moins que celui qui l'utilise : le
+         *     seul rempart serait le bit d'élévation, qui vaut douze heures, donc un cookie capté suffirait
+         *     à évincer définitivement l'opérateur — le secret et les dix codes de récupération partent
+         *     ensemble.
+         *
          *     **Deux chemins d'enrôlement et non un seul**, contrairement à ce que le §5.1 annonçait : la
          *     cérémonie WebAuthn de step-024 rendra une forme entièrement différente, et les réunir sous une
          *     opération obligerait à un `oneOf` de réponse dont le code engendré fait un type opaque. La
@@ -165,8 +171,13 @@ export interface paths {
          *     facteur volée resterait élevable pendant douze heures par qui obtient un code.
          *
          *     Le challenge n'est consommé qu'en cas de **succès** : une faute de frappe ne doit pas obliger à
-         *     refaire toute la connexion. Il compte en revanche ses échecs, et meurt au-delà d'un petit
-         *     nombre — c'est ce qui borne la recherche exhaustive d'un code à six chiffres.
+         *     refaire toute la connexion. Il compte en revanche ses échecs et meurt au-delà d'un petit
+         *     nombre, ce qui borne ce qu'un seul challenge peut servir.
+         *
+         *     Ce qui borne la recherche exhaustive d'un code à six chiffres est **un second compteur, par
+         *     opérateur**, toutes connexions confondues : le premier ne suffirait pas, puisqu'une connexion
+         *     réussie n'incrémente aucun compteur et que qui détient le mot de passe émet donc autant de
+         *     challenges qu'il veut. Son franchissement rend un 429.
          *
          *     Aucun corps en retour : ce que la session ouvre désormais se lit sur `GET /auth/me`, qui reste
          *     le seul endroit d'où le client apprend ses droits.
@@ -222,6 +233,29 @@ export interface components {
         SecondFactors: {
             totp: boolean;
             recoveryCodesRemaining: number;
+        };
+        /**
+         * @description Ce qu'un enrôlement présente : **rien** la première fois, et une preuve du facteur en place
+         *     pour le remplacer.
+         *
+         *     Le premier enrôlement n'a rien à prouver — il n'y a pas encore de facteur, et la session de
+         *     premier facteur dit déjà de qui il s'agit. Le remplacement, lui, **détruit** l'authentificateur
+         *     en place et ses dix codes de récupération : il exige donc de présenter ce qu'on détruit.
+         *
+         *     **Pourquoi un code et non un challenge frais**, alors que le challenge est ce que la
+         *     vérification exige : se reconnecter pour en obtenir un ferme la session présentée et la
+         *     désélève — c'est la remédiation de step-022 — donc un remplacement exigeant à la fois
+         *     l'élévation et un challenge frais serait **inatteignable**. Mesuré : le scénario qui l'exerçait
+         *     rendait 409 en boucle. Un code du facteur en place est par ailleurs une preuve plus forte que
+         *     le mot de passe : un cookie de session élevée capté ne le donne pas.
+         *
+         *     Un code de récupération convient aussi. L'opérateur qui a perdu son téléphone est précisément
+         *     celui qui veut réenrôler, et n'exiger qu'un code TOTP en ferait une impasse.
+         */
+        TotpEnrollmentRequest: {
+            /** @enum {string} */
+            method?: "totp" | "recovery_code";
+            code?: string;
         };
         /**
          * @description Rendu **une seule fois**, à l'enrôlement. Aucune route ne le rend ensuite : le secret est
@@ -412,7 +446,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpEnrollmentRequest"];
+            };
+        };
         responses: {
             /** @description L'authentificateur est enrôlé ; voici ce qui ne sera plus jamais montré. */
             200: {
@@ -423,9 +461,18 @@ export interface operations {
                     "application/json": components["schemas"]["TotpEnrollment"];
                 };
             };
+            /** @description La requête n'a pas la forme que la route attend. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /**
-             * @description Aucune session vivante. Un enrôlement anonyme permettrait d'attacher un authentificateur à
-             *     un compte qu'on ne détient pas.
+             * @description Aucune session vivante. Un enrôlement anonyme permettrait d'attacher un authentificateur
+             *     à un compte qu'on ne détient pas.
              */
             401: {
                 headers: {
@@ -436,13 +483,15 @@ export interface operations {
                 };
             };
             /**
-             * @description Un second facteur est déjà en place et la session n'a pas franchi le sien. Le remplacer
-             *     depuis une session de premier facteur reviendrait à le contourner : quiconque détient le
-             *     mot de passe s'en enrôlerait un neuf.
+             * @description Un second facteur est déjà en place, et rien n'a été présenté qui le prouve — ou ce qui a
+             *     été présenté n'a pas été accepté. Le remplacer sans cette preuve reviendrait à le
+             *     contourner : quiconque détient le mot de passe, ou un cookie de session élevée, s'en
+             *     enrôlerait un neuf et évincerait l'opérateur.
              *
-             *     Le refus dit ce qu'il faut faire — franchir le second facteur en cours, ou passer par un
-             *     détenteur d'`operators:manage` s'il est perdu. Un contrôle qui refuse dit où s'arrête
-             *     l'accès.
+             *     Le refus dit ce qu'il faut faire — présenter un code de l'authentificateur en place, ou
+             *     l'un des codes de récupération. Si les deux sont perdus, la sortie est la réinitialisation
+             *     par un administrateur, que la gestion des opérateurs apportera : elle n'existe pas encore,
+             *     et le message ne prétend pas le contraire.
              */
             409: {
                 headers: {
@@ -484,12 +533,31 @@ export interface operations {
                 };
             };
             /**
-             * @description Le second facteur n'a pas été accepté. Le corps est le même que le code soit faux, déjà
-             *     servi, que le challenge soit inconnu, échu, consommé ou qu'il ait épuisé ses essais, ou
-             *     qu'aucune session ne vive : les distinguer dirait à une machine où elle en est.
+             * @description Le second facteur n'a pas été accepté. Le corps est le même que le code soit faux ou déjà
+             *     servi, que le challenge soit inconnu, échu, consommé, épuisé, ou qu'il appartienne à un
+             *     autre opérateur, qu'aucune session ne vive, ou qu'elle soit morte entre-temps : les
+             *     distinguer dirait à une machine où elle en est.
              */
             401: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Trop d'essais de second facteur sur ce compte. Le message porte la durée restante, comme
+             *     celui de la connexion : un refus muet ferait retenter l'opérateur, puis ouvrir un ticket.
+             *
+             *     Il se distingue du 401, et c'est délibéré : ce qu'il révèle — « le seuil est atteint » —
+             *     est ce que l'attaquant constate de toute façon en étant refusé, et le taire priverait
+             *     l'opérateur légitime de la seule information qui lui dise quoi faire.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
                     [name: string]: unknown;
                 };
                 content: {

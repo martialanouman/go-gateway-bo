@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -227,6 +228,105 @@ func (m *MFA) ConsumeRecoveryCode(ctx context.Context, id string) (bool, error) 
 	return tag.RowsAffected() > 0, nil
 }
 
+// LockFor rend le verrou d'essais de second facteur qui pèse sur cet opérateur.
+//
+// **C'est ce qui borne la recherche exhaustive d'un code à six chiffres**, et le compteur par
+// challenge ne le fait pas : une connexion réussie n'incrémente rien, donc qui détient le mot de
+// passe émet autant de challenges qu'il veut. La raison longue est dans la migration 00007.
+//
+// Il est consulté **avant** toute dépense — avant le déchiffrement du secret, avant les argon2id du
+// chemin de récupération — pour la même raison qu'au premier facteur : sinon le verrou protégerait le
+// compte sans protéger le serveur.
+func (m *MFA) LockFor(ctx context.Context, operatorID string, window time.Duration,
+	threshold int,
+) (Lock, error) {
+	const query = `
+		SELECT scope, failures,
+		       EXTRACT(EPOCH FROM (last_failure_at + make_interval(secs => $2) - now()))
+		FROM login_attempt_counters
+		WHERE scope = $3 AND subject = $1
+		  AND failures >= $4
+		  AND last_failure_at + make_interval(secs => $2) > now()`
+
+	var (
+		lock    Lock
+		seconds float64
+	)
+
+	err := m.pool.QueryRow(ctx, query, operatorID, window.Seconds(), ScopeSecondFactor, threshold).
+		Scan(&lock.Scope, &lock.Failures, &seconds)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Lock{}, nil
+	}
+
+	if err != nil {
+		return Lock{}, fmt.Errorf("lire le verrou de second facteur : %w", err)
+	}
+
+	lock.Remaining = time.Duration(seconds * float64(time.Second))
+
+	return lock, nil
+}
+
+// RecordFailure compte un échec de second facteur et rend le verrou qui en résulte.
+//
+// Une seule instruction, comme celle du premier facteur et pour la même raison : `c` désigne dans
+// `DO UPDATE` la ligne telle que PostgreSQL la relit après avoir pris son verrou de ligne, donc deux
+// instances qui entrent ensemble sur une ligne à trois échecs sortent à quatre puis cinq, jamais à
+// quatre et quatre.
+func (m *MFA) RecordFailure(ctx context.Context, operatorID string, window time.Duration,
+	threshold int,
+) (Lock, error) {
+	const query = `
+		INSERT INTO login_attempt_counters AS c (scope, subject, failures, last_failure_at)
+		VALUES ($3, $1, 1, now())
+		ON CONFLICT (scope, subject) DO UPDATE
+		SET failures = CASE
+		        WHEN c.last_failure_at + make_interval(secs => $2) <= now() THEN 1
+		        ELSE c.failures + 1
+		    END,
+		    last_failure_at = now()
+		RETURNING scope, failures,
+		          EXTRACT(EPOCH FROM (last_failure_at + make_interval(secs => $2) - now()))`
+
+	var (
+		lock    Lock
+		seconds float64
+	)
+
+	err := m.pool.QueryRow(ctx, query, operatorID, window.Seconds(), ScopeSecondFactor).
+		Scan(&lock.Scope, &lock.Failures, &seconds)
+	if err != nil {
+		return Lock{}, fmt.Errorf("compter l'échec de second facteur : %w", err)
+	}
+
+	if lock.Failures < threshold {
+		return Lock{}, nil
+	}
+
+	lock.Remaining = time.Duration(seconds * float64(time.Second))
+
+	return lock, nil
+}
+
+// ClearFailures efface le compteur après un second facteur franchi.
+//
+// **Il n'y a pas ici la dissymétrie du premier facteur**, qui n'efface que le compteur d'adresse et
+// laisse celui de la source s'éteindre tout seul : là-bas, effacer la source aurait laissé quiconque
+// détient un compte valide annuler la seconde dimension pour tout le monde. Ici la dimension est
+// l'opérateur lui-même, et celui qui vient de franchir son second facteur est précisément celui à qui
+// le compteur était destiné.
+func (m *MFA) ClearFailures(ctx context.Context, operatorID string) error {
+	const query = `DELETE FROM login_attempt_counters WHERE scope = $2 AND subject = $1`
+
+	if _, err := m.pool.Exec(ctx, query, operatorID, ScopeSecondFactor); err != nil {
+		return fmt.Errorf("effacer le compteur de second facteur : %w", err)
+	}
+
+	return nil
+}
+
 // PendingChallenge est un challenge de second facteur encore utilisable.
 type PendingChallenge struct {
 	ID string
@@ -242,21 +342,17 @@ type PendingChallenge struct {
 // donnent la même réponse.
 //
 // Il **ne consomme rien** : une faute de frappe ne doit pas obliger à refaire toute la connexion.
-func (m *MFA) LiveChallenge(ctx context.Context, tokenHash []byte, maxFailures int) (PendingChallenge,
-	bool, error,
-) {
+func (m *MFA) LiveChallenge(ctx context.Context, tokenHash []byte) (PendingChallenge, bool, error) {
 	const query = `
 		SELECT id::text, operator_id::text
 		FROM mfa_challenges
 		WHERE token_hash = $1
 		  AND consumed_at IS NULL
-		  AND now() < expires_at
-		  AND failures < $2`
+		  AND now() < expires_at`
 
 	var challenge PendingChallenge
 
-	err := m.pool.QueryRow(ctx, query, tokenHash, maxFailures).
-		Scan(&challenge.ID, &challenge.OperatorID)
+	err := m.pool.QueryRow(ctx, query, tokenHash).Scan(&challenge.ID, &challenge.OperatorID)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return PendingChallenge{}, false, nil
@@ -267,19 +363,6 @@ func (m *MFA) LiveChallenge(ctx context.Context, tokenHash []byte, maxFailures i
 	}
 
 	return challenge, true, nil
-}
-
-// RecordChallengeFailure compte un essai raté. C'est ce qui borne la recherche exhaustive d'un code à
-// six chiffres pendant les cinq minutes de vie du challenge, et le coût des argon2id que chaque
-// essai du chemin de récupération fait payer au serveur.
-func (m *MFA) RecordChallengeFailure(ctx context.Context, id string) error {
-	const query = `UPDATE mfa_challenges SET failures = failures + 1 WHERE id = $1`
-
-	if _, err := m.pool.Exec(ctx, query, id); err != nil {
-		return fmt.Errorf("compter l'échec de second facteur : %w", err)
-	}
-
-	return nil
 }
 
 // ConsumeChallenge marque le challenge servi, et **une seule fois** : `consumed_at IS NULL` dans le

@@ -75,7 +75,10 @@ const seedSQL = `
 	VALUES ('` + seedOperator + `', '\\x01'::bytea, now() + interval '12 hours');
 
 	INSERT INTO mfa_recovery_codes (operator_id, code_hash)
-	VALUES ('` + seedOperator + `', '$argon2id$v=19$m=65536,t=3,p=4$c2Vsc2Vsc2Vsc2Vsc2Vs$aGFzaA');`
+	VALUES ('` + seedOperator + `', '$argon2id$v=19$m=65536,t=3,p=4$c2Vsc2Vsc2Vsc2Vsc2Vs$aGFzaA');
+
+	INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
+	VALUES ('mfa', '` + seedOperator + `', 1, now());`
 
 func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 	t.Parallel()
@@ -109,10 +112,11 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			sqlstate: uniqueViolation,
 		},
 		{
-			// Les deux dimensions comptées sont fermées par le schéma. Une troisième valeur écrite par
-			// erreur ne serait comptée par rien et ne verrouillerait rien : le refus est le seul
-			// symptôme possible.
-			name: "un compteur d'échecs ne connaît que deux dimensions",
+			// Les trois dimensions comptées sont fermées par le schéma — la troisième, `mfa`, est
+			// posée par le décor ci-dessus, donc une contrainte trop serrée tomberait là. Une quatrième
+			// valeur écrite par erreur ne serait comptée par rien et ne verrouillerait rien : le refus
+			// est le seul symptôme possible.
+			name: "un compteur d'échecs ne connaît que ses trois dimensions",
 			act: `INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
 				VALUES ('empreinte', 'x', 1, now())`,
 			sqlstate: checkViolation,
@@ -133,16 +137,6 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			name: "un challenge n'expire pas avant d'avoir été émis",
 			act: `INSERT INTO mfa_challenges (operator_id, token_hash, created_at, expires_at)
 				VALUES ('` + seedOperator + `', '\\x00'::bytea, now(), now() - interval '1 second')`,
-			sqlstate: checkViolation,
-		},
-		{
-			// Inatteignable depuis le produit — le compteur n'est qu'incrémenté. La contrainte garde
-			// contre la step qui le remettrait à zéro sur un succès partiel : un compteur passé sous
-			// zéro rendrait le seuil inatteignable, donc les essais de second facteur illimités, sans
-			// erreur et sans symptôme.
-			name: "le compteur d'échecs d'un challenge ne descend pas sous zéro",
-			act: `INSERT INTO mfa_challenges (operator_id, token_hash, expires_at, failures)
-				VALUES ('` + seedOperator + `', '\\x03'::bytea, now() + interval '5 minutes', -1)`,
 			sqlstate: checkViolation,
 		},
 		{

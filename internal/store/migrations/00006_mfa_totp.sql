@@ -22,22 +22,6 @@
 -- cette colonne à deux échelles différentes.
 ALTER TABLE operators ADD COLUMN mfa_totp_last_step bigint;
 
--- Les échecs de second facteur essuyés par ce challenge. Au-delà du seuil que le code applique, le
--- challenge est mort et il faut reprendre la connexion.
---
--- **Le seuil vit dans le code et non ici**, comme la fenêtre glissante des sessions : l'écrire dans
--- une contrainte obligerait une migration pour le changer. Ce que le schéma tient est que le compteur
--- ne descende pas sous zéro — sans quoi le seuil deviendrait inatteignable, sans erreur et sans
--- symptôme.
---
--- Pourquoi cette borne existe : le challenge vit cinq minutes, un code TOTP fait six chiffres, et
--- trois codes sont valables à la fois. Sans compteur, un attaquant qui détient déjà le mot de passe
--- dispose de cinq minutes d'essais illimités sur un espace de 10⁶ — et fait payer au serveur dix
--- argon2id par essai s'il vise le chemin des codes de récupération.
-ALTER TABLE mfa_challenges
-    ADD COLUMN failures integer NOT NULL DEFAULT 0
-        CONSTRAINT mfa_challenges_failures_not_negative CHECK (failures >= 0);
-
 -- Les codes de récupération : le chemin de sortie du jour où le téléphone est perdu.
 CREATE TABLE mfa_recovery_codes (
     id          uuid PRIMARY KEY DEFAULT uuidv7(),
@@ -66,7 +50,5 @@ CREATE INDEX mfa_recovery_codes_operator_id_idx ON mfa_recovery_codes (operator_
 -- +goose Down
 
 DROP TABLE mfa_recovery_codes;
-
-ALTER TABLE mfa_challenges DROP COLUMN failures;
 
 ALTER TABLE operators DROP COLUMN mfa_totp_last_step;

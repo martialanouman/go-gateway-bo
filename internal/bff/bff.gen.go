@@ -47,6 +47,24 @@ func (e MfaVerificationMethod) Valid() bool {
 	}
 }
 
+// Defines values for TotpEnrollmentRequestMethod.
+const (
+	TotpEnrollmentRequestMethodRecoveryCode TotpEnrollmentRequestMethod = "recovery_code"
+	TotpEnrollmentRequestMethodTotp         TotpEnrollmentRequestMethod = "totp"
+)
+
+// Valid indicates whether the value is a known member of the TotpEnrollmentRequestMethod enum.
+func (e TotpEnrollmentRequestMethod) Valid() bool {
+	switch e {
+	case TotpEnrollmentRequestMethodRecoveryCode:
+		return true
+	case TotpEnrollmentRequestMethodTotp:
+		return true
+	default:
+		return false
+	}
+}
+
 // CurrentOperator De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
 // `mfa_totp_secret`, ni les identifiants WebAuthn : le type de domaine du store ne traverse pas
 // cette frontière (§1.11), et `additionalProperties: false` fait refuser tout champ qu'un
@@ -139,8 +157,35 @@ type TotpEnrollment struct {
 	Secret        string   `json:"secret"`
 }
 
+// TotpEnrollmentRequest Ce qu'un enrôlement présente : **rien** la première fois, et une preuve du facteur en place
+// pour le remplacer.
+//
+// Le premier enrôlement n'a rien à prouver — il n'y a pas encore de facteur, et la session de
+// premier facteur dit déjà de qui il s'agit. Le remplacement, lui, **détruit** l'authentificateur
+// en place et ses dix codes de récupération : il exige donc de présenter ce qu'on détruit.
+//
+// **Pourquoi un code et non un challenge frais**, alors que le challenge est ce que la
+// vérification exige : se reconnecter pour en obtenir un ferme la session présentée et la
+// désélève — c'est la remédiation de step-022 — donc un remplacement exigeant à la fois
+// l'élévation et un challenge frais serait **inatteignable**. Mesuré : le scénario qui l'exerçait
+// rendait 409 en boucle. Un code du facteur en place est par ailleurs une preuve plus forte que
+// le mot de passe : un cookie de session élevée capté ne le donne pas.
+//
+// Un code de récupération convient aussi. L'opérateur qui a perdu son téléphone est précisément
+// celui qui veut réenrôler, et n'exiger qu'un code TOTP en ferait une impasse.
+type TotpEnrollmentRequest struct {
+	Code   *string                      `json:"code,omitempty"`
+	Method *TotpEnrollmentRequestMethod `json:"method,omitempty"`
+}
+
+// TotpEnrollmentRequestMethod defines model for TotpEnrollmentRequest.Method.
+type TotpEnrollmentRequestMethod string
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// EnrollTotpJSONRequestBody defines body for EnrollTotp for application/json ContentType.
+type EnrollTotpJSONRequestBody = TotpEnrollmentRequest
 
 // VerifyMfaJSONRequestBody defines body for VerifyMfa for application/json ContentType.
 type VerifyMfaJSONRequestBody = MfaVerification
@@ -558,6 +603,7 @@ func (response Me401JSONResponse) VisitMeResponse(w http.ResponseWriter) error {
 }
 
 type EnrollTotpRequestObject struct {
+	Body *EnrollTotpJSONRequestBody
 }
 
 type EnrollTotpResponseObject interface {
@@ -574,6 +620,20 @@ func (response EnrollTotp200JSONResponse) VisitEnrollTotpResponse(w http.Respons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrollTotp400JSONResponse Error
+
+func (response EnrollTotp400JSONResponse) VisitEnrollTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -646,6 +706,28 @@ func (response VerifyMfa401JSONResponse) VisitVerifyMfaResponse(w http.ResponseW
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyMfa429ResponseHeaders struct {
+	RetryAfter int
+}
+
+type VerifyMfa429JSONResponse struct {
+	Body    Error
+	Headers VerifyMfa429ResponseHeaders
+}
+
+func (response VerifyMfa429JSONResponse) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -814,6 +896,13 @@ func (sh *strictHandler) Me(w http.ResponseWriter, r *http.Request) {
 // EnrollTotp operation middleware
 func (sh *strictHandler) EnrollTotp(w http.ResponseWriter, r *http.Request) {
 	var request EnrollTotpRequestObject
+
+	var body EnrollTotpJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.EnrollTotp(ctx, request.(EnrollTotpRequestObject))

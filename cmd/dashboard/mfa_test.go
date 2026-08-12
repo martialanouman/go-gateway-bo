@@ -60,9 +60,12 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur présente le code du pas suivant$`, w.presentCodeAtOffset(1))
 	ctx.When(`^l'opérateur présente le code à deux pas$`, w.presentCodeAtOffset(2))
 	ctx.When(`^l'opérateur présente un code faux$`, w.presentWrongCode)
+	ctx.Given(`^l'opérateur présente (\d+) codes faux$`, w.presentWrongCodes)
 	ctx.When(`^l'opérateur présente (\d+) codes faux$`, w.presentWrongCodes)
 	ctx.When(`^l'opérateur présente son premier code de récupération$`, w.presentFirstRecoveryCode)
 	ctx.When(`^l'opérateur représente le même code$`, w.presentTheSameCodeAgain)
+	ctx.When(`^l'opérateur remplace son authentificateur en présentant son code$`,
+		w.replaceProvingTheCurrentCode)
 	ctx.Given(`^un second opérateur qui vient de se connecter$`, w.secondOperatorSignsIn)
 	ctx.When(`^l'opérateur présente son code sur le challenge du second opérateur$`,
 		w.presentOnTheOtherChallenge)
@@ -78,9 +81,24 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 }
 
 func (w *mfaWorld) enroll() error {
+	return w.enrollProving(nil)
+}
+
+// enrollProving enrôle en présentant — ou non — une preuve du facteur en place. Le premier
+// enrôlement n'a rien à prouver ; le remplacement détruit ce qu'il remplace, donc il l'exige.
+func (w *mfaWorld) enrollProving(proof map[string]string) error {
 	w.previousSecret = w.enrolled.Secret
 
-	if err := w.login.process.post("/api/auth/mfa/totp/enroll", ""); err != nil {
+	body, err := json.Marshal(proof)
+	if err != nil {
+		return fmt.Errorf("composer le corps de l'enrôlement : %w", err)
+	}
+
+	if proof == nil {
+		body = []byte("{}")
+	}
+
+	if err = w.login.process.post("/api/auth/mfa/totp/enroll", string(body)); err != nil {
 		return err
 	}
 
@@ -96,6 +114,20 @@ func (w *mfaWorld) enroll() error {
 	w.enrolled = enrolled
 
 	return nil
+}
+
+// replaceProvingTheCurrentCode remplace l'authentificateur en présentant un code de celui qui est en
+// place — la preuve que le remplacement exige, puisqu'il le détruit.
+// Le code présenté est celui du pas **suivant** : la vérification qui précède vient de consommer le
+// pas courant, et l'anti-rejeu refuse à juste titre de le resservir. C'est ce que vit l'opérateur —
+// il rouvre son application et y lit un autre code.
+func (w *mfaWorld) replaceProvingTheCurrentCode(ctx context.Context) error {
+	code, err := w.codeAtOffset(ctx, 1)
+	if err != nil {
+		return err
+	}
+
+	return w.enrollProving(map[string]string{"method": "totp", "code": code})
 }
 
 // currentStep lit le pas de temps **dans la base**, qui est l'horloge que le serveur emploie. Le
@@ -124,25 +156,35 @@ func (w *mfaWorld) currentStep(ctx context.Context) (int64, error) {
 // dérive, et le présente.
 func (w *mfaWorld) presentCodeAtOffset(offset int64) func(context.Context) error {
 	return func(ctx context.Context) error {
-		if w.enrolled.Secret == "" {
-			return errors.New("aucun enrôlement : le scénario n'a pas de secret pour fabriquer un code")
-		}
-
-		step, err := w.currentStep(ctx)
+		code, err := w.codeAtOffset(ctx, offset)
 		if err != nil {
 			return err
 		}
 
-		code, err := hotp.GenerateCodeCustom(w.enrolled.Secret, uint64(step+offset), hotp.ValidateOpts{
-			Digits:    otp.DigitsSix,
-			Algorithm: otp.AlgorithmSHA1,
-		})
-		if err != nil {
-			return fmt.Errorf("fabriquer le code du pas %d : %w", step+offset, err)
-		}
-
 		return w.verify("totp", code)
 	}
+}
+
+// codeAtOffset fabrique le code d'un pas voisin comme le ferait une application dont l'horloge dérive.
+func (w *mfaWorld) codeAtOffset(ctx context.Context, offset int64) (string, error) {
+	if w.enrolled.Secret == "" {
+		return "", errors.New("aucun enrôlement : le scénario n'a pas de secret pour fabriquer un code")
+	}
+
+	step, err := w.currentStep(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	code, err := hotp.GenerateCodeCustom(w.enrolled.Secret, uint64(step+offset), hotp.ValidateOpts{
+		Digits:    otp.DigitsSix,
+		Algorithm: otp.AlgorithmSHA1,
+	})
+	if err != nil {
+		return "", fmt.Errorf("fabriquer le code du pas %d : %w", step+offset, err)
+	}
+
+	return code, nil
 }
 
 // presentWrongCode présente un code de six chiffres qui n'est celui d'aucun pas. Six chiffres et non
@@ -172,9 +214,10 @@ func (w *mfaWorld) presentWrongCodes(ctx context.Context, times int) error {
 			return err
 		}
 
-		if w.login.process.received.status != 401 {
-			return fmt.Errorf("un code faux a été accepté : le serveur a répondu %d",
-				w.login.process.received.status)
+		// 401 tant que le seuil n'est pas atteint, 429 à l'essai qui le franchit. Ce qui compte ici est
+		// qu'aucun code faux n'ouvre : le pas suivant dira lequel des deux refus s'applique.
+		if status := w.login.process.received.status; status != 401 && status != 429 {
+			return fmt.Errorf("un code faux a été accepté : le serveur a répondu %d", status)
 		}
 	}
 

@@ -134,14 +134,18 @@ expectTypeOf<EnrollOperation['responses'][200]['content']['application/json']>()
   recoveryCodes: string[]
 }>()
 
-// Trois statuts, et le 409 en fait partie : le client doit traiter « un second facteur est déjà en
+// Quatre statuts, et le 409 en fait partie : le client doit traiter « un second facteur est déjà en
 // place » comme un cas normal — c'est celui d'un opérateur qui change de téléphone — et non comme une
 // panne. Le découvrir à l'exécution ferait un toast d'erreur là où il faut une explication.
-expectTypeOf<keyof EnrollOperation['responses']>().toEqualTypeOf<200 | 401 | 409>()
+expectTypeOf<keyof EnrollOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 409>()
 
-// Aucun corps : la variante est portée par le chemin. step-024 en ajoutera un autre plutôt que
-// d'introduire un discriminant ici.
-expectTypeOf<EnrollOperation['requestBody']>().toEqualTypeOf<undefined>()
+// Les deux champs sont **facultatifs**, et c'est ce que le type doit dire : un premier enrôlement n'a
+// rien à prouver, un remplacement présente le facteur qu'il détruit. Le serveur exige qu'ils soient
+// là tous les deux ou aucun ; le type ne sait pas l'exprimer, et c'est le 400 qui le tient.
+expectTypeOf<EnrollOperation['requestBody']['content']['application/json']>().toEqualTypeOf<{
+  method?: 'totp' | 'recovery_code'
+  code?: string
+}>()
 
 /**
  * `POST /api/auth/mfa/verify` — step-023. Le second facteur, TOTP ou code de récupération.
@@ -160,4 +164,8 @@ expectTypeOf<VerifyOperation['requestBody']['content']['application/json']>().to
 
 // Aucun corps en retour sur le succès : ce que la session ouvre désormais se relit sur `/auth/me`,
 // qui reste le seul endroit d'où le client apprend ses droits.
-expectTypeOf<keyof VerifyOperation['responses']>().toEqualTypeOf<204 | 400 | 401>()
+//
+// Le 429 est le quatrième, et le client doit le distinguer du 401 : l'un dit « ce code ne convient
+// pas », l'autre « arrêtez d'essayer pendant un quart d'heure ». Les confondre ferait boucler l'écran
+// sur un formulaire qui ne peut plus rien accepter.
+expectTypeOf<keyof VerifyOperation['responses']>().toEqualTypeOf<204 | 400 | 401 | 429>()

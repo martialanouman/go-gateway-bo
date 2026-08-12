@@ -56,12 +56,18 @@ type Operator struct {
 // existe.
 const StatusActive = "active"
 
-// ScopeEmail et ScopeSource nomment les deux dimensions comptées. Ce sont les deux valeurs que la
-// contrainte `CHECK` de la migration 00004 admet ; les écrire ici plutôt qu'en littéral dans trois
-// requêtes est ce qui fait qu'une faute de frappe est refusée par le compilateur et non par la base.
+// Les trois dimensions comptées. Ce sont les trois valeurs que la contrainte `CHECK` admet —
+// migration 00004 pour les deux premières, 00007 pour la troisième ; les écrire ici plutôt qu'en
+// littéral dans les requêtes est ce qui fait qu'une faute de frappe est refusée par le compilateur et
+// non par la base.
+//
+// `ScopeSecondFactor` est comptée par `mfa.go`, sur l'identifiant de l'opérateur. Elle partage cette
+// table et son mécanisme d'incrément atomique plutôt que d'en avoir une jumelle, qui en serait une
+// seconde rédaction.
 const (
-	ScopeEmail  = "email"
-	ScopeSource = "source"
+	ScopeEmail        = "email"
+	ScopeSource       = "source"
+	ScopeSecondFactor = "mfa"
 )
 
 // OperatorByEmail rend l'opérateur correspondant à une adresse **déjà minusculée**, ou nil.

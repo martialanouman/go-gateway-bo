@@ -54,8 +54,8 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Given(`^les migrations déjà jouées$`, schema.migrateThenRecordSchema)
 	ctx.When(`^les migrations sont jouées$`, schema.migrate)
 	ctx.When(`^les migrations sont rejouées$`, schema.migrate)
-	ctx.Then(`^les cinq migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
-	ctx.Then(`^les douze tables du schéma existent$`, schema.everyTableExists)
+	ctx.Then(`^les sept migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
+	ctx.Then(`^les treize tables du schéma existent$`, schema.everyTableExists)
 	ctx.Then(`^le journal d'audit accepte un événement daté du (mois courant|mois suivant)$`,
 		schema.auditLogAcceptsEventDated)
 	ctx.Then(`^la seconde exécution n'a rien appliqué$`, schema.lastRunAppliedNothing)
@@ -122,9 +122,10 @@ var initialMigrations = []string{
 	"00004_login_challenges_and_throttling.sql",
 	"00005_sessions.sql",
 	"00006_mfa_totp.sql",
+	"00007_second_factor_throttling.sql",
 }
 
-const latestSchemaVersion = 6
+const latestSchemaVersion = 7
 
 func (w *schemaWorld) everyMigrationWasReported() error {
 	if !slices.Equal(w.lastOutcome.Applied, initialMigrations) {

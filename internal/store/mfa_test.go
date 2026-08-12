@@ -261,6 +261,119 @@ func TestLAntiRejeuEstProprementParOperateur(t *testing.T) {
 	assert.True(t, accepted)
 }
 
+// **Le verrou qui borne la recherche exhaustive**, et qui manquait : le compteur par challenge ne
+// borne rien, puisqu'une connexion réussie n'incrémente aucun compteur du premier facteur.
+func TestLeVerrouDeSecondFacteurTombeAuSeuilEtPasAvant(t *testing.T) {
+	t.Parallel()
+
+	mfa, dsn := mfaOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	for essai := 1; essai < testMaxFailures; essai++ {
+		lock, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+		require.NoError(t, err)
+		require.False(t, lock.Locked(), "le verrou mord au %d° échec, avant le seuil", essai)
+	}
+
+	lock, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	require.True(t, lock.Locked(), "le seuil est franchi et rien ne verrouille")
+	assert.Positive(t, lock.Remaining)
+
+	// Et il se relit, plutôt que d'être seulement rendu par l'écriture qui l'a posé : c'est cette
+	// lecture que le handler fait avant toute dépense.
+	lock, err = mfa.LockFor(t.Context(), operator, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	assert.True(t, lock.Locked())
+}
+
+// Le verrou porte sur **l'opérateur** : celui d'un compte ne ferme pas la porte d'un autre.
+func TestLeVerrouDeSecondFacteurEstProprementParOperateur(t *testing.T) {
+	t.Parallel()
+
+	mfa, dsn := mfaOn(t)
+	camille := insertOperator(t, dsn, "camille@exemple.test", "hash")
+	martin := insertOperator(t, dsn, "martin@exemple.test", "hash")
+
+	for range testMaxFailures {
+		_, err := mfa.RecordFailure(t.Context(), camille, testWindow, testMaxFailures)
+		require.NoError(t, err)
+	}
+
+	lock, err := mfa.LockFor(t.Context(), martin, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	assert.False(t, lock.Locked())
+}
+
+// La dimension du second facteur est **distincte** de celles du premier : verrouiller le second ne
+// ferme pas la connexion, et le compteur d'adresse ne verrouille pas le second facteur. Les
+// confondre ferait qu'un opérateur qui se trompe de code perdrait aussi sa connexion.
+func TestLeVerrouDeSecondFacteurNeSeConfondPasAvecCeluiDeLaConnexion(t *testing.T) {
+	t.Parallel()
+
+	pool, dsn := migratedPool(t)
+	mfa, logins := store.NewMFA(pool), store.NewLogins(pool)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	for range testMaxFailures {
+		_, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+		require.NoError(t, err)
+	}
+
+	lock, err := logins.LockFor(t.Context(), "camille@exemple.test", "une-source", testWindow,
+		testMaxFailures)
+	require.NoError(t, err)
+	assert.False(t, lock.Locked(), "verrouiller le second facteur a fermé la connexion")
+
+	// Le témoin, dans l'autre sens : le verrou du second facteur, lui, mord bien.
+	second, err := mfa.LockFor(t.Context(), operator, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	assert.True(t, second.Locked())
+}
+
+// Un silence plus long que la fenêtre remet le compteur à un — même arbitrage qu'au premier facteur :
+// plus court, un verrou qui vient d'expirer se refermerait au premier essai suivant.
+func TestUnVerrouDeSecondFacteurEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
+	t.Parallel()
+
+	mfa, dsn := mfaOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	for range testMaxFailures {
+		_, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+		require.NoError(t, err)
+	}
+
+	execOn(t, dsn, `
+		UPDATE login_attempt_counters SET last_failure_at = now() - make_interval(secs => $1)
+		WHERE scope = 'mfa'`, (testWindow + time.Minute).Seconds())
+
+	lock, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	assert.False(t, lock.Locked(), "le compteur n'est pas reparti de un après l'oubli")
+}
+
+// Franchir le second facteur efface le compteur — contrairement au premier, où seule la dimension de
+// l'adresse est effacée. Ici la dimension **est** l'opérateur, et celui qui vient de franchir son
+// second facteur est précisément celui à qui le compteur était destiné.
+func TestFranchirLeSecondFacteurEffaceSonCompteur(t *testing.T) {
+	t.Parallel()
+
+	mfa, dsn := mfaOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	for range testMaxFailures {
+		_, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, mfa.ClearFailures(t.Context(), operator))
+
+	lock, err := mfa.LockFor(t.Context(), operator, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	assert.False(t, lock.Locked())
+}
+
 func TestUnChallengeVivantSeRetrouveAvecSonOperateur(t *testing.T) {
 	t.Parallel()
 
@@ -268,14 +381,14 @@ func TestUnChallengeVivantSeRetrouveAvecSonOperateur(t *testing.T) {
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 	issueChallenge(t, dsn, operator, "jeton")
 
-	challenge, alive, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"), testMaxFailures)
+	challenge, alive, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"))
 	require.NoError(t, err)
 	require.True(t, alive)
 	assert.Equal(t, operator, challenge.OperatorID)
 	assert.NotEmpty(t, challenge.ID)
 }
 
-// Trois façons de cesser d'être utilisable, et une quatrième juste en dessous — « ce jeton n'existe
+// Deux façons de cesser d'être utilisable, et une troisième juste en dessous — « ce jeton n'existe
 // pas », qui n'a rien à abîmer. Toutes rendent la **même** absence : le refus qu'elles produisent ne
 // dit pas laquelle s'applique.
 func TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas(t *testing.T) {
@@ -287,8 +400,7 @@ func TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas(t *testing.T) {
 		"il est échu": `UPDATE mfa_challenges
 			SET created_at = now() - interval '10 minutes', expires_at = now() - interval '1 second'
 			WHERE token_hash = $1`,
-		"il a déjà servi":        `UPDATE mfa_challenges SET consumed_at = now() WHERE token_hash = $1`,
-		"il a épuisé ses essais": `UPDATE mfa_challenges SET failures = 5 WHERE token_hash = $1`,
+		"il a déjà servi": `UPDATE mfa_challenges SET consumed_at = now() WHERE token_hash = $1`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -299,13 +411,13 @@ func TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas(t *testing.T) {
 
 			// Le témoin, avant d'abîmer quoi que ce soit : sans lui, un décor qui n'ouvrirait jamais
 			// rien rendrait ce cas vert sans exercer la condition qu'il nomme.
-			_, alive, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"), testMaxFailures)
+			_, alive, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"))
 			require.NoError(t, err)
 			require.True(t, alive, "le challenge du décor n'était pas vivant")
 
 			require.EqualValues(t, 1, execOn(t, dsn, breakIt, tokenHash("jeton")))
 
-			_, alive, err = mfa.LiveChallenge(t.Context(), tokenHash("jeton"), testMaxFailures)
+			_, alive, err = mfa.LiveChallenge(t.Context(), tokenHash("jeton"))
 			require.NoError(t, err)
 			assert.False(t, alive)
 		})
@@ -319,39 +431,10 @@ func TestUnJetonQueLaBaseNePortePasNeRetrouveAucunChallenge(t *testing.T) {
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 	issueChallenge(t, dsn, operator, "jeton")
 
-	_, alive, err := mfa.LiveChallenge(t.Context(), tokenHash("un jeton que personne n'a émis"),
-		testMaxFailures)
+	_, alive, err := mfa.LiveChallenge(t.Context(), tokenHash("un jeton que personne n'a émis"))
 
 	require.NoError(t, err)
 	assert.False(t, alive)
-}
-
-// Le seuil mord **au** seuil et pas avant : un opérateur qui s'est trompé quatre fois doit encore
-// pouvoir entrer, sinon la garde refuserait du légitime et finirait retirée.
-func TestLeChallengeSurvitJusquAuSeuil(t *testing.T) {
-	t.Parallel()
-
-	mfa, dsn := mfaOn(t)
-	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
-	issueChallenge(t, dsn, operator, "jeton")
-
-	challenge, alive, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"), testMaxFailures)
-	require.NoError(t, err)
-	require.True(t, alive)
-
-	for range testMaxFailures - 1 {
-		require.NoError(t, mfa.RecordChallengeFailure(t.Context(), challenge.ID))
-
-		_, alive, err = mfa.LiveChallenge(t.Context(), tokenHash("jeton"), testMaxFailures)
-		require.NoError(t, err)
-		require.True(t, alive, "le challenge est mort avant le seuil")
-	}
-
-	require.NoError(t, mfa.RecordChallengeFailure(t.Context(), challenge.ID))
-
-	_, alive, err = mfa.LiveChallenge(t.Context(), tokenHash("jeton"), testMaxFailures)
-	require.NoError(t, err)
-	assert.False(t, alive, "le challenge survit au seuil : la recherche exhaustive n'est pas bornée")
 }
 
 // La consommation est le point de sérialisation : deux requêtes concurrentes portant le même
@@ -363,7 +446,7 @@ func TestUnChallengeNeSeConsommeQuUneFois(t *testing.T) {
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 	issueChallenge(t, dsn, operator, "jeton")
 
-	challenge, _, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"), testMaxFailures)
+	challenge, _, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"))
 	require.NoError(t, err)
 
 	consumed, err := mfa.ConsumeChallenge(t.Context(), challenge.ID)
@@ -384,7 +467,7 @@ func TestUnChallengeConsommeResteEnBase(t *testing.T) {
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 	issueChallenge(t, dsn, operator, "jeton")
 
-	challenge, _, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"), testMaxFailures)
+	challenge, _, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"))
 	require.NoError(t, err)
 
 	_, err = mfa.ConsumeChallenge(t.Context(), challenge.ID)

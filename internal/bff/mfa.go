@@ -2,16 +2,24 @@ package bff
 
 import (
 	"context"
+	"time"
 
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 )
 
+// maximumChallengeLength borne ce qu'un corps peut présenter comme challenge. Le contrat n'en déclare
+// que la longueur minimale, et `auth.ChallengeDigest` refuse déjà tout ce qui ne fait pas exactement
+// trente-deux octets décodés — cette borne-ci refuse simplement plus tôt, avant le décodage.
+const maximumChallengeLength = 64
+
 // maximumCodeLength redit en Go la borne que le contrat déclare, pour la même raison que celles de
-// `Login` : rien dans ce dépôt ne valide une requête à l'exécution contre le YAML. Elle n'est pas
-// cosmétique — le chemin des codes de récupération paie un argon2id par code restant, donc un champ
-// sans borne en
-// ferait une arme.
+// `Login` : rien dans ce dépôt ne valide une requête à l'exécution contre le YAML.
+//
+// Ce qu'elle achète est un refus **tôt**, pas une économie de calcul : argon2id ne dépend pas de la
+// longueur de son entrée, donc un code de soixante-quatre caractères et un code de six coûtent
+// exactement le même quart de seconde. Le corps entier est par ailleurs déjà borné à huit kibioctets
+// par `RequestSize`.
 const maximumCodeLength = 64
 
 // EnrollTotp enrôle une application d'authentification et rend, **une seule fois**, de quoi la
@@ -19,9 +27,13 @@ const maximumCodeLength = 64
 //
 // Il n'élève pas la session : c'est `VerifyMfa` qui le fait, avec le premier code. Un enrôlement qui
 // élèverait ferait du second facteur une formalité — il suffirait de s'en attacher un neuf.
-func (a API) EnrollTotp(ctx context.Context, _ EnrollTotpRequestObject) (EnrollTotpResponseObject,
+func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (EnrollTotpResponseObject,
 	error,
 ) {
+	if request.Body == nil || !presentedFactorIsWellFormed(*request.Body) {
+		return EnrollTotp400JSONResponse(badRequest()), nil
+	}
+
 	resolved, alive, err := sessionFrom(ctx)
 	if err != nil {
 		return nil, err
@@ -41,18 +53,35 @@ func (a API) EnrollTotp(ctx context.Context, _ EnrollTotpRequestObject) (EnrollT
 	}
 
 	// **La garde de la step.** Le premier enrôlement est libre — il faut bien pouvoir entrer une
-	// première fois. Le remplacer exige d'avoir franchi celui qui est en place, sans quoi quiconque
-	// détient le mot de passe contourne le second facteur en s'en attachant un autre.
+	// première fois, et il n'y a rien à prouver. Le remplacement, lui, **détruit** l'authentificateur
+	// en place et ses dix codes de récupération : il exige donc de présenter ce qu'on détruit.
 	//
-	// Ce `if` est un raccourci de **coût**, pas la garde : il évite le quart de seconde de hachage
-	// quand le refus est déjà certain. La garde, elle, est appliquée par l'écriture — sans quoi deux
-	// enrôlements concurrents la traverseraient tous les deux.
-	if state.Enrolled && !resolved.Elevated {
-		return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
+	// Une preuve du mot de passe n'y suffirait pas — un cookie de session élevée capté évincerait
+	// définitivement l'opérateur. Et un challenge frais serait **inatteignable** : se reconnecter pour
+	// en obtenir un ferme la session présentée et la désélève. La raison longue est au contrat.
+	//
+	// Ce `if` est un raccourci de **coût** pour le cas sans preuve : il évite le quart de seconde de
+	// hachage quand le refus est déjà certain. La garde du remplacement, elle, est appliquée par
+	// l'écriture — sans quoi deux enrôlements concurrents la traverseraient tous les deux.
+	replace := false
+
+	if state.Enrolled {
+		if request.Body.Code == nil {
+			return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
+		}
+
+		replace, err = a.verifyPresentedFactor(ctx, resolved.OperatorID, string(*request.Body.Method),
+			*request.Body.Code)
+		if err != nil {
+			return nil, err
+		}
+
+		if !replace {
+			return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
+		}
 	}
 
-	enrollment, written, err := a.SecondFactor.Enroll(ctx, resolved.OperatorID, state.Email,
-		resolved.Elevated)
+	enrollment, written, err := a.SecondFactor.Enroll(ctx, resolved.OperatorID, state.Email, replace)
 	if err != nil {
 		return nil, err
 	}
@@ -75,20 +104,27 @@ func (a API) EnrollTotp(ctx context.Context, _ EnrollTotpRequestObject) (EnrollT
 // **L'ordre des gestes est la garde**, et chacun a sa raison d'être là :
 //
 //  1. la session vivante, qui dit de qui il s'agit ;
-//  2. le challenge vivant **et le sien** — sans cette seconde moitié, le challenge d'un opérateur
+//  2. **le verrou d'essais de l'opérateur, avant toute dépense** — c'est ce qui borne la recherche
+//     exhaustive, et le consulter après aurait fait payer au serveur le déchiffrement et les argon2id
+//     de chaque essai qu'il refuse ;
+//  3. le challenge vivant **et le sien** — sans cette seconde moitié, le challenge d'un opérateur
 //     élèverait la session d'un autre ;
-//  3. le code, dont la vérification consomme déjà ce qu'elle valide — le pas de temps ou la ligne du
+//  4. le code, dont la vérification consomme déjà ce qu'elle valide — le pas de temps ou la ligne du
 //     code de récupération, dans les deux cas par un `WHERE` qui tranche le rejeu ;
-//  4. l'échec compté, qui borne la recherche exhaustive ;
-//  5. le challenge consommé, une seule fois ;
-//  6. la session élevée, jeton régénéré.
+//  5. l'échec compté sur l'opérateur, ce qui borne ce que toutes ses connexions peuvent servir ;
+//  6. le challenge consommé, une seule fois ;
+//  7. la session élevée, jeton régénéré, et le compteur effacé.
 //
-// Les cinq refus rendent le **même** 401 : un code faux, un code rejoué, un challenge inconnu, échu
-// ou épuisé, et l'absence de session. Les distinguer dirait à une machine où elle en est.
+// **Tous les refus rendent le même 401**, sauf le verrou : un code faux ou déjà servi, un challenge
+// inconnu, échu, consommé ou appartenant à un autre, l'absence de session et sa mort en cours
+// de route sont indiscernables. Le verrou, lui, rend 429 avec sa durée — ce qu'il révèle est ce que
+// l'attaquant constate de toute façon, et le taire priverait l'opérateur légitime de la seule
+// information qui lui dise quoi faire.
 func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (VerifyMfaResponseObject,
 	error,
 ) {
 	if request.Body == nil || len([]rune(request.Body.Code)) > maximumCodeLength ||
+		len([]rune(request.Body.Challenge)) > maximumChallengeLength ||
 		!request.Body.Method.Valid() {
 		return VerifyMfa400JSONResponse(badRequest()), nil
 	}
@@ -102,6 +138,15 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 		return VerifyMfa401JSONResponse(refusedSecondFactor()), nil
 	}
 
+	lock, err := a.SecondFactor.Lock(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if lock.Locked() {
+		return tooManySecondFactorAttempts(lock.Remaining), nil
+	}
+
 	challenge, live, err := a.SecondFactor.Challenge(ctx, request.Body.Challenge)
 	if err != nil {
 		return nil, err
@@ -111,19 +156,14 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 		return VerifyMfa401JSONResponse(refusedSecondFactor()), nil
 	}
 
-	verified, err := a.verifyPresentedFactor(ctx, resolved.OperatorID, *request.Body)
+	verified, err := a.verifyPresentedFactor(ctx, resolved.OperatorID,
+		string(request.Body.Method), request.Body.Code)
 	if err != nil {
 		return nil, err
 	}
 
 	if !verified {
-		// L'échec est compté **avant** de refuser, et le challenge n'est pas consommé : une faute de
-		// frappe ne doit pas obliger à refaire toute la connexion, mais elle doit coûter un essai.
-		if err = a.SecondFactor.FailChallenge(ctx, challenge.ID); err != nil {
-			return nil, err
-		}
-
-		return VerifyMfa401JSONResponse(refusedSecondFactor()), nil
+		return a.refuseSecondFactor(ctx, resolved.OperatorID)
 	}
 
 	consumed, err := a.SecondFactor.ConsumeChallenge(ctx, challenge.ID)
@@ -149,23 +189,94 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 		return VerifyMfa401JSONResponse(refusedSecondFactor()), nil
 	}
 
+	if err = a.SecondFactor.Succeed(ctx, resolved.OperatorID); err != nil {
+		return nil, err
+	}
+
 	postCookie(ctx, session.Issued(renewed))
 
 	return VerifyMfa204Response{}, nil
+}
+
+// refuseSecondFactor compte l'essai raté et refuse.
+//
+// Le challenge n'est **pas** consommé : une faute de frappe ne doit pas obliger à refaire toute la
+// connexion. Elle coûte en revanche un essai à l'opérateur, et c'est ce qui borne la recherche
+// exhaustive.
+//
+// **Il n'y a qu'un compteur, et c'est délibéré.** Une première rédaction en portait deux — un par
+// challenge, un par opérateur — au même seuil de cinq. Celui de l'opérateur compte à travers toutes
+// les connexions, donc il mord toujours le premier : celui du challenge n'était plus observable, ni
+// par un test ni par une mutation. Deux gardes dont l'une masque l'autre valent une garde et une
+// illusion.
+//
+// L'échec qui **franchit** le seuil annonce le verrou tout de suite, plutôt que de rendre un refus nu
+// et de surprendre à l'essai suivant : la charte exige qu'un contrôle qui refuse dise jusqu'à quand.
+// Même forme qu'au premier facteur.
+func (a API) refuseSecondFactor(ctx context.Context, operatorID string) (VerifyMfaResponseObject,
+	error,
+) {
+	lock, err := a.SecondFactor.Fail(ctx, operatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if lock.Locked() {
+		return tooManySecondFactorAttempts(lock.Remaining), nil
+	}
+
+	return VerifyMfa401JSONResponse(refusedSecondFactor()), nil
+}
+
+// tooManySecondFactorAttempts annonce le verrou **et sa durée**. Les deux durées — l'en-tête et la
+// phrase — sortent du même arrondi, pour qu'un client qui lit l'un et un opérateur qui lit l'autre ne
+// voient jamais deux nombres différents. Même construction qu'au premier facteur.
+func tooManySecondFactorAttempts(remaining time.Duration) VerifyMfa429JSONResponse {
+	seconds := retryAfterSeconds(remaining)
+
+	return VerifyMfa429JSONResponse{
+		Headers: VerifyMfa429ResponseHeaders{RetryAfter: seconds},
+		Body: Error{
+			Code: "too_many_attempts",
+			Message: "Le second facteur est temporairement bloqué après plusieurs essais : réessayez " +
+				"dans " + humanDelay(seconds) + ". Le blocage porte sur ce compte, se lève tout seul, et " +
+				"n'empêche pas de se reconnecter.",
+		},
+	}
 }
 
 // verifyPresentedFactor aiguille sur la méthode déclarée plutôt que d'essayer les deux.
 //
 // Essayer les deux ferait payer les argon2id du chemin de récupération à chaque code TOTP faux,
 // et la durée de la réponse dirait alors laquelle des deux voies a répondu.
-func (a API) verifyPresentedFactor(ctx context.Context, operatorID string,
-	verification MfaVerification,
+//
+// Il sert les **deux** routes : la vérification qui élève, et le remplacement qui détruit. Le geste
+// est le même — présenter le facteur en place — et l'écrire deux fois en ferait deux rédactions qui
+// divergeraient, dont l'une consommerait le pas de temps et l'autre non.
+func (a API) verifyPresentedFactor(ctx context.Context, operatorID string, method, code string,
 ) (bool, error) {
-	if verification.Method == MfaVerificationMethodRecoveryCode {
-		return a.SecondFactor.VerifyRecoveryCode(ctx, operatorID, verification.Code)
+	if method == string(MfaVerificationMethodRecoveryCode) {
+		return a.SecondFactor.VerifyRecoveryCode(ctx, operatorID, code)
 	}
 
-	return a.SecondFactor.VerifyTOTP(ctx, operatorID, verification.Code)
+	return a.SecondFactor.VerifyTOTP(ctx, operatorID, code)
+}
+
+// presentedFactorIsWellFormed dit si la preuve d'un enrôlement a une forme exploitable : les deux
+// champs ensemble, ou aucun des deux. Un `method` sans `code` — ou l'inverse — est une requête que le
+// serveur ne saurait pas interpréter, et la traiter comme « aucune preuve » ferait rendre 409 là où le
+// client a fait une faute de forme.
+func presentedFactorIsWellFormed(request TotpEnrollmentRequest) bool {
+	if request.Method == nil && request.Code == nil {
+		return true
+	}
+
+	if request.Method == nil || request.Code == nil {
+		return false
+	}
+
+	return MfaVerificationMethod(*request.Method).Valid() &&
+		len([]rune(*request.Code)) <= maximumCodeLength
 }
 
 // refusedSecondFactor est le refus **unique** du second facteur, comme `refusedCredentials` l'est du
@@ -176,8 +287,8 @@ func (a API) verifyPresentedFactor(ctx context.Context, operatorID string,
 func refusedSecondFactor() Error {
 	return Error{
 		Code: "invalid_second_factor",
-		Message: "Ce code n'a pas été accepté. Vérifiez l'heure de votre application " +
-			"d'authentification, ou reprenez la connexion depuis le début.",
+		Message: "Ce code n'a pas été accepté. Vérifier l'heure de l'application d'authentification, " +
+			"ou reprendre la connexion depuis le début.",
 	}
 }
 
@@ -186,9 +297,9 @@ func refusedSecondFactor() Error {
 func secondFactorAlreadyEnrolled() Error {
 	return Error{
 		Code: "mfa_already_enrolled",
-		Message: "Un second facteur est déjà en place sur ce compte. Pour le remplacer, franchissez " +
-			"d'abord celui que vous utilisez aujourd'hui ; s'il est perdu, un administrateur doit le " +
-			"réinitialiser.",
+		Message: "Un second facteur est déjà en place sur ce compte. Le remplacer demande de franchir " +
+			"d'abord celui qui est en place. S'il est perdu, sa réinitialisation par un administrateur " +
+			"arrivera avec la gestion des opérateurs.",
 	}
 }
 
