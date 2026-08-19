@@ -34,4 +34,17 @@ func (API) Logout(_ context.Context, _ bff.LogoutRequestObject) (bff.LogoutRespo
 	return bff.Logout204Response{}, nil
 }
 
+// EnrollTotp et VerifyMfa sont identiques dans les deux fixtures, pour la même raison que `Login`.
+func (API) EnrollTotp(_ context.Context, _ bff.EnrollTotpRequestObject) (bff.EnrollTotpResponseObject,
+	error,
+) {
+	return bff.EnrollTotp401JSONResponse{Code: "unauthenticated", Message: "Reconnectez-vous."}, nil
+}
+
+func (API) VerifyMfa(_ context.Context, _ bff.VerifyMfaRequestObject) (bff.VerifyMfaResponseObject,
+	error,
+) {
+	return bff.VerifyMfa204Response{}, nil
+}
+
 var _ = bff.NewStrictHandler(API{}, nil)

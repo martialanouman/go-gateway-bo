@@ -64,9 +64,37 @@ func TestUneCleDeSessionTropCourteEstRefuseeSansEtreCitee(t *testing.T) {
 	assert.NotContains(t, err.Error(), "changeme", "le refus recopie le secret qu'il refuse")
 }
 
-// Les deux secrets sont distincts et le restent. Réutiliser l'un pour l'autre ferait qu'une fuite
-// de la table des compteurs — qui ne porte que des HMAC — livrerait de quoi signer des sessions.
-func TestLeSelEtLaCleDeSessionNeSeConfondentPas(t *testing.T) {
+// Sans repli non plus, et la conséquence est la plus lourde des trois : une clé publique rendrait
+// déchiffrable tout secret TOTP de la base, donc permettrait de produire les codes de n'importe quel
+// opérateur.
+func TestLaCleDeChiffrementTotpEstObligatoire(t *testing.T) {
+	t.Parallel()
+
+	env := minimalEnv()
+	delete(env, config.EnvTOTPEncryptionKey)
+
+	_, err := config.Load(lookupFrom(env))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvTOTPEncryptionKey,
+		"le refus ne nomme pas la variable manquante : l'exploitant ne sait pas quoi poser")
+}
+
+func TestUneCleDeChiffrementTropCourteEstRefuseeSansEtreCitee(t *testing.T) {
+	t.Parallel()
+
+	env := minimalEnv()
+	env[config.EnvTOTPEncryptionKey] = "changeme"
+
+	_, err := config.Load(lookupFrom(env))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvTOTPEncryptionKey)
+	assert.NotContains(t, err.Error(), "changeme", "le refus recopie le secret qu'il refuse")
+}
+
+// Les trois secrets sont distincts et le restent. Réutiliser l'un pour l'autre ferait qu'une fuite de
+// la table des compteurs — qui ne porte que des HMAC — livrerait de quoi signer des sessions, ou
+// qu'un secret de signature volé livrerait avec lui tous les seconds facteurs.
+func TestLesTroisSecretsNeSeConfondentPas(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := config.Load(lookupFrom(minimalEnv()))
@@ -74,6 +102,7 @@ func TestLeSelEtLaCleDeSessionNeSeConfondentPas(t *testing.T) {
 
 	assert.Equal(t, []byte(testBruteForceSalt), cfg.Auth.BruteForceSalt)
 	assert.Equal(t, []byte(testSessionSecret), cfg.Auth.SessionSecret)
+	assert.Equal(t, []byte(testTOTPEncryptionKey), cfg.Auth.TOTPEncryptionKey)
 }
 
 func TestLesProxysDeConfianceSeLisentEnCidr(t *testing.T) {

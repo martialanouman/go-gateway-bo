@@ -96,6 +96,7 @@ expectTypeOf<MeOperation['responses'][200]['content']['application/json']>().toE
   operator: { id: string; email: string; displayName: string }
   permissions: string[]
   elevated: boolean
+  secondFactors: { totp: boolean; recoveryCodesRemaining: number }
   absoluteExpiresAt: string
 }>()
 
@@ -114,3 +115,57 @@ expectTypeOf<keyof LogoutOperation['responses']>().toEqualTypeOf<204>()
 
 // Aucun corps à envoyer : rien à composer, donc rien à oublier de composer.
 expectTypeOf<LogoutOperation['requestBody']>().toEqualTypeOf<undefined>()
+
+/**
+ * `POST /api/auth/mfa/totp/enroll` — step-023. Ce que l'écran d'enrôlement (step-028) dessinera.
+ *
+ * Les trois champs du 200 sont ce qui n'est **montré qu'une fois** : l'URI que le QR encodera, le
+ * secret pour la saisie manuelle, et les dix codes de récupération. Aucune autre opération ne les
+ * rend, et le type le dit — chercher `secret` ailleurs dans `paths` ne trouve rien.
+ */
+
+type EnrollOperation = paths['/auth/mfa/totp/enroll']['post']
+
+// `otpauthUri` est une chaîne et non une image : le serveur ne dessine pas le QR, et c'est ce qui
+// l'affranchit d'une bibliothèque de rendu.
+expectTypeOf<EnrollOperation['responses'][200]['content']['application/json']>().toEqualTypeOf<{
+  secret: string
+  otpauthUri: string
+  recoveryCodes: string[]
+}>()
+
+// Quatre statuts, et le 409 en fait partie : le client doit traiter « un second facteur est déjà en
+// place » comme un cas normal — c'est celui d'un opérateur qui change de téléphone — et non comme une
+// panne. Le découvrir à l'exécution ferait un toast d'erreur là où il faut une explication.
+expectTypeOf<keyof EnrollOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 409>()
+
+// Les deux champs sont **facultatifs**, et c'est ce que le type doit dire : un premier enrôlement n'a
+// rien à prouver, un remplacement présente le facteur qu'il détruit. Le serveur exige qu'ils soient
+// là tous les deux ou aucun ; le type ne sait pas l'exprimer, et c'est le 400 qui le tient.
+expectTypeOf<EnrollOperation['requestBody']['content']['application/json']>().toEqualTypeOf<{
+  method?: 'totp' | 'recovery_code'
+  code?: string
+}>()
+
+/**
+ * `POST /api/auth/mfa/verify` — step-023. Le second facteur, TOTP ou code de récupération.
+ */
+
+type VerifyOperation = paths['/auth/mfa/verify']['post']
+
+// `method` est une union fermée et non une chaîne : un client qui inventerait une troisième valeur
+// rougit ici plutôt qu'au 400 du serveur. step-024 y ajoutera `'webauthn'`, et cette ligne obligera à
+// traiter le nouveau cas.
+expectTypeOf<VerifyOperation['requestBody']['content']['application/json']>().toEqualTypeOf<{
+  challenge: string
+  method: 'totp' | 'recovery_code'
+  code: string
+}>()
+
+// Aucun corps en retour sur le succès : ce que la session ouvre désormais se relit sur `/auth/me`,
+// qui reste le seul endroit d'où le client apprend ses droits.
+//
+// Le 429 est le quatrième, et le client doit le distinguer du 401 : l'un dit « ce code ne convient
+// pas », l'autre « arrêtez d'essayer pendant un quart d'heure ». Les confondre ferait boucler l'écran
+// sur un formulaire qui ne peut plus rien accepter.
+expectTypeOf<keyof VerifyOperation['responses']>().toEqualTypeOf<204 | 400 | 401 | 429>()

@@ -15,6 +15,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
 	"github.com/martialanouman/go-gateway-bo/internal/config"
+	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 	"github.com/martialanouman/go-gateway-bo/internal/webassets"
@@ -107,6 +108,14 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt)
 	sessions := session.NewManager(store.NewSessions(pool), cfg.Auth.SessionSecret)
 
+	// Avant la liaison du port : dériver la clé de chiffrement est la dernière chose qui puisse
+	// échouer sur la configuration, et un serveur qui écoute déjà refuserait alors chaque enrôlement
+	// sans que rien n'ait dit pourquoi au démarrage.
+	secondFactor, err := mfa.NewManager(store.NewMFA(pool), cfg.Auth.TOTPEncryptionKey)
+	if err != nil {
+		return err
+	}
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", cfg.Addr, err)
@@ -118,6 +127,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		Assets:         assets,
 		Authenticator:  authenticator,
 		Sessions:       sessions,
+		SecondFactor:   secondFactor,
 		TrustedProxies: cfg.Auth.TrustedProxies,
 	})
 

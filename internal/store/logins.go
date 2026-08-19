@@ -41,8 +41,8 @@ type Lock struct {
 func (l Lock) Locked() bool { return l.Remaining > 0 }
 
 // Operator est ce que le premier facteur a besoin de savoir, et rien de plus. Ni le secret TOTP, ni
-// les identifiants WebAuthn : step-023 et step-024 les liront quand elles auront de quoi les
-// exercer, et les charger ici les ferait traverser une frontière pour rien.
+// les identifiants WebAuthn : le second facteur les lit dans `mfa.go`, et les charger ici les ferait
+// traverser une frontière pour rien.
 type Operator struct {
 	// ID est l'UUID en texte. Le paquet n'introduit pas de type UUID : rien dans ce dépôt n'en
 	// manipule un, et pgx rend l'aller-retour `text` ↔ `uuid` sans conversion à écrire.
@@ -56,12 +56,18 @@ type Operator struct {
 // existe.
 const StatusActive = "active"
 
-// ScopeEmail et ScopeSource nomment les deux dimensions comptées. Ce sont les deux valeurs que la
-// contrainte `CHECK` de la migration 00004 admet ; les écrire ici plutôt qu'en littéral dans trois
-// requêtes est ce qui fait qu'une faute de frappe est refusée par le compilateur et non par la base.
+// Les trois dimensions comptées. Ce sont les trois valeurs que la contrainte `CHECK` admet —
+// migration 00004 pour les deux premières, 00007 pour la troisième ; les écrire ici plutôt qu'en
+// littéral dans les requêtes est ce qui fait qu'une faute de frappe est refusée par le compilateur et
+// non par la base.
+//
+// `ScopeSecondFactor` est comptée par `mfa.go`, sur l'identifiant de l'opérateur. Elle partage cette
+// table et son mécanisme d'incrément atomique plutôt que d'en avoir une jumelle, qui en serait une
+// seconde rédaction.
 const (
-	ScopeEmail  = "email"
-	ScopeSource = "source"
+	ScopeEmail        = "email"
+	ScopeSource       = "source"
+	ScopeSecondFactor = "mfa"
 )
 
 // OperatorByEmail rend l'opérateur correspondant à une adresse **déjà minusculée**, ou nil.
@@ -230,10 +236,10 @@ func (l *Logins) ClearFailures(ctx context.Context, emailKey string) error {
 // décalées émettraient sinon des challenges qui n'expirent pas au même moment, et le second facteur
 // refuserait un jeton que l'autre instance tient encore pour valide.
 //
-// Ce paquet ne livre pas de quoi **consommer** un challenge, et c'est délibéré : la consommation est
-// le geste de `POST /auth/mfa/verify`, qui appartient à step-023. La livrer ici produirait ce que ce
-// dépôt a déjà refusé deux fois — un artefact qu'aucun appelant n'atteint. L'usage unique, lui, est
-// porté dès maintenant par le schéma : `consumed_at` et l'unicité de `token_hash` (migration 00004).
+// Ce fichier n'émet que le challenge. Le **consommer** est le geste de `POST /auth/mfa/verify`, donc
+// du second facteur : il vit dans `mfa.go`, avec la lecture qui vérifie qu'il est encore utilisable et
+// le compteur d'essais qui le borne. L'usage unique, lui, est porté par le schéma depuis le premier
+// jour : `consumed_at` et l'unicité de `token_hash` (migration 00004).
 func (l *Logins) IssueChallenge(ctx context.Context, operatorID string, tokenHash []byte,
 	ttl time.Duration,
 ) (time.Time, error) {

@@ -104,9 +104,9 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 
 	switch verdict.Outcome {
 	case auth.OutcomeChallenged:
-		// La session naît ici, au franchissement du premier facteur, et **non élevée** : c'est
-		// step-023 et step-024 qui vérifieront le second. L'ouvrir plus tard laisserait l'enrôlement
-		// d'un authentificateur (step-023) sans rien pour dire de qui il s'agit, donc permettrait
+		// La session naît ici, au franchissement du premier facteur, et **non élevée** :
+		// `POST /auth/mfa/verify` l'élève, step-024 y ajoutera WebAuthn. L'ouvrir plus tard laisserait
+		// l'enrôlement d'un authentificateur sans rien pour dire de qui il s'agit, donc permettrait
 		// d'attacher une clé à un compte qu'on ne détient pas.
 		if sessionErr := a.closePresentedSession(ctx); sessionErr != nil {
 			return nil, sessionErr

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
+	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 )
 
@@ -45,6 +46,10 @@ type API struct {
 	// Sessions ouvre, résout et ferme les sessions. Le premier facteur et la session sont deux
 	// collaborateurs distincts : c'est ici qu'ils se composent, et nulle part plus bas.
 	Sessions *session.Manager
+	// SecondFactor enrôle et vérifie le second facteur, et c'est le troisième collaborateur distinct.
+	// Ni `auth` ni `session` ne le connaissent : le premier n'a rien à voir avec lui, et le second
+	// n'apprend que le geste d'élévation, qui lui appartient.
+	SecondFactor *mfa.Manager
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le

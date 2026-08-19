@@ -59,21 +59,26 @@ La signature de session, le sel d'anti-brute-force et le chiffrement des secrets
 repli**, et c'est délibéré — une clé codée en dur serait publique, donc n'importe qui signerait une
 session. `openssl rand -base64 48` fait le travail.
 
-**Deux des trois existent aujourd'hui** : `DASHBOARD_BRUTEFORCE_SALT` (step-021), qui masque les
-adresses sources dans la table des compteurs d'échecs, et `DASHBOARD_SESSION_SECRET` (step-022), qui
-scelle le cookie de session. Le chiffrement TOTP arrive en step-023 ; le chercher dans `.env.example`
-avant sa step serait le chercher en vain.
+**Les trois existent** : `DASHBOARD_BRUTEFORCE_SALT` (step-021), qui masque les adresses sources dans
+la table des compteurs d'échecs, `DASHBOARD_SESSION_SECRET` (step-022), qui scelle le cookie de
+session, et `DASHBOARD_TOTP_ENCRYPTION_KEY` (step-023), dont se dérive la clé qui chiffre les secrets
+TOTP au repos. Les trois s'obtiennent de la même façon et portent la même borne de 32 caractères.
 
-Les deux ne se remplacent pas de la même façon : changer le sel n'invalide aucun compte, changer la
-clé de session **déconnecte tout le monde** — et toutes les instances doivent porter la même, sans
-quoi le cookie émis par l'une serait refusé par l'autre.
+Ce qu'une rotation coûte n'est en revanche pas le même de l'une à l'autre, et l'écart est large :
+changer le sel n'invalide aucun compte ; changer la clé de session **déconnecte tout le monde**, à
+l'instant ; changer la clé de chiffrement TOTP **enferme tout le monde dehors** — les secrets déjà en
+base ne se déchiffrent plus, codes de récupération compris, et la seule sortie est le réenrôlement de
+chaque opérateur par un détenteur d'`operators:manage` (step-029). La perdre a exactement le même
+effet que la changer.
+
+Les trois doivent être **identiques sur toutes les instances**, mais pour trois symptômes distincts :
+un cookie émis par l'une serait refusé par l'autre, un second facteur vérifiable ici et pas là, et —
+pour le sel — des compteurs d'anti-brute-force qui se scindent **sans qu'aucun refus ne le signale**,
+donc un verrouillage qui s'affaiblit en silence.
 
 Contrairement à la v1.0, **le serveur refuse de démarrer** si une variable obligatoire manque, en la
 nommant (step-000). Un démarrage réussi suivi d'une erreur à la première requête d'authentification
 laissait croire que l'installation était bonne.
-
-La clé qui chiffre les secrets TOTP au repos mérite une attention à part : **la perdre rend illisibles
-tous les seconds facteurs**, codes de récupération compris.
 
 ### `make bootstrap` prépare une installation neuve
 

@@ -165,7 +165,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 28
+const minimumScenarios = 45
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -220,6 +220,8 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 		sessions.refusalSaysNothingAboutTheSession)
 	ctx.Then(`^redemander "([^"]*)" est refusé de même$`, sessions.refusedAgain)
 
+	(&mfaWorld{login: login, session: sessions}).registerSteps(ctx)
+
 	ctx.Given(`^une base dont le schéma est en retard d'une migration$`, schema.outdatedSchema)
 	ctx.Given(`^une base vierge$`, schema.freshSchema)
 	ctx.Given(`^l'adresse d'écoute déjà occupée$`, schema.occupyListenAddress)
@@ -255,7 +257,17 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 // ne finit pas, et le hook de fin — celui qui tue l'enfant — n'est alors jamais atteint. Le hook a
 // lui aussi sa borne : au-delà, il rend la main sans avoir constaté la mort de l'enfant, ce qui vaut
 // mieux qu'un scénario suspendu, mais reste un abandon.
-var browser = &http.Client{Timeout: 2 * time.Second}
+//
+// **C'est une borne anti-suspension, pas une assertion de performance**, et deux secondes ne le
+// disaient plus depuis step-023 : `POST /auth/mfa/totp/enroll` hache dix codes de récupération en
+// argon2id, soit 269 ms sur un M4 Pro et 504 ms sur deux cœurs (mesuré le 19/08/2026). Sur le runner
+// de la CI — mémoire plus lente, et `go test ./...` qui fait tourner plusieurs paquets à la fois,
+// chacun avec ses argon2id à 64 MiB — les douze scénarios d'enrôlement dépassaient les deux secondes.
+//
+// Quinze secondes ne masquent aucun défaut du produit : le pic mémoire d'un enrôlement est celui d'un
+// login (131 MiB, les hachages étant séquentiels), et c'est un geste unique par opérateur. Ce que la
+// borne doit attraper est un serveur qui ne répond **plus**, et quinze secondes l'attrapent.
+var browser = &http.Client{Timeout: 15 * time.Second}
 
 // completeConfiguration est le plus petit environnement avec lequel le binaire démarre. Le port 0
 // laisse le système en choisir un libre, et le mode `mock` n'exige de la passerelle que son adresse —
@@ -276,6 +288,10 @@ func completeConfiguration() map[string]string {
 		// Obligatoire depuis step-022, et sans repli de même. Les scénarios de session, eux, relisent
 		// bien ce que cette clé scelle : c'est le serveur qui signe et vérifie, jamais le harnais.
 		"DASHBOARD_SESSION_SECRET": "une-cle-de-scenario-assez-longue-pour-la-borne",
+		// Obligatoire depuis step-023, et sans repli de même. Le harnais ne la relit jamais : le secret
+		// TOTP lui arrive **en clair par la réponse d'enrôlement**, qui existe pour ça, donc aucun
+		// scénario n'a besoin de déchiffrer une colonne.
+		"DASHBOARD_TOTP_ENCRYPTION_KEY": "une-cle-de-chiffrement-de-scenario-assez-longue",
 	}
 }
 

@@ -72,7 +72,13 @@ const seedSQL = `
 	VALUES ('` + seedOperator + `', 'cdr_search', '{"status": "failed"}'::jsonb, 'Échecs du jour');
 
 	INSERT INTO sessions (operator_id, token_hash, expires_at)
-	VALUES ('` + seedOperator + `', '\\x01'::bytea, now() + interval '12 hours');`
+	VALUES ('` + seedOperator + `', '\\x01'::bytea, now() + interval '12 hours');
+
+	INSERT INTO mfa_recovery_codes (operator_id, code_hash)
+	VALUES ('` + seedOperator + `', '$argon2id$v=19$m=65536,t=3,p=4$c2Vsc2Vsc2Vsc2Vsc2Vs$aGFzaA');
+
+	INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
+	VALUES ('mfa', '` + seedOperator + `', 1, now());`
 
 func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 	t.Parallel()
@@ -106,10 +112,11 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			sqlstate: uniqueViolation,
 		},
 		{
-			// Les deux dimensions comptées sont fermées par le schéma. Une troisième valeur écrite par
-			// erreur ne serait comptée par rien et ne verrouillerait rien : le refus est le seul
-			// symptôme possible.
-			name: "un compteur d'échecs ne connaît que deux dimensions",
+			// Les trois dimensions comptées sont fermées par le schéma — la troisième, `mfa`, est
+			// posée par le décor ci-dessus, donc une contrainte trop serrée tomberait là. Une quatrième
+			// valeur écrite par erreur ne serait comptée par rien et ne verrouillerait rien : le refus
+			// est le seul symptôme possible.
+			name: "un compteur d'échecs ne connaît que ses trois dimensions",
 			act: `INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
 				VALUES ('empreinte', 'x', 1, now())`,
 			sqlstate: checkViolation,
@@ -131,6 +138,15 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			act: `INSERT INTO mfa_challenges (operator_id, token_hash, created_at, expires_at)
 				VALUES ('` + seedOperator + `', '\\x00'::bytea, now(), now() - interval '1 second')`,
 			sqlstate: checkViolation,
+		},
+		{
+			// Un code de récupération qui ne désigne personne serait accepté par quiconque : la
+			// confrontation cherche les codes **d'un opérateur**, et une ligne orpheline n'appartient à
+			// aucun.
+			name: "un code de récupération appartient à un opérateur qui existe",
+			act: `INSERT INTO mfa_recovery_codes (operator_id, code_hash)
+				VALUES ('01900000-0000-7000-8000-0000000000ff', 'hash')`,
+			sqlstate: foreignKeyViolation,
 		},
 		{
 			// L'unicité est ce que la résolution emprunte — on retrouve une session **par son jeton**.
