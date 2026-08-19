@@ -219,12 +219,19 @@ le QR et le téléchargement des codes → step-028. La réinitialisation du sec
 opérateur → step-029.
 
 ## Suivis ouverts
-- **`POST /auth/mfa/totp/enroll` n'est borné par rien**, et chaque appel coûte au serveur 269 ms de
-  processeur et 64 MiB de pic — mesuré le 12/08/2026 par `BenchmarkEnrolement`, dix argon2id. Un
-  remplacement est borné par la preuve qu'il exige, mais le **premier** enrôlement d'un compte non
-  encore enrôlé ne l'est pas : une session de premier facteur suffit à le répéter. C'est le mode
-  d'échec que `internal/auth/argon2.go` invoque pour fermer les profils à 512 MiB, sur un chemin ajouté
-  ailleurs. À borner par step-025, qui reprend ce chemin.
+- **`POST /auth/mfa/totp/enroll` n'est borné par aucun compteur**, contrairement à la vérification :
+  une session de premier facteur suffit à le répéter, puisqu'un remplacement seul exige une preuve.
+  À borner par step-025, qui reprend ce chemin.
+
+  **La première rédaction de ce suivi le surdimensionnait, et c'est corrigé ici** (19/08/2026). Elle
+  disait « 269 ms et 64 MiB de pic » en citant l'avertissement d'`internal/auth/argon2.go` sur les
+  profils à 512 MiB. Cet avertissement porte sur le pic **simultané** — or les dix hachages sont
+  séquentiels. Mesuré : le pic système d'un enrôlement est de 131 MiB, **exactement celui d'un login**
+  ; seul le total alloué diffère (640 contre 64 MiB), et il est transitoire. Le coût réel est donc dix
+  fois plus de processeur par requête que `/auth/login`, sur une porte qui exige un mot de passe valide
+  là où celle-ci est ouverte à tous. La porte la plus large existe déjà et n'est pas de cette step.
+  Un raisonnement juste transposé à un objet où il ne s'applique pas — le même défaut que la revue a
+  trouvé trois fois ailleurs dans cette PR.
 - **Le premier enrôlement est libre pour toute session de premier facteur.** Sur un déploiement neuf,
   aucun opérateur n'est enrôlé : un mot de passe volé pendant cette fenêtre vaut un compte complet,
   second facteur compris. C'est le problème d'amorçage classique du MFA, et DN-6 l'assume — mais la
@@ -236,3 +243,8 @@ opérateur → step-029.
 - **Le conteneur PostgreSQL des scénarios meurt parfois sous la charge** (`terminating connection due
   to unexpected postmaster exit`), observé deux fois pendant les mesures de mutation. Ce n'est pas un
   défaut du produit, mais ça rend une suite rouge sans cause lisible.
+- **Le timeout du harnais godog est passé de 2 s à 15 s** (19/08/2026), parce que l'enrôlement le
+  dépassait sur le runner de la CI. C'est une borne anti-suspension et non une assertion de
+  performance — la raison est écrite là où elle vit, sur `browser` dans `cmd/dashboard/main_test.go`.
+  Ce qu'on perd : une régression qui rendrait une route dix fois plus lente ne rougirait plus ici. Rien
+  ne la garderait par ailleurs, et c'était déjà vrai à deux secondes.

@@ -257,7 +257,17 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 // ne finit pas, et le hook de fin — celui qui tue l'enfant — n'est alors jamais atteint. Le hook a
 // lui aussi sa borne : au-delà, il rend la main sans avoir constaté la mort de l'enfant, ce qui vaut
 // mieux qu'un scénario suspendu, mais reste un abandon.
-var browser = &http.Client{Timeout: 2 * time.Second}
+//
+// **C'est une borne anti-suspension, pas une assertion de performance**, et deux secondes ne le
+// disaient plus depuis step-023 : `POST /auth/mfa/totp/enroll` hache dix codes de récupération en
+// argon2id, soit 269 ms sur un M4 Pro et 504 ms sur deux cœurs (mesuré le 19/08/2026). Sur le runner
+// de la CI — mémoire plus lente, et `go test ./...` qui fait tourner plusieurs paquets à la fois,
+// chacun avec ses argon2id à 64 MiB — les douze scénarios d'enrôlement dépassaient les deux secondes.
+//
+// Quinze secondes ne masquent aucun défaut du produit : le pic mémoire d'un enrôlement est celui d'un
+// login (131 MiB, les hachages étant séquentiels), et c'est un geste unique par opérateur. Ce que la
+// borne doit attraper est un serveur qui ne répond **plus**, et quinze secondes l'attrapent.
+var browser = &http.Client{Timeout: 15 * time.Second}
 
 // completeConfiguration est le plus petit environnement avec lequel le binaire démarre. Le port 0
 // laisse le système en choisir un libre, et le mode `mock` n'exige de la passerelle que son adresse —
