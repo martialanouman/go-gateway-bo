@@ -38,8 +38,9 @@ type webauthnWorld struct {
 	// passkeys sont les identifiants que le serveur a rendus, dans le même ordre — c'est par eux qu'on
 	// retire, jamais par l'identifiant que l'authentificateur s'est choisi.
 	passkeys []string
-	// presented est la dernière assertion envoyée, telle quelle. Le rejeu la renvoie **à la lettre** :
-	// en recomposer une signerait un autre défi et ne prouverait rien de l'anti-rejeu.
+	// presented est la dernière réponse d'authentificateur envoyée — attestation ou assertion —, telle
+	// quelle. Le rejeu la renvoie **à la lettre** : en recomposer une signerait un autre défi et ne
+	// prouverait rien de l'anti-rejeu.
 	presented string
 }
 
@@ -54,7 +55,7 @@ func (w *webauthnWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^l'opérateur a présenté sa clé d'accès$`, w.assertPasskey)
 	ctx.When(`^l'opérateur présente sa clé d'accès$`, w.assertPasskey)
 	ctx.When(`^l'opérateur ouvre une assertion sans clé enregistrée$`, w.beginAssertion)
-	ctx.When(`^l'opérateur représente exactement la même assertion$`, w.replayTheSameAssertion)
+	ctx.When(`^l'opérateur représente exactement la même attestation$`, w.replayTheSameAttestation)
 	ctx.When(`^l'opérateur ouvre une assertion puis finit un enregistrement avec ce défi$`,
 		w.finishRegistrationWithAnAssertionChallenge)
 	ctx.When(`^l'opérateur ouvre une assertion puis se reconnecte avant de la finir$`,
@@ -102,6 +103,7 @@ func (w *webauthnWorld) registerPasskey() error {
 	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 	attestation := virtualwebauthn.CreateAttestationResponse(w.relyingParty(ceremonyOrigin),
 		w.authenticator, credential, *options)
+	w.presented = attestation
 
 	if err = w.finishRegistration(attestation); err != nil {
 		return err
@@ -202,14 +204,18 @@ func (w *webauthnWorld) presentAssertion(assertion string) error {
 	return w.login.process.post("/api/auth/mfa/verify", string(body))
 }
 
-// replayTheSameAssertion renvoie **à la lettre** ce qui vient d'être envoyé. En recomposer une
-// signerait un autre défi et ne dirait rien de l'anti-rejeu.
-func (w *webauthnWorld) replayTheSameAssertion() error {
+// replayTheSameAttestation renvoie **à la lettre** l'attestation qui vient d'enregistrer une clé.
+//
+// Sur l'enregistrement et non sur l'assertion, et c'est ce qui donne sa valeur au pas : le chemin
+// d'assertion porte un challenge de premier facteur, consommé au succès, qui refuserait le rejeu
+// avant que le défi de cérémonie n'ait son mot à dire. Mesuré, en retirant la consommation du défi :
+// la première rédaction de ce scénario restait verte.
+func (w *webauthnWorld) replayTheSameAttestation() error {
 	if w.presented == "" {
-		return errors.New("aucune assertion déjà présentée : le scénario n'a rien à rejouer")
+		return errors.New("aucune attestation déjà présentée : le scénario n'a rien à rejouer")
 	}
 
-	return w.presentAssertion(w.presented)
+	return w.finishRegistration(w.presented)
 }
 
 // finishRegistrationWithAnAssertionChallenge ouvre une cérémonie d'**assertion**, puis présente sa

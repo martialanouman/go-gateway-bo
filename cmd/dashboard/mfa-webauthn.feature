@@ -36,17 +36,19 @@ Fonctionnalité: Le second facteur par passkey
     Alors la réponse est conforme au contrat du BFF
     Et la réponse conduit vers l'enrôlement
 
-  Scénario: un défi d'assertion déjà servi ne se rejoue pas
+  Scénario: une attestation d'enregistrement déjà servie ne se rejoue pas
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
     Et une clé d'accès enregistrée
-    Et l'opérateur a présenté sa clé d'accès
-    # Le défi a été consommé par la présentation réussie. Le rejouer présente une assertion
-    # parfaitement signée, pour un défi qui n'existe plus.
-    Quand l'opérateur représente exactement la même assertion
+    # Le rejeu porte sur l'**enregistrement** et non sur l'assertion, et c'est une correction : sur le
+    # chemin d'assertion, le challenge de premier facteur est consommé au succès et refuse le rejeu
+    # avant que le défi de cérémonie n'ait son mot à dire. Mesuré — le défi jamais consommé laissait
+    # ce scénario vert dans sa première rédaction. L'enregistrement, lui, n'exige aucun challenge :
+    # le défi de cérémonie y est la seule garde.
+    Quand l'opérateur représente exactement la même attestation
     Alors la réponse est conforme au contrat du BFF
-    Et le second facteur est refusé
+    Et la cérémonie est refusée
 
   Scénario: un défi d'assertion ne finit pas un enregistrement
     Étant donné une installation avec un opérateur
@@ -55,6 +57,11 @@ Fonctionnalité: Le second facteur par passkey
     Et une clé d'accès enregistrée
     # L'assertion ouverte ici tire un défi d'objet « assertion ». Le présenter à la finition d'un
     # enregistrement laisserait enrôler une clé neuve sans rien prouver.
+    #
+    # **Ce scénario ne garde pas à lui seul le contrôle d'objet**, et c'est mesuré : le `purpose`
+    # retiré du `WHERE`, il reste vert — parce que l'analyseur d'attestation refuse de toute façon
+    # une réponse d'assertion. Deux gardes, dont l'une masque l'autre ici. Celle qui compte est tenue
+    # par `TestUnDefiDAssertionNeSeRelitPasCommeUnEnregistrement`, qui rougit, lui.
     Quand l'opérateur ouvre une assertion puis finit un enregistrement avec ce défi
     Alors la réponse est conforme au contrat du BFF
     Et la cérémonie est refusée
@@ -65,6 +72,11 @@ Fonctionnalité: Le second facteur par passkey
     Et l'opérateur se connecte avec son mot de passe
     Et une clé d'accès enregistrée
     # Le même opérateur, et pourtant non : une cérémonie ne traverse pas deux sessions.
+    #
+    # **Ce scénario ne garde pas à lui seul le contrôle de session**, et c'est mesuré : la session
+    # retirée du `WHERE`, il reste vert — parce que se reconnecter ferme la session précédente, et
+    # que la clé étrangère emporte ses défis en cascade. Deux gardes là encore. Celle du `WHERE` est
+    # tenue par `TestLeDefiDUneAutreSessionNeSeRelitPas`.
     Quand l'opérateur ouvre une assertion puis se reconnecte avant de la finir
     Alors la réponse est conforme au contrat du BFF
     Et le second facteur est refusé
