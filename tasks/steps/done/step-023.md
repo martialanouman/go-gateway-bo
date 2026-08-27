@@ -244,9 +244,23 @@ ici sans porteur, et une fiche de `done/` n'est ouverte par personne.)*
   sous le même nom dans le téléphone d'un opérateur qui enrôle les deux.
 - **`minimumTOTPEncryptionKeyLength` compte des caractères, pas de l'entropie.** Trente-deux `a` de
   suite passent. Le README recommande un CSPRNG ; rien ne l'applique.
-- **Le conteneur PostgreSQL des scénarios meurt parfois sous la charge** (`terminating connection due
-  to unexpected postmaster exit`), observé deux fois pendant les mesures de mutation. Ce n'est pas un
-  défaut du produit, mais ça rend une suite rouge sans cause lisible.
+- **Le conteneur PostgreSQL des scénarios meurt parfois sous la charge**, et **ce n'est pas un
+  problème d'outillage local** : mesuré le 27/08/2026 en relisant le journal du job en échec de la
+  PR 52, c'est lui qui a fait rougir « Tests Go » sur la CI — `connection refused` sur le port du
+  conteneur, en plein milieu de la suite. Cet échec a bloqué un bump de `kin-openapi` pendant huit
+  jours en faisant croire à une rupture de la bibliothèque, alors que la même version passe toute la
+  suite sur un `main` à jour. Le coût n'est donc pas l'inconfort d'une suite rouge : c'est une
+  dépendance qu'on n'ose plus bumper, et un diagnostic qu'il faut refaire à la main.
+
+  *(Une rédaction du 27/08 avait annoncé le retrait de cette entrée et de la suivante, au motif
+  qu'elles n'étaient pas des dettes du produit. Le retrait n'a jamais eu lieu — le message de commit
+  décrivait une intention et non le diff — et il aurait été faux : la preuve ci-dessus est arrivée
+  une heure plus tard.)*
+
+  Le symptôme en local est différent et vient du même défaut : `terminating connection due to
+  unexpected postmaster exit`, observé deux fois pendant les mesures de mutation de step-023 et une
+  fois pendant celles de step-024. Ce n'est pas un défaut du produit, mais ça rend une suite rouge
+  sans cause lisible — et, on le sait maintenant, ça se paie aussi en CI.
 - **Le timeout du harnais godog est passé de 2 s à 15 s** (19/08/2026), parce que l'enrôlement le
   dépassait sur le runner de la CI. C'est une borne anti-suspension et non une assertion de
   performance — la raison est écrite là où elle vit, sur `browser` dans `cmd/dashboard/main_test.go`.
