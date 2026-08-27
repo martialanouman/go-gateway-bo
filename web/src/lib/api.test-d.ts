@@ -96,7 +96,7 @@ expectTypeOf<MeOperation['responses'][200]['content']['application/json']>().toE
   operator: { id: string; email: string; displayName: string }
   permissions: string[]
   elevated: boolean
-  secondFactors: { totp: boolean; recoveryCodesRemaining: number }
+  secondFactors: { totp: boolean; recoveryCodesRemaining: number; passkeys: number }
   absoluteExpiresAt: string
 }>()
 
@@ -153,13 +153,21 @@ expectTypeOf<EnrollOperation['requestBody']['content']['application/json']>().to
 
 type VerifyOperation = paths['/auth/mfa/verify']['post']
 
-// `method` est une union fermée et non une chaîne : un client qui inventerait une troisième valeur
-// rougit ici plutôt qu'au 400 du serveur. step-024 y ajoutera `'webauthn'`, et cette ligne obligera à
-// traiter le nouveau cas.
+// `method` est une union fermée et non une chaîne : un client qui inventerait une quatrième valeur
+// rougit ici plutôt qu'au 400 du serveur.
+//
+// `code` et `assertion` sont **tous deux facultatifs**, et c'est ce que le type doit dire : une
+// assertion de passkey n'a pas de code, un code TOTP n'a pas d'assertion. Le contrat ne sait pas
+// exprimer deux champs qui s'excluent — c'est le serveur qui le tient, et son 400 qui le dit.
+//
+// `assertion` est `{ [key: string]: unknown }` et non `Record<string, never>` : la seconde forme est
+// ce qu'`openapi-typescript` produit pour un `type: object` sans `additionalProperties`, et **aucune
+// clé ne peut y être écrite**. Mesuré à l'écriture de step-024, avant qu'un écran n'en dépende.
 expectTypeOf<VerifyOperation['requestBody']['content']['application/json']>().toEqualTypeOf<{
   challenge: string
-  method: 'totp' | 'recovery_code'
-  code: string
+  method: 'totp' | 'recovery_code' | 'webauthn'
+  code?: string
+  assertion?: { [key: string]: unknown }
 }>()
 
 // Aucun corps en retour sur le succès : ce que la session ouvre désormais se relit sur `/auth/me`,
@@ -169,3 +177,85 @@ expectTypeOf<VerifyOperation['requestBody']['content']['application/json']>().to
 // pas », l'autre « arrêtez d'essayer pendant un quart d'heure ». Les confondre ferait boucler l'écran
 // sur un formulaire qui ne peut plus rien accepter.
 expectTypeOf<keyof VerifyOperation['responses']>().toEqualTypeOf<204 | 400 | 401 | 429>()
+
+/**
+ * `POST /api/auth/mfa/webauthn/*` — step-024. Les deux cérémonies de passkey.
+ *
+ * Ce que ces assertions tiennent que les autres ne tiennent pas : les options rendues sont **des DTO
+ * déclarés champ par champ**, non le type de la bibliothèque serveur. Un bump qui ajouterait un champ
+ * ne le ferait donc pas traverser jusqu'ici en silence — il rougirait sur ces lignes.
+ */
+
+type BeginRegistrationOperation = paths['/auth/mfa/webauthn/register/begin']['post']
+
+// L'enveloppe `publicKey` est ce que `navigator.credentials.create()` attend : le client passe l'objet
+// tel quel, sans le reconstruire.
+expectTypeOf<
+  BeginRegistrationOperation['responses'][200]['content']['application/json']['publicKey']
+>().toEqualTypeOf<{
+  rp: { id: string; name: string }
+  user: { id: string; name: string; displayName: string }
+  challenge: string
+  pubKeyCredParams: { type: 'public-key'; alg: number }[]
+  timeout?: number
+  excludeCredentials?: { type: 'public-key'; id: string; transports?: string[] }[]
+  authenticatorSelection?: { residentKey?: string; userVerification?: string }
+}>()
+
+// Le 409 en fait partie, et le client doit le traiter comme un cas normal : c'est un opérateur qui
+// ajoute un appareil sans avoir franchi le facteur en place. Un toast d'erreur là où il faut une
+// explication serait le pire des rendus.
+expectTypeOf<keyof BeginRegistrationOperation['responses']>().toEqualTypeOf<200 | 401 | 409>()
+
+// Aucun corps à envoyer : le serveur sait qui demande par le cookie, et ce que l'opérateur détient
+// par sa propre lecture. Rien à composer, donc rien à oublier de composer.
+expectTypeOf<BeginRegistrationOperation['requestBody']>().toEqualTypeOf<undefined>()
+
+type FinishRegistrationOperation = paths['/auth/mfa/webauthn/register/finish']['post']
+
+// L'attestation traverse **telle quelle**. `{ [key: string]: unknown }` et non `Record<string,
+// never>` : la seconde forme n'accepterait aucune clé.
+expectTypeOf<
+  FinishRegistrationOperation['requestBody']['content']['application/json']
+>().toEqualTypeOf<{ attestation: { [key: string]: unknown } }>()
+
+// Seul l'identifiant en retour, et c'est ce dont le client a besoin : de quoi la retirer plus tard.
+// Rien de la clé — pas même publique, qu'aucun écran n'affiche.
+expectTypeOf<
+  FinishRegistrationOperation['responses'][200]['content']['application/json']
+>().toEqualTypeOf<{ id: string }>()
+
+// Le 409 dit qu'un second facteur est apparu **entre** l'ouverture de la cérémonie et sa finition, sur
+// une session non élevée. Le client doit le distinguer du 401 : le premier se rattrape en franchissant
+// le facteur, le second en reprenant la cérémonie.
+expectTypeOf<keyof FinishRegistrationOperation['responses']>().toEqualTypeOf<
+  200 | 400 | 401 | 409
+>()
+
+type BeginAssertionOperation = paths['/auth/mfa/webauthn/assert/begin']['post']
+
+expectTypeOf<
+  BeginAssertionOperation['responses'][200]['content']['application/json']['publicKey']
+>().toEqualTypeOf<{
+  challenge: string
+  timeout?: number
+  rpId?: string
+  allowCredentials?: { type: 'public-key'; id: string; transports?: string[] }[]
+  userVerification?: string
+}>()
+
+// Le 400 dit « aucune passkey enregistrée », et c'est une impasse et non une panne : l'écran doit
+// conduire à l'enrôlement. Le distinguer du 401 est ce qui lui permet de le faire.
+expectTypeOf<keyof BeginAssertionOperation['responses']>().toEqualTypeOf<200 | 400 | 401>()
+
+type DeletePasskeyOperation = paths['/auth/mfa/webauthn/passkeys/{passkeyId}']['delete']
+
+// Le seul paramètre de chemin du contrat à ce jour. C'est l'identifiant rendu à l'enregistrement,
+// jamais celui que l'authentificateur s'est choisi — celui-là est binaire et n'a rien à faire dans
+// une URL.
+expectTypeOf<DeletePasskeyOperation['parameters']['path']>().toEqualTypeOf<{ passkeyId: string }>()
+
+// Le 409 est ce qui permet au client de ne pas proposer un retrait qui échouera : croisé avec
+// `secondFactors`, il sait d'avance que la dernière passkey d'un compte sans TOTP est verrouillée, et
+// peut désactiver le contrôle **en l'expliquant** plutôt que de laisser l'opérateur le découvrir.
+expectTypeOf<keyof DeletePasskeyOperation['responses']>().toEqualTypeOf<204 | 401 | 409>()

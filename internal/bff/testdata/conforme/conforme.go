@@ -47,4 +47,38 @@ func (API) VerifyMfa(_ context.Context, _ bff.VerifyMfaRequestObject) (bff.Verif
 	return bff.VerifyMfa204Response{}, nil
 }
 
+// Les quatre cérémonies WebAuthn sont identiques dans les deux fixtures, pour la même raison que
+// `Login` : ce que la porte mesure est l'écart sur `Health`, et une méthode qui différerait ici
+// brouillerait la mesure — le compilateur nommerait la méthode manquante plutôt que la signature
+// divergente.
+func (API) BeginWebauthnRegistration(_ context.Context,
+	_ bff.BeginWebauthnRegistrationRequestObject,
+) (bff.BeginWebauthnRegistrationResponseObject, error) {
+	return bff.BeginWebauthnRegistration401JSONResponse{
+		Code: "unauthenticated", Message: "Reconnectez-vous.",
+	}, nil
+}
+
+func (API) FinishWebauthnRegistration(_ context.Context,
+	_ bff.FinishWebauthnRegistrationRequestObject,
+) (bff.FinishWebauthnRegistrationResponseObject, error) {
+	return bff.FinishWebauthnRegistration401JSONResponse{
+		Code: "unauthenticated", Message: "Reconnectez-vous.",
+	}, nil
+}
+
+func (API) BeginWebauthnAssertion(_ context.Context,
+	_ bff.BeginWebauthnAssertionRequestObject,
+) (bff.BeginWebauthnAssertionResponseObject, error) {
+	return bff.BeginWebauthnAssertion401JSONResponse{
+		Code: "unauthenticated", Message: "Reconnectez-vous.",
+	}, nil
+}
+
+func (API) DeleteWebauthnPasskey(_ context.Context,
+	_ bff.DeleteWebauthnPasskeyRequestObject,
+) (bff.DeleteWebauthnPasskeyResponseObject, error) {
+	return bff.DeleteWebauthnPasskey204Response{}, nil
+}
+
 var _ = bff.NewStrictHandler(API{}, nil)

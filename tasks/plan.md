@@ -112,13 +112,13 @@ Aucune autre bibliothèque pour ces rôles sans décision d'équipe.
 | WebSocket | `coder/websocket` | v1.8.15 |
 | PostgreSQL | `jackc/pgx/v5` | v5.10.0 |
 | Génération OpenAPI | `oapi-codegen/oapi-codegen/v2` | v2.8.0 |
-| WebAuthn | `go-webauthn/webauthn` | v0.17.4 |
+| WebAuthn | `go-webauthn/webauthn` | v0.18.0 |
 | TOTP | `pquerna/otp` | v1.5.0 |
 | Redis Pub/Sub | `redis/go-redis/v9` | v9.21.0 |
 | Hachage | `golang.org/x/crypto/argon2` | — |
 | Assets embarqués | `embed` (stdlib) | — |
 | BDD (scénarios Gherkin) | `cucumber/godog` | v0.16.0 |
-| Assertions | `stretchr/testify` | v1.11.1 |
+| Assertions | `stretchr/testify` | v1.12.1 |
 
 **Moitié client** — versions installées, à revérifier via `ctx7` à chaque bump :
 

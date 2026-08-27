@@ -45,12 +45,12 @@ Versions Go relevées sur `proxy.golang.org` le 01/08/2026 ; versions JS telles 
 | WebSocket | `coder/websocket` | v1.8.15 |
 | PostgreSQL | `jackc/pgx/v5` | v5.10.0 |
 | Génération OpenAPI | `oapi-codegen/oapi-codegen/v2` | v2.8.0 |
-| WebAuthn | `go-webauthn/webauthn` | v0.17.4 |
+| WebAuthn | `go-webauthn/webauthn` | v0.18.0 |
 | TOTP | `pquerna/otp` | v1.5.0 |
 | Redis Pub/Sub | `redis/go-redis/v9` | v9.21.0 |
 | Hachage | `golang.org/x/crypto/argon2` | — |
 | Assets embarqués | `embed` (stdlib) | — |
-| **BDD** | `cucumber/godog` + `stretchr/testify` | v0.16.0 / v1.11.1 |
+| **BDD** | `cucumber/godog` + `stretchr/testify` | v0.16.0 / v1.12.1 |
 | Socle client | React + Vite | 19.2.8 / 8.1.5 |
 | Routage | `@tanstack/react-router` + `router-plugin` | 1.170.x |
 | État serveur | `@tanstack/react-query` | 5.101.4 |
@@ -136,7 +136,7 @@ qui restait à payer au bump n'avait effectivement pas grossi.
 - [x] step-021 — Login email/mot de passe (**argon2id**) + anti-brute-force partagé entre instances
 - [x] step-022 — Session BFF (cookie signé) + `/auth/me` + `/auth/logout`
 - [x] step-023 — MFA TOTP : enrôlement, vérification, codes de récupération
-- [ ] step-024 — MFA WebAuthn / passkey
+- [x] step-024 — MFA WebAuthn / passkey
 - [ ] step-025 — `RequirePermission` + journal d'audit + MFA obligatoire  *(invariant c)*
 - [ ] step-026 — DTO de sortie déclarés partout + test bloquant  *(invariant a, moitié structurelle)*
 - [ ] step-027 — Écrans Login & MFA, branchés sur le BFF Go †

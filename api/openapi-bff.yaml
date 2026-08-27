@@ -12,13 +12,13 @@
 #
 # Ce qui l'acquitte devant la porte anti-copie de `internal/gateway` est le **compte d'opérations
 # qu'il déclare en commun avec les contrats de la passerelle**, et rien d'autre. **Re-sondé le
-# 12/08/2026** à l'ajout de `POST /auth/mfa/totp/enroll` et `POST /auth/mfa/verify`, en rejouant la
-# mesure plutôt qu'en la déduisant :
+# 27/08/2026** à l'ajout des quatre opérations WebAuthn de step-024, en rejouant la mesure plutôt
+# qu'en la déduisant :
 #
 #   openapi-admin.yaml   0 signature sur 28  → sous le seuil
 #   openapi-public.yaml  1 signature sur 5   → sous le seuil
 #
-# Inchangé pour la troisième mesure d'affilée, et la raison est vérifiable : le dénominateur est
+# Inchangé pour la quatrième mesure d'affilée, et la raison est vérifiable : le dénominateur est
 # l'échantillon **de la passerelle**, pas le nombre d'opérations de ce fichier. La seule signature
 # commune est `/health`, que le contrat public déclare aussi ; `/auth/*` n'existe dans aucun des deux
 # contrats amont, dont les opérations sont toutes sous `/admin/…` ou parmi `/messages`, `/account`,
@@ -189,7 +189,7 @@ paths:
         ensemble.
 
         **Deux chemins d'enrôlement et non un seul**, contrairement à ce que le §5.1 annonçait : la
-        cérémonie WebAuthn de step-024 rendra une forme entièrement différente, et les réunir sous une
+        cérémonie WebAuthn de step-024 rend une forme entièrement différente, et les réunir sous une
         opération obligerait à un `oneOf` de réponse dont le code engendré fait un type opaque. La
         vérification, elle, rend le même 204 des deux côtés et reste une seule opération.
       requestBody:
@@ -233,7 +233,7 @@ paths:
   /auth/mfa/verify:
     post:
       operationId: verifyMfa
-      summary: Second facteur — code TOTP ou code de récupération
+      summary: Second facteur — code TOTP, code de récupération ou assertion de passkey
       description: |
         Vérifie le second facteur et **élève** la session ouverte par `POST /auth/login`. Le jeton de
         session est régénéré au passage : sans cela, un cookie obtenu avant le second facteur resterait
@@ -245,8 +245,10 @@ paths:
         facteur volée resterait élevable pendant douze heures par qui obtient un code.
 
         Le challenge n'est consommé qu'en cas de **succès** : une faute de frappe ne doit pas obliger à
-        refaire toute la connexion. Il compte en revanche ses échecs et meurt au-delà d'un petit
-        nombre, ce qui borne ce qu'un seul challenge peut servir.
+        refaire toute la connexion. *(Correction step-024 : une rédaction précédente lui prêtait un
+        compteur d'échecs propre. Il a existé le temps d'une revue, puis a été retiré — il doublait le
+        compteur par opérateur décrit juste après, et deux gardes dont l'une masque l'autre valent une
+        garde et une illusion.)*
 
         Ce qui borne la recherche exhaustive d'un code à six chiffres est **un second compteur, par
         opérateur**, toutes connexions confondues : le premier ne suffirait pas, puisqu'une connexion
@@ -290,6 +292,168 @@ paths:
               description: Secondes restant à attendre. Un entier et jamais une date HTTP.
               required: true
               schema: { type: integer, minimum: 1 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/mfa/webauthn/register/begin:
+    post:
+      operationId: beginWebauthnRegistration
+      summary: Ouvre l'enregistrement d'une passkey
+      description: |
+        Tire les options que le navigateur passera à `navigator.credentials.create()`, et ouvre un défi
+        de courte durée **lié à la session en cours**.
+
+        **Deux opérations et non une**, contrairement à l'enrôlement TOTP : WebAuthn est en deux temps
+        par nature — le serveur tire un défi, l'appareil le signe. Les réunir obligerait à rendre le
+        défi devinable par l'appelant, ce qui est exactement ce qu'un défi ne doit pas être.
+
+        Un seul défi vit à la fois pour une session : rappeler cette route en éteint le précédent.
+        Deux onglets rendraient sinon indécidable celui que la finition doit relire.
+
+        Les passkeys déjà détenues sont exclues des options : sans cela, l'appareil en enregistrerait
+        une seconde que l'opérateur ne saurait pas distinguer de la première.
+      responses:
+        '200':
+          description: Les options de création, à passer telles quelles au navigateur.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebauthnRegistrationOptions' }
+        '401':
+          description: Aucune session vivante.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            Un second facteur est déjà en place et la session n'est pas élevée. En ajouter un sans
+            l'élévation permettrait à quiconque détient le mot de passe de se donner un second facteur,
+            donc de contourner celui qui existe.
+
+            Ce n'est pas une panne : c'est le cas d'un opérateur qui ajoute un appareil. Le refus dit
+            par où passer.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/mfa/webauthn/register/finish:
+    post:
+      operationId: finishWebauthnRegistration
+      summary: Enregistre la passkey que l'appareil vient de produire
+      description: |
+        Confronte la réponse de l'authentificateur au défi ouvert par la route précédente, et
+        enregistre la passkey.
+
+        Le défi est consommé quoi qu'il arrive ici — succès comme échec — parce qu'il a été signé :
+        contrairement à un code mal tapé, une réponse refusée ne se retente pas sur le même défi.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebauthnRegistration' }
+      responses:
+        '200':
+          description: La passkey est enregistrée.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebauthnCredential' }
+        '400':
+          description: La requête n'a pas la forme que la route attend.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: |
+            Aucune session vivante, ou la cérémonie n'a pas abouti. Le corps du second cas est le même
+            qu'aucun défi ne soit ouvert, qu'il soit échu ou déjà servi, que l'origine ne soit pas
+            celle qu'on attendait, que la signature soit fausse, ou que **cette clé soit déjà
+            enregistrée** — ici ou ailleurs : les distinguer dirait à qui détient l'authentificateur
+            s'il est enrôlé quelque part.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            Un second facteur a été mis en place **entre l'ouverture de la cérémonie et sa finition**,
+            et la session n'est pas élevée. Le défi vit cinq minutes : sans ce contrôle, une cérémonie
+            ouverte quand l'enrôlement était libre attacherait encore une passkey après coup.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/mfa/webauthn/assert/begin:
+    post:
+      operationId: beginWebauthnAssertion
+      summary: Ouvre une assertion de passkey
+      description: |
+        Tire les options que le navigateur passera à `navigator.credentials.get()`. Comme
+        l'enregistrement, la cérémonie est en deux temps ; contrairement à lui, elle **se finit sur**
+        `POST /auth/mfa/verify`, avec `method: webauthn` — la vérification reste une seule opération,
+        et rend le même 204 pour les trois méthodes.
+
+        Elle n'exige pas de challenge de connexion : c'est la finition qui l'exige, comme pour un code
+        TOTP. Ouvrir une cérémonie ne prouve rien et n'élève rien.
+      responses:
+        '200':
+          description: Les options d'assertion, à passer telles quelles au navigateur.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebauthnAssertionOptions' }
+        '400':
+          description: Aucune passkey n'est enregistrée ; il n'y a pas de cérémonie à ouvrir.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Aucune session vivante.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/mfa/webauthn/passkeys/{passkeyId}:
+    delete:
+      operationId: deleteWebauthnPasskey
+      summary: Retire une passkey
+      description: |
+        Retire une passkey de l'opérateur de la session.
+
+        **Seule opération de ce préfixe qui soit une mutation**, et la seule que step-025 devra garder
+        plutôt qu'exempter. Elle exige une session élevée — mais **pas** de présenter la passkey qu'on
+        retire : on la retire précisément quand on ne l'a plus, appareil perdu ou clé cassée, et
+        l'exiger rendrait le geste impossible dans le seul cas qui le motive.
+
+        `passkeyId` est l'identifiant de la passkey tel que l'enregistrement l'a rendu, jamais
+        l'identifiant que l'authentificateur s'est choisi — celui-là est long, binaire, et n'a aucune
+        raison de traverser une URL.
+      parameters:
+        - name: passkeyId
+          in: path
+          required: true
+          description: L'identifiant rendu à l'enregistrement.
+          schema: { type: string }
+      responses:
+        '204':
+          description: La passkey est retirée.
+        '401':
+          description: |
+            Aucune session vivante, ou cette passkey n'appartient pas à l'opérateur — le même corps
+            pour les deux, parce que distinguer « elle existe mais pas chez vous » de « elle n'existe
+            pas » dirait ce que possède quelqu'un d'autre.
+
+            La session **vivante mais non élevée**, elle, rend un 409 : la confondre avec les deux
+            précédentes ferait lire « reconnectez-vous » à un opérateur dont le remède est l'inverse —
+            se reconnecter rend une session de premier facteur, donc le même refus.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            Deux causes, deux codes. `mfa_elevation_required` : la session n'a pas franchi le second
+            facteur. `mfa_last_factor` : c'est le dernier facteur de l'opérateur, et le retirer
+            l'enfermerait dehors.
+
+            Les deux nomment ce qui manque et par où passer — un contrôle interdit est désactivé et
+            expliqué, jamais masqué.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -385,7 +549,7 @@ components:
         à l'enrôlement.
 
         C'est ce qui permet à l'écran de savoir s'il conduit à l'enrôlement ou au challenge, sans
-        essayer l'un pour découvrir qu'il fallait l'autre. step-024 y ajoutera le compte de passkeys.
+        essayer l'un pour découvrir qu'il fallait l'autre.
       additionalProperties: false
       properties:
         totp:
@@ -395,7 +559,17 @@ components:
           # avant qu'elle ne soit vide, pas au moment où elle l'est.
           type: integer
           minimum: 0
-      required: [totp, recoveryCodesRemaining]
+        passkeys:
+          # Un compte et non une liste : ce que l'écran doit savoir pour se rendre est s'il conduit à
+          # l'enrôlement ou au challenge. L'inventaire qui nomme les appareils appartient à l'écran de
+          # gestion de step-028.
+          #
+          # C'est aussi ce qui permet au client de prévoir qu'un retrait sera refusé — dernière passkey
+          # et pas de TOTP — donc de désactiver le contrôle en l'expliquant, plutôt que de laisser
+          # l'opérateur le découvrir sur un 409.
+          type: integer
+          minimum: 0
+      required: [totp, recoveryCodesRemaining, passkeys]
 
     TotpEnrollmentRequest:
       type: object
@@ -465,18 +639,173 @@ components:
           # ferait payer les argon2id du chemin de récupération à chaque code TOTP faux, et la
           # durée de la réponse dirait alors laquelle des deux voies a été prise.
           #
-          # step-024 y ajoutera `webauthn`, avec le champ d'assertion qui va avec.
           type: string
-          enum: [totp, recovery_code]
+          enum: [totp, recovery_code, webauthn]
         code:
-          # La borne haute vaut pour les deux méthodes : six chiffres d'un côté, onze caractères de
-          # l'autre. Elle n'est pas cosmétique — le chemin de récupération coûte un argon2id par
-          # code restant, et un
-          # corps sans borne en ferait une arme.
+          # La borne haute vaut pour les deux méthodes qui en portent un : six chiffres d'un côté,
+          # onze caractères de l'autre. Elle n'est pas cosmétique — le chemin de récupération coûte un
+          # argon2id par code restant, et un corps sans borne en ferait une arme.
+          #
+          # **Facultatif depuis step-024** : une assertion de passkey n'a pas de code. Le serveur exige
+          # l'un ou l'autre selon la méthode et rend 400 sinon — c'est le patron que
+          # `TotpEnrollmentRequest` emploie déjà, et le contrat ne sait pas exprimer deux champs qui
+          # s'excluent.
           type: string
           minLength: 1
           maxLength: 64
-      required: [challenge, method, code]
+        assertion:
+          # Ce que `navigator.credentials.get()` a produit, transmis **tel quel**.
+          #
+          # Un objet libre, et c'est le seul du contrat. Sa forme appartient à la spécification
+          # WebAuthn et c'est la bibliothèque qui l'analyse ; la retyper ici en ferait deux rédactions
+          # dont une périmerait — le même arbitrage que la colonne `ceremony` de la migration 00008.
+          #
+          # L'asymétrie avec les options rendues plus bas, qui sont des DTO déclarés champ par champ,
+          # est délibérée : c'est **en sortie** que déclarer garde quelque chose, puisqu'un champ
+          # absent du struct ne peut pas fuir. En entrée, un champ non déclaré est simplement ignoré.
+          #
+          # `additionalProperties: true` est nécessaire et non décoratif : sans lui, le générateur
+          # TypeScript rend `Record<string, never>`, un type où aucune clé ne peut être écrite. Mesuré
+          # — le client de step-027 n'aurait rien pu y mettre.
+          type: object
+          additionalProperties: true
+      required: [challenge, method]
+
+    WebauthnCredentialDescriptor:
+      type: object
+      description: |
+        Une passkey désignée dans des options de cérémonie — exclue d'un enregistrement, ou admise
+        pour une assertion. `id` est l'identifiant que l'authentificateur s'est choisi, en base64url.
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [public-key]
+        id:
+          type: string
+        transports:
+          type: array
+          items: { type: string }
+      required: [type, id]
+
+    WebauthnRegistrationOptions:
+      type: object
+      description: |
+        Ce que le client passe **tel quel** à `navigator.credentials.create()`. L'enveloppe `publicKey`
+        est ce que l'API du navigateur attend ; la retirer obligerait le client à la reconstruire.
+
+        Chaque champ est déclaré, plutôt que de sérialiser le type de la bibliothèque : c'est en sortie
+        que la règle du DTO garde quelque chose — un champ absent d'ici ne peut pas fuir, et un bump de
+        la bibliothèque qui en ajouterait un ne le ferait pas traverser en silence.
+
+        Ce qui n'y figure pas est ce que nous ne demandons pas : aucune extension, aucune préférence
+        d'attestation. Nous ne vérifions le modèle d'aucun authentificateur — il n'y a pas de registre
+        de métadonnées ici — donc une attestation ne serait pas contrôlée, et une valeur qu'on ne
+        contrôle pas vaut moins que son absence.
+      additionalProperties: false
+      properties:
+        publicKey:
+          type: object
+          additionalProperties: false
+          properties:
+            rp:
+              type: object
+              additionalProperties: false
+              properties:
+                id: { type: string }
+                name: { type: string }
+              required: [id, name]
+            user:
+              type: object
+              additionalProperties: false
+              properties:
+                # Le *user handle* que l'appareil mémorisera, en base64url. C'est l'identifiant
+                # d'opérateur et non son adresse : il est stocké en clair par l'appareil et voyage
+                # dans chaque assertion, alors qu'un UUID ne dit rien de personne.
+                id: { type: string }
+                name: { type: string }
+                displayName: { type: string }
+              required: [id, name, displayName]
+            challenge: { type: string }
+            pubKeyCredParams:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  type:
+                    type: string
+                    enum: [public-key]
+                  # L'identifiant COSE de l'algorithme, un entier négatif (-7 pour ES256).
+                  alg: { type: integer }
+                required: [type, alg]
+            timeout: { type: integer }
+            excludeCredentials:
+              type: array
+              items: { $ref: '#/components/schemas/WebauthnCredentialDescriptor' }
+            authenticatorSelection:
+              type: object
+              additionalProperties: false
+              properties:
+                residentKey: { type: string }
+                userVerification: { type: string }
+          required: [rp, user, challenge, pubKeyCredParams]
+      required: [publicKey]
+
+    WebauthnAssertionOptions:
+      type: object
+      description: |
+        Ce que le client passe **tel quel** à `navigator.credentials.get()`. Même enveloppe et même
+        règle que pour l'enregistrement.
+
+        `allowCredentials` énumère les passkeys de l'opérateur : la session dit déjà de qui il s'agit,
+        donc l'assertion n'a pas à être découvrable, et l'appareil sait quoi proposer.
+      additionalProperties: false
+      properties:
+        publicKey:
+          type: object
+          additionalProperties: false
+          properties:
+            challenge: { type: string }
+            timeout: { type: integer }
+            rpId: { type: string }
+            allowCredentials:
+              type: array
+              items: { $ref: '#/components/schemas/WebauthnCredentialDescriptor' }
+            userVerification: { type: string }
+          required: [challenge]
+      required: [publicKey]
+
+    WebauthnRegistration:
+      type: object
+      description: |
+        Ce que `navigator.credentials.create()` a produit, transmis **tel quel**.
+
+        Un objet libre, pour la même raison que le champ `assertion` de `MfaVerification` : sa forme
+        appartient à la spécification WebAuthn, la bibliothèque l'analyse, et la retyper ici en ferait
+        deux rédactions dont une périmerait.
+      additionalProperties: false
+      properties:
+        attestation:
+          # `additionalProperties: true` pour la même raison que le champ `assertion` de
+          # `MfaVerification` : sans lui, le type TypeScript n'accepte aucune clé.
+          type: object
+          additionalProperties: true
+      required: [attestation]
+
+    WebauthnCredential:
+      type: object
+      description: |
+        La passkey qui vient d'être enregistrée. **Seul son identifiant**, et c'est ce dont le client a
+        besoin : de quoi la retirer plus tard.
+
+        Rien de la clé, pas même publique. Non qu'elle soit secrète — elle ne l'est pas, et c'est ce
+        qui dispense sa table du chiffrement au repos — mais parce qu'aucun écran n'en fait rien, et
+        qu'un champ qu'on rend est un champ qu'on doit tenir.
+      additionalProperties: false
+      properties:
+        id: { type: string }
+      required: [id]
 
     CurrentOperator:
       type: object

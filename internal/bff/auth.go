@@ -105,7 +105,8 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 	switch verdict.Outcome {
 	case auth.OutcomeChallenged:
 		// La session naît ici, au franchissement du premier facteur, et **non élevée** :
-		// `POST /auth/mfa/verify` l'élève, step-024 y ajoutera WebAuthn. L'ouvrir plus tard laisserait
+		// `POST /auth/mfa/verify` l'élève — code TOTP, code de récupération ou assertion de passkey
+		// depuis step-024. L'ouvrir plus tard laisserait
 		// l'enrôlement d'un authentificateur sans rien pour dire de qui il s'agit, donc permettrait
 		// d'attacher une clé à un compte qu'on ne détient pas.
 		if sessionErr := a.closePresentedSession(ctx); sessionErr != nil {

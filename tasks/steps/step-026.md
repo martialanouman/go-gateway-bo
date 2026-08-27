@@ -15,7 +15,10 @@ d'ici, un champ de trop est un hachage de mot de passe, un secret TOTP ou une cl
 - Une porte qui refuse qu'un **type de domaine** (l'opérateur du store, la session, un
   authentificateur) soit atteignable depuis un type de réponse, à quelque profondeur que ce soit.
 - Une porte nommant les champs qu'aucune réponse ne doit porter : `password_hash`,
-  `mfa_totp_secret`, `mfa_webauthn_credentials`, secret de session, code de récupération.
+  `mfa_totp_secret`, secret de session, code de récupération, et l'état de cérémonie
+  `webauthn_challenges.ceremony`. *(Correction step-024 : `mfa_webauthn_credentials` a disparu du
+  schéma — les passkeys ont leur table, et rien n'y est secret puisque la clé est publique. C'est le
+  défi en vol qui ne doit pas fuir, pas la clé.)*
 - La règle inscrite là où elle se lit — dans le paquet qui écrit les DTO, pas seulement dans un test.
 
 ## Points d'implémentation clés

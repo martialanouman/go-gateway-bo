@@ -31,7 +31,7 @@ func (failingAPI) Health(_ context.Context, _ HealthRequestObject) (HealthRespon
 	return nil, errors.New("appel de " + internalTopology + "/admin/v1/health: connexion refusée")
 }
 
-// Aucune des cinq méthodes ci-dessous n'est exercée par cette suite : ce qu'elle observe est le
+// Aucune des neuf méthodes ci-dessous n'est exercée par cette suite : ce qu'elle observe est le
 // gestionnaire d'erreur du montage, et `Health` suffit à le déclencher. Elles sont là parce que
 // l'interface stricte les exige — c'est précisément ce qu'on lui demande, refuser de compiler une
 // implémentation partielle.
@@ -57,6 +57,30 @@ func (failingAPI) VerifyMfa(_ context.Context, _ VerifyMfaRequestObject) (Verify
 	error,
 ) {
 	return nil, errors.New("appel de " + internalTopology + "/admin/v1/verify: connexion refusée")
+}
+
+func (failingAPI) BeginWebauthnRegistration(_ context.Context,
+	_ BeginWebauthnRegistrationRequestObject,
+) (BeginWebauthnRegistrationResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/register: connexion refusée")
+}
+
+func (failingAPI) FinishWebauthnRegistration(_ context.Context,
+	_ FinishWebauthnRegistrationRequestObject,
+) (FinishWebauthnRegistrationResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/register: connexion refusée")
+}
+
+func (failingAPI) BeginWebauthnAssertion(_ context.Context,
+	_ BeginWebauthnAssertionRequestObject,
+) (BeginWebauthnAssertionResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/assert: connexion refusée")
+}
+
+func (failingAPI) DeleteWebauthnPasskey(_ context.Context,
+	_ DeleteWebauthnPasskeyRequestObject,
+) (DeleteWebauthnPasskeyResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/passkeys: connexion refusée")
 }
 
 // Une implémentation qui rend une erreur ne fait pas partir le message Go au navigateur.

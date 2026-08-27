@@ -21,6 +21,25 @@ gagne l'invariant (c).
 - Le **test d'énumération des routes**, bloquant et non désactivable.
 - L'appel récurrent à `ensure_audit_log_partitions()`, ou l'écrit de qui le portera — voir plus bas.
 
+### Cinq dettes que cette step hérite, et que ses prédécesseures ont laissées ouvertes
+
+*Elles sont écrites **ici** et non seulement dans `steps/done/`, parce qu'une fiche archivée n'est
+ouverte par personne : le renvoi doit aller vers la step qui paie, pas vers celle qui a créé.*
+
+- **Trois routes d'authentification ne sont bornées par aucun compteur** :
+  `POST /auth/mfa/totp/enroll` (step-023), `POST /auth/mfa/webauthn/register/begin` et
+  `POST /auth/mfa/webauthn/assert/begin` (step-024). Une session de premier facteur suffit à les
+  répéter — le verrou d'essais ne garde que la vérification. L'enrôlement TOTP y hache dix argon2id
+  par appel ; les cérémonies WebAuthn, elles, ne coûtent qu'une ligne dans `webauthn_challenges`, que
+  rien ne purge avant step-187. Cette step reprend ces chemins pour les garder : c'est le moment.
+- **`POST /auth/mfa/webauthn/register/finish` doit être audité même s'il reste exempté de garde.**
+  Il pose un second facteur, et c'est précisément l'événement qu'une enquête sur compte compromis va
+  chercher — « un facteur a été ajouté le … ». La liste d'exemptions ci-dessous parle de permission,
+  pas d'audit : les deux ne se confondent pas.
+- **`DELETE /auth/mfa/webauthn/passkeys/{passkeyId}` doit sortir des exemptions.** C'est la seule
+  opération de `/auth/mfa/*` qui exige une permission : elle retire un facteur. Elle porte déjà sa
+  propre garde d'élévation (step-024, DN-9), mais pas de garde de permission ni d'audit.
+
 ## Points d'implémentation clés
 - **La garde se pose par `operationID` parce que c'est ce que le code engendré offre.** Une garde
   montée sur un préfixe de chemin garde ce que le préfixe attrape, pas ce que le contrat déclare : le

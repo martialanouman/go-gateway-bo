@@ -116,6 +116,16 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
+	// Avant la liaison du port pour la même raison, et une de plus : c'est cet appel qui juge le
+	// domaine des passkeys. Un `rp_id` que la spécification WebAuthn refuse — une adresse IP, un label
+	// vide — échoue ici. Plus tard, le serveur écouterait en refusant chaque cérémonie sans que rien
+	// n'ait dit pourquoi.
+	passkeys, err := mfa.NewPasskeyManager(store.NewWebauthn(pool),
+		cfg.Auth.WebauthnRPID, cfg.Auth.WebauthnOrigin)
+	if err != nil {
+		return err
+	}
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", cfg.Addr, err)
@@ -128,6 +138,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		Authenticator:  authenticator,
 		Sessions:       sessions,
 		SecondFactor:   secondFactor,
+		Passkeys:       passkeys,
 		TrustedProxies: cfg.Auth.TrustedProxies,
 	})
 

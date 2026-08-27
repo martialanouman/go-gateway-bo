@@ -39,6 +39,10 @@ type Dependencies struct {
 	// SecondFactor enrôle et vérifie le second facteur, et porte la clé qui chiffre les secrets au
 	// repos. Comme les deux ci-dessus, il arrive déjà construit.
 	SecondFactor *mfa.Manager
+	// Passkeys mène les cérémonies WebAuthn. Comme les trois ci-dessus, il arrive déjà construit — et
+	// sa construction est ce qui juge `DASHBOARD_WEBAUTHN_RP_ID`, donc elle doit précéder la liaison
+	// du port.
+	Passkeys *mfa.PasskeyManager
 	// TrustedProxies alimente la dérivation de l'adresse cliente. Vide est une valeur sûre : voir
 	// `withClientAddress` et `internal/auth.ClientAddress`.
 	TrustedProxies []netip.Prefix
@@ -67,6 +71,7 @@ func NewRouter(deps Dependencies) http.Handler {
 			Authenticator: deps.Authenticator,
 			Sessions:      deps.Sessions,
 			SecondFactor:  deps.SecondFactor,
+			Passkeys:      deps.Passkeys,
 		})
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
