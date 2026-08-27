@@ -846,12 +846,26 @@ export interface operations {
                 };
             };
             /**
-             * @description La cérémonie n'a pas abouti. Le corps est le même qu'aucune session ne vive, qu'aucun défi
-             *     ne soit ouvert, qu'il soit échu ou déjà servi, que l'origine ne soit pas celle qu'on
-             *     attendait, ou que la signature soit fausse : les distinguer dirait à une machine où elle en
-             *     est.
+             * @description Aucune session vivante, ou la cérémonie n'a pas abouti. Le corps du second cas est le même
+             *     qu'aucun défi ne soit ouvert, qu'il soit échu ou déjà servi, que l'origine ne soit pas
+             *     celle qu'on attendait, que la signature soit fausse, ou que **cette clé soit déjà
+             *     enregistrée** — ici ou ailleurs : les distinguer dirait à qui détient l'authentificateur
+             *     s'il est enrôlé quelque part.
              */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Un second facteur a été mis en place **entre l'ouverture de la cérémonie et sa finition**,
+             *     et la session n'est pas élevée. Le défi vit cinq minutes : sans ce contrôle, une cérémonie
+             *     ouverte quand l'enrôlement était libre attacherait encore une passkey après coup.
+             */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -919,9 +933,13 @@ export interface operations {
                 content?: never;
             };
             /**
-             * @description Aucune session vivante, la session n'est pas élevée, ou cette passkey n'appartient pas à
-             *     l'opérateur — le même corps pour les trois, parce que distinguer « elle existe mais pas
-             *     chez vous » de « elle n'existe pas » dirait ce que possède quelqu'un d'autre.
+             * @description Aucune session vivante, ou cette passkey n'appartient pas à l'opérateur — le même corps
+             *     pour les deux, parce que distinguer « elle existe mais pas chez vous » de « elle n'existe
+             *     pas » dirait ce que possède quelqu'un d'autre.
+             *
+             *     La session **vivante mais non élevée**, elle, rend un 409 : la confondre avec les deux
+             *     précédentes ferait lire « reconnectez-vous » à un opérateur dont le remède est l'inverse —
+             *     se reconnecter rend une session de premier facteur, donc le même refus.
              */
             401: {
                 headers: {
@@ -932,10 +950,12 @@ export interface operations {
                 };
             };
             /**
-             * @description C'est le dernier second facteur de l'opérateur : le retirer l'enfermerait dehors. Le refus
-             *     nomme ce qui manque — il faut d'abord enrôler un autre facteur.
+             * @description Deux causes, deux codes. `mfa_elevation_required` : la session n'a pas franchi le second
+             *     facteur. `mfa_last_factor` : c'est le dernier facteur de l'opérateur, et le retirer
+             *     l'enfermerait dehors.
              *
-             *     Un contrôle interdit est désactivé et expliqué, jamais masqué.
+             *     Les deux nomment ce qui manque et par où passer — un contrôle interdit est désactivé et
+             *     expliqué, jamais masqué.
              */
             409: {
                 headers: {

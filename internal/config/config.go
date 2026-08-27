@@ -147,9 +147,13 @@ type AuthConfig struct {
 	// laisserait l'attaquant choisir le domaine contre lequel la clé s'authentifie, c'est-à-dire
 	// perdre exactement ce que WebAuthn achète sur un code TOTP.
 	//
-	// Leur *validité* n'est pas jugée ici : un `rp_id` qui est une adresse IP, ou dont un label est
-	// vide, est refusé par `webauthn.New` — que `cmd/dashboard` appelle avant de lier son port. Le
-	// redire ici reviendrait à réécrire §5.1.3 de la spécification WebAuthn moins bien.
+	// La validité du **domaine** n'est pas jugée ici : un `rp_id` qui est une adresse IP, ou dont un
+	// label est vide, est refusé par `webauthn.New` — que `cmd/dashboard` appelle avant de lier son
+	// port. Le redire ici reviendrait à réécrire §5.1.3 de la spécification WebAuthn, moins bien.
+	//
+	// Celle de l'**origine** l'est en revanche : la bibliothèque ne contrôle que sa présence, donc
+	// c'est `requiredAbsoluteURL` qui exige un schéma et un hôte. Sans lui, `http://:3000` passerait
+	// et aucune cérémonie n'aboutirait jamais, sans que rien ne l'ait dit au démarrage.
 	WebauthnRPID   string
 	WebauthnOrigin string
 }
@@ -356,8 +360,6 @@ func (r *reader) requiredDatabaseURL(name string) string {
 	return value
 }
 
-// requiredSecret exige une valeur d'au moins `minimum` caractères, sans jamais citer ce qu'elle a
-// trouvé — ni sa longueur, qui est déjà une information sur le secret.
 // requiredValue exige une valeur non vide et la rend telle quelle. Contrairement à `required`, dont
 // elle n'est que la façade, elle n'oblige pas l'appelant à porter un drapeau qu'il jetterait : le
 // littéral `Config` veut une chaîne, et l'absence est déjà signalée dans `r.problems`.
@@ -367,6 +369,8 @@ func (r *reader) requiredValue(name string) string {
 	return value
 }
 
+// requiredSecret exige une valeur d'au moins `minimum` caractères, sans jamais citer ce qu'elle a
+// trouvé — ni sa longueur, qui est déjà une information sur le secret.
 func (r *reader) requiredSecret(name string, minimum int) []byte {
 	value, ok := r.required(name)
 	if !ok {

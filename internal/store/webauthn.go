@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -48,6 +49,10 @@ type PasskeyOwner struct {
 	DisplayName string
 	Passkeys    []Passkey
 }
+
+// uniqueViolation est le SQLSTATE d'une contrainte d'unicité violée. Le nommer évite de relire
+// « 23505 » comme un numéro de téléphone.
+const uniqueViolation = "23505"
 
 // Ceremony est un défi en vol : son identifiant, et l'état que la bibliothèque exige de retrouver
 // intact pour finir. Le contenu de `Data` ne regarde pas ce paquet.
@@ -146,11 +151,17 @@ func (w *Webauthn) passkeysOf(ctx context.Context, operatorID string) ([]Passkey
 	return passkeys, nil
 }
 
-// Register écrit une passkey et rend l'identifiant de sa ligne.
+// Register écrit une passkey et rend l'identifiant de sa ligne. Une chaîne vide dit que cette clé
+// est **déjà enregistrée**, ici ou sur un autre compte.
 //
-// L'unicité de `credential_id` est **globale** et tenue par l'index : un authentificateur qui
-// présenterait une clé déjà enregistrée ailleurs échoue ici plutôt que d'appartenir à deux
-// opérateurs. La cérémonie l'exclut déjà pour le même opérateur ; l'index couvre le reste.
+// L'unicité de `credential_id` est globale et tenue par l'index. Elle est la **seule** garde :
+// l'exclusion posée dans les options de cérémonie n'est qu'un indice pour le client — vérifié dans
+// go-webauthn v0.18.0, `CreateCredential` ne consulte jamais la liste d'exclusion — donc un client
+// qui l'ignore repasse.
+//
+// La violation est traduite en refus plutôt que remontée en erreur, et c'est ce qui ferme un oracle :
+// un 500 face à un 200 dirait à qui détient un authentificateur si sa clé est enrôlée quelque part
+// dans le déploiement, y compris sous un autre opérateur.
 func (w *Webauthn) Register(ctx context.Context, operatorID string, passkey Passkey) (string,
 	error,
 ) {
@@ -166,6 +177,12 @@ func (w *Webauthn) Register(ctx context.Context, operatorID string, passkey Pass
 	err := w.pool.QueryRow(ctx, query, operatorID, passkey.CredentialID, passkey.PublicKey,
 		int64(passkey.SignCount), passkey.AAGUID, passkey.Transports, passkey.Attachment,
 		passkey.UserVerified, passkey.BackupEligible, passkey.BackupState).Scan(&id)
+
+	var violation *pgconn.PgError
+	if errors.As(err, &violation) && violation.Code == uniqueViolation {
+		return "", nil
+	}
+
 	if err != nil {
 		return "", fmt.Errorf("enregistrer la passkey : %w", err)
 	}
@@ -206,10 +223,15 @@ func (w *Webauthn) ConsumeSignCount(ctx context.Context, credentialID []byte, si
 // Remove retire une passkey, et **refuse de retirer le dernier facteur** : sans TOTP et sans autre
 // passkey, l'opérateur ne pourrait plus élever aucune session.
 //
-// Une transaction, et un verrou sur la ligne de l'opérateur avant tout le reste. Sans lui, deux
-// retraits concurrents de deux passkeys distinctes se verraient chacun l'autre encore présente — les
-// sous-requêtes lisent le snapshot de leur instruction, pas l'effet d'une transaction voisine non
-// commitée — et les deux réussiraient. Le compte reste juste parce que le verrou les met en file.
+// Une transaction, et **deux instructions** : le verrou d'abord, l'inventaire ensuite. Les réunir
+// serait faux, et ça l'a été — mesuré le 27/08/2026 en forçant la séquence, verrou observé dans
+// `pg_locks` : en READ COMMITTED, attendre un verrou de ligne ne rafraîchit pas le snapshot de
+// l'instruction pour les **autres** relations. Deux retraits concurrents de deux passkeys distinctes
+// comptaient donc chacun celle que l'autre venait de supprimer, et les deux aboutissaient — laissant
+// l'opérateur sans aucun second facteur.
+//
+// La seconde instruction, elle, prend son propre snapshot **après** l'attente : elle voit ce que la
+// transaction précédente a commité. C'est ce qui rend le compte juste.
 func (w *Webauthn) Remove(ctx context.Context, operatorID, passkeyID string) (PasskeyRemoval,
 	error,
 ) {
@@ -220,28 +242,42 @@ func (w *Webauthn) Remove(ctx context.Context, operatorID, passkeyID string) (Pa
 
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 
+	// Le verrou, et rien d'autre : il met en file les retraits qui portent sur le même opérateur.
+	const lock = `SELECT 1 FROM operators WHERE id = $1 AND status = $2 FOR UPDATE`
+
+	var held int
+
+	err = tx.QueryRow(ctx, lock, operatorID, StatusActive).Scan(&held)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PasskeyUnknown, nil
+	}
+
+	if err != nil {
+		return PasskeyUnknown, fmt.Errorf("verrouiller l'opérateur pour le retrait : %w", err)
+	}
+
+	// L'inventaire, dans sa propre instruction pour qu'il voie l'état d'après l'attente.
 	const inventory = `
 		SELECT o.mfa_totp_secret IS NOT NULL,
 		       (SELECT count(*) FROM webauthn_credentials AS c WHERE c.operator_id = o.id),
 		       EXISTS (SELECT 1 FROM webauthn_credentials AS c
-		               WHERE c.operator_id = o.id AND c.id = $2)
+		               WHERE c.operator_id = o.id AND c.id::text = $2)
 		FROM operators AS o
-		WHERE o.id = $1 AND o.status = $3
-		FOR UPDATE OF o`
+		WHERE o.id = $1`
 
+	// `c.id::text = $2` et non `c.id = $2` : ce que porte un chemin d'URL n'est pas nécessairement un
+	// UUID, et la comparaison directe ferait échouer le **typage** en base — une erreur, donc un 500,
+	// sur un statut que le contrat ne déclare pas. Comparé en texte, un identifiant mal formé ne
+	// désigne simplement aucune ligne, ce qui est exactement « inconnu ». Le coût est nul : la
+	// sous-requête est déjà bornée à un opérateur, donc à quelques lignes.
 	var (
 		hasTOTP  bool
 		passkeys int
 		mine     bool
 	)
 
-	err = tx.QueryRow(ctx, inventory, operatorID, passkeyID, StatusActive).
-		Scan(&hasTOTP, &passkeys, &mine)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return PasskeyUnknown, nil
-	}
-
+	err = tx.QueryRow(ctx, inventory, operatorID, passkeyID).Scan(&hasTOTP, &passkeys, &mine)
 	if err != nil {
 		return PasskeyUnknown, fmt.Errorf("inventorier les facteurs de l'opérateur : %w", err)
 	}
@@ -303,6 +339,12 @@ func (w *Webauthn) IssueCeremony(ctx context.Context, sessionID, purpose string,
 // Trois conditions, et zéro ligne ne dit pas laquelle a manqué : jamais ouvert, échu, déjà consommé,
 // ou d'un autre objet. C'est aussi la garde d'appartenance — la session est dans le `WHERE`, donc un
 // défi ouvert ailleurs ne se finit pas ici.
+//
+// `ORDER BY … LIMIT 1` parce que « un seul défi vivant » est une propriété que l'ouverture **produit**
+// et qu'aucun index n'**impose** : deux ouvertures concurrentes ne se voient pas l'une l'autre et
+// insèrent toutes deux. Sans tri, `QueryRow` prendrait une ligne au hasard et pourrait consommer le
+// défi de l'autre onglet ; avec, c'est toujours le plus récent — celui que le client vient de
+// recevoir.
 func (w *Webauthn) LiveCeremony(ctx context.Context, sessionID, purpose string) (Ceremony, bool,
 	error,
 ) {
@@ -312,7 +354,9 @@ func (w *Webauthn) LiveCeremony(ctx context.Context, sessionID, purpose string) 
 		WHERE session_id = $1
 		  AND purpose = $2
 		  AND consumed_at IS NULL
-		  AND now() < expires_at`
+		  AND now() < expires_at
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1`
 
 	var ceremony Ceremony
 

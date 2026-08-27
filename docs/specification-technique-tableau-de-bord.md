@@ -333,11 +333,13 @@ POST   /auth/mfa/webauthn/assert/begin     # (Amendement step-024) options d'ass
                                        # L'assertion se FINIT sur /auth/mfa/verify, avec
                                        # `method: webauthn` : la vérification reste une seule
                                        # opération, ce que la ligne du dessus promettait.
-DELETE /auth/mfa/webauthn/credentials/{id} # (Amendement step-024) retire une passkey. REFUSÉ quand
+DELETE /auth/mfa/webauthn/passkeys/{passkeyId} # (Amendement step-024) retire une passkey. REFUSÉ quand
                                        # c'est le dernier facteur : retirer le dernier enferme
-                                       # l'opérateur dehors. Seule route de ce préfixe qui soit une
-                                       # mutation — donc la seule que step-025 doit garder plutôt
-                                       # qu'exempter.
+                                       # l'opérateur dehors. Seule route de ce préfixe qui exige une
+                                       # PERMISSION — donc la seule que step-025 doit garder plutôt
+                                       # qu'exempter. Elle n'est en revanche pas la seule à ÉCRIRE :
+                                       # register/finish pose un second facteur, et cet événement-là
+                                       # doit être audité même exempté de garde.
 POST   /auth/logout
 GET    /auth/me                        # current operator + resolved permission set (union of held roles)
 

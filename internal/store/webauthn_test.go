@@ -1,8 +1,11 @@
 package store_test
 
 import (
+	"context"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -138,8 +141,17 @@ func TestUneMemeCleNeSEnregistrePasDeuxFois(t *testing.T) {
 	registerPasskey(t, passkeys, camille, "la-meme")
 
 	// Même sur un autre opérateur : une passkey n'appartient qu'à un compte, et l'index est global.
-	_, err := passkeys.Register(t.Context(), martin, samplePasskey("la-meme"))
-	require.Error(t, err)
+	//
+	// Un identifiant vide et **non une erreur** : la violation d'unicité est traduite en refus, ce qui
+	// ferme un oracle — un 500 face à un 200 dirait à qui détient l'authentificateur si sa clé est
+	// enrôlée quelque part dans le déploiement, fût-ce sous un autre compte.
+	id, err := passkeys.Register(t.Context(), martin, samplePasskey("la-meme"))
+	require.NoError(t, err)
+	assert.Empty(t, id)
+
+	owner, _, err := passkeys.OwnerOf(t.Context(), martin)
+	require.NoError(t, err)
+	assert.Empty(t, owner.Passkeys, "un refus ne doit rien écrire")
 }
 
 func TestLeCompteurDeSignatureNAvanceQue(t *testing.T) {
@@ -418,4 +430,73 @@ func TestFermerUneSessionEmporteSesDefis(t *testing.T) {
 	queryOn(t, dsn, `SELECT count(*) FROM webauthn_challenges WHERE session_id = $1`,
 		&remaining, session)
 	assert.Zero(t, remaining, "une cérémonie n'a pas à survivre à la session qui l'a ouverte")
+}
+
+// Deux retraits concurrents de deux passkeys distinctes ne doivent pas emporter les deux.
+//
+// La séquence est **forcée**, et non confiée à deux goroutines lancées ensemble : mesuré, une course
+// libre ne se produit jamais et le test passait sur le code fautif. C'est le décor qui tient le
+// verrou et libère au bon moment ; la fonction sous test, elle, est bien `Remove`.
+//
+// L'attente est observée dans `pg_locks` plutôt que temporisée : une temporisation rendrait le test
+// vert sur une machine lente sans que rien n'ait été exercé.
+func TestUnRetraitConcurrentNEmportePasLaDernierePasskey(t *testing.T) {
+	t.Parallel()
+
+	passkeys, dsn := webauthnOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+	first := registerPasskey(t, passkeys, operator, "premiere")
+	second := registerPasskey(t, passkeys, operator, "seconde")
+
+	ctx := t.Context()
+
+	decor, err := pgx.Connect(ctx, dsn)
+	require.NoError(t, err)
+
+	defer func() { _ = decor.Close(context.WithoutCancel(ctx)) }()
+
+	watcher, err := pgx.Connect(ctx, dsn)
+	require.NoError(t, err)
+
+	defer func() { _ = watcher.Close(context.WithoutCancel(ctx)) }()
+
+	// Le décor prend le verrou de l'opérateur et supprime la première passkey, sans commiter.
+	held, err := decor.Begin(ctx)
+	require.NoError(t, err)
+
+	var locked int
+
+	require.NoError(t, held.QueryRow(ctx,
+		`SELECT 1 FROM operators WHERE id = $1 FOR UPDATE`, operator).Scan(&locked))
+	_, err = held.Exec(ctx, `DELETE FROM webauthn_credentials WHERE id = $1`, first)
+	require.NoError(t, err)
+
+	// Le retrait de la seconde part maintenant : il va buter sur le verrou.
+	outcome := make(chan store.PasskeyRemoval, 1)
+
+	go func() {
+		removal, removeErr := passkeys.Remove(context.WithoutCancel(ctx), operator, second)
+		assert.NoError(t, removeErr)
+		outcome <- removal
+	}()
+
+	require.Eventually(t, func() bool {
+		var waiting int
+		require.NoError(t, watcher.QueryRow(ctx,
+			`SELECT count(*) FROM pg_locks WHERE NOT granted`).Scan(&waiting))
+
+		return waiting > 0
+	}, 5*time.Second, 20*time.Millisecond,
+		"le retrait n'a jamais attendu de verrou : la séquence n'exerce pas la course")
+
+	require.NoError(t, held.Commit(ctx))
+
+	// Débloqué, il doit voir qu'il ne reste qu'une passkey — celle qu'il allait retirer.
+	assert.Equal(t, store.PasskeyIsLastFactor, <-outcome,
+		"le retrait a compté la passkey que la transaction précédente venait de supprimer : "+
+			"l'opérateur se retrouve sans aucun second facteur")
+
+	owner, _, err := passkeys.OwnerOf(ctx, operator)
+	require.NoError(t, err)
+	assert.Len(t, owner.Passkeys, 1)
 }

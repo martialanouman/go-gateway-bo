@@ -64,6 +64,24 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 	// Ce `if` est un raccourci de **coût** pour le cas sans preuve : il évite le quart de seconde de
 	// hachage quand le refus est déjà certain. La garde du remplacement, elle, est appliquée par
 	// l'écriture — sans quoi deux enrôlements concurrents la traverseraient tous les deux.
+	// **Un facteur qui n'est pas un TOTP ne peut pas être présenté ici** : le corps de cette route ne
+	// déclare que `totp` et `recovery_code`, et l'y ajouter reviendrait à faire passer une assertion
+	// WebAuthn par un champ `code`. C'est donc l'élévation qui tient lieu de preuve — la même garde
+	// que `POST /auth/mfa/webauthn/register/begin`, pour la même raison.
+	//
+	// Sans elle, un opérateur qui ne détient qu'une passkey se faisait enrôler une application
+	// d'authentification par quiconque détenait son mot de passe : l'enrôlement rendait le secret et
+	// dix codes de récupération, et la vérification élevait la session sans que la clé ait jamais été
+	// présentée. Trouvé en revue, et le scénario qui le garde a d'abord rendu 200.
+	held, err := a.SecondFactor.Factors(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !state.Enrolled && held.Passkeys > 0 && !resolved.Elevated {
+		return EnrollTotp409JSONResponse(elevationRequiredToAddAFactor()), nil
+	}
+
 	replace := false
 
 	if state.Enrolled {

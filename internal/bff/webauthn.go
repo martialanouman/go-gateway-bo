@@ -74,7 +74,20 @@ func (a API) FinishWebauthnRegistration(ctx context.Context,
 	}
 
 	if !alive {
-		return FinishWebauthnRegistration401JSONResponse(refusedCeremony()), nil
+		return FinishWebauthnRegistration401JSONResponse(notAuthenticated()), nil
+	}
+
+	// La garde de `begin` est **rejouée ici**, et ce n'est pas une redite : le défi vit cinq minutes,
+	// et l'opérateur peut avoir enrôlé un facteur entre-temps. Sans ce contrôle, une cérémonie ouverte
+	// à l'amorçage — quand elle était légitimement libre — attacherait encore une passkey cinq minutes
+	// plus tard, sur une session non élevée, à un compte qui en porte désormais un.
+	held, err := a.SecondFactor.Factors(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if secondFactorHeld(held) && !resolved.Elevated {
+		return FinishWebauthnRegistration409JSONResponse(elevationRequiredToAddAFactor()), nil
 	}
 
 	id, err := a.Passkeys.FinishRegistration(ctx, resolved.ID, resolved.OperatorID, attestation)
@@ -135,8 +148,16 @@ func (a API) DeleteWebauthnPasskey(ctx context.Context,
 		return nil, err
 	}
 
-	if !alive || !resolved.Elevated {
+	if !alive {
 		return DeleteWebauthnPasskey401JSONResponse(notAuthenticated()), nil
+	}
+
+	// **409 et non 401**, et la distinction n'est pas cosmétique : `notAuthenticated()` dit « cette
+	// session n'est plus ouverte, reconnectez-vous », ce qui est faux d'une session vivante non élevée
+	// — et dont le remède **boucle**, puisque se reconnecter rend précisément une session de premier
+	// facteur. La route sœur rend déjà 409 pour la même condition.
+	if !resolved.Elevated {
+		return DeleteWebauthnPasskey409JSONResponse(elevationRequiredToRemoveAFactor()), nil
 	}
 
 	outcome, err := a.Passkeys.Remove(ctx, resolved.OperatorID, request.PasskeyId)
@@ -189,6 +210,14 @@ func elevationRequiredToAddAFactor() Error {
 	}
 }
 
+func elevationRequiredToRemoveAFactor() Error {
+	return Error{
+		Code: "mfa_elevation_required",
+		Message: "Retirer une clé d'accès demande d'avoir franchi le second facteur sur cette session. " +
+			"Le franchir, puis reprendre ce retrait.",
+	}
+}
+
 func lastSecondFactor() Error {
 	return Error{
 		Code: "mfa_last_factor",
@@ -205,13 +234,18 @@ func noPasskeyToAssert() Error {
 	}
 }
 
-// refusedCeremony est le refus unique des cérémonies, comme `refusedSecondFactor` l'est des codes :
-// un seul constructeur, donc pas deux messages entre lesquels choisir.
+// refusedCeremony est le refus unique de l'enregistrement, comme `refusedSecondFactor` l'est de la
+// vérification : un seul constructeur, donc pas deux messages entre lesquels choisir.
+//
+// Il ne sert **que** ce chemin — l'assertion se termine dans `VerifyMfa` et emprunte l'autre. La
+// copie s'adresse donc à quelqu'un qui **pose** un facteur, pas à quelqu'un qui en franchit un : lui
+// conseiller « franchir le second facteur autrement », comme une rédaction précédente le faisait, le
+// renvoyait vers un geste sans rapport avec ce qu'il essayait de faire.
 func refusedCeremony() Error {
 	return Error{
 		Code: "webauthn_ceremony_refused",
-		Message: "Cette clé d'accès n'a pas été acceptée. Reprendre depuis le début, ou franchir le " +
-			"second facteur autrement.",
+		Message: "Cette clé d'accès n'a pas pu être enregistrée. Reprendre l'enregistrement depuis le " +
+			"début ; si elle est déjà enregistrée sur ce compte, elle est utilisable telle quelle.",
 	}
 }
 

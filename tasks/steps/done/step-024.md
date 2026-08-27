@@ -118,12 +118,22 @@ step-023 a découvert en retirant le compteur par challenge.
 Le prix : cinq assertions refusées tiennent l'opérateur hors de **tous** ses seconds facteurs pendant
 un quart d'heure, TOTP compris. Un scénario l'exerce nommément.
 
-### DN-8 — Retirer le dernier facteur est refusé, et la garde est une transaction
+### DN-8 — Retirer le dernier facteur est refusé, et la garde est une transaction **en deux
+instructions**
+
 Une transaction dont le premier geste verrouille la ligne de l'opérateur, et non une garde dans le
-`WHERE` comme le plan l'annonçait. La correction vient d'un raisonnement, pas d'un échec : deux
-retraits concurrents de deux passkeys distinctes se verraient chacun l'autre encore présente — les
-sous-requêtes lisent le snapshot de leur instruction, pas l'effet d'une transaction voisine non
-commitée — et les deux réussiraient.
+`WHERE` comme le plan l'annonçait : deux retraits concurrents de deux passkeys distinctes se
+verraient chacun l'autre encore présente, et les deux réussiraient.
+
+**La première rédaction du correctif était fausse, et la revue l'a réfutée par la mesure.** Elle
+plaçait le `FOR UPDATE` et l'inventaire dans la **même instruction** — ce qui ne sert à rien : en
+READ COMMITTED, attendre un verrou de ligne ne rafraîchit pas le snapshot de l'instruction pour les
+*autres* relations. Reproduit en forçant la séquence, verrou observé dans `pg_locks` : la seconde
+transaction, débloquée par le commit de la première, lisait encore `n=2` alors qu'il n'en restait
+qu'une. Elle aurait supprimé la dernière.
+
+Le verrou est donc pris dans **sa propre instruction**, et l'inventaire dans la suivante — celle-ci
+prend son snapshot après l'attente, et voit ce que la précédente a commité.
 
 Trois issues et non deux : « je n'ai rien trouvé » et « je refuse de vous enfermer dehors » ne se
 disent pas de la même façon à l'opérateur.
@@ -133,17 +143,44 @@ DN-6 de step-023 exige de présenter le facteur qu'on remplace. La symétrie s'a
 se retire précisément quand on ne l'a plus — appareil perdu, clé cassée. L'exiger rendrait le geste
 impossible dans le seul cas qui le motive.
 
+La session élevée reste requise, et son absence rend **409 et non 401** : `notAuthenticated()` dit
+« reconnectez-vous », ce qui est faux d'une session vivante — et dont le remède **boucle**, puisque se
+reconnecter rend précisément une session de premier facteur. La route sœur avait raison ; la revue a
+relevé l'écart.
+
 Ce que l'élévation seule ne couvre pas est écrit dans le §6.9 : elle vaut douze heures. Ce qui reste
 est borné par DN-8 et par l'audit de step-025.
 
-**Conséquence pour step-025** : cette opération est la **seule mutation** de son préfixe. Elle doit
-être gardée, donc hors de la liste d'exemptions `/auth/mfa/*` que `step-025.md:37` déclare. Les quatre
-autres opérations y restent.
+**Conséquence pour step-025**, et la première rédaction se trompait. Le retrait est la seule opération
+de ce préfixe qui exige une **permission**, mais **pas la seule qui écrive** : `register/finish`
+insère une passkey, et les deux `begin` écrivent un défi. Exempter `/auth/mfa/*` sauf le `DELETE`
+laisserait donc **l'ajout d'un second facteur partir sans écriture d'audit** — précisément
+l'événement qu'une enquête sur compte compromis va chercher. `register/finish` doit être audité
+même s'il reste exempté de garde de permission.
 
-### DN-10 — Le premier facteur est libre, le suivant exige l'élévation
+### DN-10 — Le premier facteur est libre, le suivant exige l'élévation — **sur les deux routes, et
+aux deux temps de la cérémonie**
+
 Aucun facteur enrôlé → une session de premier facteur suffit ; c'est l'amorçage. Un facteur déjà en
 place — TOTP ou passkey → session élevée exigée, sans quoi quiconque détient le mot de passe se donne
 un second facteur et toute la step ne garde rien.
+
+**La revue a trouvé deux trous dans cette règle, et les deux étaient exploitables.**
+
+Le premier : `POST /auth/mfa/totp/enroll` jugeait « un facteur est-il en place ? » sur
+`mfa_totp_secret IS NOT NULL`. Une passkey n'y comptait pas. Un opérateur qui n'avait qu'une passkey
+se faisait donc enrôler une application d'authentification par quiconque détenait son mot de passe —
+l'enrôlement rendant le secret **et** dix codes de récupération —, puis la vérification élevait la
+session sans que la clé ait jamais été présentée. Le scénario qui le garde a d'abord rendu 200.
+
+La preuve ne peut pas être présentée sur cette route : son corps ne déclare que `totp` et
+`recovery_code`, et y ajouter `webauthn` ferait passer une assertion par un champ `code`. C'est donc
+l'élévation qui en tient lieu.
+
+Le second : la garde ne vivait que sur `register/begin`. Le défi vit cinq minutes et la session
+survit à l'élévation : une cérémonie ouverte à l'amorçage — quand elle était légitimement libre —
+attachait encore une passkey cinq minutes plus tard, sur une session jamais élevée, à un compte qui
+en portait désormais un. Elle est rejouée à la finition.
 
 ### DN-11 — Les options de cérémonie sont un DTO déclaré, pas le type de la bibliothèque
 La règle d'or est sans réserve. Le contrat déclare les champs dont le client a besoin pour appeler
@@ -174,71 +211,102 @@ confirment sur le livré.
 |---|---|
 | **compteur non monotone** (`$2::bigint >= 0`) | `TestLeCompteurDeSignatureNAvanceQue` |
 | **le zéro refusé** — garde rendue *plus stricte* | `TestUnCompteurToujoursAZeroEstAccepte` |
+| **le verdict du compteur jeté** (`return true, err`) | « une clé d'accès dont le compteur a reculé est refusée » |
 | `user_verified` affecté au lieu d'être latché | `TestLaVerificationDeLUtilisateurNeRecuePas` |
 | `purpose` retiré du `WHERE` | `TestUnDefiDAssertionNeSeRelitPasCommeUnEnregistrement` |
 | session retirée du `WHERE` | `TestLeDefiDUneAutreSessionNeSeRelitPas` |
 | l'ouverture n'éteint plus le défi précédent | `TestOuvrirUneCeremonieEteintCelleQuElleRemplace` |
+| usage unique retiré du `WHERE` | `TestUnDefiDeCeremonieSeRelitEtNeSeConsommeQuUneFois` |
+| appartenance de la passkey (`!mine`) retirée | `TestRetirerLaPasskeyDUnAutreOperateurNeLaTrouvePas` |
+| **`FOR UPDATE` et inventaire dans la même instruction** | `TestUnRetraitConcurrentNEmportePasLaDernierePasskey` |
 | **retrait du dernier facteur autorisé** | `TestRetirerLaDernierePasskeySansTOTPEstRefuse` + le scénario |
-| **défi jamais consommé** | « une attestation d'enregistrement déjà servie ne se rejoue pas » |
-| origines élargies, **cérémonie toujours liée** | **rien — et c'est le témoin** : le refus tient par le liage, pas par la configuration |
-| origines élargies **et cérémonie déliée** | « une assertion signée pour une autre origine est refusée » |
-| élévation non exigée à l'ajout d'un facteur | « enregistrer une clé d'accès sans avoir franchi le facteur en place » |
-| verrou d'essais non consulté | trois scénarios, dont deux de TOTP — le seau est bien partagé |
-| `passkeys: string`, `passkeyId: number`, `method` sans `webauthn` | `typecheck-web`, une erreur chacune |
+| **défi jamais consommé** | `TestUnDefiDeCeremonieSeRelitEtNeSeConsommeQuUneFois` |
+| origines élargies, **assertion toujours liée** | **rien — et c'est le témoin** |
+| origines élargies **et assertion déliée** | « une assertion signée pour une autre origine est refusée » |
+| origines élargies, **enregistrement toujours lié** | **rien — second témoin** |
+| origines élargies **et enregistrement délié** | « une clé d'accès enregistrée depuis une autre origine est refusée » |
+| **élévation non exigée à l'ajout** (`register/begin`) | « enregistrer une clé d'accès sans avoir franchi le facteur en place » |
+| **élévation non rejouée à la finition** | « une cérémonie ouverte avant qu'un facteur n'existe ne l'attache pas après » |
+| **élévation non exigée au retrait** | « retirer une clé d'accès sans avoir franchi le second facteur » |
+| **`EnrollTotp` aveugle aux passkeys** | « enrôler une application d'authentification sans franchir la clé en place » |
+| identifiant comparé en `uuid` et non en texte | « un identifiant de clé d'accès mal formé est refusé sur sa forme » |
+| retrait qui rend 409 au lieu de 204 | « retirer une clé d'accès quand il en reste une autre réussit » |
+| verrou d'essais non consulté | quatre scénarios, dont deux de TOTP et le croisé |
+| `passkeys: string`, `passkeyId: number`, `method` sans `webauthn`, finition sans 409 | `typecheck-web`, une erreur chacune |
 
-### Ce que les mutations ont trouvé
+### Ce que les mutations ont trouvé, avant la revue
 
 **Un scénario qui se lisait bien et ne gardait pas ce qu'il prétendait.** « Un défi d'assertion déjà
 servi ne se rejoue pas » restait vert avec la consommation du défi entièrement retirée : sur le chemin
 d'assertion, le challenge de premier facteur est consommé au succès et refuse le rejeu bien avant que
-le défi de cérémonie n'ait son mot à dire. Il gardait donc l'anti-rejeu de step-023. Le rejeu porte
-désormais sur l'enregistrement, qui n'exige aucun challenge — le défi y est la seule garde.
+le défi de cérémonie n'ait son mot à dire. Il gardait donc l'anti-rejeu de step-023. Déplacé sur
+l'enregistrement, qui n'exige aucun challenge.
 
 **Deux pièges de mesure, tous deux lisibles comme des succès :**
 
-- Trois mutations SQL écrites `AND $n IS NOT NULL` **rougissaient pour la mauvaise raison** :
-  PostgreSQL perd le typage d'un paramètre qui n'apparaît plus ailleurs, et l'erreur était
-  `could not determine data type of parameter`. Refaites avec un cast explicite, chacune fait tomber
-  exactement le test qui la garde, et rien d'autre.
+- Des mutations SQL écrites `AND $n IS NOT NULL` **rougissaient pour la mauvaise raison** :
+  PostgreSQL perd le typage d'un paramètre qui n'apparaît plus ailleurs. Refaites avec un cast
+  explicite, chacune fait tomber exactement le test qui la garde.
 - La première mutation de l'anti-rejeu retirait la lecture du verdict de `ConsumeCeremony` **sans
-  cesser de consommer** : elle ne retirait donc pas la garde. C'est le même défaut que les mutations
-  à sens unique du chiffrement, en step-023.
+  cesser de consommer** : elle ne retirait donc pas la garde.
 
 Et un piège de méthode : le script qui jouait les mutations lisait les lignes `--- FAIL` au lieu du
-code de retour de `go test`. Une mutation qui cassait la compilation se lisait « verte ». Tout a été
-remesuré sur `rc`.
+code de retour de `go test`. Une mutation qui cassait la compilation se lisait « verte ».
 
-**Un défaut introduit puis refermé dans le même diff.** `presentedFactorIsWellFormed` convertissait la
-méthode d'enrôlement vers l'enum de la vérification, qui venait de gagner `webauthn` : un `webauthn`
-envoyé à `enrollTotp` serait devenu bien formé, puis serait parti sur le repli TOTP.
+### Ce que la revue a trouvé, et qu'aucune mutation n'avait vu
 
-**Trois textes faux hérités de step-023**, trouvés en amendant le §3.1 et corrigés : la colonne
-`mfa_challenges.failures` que le §3.1 **et** le contrat décrivaient encore alors que la revue de
-step-023 l'avait retirée, et `login_attempt_counters.scope` qui y valait `(email|source)` alors que
-00007 admet `mfa`.
+Trois lectures indépendantes, chacune sur un angle. Elles ont trouvé **deux failles exploitables** que
+les treize premières mutations n'atteignaient pas — parce qu'on ne mute que ce qu'on a pensé à écrire.
+
+1. **Un opérateur qui n'avait qu'une passkey n'était protégé par rien.** `EnrollTotp` jugeait sur
+   `mfa_totp_secret IS NOT NULL` ; une passkey n'y comptait pas. La PR créait le trou en ajoutant un
+   second type de facteur sans élargir la garde de l'autre chemin.
+2. **La garde du dernier facteur ne tenait pas**, et sa première correction non plus : `FOR UPDATE` et
+   inventaire dans la même instruction ne sérialisent rien. Réfuté par la mesure, verrou observé dans
+   `pg_locks`.
+
+Plus quatre gardes qu'aucun test ne tenait — le verdict du compteur de signature, le liage d'origine
+de l'**enregistrement**, l'élévation au **retrait**, et la fenêtre entre l'ouverture d'une cérémonie
+et sa finition. Chacune a désormais son scénario, et chacune a été mutée.
+
+Et deux défauts de forme : un `passkeyId` qui n'est pas un UUID rendait **500**, statut que le contrat
+ne déclare pas ; une clé déjà enregistrée ailleurs violait l'index et rendait **500** aussi, ce qui en
+faisait un oracle — 500 contre 200 disait à qui détient un authentificateur s'il est enrôlé quelque
+part dans le déploiement.
+
+**Un correctif en a masqué un autre**, et c'est le genre d'effet qu'on ne voit qu'en remutant : traiter
+la clé déjà enregistrée comme un refus a intercepté le rejeu d'attestation *avant* l'anti-rejeu, et
+rejouer la garde d'élévation à la finition a rendu deux scénarios inopérants. Les trois mutations
+correspondantes, vertes après coup, ont été remesurées et les scénarios réparés.
 
 ## Ce qui n'est pas testé, et pourquoi
 
-- **Le compteur de signature n'est pas observé par un scénario.** Un authentificateur virtuel qui
-  reculerait son compteur ne dirait rien du produit — il dirait ce que le harnais a bien voulu écrire.
-  La monotonie vit dans un `UPDATE` et s'observe dans `internal/store`, où elle est mutée.
-- **Deux scénarios ne gardent pas seuls ce qu'ils nomment**, et le constat est écrit au-dessus de
-  chacun : « un défi d'assertion ne finit pas un enregistrement » reste vert le `purpose` retiré,
-  parce que l'analyseur d'attestation refuse de toute façon une réponse d'assertion ; « le défi ouvert
-  dans une autre session n'élève rien » reste vert la session retirée, parce que se reconnecter ferme
-  la session et que la clé étrangère emporte ses défis. Deux gardes chaque fois, et c'est le `WHERE`
-  qui compte — tenu par les unitaires, qui rougissent tous les deux.
+- **Deux scénarios sont doublés** et ne gardent pas seuls ce qu'ils nomment : le rejeu d'attestation
+  est intercepté par le refus de clé déjà enregistrée, et « un défi d'assertion ne finit pas un
+  enregistrement » n'atteint jamais l'analyseur puisque le décor a déjà consommé le défi
+  d'enregistrement. Le constat est écrit au-dessus de chacun ; les deux gardes sont tenues par les
+  unitaires de `internal/store`, qui rougissent.
+- **`WithExclusions` n'est gardé par rien**, et ne garde rien : vérifié dans la bibliothèque,
+  `CreateCredential` ne consulte jamais la liste d'exclusion — c'est un indice pour le client. La
+  garde réelle est l'index unique, qui a son test.
 - **Aucune attestation n'est vérifiée** : nous ne consultons aucun registre de métadonnées, donc le
-  modèle d'authentificateur n'est pas contrôlé. Une valeur qu'on ne contrôle pas vaut moins que son
-  absence.
+  modèle d'authentificateur n'est pas contrôlé.
+- **Le refus de démarrage sur un `rp_id` en adresse IP n'a pas de scénario.** Vérifié à la main sur le
+  binaire — il refuse en nommant la cause, avant de lier son port — mais le pas de configuration
+  existe et aurait pu le porter. C'est une dette, pas une impossibilité.
 
 ## Definition of Done
 - [x] `make check` vert, `make e2e` vert
 - [x] la politique sur le compteur à zéro est écrite, avec le cas légitime qu'elle admet
-- [x] la mutation « lire `origin` dans la requête » fait rougir — jouée en deux temps, voir le tableau
-- [x] la mutation « accepter un défi déjà consommé » fait rougir
-- [x] la mutation « ignorer le compteur de signature » fait rougir
-- [x] la mutation « autoriser le retrait du dernier facteur » fait rougir
+- [x] la mutation « lire `origin` dans la requête » fait rougir — jouée en deux temps sur **les deux**
+      cérémonies, chacune avec son témoin
+- [x] la mutation « accepter un défi déjà consommé » fait rougir — au store ; au niveau scénario elle
+      est doublée par le refus de clé déjà enregistrée, et le constat est écrit
+- [x] la mutation « ignorer le compteur de signature » fait rougir — **au SQL et au produit**. La
+      première rédaction de cette case sur-affirmait : elle était vraie du `WHERE` et fausse du
+      verdict, que rien ne tenait. La revue l'a mesuré, un scénario le garde désormais
+- [x] la mutation « autoriser le retrait du dernier facteur » fait rougir — et la garde elle-même a dû
+      être refaite : sa première forme ne sérialisait rien
 
 ## Suivis ouverts
 
@@ -260,6 +328,20 @@ step-023 l'avait retirée, et `login_attempt_counters.scope` qui y valait `(emai
 5. **Aucune passkey ne porte de nom.** step-028 devra en donner un pour que l'écran distingue deux
    appareils ; la colonne s'écrira avec la step qui saura ce qu'elle doit contenir, comme step-005 l'a
    fait pour `sessions`.
+6. **« Un seul défi vivant par session et par objet » est une propriété que l'ouverture produit, et
+   qu'aucun index n'impose.** Deux ouvertures concurrentes ne se voient pas et insèrent toutes deux ;
+   la lecture prend désormais le plus récent (`ORDER BY … LIMIT 1`) plutôt qu'une ligne au hasard, ce
+   qui rend le comportement déterministe sans rendre l'invariant vrai. Un index unique partiel
+   `(session_id, purpose) WHERE consumed_at IS NULL` le tiendrait, mais entre en tension avec la CTE
+   qui éteint le précédent dans la même commande — à mesurer avant d'y toucher.
+7. **`BeginWebauthnAssertion` n'est borné par aucun compteur**, comme les deux routes
+   d'enregistrement : quiconque détient un mot de passe peut y boucler et faire croître
+   `webauthn_challenges` jusqu'à la purge de step-187. Le verrou d'essais ne garde que la
+   vérification. Même famille que le suivi n°2.
+8. **Un authentificateur au compteur cassé verrouille l'opérateur sur tous ses facteurs.** Cinq
+   assertions refusées pour compteur reculé ferment aussi le TOTP et les codes de récupération, un
+   quart d'heure. C'est le prix de DN-7 appliqué à un mode d'échec légitime, et il n'était écrit nulle
+   part.
 
 ## Hors périmètre
 L'exigence de second facteur sur les écritures → step-025. Le choix d'affichage entre passkey et TOTP,

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/descope/virtualwebauthn"
+	"github.com/jackc/pgx/v5"
 )
 
 // Le domaine des cérémonies, tel que `completeConfiguration()` le pose. Il ne ressemble **pas** à
@@ -63,14 +65,22 @@ func (w *webauthnWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur présente sa clé d'accès signée pour une autre origine$`,
 		w.assertFromAnotherOrigin)
 	ctx.When(`^l'opérateur retire sa première clé d'accès$`, w.removeFirstPasskey)
+	ctx.When(`^l'opérateur retire une clé d'accès dont l'identifiant est mal formé$`,
+		w.removeMalformedPasskey)
+	ctx.When(`^le compteur de la clé d'accès est avancé en base$`, w.advanceStoredSignCount)
+	ctx.When(`^l'opérateur enregistre une clé d'accès signée pour une autre origine$`,
+		w.registerFromAnotherOrigin)
+	ctx.Given(`^l'opérateur ouvre l'enregistrement d'une clé d'accès$`, w.openRegistration)
+	ctx.When(`^l'opérateur finit l'enregistrement ouvert$`, w.closeOpenedRegistration)
 	ctx.When(`^l'opérateur présente (\d+) assertions fausses$`, w.presentWrongAssertions)
-	ctx.Then(`^il lui reste (\d+) clés d'accès$`, w.passkeysRemaining)
+	ctx.Then(`^il lui reste (\d+) clés? d'accès$`, w.passkeysRemaining)
 	ctx.Then(`^le second facteur est refusé$`, w.secondFactorIsRefused)
 	ctx.Then(`^le second facteur est verrouillé$`, w.secondFactorIsLocked)
 	ctx.Then(`^la réponse conduit vers l'enrôlement$`, w.responseLeadsToEnrolment)
 	ctx.Then(`^la cérémonie est refusée$`, w.ceremonyIsRefused)
 	ctx.Then(`^le refus dit qu'il faut d'abord un autre facteur$`, w.refusalNamesTheMissingFactor)
 	ctx.Then(`^le refus dit comment ajouter un facteur$`, w.refusalNamesTheElevation)
+	ctx.Then(`^le refus dit comment franchir le second facteur$`, w.refusalNamesTheElevation)
 }
 
 func (w *webauthnWorld) relyingParty(origin string) virtualwebauthn.RelyingParty {
@@ -83,9 +93,22 @@ func (w *webauthnWorld) relyingParty(origin string) virtualwebauthn.RelyingParty
 
 // registerPasskey joue la cérémonie complète : ouvrir, signer, finir.
 //
-// Elle **n'exige pas** que le serveur ait accepté : trois scénarios l'appellent en attendant un refus
-// (409 sans élévation), et exiger ici masquerait ce qu'ils observent. Le pas suivant lit le statut.
+// Elle **n'exige pas** que le serveur ait accepté, parce que plusieurs scénarios l'appellent en
+// attendant un refus — exiger ici masquerait ce qu'ils observent. Ce que ça coûte est réel et
+// nommé : un `Étant donné` qui échouerait passerait inaperçu jusqu'au premier `Alors`. C'est
+// pourquoi les scénarios qui l'emploient en décor observent tous, plus loin, un effet que l'absence
+// d'enregistrement rendrait faux — un statut, un compte de clés, ou une élévation.
 func (w *webauthnWorld) registerPasskey() error {
+	return w.registerSignedFor(ceremonyOrigin)
+}
+
+// registerFromAnotherOrigin signe l'attestation pour une origine que le serveur n'attend pas. Le
+// défi est le bon, la clé est neuve : seule l'origine inscrite dans les données signées diffère.
+func (w *webauthnWorld) registerFromAnotherOrigin() error {
+	return w.registerSignedFor(phishingOrigin)
+}
+
+func (w *webauthnWorld) registerSignedFor(origin string) error {
 	if err := w.login.process.post("/api/auth/mfa/webauthn/register/begin", ""); err != nil {
 		return err
 	}
@@ -101,7 +124,7 @@ func (w *webauthnWorld) registerPasskey() error {
 	}
 
 	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
-	attestation := virtualwebauthn.CreateAttestationResponse(w.relyingParty(ceremonyOrigin),
+	attestation := virtualwebauthn.CreateAttestationResponse(w.relyingParty(origin),
 		w.authenticator, credential, *options)
 	w.presented = attestation
 
@@ -126,6 +149,39 @@ func (w *webauthnWorld) registerPasskey() error {
 	w.passkeys = append(w.passkeys, registered.ID)
 
 	return nil
+}
+
+// openRegistration ouvre une cérémonie et signe sa réponse **sans la présenter**. C'est ce qui rend
+// observable la fenêtre entre la décision d'autoriser l'enrôlement et son emploi : le défi vit cinq
+// minutes, et ce qu'un compte détient peut changer entre-temps.
+func (w *webauthnWorld) openRegistration() error {
+	if err := w.login.process.post("/api/auth/mfa/webauthn/register/begin", ""); err != nil {
+		return err
+	}
+
+	if w.login.process.received.status != 200 {
+		return fmt.Errorf("l'ouverture de l'enregistrement rend %d : le scénario ne peut rien exercer",
+			w.login.process.received.status)
+	}
+
+	options, err := virtualwebauthn.ParseAttestationOptions(w.login.process.received.body)
+	if err != nil {
+		return fmt.Errorf("relire les options d'enregistrement : %w", err)
+	}
+
+	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+	w.presented = virtualwebauthn.CreateAttestationResponse(w.relyingParty(ceremonyOrigin),
+		w.authenticator, credential, *options)
+
+	return nil
+}
+
+func (w *webauthnWorld) closeOpenedRegistration() error {
+	if w.presented == "" {
+		return errors.New("aucune cérémonie ouverte : le scénario n'a rien à finir")
+	}
+
+	return w.finishRegistration(w.presented)
 }
 
 func (w *webauthnWorld) finishRegistration(attestation string) error {
@@ -272,6 +328,34 @@ func (w *webauthnWorld) presentWrongAssertions(count int) error {
 	}
 
 	return nil
+}
+
+// advanceStoredSignCount fait avancer le compteur **en base**, comme si l'appareil enregistré avait
+// servi plusieurs fois. L'assertion suivante en annoncera un plus petit — le signal du clonage.
+func (w *webauthnWorld) advanceStoredSignCount(ctx context.Context) error {
+	conn, err := pgx.Connect(ctx, w.login.dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	tag, err := conn.Exec(ctx, `UPDATE webauthn_credentials SET sign_count = 100`)
+	if err != nil {
+		return fmt.Errorf("avancer le compteur de signature : %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return errors.New("aucune clé d'accès en base : le scénario n'a rien à faire avancer")
+	}
+
+	return nil
+}
+
+// removeMalformedPasskey demande le retrait d'un identifiant qui n'en est pas un. Ce que porte un
+// chemin d'URL n'est pas nécessairement un UUID.
+func (w *webauthnWorld) removeMalformedPasskey() error {
+	return w.login.process.remove("/api/auth/mfa/webauthn/passkeys/pas-un-identifiant")
 }
 
 func (w *webauthnWorld) removeFirstPasskey() error {

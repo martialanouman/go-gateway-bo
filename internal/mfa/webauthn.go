@@ -28,12 +28,17 @@ type Passkeys struct {
 	origin     string
 }
 
-// NewPasskeys valide le domaine et l'origine, et échoue si l'un des deux ne peut mener aucune
-// cérémonie — une adresse IP, un label vide, un port sans hôte.
+// NewPasskeys valide le **domaine**, et échoue s'il ne peut mener aucune cérémonie — une adresse IP,
+// un label vide, un label numérique.
 //
-// C'est **ici** que la configuration est jugée, et non dans `internal/config` : la spécification
-// WebAuthn §5.1.3 dit ce qu'est un domaine valable, la bibliothèque l'applique, et le redire ailleurs
-// en ferait deux rédactions dont une périmerait. L'appelant doit donc le construire **avant de lier
+// L'origine, elle, n'est **pas** jugée ici : lu dans `Config.validate()` de la v0.18.0, seule sa
+// présence est contrôlée. Ce qui la garde est `requiredAbsoluteURL` dans `internal/config`. Une
+// rédaction précédente de ce commentaire promettait les deux, et la revue l'a réfutée en sondant la
+// bibliothèque — c'est le genre d'affirmation que personne ne relit contre sa source.
+//
+// Le domaine, lui, est bien jugé ici plutôt que dans `internal/config` : la spécification WebAuthn
+// §5.1.3 dit ce qu'est un domaine valable, la bibliothèque l'applique, et le redire ailleurs en
+// ferait deux rédactions dont une périmerait. L'appelant doit donc construire ceci **avant de lier
 // son port**, sans quoi le serveur écouterait en refusant chaque cérémonie sans avoir rien dit.
 func NewPasskeys(rpID, origin string) (*Passkeys, error) {
 	ceremonies, err := webauthn.New(&webauthn.Config{
@@ -143,8 +148,13 @@ func (p *Passkeys) FinishAssertion(subject store.PasskeyOwner, session webauthn.
 // inattendue, signature fausse, réponse mal formée.
 //
 // **Toutes ces causes sont une seule ici**, comme les cinq du refus de second facteur : ce que
-// l'appelant en fait est un 401 muet, et distinguer dirait à une machine où elle en est. La cause
-// réelle est enveloppée pour le journal, jamais rendue au client.
+// l'appelant en fait est un 401 muet, et distinguer dirait à une machine où elle en est.
+//
+// La cause réelle est enveloppée, et **n'atteint aujourd'hui personne** : il n'y a pas encore de
+// journal dans `internal/bff`, et le chemin d'assertion la jette. Une rédaction précédente disait
+// « enveloppée pour le journal » — elle décrivait une destination qui n'existe pas. Elle deviendra
+// vraie quand le logging arrivera ; d'ici là, l'enveloppe ne sert qu'à distinguer un refus d'une
+// panne, ce qui est déjà sa raison d'être.
 type RefusedCeremonyError struct {
 	cause error
 }
@@ -334,6 +344,9 @@ func (p *PasskeyManager) FinishRegistration(ctx context.Context, sessionID, oper
 		return "", err
 	}
 
+	// Une chaîne vide dit « cette clé est déjà enregistrée ». L'appelant en fait le même refus que
+	// pour une signature fausse — le distinguer dirait à qui détient l'authentificateur qu'il est
+	// enrôlé quelque part.
 	return p.credentials.Register(ctx, operatorID, passkey)
 }
 

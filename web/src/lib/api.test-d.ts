@@ -225,7 +225,12 @@ expectTypeOf<
   FinishRegistrationOperation['responses'][200]['content']['application/json']
 >().toEqualTypeOf<{ id: string }>()
 
-expectTypeOf<keyof FinishRegistrationOperation['responses']>().toEqualTypeOf<200 | 400 | 401>()
+// Le 409 dit qu'un second facteur est apparu **entre** l'ouverture de la cérémonie et sa finition, sur
+// une session non élevée. Le client doit le distinguer du 401 : le premier se rattrape en franchissant
+// le facteur, le second en reprenant la cérémonie.
+expectTypeOf<keyof FinishRegistrationOperation['responses']>().toEqualTypeOf<
+  200 | 400 | 401 | 409
+>()
 
 type BeginAssertionOperation = paths['/auth/mfa/webauthn/assert/begin']['post']
 

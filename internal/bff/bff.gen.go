@@ -1163,6 +1163,20 @@ func (response FinishWebauthnRegistration401JSONResponse) VisitFinishWebauthnReg
 	return err
 }
 
+type FinishWebauthnRegistration409JSONResponse Error
+
+func (response FinishWebauthnRegistration409JSONResponse) VisitFinishWebauthnRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type HealthRequestObject struct {
 }
 

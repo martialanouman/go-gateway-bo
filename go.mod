@@ -4,6 +4,7 @@ go 1.26.6
 
 require (
 	github.com/cucumber/godog v0.16.0
+	github.com/descope/virtualwebauthn v1.0.5
 	github.com/getkin/kin-openapi v0.144.0
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/go-webauthn/webauthn v0.18.0
@@ -89,7 +90,6 @@ require (
 	github.com/daixiang0/gci v0.13.7 // indirect
 	github.com/dave/dst v0.27.3 // indirect
 	github.com/denis-tingaikin/go-header v0.5.0 // indirect
-	github.com/descope/virtualwebauthn v1.0.5 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/docker/go-connections v0.7.0 // indirect

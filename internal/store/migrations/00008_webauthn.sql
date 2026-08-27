@@ -5,8 +5,9 @@
 -- tables.
 --
 -- **Une table et non la colonne `operators.mfa_webauthn_credentials`** que le §3.1 déclarait. La
--- raison est mécanique : le refus du compteur de signature qui recule s'écrit ici
--- `WHERE sign_count < $2`, et `RowsAffected()` est le verdict — le patron de 00006, déjà éprouvé.
+-- raison est mécanique : le refus du compteur de signature qui recule s'écrit dans un `WHERE`, et
+-- `RowsAffected()` est le verdict — le patron de 00006, déjà éprouvé. La condition exacte vit dans
+-- `internal/store/webauthn.go` et n'est pas recopiée ici : une citation diverge.
 -- Dans un tableau `jsonb` il faudrait un `jsonb_set` sur un chemin calculé, et l'atomicité se
 -- raisonnerait au cas par cas plutôt qu'une fois. `mfa_recovery_codes` est le précédent : step-023 a
 -- préféré une table à un tableau, et le §3.1 ne la déclarait pas non plus.
@@ -31,15 +32,15 @@ CREATE TABLE webauthn_credentials (
     credential_id   bytea NOT NULL,
     -- La clé **publique**, au format COSE. Elle vérifie la signature, elle n'en produit aucune.
     public_key      bytea NOT NULL,
-    -- Le compteur de signature de l'authentificateur, et la garde du clonage. Il n'avance que :
-    -- `RowsAffected() = 0` sur l'`UPDATE` monotone signale deux copies de la même clé privée.
+    -- Le compteur de signature de l'authentificateur, et la garde du clonage. Il n'avance que : un
+    -- compteur qui recule dit que deux copies de la même clé privée existent, chacune avec le sien.
     --
     -- `bigint` pour un `uint32` : la moitié haute ne tiendrait pas dans un `integer` signé.
     --
-    -- Le défaut est zéro et le `CHECK` l'admet, parce que **certains authentificateurs rendent
-    -- toujours zéro** — c'est le cas légitime que la garde doit laisser passer, et il est admis
-    -- nommément plutôt qu'en désactivant le contrôle. Une garde qui refuse du légitime finit
-    -- retirée.
+    -- Le `CHECK` n'est pas la garde : il refuse un compteur négatif, rien de plus. Ce qui refuse un
+    -- compteur qui **recule** est la condition de l'`UPDATE`, en Go — et c'est elle aussi qui admet
+    -- nommément le zéro permanent, parce que certains authentificateurs ne comptent pas. Une garde
+    -- qui refuse du légitime finit retirée.
     sign_count      bigint NOT NULL DEFAULT 0 CHECK (sign_count >= 0),
     -- Le modèle d'authentificateur. Il ne garde rien aujourd'hui ; il vient gratuitement de la
     -- cérémonie et c'est ce qui permettra à step-028 d'écrire « votre clé YubiKey » plutôt que « une
