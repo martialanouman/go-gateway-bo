@@ -33,3 +33,16 @@ Fonctionnalité: Le binaire refuse de servir sur un schéma en retard
     Quand le serveur démarre
     Alors le serveur refuse de démarrer
     Et le message d'erreur parle du schéma et non de l'adresse
+
+  # Les partitions d'`audit_log` sont posées par la migration, une seule fois, pour le mois courant
+  # et le suivant. **Rien ne les renouvelle** — mesuré en step-005, et la panne est datée : la
+  # première écriture du mois+2 est refusée. Comme l'audit partage la transaction de l'action qu'il
+  # trace, c'est l'action métier qui tomberait, sans que rien n'ait prévenu.
+  #
+  # Les retirer avant le démarrage est le seul moyen de rendre l'appel observable : la migration a
+  # déjà créé celles que `now()` réclame, donc un appel de plus ne changerait rien de visible.
+  Scénario: le démarrage crée les partitions d'audit qui manquent
+    Étant donné une base migrée dont les partitions d'audit ont été retirées
+    Et un serveur démarré
+    Alors le journal d'audit accepte une écriture datée du mois courant
+    Et le journal d'audit accepte une écriture datée du mois suivant

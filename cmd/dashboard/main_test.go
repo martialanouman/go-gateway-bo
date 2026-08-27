@@ -166,7 +166,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 64
+const minimumScenarios = 65
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -231,6 +231,10 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.Given(`^une base dont le schéma est en retard d'une migration$`, schema.outdatedSchema)
 	ctx.Given(`^une base vierge$`, schema.freshSchema)
 	ctx.Given(`^l'adresse d'écoute déjà occupée$`, schema.occupyListenAddress)
+	ctx.Given(`^une base migrée dont les partitions d'audit ont été retirées$`,
+		schema.migratedSchemaWithoutAuditPartitions)
+	ctx.Then(`^le journal d'audit accepte une écriture datée du (mois courant|mois suivant)$`,
+		schema.auditLogAcceptsWriteDated)
 	ctx.Then(`^le message d'erreur nomme la version trouvée et la version attendue$`,
 		schema.messageNamesBothVersions)
 	ctx.Then(`^le message d'erreur parle du schéma et non de l'adresse$`,

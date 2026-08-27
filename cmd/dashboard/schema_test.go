@@ -8,6 +8,8 @@ import (
 	"net"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -18,6 +20,10 @@ type schemaWorld struct {
 	process  *process
 	occupied net.Listener
 	applied  int64
+	// dsn est celui de la base que ce scénario s'est taillée. Les cas de version n'en avaient pas
+	// besoin — ils lisent le refus dans la sortie du process ; celui des partitions relit la base
+	// après que le serveur l'a touchée.
+	dsn string
 }
 
 // release rend l'adresse occupée. Sans elle, le port resterait pris pour toute la suite — et le
@@ -65,6 +71,7 @@ func (w *schemaWorld) pointTheServerAt(dsn string) error {
 	maps.Copy(env, w.process.env)
 	env["DASHBOARD_DATABASE_URL"] = dsn
 	w.process.env = env
+	w.dsn = dsn
 
 	return nil
 }
@@ -137,6 +144,118 @@ func (w *schemaWorld) messageNamesBothVersions() error {
 	if w.applied == suiteSchemaVersion {
 		return fmt.Errorf("les deux versions valent %d : le contrôle ci-dessus passerait sur un "+
 			"message qui n'en nomme qu'une", w.applied)
+	}
+
+	return nil
+}
+
+// migratedSchemaWithoutAuditPartitions taille une base migrée, puis **retire** les partitions
+// d'`audit_log` que la migration vient d'y poser.
+//
+// C'est le seul moyen de rendre l'appel de démarrage observable : la migration a déjà créé celles que
+// `now()` réclame, donc un appel de plus ne changerait rien qu'on puisse voir. Les retirer place la
+// base dans l'état où elle sera le 1er octobre — celui où l'écriture d'audit est refusée, et avec
+// elle l'action qu'elle trace.
+func (w *schemaWorld) migratedSchemaWithoutAuditPartitions(ctx context.Context) error {
+	dsn, err := migratedDatabase(ctx)
+	if err != nil {
+		return err
+	}
+
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	const partitions = `
+		SELECT child.relname
+		FROM pg_inherits
+		JOIN pg_class AS parent ON parent.oid = pg_inherits.inhparent
+		JOIN pg_class AS child ON child.oid = pg_inherits.inhrelid
+		WHERE parent.relname = 'audit_log'`
+
+	rows, err := conn.Query(ctx, partitions)
+	if err != nil {
+		return fmt.Errorf("lire les partitions d'audit : %w", err)
+	}
+
+	var names []string
+
+	for rows.Next() {
+		var name string
+		if err = rows.Scan(&name); err != nil {
+			rows.Close()
+
+			return fmt.Errorf("lire un nom de partition : %w", err)
+		}
+
+		names = append(names, name)
+	}
+
+	rows.Close()
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("parcourir les partitions d'audit : %w", err)
+	}
+
+	if len(names) == 0 {
+		return errors.New("aucune partition d'audit à retirer : ce scénario n'exercerait rien")
+	}
+
+	for _, name := range names {
+		// Le nom vient du catalogue de cette base même, jamais d'une donnée reçue : PostgreSQL
+		// n'accepte de toute façon aucun paramètre lié à cet endroit d'une commande de schéma.
+		if _, err = conn.Exec(ctx, "DROP TABLE "+name); err != nil {
+			return fmt.Errorf("retirer la partition %s : %w", name, err)
+		}
+	}
+
+	return w.pointTheServerAt(dsn)
+}
+
+// auditLogAcceptsWriteDated écrit un événement daté du mois demandé et observe **où il atterrit** —
+// la même forme que dans `internal/store`, et pour la même raison : ce qu'une partition sert à faire
+// est d'accueillir une écriture, et c'est cela que son absence casse. Un inventaire de `pg_class`
+// décrirait une structure sans jamais tenter l'écriture qui compte.
+//
+// Le calcul se fait en `timestamp` et ne devient un instant qu'à la sortie, comme les bornes de
+// `ensure_audit_log_partitions()` : l'arithmétique de `timestamptz` suit le fuseau de la session.
+func (w *schemaWorld) auditLogAcceptsWriteDated(ctx context.Context, month string) error {
+	months := map[string]int{"mois courant": 0, "mois suivant": 1}
+
+	offset, known := months[month]
+	if !known {
+		return fmt.Errorf("mois inconnu : %q", month)
+	}
+
+	conn, err := pgx.Connect(ctx, w.dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	const insertDatedEvent = `
+		INSERT INTO audit_log (action, created_at)
+		VALUES ('test.partition', (date_trunc('month', now() AT TIME ZONE 'UTC')
+			+ make_interval(months => $1)) AT TIME ZONE 'UTC')
+		RETURNING tableoid::regclass::text,
+			to_char(created_at AT TIME ZONE 'UTC', 'YYYY_MM')`
+
+	var landedIn, eventMonth string
+
+	err = conn.QueryRow(ctx, insertDatedEvent, offset).Scan(&landedIn, &eventMonth)
+	if err != nil {
+		return fmt.Errorf("écrire un événement d'audit daté du %s : %w\n"+
+			"le démarrage n'a pas recréé la partition qui manquait", month, err)
+	}
+
+	if expected := "audit_log_" + eventMonth; landedIn != expected {
+		return fmt.Errorf("l'événement du %s est rangé dans %q et non dans %q : une partition "+
+			"fourre-tout accepterait tout en ayant perdu l'élagage par période", month, landedIn,
+			expected)
 	}
 
 	return nil

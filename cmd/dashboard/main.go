@@ -126,12 +126,29 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
+	// Avant la liaison du port, et cette fois le refus est le point : sans partition du mois, toute
+	// écriture d'audit échoue — donc, l'audit partageant la transaction de l'action qu'il trace,
+	// toute action tracée. Démarrer quand même produirait un serveur qui accepte les lectures et
+	// refuse les écritures sur une erreur de contrainte, ce qui ne ressemble à rien de diagnosticable.
+	//
+	// La migration ne les crée qu'une fois : c'est ici que la fenêtre se remet à glisser.
+	if err = store.EnsureAuditPartitions(ctx, pool); err != nil {
+		return err
+	}
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", cfg.Addr, err)
 	}
 
 	logger.Info("le serveur écoute", "addr", ln.Addr().String())
+
+	// Après la liaison, parce que rien n'en dépend pour servir, et avec le contexte d'arrêt : la
+	// boucle s'éteint avec le serveur. Ce qu'elle couvre que l'appel ci-dessus ne couvre pas, c'est
+	// un process qui tourne plus d'un mois — le produit stable qu'on ne redéploie plus.
+	go store.KeepAuditPartitions(ctx, pool, store.PartitionRefresh, func(err error) {
+		logger.Error("les partitions du journal d'audit n'ont pas pu être renouvelées", "error", err)
+	})
 
 	router := bff.NewRouter(bff.Dependencies{
 		Assets:         assets,
