@@ -86,7 +86,9 @@ operators
                                           -- l'opérateur en données associées
   mfa_totp_last_step     (nullable)       -- (Amendement step-023) anti-rejeu : dernier pas de temps
                                           -- consommé ; un code n'est accepté que strictement au-delà
-  mfa_webauthn_credentials (jsonb/array)  -- registered passkeys/WebAuthn authenticators
+                                          -- (Amendement step-024) la colonne
+                                          -- mfa_webauthn_credentials (jsonb/array) a été RETIRÉE :
+                                          -- les passkeys vivent dans leur propre table, plus bas
   status                 (active|disabled)
   last_login_at
 
@@ -125,9 +127,11 @@ mfa_challenges                       -- (Amendement step-021) second-factor chal
   token_hash                             -- SHA-256 du jeton ; le jeton lui-même n'est jamais stocké
   created_at, expires_at
   consumed_at            (nullable)      -- anti-rejeu : un challenge consommé ne se rejoue pas
-  failures                               -- (Amendement step-023) essais de second facteur essuyés ;
-                                         -- au-delà du seuil le challenge est mort, ce qui borne la
-                                         -- recherche exhaustive d'un code à six chiffres
+                                         -- (Correction step-024) une colonne `failures` a été
+                                         -- décrite ici par step-023 puis retirée pendant sa revue :
+                                         -- elle doublait le compteur par opérateur ci-dessous, et
+                                         -- deux gardes dont l'une masque l'autre valent une garde
+                                         -- et une illusion
 
 mfa_recovery_codes                   -- (Amendement step-023) le chemin de sortie quand le téléphone est perdu
   id (uuidv7, pk)
@@ -137,7 +141,10 @@ mfa_recovery_codes                   -- (Amendement step-023) le chemin de sorti
   created_at                             -- consommé = DÉTRUIT ; rien à réafficher, rien à fuir
 
 login_attempt_counters               -- (Amendement step-021) anti-brute-force partagé entre instances
-  scope                  (email|source) -- l'adresse soumise, ou le HMAC de l'adresse source
+  scope                  (email|source|mfa) -- l'adresse soumise, le HMAC de l'adresse source, ou
+                                         -- (Amendement step-023) l'identifiant de l'opérateur pour
+                                         -- le second facteur — TOTP, code de récupération et
+                                         -- passkey partagent ce seau
   subject                (pk avec scope)
   failures, last_failure_at              -- l'état de verrou se DÉRIVE des deux ; pas de locked_until
 
@@ -152,6 +159,35 @@ sessions                             -- (Amendement step-022) la session du tabl
                                          -- vivante <=> now() < expires_at ET now() < last_seen_at + 2 h
                                          -- avec état parce que le logout, step-029 et l'élévation
                                          -- exigent une révocation avant l'échéance
+
+webauthn_credentials                 -- (Amendement step-024) les passkeys enregistrées
+  id (uuidv7, pk)
+  operator_id (fk)
+  credential_id                          -- l'identifiant choisi par l'authentificateur ; UNIQUE
+  public_key                             -- COSE, et PUBLIQUE : rien ici ne forge d'assertion, donc
+                                         -- rien à chiffrer au repos, contrairement au secret TOTP
+  sign_count                             -- garde du clonage : il n'avance QUE ; un compteur qui
+                                         -- recule signale deux copies de la même clé privée. Le
+                                         -- zéro permanent est ADMIS — certains authentificateurs ne
+                                         -- comptent pas, et une garde qui refuse du légitime finit
+                                         -- retirée
+  aaguid, transports, attachment         -- le modèle et le geste ; aucun ne garde quoi que ce soit
+  user_verified                          -- uvInitialized : latché, il n'avance jamais en arrière
+  backup_eligible, backup_state          -- BE ne change jamais, BS suit la synchronisation
+  created_at, last_used_at (nullable)
+
+webauthn_challenges                  -- (Amendement step-024) le défi d'une cérémonie
+  id (uuidv7, pk)
+  session_id (fk)                        -- lié à la SESSION et non à l'opérateur : une cérémonie
+                                         -- commencée dans une session ne se finit pas dans une
+                                         -- autre, fût-elle du même opérateur
+  purpose                (registration|assertion) -- un défi d'assertion qui finirait un
+                                         -- enregistrement contournerait la preuve de possession
+  ceremony               (jsonb)         -- l'état que la bibliothèque exige de retrouver intact :
+                                         -- défi tiré, utilisateur visé, credentials admis, origine
+                                         -- à laquelle la cérémonie est liée
+  created_at, expires_at
+  consumed_at            (nullable)      -- usage unique, même forme qu'en mfa_challenges
 
 audit_log
   id (uuidv7, pk)
@@ -286,7 +322,22 @@ POST   /auth/mfa/totp/enroll           # (Amendement step-023) enroll a TOTP aut
                                        # réponse dont le code engendré fait un type opaque. La
                                        # VÉRIFICATION, elle, rend le même 204 des deux côtés : elle
                                        # reste une seule opération, à corps discriminé.
-                                       # step-024 ajoutera POST /auth/mfa/webauthn/register.
+                                       # (Amendement step-024) et la cérémonie WebAuthn n'est pas
+                                       # UNE route mais quatre : le protocole est en deux temps des
+                                       # deux côtés — le serveur tire un défi, le navigateur le
+                                       # signe. Aucune ne peut être fusionnée avec sa jumelle sans
+                                       # rendre le défi devinable par l'appelant.
+POST   /auth/mfa/webauthn/register/begin   # (Amendement step-024) options de création
+POST   /auth/mfa/webauthn/register/finish  # (Amendement step-024) enregistre la passkey
+POST   /auth/mfa/webauthn/assert/begin     # (Amendement step-024) options d'assertion
+                                       # L'assertion se FINIT sur /auth/mfa/verify, avec
+                                       # `method: webauthn` : la vérification reste une seule
+                                       # opération, ce que la ligne du dessus promettait.
+DELETE /auth/mfa/webauthn/credentials/{id} # (Amendement step-024) retire une passkey. REFUSÉ quand
+                                       # c'est le dernier facteur : retirer le dernier enferme
+                                       # l'opérateur dehors. Seule route de ce préfixe qui soit une
+                                       # mutation — donc la seule que step-025 doit garder plutôt
+                                       # qu'exempter.
 POST   /auth/logout
 GET    /auth/me                        # current operator + resolved permission set (union of held roles)
 
@@ -495,6 +546,17 @@ Email/mot de passe + **MFA** : application authenticator (TOTP) et **passkey/Web
 Le secret et les codes ne se réaffichent **jamais** : aucune action « révéler » n'existe, dans l'esprit de la règle du §6.7 sur les identifiants de bind. Le serveur rend l'URI `otpauth://` et non une image — le QR est dessiné par le client.
 
 Un enrôlement exige au minimum une session de premier facteur ; **remplacer** un second facteur déjà en place exige une session dont le second facteur a été vérifié, sans quoi quiconque détient le mot de passe le contournerait en s'en enrôlant un neuf.
+
+**(Amendement step-024) Ce que WebAuthn exige, et que les lignes ci-dessus ne disaient pas.** Quatre mécanismes, aucun optionnel :
+
+- **`rpID` et `origin` viennent de la configuration du serveur, jamais de la requête.** Les lire dans la requête laisserait l'attaquant choisir le domaine contre lequel la clé s'authentifie — c'est exactement la propriété que WebAuthn achète sur le TOTP, et la seule façon de la perdre. Chaque cérémonie est en outre **liée à une seule origine**, inscrite avec son défi : une cérémonie commencée sur l'une ne se finit pas sur une autre, fût-elle également configurée.
+- **Le compteur de signature est monotone.** Un compteur qui recule signale que deux copies de la même clé privée existent, et l'assertion est refusée. Mais **certains authentificateurs rendent toujours zéro** : ce cas est admis nommément plutôt que contourné en désactivant le contrôle — une garde qui refuse du légitime finit retirée.
+- **Les défis sont à usage unique, de courte durée, et liés à la session qui les a demandés** — non pas à l'opérateur : une cérémonie ne traverse pas deux sessions du même opérateur. Ils portent leur objet (`registration` ou `assertion`), car un défi d'assertion qui finirait un enregistrement laisserait enrôler une passkey neuve sans rien prouver.
+- **Retirer le dernier facteur d'un opérateur est refusé**, et le refus nomme ce qui manque. Un contrôle interdit est désactivé et expliqué, jamais masqué (§1.9).
+
+Un opérateur peut détenir plusieurs passkeys, et TOTP **et** passkey à la fois : le serveur les accepte à parité, et laquelle proposer en premier est une décision d'écran. Ajouter un facteur à un opérateur qui en détient déjà un exige une session élevée, pour la même raison que le remplacement ci-dessus. **Supprimer** une passkey exige l'élévation mais non de la présenter — on retire une passkey précisément quand on ne l'a plus, et l'exiger rendrait le geste impossible dans le seul cas qui le motive.
+
+Rien de ce qui est stocké pour une passkey n'est un secret : la clé est **publique**, et aucune lecture de la base ne permet de forger une assertion. C'est ce qui dispense cette table du chiffrement au repos qu'exige le secret TOTP.
 
 ### 6.10 Modèle de permission & rôles par défaut
 
