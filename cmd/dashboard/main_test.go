@@ -292,6 +292,15 @@ func completeConfiguration() map[string]string {
 		// TOTP lui arrive **en clair par la réponse d'enrôlement**, qui existe pour ça, donc aucun
 		// scénario n'a besoin de déchiffrer une colonne.
 		"DASHBOARD_TOTP_ENCRYPTION_KEY": "une-cle-de-chiffrement-de-scenario-assez-longue",
+		// Obligatoires depuis step-024, et sans repli de même. Ce ne sont pas des secrets.
+		//
+		// **Le domaine ne ressemble délibérément pas à l'adresse d'écoute**, qui est
+		// `127.0.0.1:<port éphémère>`. C'est ce qui donne sa preuve aux scénarios de passkey :
+		// l'authentificateur du harnais signe pour `https://dashboard.exemple.test`, et une cérémonie
+		// ne peut aboutir que si le serveur tient cette origine de sa **configuration**. Un code qui
+		// la lirait dans la requête verrait `http://127.0.0.1:…` et refuserait tout.
+		"DASHBOARD_WEBAUTHN_RP_ID":  "dashboard.exemple.test",
+		"DASHBOARD_WEBAUTHN_ORIGIN": "https://dashboard.exemple.test",
 	}
 }
 

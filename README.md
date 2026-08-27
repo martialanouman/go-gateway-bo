@@ -76,6 +76,13 @@ un cookie émis par l'une serait refusé par l'autre, un second facteur vérifia
 pour le sel — des compteurs d'anti-brute-force qui se scindent **sans qu'aucun refus ne le signale**,
 donc un verrouillage qui s'affaiblit en silence.
 
+`DASHBOARD_WEBAUTHN_RP_ID` et `DASHBOARD_WEBAUTHN_ORIGIN` (step-024) sont obligatoires de la même
+façon, mais **ne sont pas des secrets** : le navigateur les voit à chaque cérémonie de passkey. Ce
+qu'elles gardent tient à leur provenance — elles viennent de la configuration et jamais de la requête,
+faute de quoi l'attaquant choisirait le domaine contre lequel la clé s'authentifie. Un `rp_id` doit
+être un domaine et jamais une adresse IP : en développement, `localhost`. Le changer ne déconnecte
+personne mais **invalide toutes les passkeys enregistrées** — elles sont liées au domaine.
+
 Contrairement à la v1.0, **le serveur refuse de démarrer** si une variable obligatoire manque, en la
 nommant (step-000). Un démarrage réussi suivi d'une erreur à la première requête d'authentification
 laissait croire que l'installation était bonne.

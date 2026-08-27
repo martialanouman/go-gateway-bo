@@ -48,6 +48,9 @@ const (
 	// Même faux positif G101, même raison.
 	EnvTOTPEncryptionKey = "DASHBOARD_TOTP_ENCRYPTION_KEY" //nolint:gosec
 	EnvTrustedProxies    = "DASHBOARD_TRUSTED_PROXIES"
+
+	EnvWebauthnRPID   = "DASHBOARD_WEBAUTHN_RP_ID"
+	EnvWebauthnOrigin = "DASHBOARD_WEBAUTHN_ORIGIN"
 )
 
 // minimumBruteForceSaltLength borne le sel d'anti-brute-force. Trente-deux caractères : ce que rend
@@ -136,6 +139,19 @@ type AuthConfig struct {
 	// balancer — le verrou se refermerait alors sur tout le monde d'un coup, ce qui se remarque, au
 	// lieu de laisser passer, ce qui ne se remarque pas.
 	TrustedProxies []netip.Prefix
+	// WebauthnRPID est le domaine auquel les passkeys sont liées, et WebauthnOrigin l'origine exacte
+	// depuis laquelle une cérémonie est acceptée.
+	//
+	// **Ce ne sont pas des secrets** : le navigateur les voit à chaque cérémonie. Ce qu'ils gardent
+	// tient à leur provenance — venir d'ici et **jamais de la requête**. Les lire dans la requête
+	// laisserait l'attaquant choisir le domaine contre lequel la clé s'authentifie, c'est-à-dire
+	// perdre exactement ce que WebAuthn achète sur un code TOTP.
+	//
+	// Leur *validité* n'est pas jugée ici : un `rp_id` qui est une adresse IP, ou dont un label est
+	// vide, est refusé par `webauthn.New` — que `cmd/dashboard` appelle avant de lier son port. Le
+	// redire ici reviendrait à réécrire §5.1.3 de la spécification WebAuthn moins bien.
+	WebauthnRPID   string
+	WebauthnOrigin string
 }
 
 // GatewayConfig décrit la connexion sortante vers l'API Admin. Hors du mode `real`, seule BaseURL
@@ -186,6 +202,8 @@ func Load(lookup Lookup) (Config, error) {
 			TOTPEncryptionKey: r.requiredSecret(EnvTOTPEncryptionKey,
 				minimumTOTPEncryptionKeyLength),
 			TrustedProxies: r.prefixList(EnvTrustedProxies),
+			WebauthnRPID:   r.requiredValue(EnvWebauthnRPID),
+			WebauthnOrigin: r.requiredAbsoluteURL(EnvWebauthnOrigin, "http", "https"),
 		},
 	}
 
@@ -340,6 +358,15 @@ func (r *reader) requiredDatabaseURL(name string) string {
 
 // requiredSecret exige une valeur d'au moins `minimum` caractères, sans jamais citer ce qu'elle a
 // trouvé — ni sa longueur, qui est déjà une information sur le secret.
+// requiredValue exige une valeur non vide et la rend telle quelle. Contrairement à `required`, dont
+// elle n'est que la façade, elle n'oblige pas l'appelant à porter un drapeau qu'il jetterait : le
+// littéral `Config` veut une chaîne, et l'absence est déjà signalée dans `r.problems`.
+func (r *reader) requiredValue(name string) string {
+	value, _ := r.required(name)
+
+	return value
+}
+
 func (r *reader) requiredSecret(name string, minimum int) []byte {
 	value, ok := r.required(name)
 	if !ok {
