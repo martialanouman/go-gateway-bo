@@ -73,20 +73,25 @@ func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds 
 type SecondFactors struct {
 	TOTPEnrolled           bool
 	RecoveryCodesRemaining int
+	// Passkeys est le nombre de passkeys enregistrées (step-024). Un compte et non une liste : ce que
+	// l'écran doit savoir pour se rendre est s'il conduit à l'enrôlement ou au challenge, et
+	// l'inventaire détaillé appartient à l'écran de gestion de step-028.
+	Passkeys int
 }
 
 // FactorsOf rend ce que l'écran d'enrôlement doit savoir pour se rendre.
 func (m *MFA) FactorsOf(ctx context.Context, operatorID string) (SecondFactors, error) {
 	const query = `
 		SELECT o.mfa_totp_secret IS NOT NULL,
-		       (SELECT count(*) FROM mfa_recovery_codes AS r WHERE r.operator_id = o.id)
+		       (SELECT count(*) FROM mfa_recovery_codes AS r WHERE r.operator_id = o.id),
+		       (SELECT count(*) FROM webauthn_credentials AS c WHERE c.operator_id = o.id)
 		FROM operators AS o
 		WHERE o.id = $1`
 
 	var factors SecondFactors
 
 	err := m.pool.QueryRow(ctx, query, operatorID).
-		Scan(&factors.TOTPEnrolled, &factors.RecoveryCodesRemaining)
+		Scan(&factors.TOTPEnrolled, &factors.RecoveryCodesRemaining, &factors.Passkeys)
 	if err != nil {
 		return SecondFactors{}, fmt.Errorf("lire les facteurs de l'opérateur : %w", err)
 	}
