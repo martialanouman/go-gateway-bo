@@ -236,6 +236,7 @@ type me struct {
 	SecondFactors struct {
 		TOTP                   bool `json:"totp"`
 		RecoveryCodesRemaining int  `json:"recoveryCodesRemaining"`
+		Passkeys               int  `json:"passkeys"`
 	} `json:"secondFactors"`
 	AbsoluteExpiresAt time.Time `json:"absoluteExpiresAt"`
 }

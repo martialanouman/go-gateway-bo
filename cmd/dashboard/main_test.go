@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	"github.com/descope/virtualwebauthn"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers"
@@ -165,7 +166,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 45
+const minimumScenarios = 56
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -221,6 +222,11 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.Then(`^redemander "([^"]*)" est refusé de même$`, sessions.refusedAgain)
 
 	(&mfaWorld{login: login, session: sessions}).registerSteps(ctx)
+	(&webauthnWorld{
+		login:         login,
+		session:       sessions,
+		authenticator: virtualwebauthn.NewAuthenticator(),
+	}).registerSteps(ctx)
 
 	ctx.Given(`^une base dont le schéma est en retard d'une migration$`, schema.outdatedSchema)
 	ctx.Given(`^une base vierge$`, schema.freshSchema)
@@ -543,6 +549,13 @@ func (p *process) remember(cookies []*http.Cookie) {
 // **méthode** pour retrouver la route dans le YAML.
 func (p *process) post(path, body string) error {
 	return p.send(http.MethodPost, path, "application/json", body)
+}
+
+// remove est le troisième verbe du harnais, et il arrive avec la première opération du contrat qui
+// en emploie un — le retrait d'une passkey (step-024). Aucun corps : ce qu'elle désigne est dans son
+// chemin.
+func (p *process) remove(path string) error {
+	return p.send(http.MethodDelete, path, "", "")
 }
 
 // La coquille référence ses fichiers hachés en absolu : les relire dans le corps rendu, plutôt que

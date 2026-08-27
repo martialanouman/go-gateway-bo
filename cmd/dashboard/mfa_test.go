@@ -243,7 +243,9 @@ func (w *mfaWorld) presentOversizedCode() error {
 }
 
 func (w *mfaWorld) presentUnknownMethod() error {
-	return w.verify("webauthn", "123456")
+	// `"webauthn"` jusqu'à step-024, qui l'a rendue valide. Toute chaîne que l'enum ne porte pas fait
+	// l'affaire — ce que ce scénario observe est le refus **sur la forme**, pas la valeur choisie.
+	return w.verify("carte-a-puce", "123456")
 }
 
 func (w *mfaWorld) presentFirstRecoveryCode() error {
