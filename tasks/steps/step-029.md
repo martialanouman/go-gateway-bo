@@ -18,6 +18,22 @@ surface serveur **et** son écran dans la même PR.
 - Les refus structurels, chacun expliqué : rôle par défaut non supprimable, rôle détenu non
   supprimable, auto-verrouillage impossible.
 
+### Deux dettes que cette step hérite
+
+*Écrites ici et non seulement dans `steps/done/`, parce qu'une fiche archivée n'est ouverte par
+personne.*
+
+- **Le premier enrôlement d'un second facteur est libre pour toute session de premier facteur**
+  (step-023, puis step-024 pour les passkeys). Sur un déploiement neuf, aucun opérateur n'est enrôlé :
+  un mot de passe volé pendant cette fenêtre vaut un compte complet. C'est le problème d'amorçage
+  classique du MFA, assumé faute de mieux — mais cette step est celle qui saura enrôler **pour le
+  compte d'un autre**, donc celle qui peut fermer la fenêtre : un opérateur créé par un
+  `operators:manage` peut recevoir son facteur d'emblée, ou un jeton d'enrôlement à usage unique.
+- **La réinitialisation du second facteur d'un autre opérateur** est le chemin de sortie que
+  step-023 et step-024 nomment toutes deux dans leurs refus : « sa réinitialisation par un
+  administrateur arrivera avec la gestion des opérateurs ». Deux messages d'erreur en production
+  promettent donc cette step. Ils deviendront faux si elle ne la livre pas.
+
 ## Points d'implémentation clés
 - **L'auto-verrouillage est le défaut qui coûte l'installation** : un opérateur ne peut ni se retirer
   `operators:manage` / `roles:manage`, ni se désactiver. Sans cette règle, une installation devient

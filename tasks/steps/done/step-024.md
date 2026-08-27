@@ -310,38 +310,45 @@ correspondantes, vertes après coup, ont été remesurées et les scénarios ré
 
 ## Suivis ouverts
 
+**Chacun est désormais inscrit dans la fiche de la step qui le paiera**, et pas seulement ici : une
+fiche de `done/` n'est ouverte par personne, et le renvoi doit aller vers la step qui paie plutôt que
+depuis celle qui a créé. Ce qui suit reste la trace, pas le porteur.
+
+### Ont trouvé leur porteur
+
+| Dette | Inscrite dans |
+|---|---|
+| `register/begin` et `assert/begin` ne sont bornés par aucun compteur | `step-025.md`, périmètre |
+| `register/finish` doit être audité même exempté de garde | `step-025.md`, périmètre |
+| Le retrait d'une passkey doit sortir des exemptions | `step-025.md`, périmètre |
+| Aucune passkey ne porte de nom | `step-028.md`, périmètre |
+| Le premier enrôlement est libre pour toute session de premier facteur | `step-029.md`, périmètre |
+
+### N'en ont pas, et c'est assumé
+
 1. **`displayName` est codé en dur** (`internal/mfa/webauthn.go`), comme l'`issuer` du TOTP : deux
-   déploiements du même produit s'affichent sous le même nom dans l'appareil de l'opérateur. Même
-   suivi que le n°3 de step-023, et la même sortie — une variable de plus, le jour où il y a une
-   préproduction.
-2. **`POST /auth/mfa/webauthn/register/begin` n'est borné par aucun compteur**, exactement comme
-   `enrollTotp` : une session de premier facteur suffit à le répéter. À borner par step-025, qui
-   reprend ce chemin. Le coût y est en revanche bien moindre — une cérémonie ne hache rien.
-3. **Le premier enrôlement reste libre pour toute session de premier facteur**, hérité de step-023 :
-   sur un déploiement neuf, un mot de passe volé pendant cette fenêtre vaut un compte complet. C'est
-   le problème d'amorçage classique du MFA ; la fenêtre mérite d'être bornée quand step-029 saura
-   enrôler pour le compte d'un autre.
-4. **`descope/virtualwebauthn` est épinglée sur `go-webauthn v0.16.5`.** Elle fonctionne contre
-   0.18.0 — les onze scénarios le montrent — mais un durcissement futur de la bibliothèque serveur
-   pourrait la mettre en défaut, et le symptôme serait une suite rouge sans cause lisible dans le
-   produit. Le repli est écrit dans DN-12 : un authentificateur à la main, ~150 lignes.
-5. **Aucune passkey ne porte de nom.** step-028 devra en donner un pour que l'écran distingue deux
-   appareils ; la colonne s'écrira avec la step qui saura ce qu'elle doit contenir, comme step-005 l'a
-   fait pour `sessions`.
-6. **« Un seul défi vivant par session et par objet » est une propriété que l'ouverture produit, et
+   déploiements du même produit s'affichent sous le même nom dans l'appareil de l'opérateur. La sortie
+   est une variable de plus, le jour où il y a une préproduction — aucune step planifiée n'en a une.
+2. **« Un seul défi vivant par session et par objet » est une propriété que l'ouverture produit, et
    qu'aucun index n'impose.** Deux ouvertures concurrentes ne se voient pas et insèrent toutes deux ;
-   la lecture prend désormais le plus récent (`ORDER BY … LIMIT 1`) plutôt qu'une ligne au hasard, ce
-   qui rend le comportement déterministe sans rendre l'invariant vrai. Un index unique partiel
-   `(session_id, purpose) WHERE consumed_at IS NULL` le tiendrait, mais entre en tension avec la CTE
-   qui éteint le précédent dans la même commande — à mesurer avant d'y toucher.
-7. **`BeginWebauthnAssertion` n'est borné par aucun compteur**, comme les deux routes
-   d'enregistrement : quiconque détient un mot de passe peut y boucler et faire croître
-   `webauthn_challenges` jusqu'à la purge de step-187. Le verrou d'essais ne garde que la
-   vérification. Même famille que le suivi n°2.
-8. **Un authentificateur au compteur cassé verrouille l'opérateur sur tous ses facteurs.** Cinq
+   la lecture prend le plus récent, ce qui rend le comportement déterministe sans rendre l'invariant
+   vrai. Conséquence réelle : un double-clic peut faire consommer le défi de l'autre onglet et refuser
+   une cérémonie légitime. Un index unique partiel `(session_id, purpose) WHERE consumed_at IS NULL`
+   le tiendrait, mais entre en tension avec la CTE qui éteint le précédent dans la même commande — à
+   mesurer avant d'y toucher, pas à écrire de confiance.
+3. **Un authentificateur au compteur cassé verrouille l'opérateur sur tous ses facteurs.** Cinq
    assertions refusées pour compteur reculé ferment aussi le TOTP et les codes de récupération, un
-   quart d'heure. C'est le prix de DN-7 appliqué à un mode d'échec légitime, et il n'était écrit nulle
-   part.
+   quart d'heure. C'est DN-7 appliqué à un mode d'échec légitime. Le découpler rouvrirait le trou que
+   DN-7 ferme ; le laisser expose un opérateur au matériel défaillant. Aucune des deux sorties n'est
+   évidente.
+4. **`descope/virtualwebauthn` est épinglée sur `go-webauthn v0.16.5`.** Elle fonctionne contre
+   0.18.0 — les scénarios le montrent — mais un durcissement futur de la bibliothèque serveur pourrait
+   la mettre en défaut, et le symptôme serait une suite rouge sans cause lisible dans le produit. Le
+   repli est écrit dans DN-12 : un authentificateur à la main, ~150 lignes.
+5. **Le scénario du `rp_id` en adresse IP ne garde pas l'ordre.** Il garde que le domaine vient de la
+   configuration et qu'un domaine inutilisable arrête le démarrage. Mesuré, la construction déplacée
+   après `net.Listen` le laisse vert : il observe la sortie du process, pas son écoute. L'ordre est
+   tenu par un commentaire et par rien d'autre.
 
 ## Hors périmètre
 L'exigence de second facteur sur les écritures → step-025. Le choix d'affichage entre passkey et TOTP,

@@ -219,6 +219,10 @@ le QR et le téléchargement des codes → step-028. La réinitialisation du sec
 opérateur → step-029.
 
 ## Suivis ouverts
+
+*(Note de step-024 : les deux premiers ont été inscrits dans les fiches qui les paieront —
+`step-025.md` pour la borne de l'enrôlement, `step-029.md` pour la fenêtre d'amorçage. Ils restaient
+ici sans porteur, et une fiche de `done/` n'est ouverte par personne.)*
 - **`POST /auth/mfa/totp/enroll` n'est borné par aucun compteur**, contrairement à la vérification :
   une session de premier facteur suffit à le répéter, puisqu'un remplacement seul exige une preuve.
   À borner par step-025, qui reprend ce chemin.
