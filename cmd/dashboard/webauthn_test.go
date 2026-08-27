@@ -71,6 +71,7 @@ func (w *webauthnWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur enregistre une clé d'accès signée pour une autre origine$`,
 		w.registerFromAnotherOrigin)
 	ctx.Given(`^l'opérateur ouvre l'enregistrement d'une clé d'accès$`, w.openRegistration)
+	ctx.When(`^l'opérateur ouvre l'enregistrement d'une clé d'accès$`, w.openRegistration)
 	ctx.When(`^l'opérateur finit l'enregistrement ouvert$`, w.closeOpenedRegistration)
 	ctx.When(`^l'opérateur présente (\d+) assertions fausses$`, w.presentWrongAssertions)
 	ctx.Then(`^il lui reste (\d+) clés? d'accès$`, w.passkeysRemaining)

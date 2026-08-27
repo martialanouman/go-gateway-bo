@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/martialanouman/go-gateway-bo/internal/session"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // Me rend l'opérateur connecté et **ce qu'il a le droit de faire**.
@@ -71,6 +72,13 @@ func (a API) Logout(ctx context.Context, _ LogoutRequestObject) (LogoutResponseO
 	}
 
 	if err = a.Sessions.Close(ctx, resolved.ID); err != nil {
+		return nil, err
+	}
+
+	if err = a.audited(ctx, store.Event{
+		OperatorID: resolved.OperatorID,
+		Action:     actionLogout,
+	}); err != nil {
 		return nil, err
 	}
 

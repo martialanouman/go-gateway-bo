@@ -17,6 +17,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // Dependencies porte ce que les routes du BFF ne savent pas fabriquer.
@@ -43,6 +44,8 @@ type Dependencies struct {
 	// sa construction est ce qui juge `DASHBOARD_WEBAUTHN_RP_ID`, donc elle doit précéder la liaison
 	// du port.
 	Passkeys *mfa.PasskeyManager
+	// Audit écrit le journal des mutations. Comme les autres, il arrive déjà construit.
+	Audit *store.Audit
 	// TrustedProxies alimente la dérivation de l'adresse cliente. Vide est une valeur sûre : voir
 	// `withClientAddress` et `internal/auth.ClientAddress`.
 	TrustedProxies []netip.Prefix
@@ -72,6 +75,7 @@ func NewRouter(deps Dependencies) http.Handler {
 			Sessions:      deps.Sessions,
 			SecondFactor:  deps.SecondFactor,
 			Passkeys:      deps.Passkeys,
+			Audit:         deps.Audit,
 		})
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un

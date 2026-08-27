@@ -105,6 +105,18 @@ func (a API) FinishWebauthnRegistration(ctx context.Context,
 		return FinishWebauthnRegistration401JSONResponse(refusedCeremony()), nil
 	}
 
+	// **Audité bien qu'exempté de garde de permission** : poser un second facteur est précisément
+	// l'événement qu'une enquête sur compte compromis cherche en premier. Exemption de garde et
+	// exemption d'audit ne se confondent pas.
+	if err = a.audited(ctx, store.Event{
+		OperatorID: resolved.OperatorID,
+		Action:     actionPasskeyRegister,
+		TargetType: auditTargetPasskey,
+		TargetID:   id,
+	}); err != nil {
+		return nil, err
+	}
+
 	return FinishWebauthnRegistration200JSONResponse{Id: id}, nil
 }
 
@@ -173,6 +185,15 @@ func (a API) DeleteWebauthnPasskey(ctx context.Context,
 		// ce que possède quelqu'un d'autre.
 		return DeleteWebauthnPasskey401JSONResponse(notAuthenticated()), nil
 	case store.PasskeyRemoved:
+		if err = a.audited(ctx, store.Event{
+			OperatorID: resolved.OperatorID,
+			Action:     actionPasskeyRemove,
+			TargetType: auditTargetPasskey,
+			TargetID:   request.PasskeyId,
+		}); err != nil {
+			return nil, err
+		}
+
 		return DeleteWebauthnPasskey204Response{}, nil
 	}
 

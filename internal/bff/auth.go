@@ -10,6 +10,7 @@ import (
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // maximumPasswordLength et maximumEmailLength redisent en Go les bornes que le contrat déclare. Le
@@ -119,6 +120,13 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 		}
 
 		postCookie(ctx, session.Issued(value))
+
+		if auditErr := a.audited(ctx, store.Event{
+			OperatorID: verdict.OperatorID,
+			Action:     actionLogin,
+		}); auditErr != nil {
+			return nil, auditErr
+		}
 
 		return Login200JSONResponse{Challenge: verdict.Challenge, ExpiresAt: verdict.ExpiresAt}, nil
 	case auth.OutcomeLocked:

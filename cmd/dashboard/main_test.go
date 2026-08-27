@@ -166,7 +166,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 65
+const minimumScenarios = 71
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -221,7 +221,12 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 		sessions.refusalSaysNothingAboutTheSession)
 	ctx.Then(`^redemander "([^"]*)" est refusé de même$`, sessions.refusedAgain)
 
-	(&mfaWorld{login: login, session: sessions}).registerSteps(ctx)
+	// Un seul `mfaWorld`, partagé : le monde d'audit relit ce que l'enrôlement lui a rendu, donc il
+	// doit voir **cette** instance-là. En enregistrer deux dupliquerait les définitions de step et
+	// laisserait le second monde répondre pour le premier.
+	factors := &mfaWorld{login: login, session: sessions}
+	factors.registerSteps(ctx)
+	(&auditWorld{login: login, mfa: factors}).registerSteps(ctx)
 	(&webauthnWorld{
 		login:         login,
 		session:       sessions,

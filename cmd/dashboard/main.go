@@ -156,6 +156,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		Sessions:       sessions,
 		SecondFactor:   secondFactor,
 		Passkeys:       passkeys,
+		Audit:          store.NewAudit(pool),
 		TrustedProxies: cfg.Auth.TrustedProxies,
 	})
 
