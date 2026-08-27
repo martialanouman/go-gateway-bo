@@ -139,7 +139,7 @@ export interface paths {
          *     ensemble.
          *
          *     **Deux chemins d'enrôlement et non un seul**, contrairement à ce que le §5.1 annonçait : la
-         *     cérémonie WebAuthn de step-024 rendra une forme entièrement différente, et les réunir sous une
+         *     cérémonie WebAuthn de step-024 rend une forme entièrement différente, et les réunir sous une
          *     opération obligerait à un `oneOf` de réponse dont le code engendré fait un type opaque. La
          *     vérification, elle, rend le même 204 des deux côtés et reste une seule opération.
          */

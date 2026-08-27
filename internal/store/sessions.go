@@ -27,7 +27,7 @@ func NewSessions(pool *pgxpool.Pool) *Sessions {
 // rendre ferait traverser à un secret une frontière qu'il n'a aucune raison de franchir.
 type Session struct {
 	// ID est stable pour toute la vie de la session, y compris à travers l'élévation. C'est ce à quoi
-	// step-024 liera ses défis WebAuthn.
+	// step-024 y a lié ses défis WebAuthn, dans `webauthn_challenges`.
 	ID         string
 	OperatorID string
 	// ExpiresAt est l'échéance **absolue**. La glissante n'est pas rendue : elle se déplace à chaque
@@ -126,8 +126,8 @@ func (s *Sessions) Resolve(ctx context.Context, tokenHash []byte, idle time.Dura
 // Les trois gardes de `Resolve` sont **redites** ici plutôt qu'empruntées : entre la résolution et
 // l'élévation, la session peut être fermée par un logout concurrent ou son opérateur désactivé.
 //
-// La ligne, elle, est conservée — step-024 liera ses défis à `id`, qui ne doit pas disparaître sous
-// eux.
+// La ligne, elle, est conservée — les défis de cérémonie de step-024 sont liés à `id`, qui ne doit
+// pas disparaître sous eux.
 //
 // `expires_at` n'est pas repoussée : l'élévation n'achète pas du temps, elle change ce que la session
 // autorise.
