@@ -50,6 +50,11 @@ type API struct {
 	// Ni `auth` ni `session` ne le connaissent : le premier n'a rien à voir avec lui, et le second
 	// n'apprend que le geste d'élévation, qui lui appartient.
 	SecondFactor *mfa.Manager
+	// Passkeys mène les cérémonies WebAuthn et tient ce qu'elles produisent. Un quatrième
+	// collaborateur et non une part de `SecondFactor` : les deux facteurs ne partagent que le verrou
+	// d'essais et l'élévation, et les réunir aurait fait d'un manager la somme de deux protocoles qui
+	// n'ont ni la même forme ni le même nombre d'allers-retours.
+	Passkeys *mfa.PasskeyManager
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le

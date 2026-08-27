@@ -6,6 +6,7 @@ import (
 
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // maximumChallengeLength borne ce qu'un corps peut présenter comme challenge. Le contrat n'en déclare
@@ -123,9 +124,7 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (VerifyMfaResponseObject,
 	error,
 ) {
-	if request.Body == nil || len([]rune(request.Body.Code)) > maximumCodeLength ||
-		len([]rune(request.Body.Challenge)) > maximumChallengeLength ||
-		!request.Body.Method.Valid() {
+	if request.Body == nil || !presentedSecondFactorIsWellFormed(*request.Body) {
 		return VerifyMfa400JSONResponse(badRequest()), nil
 	}
 
@@ -156,8 +155,7 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 		return VerifyMfa401JSONResponse(refusedSecondFactor()), nil
 	}
 
-	verified, err := a.verifyPresentedFactor(ctx, resolved.OperatorID,
-		string(request.Body.Method), request.Body.Code)
+	verified, err := a.verifySecondFactor(ctx, resolved, *request.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -262,6 +260,41 @@ func (a API) verifyPresentedFactor(ctx context.Context, operatorID string, metho
 	return a.SecondFactor.VerifyTOTP(ctx, operatorID, code)
 }
 
+// presentedSecondFactorIsWellFormed dit si une vérification a une forme que le serveur sait exercer.
+//
+// Le contrat ne sait pas exprimer deux champs qui s'excluent : `code` et `assertion` y sont tous deux
+// facultatifs, et c'est ici que la règle vit. Un `webauthn` accompagné d'un code, ou un `totp`
+// accompagné d'une assertion, est une requête que le serveur ne saurait pas interpréter — la traiter
+// comme un refus rendrait 401 là où le client a fait une faute de forme, et le lui cacherait.
+func presentedSecondFactorIsWellFormed(body MfaVerification) bool {
+	if len([]rune(body.Challenge)) > maximumChallengeLength || !body.Method.Valid() {
+		return false
+	}
+
+	if body.Method == MfaVerificationMethodWebauthn {
+		return body.Assertion != nil && len(*body.Assertion) > 0 && body.Code == nil
+	}
+
+	return body.Assertion == nil && body.Code != nil &&
+		len([]rune(*body.Code)) <= maximumCodeLength && *body.Code != ""
+}
+
+// verifySecondFactor aiguille sur la méthode présentée.
+//
+// Trois branches et deux chemins : les deux méthodes qui portent un code partagent
+// `verifyPresentedFactor`, que le remplacement d'un authentificateur emprunte aussi. L'assertion, non
+// — elle consomme un défi de cérémonie et avance un compteur de signature, ce que ni l'un ni l'autre
+// n'a à faire, et l'y forcer aurait fait de la signature une troisième valeur de `code`.
+func (a API) verifySecondFactor(ctx context.Context, resolved store.Session,
+	body MfaVerification,
+) (bool, error) {
+	if body.Method == MfaVerificationMethodWebauthn {
+		return a.verifyPresentedAssertion(ctx, resolved, *body.Assertion)
+	}
+
+	return a.verifyPresentedFactor(ctx, resolved.OperatorID, string(body.Method), *body.Code)
+}
+
 // presentedFactorIsWellFormed dit si la preuve d'un enrôlement a une forme exploitable : les deux
 // champs ensemble, ou aucun des deux. Un `method` sans `code` — ou l'inverse — est une requête que le
 // serveur ne saurait pas interpréter, et la traiter comme « aucune preuve » ferait rendre 409 là où le
@@ -275,8 +308,10 @@ func presentedFactorIsWellFormed(request TotpEnrollmentRequest) bool {
 		return false
 	}
 
-	return MfaVerificationMethod(*request.Method).Valid() &&
-		len([]rune(*request.Code)) <= maximumCodeLength
+	// L'enum de **l'enrôlement** et non celui de la vérification, qui porte `webauthn` depuis
+	// step-024 : les convertir l'un en l'autre ferait accepter ici une méthode que cette route ne sait
+	// pas exercer, et le repli de `verifyPresentedFactor` l'enverrait alors sur le chemin TOTP.
+	return request.Method.Valid() && len([]rune(*request.Code)) <= maximumCodeLength
 }
 
 // refusedSecondFactor est le refus **unique** du second facteur, comme `refusedCredentials` l'est du
@@ -316,5 +351,6 @@ func secondFactorsOf(ctx context.Context, factors *mfa.Manager, operatorID strin
 	return SecondFactors{
 		Totp:                   held.TOTPEnrolled,
 		RecoveryCodesRemaining: held.RecoveryCodesRemaining,
+		Passkeys:               held.Passkeys,
 	}, nil
 }

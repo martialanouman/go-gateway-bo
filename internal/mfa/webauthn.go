@@ -1,8 +1,11 @@
 package mfa
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -249,4 +252,189 @@ func passkeyOf(credential *webauthn.Credential) store.Passkey {
 		BackupEligible: credential.Flags.BackupEligible,
 		BackupState:    credential.Flags.BackupState,
 	}
+}
+
+// PasskeyManager compose les cérémonies et leur stockage, comme `Manager` compose l'authentificateur
+// TOTP et le sien. Les deux sont frères : chacun porte un facteur, et c'est `internal/bff` qui les
+// assemble.
+type PasskeyManager struct {
+	ceremonies  *Passkeys
+	credentials *store.Webauthn
+}
+
+// NewPasskeyManager valide la configuration WebAuthn. **L'appeler avant de lier le port** : un rpID
+// que la spécification refuse échoue ici, et un serveur qui écoute déjà refuserait chaque cérémonie
+// sans avoir rien dit au démarrage.
+func NewPasskeyManager(credentials *store.Webauthn, rpID, origin string) (*PasskeyManager, error) {
+	ceremonies, err := NewPasskeys(rpID, origin)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PasskeyManager{ceremonies: ceremonies, credentials: credentials}, nil
+}
+
+// CeremonyTTL borne la vie d'un défi. Cinq minutes, comme le challenge de premier facteur : c'est le
+// temps de sortir une clé de sa poche ou de déverrouiller un téléphone, pas celui d'aller déjeuner.
+const CeremonyTTL = 5 * time.Minute
+
+// ErrNoPasskey dit qu'il n'y a rien à asserter. Ce n'est pas un refus mais une impasse : l'écran doit
+// conduire à l'enrôlement, pas afficher un échec.
+var ErrNoPasskey = errors.New("aucune passkey enregistrée")
+
+// BeginRegistration ouvre une cérémonie d'enregistrement pour cette session.
+//
+// `false` dit qu'aucun opérateur actif ne porte cet identifiant — sa session a survécu à sa
+// désactivation, ce que `store.Sessions.Resolve` refuse déjà par ailleurs.
+func (p *PasskeyManager) BeginRegistration(ctx context.Context, sessionID,
+	operatorID string,
+) (*protocol.CredentialCreation, bool, error) {
+	owner, found, err := p.credentials.OwnerOf(ctx, operatorID)
+	if err != nil || !found {
+		return nil, false, err
+	}
+
+	creation, session, err := p.ceremonies.BeginRegistration(owner)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if err = p.openCeremony(ctx, sessionID, store.CeremonyRegistration, session); err != nil {
+		return nil, false, err
+	}
+
+	return creation, true, nil
+}
+
+// FinishRegistration confronte la réponse au défi ouvert, et enregistre la passkey.
+//
+// **Le défi est consommé avant la vérification**, contrairement au challenge du premier facteur qui ne
+// l'est qu'au succès. La différence est réelle : un code TOTP mal tapé se retape, une réponse
+// d'authentificateur est signée pour un défi précis et ne se retente jamais sur le même. Le garder en
+// vie n'offrirait qu'une cible.
+func (p *PasskeyManager) FinishRegistration(ctx context.Context, sessionID, operatorID string,
+	attestation []byte,
+) (string, error) {
+	owner, found, err := p.credentials.OwnerOf(ctx, operatorID)
+	if err != nil {
+		return "", err
+	}
+
+	if !found {
+		return "", refusedCeremony(errors.New("aucun opérateur actif"))
+	}
+
+	session, consumed, err := p.consumeCeremony(ctx, sessionID, store.CeremonyRegistration)
+	if err != nil || !consumed {
+		return "", err
+	}
+
+	passkey, err := p.ceremonies.FinishRegistration(owner, session, attestation)
+	if err != nil {
+		return "", err
+	}
+
+	return p.credentials.Register(ctx, operatorID, passkey)
+}
+
+// BeginAssertion ouvre une cérémonie d'assertion sur les passkeys que l'opérateur détient.
+func (p *PasskeyManager) BeginAssertion(ctx context.Context, sessionID,
+	operatorID string,
+) (*protocol.CredentialAssertion, error) {
+	owner, found, err := p.credentials.OwnerOf(ctx, operatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !found || len(owner.Passkeys) == 0 {
+		return nil, ErrNoPasskey
+	}
+
+	assertion, session, err := p.ceremonies.BeginAssertion(owner)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = p.openCeremony(ctx, sessionID, store.CeremonyAssertion, session); err != nil {
+		return nil, err
+	}
+
+	return assertion, nil
+}
+
+// VerifyAssertion vérifie une assertion et avance le compteur de signature.
+//
+// `false` couvre tout ce qui refuse : aucun défi, défi échu ou déjà servi, signature fausse, origine
+// inattendue, **et compteur qui recule**. L'appelant en fait un seul 401, comme pour un code TOTP.
+func (p *PasskeyManager) VerifyAssertion(ctx context.Context, sessionID, operatorID string,
+	assertion []byte,
+) (bool, error) {
+	owner, found, err := p.credentials.OwnerOf(ctx, operatorID)
+	if err != nil {
+		return false, err
+	}
+
+	if !found {
+		return false, nil
+	}
+
+	session, consumed, err := p.consumeCeremony(ctx, sessionID, store.CeremonyAssertion)
+	if err != nil || !consumed {
+		return false, err
+	}
+
+	used, err := p.ceremonies.FinishAssertion(owner, session, assertion)
+	if err != nil {
+		if IsRefusedCeremony(err) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return p.credentials.ConsumeSignCount(ctx, used.CredentialID, used.SignCount, used.UserVerified)
+}
+
+// Remove retire une passkey, et le store refuse d'emporter le dernier facteur.
+func (p *PasskeyManager) Remove(ctx context.Context, operatorID, passkeyID string) (
+	store.PasskeyRemoval, error,
+) {
+	return p.credentials.Remove(ctx, operatorID, passkeyID)
+}
+
+func (p *PasskeyManager) openCeremony(ctx context.Context, sessionID, purpose string,
+	session *webauthn.SessionData,
+) error {
+	data, err := json.Marshal(session)
+	if err != nil {
+		return fmt.Errorf("sérialiser l'état de cérémonie : %w", err)
+	}
+
+	_, err = p.credentials.IssueCeremony(ctx, sessionID, purpose, data, CeremonyTTL)
+
+	return err
+}
+
+// consumeCeremony relit **et ferme** le défi d'un même geste. `false` dit qu'il n'y en avait pas, ou
+// qu'un autre l'a fermé d'abord — deux finitions concurrentes n'en font aboutir qu'une.
+func (p *PasskeyManager) consumeCeremony(ctx context.Context, sessionID, purpose string) (
+	webauthn.SessionData, bool, error,
+) {
+	ceremony, live, err := p.credentials.LiveCeremony(ctx, sessionID, purpose)
+	if err != nil || !live {
+		return webauthn.SessionData{}, false, err
+	}
+
+	consumed, err := p.credentials.ConsumeCeremony(ctx, ceremony.ID)
+	if err != nil || !consumed {
+		return webauthn.SessionData{}, false, err
+	}
+
+	var session webauthn.SessionData
+
+	if err = json.Unmarshal(ceremony.Data, &session); err != nil {
+		return webauthn.SessionData{}, false, fmt.Errorf("relire l'état de cérémonie : %w", err)
+	}
+
+	return session, true, nil
 }
