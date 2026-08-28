@@ -111,7 +111,8 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// Avant la liaison du port : dériver la clé de chiffrement est la dernière chose qui puisse
 	// échouer sur la configuration, et un serveur qui écoute déjà refuserait alors chaque enrôlement
 	// sans que rien n'ait dit pourquoi au démarrage.
-	secondFactor, err := mfa.NewManager(store.NewMFA(pool), cfg.Auth.TOTPEncryptionKey)
+	secondFactor, err := mfa.NewManager(store.NewMFA(pool),
+		store.NewCounter(pool, store.ScopeTOTPEnroll), cfg.Auth.TOTPEncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -121,6 +122,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// vide — échoue ici. Plus tard, le serveur écouterait en refusant chaque cérémonie sans que rien
 	// n'ait dit pourquoi.
 	passkeys, err := mfa.NewPasskeyManager(store.NewWebauthn(pool),
+		store.NewCounter(pool, store.ScopeWebauthnCeremony),
 		cfg.Auth.WebauthnRPID, cfg.Auth.WebauthnOrigin)
 	if err != nil {
 		return err

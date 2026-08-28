@@ -134,10 +134,13 @@ expectTypeOf<EnrollOperation['responses'][200]['content']['application/json']>()
   recoveryCodes: string[]
 }>()
 
-// Quatre statuts, et le 409 en fait partie : le client doit traiter « un second facteur est déjà en
+// Cinq statuts, et le 409 en fait partie : le client doit traiter « un second facteur est déjà en
 // place » comme un cas normal — c'est celui d'un opérateur qui change de téléphone — et non comme une
 // panne. Le découvrir à l'exécution ferait un toast d'erreur là où il faut une explication.
-expectTypeOf<keyof EnrollOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 409>()
+//
+// Le 429 aussi est un cas normal, et il ne dit pas la même chose ici qu'ailleurs : le compteur porte
+// sur les **appels** et non sur les échecs. L'opérateur n'a rien raté ; il a demandé trop souvent.
+expectTypeOf<keyof EnrollOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 409 | 429>()
 
 // Les deux champs sont **facultatifs**, et c'est ce que le type doit dire : un premier enrôlement n'a
 // rien à prouver, un remplacement présente le facteur qu'il détruit. Le serveur exige qu'ils soient
@@ -205,7 +208,9 @@ expectTypeOf<
 // Le 409 en fait partie, et le client doit le traiter comme un cas normal : c'est un opérateur qui
 // ajoute un appareil sans avoir franchi le facteur en place. Un toast d'erreur là où il faut une
 // explication serait le pire des rendus.
-expectTypeOf<keyof BeginRegistrationOperation['responses']>().toEqualTypeOf<200 | 401 | 409>()
+// Le 429 borne les **ouvertures**, sur un seuil commun à l'enregistrement et à l'assertion : un
+// écran qui les traiterait séparément se tromperait sur ce qui reste possible après un refus.
+expectTypeOf<keyof BeginRegistrationOperation['responses']>().toEqualTypeOf<200 | 401 | 409 | 429>()
 
 // Aucun corps à envoyer : le serveur sait qui demande par le cookie, et ce que l'opérateur détient
 // par sa propre lecture. Rien à composer, donc rien à oublier de composer.
@@ -246,7 +251,7 @@ expectTypeOf<
 
 // Le 400 dit « aucune passkey enregistrée », et c'est une impasse et non une panne : l'écran doit
 // conduire à l'enrôlement. Le distinguer du 401 est ce qui lui permet de le faire.
-expectTypeOf<keyof BeginAssertionOperation['responses']>().toEqualTypeOf<200 | 400 | 401>()
+expectTypeOf<keyof BeginAssertionOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 429>()
 
 type DeletePasskeyOperation = paths['/auth/mfa/webauthn/passkeys/{passkeyId}']['delete']
 

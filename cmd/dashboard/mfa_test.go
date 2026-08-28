@@ -54,6 +54,8 @@ type enrollment struct {
 func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^l'opérateur enrôle une application d'authentification$`, w.enroll)
 	ctx.When(`^l'opérateur enrôle une application d'authentification$`, w.enroll)
+	ctx.Given(`^l'opérateur enrôle une application d'authentification (\d+) fois$`, w.enrollTimes)
+	ctx.When(`^l'opérateur enrôle une application d'authentification (\d+) fois$`, w.enrollTimes)
 	ctx.Given(`^l'opérateur présente le code du pas courant$`, w.presentCodeAtOffset(0))
 	ctx.When(`^l'opérateur présente le code du pas courant$`, w.presentCodeAtOffset(0))
 	ctx.When(`^l'opérateur présente le code du pas précédent$`, w.presentCodeAtOffset(-1))
@@ -86,6 +88,20 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 
 func (w *mfaWorld) enroll() error {
 	return w.enrollProving(nil)
+}
+
+// enrollTimes répète l'appel sans juger ce qu'il rend : c'est le scénario qui juge la **dernière**
+// réponse. Les appels intermédiaires sont refusés en 409 dès le second — un second facteur est en
+// place et rien ne le prouve — et c'est justement ce qui rend la borne visible : elle compte des
+// appels, là où le verrou d'essais ne compterait aucun de ceux-là.
+func (w *mfaWorld) enrollTimes(count int) error {
+	for range count {
+		if err := w.enroll(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // enrollProving enrôle en présentant — ou non — une preuve du facteur en place. Le premier

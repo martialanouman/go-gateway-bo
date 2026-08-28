@@ -44,6 +44,22 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		return EnrollTotp401JSONResponse(notAuthenticated()), nil
 	}
 
+	// **Avant toute dépense**, et avant même de lire l'état du facteur : cette route hache dix
+	// argon2id par appel, et jusqu'ici une session de premier facteur suffisait à la répéter sans
+	// qu'aucun compteur la voie — elle réussit, et les compteurs d'échecs ne comptent que les refus.
+	// Compté ici et non au succès : le travail est fait dès qu'on entre, et un client qui coupe la
+	// connexion pendant les dix hachages les a fait payer quand même. Un refus en aval — 401 sur une
+	// session survivante, 409 sur un remplacement sans preuve — a lui aussi coûté, jusqu'aux argon2id
+	// du code présenté.
+	enrollments, err := a.SecondFactor.AdmitEnrollment(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if enrollments.Locked() {
+		return tooManyEnrollments(enrollments.Remaining), nil
+	}
+
 	state, found, err := a.SecondFactor.State(ctx, resolved.OperatorID)
 	if err != nil {
 		return nil, err
@@ -280,6 +296,27 @@ func tooManySecondFactorAttempts(remaining time.Duration) VerifyMfa429JSONRespon
 			Message: "Le second facteur est temporairement bloqué après plusieurs essais : réessayez " +
 				"dans " + humanDelay(seconds) + ". Le blocage porte sur ce compte, se lève tout seul, et " +
 				"n'empêche pas de se reconnecter.",
+		},
+	}
+}
+
+// tooManyEnrollments annonce le verrou d'enrôlement et sa durée. Même construction que les deux
+// autres : les deux durées — l'en-tête et la phrase — sortent du même arrondi.
+//
+// La copie dit **ce que le blocage ne touche pas**, parce qu'un opérateur qui lit « bloqué » sur la
+// route qui mène au second facteur croirait son compte perdu : se connecter et franchir un facteur
+// déjà en place restent ouverts.
+func tooManyEnrollments(remaining time.Duration) EnrollTotp429JSONResponse {
+	seconds := retryAfterSeconds(remaining)
+
+	return EnrollTotp429JSONResponse{
+		Headers: EnrollTotp429ResponseHeaders{RetryAfter: seconds},
+		Body: Error{
+			Code: "too_many_attempts",
+			Message: "L'enrôlement d'une application d'authentification est temporairement bloqué " +
+				"après plusieurs demandes : réessayez dans " + humanDelay(seconds) + ". Le blocage " +
+				"porte sur ce compte, se lève tout seul, et n'empêche ni de se connecter ni de " +
+				"franchir un second facteur déjà en place.",
 		},
 	}
 }

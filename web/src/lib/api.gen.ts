@@ -704,6 +704,25 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /**
+             * @description Trop d'enrôlements depuis ce compte sur le dernier quart d'heure. Le compteur porte ici sur
+             *     les **appels** et non sur les échecs : cette route réussit, et une session de premier
+             *     facteur suffisait à la répéter — chaque appel hachant dix codes de récupération, soit dix
+             *     fois le processeur d'une connexion.
+             *
+             *     Le message porte la durée restante, comme les autres verrous : un refus muet ferait
+             *     retenter l'opérateur, puis ouvrir un ticket.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     verifyMfa: {
@@ -812,6 +831,25 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /**
+             * @description Trop de cérémonies ouvertes depuis ce compte sur le dernier quart d'heure. Le compteur
+             *     porte ici sur les **appels** et non sur les échecs : cette route réussit, et une session de
+             *     premier facteur suffisait à la répéter — chaque appel écrivant un défi que rien ne purge.
+             *
+             *     Le seuil est commun aux deux ouvertures, enregistrement et assertion : les séparer
+             *     doublerait le budget disponible pour la même protection. Le message porte la durée
+             *     restante.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     finishWebauthnRegistration: {
@@ -905,6 +943,25 @@ export interface operations {
             /** @description Aucune session vivante. */
             401: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Trop de cérémonies ouvertes depuis ce compte sur le dernier quart d'heure. Le compteur
+             *     porte ici sur les **appels** et non sur les échecs : cette route réussit, et une session de
+             *     premier facteur suffisait à la répéter — chaque appel écrivant un défi que rien ne purge.
+             *
+             *     Le seuil est commun aux deux ouvertures, enregistrement et assertion : les séparer
+             *     doublerait le budget disponible pour la même protection. Le message porte la durée
+             *     restante.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
                     [name: string]: unknown;
                 };
                 content: {

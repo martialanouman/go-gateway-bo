@@ -35,7 +35,8 @@ func closedPool(t *testing.T) *pgxpool.Pool {
 func TestUnChallengeMalFormeNAtteintPasLaBase(t *testing.T) {
 	t.Parallel()
 
-	manager, err := mfa.NewManager(store.NewMFA(closedPool(t)), []byte(testPassphrase))
+	manager, err := mfa.NewManager(store.NewMFA(closedPool(t)),
+		store.NewCounter(closedPool(t), store.ScopeTOTPEnroll), []byte(testPassphrase))
 	require.NoError(t, err)
 
 	_, live, err := manager.Challenge(context.Background(), "ceci n'est pas un challenge")
@@ -51,7 +52,8 @@ func TestUnChallengeMalFormeNAtteintPasLaBase(t *testing.T) {
 func TestUnManagerSeConstruitAvecSaClef(t *testing.T) {
 	t.Parallel()
 
-	manager, err := mfa.NewManager(store.NewMFA(closedPool(t)), []byte(testPassphrase))
+	manager, err := mfa.NewManager(store.NewMFA(closedPool(t)),
+		store.NewCounter(closedPool(t), store.ScopeTOTPEnroll), []byte(testPassphrase))
 	require.NoError(t, err)
 	assert.NotNil(t, manager)
 }

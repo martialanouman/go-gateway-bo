@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
 
@@ -30,6 +31,17 @@ func (a API) BeginWebauthnRegistration(ctx context.Context, _ BeginWebauthnRegis
 
 	if !alive {
 		return BeginWebauthnRegistration401JSONResponse(notAuthenticated()), nil
+	}
+
+	if lock, err := a.Passkeys.AdmitCeremony(ctx, resolved.OperatorID); err != nil {
+		return nil, err
+	} else if lock.Locked() {
+		return BeginWebauthnRegistration429JSONResponse{
+			Headers: BeginWebauthnRegistration429ResponseHeaders{
+				RetryAfter: retryAfterSeconds(lock.Remaining),
+			},
+			Body: tooManyCeremonies(lock.Remaining),
+		}, nil
 	}
 
 	held, err := a.SecondFactor.Factors(ctx, resolved.OperatorID)
@@ -134,6 +146,17 @@ func (a API) BeginWebauthnAssertion(ctx context.Context, _ BeginWebauthnAssertio
 		return BeginWebauthnAssertion401JSONResponse(notAuthenticated()), nil
 	}
 
+	if lock, err := a.Passkeys.AdmitCeremony(ctx, resolved.OperatorID); err != nil {
+		return nil, err
+	} else if lock.Locked() {
+		return BeginWebauthnAssertion429JSONResponse{
+			Headers: BeginWebauthnAssertion429ResponseHeaders{
+				RetryAfter: retryAfterSeconds(lock.Remaining),
+			},
+			Body: tooManyCeremonies(lock.Remaining),
+		}, nil
+	}
+
 	assertion, err := a.Passkeys.BeginAssertion(ctx, resolved.ID, resolved.OperatorID)
 	if err != nil {
 		if errors.Is(err, mfa.ErrNoPasskey) {
@@ -144,6 +167,24 @@ func (a API) BeginWebauthnAssertion(ctx context.Context, _ BeginWebauthnAssertio
 	}
 
 	return BeginWebauthnAssertion200JSONResponse(assertionOptionsOf(assertion)), nil
+}
+
+// tooManyCeremonies porte la copie commune aux deux ouvertures. Le corps est partagé, les deux types
+// de réponse engendrés ne le sont pas — c'est le code engendré qui l'impose, une réponse par
+// opération.
+//
+// Elle dit **ce que le blocage ne touche pas** : les autres méthodes de second facteur restent
+// ouvertes, et un opérateur qui lirait « bloqué » sur le chemin de sa clé croirait sinon n'avoir plus
+// aucune voie.
+func tooManyCeremonies(remaining time.Duration) Error {
+	seconds := retryAfterSeconds(remaining)
+
+	return Error{
+		Code: "too_many_attempts",
+		Message: "Les cérémonies de clé d'accès sont temporairement bloquées après plusieurs " +
+			"ouvertures : réessayez dans " + humanDelay(seconds) + ". Le blocage porte sur ce compte, " +
+			"se lève tout seul, et laisse ouvertes les autres méthodes de second facteur.",
+	}
 }
 
 // DeleteWebauthnPasskey retire une passkey.
