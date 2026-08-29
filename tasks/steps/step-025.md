@@ -141,6 +141,38 @@ Il l'a d'abord été deux fois, un appelant chacun, et la mutation qui l'inverse
 celui des deux qu'aucun scénario d'échéance n'atteint. C'est ce qui a fait replier les deux gestes en
 une méthode.
 
+### DN-7 — `pgx` nu confirmé, et le critère de réexamen était un proxy
+
+`plan.md` §19 fixait le réexamen à cette step et nommait deux déclencheurs. Mesurés :
+
+| Déclencheur | Aujourd'hui |
+|---|---|
+| « un store au-delà d'une vingtaine de requêtes » | **29** littéraux SQL nommés, 42 sites d'appel |
+| « une requête à plus de cinq ou six colonnes » | **dix** — `internal/store/webauthn.go:137` |
+
+Les deux ont tiré, et le second dès step-024. Des trois jambes de la décision de step-020, **une est
+cassée** : « `sqlc` n'aurait presque rien à engendrer » n'est plus vrai. Les deux autres tiennent, et
+la première tient plus fort qu'alors — le second analyseur SQL doit désormais avaler une table
+partitionnée, une fonction PL/pgSQL, `uuidv7()`, `make_interval(secs => $n)` et `nullif($1, '')::inet`.
+
+**La troisième a cessé d'être une affirmation pour devenir une mesure.** Le plan nommait précisément
+le défaut que `sqlc` supprime par construction : une liste d'arguments de `Scan` tenue à la main. Il
+a été reproduit sur le pire cas du dépôt — le scan à dix colonnes de `passkeysOf` — en intervertissant
+deux champs **de même type**, ce qui compile et passe le typage :
+
+| Mutation | Résultat |
+|---|---|
+| `BackupEligible` et `BackupState` intervertis (deux `bool` adjacents) | rouge |
+| `CredentialID` et `PublicKey` intervertis (deux `[]byte` adjacents) | rouge |
+
+Le défaut n'est pas silencieux ici : les testcontainers l'attrapent. `pgx` nu tient.
+
+**Et le critère lui-même était un proxy, qui a mal tiré.** « Vingt requêtes, six colonnes » mesure une
+taille ; ce qui décide est l'observabilité d'un `Scan` mal ordonné, une propriété du harnais et non du
+compte de requêtes. Le déclencheur juste est écrit dans `plan.md` §19 à la place de l'ancien : **un
+`Scan` dont la mutation d'interversion de deux champs de même type reste verte**. Falsifiable, et
+c'est la discipline que le dépôt applique déjà.
+
 ## Mutations mesurées — PR 1/2
 
 Jouées une par une, `-count=1`, lues au code de sortie.
@@ -237,10 +269,10 @@ métier → leurs steps respectives, qui consomment ce middleware sans le redéf
   du dépôt. `audit_log` croît sans borne. → **step-187**, avec le détachement des partitions.
 - **`GET /audit-log` filtrera sur `target_type` sans index.** La table est partitionnée par mois, donc
   un filtre par cible balaiera chaque partition retenue. → **step-184**, qui livre l'écran.
-- **`pgx` nu vs `sqlc` : le point de réexamen que `plan.md:893` fixait ici est re-daté à step-029.**
-  Le store ne porte encore que des tables d'authentification, toutes écrites à la main et toutes
-  vertes ; le premier vrai CRUD arrive avec les opérateurs. Trancher maintenant serait trancher sans
-  le cas qui départage.
+- ~~**`pgx` nu vs `sqlc` : le point de réexamen est re-daté à step-029.**~~ **La première rédaction de
+  ce point était fausse, et le reste de cette puce la corrige.** Elle re-datait sans avoir mesuré les
+  deux déclencheurs que `plan.md` nommait — or les deux avaient tiré, et le second dès step-024.
+  Le réexamen a donc eu lieu ici, à la date prévue. **Verdict : `pgx` nu, confirmé** ; voir DN-7.
 - **L'enrôlement TOTP ne compte toujours aucun échec dans la dimension qui convient.** Le compteur
   d'appels de DN-6 le borne au bon débit, mais un code faux y coûte autant qu'un enrôlement légitime,
   et un opérateur qui se trompe trois fois consomme trois cinquièmes de son budget d'enrôlement. La
