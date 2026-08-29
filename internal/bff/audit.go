@@ -30,6 +30,24 @@ const (
 	auditTargetPasskey  = "passkey"
 )
 
+// auditExemptions nomme les mutations qui ne laissent **pas** de trace, et pourquoi.
+//
+// **Une table distincte de `authorization`, parce que garder et auditer ne sont pas le même geste.**
+// Le cas qui le prouve est `FinishWebauthnRegistration` : exempté de garde de permission — poser son
+// propre second facteur est du self-service — et pourtant audité, parce que c'est l'événement qu'une
+// enquête sur compte compromis cherche en premier. Une table unique avec un champ optionnel aurait
+// laissé les deux décisions se confondre.
+//
+// La porte d'énumération lit cette table **et le code** : une mutation qui n'écrit pas et n'est pas
+// listée ici fait rougir.
+var auditExemptions = map[string]string{
+	"BeginWebauthnRegistration": "un défi tiré, remplacé au prochain appel, consommé ou échu en cinq " +
+		"minutes : aucun effet durable à retrouver dans une enquête",
+	"BeginWebauthnAssertion": "même chose que l'ouverture d'enregistrement — et tracer les deux " +
+		"produirait un bruit qu'une enquête devrait apprendre à écarter, ce qui est le meilleur moyen " +
+		"de lui faire écarter autre chose",
+}
+
 // audited écrit une ligne au journal si un journal est branché.
 //
 // **Seuls les succès sont journalisés.** Un refus est déjà compté par le verrou d'essais, et

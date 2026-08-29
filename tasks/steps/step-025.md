@@ -54,8 +54,8 @@ six écritures d'audit sont déclenchées par de vraies routes, et les trois bor
 gratuits. Elle se juge sur « la trace est-elle complète et propre ? ».
 
 **PR 2/2 — `RequirePermission`, l'exigence d'élévation, et la porte d'énumération.** Aucune de ces
-trois choses n'a de client dans M1 : les neuf mutations existantes sont exemptées de permission, et
-la dixième opération n'est pas une mutation. Elle se juge sur « la porte forcera-t-elle step-029 et
+trois choses n'a de client dans M1 : les **huit** mutations existantes sont exemptées de permission,
+et les deux autres opérations sont des lectures. Elle se juge sur « la porte forcera-t-elle step-029 et
 M3 à déclarer leur garde ? ».
 
 La fiche ne part dans `done/` qu'avec la seconde, et la ligne de `todo.md` reste décochée d'ici là.

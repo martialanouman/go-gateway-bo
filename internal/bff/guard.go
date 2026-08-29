@@ -49,9 +49,9 @@ func (r rule) exempted() bool { return r.exemption != "" }
 // laisser passer aurait ouvert la garde en silence. La porte d'énumération tient le même invariant
 // par le type-checker, et les deux ensemble sont ce qui ferme le piège.
 //
-// **Aucune entrée n'exige de clé aujourd'hui, et c'est le sujet de la step.** Les neuf mutations
-// vivent sous `/auth/`, où l'autorisation est l'affaire de chaque route ; la dixième opération est
-// une lecture. Le premier `requires` arrive avec `POST /operators`, en step-029.
+// **Aucune entrée n'exige de clé aujourd'hui, et c'est le sujet de la step.** Les **huit** mutations
+// vivent sous `/auth/`, où l'autorisation est l'affaire de chaque route ; les deux autres opérations
+// sont des lectures. Le premier `requires` arrive avec `POST /operators`, en step-029.
 var authorization = map[string]rule{
 	"Health": exempt("la sonde de l'orchestrateur, qui n'a pas de session et ne doit jamais " +
 		"dépendre d'une autre brique pour répondre"),
