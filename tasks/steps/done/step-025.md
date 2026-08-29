@@ -403,6 +403,16 @@ métier → leurs steps respectives, qui consomment ce middleware sans le redéf
   dimensions en une instruction — et n'est pas de cette step. **Sans porteur**, et c'est assumé :
   aucune des trois n'est fausse aujourd'hui, le risque est qu'une correction future n'en touche
   qu'une.
+- **Un refus de permission ne laisse aucune trace côté serveur.** `internal/bff` ne reçoit aucun
+  `*slog.Logger` (`router.go:151-156`), et le journal d'audit ne porte que les **succès** : un 403 de
+  `RequirePermission` n'existe nulle part. → **step-029**, qui livre les premières routes gardées.
+  Renvoyer la dette à step-060, qui apporte le journal avec le premier appel à la passerelle, la
+  daterait **plus tard que la step qui la fait mordre** — step-029 est en M1, step-060 en M3.
+
+  La forme proposée n'exige aucun journal : **auditer les refus de permission**. La raison écrite de
+  ne journaliser que les succès — une écriture par requête **non authentifiée** — ne vaut pas ici : un
+  403 de permission vient d'une session vivante *et* élevée. Les **500**, eux, restent sans trace, et
+  ça reste l'affaire de step-060.
 - **Aucune durée de rétention n'existe nulle part.** Le §3.1 renvoie à un document compagnon absent
   du dépôt. `audit_log` croît sans borne. → **step-187**, avec le détachement des partitions.
 - **`GET /audit-log` filtrera sur `target_type` sans index.** La table est partitionnée par mois, donc
@@ -411,8 +421,9 @@ métier → leurs steps respectives, qui consomment ce middleware sans le redéf
   ce point était fausse, et le reste de cette puce la corrige.** Elle re-datait sans avoir mesuré les
   deux déclencheurs que `plan.md` nommait — or les deux avaient tiré, et le second dès step-024.
   Le réexamen a donc eu lieu ici, à la date prévue. **Verdict : `pgx` nu, confirmé** ; voir DN-7.
-- **L'enrôlement TOTP ne compte toujours aucun échec dans la dimension qui convient.** Le compteur
-  d'appels de DN-6 le borne au bon débit, mais un code faux y coûte autant qu'un enrôlement légitime,
-  et un opérateur qui se trompe trois fois consomme trois cinquièmes de son budget d'enrôlement. La
-  dimension juste est celle des échecs de second facteur, qui existe déjà. → **step-029**, qui reprend
-  ce chemin pour la réinitialisation par un administrateur.
+- ~~**L'enrôlement TOTP ne compte aucun échec dans la dimension qui convient.**~~ **Payée
+  séparément le 29/08/2026**, et l'intitulé sous-estimait le défaut : ce n'était pas une dimension mal
+  choisie mais un **second seau de cinq essais**, indépendant de celui de la vérification — dix
+  devinettes par quart d'heure au lieu de cinq. Le remplacement consulte désormais le même verrou et
+  compte dans le même seau. La correction a aussi refait le calcul qui rassurait : « quatre-vingts
+  ans » était faux d'un facteur soixante, le verrou en achète **seize mois**.
