@@ -32,8 +32,8 @@ type lockScanner interface {
 //
 // **La conversion en `time.Duration` est la seule arithmétique de temps qui se fasse en Go**, et elle
 // ne consulte aucune horloge : la base a déjà mesuré la durée restante contre la sienne, et il ne
-// reste qu'à changer d'unité. Elle était écrite cinq fois avant ce repli, sur trois rédactions du même
-// compteur ; c'est le genre de ligne dont une correction n'atteint qu'un exemplaire.
+// reste qu'à changer d'unité. Elle était écrite **cinq** fois avant ce repli, sur les trois types qui
+// lisaient un verrou ; c'est le genre de ligne dont une correction n'atteint qu'un exemplaire.
 //
 // L'erreur remonte nue : `pgx.ErrNoRows` doit rester reconnaissable par l'appelant, qui seul sait si
 // l'absence de ligne est un cas normal, et lui seul sait aussi nommer la dimension dans son message.

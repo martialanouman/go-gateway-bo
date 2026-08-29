@@ -112,11 +112,13 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			sqlstate: uniqueViolation,
 		},
 		{
-			// Les trois dimensions comptées sont fermées par le schéma — la troisième, `mfa`, est
-			// posée par le décor ci-dessus, donc une contrainte trop serrée tomberait là. Une quatrième
-			// valeur écrite par erreur ne serait comptée par rien et ne verrouillerait rien : le refus
-			// est le seul symptôme possible.
-			name: "un compteur d'échecs ne connaît que ses trois dimensions",
+			// Les dimensions comptées sont fermées par le schéma. Elles sont **cinq** depuis 00009 et
+			// non trois, comme ce cas l'a dit jusqu'au 29/08/2026 : la contrainte a été élargie deux
+			// fois — 00007 pour `mfa`, 00009 pour `totp_enroll` et `webauthn_ceremony` — sans que
+			// l'intitulé bouge, et le cas restait vert parce que `empreinte` reste refusé quel que soit
+			// le nombre de valeurs admises. Une sixième valeur écrite par erreur ne serait comptée par
+			// rien et ne verrouillerait rien : le refus est le seul symptôme possible.
+			name: "un compteur d'échecs ne connaît que ses cinq dimensions",
 			act: `INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
 				VALUES ('empreinte', 'x', 1, now())`,
 			sqlstate: checkViolation,

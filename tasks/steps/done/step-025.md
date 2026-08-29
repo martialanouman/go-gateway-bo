@@ -397,12 +397,19 @@ métier → leurs steps respectives, qui consomment ce middleware sans le redéf
 
 ## Dettes ouvertes par cette step, avec leur porteur
 
-- **Trois rédactions du même SQL de compteur.** `Logins` (premier facteur), `MFA` (second facteur) et
-  `Counter` (appels) portent chacune l'incrément atomique et la fenêtre d'oubli. Replier les deux
-  premières sur `Counter` est un remaniement de leur chemin — celui du premier facteur compte deux
-  dimensions en une instruction — et n'est pas de cette step. **Sans porteur**, et c'est assumé :
-  aucune des trois n'est fausse aujourd'hui, le risque est qu'une correction future n'en touche
-  qu'une.
+- ~~**Trois rédactions du même SQL de compteur.**~~ **Payée le 29/08/2026**, et l'intitulé était faux
+  dans le sens qui arrange. Mesuré ligne à ligne : `MFA` et `Counter` étaient le **même** SQL à la
+  source de la dimension près — `LockFor` au caractère près, `RecordFailure` au `RETURNING` près — et
+  `Logins` est une requête d'une autre forme, deux dimensions en une instruction avec le seuil filtré
+  en Go sur le plus fort des deux verrous. Deux rédactions, donc, pas trois. Et une quatrième
+  duplication que la note ne voyait pas : le `DELETE` de `ClearFailures`, écrit deux fois à
+  l'identique, plus le calcul de `Lock.Remaining`, écrit **cinq** fois.
+
+  `Counter` est désormais la rédaction unique de tout accès **mono-dimension** ; `Logins` garde la
+  seule requête qui en couvre deux. Le repli a un gain qui se mesure : `Counter` n'avait **aucun test
+  de niveau store** — il n'était exercé que de bout en bout — et hérite de ceux de `MFA`. Une seule
+  mutation, retirer la fenêtre d'oubli, fait maintenant rougir le test Go du second facteur *et* le
+  scénario de l'enrôlement ; avant, elle en atteignait un seul.
 - **Un refus de permission ne laisse aucune trace côté serveur.** `internal/bff` ne reçoit aucun
   `*slog.Logger` (`router.go:151-156`), et le journal d'audit ne porte que les **succès** : un 403 de
   `RequirePermission` n'existe nulle part. → **step-029**, qui livre les premières routes gardées.
