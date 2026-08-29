@@ -18,10 +18,14 @@ import (
 // `sessions.go` à côté.
 type MFA struct {
 	pool *pgxpool.Pool
+	// attempts compte les essais de second facteur. C'est un `Counter` et non une quatrième rédaction
+	// du compteur glissant : la dimension `mfa` en partage le mécanisme entier — dérivation du verrou,
+	// incrément atomique, fenêtre d'oubli — et n'en diffère que par ce qu'elle compte.
+	attempts *Counter
 }
 
 func NewMFA(pool *pgxpool.Pool) *MFA {
-	return &MFA{pool: pool}
+	return &MFA{pool: pool, attempts: NewCounter(pool, ScopeSecondFactor)}
 }
 
 // TOTPState est ce qu'une vérification et un enrôlement ont besoin de lire, en un seul aller-retour.
@@ -245,74 +249,14 @@ func (m *MFA) ConsumeRecoveryCode(ctx context.Context, id string) (bool, error) 
 func (m *MFA) LockFor(ctx context.Context, operatorID string, window time.Duration,
 	threshold int,
 ) (Lock, error) {
-	const query = `
-		SELECT scope, failures,
-		       EXTRACT(EPOCH FROM (last_failure_at + make_interval(secs => $2) - now()))
-		FROM login_attempt_counters
-		WHERE scope = $3 AND subject = $1
-		  AND failures >= $4
-		  AND last_failure_at + make_interval(secs => $2) > now()`
-
-	var (
-		lock    Lock
-		seconds float64
-	)
-
-	err := m.pool.QueryRow(ctx, query, operatorID, window.Seconds(), ScopeSecondFactor, threshold).
-		Scan(&lock.Scope, &lock.Failures, &seconds)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Lock{}, nil
-	}
-
-	if err != nil {
-		return Lock{}, fmt.Errorf("lire le verrou de second facteur : %w", err)
-	}
-
-	lock.Remaining = time.Duration(seconds * float64(time.Second))
-
-	return lock, nil
+	return m.attempts.LockFor(ctx, operatorID, window, threshold)
 }
 
 // RecordFailure compte un échec de second facteur et rend le verrou qui en résulte.
-//
-// Une seule instruction, comme celle du premier facteur et pour la même raison : `c` désigne dans
-// `DO UPDATE` la ligne telle que PostgreSQL la relit après avoir pris son verrou de ligne, donc deux
-// instances qui entrent ensemble sur une ligne à trois échecs sortent à quatre puis cinq, jamais à
-// quatre et quatre.
 func (m *MFA) RecordFailure(ctx context.Context, operatorID string, window time.Duration,
 	threshold int,
 ) (Lock, error) {
-	const query = `
-		INSERT INTO login_attempt_counters AS c (scope, subject, failures, last_failure_at)
-		VALUES ($3, $1, 1, now())
-		ON CONFLICT (scope, subject) DO UPDATE
-		SET failures = CASE
-		        WHEN c.last_failure_at + make_interval(secs => $2) <= now() THEN 1
-		        ELSE c.failures + 1
-		    END,
-		    last_failure_at = now()
-		RETURNING scope, failures,
-		          EXTRACT(EPOCH FROM (last_failure_at + make_interval(secs => $2) - now()))`
-
-	var (
-		lock    Lock
-		seconds float64
-	)
-
-	err := m.pool.QueryRow(ctx, query, operatorID, window.Seconds(), ScopeSecondFactor).
-		Scan(&lock.Scope, &lock.Failures, &seconds)
-	if err != nil {
-		return Lock{}, fmt.Errorf("compter l'échec de second facteur : %w", err)
-	}
-
-	if lock.Failures < threshold {
-		return Lock{}, nil
-	}
-
-	lock.Remaining = time.Duration(seconds * float64(time.Second))
-
-	return lock, nil
+	return m.attempts.Count(ctx, operatorID, window, threshold)
 }
 
 // ClearFailures efface le compteur après un second facteur franchi.
@@ -323,13 +267,7 @@ func (m *MFA) RecordFailure(ctx context.Context, operatorID string, window time.
 // l'opérateur lui-même, et celui qui vient de franchir son second facteur est précisément celui à qui
 // le compteur était destiné.
 func (m *MFA) ClearFailures(ctx context.Context, operatorID string) error {
-	const query = `DELETE FROM login_attempt_counters WHERE scope = $2 AND subject = $1`
-
-	if _, err := m.pool.Exec(ctx, query, operatorID, ScopeSecondFactor); err != nil {
-		return fmt.Errorf("effacer le compteur de second facteur : %w", err)
-	}
-
-	return nil
+	return m.attempts.Clear(ctx, operatorID)
 }
 
 // PendingChallenge est un challenge de second facteur encore utilisable.

@@ -18,27 +18,15 @@ import (
 // le site d'appel que `NewPool` annonce depuis step-005.
 type Logins struct {
 	pool *pgxpool.Pool
+	// emails est le compteur de la dimension de l'adresse, et il n'en sert qu'un geste : l'effacement
+	// d'un succès. Les deux autres accès de ce fichier couvrent **deux** dimensions en une
+	// instruction, ce que `Counter` ne sait pas faire et n'a pas à apprendre.
+	emails *Counter
 }
 
 func NewLogins(pool *pgxpool.Pool) *Logins {
-	return &Logins{pool: pool}
+	return &Logins{pool: pool, emails: NewCounter(pool, ScopeEmail)}
 }
-
-// Lock décrit un verrouillage en cours. Sa valeur nulle veut dire « aucun verrou », ce qui est le cas
-// courant : c'est ce qui permet à l'appelant d'écrire `if lock.Locked()` sans distinguer l'absence.
-type Lock struct {
-	// Scope dit laquelle des deux dimensions a verrouillé — l'adresse soumise ou la source.
-	Scope string
-	// Failures est le compte d'échecs de cette dimension.
-	Failures int
-	// Remaining est ce qu'il reste à attendre, **calculé par le serveur de base**. Le calculer en Go
-	// ferait dépendre le verrou de l'horloge de l'instance qui répond, donc rendrait deux durées
-	// différentes pour le même verrou selon l'instance jointe.
-	Remaining time.Duration
-}
-
-// Locked dit si ce verrou mord encore.
-func (l Lock) Locked() bool { return l.Remaining > 0 }
 
 // Operator est ce que le premier facteur a besoin de savoir, et rien de plus. Ni le secret TOTP, ni
 // les identifiants WebAuthn : le second facteur les lit dans `mfa.go`, et les charger ici les ferait
@@ -121,13 +109,8 @@ func (l *Logins) LockFor(ctx context.Context, emailKey, sourceKey string, window
 		ORDER BY last_failure_at DESC
 		LIMIT 1`
 
-	var (
-		lock    Lock
-		seconds float64
-	)
-
-	err := l.pool.QueryRow(ctx, query, emailKey, sourceKey, window.Seconds(), ScopeEmail, ScopeSource,
-		threshold).Scan(&lock.Scope, &lock.Failures, &seconds)
+	lock, err := scanLock(l.pool.QueryRow(ctx, query, emailKey, sourceKey, window.Seconds(),
+		ScopeEmail, ScopeSource, threshold))
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Lock{}, nil
@@ -136,8 +119,6 @@ func (l *Logins) LockFor(ctx context.Context, emailKey, sourceKey string, window
 	if err != nil {
 		return Lock{}, fmt.Errorf("lire le verrou de connexion : %w", err)
 	}
-
-	lock.Remaining = time.Duration(seconds * float64(time.Second))
 
 	return lock, nil
 }
@@ -188,20 +169,15 @@ func (l *Logins) RecordFailure(ctx context.Context, emailKey, sourceKey string, 
 	var strongest Lock
 
 	for rows.Next() {
-		var (
-			lock    Lock
-			seconds float64
-		)
-
-		if err = rows.Scan(&lock.Scope, &lock.Failures, &seconds); err != nil {
-			return Lock{}, fmt.Errorf("lire le compteur mis à jour : %w", err)
+		lock, scanErr := scanLock(rows)
+		if scanErr != nil {
+			return Lock{}, fmt.Errorf("lire le compteur mis à jour : %w", scanErr)
 		}
 
 		if lock.Failures < threshold {
 			continue
 		}
 
-		lock.Remaining = time.Duration(seconds * float64(time.Second))
 		if lock.Remaining > strongest.Remaining {
 			strongest = lock
 		}
@@ -221,13 +197,7 @@ func (l *Logins) RecordFailure(ctx context.Context, emailKey, sourceKey string, 
 // annulerait la seconde dimension pour quiconque détient un identifiant. Le compteur de source
 // s'éteint tout seul, par oubli, au bout de la fenêtre.
 func (l *Logins) ClearFailures(ctx context.Context, emailKey string) error {
-	const query = `DELETE FROM login_attempt_counters WHERE scope = $2 AND subject = $1`
-
-	if _, err := l.pool.Exec(ctx, query, emailKey, ScopeEmail); err != nil {
-		return fmt.Errorf("effacer le compteur d'échecs : %w", err)
-	}
-
-	return nil
+	return l.emails.Clear(ctx, emailKey)
 }
 
 // IssueChallenge pose un challenge de second facteur et rend son échéance.
