@@ -68,6 +68,9 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur représente le même code$`, w.presentTheSameCodeAgain)
 	ctx.When(`^l'opérateur remplace son authentificateur en présentant son code$`,
 		w.replaceProvingTheCurrentCode)
+	ctx.Given(`^l'opérateur tente (\d+) remplacements avec un code faux$`, w.replaceWithWrongCodes)
+	ctx.When(`^l'opérateur tente (\d+) remplacements avec un code faux$`, w.replaceWithWrongCodes)
+	ctx.When(`^l'opérateur tente un remplacement avec un code faux$`, w.replaceWithWrongCode)
 	ctx.When(`^l'opérateur présente un code qui n'est celui d'aucun authentificateur$`,
 		w.presentCodeWithoutEnrolment)
 	ctx.When(`^l'opérateur présente un code démesuré$`, w.presentOversizedCode)
@@ -207,12 +210,22 @@ func (w *mfaWorld) codeAtOffset(ctx context.Context, offset int64) (string, erro
 	return code, nil
 }
 
-// presentWrongCode présente un code de six chiffres qui n'est celui d'aucun pas. Six chiffres et non
-// une chaîne quelconque : ce qui doit être exercé est la comparaison, pas le refus de forme.
+// presentWrongCode devine un code sur la route de vérification.
 func (w *mfaWorld) presentWrongCode(ctx context.Context) error {
-	step, err := w.currentStep(ctx)
+	code, err := w.wrongCode(ctx)
 	if err != nil {
 		return err
+	}
+
+	return w.verify("totp", code)
+}
+
+// wrongCode fabrique un code de six chiffres qui n'est celui d'aucun pas. Six chiffres et non une
+// chaîne quelconque : ce qui doit être exercé est la comparaison, pas le refus de forme.
+func (w *mfaWorld) wrongCode(ctx context.Context) (string, error) {
+	step, err := w.currentStep(ctx)
+	if err != nil {
+		return "", err
 	}
 
 	// Un pas très éloigné produit un code de la bonne forme que la fenêtre ne couvre pas — plus sûr
@@ -222,10 +235,38 @@ func (w *mfaWorld) presentWrongCode(ctx context.Context) error {
 		Algorithm: otp.AlgorithmSHA1,
 	})
 	if err != nil {
-		return fmt.Errorf("fabriquer un code faux : %w", err)
+		return "", fmt.Errorf("fabriquer un code faux : %w", err)
 	}
 
-	return w.verify("totp", code)
+	return code, nil
+}
+
+// replaceWithWrongCode emprunte la **route d'enrôlement** pour deviner un code, ce qui est le chemin
+// que la migration 00007 n'avait pas vu : elle ne bornait que `POST /auth/mfa/verify`.
+func (w *mfaWorld) replaceWithWrongCode(ctx context.Context) error {
+	code, err := w.wrongCode(ctx)
+	if err != nil {
+		return err
+	}
+
+	return w.enrollProving(map[string]string{"method": "totp", "code": code})
+}
+
+func (w *mfaWorld) replaceWithWrongCodes(ctx context.Context, times int) error {
+	for range times {
+		if err := w.replaceWithWrongCode(ctx); err != nil {
+			return err
+		}
+
+		// 409 tant que le seuil n'est pas atteint, 429 à l'essai qui le franchit. Ce qui compte ici est
+		// qu'aucun code faux ne remplace l'authentificateur en place.
+		if status := w.login.process.received.status; status != 409 && status != 429 {
+			return fmt.Errorf("un code faux a été accepté au remplacement : le serveur a répondu %d",
+				status)
+		}
+	}
+
+	return nil
 }
 
 func (w *mfaWorld) presentWrongCodes(ctx context.Context, times int) error {
