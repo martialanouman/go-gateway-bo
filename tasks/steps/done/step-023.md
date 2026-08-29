@@ -90,7 +90,15 @@ heures.
 La migration 00007 ajoute une troisième dimension à `login_attempt_counters`, sur l'identifiant de
 l'opérateur, et réutilise tel quel l'incrément atomique de step-021. Cinq essais par quart d'heure sur
 10⁶ codes dont trois sont valables à la fois : une chance sur deux demanderait de l'ordre de
-quatre-vingts ans. Le verrou est consulté **avant** toute dépense — sinon il protégerait le compte sans
+quatre-vingts ans.
+
+*(Correction du 29/08/2026, en step-025 : ce chiffre est faux d'un facteur soixante. Sur ses propres
+prémisses — 231 000 essais pour une chance sur deux, 175 200 essais par an à cinq par quart d'heure —
+le verrou achète de l'ordre de **seize mois**. Le calcul refait est dans `internal/mfa/manager.go`.
+step-025 a par ailleurs fermé un second seau que l'enrôlement ouvrait, et qui divisait ce délai par
+deux.)*
+
+Le verrou est consulté **avant** toute dépense — sinon il protégerait le compte sans
 protéger le serveur — et son franchissement rend un 429 avec sa durée, comme la connexion.
 
 **Le compteur par challenge disparaît avec lui.** Au même seuil, celui de l'opérateur compte à travers

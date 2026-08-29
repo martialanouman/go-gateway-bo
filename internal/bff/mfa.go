@@ -105,6 +105,26 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 			return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
 		}
 
+		// **Le verrou d'essais de second facteur, consulté ici comme il l'est par la vérification.**
+		// Sans lui, ce chemin ouvrait un second seau de cinq essais, indépendant du premier : qui
+		// détient le mot de passe disposait de dix devinettes par quart d'heure au lieu de cinq, la
+		// moitié par une route que la migration 00007 n'avait pas vue. Le compteur d'appels de 00009
+		// bornait le nombre de requêtes, pas le budget de recherche.
+		//
+		// **Consulter et compter sont deux gardes distinctes, et l'une masque l'autre sur un code
+		// faux** — les deux rendent alors le même 429, et la mutation qui retire cette consultation
+		// reste verte. Mesuré. Ce qu'elle tient seule se voit sur un code **juste** : sans elle, un
+		// compte verrouillé remplacerait son authentificateur, c'est-à-dire que le verrou échouerait à
+		// empêcher le succès qu'il existe pour empêcher. C'est ce scénario-là qui la garde.
+		lock, err := a.SecondFactor.Lock(ctx, resolved.OperatorID)
+		if err != nil {
+			return nil, err
+		}
+
+		if lock.Locked() {
+			return enrollmentLockedBySecondFactor(lock.Remaining), nil
+		}
+
 		replace, err = a.verifyPresentedFactor(ctx, resolved.OperatorID, string(*request.Body.Method),
 			*request.Body.Code)
 		if err != nil {
@@ -112,7 +132,7 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		}
 
 		if !replace {
-			return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
+			return a.refuseReplacement(ctx, resolved.OperatorID)
 		}
 	}
 
@@ -291,13 +311,53 @@ func tooManySecondFactorAttempts(remaining time.Duration) VerifyMfa429JSONRespon
 
 	return VerifyMfa429JSONResponse{
 		Headers: VerifyMfa429ResponseHeaders{RetryAfter: seconds},
-		Body: Error{
-			Code: "too_many_attempts",
-			Message: "Le second facteur est temporairement bloqué après plusieurs essais : réessayez " +
-				"dans " + humanDelay(seconds) + ". Le blocage porte sur ce compte, se lève tout seul, et " +
-				"n'empêche pas de se reconnecter.",
-		},
+		Body:    secondFactorLocked(seconds),
 	}
+}
+
+// enrollmentLockedBySecondFactor rend le **même** refus sur la route d'enrôlement : c'est le même
+// seau, la même durée et le même remède. Une seconde copie qui dirait « l'enrôlement est bloqué »
+// laisserait croire à deux verrous là où il n'y en a qu'un.
+//
+// Il ne se confond pas avec `tooManyEnrollments`, qui porte le compteur d'**appels** de la migration
+// 00009 : même statut, autre cause, autre phrase. Les deux se distinguent au message, et les
+// scénarios les exercent sur des routes où une seule des deux peut mordre.
+func enrollmentLockedBySecondFactor(remaining time.Duration) EnrollTotp429JSONResponse {
+	seconds := retryAfterSeconds(remaining)
+
+	return EnrollTotp429JSONResponse{
+		Headers: EnrollTotp429ResponseHeaders{RetryAfter: seconds},
+		Body:    secondFactorLocked(seconds),
+	}
+}
+
+func secondFactorLocked(seconds int) Error {
+	return Error{
+		Code: "too_many_attempts",
+		Message: "Le second facteur est temporairement bloqué après plusieurs essais : réessayez " +
+			"dans " + humanDelay(seconds) + ". Le blocage porte sur ce compte, se lève tout seul, et " +
+			"n'empêche pas de se reconnecter.",
+	}
+}
+
+// refuseReplacement compte l'essai raté **dans le seau du second facteur**, et annonce le verrou à
+// l'essai qui le franchit plutôt que de surprendre au suivant — même forme que `refuseSecondFactor`.
+//
+// Le succès, lui, n'efface rien, contrairement à la vérification : ce qui reste au compteur s'éteint
+// de lui-même en un quart d'heure, et le remplacement détruit déjà le facteur qu'il vient de prouver.
+func (a API) refuseReplacement(ctx context.Context, operatorID string) (EnrollTotpResponseObject,
+	error,
+) {
+	lock, err := a.SecondFactor.Fail(ctx, operatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if lock.Locked() {
+		return enrollmentLockedBySecondFactor(lock.Remaining), nil
+	}
+
+	return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
 }
 
 // tooManyEnrollments annonce le verrou d'enrôlement et sa durée. Même construction que les deux

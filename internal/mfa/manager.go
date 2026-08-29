@@ -20,8 +20,15 @@ import (
 // d'heure qui est **à la fois** la durée du verrou et la fenêtre d'oubli, sans quoi un verrou qui
 // vient d'expirer se refermerait au premier essai suivant.
 //
-// Ce qu'elles coûtent : cinq essais par quart d'heure, sur 10⁶ codes dont trois sont valables à la
-// fois. Une chance sur deux demanderait de l'ordre de quatre-vingts ans.
+// Ce qu'elles achètent, **recalculé en step-025 et corrigé** : cinq essais par quart d'heure, sur 10⁶
+// codes dont trois sont valables à la fois, donc 231 000 essais pour une chance sur deux et
+// 175 200 essais par an — de l'ordre de **seize mois**, pour un attaquant qui détient déjà le mot de
+// passe et s'acharne sans interruption.
+//
+// La rédaction précédente disait « quatre-vingts ans ». Le chiffre était faux d'un facteur soixante,
+// et personne ne l'avait refait : il vivait ici et dans `done/step-023.md`, à côté de ses propres
+// prémisses, qui suffisent à le contredire. Seize mois n'est pas « infaisable » — c'est cher, et
+// c'est la raison pour laquelle l'enrôlement a cessé d'ouvrir un second seau (step-025).
 const (
 	MaxFailures = 5
 	LockWindow  = 15 * time.Minute
