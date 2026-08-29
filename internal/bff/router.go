@@ -7,6 +7,7 @@
 package bff
 
 import (
+	"context"
 	"io/fs"
 	"net/http"
 	"net/netip"
@@ -76,7 +77,7 @@ func NewRouter(deps Dependencies) http.Handler {
 			SecondFactor:  deps.SecondFactor,
 			Passkeys:      deps.Passkeys,
 			Audit:         deps.Audit,
-		})
+		}, deps.Sessions)
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
@@ -124,8 +125,8 @@ func NewRouter(deps Dependencies) http.Handler {
 // `GET /health` n'ayant ni paramètre ni en-tête requis, aucune requête que le contrat autorise
 // n'atteint ce gestionnaire aujourd'hui : c'est `TestTheContractMountInstallsTheProductErrorHandler`
 // qui garde le montage, faute de pouvoir l'exercer.
-func mountContract(api chi.Router, impl StrictServerInterface) {
-	HandlerWithOptions(newContractHandler(impl), ChiServerOptions{
+func mountContract(api chi.Router, impl StrictServerInterface, sessions *session.Manager) {
+	HandlerWithOptions(newContractHandler(impl, sessions), ChiServerOptions{
 		BaseRouter:       api,
 		ErrorHandlerFunc: rejectRequest,
 	})
@@ -154,12 +155,30 @@ func mountContract(api chi.Router, impl StrictServerInterface) {
 // 500 servi ici ne laisse donc **aucune trace côté serveur**, et c'est désormais vrai d'une route qui
 // travaille : un `password_hash` corrompu en base fait refuser la connexion sans que rien ne le dise.
 // Le premier appel réel à la passerelle (step-060) devra apporter les deux à la fois.
-func newContractHandler(impl StrictServerInterface) ServerInterface {
-	return NewStrictHandlerWithOptions(impl, []StrictMiddlewareFunc{writePendingCookie()},
+//
+// **L'ordre du slice compte.** La boucle du wrapper engendré (`bff.gen.go:1354`) enveloppe
+// successivement, donc le **dernier** élément est le plus extérieur : la garde s'exécute avant tout
+// le reste, et son refus court-circuite la machinerie de cookie — qui ne pose rien, ne posant que sur
+// `err == nil && pending.cookie != nil`.
+func newContractHandler(impl StrictServerInterface, sessions *session.Manager) ServerInterface {
+	return NewStrictHandlerWithOptions(impl,
+		[]StrictMiddlewareFunc{writePendingCookie(), requirePermission(authorization, grantsFrom(sessions))},
 		StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  rejectRequest,
 			ResponseErrorHandlerFunc: reportFailedResponse,
 		})
+}
+
+// grantsFrom branche la garde sur la vraie source des permissions. C'est la seule adaptation entre
+// `session.Manager`, qui rend de quoi nommer l'opérateur **et** ses permissions, et la garde, qui ne
+// veut que les secondes : lui passer les trois champs l'inviterait à nommer l'opérateur dans un
+// message de refus, ce que la charte n'a aucune raison de demander.
+func grantsFrom(sessions *session.Manager) grantsOf {
+	return func(ctx context.Context, operatorID string) ([]string, error) {
+		held, err := sessions.Grants(ctx, operatorID)
+
+		return held.Permissions, err
+	}
 }
 
 // rejectRequest répond à une requête que le code engendré n'a pas su lier au contrat. Il sert les deux
