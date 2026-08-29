@@ -18,10 +18,28 @@ surface serveur **et** son écran dans la même PR.
 - Les refus structurels, chacun expliqué : rôle par défaut non supprimable, rôle détenu non
   supprimable, auto-verrouillage impossible.
 
-### Deux dettes que cette step hérite
+### Trois dettes que cette step hérite
 
 *Écrites ici et non seulement dans `steps/done/`, parce qu'une fiche archivée n'est ouverte par
 personne.*
+
+- **Un refus de permission ne laisse aucune trace côté serveur, et c'est cette step qui le rend
+  visible.** `internal/bff` ne reçoit aucun `*slog.Logger` (`router.go:151-156`), et le journal
+  d'audit ne porte que les **succès** — un 403 de `RequirePermission` n'existe donc nulle part.
+  step-025 renvoyait la dette à step-060, qui apporte le journal avec le premier appel à la
+  passerelle : **c'est plus tard que la step qui la fait mordre**, step-029 étant en M1 et step-060
+  en M3. Le porteur est corrigé ici.
+
+  **La forme proposée n'exige aucun journal : auditer les refus de permission.** La règle « seuls les
+  succès sont journalisés » a une raison écrite — journaliser les échecs de connexion ouvrirait une
+  écriture par requête **non authentifiée**, ce que `login_attempt_counters` existe précisément pour
+  éviter d'exposer. Cette raison **ne s'applique pas à un 403 de permission**, qui vient par
+  construction d'une session vivante *et* élevée : l'écriture est bornée par le nombre de sessions
+  authentifiées, et c'est exactement ce qu'une enquête cherche — qui a tenté ce qu'il ne pouvait pas
+  faire. Trancher dans cette PR, avec la première route gardée sous les yeux.
+
+  Les **500**, eux, restent sans trace, et ça reste l'affaire de step-060 : ils ne sont pas bornés
+  par une session, et le journal les attend de toute façon.
 
 - **Le premier enrôlement d'un second facteur est libre pour toute session de premier facteur**
   (step-023, puis step-024 pour les passkeys). Sur un déploiement neuf, aucun opérateur n'est enrôlé :

@@ -451,7 +451,7 @@ func (w *mfaWorld) secretChanged() error {
 }
 
 // secondFactorIsVerified et son contraire lisent `/auth/me`, donc l'état **servi** et non celui de la
-// ligne. C'est ce que step-025 lira pour garder les écritures.
+// ligne. C'est ce que la garde de permission lit pour décider (step-025).
 func (w *mfaWorld) secondFactorIsVerified() error {
 	elevated, err := w.elevation()
 	if err != nil {
@@ -473,7 +473,7 @@ func (w *mfaWorld) secondFactorIsNotVerified() error {
 
 	if elevated {
 		return errors.New("la session est élevée alors que rien n'a franchi le second facteur : " +
-			"step-025 la laisserait écrire")
+			"la garde de permission la laisserait écrire")
 	}
 
 	return nil

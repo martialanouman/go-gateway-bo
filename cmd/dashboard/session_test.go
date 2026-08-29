@@ -302,7 +302,7 @@ func (w *sessionWorld) secondFactorIsNotVerified() error {
 
 	if decoded.Elevated {
 		return errors.New("la session se dit élevée alors qu'aucun second facteur n'a été vérifié : " +
-			"step-025 la laisserait écrire")
+			"la garde de permission la laisserait écrire")
 	}
 
 	return nil

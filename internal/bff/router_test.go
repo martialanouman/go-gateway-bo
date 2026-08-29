@@ -188,8 +188,11 @@ func declaringFile(t *testing.T, pkg *packages.Package, handler http.Handler) st
 // `NewStrictHandlerWithOptions` n'accepte qu'un `StrictServerInterface`, mais rien n'exige qu'il soit
 // **appelé**.
 //
-// `chi.Walk` ne rapporte pas le `NotFound` d'un sous-routeur — mesuré, les routes rapportées sont exactement
-// `/api/health`, `/assets/*`, `/ws` et `/*`. `handleUnknownAPIRoute` n'a donc pas à être exempté ici.
+// `chi.Walk` ne rapporte pas le `NotFound` d'un sous-routeur : `handleUnknownAPIRoute` n'a donc pas à
+// être exempté ici. Ce qu'il rapporte, **remesuré en step-025** : les dix opérations du contrat sous
+// `/api`, plus `/assets/*`, `/ws` et `/*` une fois par méthode — vingt-quatre entrées. La rédaction
+// précédente en nommait quatre, ce qui était vrai quand le contrat n'avait qu'une opération et a
+// cessé de l'être sans que rien ne le voie.
 func TestOnlyGeneratedCodeServesTheAPIRoutes(t *testing.T) {
 	t.Parallel()
 
