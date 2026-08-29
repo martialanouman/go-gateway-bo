@@ -137,7 +137,7 @@ qui restait à payer au bump n'avait effectivement pas grossi.
 - [x] step-022 — Session BFF (cookie signé) + `/auth/me` + `/auth/logout`
 - [x] step-023 — MFA TOTP : enrôlement, vérification, codes de récupération
 - [x] step-024 — MFA WebAuthn / passkey
-- [ ] step-025 — `RequirePermission` + journal d'audit + MFA obligatoire  *(invariant c)*
+- [x] step-025 — `RequirePermission` + journal d'audit + MFA obligatoire  *(invariant c)*
 - [ ] step-026 — DTO de sortie déclarés partout + test bloquant  *(invariant a, moitié structurelle)*
 - [ ] step-027 — Écrans Login & MFA, branchés sur le BFF Go †
 - [ ] step-028 — Écran d'enrôlement du second facteur †

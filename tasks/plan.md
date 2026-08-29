@@ -469,8 +469,9 @@ contrats, et produit **un binaire qui sert la SPA**.
   signée, `/auth/me` renvoyant l'union des permissions.
 - MFA **TOTP** (anti-rejeu, codes de récupération) et **WebAuthn/passkey** (`rpID`/`origin` vérifiés
   côté serveur, compteur de signature).
-- `RequirePermission(key)` en middleware chi + écriture systématique d'`audit_log` + **MFA
-  obligatoire** pour les rôles privilégiés.
+- `RequirePermission(key)` en **middleware strict** — corrigé en step-025 : un middleware chi ne
+  reprend la main qu'après `Visit…Response(w)`, donc sur une réponse déjà écrite — plus l'écriture
+  systématique d'`audit_log` et le **MFA obligatoire** pour les rôles privilégiés.
 - Écrans Login, MFA, enrôlement du second facteur, administration des opérateurs et des rôles —
   **portés** et rebranchés sur les handlers Go.
 
@@ -487,8 +488,11 @@ passerelle elle-même (côté `go-gateway`, voir §15).
 - Table de vérité des neuf rôles vérifiée, **y compris les exclusions** : `ops` sans
   `suppressions:delete`, `script_author` sans `scripts:publish`, `support_readonly` sans
   `content:read`, `account_manager` sans `billing:topup`.
-- **Invariant (c)** : le test d'énumération des routes échoue si une route de mutation n'a ni garde de
-  permission ni écriture d'audit. Il lit le routeur comme une **valeur**, jamais le texte source.
+- **Invariant (c)** : le test d'énumération échoue si une opération de mutation n'a ni garde de
+  permission ni écriture d'audit. Il tire ses cas du **contrat** et non du routeur — mesuré en
+  step-004, `chi.Walk` prouve qu'une route est montée mais n'atteint pas le slice de middlewares,
+  qui vit dans un champ non exporté de closure. L'audit, lui, est lu dans le **code** par le
+  type-checker, jamais dans une déclaration ni dans le texte source.
 - Une session non-MFA ne peut atteindre aucune écriture ni `content:read`.
 - Aucun secret ni corps ne se retrouve dans `audit_log` (payload piégé).
 - Le premier administrateur peut **entrer** : installation → login → enrôlement → console, sans
@@ -903,7 +907,7 @@ moins : un scénario qui se lit juste inspire une confiance que rien n'a encore 
   qui décide est l'observabilité d'un `Scan` mal ordonné — une propriété du harnais de test, pas du
   compte de requêtes. Le déclencheur qui les remplace : **un `Scan` dont la mutation d'interversion de
   deux champs de même type reste verte**. Ce jour-là, `sqlc` reprend l'avantage et la décision se
-  rouvre. `tasks/steps/step-025.md` DN-7.
+  rouvre. `tasks/steps/done/step-025.md` DN-7.
 
   > **Amendement du 02/08/2026, au début de step-005.** Cette décision disait « en step-005 ». Elle y
   > est **indécidable** : le périmètre de cette step écrit noir sur blanc qu'« aucune requête n'est

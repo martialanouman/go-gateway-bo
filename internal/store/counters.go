@@ -26,7 +26,7 @@ const (
 // **Il ne remplace pas les deux rédactions existantes** (`Logins` pour le premier facteur, `MFA` pour
 // le second) : celle du premier facteur compte deux dimensions en une instruction, et les replier
 // toutes deux ici serait un remaniement de leur chemin, pas de celui-ci. La dette est nommée dans
-// `tasks/steps/step-025.md`.
+// `tasks/steps/done/step-025.md`.
 type Counter struct {
 	pool  *pgxpool.Pool
 	scope string
