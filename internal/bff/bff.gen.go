@@ -905,6 +905,28 @@ func (response EnrollTotp409JSONResponse) VisitEnrollTotpResponse(w http.Respons
 	return err
 }
 
+type EnrollTotp429ResponseHeaders struct {
+	RetryAfter int
+}
+
+type EnrollTotp429JSONResponse struct {
+	Body    Error
+	Headers EnrollTotp429ResponseHeaders
+}
+
+func (response EnrollTotp429JSONResponse) VisitEnrollTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type VerifyMfaRequestObject struct {
 	Body *VerifyMfaJSONRequestBody
 }
@@ -1020,6 +1042,28 @@ func (response BeginWebauthnAssertion401JSONResponse) VisitBeginWebauthnAssertio
 	return err
 }
 
+type BeginWebauthnAssertion429ResponseHeaders struct {
+	RetryAfter int
+}
+
+type BeginWebauthnAssertion429JSONResponse struct {
+	Body    Error
+	Headers BeginWebauthnAssertion429ResponseHeaders
+}
+
+func (response BeginWebauthnAssertion429JSONResponse) VisitBeginWebauthnAssertionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteWebauthnPasskeyRequestObject struct {
 	PasskeyId string `json:"passkeyId"`
 }
@@ -1109,6 +1153,28 @@ func (response BeginWebauthnRegistration409JSONResponse) VisitBeginWebauthnRegis
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginWebauthnRegistration429ResponseHeaders struct {
+	RetryAfter int
+}
+
+type BeginWebauthnRegistration429JSONResponse struct {
+	Body    Error
+	Headers BeginWebauthnRegistration429ResponseHeaders
+}
+
+func (response BeginWebauthnRegistration429JSONResponse) VisitBeginWebauthnRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
 	_, err := buf.WriteTo(w)
 	return err
 }

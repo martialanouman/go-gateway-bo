@@ -6,6 +6,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // API implémente l'interface **stricte** qu'engendre `api/openapi-bff.yaml`. Ce que l'interface
@@ -55,6 +56,9 @@ type API struct {
 	// d'essais et l'élévation, et les réunir aurait fait d'un manager la somme de deux protocoles qui
 	// n'ont ni la même forme ni le même nombre d'allers-retours.
 	Passkeys *mfa.PasskeyManager
+	// Audit écrit le journal. Cinquième collaborateur, et le seul dont **toutes** les routes de
+	// mutation dépendent : c'est la moitié « et l'audit avec elle » de l'invariant (c).
+	Audit *store.Audit
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le

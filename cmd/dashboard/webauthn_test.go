@@ -71,6 +71,9 @@ func (w *webauthnWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur enregistre une clé d'accès signée pour une autre origine$`,
 		w.registerFromAnotherOrigin)
 	ctx.Given(`^l'opérateur ouvre l'enregistrement d'une clé d'accès$`, w.openRegistration)
+	ctx.When(`^l'opérateur ouvre l'enregistrement d'une clé d'accès$`, w.openRegistration)
+	ctx.Given(`^l'opérateur ouvre (\d+) enregistrements de clé d'accès$`, w.openRegistrations)
+	ctx.When(`^l'opérateur ouvre (\d+) enregistrements de clé d'accès$`, w.openRegistrations)
 	ctx.When(`^l'opérateur finit l'enregistrement ouvert$`, w.closeOpenedRegistration)
 	ctx.When(`^l'opérateur présente (\d+) assertions fausses$`, w.presentWrongAssertions)
 	ctx.Then(`^il lui reste (\d+) clés? d'accès$`, w.passkeysRemaining)
@@ -191,6 +194,19 @@ func (w *webauthnWorld) finishRegistration(attestation string) error {
 	}
 
 	return w.login.process.post("/api/auth/mfa/webauthn/register/finish", string(body))
+}
+
+// openRegistrations répète l'ouverture sans juger ce qu'elle rend — contrairement à
+// `openRegistration`, qui exige un 200 parce que le scénario exerce ensuite le défi qu'elle ouvre.
+// Ici c'est la dernière réponse que le scénario juge, et elle doit pouvoir être un refus.
+func (w *webauthnWorld) openRegistrations(count int) error {
+	for range count {
+		if err := w.login.process.post("/api/auth/mfa/webauthn/register/begin", ""); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (w *webauthnWorld) beginAssertion() error {

@@ -270,18 +270,41 @@ func passkeyOf(credential *webauthn.Credential) store.Passkey {
 type PasskeyManager struct {
 	ceremonies  *Passkeys
 	credentials *store.Webauthn
+	// openings borne les **ouvertures** de cérémonie. Aucun compteur d'échecs ne les voit : elles
+	// réussissent, et une session de premier facteur suffit à les répéter.
+	openings *store.Counter
 }
+
+// MaxCeremonies borne les appels à `register/begin` et `assert/begin`, sur la fenêtre commune.
+//
+// Quatre fois le seuil des autres dimensions, et la raison est le coût : une ouverture n'écrit
+// qu'une ligne dans `webauthn_challenges` — que rien ne purge avant step-187 — là où un enrôlement
+// TOTP hache dix argon2id. L'usage légitime est aussi plus bavard : une clé qu'on cherche, cinq
+// minutes qu'on laisse filer, une seconde tentative. Un seuil qui refuse du légitime finit retiré.
+const MaxCeremonies = 20
 
 // NewPasskeyManager valide la configuration WebAuthn. **L'appeler avant de lier le port** : un rpID
 // que la spécification refuse échoue ici, et un serveur qui écoute déjà refuserait chaque cérémonie
 // sans avoir rien dit au démarrage.
-func NewPasskeyManager(credentials *store.Webauthn, rpID, origin string) (*PasskeyManager, error) {
+func NewPasskeyManager(credentials *store.Webauthn, openings *store.Counter, rpID,
+	origin string,
+) (*PasskeyManager, error) {
 	ceremonies, err := NewPasskeys(rpID, origin)
 	if err != nil {
 		return nil, err
 	}
 
-	return &PasskeyManager{ceremonies: ceremonies, credentials: credentials}, nil
+	return &PasskeyManager{ceremonies: ceremonies, credentials: credentials, openings: openings}, nil
+}
+
+// AdmitCeremony consulte le verrou d'ouverture puis compte l'appel, avant d'écrire le défi que la
+// borne existe pour empêcher.
+//
+// **Les deux cérémonies partagent la dimension** : les séparer doublerait le budget d'un attaquant
+// pour la même protection, et un opérateur qui vient d'épuiser vingt enregistrements n'a pas de
+// raison d'avoir besoin de vingt assertions dans le même quart d'heure.
+func (p *PasskeyManager) AdmitCeremony(ctx context.Context, operatorID string) (store.Lock, error) {
+	return p.openings.Admit(ctx, operatorID, LockWindow, MaxCeremonies)
 }
 
 // CeremonyTTL borne la vie d'un défi. Cinq minutes, comme le challenge de premier facteur : c'est le

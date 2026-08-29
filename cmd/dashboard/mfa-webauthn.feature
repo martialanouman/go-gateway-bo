@@ -270,3 +270,28 @@ Fonctionnalité: Le second facteur par passkey
     Et l'opérateur présente sa clé d'accès
     Alors la réponse est conforme au contrat du BFF
     Et le second facteur est verrouillé
+
+  # Un compteur d'**appels** et non d'échecs, comme celui de l'enrôlement : ouvrir une cérémonie
+  # réussit toujours, et chaque ouverture écrit un défi que rien ne purge avant step-187. Le seuil est
+  # quatre fois celui des autres dimensions, parce qu'une clé qu'on cherche et cinq minutes qu'on
+  # laisse filer produisent de vraies reprises. Dette de step-024, payée ici.
+  Scénario: vingt et une ouvertures d'affilée sont bornées
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur ouvre 21 enregistrements de clé d'accès
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 429
+    Et la réponse porte l'en-tête "Retry-After"
+    Et le message annonce la durée restante
+
+  Scénario: le seuil des cérémonies est commun à l'enregistrement et à l'assertion
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur ouvre 20 enregistrements de clé d'accès
+    # Sans clé enregistrée, une assertion rend 400 : c'est ce que ce scénario verrait si les deux
+    # ouvertures comptaient chacune de leur côté.
+    Quand l'opérateur ouvre une assertion sans clé enregistrée
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 429

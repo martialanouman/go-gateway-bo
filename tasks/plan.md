@@ -888,10 +888,22 @@ moins : un scénario qui se lit juste inspire une confiance que rien n'a encore 
   analyseur SQL** devant avaler `uuidv7()`, la table partitionnée et le bloc PL/pgSQL — le mode
   d'échec que `internal/store/permissions_catalog_test.go` a précisément corrigé ; et ce que `pgx` nu
   coûte est déjà payé, chaque requête étant exercée contre un PostgreSQL 18 réel par testcontainers.
-  Ce qui doit faire réviser : un store au-delà d'une vingtaine de requêtes, ou une requête à plus de
-  cinq ou six colonnes — c'est dans une liste d'arguments de `Scan` tenue à la main que vit le défaut
-  silencieux que `sqlc` supprime par construction. **Point de réexamen : step-025**, ou la première
-  route de liste de M3, selon celle qui arrive la première.
+  **Réexaminé en step-025, et confirmé.** Les deux déclencheurs alors nommés — « au-delà d'une
+  vingtaine de requêtes », « une requête à plus de cinq ou six colonnes » — avaient tous deux tiré, le
+  second dès step-024 : 29 littéraux SQL nommés, et un `Scan` à dix colonnes dans
+  `internal/store/webauthn.go`. La jambe « `sqlc` n'aurait presque rien à engendrer » est donc tombée.
+  Les deux autres tiennent, et le second analyseur SQL doit désormais avaler une table partitionnée,
+  une fonction PL/pgSQL, `uuidv7()`, `make_interval(secs => $n)` et `nullif($1, '')::inet`.
+
+  Ce qui a tranché est une **mesure et non plus un argument** : le défaut que `sqlc` supprime par
+  construction — deux champs de même type intervertis dans un `Scan`, ce qui compile et passe le
+  typage — a été reproduit sur le pire cas du dépôt, deux fois, et la suite rougit les deux fois.
+
+  **Ces deux déclencheurs étaient un proxy, et il a mal tiré** : ils mesurent une taille, alors que ce
+  qui décide est l'observabilité d'un `Scan` mal ordonné — une propriété du harnais de test, pas du
+  compte de requêtes. Le déclencheur qui les remplace : **un `Scan` dont la mutation d'interversion de
+  deux champs de même type reste verte**. Ce jour-là, `sqlc` reprend l'avantage et la décision se
+  rouvre. `tasks/steps/step-025.md` DN-7.
 
   > **Amendement du 02/08/2026, au début de step-005.** Cette décision disait « en step-005 ». Elle y
   > est **indécidable** : le périmètre de cette step écrit noir sur blanc qu'« aucune requête n'est
