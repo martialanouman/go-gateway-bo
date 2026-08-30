@@ -112,11 +112,13 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			sqlstate: uniqueViolation,
 		},
 		{
-			// Les trois dimensions comptées sont fermées par le schéma — la troisième, `mfa`, est
-			// posée par le décor ci-dessus, donc une contrainte trop serrée tomberait là. Une quatrième
-			// valeur écrite par erreur ne serait comptée par rien et ne verrouillerait rien : le refus
-			// est le seul symptôme possible.
-			name: "un compteur d'échecs ne connaît que ses trois dimensions",
+			// Les dimensions comptées sont fermées par le schéma. Elles sont **cinq** depuis 00009 et
+			// non trois, comme ce cas l'a dit jusqu'au 29/08/2026 : la contrainte a été élargie deux
+			// fois — 00007 pour `mfa`, 00009 pour `totp_enroll` et `webauthn_ceremony` — sans que
+			// l'intitulé bouge, et le cas restait vert parce que `empreinte` reste refusé quel que soit
+			// le nombre de valeurs admises. Une sixième valeur écrite par erreur ne serait comptée par
+			// rien et ne verrouillerait rien : le refus est le seul symptôme possible.
+			name: "un compteur d'échecs ne connaît que ses cinq dimensions",
 			act: `INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
 				VALUES ('empreinte', 'x', 1, now())`,
 			sqlstate: checkViolation,
@@ -253,6 +255,38 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 // Ce qu'un `ON DELETE` décide n'est pas un refus mais une **conséquence**, et une conséquence
 // silencieuse : un `CASCADE` posé là où le §3.1 veut un `SET NULL` effacerait des notifications
 // déjà signalées sans qu'aucune erreur ne remonte.
+// Les cinq dimensions comptées sont **acceptées** par le schéma.
+//
+// **Le cas « ne connaît que ses cinq dimensions » ne prouve que la moitié**, et le renommage du
+// 29/08/2026 promettait plus qu'il ne tenait : `empreinte` reste refusé quel que soit le nombre de
+// valeurs admises, donc une migration qui resserrerait la contrainte à trois dimensions le laisserait
+// **vert**. Ce test tient l'autre moitié.
+//
+// Il n'est pas dans la table voisine parce que celle-ci exige un refus de chaque cas. Et le symptôme
+// qu'il garde serait muet : `internal/bff` ne reçoit aucun journal, donc `POST /auth/mfa/totp/enroll`
+// rendrait 500 sans que la violation de contrainte soit écrite nulle part.
+func TestLesCinqDimensionsComptéesSontAcceptées(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	tx := seededTransaction(ctx, t, migratedDatabase(ctx, t))
+
+	const insert = `
+		INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
+		SELECT dimension, 'sujet-' || dimension, 1, now()
+		FROM unnest($1::text[]) AS dimension`
+
+	dimensions := []string{
+		store.ScopeEmail, store.ScopeSource, store.ScopeSecondFactor,
+		store.ScopeTOTPEnroll, store.ScopeWebauthnCeremony,
+	}
+
+	tag, err := tx.Exec(ctx, insert, dimensions)
+	require.NoError(t, err, "le schéma refuse une dimension que le produit compte")
+	require.EqualValues(t, len(dimensions), tag.RowsAffected(),
+		"toutes les dimensions ne sont pas entrées : le contrôle ne prouve pas ce qu'il annonce")
+}
+
 func TestWhatADeletionCarriesAway(t *testing.T) {
 	t.Parallel()
 
