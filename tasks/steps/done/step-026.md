@@ -30,8 +30,10 @@ d'ici, un champ de trop est un hachage de mot de passe, un secret TOTP ou une cl
 ## Points d'implémentation clés
 - **Ne pas réécrire ce qui existe.** `TestResponseTypesDeclareTheirFields` (step-004) refuse déjà les
   `map` et les `any` à toute profondeur et l'embarquement d'un type que le générateur n'a pas écrit ;
-  elle recharge le paquet par le type-checker, donc elle voit **les types que les steps futures
-  ajoutent** sans qu'on la touche. Cette step attaque ce qu'elle ne voit pas, et `api.go` le nomme
+  elle recharge le paquet par le type-checker, donc elle voit les types que les steps futures ajoutent
+  **à `internal/bff`** sans qu'on la touche. *Correction du 30/08/2026 : « les types que les steps
+  futures ajoutent » était trop large — elle ne charge que ce paquet, et un type déclaré ailleurs dans
+  le module lui échappe entièrement. C'est DN-7.* Cette step attaque ce qu'elle ne voit pas, et `api.go` le nomme
   déjà en toutes lettres.
 - **Une liste de champs interdits vieillit mal** : elle ne connaît que les secrets d'aujourd'hui. Elle
   se double donc d'une règle de **forme** — aucun type déclaré hors du contrat ne traverse une
@@ -49,6 +51,11 @@ d'ici, un champ de trop est un hachage de mot de passe, un secret TOTP ou une cl
 - Aucun type de réponse n'expose un des champs nommés, à aucune profondeur.
 - Les portes restent **mordantes** : chacune est vue tomber sur une sonde jetable, et le constat écrit
   — une porte qu'on n'a pas vue rougir ne prouve rien.
+
+> **La première livraison n'a tenu que les trois premiers points**, et la revue du 30/08/2026 l'a dit :
+> les sondes avaient été jouées à la main puis retirées, donc rien dans le dépôt ne distinguait une
+> porte mordante d'une porte débranchée. `TestLesPortesMordentSurLeTemoin` tient le quatrième — un
+> témoin **par règle**, permanent. Voir DN-8.
 
 ## Definition of Done
 - [x] `make check` vert — rc=0
@@ -128,6 +135,57 @@ Pour le second chemin, le témoin est neuf : `require.GreaterOrEqual(sites, 8)`,
 une égalité. Vérifié en le portant à 9 : la porte annonce « 8 site(s) d'appel pour 9 attendus », donc
 elle compte réellement les huit.
 
+### DN-7 — La porte ne voyait que `internal/bff`, et c'est le contournement qui rendait la step décorative
+`HealthResponseObject` ne mentionne que `http.ResponseWriter`, et le dispatch du wrapper engendré est
+une **assertion de type à l'exécution** : n'importe quel paquet peut implémenter l'interface. La porte,
+elle, énumérait `packages.Load(".")`.
+
+Sondé le 30/08/2026 : un `internal/leak` rendant un `store.Operator` complet compile, `Health` le sert,
+`password_hash` part sur le fil — et les cinq règles rendent **rc=0**.
+
+`TestAucuneMethodeDeSerialisationNEstEcriteAilleurs` charge `./...` et porte sur la **méthode** et non
+sur le type : implémenter une de ces interfaces exige d'écrire une méthode de ce nom et de cette
+signature, où qu'elle soit. Elle est donc strictement plus forte que la provenance, et attrape du même
+coup le troisième contournement — poser un `Visit…` sur un type **engendré qui n'en portait pas**
+(`Health`, `Me`, `MfaChallenge`), ce qui compilait et que « une redéclaration que le compilateur
+refuse » déclarait impossible.
+
+La signature est vérifiée avec le nom, sans quoi un homonyme sans rapport ferait rougir la porte sans
+rien pouvoir servir.
+
+### DN-8 — Un témoin **par règle**, permanent, parce que le premier prouvait la mauvaise borne
+La première version n'avait qu'un témoin — le paquet `testdata/fuite` — et une assertion qui demandait
+seulement que « quelque chose ait parlé ». Débranchée, la règle de domaine laissait le témoin **vert** :
+le type y était attrapé par la règle des méthodes.
+
+Un paquet de `testdata/` est de surcroît lui-même « du domaine » pour le parcours, donc il rougit dès
+la racine et n'éprouve jamais la descente. Le témoin de la règle de domaine s'exerce donc sur
+`store.Operator` **tel que `internal/bff` l'importe** — le même objet du type-checker que celui qu'un
+DTO atteindrait —, et celui de la règle des colonnes sur un struct fabriqué.
+
+Chacune des trois est vue rougir sur son propre témoin, débranchée une par une.
+
+### DN-9 — Un seul parcours, parce que les deux jumeaux avaient **déjà** divergé
+Le premier jet portait deux marcheurs présentés comme suivant « la même règle de descente ». Ils n'en
+suivaient pas la même : l'un traitait une map comme fatale et l'autre y descendait, l'un connaissait
+les interfaces et l'autre les ignorait en silence — en une seule rédaction, dans la porte même qui
+existe pour interdire cela.
+
+Fusionnés. Et la branche des interfaces est resserrée du même coup : `error` a une méthode, et
+`encoding/json` sérialise les champs exportés de sa valeur **dynamique** — un `*pgconn.PgError` y
+mettrait la requête et le nom de la contrainte. `streamedBodies` nomme ce qui est admis (`io.Reader`,
+`io.ReadCloser`) au lieu d'admettre toute interface non vide. `json.RawMessage` est refusée nommément :
+son contenu n'est déclaré nulle part, et une règle de forme y verrait un `[]byte` parfaitement borné.
+
+### DN-10 — `writeJSON` ne doit jamais être passé de main en main
+`var emit = writeJSON` puis `emit(w, 403, session)` n'est pas un appel dont le `Fun` résout sur la
+fonction : le site n'entre dans aucune population, les huit sites directs restent en place, le plancher
+est satisfait, et la porte est **verte** pendant qu'un type de domaine part sur le fil.
+`assertNeverPassedAround` exige que le nom n'apparaisse qu'en position d'appel.
+
+**La première sonde de ce cas était mal construite** : elle remplaçait un site direct au lieu d'en
+ajouter un, donc c'est le plancher qui rougissait — rc=1 pour la mauvaise borne. Refaite en ajoutant.
+
 ## Mutations, une par une, `-count=1`, lues au code de sortie
 
 | Mutation | Attendu | Mesuré |
@@ -139,7 +197,12 @@ elle compte réellement les huit.
 | M4 — champ `PasswordHash string` dans `CurrentOperator` | rouge | rc=1 · « `Me200JSONResponse.Operator.PasswordHash` porte `operators.password_hash` » |
 | M6 — M4 rejouée, liste de champs **vidée** | **vert** | rc=0 · une `string` n'est pas un type de domaine : les deux règles ne se couvrent pas |
 | M5 — `writeJSON(w, 403, resolved)` dans `guard.go` | rouge | rc=1 · « `guard.go:137:40` sérialise un `…/internal/store.Session` » |
-| **M7 — `MarshalJSON` écrit à la main sur `Health200JSONResponse`** | rouge | rc=1 · « porte une méthode écrite à la main : `MarshalJSON`, déclarée dans `api.go` ». **Avant DN-6, rc=0.** |
+| **M7 — `MarshalJSON` écrit à la main sur `Health200JSONResponse`** | rouge | rc=1 · « porte une méthode écrite à la main ». **Avant DN-6, rc=0.** |
+| **M8 — un type de réponse dans `internal/leak`, servi par `Health`** | rouge | rc=1 · « internal/leak.VisitHealthResponse est une méthode … écrite à la main ». **Avant DN-7, rc=0** — c'est le contournement qui rendait la step décorative |
+| **M9 — `MarshalJSON` à la main sur `Error`** | rouge | rc=1 · « porte une méthode écrite à la main : MarshalJSON ». **Avant DN-7, rc=0** — `Error` n'implémente aucune interface, donc il n'entrait dans aucune population |
+| **M10 — `VisitHealthResponse` posé sur `Health`, type engendré nu** | rouge | rc=1 · **avant DN-7, rc=0**, alors que le commentaire disait le compilateur garant |
+| **M11 — `emit := writeJSON` puis `emit(w, 403, resolved)`, en *plus* des huit sites** | rouge | rc=1 · « nomme writeJSON hors d'une position d'appel » |
+| W1/W2/W3 — chacune des trois règles **débranchée** | rouge sur son témoin | rc=1 · « elle est débranchée », une par une |
 
 M4 et M6 forment la paire qui compte : elles montrent que la liste de champs est bien le **juge** du
 cas qu'elle prétend garder, et que la règle de forme ne la couvre pas — une `string` mal nommée n'est

@@ -1,4 +1,4 @@
-package bff
+package bff_test
 
 import (
 	"go/ast"
@@ -16,15 +16,6 @@ const (
 	writerName   = "writeJSON"
 	bodyArgument = 2
 )
-
-// strictInterfaceName désigne l'interface que le gabarit strict écrit toujours en pied de fichier
-// engendré. **Sa position est la définition de « type engendré »** utilisée plus bas — un renommage du
-// fichier de sortie déplace la porte avec lui, là où un `bff.gen.go` codé en dur laisserait la porte
-// pointer sur un fichier disparu.
-//
-// Il double la constante de `dto_test.go` pour la raison que `loadThisPackage` double `loadBFF` :
-// celle-là vit dans `package bff_test`.
-const strictInterfaceName = "StrictServerInterface"
 
 // writeJSONCallSites est un **plancher**, pas une égalité : quatre refus dans `guard.go` et quatre
 // dans `router.go` le jour où ce contrôle est écrit. Il est là parce qu'un inventaire vidé passe en
@@ -50,13 +41,8 @@ const writeJSONCallSites = 8
 func TestLeSecondCheminVersLeFilNeSerialiseQueDesDTODeclares(t *testing.T) {
 	t.Parallel()
 
-	pkg := loadThisPackage(t)
-
-	contract := pkg.Types.Scope().Lookup(strictInterfaceName)
-	require.NotNil(t, contract, "%s introuvable : « type engendré » n'a plus de définition",
-		strictInterfaceName)
-	generated := pkg.Fset.Position(contract.Pos()).Filename
-
+	pkg := loadBFF(t)
+	generated := generatedFile(t, pkg)
 	bodies := serializedBodies(t, pkg)
 
 	require.GreaterOrEqualf(t, len(bodies), writeJSONCallSites,
@@ -64,9 +50,51 @@ func TestLeSecondCheminVersLeFilNeSerialiseQueDesDTODeclares(t *testing.T) {
 		len(bodies), writerName, writeJSONCallSites)
 
 	for _, body := range bodies {
-		assert.Equalf(t, generated, declaredIn(pkg, body.carrier),
+		assert.Equalf(t, generated, declarationFile(pkg, body.carrier),
 			"%s sérialise un %s, que le contrat n'engendre pas : ce qu'il porte partirait sur le fil "+
 				"sans qu'aucun DTO ne le borne", body.where, body.carrier)
+	}
+
+	assertNeverPassedAround(t, pkg)
+}
+
+// assertNeverPassedAround exige que `writeJSON` ne soit **jamais** nommé ailleurs qu'en position
+// d'appel.
+//
+// Sans cela, la porte ci-dessus se contourne sans faire tomber son plancher, et la revue du
+// 30/08/2026 l'a montré : `var emit = writeJSON` puis `emit(w, 403, session)` n'est pas un
+// `*ast.CallExpr` dont le `Fun` résout sur la fonction, donc le site n'entre pas dans la population.
+// Les huit sites directs restent en place, le `GreaterOrEqual` est satisfait, et la porte est verte
+// pendant qu'un type de domaine part sur le fil.
+//
+// La règle est plus simple à tenir que l'analyse d'un alias : un `writeJSON` qui n'est qu'appelé est
+// entièrement vu par la population, et c'est exactement ce que ce contrôle rend vrai.
+func assertNeverPassedAround(t *testing.T, pkg *packages.Package) {
+	t.Helper()
+
+	called := map[*ast.Ident]bool{}
+
+	for _, file := range pkg.Syntax {
+		ast.Inspect(file, func(node ast.Node) bool {
+			if call, isCall := node.(*ast.CallExpr); isCall {
+				if name, isIdent := call.Fun.(*ast.Ident); isIdent {
+					called[name] = true
+				}
+			}
+
+			return true
+		})
+	}
+
+	for name, object := range pkg.TypesInfo.Uses {
+		resolved, isFunc := object.(*types.Func)
+		if !isFunc || resolved.Name() != writerName || called[name] {
+			continue
+		}
+
+		assert.Failf(t, "writeJSON est passé de main en main",
+			"%s nomme %s hors d'une position d'appel : ce qu'il sérialisera n'entre dans aucune "+
+				"population, et cette porte resterait verte", pkg.Fset.Position(name.Pos()), writerName)
 	}
 }
 
@@ -117,18 +145,4 @@ func serializedBodies(t *testing.T, pkg *packages.Package) []serializedBody {
 	}
 
 	return found
-}
-
-// declaredIn rend le fichier où le type de `carrier` est déclaré, "" pour un type qui n'en a pas.
-//
-// Il double `declarationFile` de `dto_test.go` pour la raison que `loadThisPackage` double `loadBFF` :
-// celui-là vit dans `package bff_test`, et deux paquets de test d'un même répertoire ne partagent pas
-// leurs aides.
-func declaredIn(pkg *packages.Package, carrier types.Type) string {
-	named, ok := types.Unalias(carrier).(*types.Named)
-	if !ok {
-		return ""
-	}
-
-	return pkg.Fset.Position(named.Obj().Pos()).Filename
 }
