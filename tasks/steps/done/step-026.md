@@ -68,10 +68,25 @@ livraison** : cinq `…429JSONResponse` engendrés encodent `response.Body` et n
 qu'ils portent aussi un en-tête `Retry-After` ; et trois `…204Response` n'encodent rien du tout. Huit
 faux positifs sur trente-deux `Visit…`. Une garde qui refuse du légitime finit retirée.
 
-La localisation ferme pourtant le trou en **entier**, sans contournement : implémenter une interface
-engendrée exige d'écrire son `Visit…` ; poser cette méthode sur un type engendré est une
-redéclaration que le compilateur refuse ; et l'hériter par embarquement laisse le type porteur
-déclaré hors du fichier engendré, donc pris par la même comparaison.
+La localisation ferme trois chemins sur quatre : implémenter une interface engendrée exige d'écrire son
+`Visit…` ; poser cette méthode sur un type engendré est une redéclaration que le compilateur refuse ;
+et l'hériter par embarquement laisse le type porteur déclaré hors du fichier engendré.
+
+**Le quatrième a été trouvé en revue, après la première rédaction de cette fiche, qui affirmait
+« sans contournement ».** Un `MarshalJSON` écrit à la main **sur un type engendré** compile — le
+fichier engendré ne déclare pas cette méthode, donc ce n'est pas une redéclaration — et le `Visit…`
+l'appelle, puisqu'il fait `json.NewEncoder(&buf).Encode(response)`. Sondé sur `Health200JSONResponse`,
+les quatre règles restaient **vertes** ; ce qui rougissait était `TestHealthProbe`, un test de corps
+exact, donc par route et non par propriété — précisément ce que cette step existe pour remplacer.
+
+### DN-6 — La cinquième règle : **aucune** méthode écrite hors du fichier engendré
+`handWrittenMethod` prend le jeu de méthodes du **pointeur** — le sur-ensemble, qui porte les
+récepteurs valeur comme pointeur — et exige que chacune soit déclarée dans le fichier engendré.
+
+La règle nomme « toute méthode » et non « `MarshalJSON` » : une liste laisserait `MarshalText`,
+`UnmarshalJSON`, et celles que la bibliothèque standard ajoutera. Les méthodes **promues** d'un type
+embarqué engendré sont déclarées dans le même fichier, donc elles passent ; embarquer un type non
+engendré est déjà refusé par `assertEmbedsOnlyGeneratedTypes`.
 
 ### DN-2 — La liste de champs interdits est courte **délibérément**, et le contrat dit pourquoi
 Le contrat déclare aujourd'hui un champ `secret` et un champ `recoveryCodes` : ce sont les affichages
@@ -124,14 +139,19 @@ elle compte réellement les huit.
 | M4 — champ `PasswordHash string` dans `CurrentOperator` | rouge | rc=1 · « `Me200JSONResponse.Operator.PasswordHash` porte `operators.password_hash` » |
 | M6 — M4 rejouée, liste de champs **vidée** | **vert** | rc=0 · une `string` n'est pas un type de domaine : les deux règles ne se couvrent pas |
 | M5 — `writeJSON(w, 403, resolved)` dans `guard.go` | rouge | rc=1 · « `guard.go:137:40` sérialise un `…/internal/store.Session` » |
+| **M7 — `MarshalJSON` écrit à la main sur `Health200JSONResponse`** | rouge | rc=1 · « porte une méthode écrite à la main : `MarshalJSON`, déclarée dans `api.go` ». **Avant DN-6, rc=0.** |
 
 M4 et M6 forment la paire qui compte : elles montrent que la liste de champs est bien le **juge** du
 cas qu'elle prétend garder, et que la règle de forme ne la couvre pas — une `string` mal nommée n'est
 pas un type de domaine.
 
-Une septième mutation a été jouée par accident et mérite d'être écrite : le premier essai de M5 n'a
-pas trouvé son motif et **n'a rien changé**. Le `rc=0` disait « je n'ai rien modifié », pas « la garde
-tient ». C'est le mode d'échec que ce dépôt a déjà nommé, et il s'est présenté ici.
+**M7 n'était pas au plan** : elle vient de la revue, et elle a trouvé un chemin que la première
+rédaction déclarait fermé. Elle est la preuve que la cinquième règle était nécessaire, et la seule
+mutation de cette step qui ait rougi *après* avoir été verte.
+
+Une huitième a été jouée par accident et mérite d'être écrite : le premier essai de M5 n'a pas trouvé
+son motif et **n'a rien changé**. Le `rc=0` disait « je n'ai rien modifié », pas « la garde tient ».
+C'est le mode d'échec que ce dépôt a déjà nommé, et il s'est présenté ici.
 
 ## Ce qui n'est pas testable, écrit là où il vit
 `respond.go` porte désormais la raison pour laquelle `body` reste un `any`, et le nom de la porte qui

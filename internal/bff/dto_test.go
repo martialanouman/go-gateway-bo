@@ -287,6 +287,38 @@ func normalize(name string) string {
 	return strings.ToLower(strings.NewReplacer("_", "", "-", "").Replace(name))
 }
 
+// handWrittenMethod nomme la première méthode de `carrier` qui n'est pas déclarée dans le fichier
+// engendré, et rend "" quand elles le sont toutes.
+//
+// **La règle de provenance sur le type ne suffit pas, et c'est mesuré.** Un `MarshalJSON` écrit à la
+// main sur un type de réponse **engendré** compile — le fichier engendré ne déclare pas cette méthode,
+// donc ce n'est pas une redéclaration — et le `Visit…` engendré l'appelle, puisqu'il fait
+// `json.NewEncoder(&buf).Encode(response)`. Sondé le 30/08/2026 sur `Health200JSONResponse` : les
+// quatre autres règles restent **vertes**, et ce qui rougit est `TestHealthProbe`, un test de corps
+// exact, c'est-à-dire par route et non par propriété — exactement ce que cette step existe pour
+// remplacer.
+//
+// La règle est donc « **aucune** méthode écrite ailleurs », et non « aucun `Visit…` écrit ailleurs » :
+// nommer les méthodes dangereuses laisserait `MarshalText`, `UnmarshalJSON` et celles que la
+// bibliothèque standard ajoutera. Les méthodes promues d'un type embarqué engendré sont déclarées dans
+// le même fichier, donc elles passent ; embarquer un type non engendré est déjà refusé ailleurs.
+//
+// Le jeu de méthodes est pris sur le **pointeur**, qui est le sur-ensemble : il porte les méthodes à
+// récepteur valeur comme celles à récepteur pointeur.
+func handWrittenMethod(pkg *packages.Package, carrier types.Type, generated string) string {
+	methods := types.NewMethodSet(types.NewPointer(carrier))
+
+	for index := range methods.Len() {
+		declared := methods.At(index).Obj()
+
+		if where := pkg.Fset.Position(declared.Pos()).Filename; where != generated {
+			return declared.Name() + ", déclarée dans " + where
+		}
+	}
+
+	return ""
+}
+
 // declarationFile rend le fichier où `carrier` est déclaré, et "" pour un type qui n'en a pas — un
 // struct anonyme, un `[]byte`. Un fichier vide n'est jamais celui du code engendré : la comparaison
 // qui s'en sert échoue alors du bon côté.
@@ -377,6 +409,10 @@ func TestResponseTypesDeclareTheirFields(t *testing.T) {
 
 		assert.Emptyf(t, domainReach(declared.Type(), name, map[types.Type]bool{}),
 			"%s est un type de réponse : rien de ce qu'il atteint ne doit venir du domaine", name)
+
+		assert.Emptyf(t, handWrittenMethod(pkg, declared.Type(), generated),
+			"%s porte une méthode écrite à la main : elle décide de ce qui part sur le fil, que le "+
+				"`Visit…` engendré l'appelle ou non", name)
 
 		assertEmbedsOnlyGeneratedTypes(t, pkg, name, declared.Type(), generated)
 	}

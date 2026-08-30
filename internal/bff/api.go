@@ -31,9 +31,15 @@ import (
 //
 // La règle est une localisation et non une inspection du corps du `Visit…`, ce qui est mesuré aussi :
 // cinq `…429JSONResponse` engendrés encodent `response.Body` et non `response`, trois `…204Response`
-// n'encodent rien. Elle ne laisse pas de contournement — implémenter l'interface exige d'écrire le
-// `Visit…`, le poser sur un type engendré est une redéclaration que le compilateur refuse, et
-// l'hériter par embarquement laisse le type porteur déclaré hors du fichier engendré.
+// n'encodent rien.
+//
+// **Elle ne suffisait pas seule, et la revue l'a trouvé** : implémenter l'interface exige bien d'écrire
+// le `Visit…`, le poser sur un type engendré est une redéclaration que le compilateur refuse, et
+// l'hériter par embarquement laisse le type porteur déclaré hors du fichier engendré — mais un
+// `MarshalJSON` écrit à la main **sur un type engendré** compile, parce que le fichier engendré ne
+// déclare pas cette méthode, et le `Visit…` l'appelle en encodant `response`. Sondé le 30/08/2026 : les
+// quatre règles restaient vertes. C'est `handWrittenMethod` qui ferme ce chemin-là, en refusant
+// **toute** méthode déclarée hors du fichier engendré.
 //
 // Ce qui rougissait **avant** step-026 se comptait par route et non par propriété — mesuré, le type
 // ci-dessus effectivement servi par `Health` faisait tomber le test de corps exact `TestHealthProbe`
