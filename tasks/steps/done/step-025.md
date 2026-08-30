@@ -401,7 +401,7 @@ métier → leurs steps respectives, qui consomment ce middleware sans le redéf
   dans le sens qui arrange. Mesuré ligne à ligne : `MFA` et `Counter` étaient le **même** SQL à la
   source de la dimension près — `LockFor` au caractère près, `RecordFailure` au `RETURNING` près — et
   `Logins` est une requête d'une autre forme, deux dimensions en une instruction avec le seuil filtré
-  en Go sur le plus fort des deux verrous. Deux rédactions, donc, pas trois. Et une quatrième
+  en Go. Deux rédactions, donc, pas trois. Et une quatrième
   duplication que la note ne voyait pas : le `DELETE` de `ClearFailures`, écrit deux fois à
   l'identique, plus le calcul de `Lock.Remaining`, écrit **cinq** fois.
 
@@ -410,6 +410,15 @@ métier → leurs steps respectives, qui consomment ce middleware sans le redéf
   de niveau store** — il n'était exercé que de bout en bout — et hérite de ceux de `MFA`. Une seule
   mutation, retirer la fenêtre d'oubli, fait maintenant rougir le test Go du second facteur *et* le
   scénario de l'enrôlement ; avant, elle en atteignait un seul.
+
+- **Ce qui reste de cette dette, et qui n'est pas payé.** La marque « payée » ci-dessus vaut pour le
+  mono-dimension. La branche `CASE` de la fenêtre d'oubli et l'`ON CONFLICT DO UPDATE` restent écrits
+  **deux fois** — `counters.go` et `logins.go` —, parce que la requête à deux dimensions ne se replie
+  pas. Le scénario d'origine survit donc, en plus petit : changer la politique d'oubli et ne toucher
+  que `Counter` donnerait au premier et au second facteur deux politiques différentes, et le
+  commentaire de `logins.go` qui dit « la même valeur, délibérément » deviendrait faux en silence.
+  **Toujours sans porteur, et cette fois avec la raison mesurée** : replier la requête bi-dimension
+  remanierait le chemin consulté avant tout argon2id, pour un gain de forme.
 - **Un refus de permission ne laisse aucune trace côté serveur.** `internal/bff` ne reçoit aucun
   `*slog.Logger` (`router.go:151-156`), et le journal d'audit ne porte que les **succès** : un 403 de
   `RequirePermission` n'existe nulle part. → **step-029**, qui livre les premières routes gardées.

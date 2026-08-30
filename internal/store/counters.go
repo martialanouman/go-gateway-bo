@@ -41,12 +41,12 @@ func NewCounter(pool *pgxpool.Pool, scope string) *Counter {
 	return &Counter{pool: pool, scope: scope}
 }
 
-// LockFor rend le verrou en cours sur cette dimension, ou le verrou nul.
+// lockFor rend le verrou en cours sur cette dimension, ou le verrou nul.
 //
 // Il est consulté **avant** toute dépense — avant les argon2id du premier facteur, avant le
 // déchiffrement du secret du second — sans quoi le verrou protégerait le compte sans protéger le
 // serveur. Il borne aussi le nombre de lignes qu'une attaque peut créer dans la table.
-func (c *Counter) LockFor(ctx context.Context, subject string, window time.Duration, threshold int,
+func (c *Counter) lockFor(ctx context.Context, subject string, window time.Duration, threshold int,
 ) (Lock, error) {
 	const query = `
 		SELECT scope, failures,
@@ -69,7 +69,7 @@ func (c *Counter) LockFor(ctx context.Context, subject string, window time.Durat
 	return lock, nil
 }
 
-// Count compte un passage sur cette dimension et rend le verrou qui en résulte — le verrou **nul**
+// count compte un passage sur cette dimension et rend le verrou qui en résulte — le verrou **nul**
 // tant que le seuil n'est pas atteint.
 //
 // **Une seule instruction, et c'est ce qui rend le compteur partagé entre instances.** Dans
@@ -81,12 +81,14 @@ func (c *Counter) LockFor(ctx context.Context, subject string, window time.Durat
 // répéter le `CASE` : une CTE `SELECT … FOR UPDATE` suivie d'un `DO UPDATE SET failures =
 // excluded.failures`. Elle **perd des passages** — la CTE lit sur le snapshot, donc `excluded` porte
 // une valeur périmée qui écrase la valeur fraîche, et le `FOR UPDATE` n'y change rien puisqu'il ne
-// verrouille pas une ligne absente. Elle est verte sous test séquentiel.
+// verrouille pas une ligne absente. Elle est verte sous test séquentiel. C'est le genre de réécriture
+// qu'une revue « simplifions cette expression dupliquée » réintroduit six mois plus tard, et c'est
+// pourquoi cette mise en garde est écrite **ici seulement** : `Logins.RecordFailure` y renvoie.
 //
 // La branche `CASE` est la **fenêtre d'oubli**, et sa durée est celle du verrou, délibérément : plus
 // courte, un verrou qui vient d'expirer se refermerait au premier passage suivant, et « verrou
 // expiré → un nouvel essai est possible » serait faux.
-func (c *Counter) Count(ctx context.Context, subject string, window time.Duration, threshold int,
+func (c *Counter) count(ctx context.Context, subject string, window time.Duration, threshold int,
 ) (Lock, error) {
 	const query = `
 		INSERT INTO login_attempt_counters AS c (scope, subject, failures, last_failure_at)
@@ -112,11 +114,11 @@ func (c *Counter) Count(ctx context.Context, subject string, window time.Duratio
 	return lock, nil
 }
 
-// Clear efface le compteur de ce sujet sur cette dimension.
+// reset efface le compteur de ce sujet sur cette dimension.
 //
 // Il n'efface **que** cette dimension, ce qui est la propriété dont dépend la dissymétrie du premier
 // facteur : une connexion réussie efface l'adresse et laisse la source s'éteindre par oubli.
-func (c *Counter) Clear(ctx context.Context, subject string) error {
+func (c *Counter) reset(ctx context.Context, subject string) error {
 	const query = `DELETE FROM login_attempt_counters WHERE scope = $2 AND subject = $1`
 
 	if _, err := c.pool.Exec(ctx, query, subject, c.scope); err != nil {
@@ -135,17 +137,23 @@ func (c *Counter) Clear(ctx context.Context, subject string) error {
 // cette propriété ; l'écrire une seconde fois dans chaque appelant la ferait diverger dans l'un
 // d'eux, où aucun test ne la cherche.
 //
-// **Le verrou que `Count` rend est délibérément jeté.** L'appel qui atteint le seuil a fait un travail
+// **Le verrou que `count` rend est délibérément jeté.** L'appel qui atteint le seuil a fait un travail
 // légitime et n'est pas refusé ; c'est le **suivant** qu'`Admit` arrête, sur le `LockFor` d'entrée. Le
 // rendre ici décalerait d'un cran chaque borne du produit — cinq enrôlements deviendraient quatre.
+//
+// **`Admit` est la seule des quatre méthodes qui soit exportée, et c'est une garde et non un style.**
+// Les trois autres sont privées parce que `internal/mfa` détient un `*Counter` : exportées, un appelant
+// pourrait compter sans consulter, ce que les deux paragraphes ci-dessus existent pour interdire — et
+// il n'en resterait alors que ces paragraphes. Le compilateur les tient maintenant. `MFA` et `Logins`
+// les atteignent parce qu'ils vivent dans ce paquet, et c'est exactement la portée voulue.
 func (c *Counter) Admit(ctx context.Context, subject string, window time.Duration, threshold int,
 ) (Lock, error) {
-	lock, err := c.LockFor(ctx, subject, window, threshold)
+	lock, err := c.lockFor(ctx, subject, window, threshold)
 	if err != nil || lock.Locked() {
 		return lock, err
 	}
 
-	_, err = c.Count(ctx, subject, window, threshold)
+	_, err = c.count(ctx, subject, window, threshold)
 
 	return Lock{}, err
 }

@@ -21,6 +21,11 @@ type Logins struct {
 	// emails est le compteur de la dimension de l'adresse, et il n'en sert qu'un geste : l'effacement
 	// d'un succès. Les deux autres accès de ce fichier couvrent **deux** dimensions en une
 	// instruction, ce que `Counter` ne sait pas faire et n'a pas à apprendre.
+	//
+	// **Le risque résiduel est nommé plutôt que tu** : lui faire porter `lockFor` ou `count`
+	// retirerait la dimension de la source du chemin, sans erreur et sans test rouge — aucun cas de
+	// `logins_test.go` n'y passe. Ce qui le borne est que les méthodes de `Counter` sont **privées** :
+	// hors de ce paquet, personne ne peut l'écrire.
 	emails *Counter
 }
 
@@ -130,13 +135,9 @@ func (l *Logins) LockFor(ctx context.Context, emailKey, sourceKey string, window
 // non telle que le snapshot de la transaction la voyait : deux instances qui entrent ensemble sur une
 // ligne à trois échecs sortent à quatre puis cinq, jamais à quatre et quatre.
 //
-// **La forme qu'il ne faut pas écrire**, et qui est la première qui vient quand on veut éviter de
-// répéter le `CASE` : une CTE `SELECT … FOR UPDATE` suivie d'un `DO UPDATE SET failures =
-// excluded.failures`. Elle **perd des échecs** — la CTE lit sur le snapshot, donc `excluded` porte
-// une valeur périmée qui écrase la valeur fraîche, et le `FOR UPDATE` n'y change rien puisqu'il ne
-// verrouille pas une ligne absente. Elle est verte sous test séquentiel. C'est exactement le défaut
-// que cette step existe pour interdire, et c'est le genre de réécriture qu'une revue « simplifions
-// cette expression dupliquée » réintroduit six mois plus tard.
+// **La forme qu'il ne faut pas écrire est décrite une seule fois, sur `Counter.count`**, et elle vaut
+// ici mot pour mot : la CTE `SELECT … FOR UPDATE` perd des échecs quel que soit le nombre de
+// dimensions. L'écrire deux fois serait le défaut même que ce fichier a cessé de porter.
 //
 // Les deux lignes ne peuvent jamais entrer en collision entre elles — leurs `scope` diffèrent — donc
 // « ON CONFLICT DO UPDATE command cannot affect row a second time » est inatteignable ici.
@@ -197,7 +198,7 @@ func (l *Logins) RecordFailure(ctx context.Context, emailKey, sourceKey string, 
 // annulerait la seconde dimension pour quiconque détient un identifiant. Le compteur de source
 // s'éteint tout seul, par oubli, au bout de la fenêtre.
 func (l *Logins) ClearFailures(ctx context.Context, emailKey string) error {
-	return l.emails.Clear(ctx, emailKey)
+	return l.emails.reset(ctx, emailKey)
 }
 
 // IssueChallenge pose un challenge de second facteur et rend son échéance.

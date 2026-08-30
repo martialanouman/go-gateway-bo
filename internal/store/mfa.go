@@ -249,14 +249,18 @@ func (m *MFA) ConsumeRecoveryCode(ctx context.Context, id string) (bool, error) 
 func (m *MFA) LockFor(ctx context.Context, operatorID string, window time.Duration,
 	threshold int,
 ) (Lock, error) {
-	return m.attempts.LockFor(ctx, operatorID, window, threshold)
+	return m.attempts.lockFor(ctx, operatorID, window, threshold)
 }
 
 // RecordFailure compte un échec de second facteur et rend le verrou qui en résulte.
+//
+// **Un `Lock` nul ne veut pas dire « rien n'a été compté »** : l'échec est enregistré à tous les coups,
+// et le verrou reste nul tant que le seuil n'est pas atteint. C'est écrit ici parce que l'appelant est
+// à deux délégations de `Counter.count`, où la règle vit.
 func (m *MFA) RecordFailure(ctx context.Context, operatorID string, window time.Duration,
 	threshold int,
 ) (Lock, error) {
-	return m.attempts.Count(ctx, operatorID, window, threshold)
+	return m.attempts.count(ctx, operatorID, window, threshold)
 }
 
 // ClearFailures efface le compteur après un second facteur franchi.
@@ -267,7 +271,7 @@ func (m *MFA) RecordFailure(ctx context.Context, operatorID string, window time.
 // l'opérateur lui-même, et celui qui vient de franchir son second facteur est précisément celui à qui
 // le compteur était destiné.
 func (m *MFA) ClearFailures(ctx context.Context, operatorID string) error {
-	return m.attempts.Clear(ctx, operatorID)
+	return m.attempts.reset(ctx, operatorID)
 }
 
 // PendingChallenge est un challenge de second facteur encore utilisable.

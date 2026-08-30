@@ -1,6 +1,10 @@
 package store
 
-import "time"
+import (
+	"time"
+
+	"github.com/jackc/pgx/v5"
+)
 
 // Lock décrit un verrouillage en cours. Sa valeur nulle veut dire « aucun verrou », ce qui est le cas
 // courant : c'est ce qui permet à l'appelant d'écrire `if lock.Locked()` sans distinguer l'absence.
@@ -21,14 +25,12 @@ type Lock struct {
 // Locked dit si ce verrou mord encore.
 func (l Lock) Locked() bool { return l.Remaining > 0 }
 
-// lockScanner est ce dont la lecture d'un verrou a besoin, et rien de plus. `pgx.Row` et `pgx.Rows`
-// le satisfont tous deux, ce qui laisse `scanLock` servir aussi bien la lecture à une ligne que le
-// curseur des deux dimensions du premier facteur.
-type lockScanner interface {
-	Scan(dest ...any) error
-}
-
 // scanLock lit les trois colonnes que rend toute requête de verrou et compose le `Lock`.
+//
+// Il prend un `pgx.Row` et non une interface maison : `pgx.Rows` le satisfait déjà — les deux ne
+// portent que `Scan` — donc le même helper sert la lecture à une ligne et le curseur des deux
+// dimensions du premier facteur. Une interface écrite ici aurait été la redéclaration exacte de celle
+// de la bibliothèque.
 //
 // **La conversion en `time.Duration` est la seule arithmétique de temps qui se fasse en Go**, et elle
 // ne consulte aucune horloge : la base a déjà mesuré la durée restante contre la sienne, et il ne
@@ -37,7 +39,7 @@ type lockScanner interface {
 //
 // L'erreur remonte nue : `pgx.ErrNoRows` doit rester reconnaissable par l'appelant, qui seul sait si
 // l'absence de ligne est un cas normal, et lui seul sait aussi nommer la dimension dans son message.
-func scanLock(row lockScanner) (Lock, error) {
+func scanLock(row pgx.Row) (Lock, error) {
 	var (
 		lock    Lock
 		seconds float64
