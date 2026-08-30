@@ -15,7 +15,8 @@ import (
 //
 // Le DTO se compose champ par champ depuis ce que le store rend. Aucun type de domaine ne traverse :
 // c'est ce qui met `password_hash` et `mfa_totp_secret` hors d'atteinte par construction, et non par
-// vigilance.
+// vigilance. **Depuis step-026, ce n'est plus une affirmation mais une propriété gardée** — jusque-là
+// rien ne la tenait, et un `Operator` ajouté ici serait passé sans bruit.
 func (a API) Me(ctx context.Context, _ MeRequestObject) (MeResponseObject, error) {
 	resolved, alive, err := sessionFrom(ctx)
 	if err != nil {
@@ -56,9 +57,10 @@ func (a API) Me(ctx context.Context, _ MeRequestObject) (MeResponseObject, error
 // Ce qui protège est la suppression de la ligne, pas le cookie expiré — voir `store.Sessions.Delete`.
 // Sans session, le même 204 ; la raison est dans la description de l'opération au contrat.
 //
-// `Logout204Response` est un struct **sans champ**, que `TestResponseTypesDeclareTheirFields`
-// traverse en vert faute d'avoir quoi que ce soit à examiner : ce qui garde cette réponse est le
-// scénario qui la confronte au contrat.
+// `Logout204Response` est un struct **sans champ**, que les règles de forme de
+// `TestResponseTypesDeclareTheirFields` traversent en vert faute d'avoir quoi que ce soit à examiner.
+// Ce qui le garde tout de même est la règle de **provenance** ajoutée par step-026 — le type vient du
+// fichier engendré, donc son `Visit…` aussi — et le scénario qui confronte la réponse au contrat.
 func (a API) Logout(ctx context.Context, _ LogoutRequestObject) (LogoutResponseObject, error) {
 	postCookie(ctx, session.Cleared())
 

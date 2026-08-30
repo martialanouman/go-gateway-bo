@@ -223,7 +223,9 @@ func TestChaqueExemptionPorteSaRaison(t *testing.T) {
 // TestChaqueOperationGardeeDeclareSon403 — propriété 4.
 //
 // Le refus de la garde est écrit **à la main** sur le `ResponseWriter`, donc il échappe au
-// `Visit…Response` engendré et à la conformité au contrat que les scénarios exercent. Sans cette
+// `Visit…Response` engendré et à la conformité au contrat que les scénarios exercent. Ce qu'il porte
+// est gardé depuis step-026 par `TestLeSecondCheminVersLeFilNeSerialiseQueDesDTODeclares` ; ce que le
+// **contrat en dit**, c'est-à-dire le 403 déclaré, reste l'affaire de ce cas-ci. Sans cette
 // propriété, la première route gardée servirait un 403 que le YAML ne déclare pas, et c'est le
 // scénario de step-029 qui le découvrirait — une step trop tard.
 func TestChaqueOperationGardeeDeclareSon403(t *testing.T) {
