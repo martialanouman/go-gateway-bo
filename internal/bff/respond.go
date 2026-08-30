@@ -19,7 +19,9 @@ type errorResponse = Error
 // une fois le statut envoyé, un échec de sérialisation ne laisserait qu'une réponse tronquée que le
 // client interpréterait comme un succès.
 //
-// **`body` est un `any`, et c'est la seule surface de sérialisation non typée du paquet.** Le mode
+// **`body` est un `any`, et c'est la seule surface de sérialisation non typée du paquet** — désormais
+// par propriété et non par constat : `TestUnCorpsDeReponseNeSEcritQuALEndroitPrevu` refuse qu'un
+// `http.ResponseWriter` atteigne autre chose qu'un puits nommé, hors de ce fichier et de l'engendré. Le mode
 // strict retire le `ResponseWriter` du *handler*, pas du produit : ce que les middlewares refusent
 // part par ici, hors de tout `Visit…Response` engendré. La règle qui s'y applique est celle du
 // §1.11, et elle n'est pas une discipline — `TestLeSecondCheminVersLeFilNeSerialiseQueDesDTODeclares`

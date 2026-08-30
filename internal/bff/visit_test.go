@@ -3,6 +3,7 @@ package bff_test
 import (
 	"go/types"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -172,6 +173,28 @@ func TestLesPortesMordentSurLeTemoin(t *testing.T) {
 			forbidden(bff, operator, generated, "Sonde", map[types.Type]bool{}),
 			"un type de domaine de ce dépôt",
 			"la règle de domaine ne reconnaît plus un type du store : elle est débranchée")
+	})
+
+	t.Run("la porte du fil voit une écriture directe", func(t *testing.T) {
+		t.Parallel()
+
+		// Le témoin écrit `json.NewEncoder(w).Encode(…)` **et** `w.WriteHeader(…)`. Aucun de ses
+		// fichiers n'est exempté — il n'abrite ni `writeJSON` ni l'interface engendrée —, donc les deux
+		// doivent être rapportés.
+		//
+		// **Les deux nommément, et c'est une correction.** La première version demandait seulement que
+		// « quelque chose » soit rapporté, et restait verte quand on retirait la moitié « argument » du
+		// détecteur : le `WriteHeader`, qui est un récepteur, suffisait à la satisfaire. Or c'est la
+		// moitié « argument » qui attrape le défaut le plus naturel à écrire. Deux gardes dont une
+		// seule est observée ne prouvent que celle qu'on observe.
+		found, seen := directWrites(loadWitness(t), map[string]bool{})
+
+		require.Positive(t, seen, "le témoin n'atteint plus de writer : il ne prouve rien")
+
+		assert.Contains(t, strings.Join(found, " "), "encoding/json.NewEncoder",
+			"la moitié « argument » du détecteur ne voit plus `json.NewEncoder(w)` : elle est débranchée")
+		assert.Contains(t, strings.Join(found, " "), "WriteHeader",
+			"la moitié « récepteur » du détecteur ne voit plus `w.WriteHeader(…)` : elle est débranchée")
 	})
 
 	t.Run("la règle des colonnes nomme la colonne", func(t *testing.T) {

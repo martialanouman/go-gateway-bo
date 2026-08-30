@@ -186,6 +186,34 @@ est satisfait, et la porte est **verte** pendant qu'un type de domaine part sur 
 **La première sonde de ce cas était mal construite** : elle remplaçait un site direct au lieu d'en
 ajouter un, donc c'est le plancher qui rougissait — rc=1 pour la mauvaise borne. Refaite en ajoutant.
 
+### DN-11 — « la seule surface de sérialisation » était un constat ; c'est maintenant une propriété
+`respond.go` affirmait que `writeJSON` est la seule surface non typée du paquet. C'était vrai et rien
+ne l'obligeait à le rester : `json.NewEncoder(w).Encode(resolved)` écrit dans un middleware compile, ne
+passe par aucun `Visit…` engendré, échappe à la conformité au contrat que les scénarios exercent, et
+aucune des portes précédentes ne le voit.
+
+`TestUnCorpsDeReponseNeSEcritQuALEndroitPrevu` suit le **type statique** de chaque expression et refuse
+qu'un `http.ResponseWriter` atteigne autre chose qu'un puits nommé. Les fichiers exemptés — celui du
+code engendré et celui qui abrite `writeJSON` — sont repérés par la **position d'une déclaration**,
+jamais par leur nom.
+
+**La règle ne porte pas sur `json`, et c'est mesuré.** La rédaction qui vient d'abord — « pas de
+`json.Marshal` hors de `respond.go` » — aurait eu **deux faux positifs le jour de sa livraison** :
+`webauthn.go` marshale l'attestation et l'assertion d'une *requête* vers le store, sans jamais toucher
+au writer.
+
+**Une liste de puits et non une liste de fichiers.** Exempter `assets.go` en entier le laisserait
+écrire n'importe quoi ; ce qu'il fait de légitime tient en deux appels (`http.NotFound`,
+`http.ServeFileFS`), dont le contenu vient d'un `//go:embed` résolu à la compilation. Chaque puits
+porte sa raison, comme les exemptions de `guard.go`.
+
+**Le rouge d'abord a montré un puits que le plan n'avait pas prévu.** La chaîne des middlewares
+**stricts** passe le writer par `next(ctx, w, r, request)` — un appel à une *valeur* de type
+`StrictHandlerFunc`, pas à une fonction déclarée. Le premier détecteur le rapportait comme « un appelé
+qui n'est pas une fonction ». C'est la même délégation que `ServeHTTP`, sous la forme que le mode
+strict lui donne ; elle est nommée par son **type**, ce qui l'admet sans admettre n'importe quel
+`func(http.ResponseWriter)` du paquet.
+
 ## Mutations, une par une, `-count=1`, lues au code de sortie
 
 | Mutation | Attendu | Mesuré |
@@ -203,10 +231,19 @@ ajouter un, donc c'est le plancher qui rougissait — rc=1 pour la mauvaise born
 | **M10 — `VisitHealthResponse` posé sur `Health`, type engendré nu** | rouge | rc=1 · **avant DN-7, rc=0**, alors que le commentaire disait le compilateur garant |
 | **M11 — `emit := writeJSON` puis `emit(w, 403, resolved)`, en *plus* des huit sites** | rouge | rc=1 · « nomme writeJSON hors d'une position d'appel » |
 | W1/W2/W3 — chacune des trois règles **débranchée** | rouge sur son témoin | rc=1 · « elle est débranchée », une par une |
+| **X0 — `json.NewEncoder(w).Encode(resolved)` planté dans `guard.go`** | rouge | rc=1 · c'est le **rouge d'abord** de DN-11, écrit avant le détecteur |
+| **X1 — le détecteur n'admet plus aucun puits** | rouge sur le paquet réel | rc=1 · les six puits légitimes sont bien vus |
+| **X2 — le détecteur admet tout** | rouge sur le témoin | rc=1 · « elle est débranchée » |
+| **X3 — retirer la moitié « argument »** (`json.NewEncoder(w)`) | rouge | rc=1 · **la première version du témoin rendait rc=0 ici** : le `WriteHeader` du récepteur suffisait à la satisfaire |
+| **X4 — retirer la moitié « récepteur »** (`w.WriteHeader`) | rouge | rc=1 |
 
 M4 et M6 forment la paire qui compte : elles montrent que la liste de champs est bien le **juge** du
 cas qu'elle prétend garder, et que la règle de forme ne la couvre pas — une `string` mal nommée n'est
 pas un type de domaine.
+
+X3 est la seconde fois de cette step qu'un témoin prouve la mauvaise borne, et la leçon est la même :
+**deux gardes dont une seule est observée ne prouvent que celle qu'on observe.** Le témoin nomme
+désormais chacune des deux moitiés.
 
 **M7 n'était pas au plan** : elle vient de la revue, et elle a trouvé un chemin que la première
 rédaction déclarait fermé. Elle est la preuve que la cinquième règle était nécessaire, et la seule
