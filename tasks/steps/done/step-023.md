@@ -274,3 +274,17 @@ ici sans porteur, et une fiche de `done/` n'est ouverte par personne.)*
   performance — la raison est écrite là où elle vit, sur `browser` dans `cmd/dashboard/main_test.go`.
   Ce qu'on perd : une régression qui rendrait une route dix fois plus lente ne rougirait plus ici. Rien
   ne la garderait par ailleurs, et c'était déjà vrai à deux secondes.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai des quarante-neuf.
+
+L'entropie de la clé TOTP, l'`issuer` de l'URI, la boucle des codes de récupération et les trois
+branches de course → **step-031**. Le conteneur PostgreSQL et le délai godog → **step-032**. Le
+journal de `internal/mfa` et `internal/auth` → **step-060**.

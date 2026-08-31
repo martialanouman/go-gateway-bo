@@ -286,3 +286,19 @@ restent écrites avec ce qui les referme — une ligne qu'on efface se réouvre 
 | les bornes d'entrée `maximumPasswordLength`, `maximumEmailLength` et `RequestSize` | ~~aucune porte~~ **refermé** : `bornes_test.go` monte le routeur entier sur un pool fermé, où 400 (refusé à la porte) se distingue de 500 (arrivé jusqu'à la base). Le compte en runes est gardé avec elles |
 | le chemin d'erreur base pendant un login | ~~aucune porte~~ **refermé** : `TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants`, qui vérifie le corps autant que le statut — faute de journal dans `internal/bff`, ce que le navigateur reçoit est tout ce qui existe |
 | `request.Body == nil` dans `API.Login` | aucune porte, et **inatteignable par le routeur** : `strictHandler.Login` assigne le pointeur sans condition. Lui écrire un test demanderait d'appeler la méthode hors de son routeur — il prouverait la garde et rien du produit. Le constat est au-dessus de la ligne |
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai des quarante-neuf.
+
+`subtle.ConstantTimeCompare` et l'appel à `VerifyDummy` → **step-031**. Le pool détaché du contexte
+d'arrêt → **step-047**. La calibration argon2id, mesurée sur un poste de développement → **step-186**.
+`request.Body == nil` et `pg_advisory_xact_lock` restent **sans porteur** : la première est une
+décision consignée, la seconde n'a d'observateur possible qu'au premier déploiement à plusieurs
+instances.
