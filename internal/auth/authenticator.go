@@ -118,16 +118,18 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 
 // passwordMatches est le **seul** endroit où un mot de passe est confronté à quoi que ce soit.
 //
-// **Rien ne garde l'appel à `VerifyDummy` ci-dessous, et il faut le dire sans l'enjoliver.** Une
-// rédaction précédente affirmait que le retirer demanderait d'*ajouter* un retour anticipé, donc que
-// la mutation se verrait en revue : c'est faux. `VerifyDummy(password)` est une instruction isolée
-// dans une branche qui existe déjà, et sa suppression laisse un `if` parfaitement idiomatique. Le
-// test qui la nomme, `TestLeHachageFacticeSExecuteSurNImporteQuelSecret`, l'appelle **directement** :
-// il garde la fonction, jamais son site d'appel.
+// **L'appel à `VerifyDummy` ci-dessous est gardé par `oracle_test.go`**, qui descend dans ce corps
+// avec le type-checker et exige l'appel dans cette branche-ci. Ce commentaire a annoncé le contraire
+// pendant deux steps : la porte a été écrite en step-021 et il a été touché après, en step-023, sans
+// être relu contre le code qu'il surplombe.
 //
-// Ce qui reste est la mesure manuelle écrite au-dessus de `VerifyDummy` et la revue. Une porte
-// structurelle est possible — `internal/bff/dto_test.go` descend déjà dans les corps de fonction avec
-// le type-checker — et elle appartient à la step qui reprendra ce chemin.
+// Ce qu'elle ferme : `TestLeHachageFacticeSExecuteSurNImporteQuelSecret` appelle `VerifyDummy`
+// **directement**, donc garde la fonction et jamais son site d'appel — et `VerifyDummy(password)` est
+// une instruction isolée dans une branche qui existe déjà, dont la suppression laisse un `if`
+// parfaitement idiomatique. Rien ne se voyait en revue.
+//
+// Ce qui reste hors de portée est la **durée**, écrite au-dessus de `VerifyDummy` : elle se mesure à
+// la main. Le plancher sur les paramètres, lui, garde le profil retenu depuis step-031.
 //
 // Un `password_hash` illisible est traité comme un refus et non comme une panne : la ligne est
 // abîmée, mais le dire au navigateur distinguerait ce compte des autres. L'erreur est écartée ici et

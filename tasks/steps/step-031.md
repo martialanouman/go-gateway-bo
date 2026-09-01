@@ -36,7 +36,7 @@ deux fois.*
 |---|---|
 | l'appel à `VerifyDummy` n'est exigé par aucune porte | **la porte existe** — `internal/auth/oracle_test.go:31`, livrée par step-021 ; seule la cible de durée reste sans garde |
 | la variable nouvelle se pose « dans le compose de développement » | `docker-compose.yml` ne déclare aucun `DASHBOARD_*` ; le pendant réel est `.env.example`, gardé par `dotenv_test.go` |
-| « les trois branches de course » | **dix** : les trois de step-023, plus sept côté WebAuthn que step-023 ne pouvait pas compter, lui étant antérieure |
+| « les trois branches de course » | la famille est plus large : `bff/webauthn.go` et `mfa/webauthn.go` en portent la forme à **huit sites**, livrés par step-024, que step-023 ne pouvait pas nommer — non audités un à un, un décompte au grep se trompant |
 
 ### Sept dettes que cette step hérite
 
@@ -55,9 +55,10 @@ personne. Les sept figurent au registre de `todo.md`.*
   compilait pas, `crypto/subtle` devenant un import inutilisé : le `rc=1` disait « le paquet ne
   compile pas », pas « la garde tient ».*
 
-  **La voie est nommée par le code lui-même** — `internal/auth/authenticator.go` : « une porte
-  structurelle est possible — `internal/bff/dto_test.go` descend déjà dans les corps de fonction avec
-  le type-checker — et elle appartient à la step qui reprendra ce chemin ». Aucune step ne le reprend.
+  **La voie était nommée par le code lui-même** — `internal/auth/authenticator.go` annonçait « une
+  porte structurelle est possible […] elle appartient à la step qui reprendra ce chemin », et aucune
+  ne le reprenait. C'est celle-ci. *(Cette phrase a disparu du commentaire avec sa correction : elle
+  y côtoyait une affirmation sur `VerifyDummy` que la mesure a démentie.)*
 
 - **`minimumTOTPEncryptionKeyLength` compte des caractères, pas de l'entropie.** « Trente-deux `a` de
   suite passent. Le README recommande un CSPRNG ; rien ne l'applique. » C'est la clé qui chiffre les
@@ -71,11 +72,11 @@ personne. Les sept figurent au registre de `todo.md`.*
   sortie est une variable de plus, le jour où il y a une préproduction — aucune step planifiée n'en a
   une ». Avec l'entropie de la clé, cela fait trois valeurs et un seul geste, au même endroit.
 
-- **Trois branches de course ne sont exercées par rien** — et l'inventaire réel en compte **dix**.
+- **Trois branches de course ne sont exercées par rien**, et la famille est plus large qu'elles.
   `done/step-023.md` : « elles ne sont atteignables que par deux requêtes en vol ou une désactivation
   entre le middleware et le handler. Aucun test ne les exerce, et c'est écrit ici plutôt que couvert
-  par un test qui ferait semblant. » Les sept autres sont côté WebAuthn, livrées par step-024 :
-  step-023 lui est antérieure et ne pouvait pas les voir.
+  par un test qui ferait semblant. » `bff/webauthn.go` et `mfa/webauthn.go` en portent la forme à huit
+  sites de plus, livrés par step-024 : step-023 lui est antérieure et ne pouvait pas les nommer.
 
 - **Une constante `Key` déclarée sans entrée au catalogue ne fait rougir aucune porte.** step-006 :
   « compile, deux suites vertes, absente du TS engendré. Go ne signale pas une constante exportée

@@ -66,6 +66,8 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 	}
 
 	if !found {
+		// Course perdue : la session résolue par le middleware impliquait un opérateur actif, et il ne
+		// l'est plus. Rien ne l'exerce — voir le constat au-dessus de `VerifyMfa`.
 		return EnrollTotp401JSONResponse(notAuthenticated()), nil
 	}
 
@@ -188,6 +190,30 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 // de route sont indiscernables. Le verrou, lui, rend 429 avec sa durée — ce qu'il révèle est ce que
 // l'attaquant constate de toute façon, et le taire priverait l'opérateur légitime de la seule
 // information qui lui dise quoi faire.
+// **Deux de ses refus ne sont exercés par rien, et c'est mesuré** (critère 4) : le 01/09/2026,
+// neutraliser `!consumed` puis `!elevated` — `if false && !x`, un à la fois — laisse `cmd/dashboard`
+// et `internal/bff` verts. Idem pour `!found` dans `EnrollTotp`.
+//
+// Aucune des trois n'est morte : la condition n'est garantie que par une lecture antérieure **non
+// transactionnelle**, et le temps passe entre les deux. Aucune n'est atteignable par un test non
+// plus : `a.SecondFactor` et `a.Sessions` sont des types concrets, sans couture d'injection. En
+// ajouter une remanierait le câblage, et ce dépôt s'est déjà fait mordre par un faux de test qui
+// cachait que le vrai n'existait pas.
+//
+// Ce qui est couvert, et que « aucun test ne les exerce » disait trop largement : les trois `false`
+// **le sont au niveau du store** — `TestUnChallengeNeSeConsommeQuUneFois`,
+// `TestUneSessionOisiveNeSEleveJamais`, `TestUnOperateurDesactiveNEleveJamaisSaSession`,
+// `TestUneSessionMorteNeSEleveJamais`. Ce qui ne l'est pas est leur **traduction en 401** ici.
+//
+// La couverture ne peut pas trancher à leur place : les scénarios lancent le binaire en
+// sous-processus, donc `-coverprofile` sur `cmd/dashboard` ne voit que 0,1 % de ce paquet — mesuré le
+// même jour. Seule la mutation répond.
+//
+// **La famille est plus large que ces trois-là.** `internal/bff/webauthn.go` et
+// `internal/mfa/webauthn.go` portent la même forme à huit sites, livrés par step-024 : step-023 lui
+// est antérieure et ne pouvait pas les nommer. Ils ne sont **pas** audités un à un ici, et un
+// décompte au grep se trompe — `internal/mfa/cipher.go:78` a la même forme sans être une course, et
+// `mfa/webauthn.go:383` est atteint par un scénario, mais par son second membre.
 func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (VerifyMfaResponseObject,
 	error,
 ) {
