@@ -259,7 +259,7 @@ naissance sans toucher la dernière vue.
 
 | Ligne | Constat |
 |---|---|
-| `hmac.Equal` | aucune porte — voir ci-dessus, le constat est écrit au-dessus de la ligne |
+| `hmac.Equal` | ~~aucune porte~~ **refermé en step-031** : `TestLeSceauNeSeCompareQuEnTempsConstant` exige l'appel dans `Unseal` **et** y refuse toute comparaison d'octets. Le constat au-dessus de la ligne a été réécrit avec elle |
 | le préfixe `__Host-` lui-même | ~~aucune porte du dépôt~~ **faux, corrigé en revue** : `TestLeCookieDeSessionPorteSesCinqAttributs` exige le préfixe, et le remplacer par `dashboard_session` fait rougir. Ce qui reste vrai est que les **scénarios** ne le voient pas — le harnais porte ses cookies à la main et accepterait n'importe quel nom |
 | `Elevate`, en tant que geste **atteignable depuis une route** | aucune, et c'est DN-11 : il n'a pas d'appelant de production avant step-023. Ses gardes, elles, sont désormais tenues — voir la section suivante |
 | la valeur des durées (12 h, 2 h) | aucune porte : ce qui est gardé est que les **deux bornes existent et mordent**, pas leur valeur. Les changer laisse tout vert — c'est une décision, pas un invariant |

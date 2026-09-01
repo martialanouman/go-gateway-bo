@@ -129,6 +129,44 @@ func TestUnSecretTireDUnCSPRNGPasse(t *testing.T) {
 	assert.Equal(t, env[config.EnvTOTPEncryptionKey], string(cfg.Auth.TOTPEncryptionKey))
 }
 
+// Les deux séparateurs que l'URI otpauth:// ne sait pas porter, et qui sont exactement ceux qu'on
+// écrit pour distinguer une préproduction. Un nom trop long est refusé pour une autre raison — le QR
+// de l'écran d'enrôlement.
+func TestUnNomDeProduitQueLUriNeSaitPasPorterEstRefuse(t *testing.T) {
+	t.Parallel()
+
+	for _, refused := range []struct {
+		name  string
+		value string
+	}{
+		{"deux-points", "Preprod:Passerelle"},
+		{"barre oblique", "Pass/erelle"},
+		{"trop long", strings.Repeat("Passerelle ", 10)},
+	} {
+		t.Run(refused.name, func(t *testing.T) {
+			t.Parallel()
+
+			env := minimalEnv()
+			env[config.EnvProductName] = refused.value
+
+			_, err := config.Load(lookupFrom(env))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.EnvProductName)
+		})
+	}
+}
+
+func TestUnNomDeProduitOrdinairePasse(t *testing.T) {
+	t.Parallel()
+
+	env := minimalEnv()
+	env[config.EnvProductName] = "Passerelle SMS — Préproduction"
+
+	cfg, err := config.Load(lookupFrom(env))
+	require.NoError(t, err)
+	assert.Equal(t, "Passerelle SMS — Préproduction", cfg.ProductName)
+}
+
 // Les trois secrets sont distincts et le restent. Réutiliser l'un pour l'autre ferait qu'une fuite de
 // la table des compteurs — qui ne porte que des HMAC — livrerait de quoi signer des sessions, ou
 // qu'un secret de signature volé livrerait avec lui tous les seconds facteurs.

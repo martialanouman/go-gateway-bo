@@ -60,8 +60,10 @@ export default defineConfig({
     env: {
       DASHBOARD_ADDR: `${host}:${port}`,
       // Obligatoire depuis step-031, sans repli : le nom sous lequel ce déploiement se présente
-      // à l'opérateur, dans son application d'authentification et dans la cérémonie WebAuthn.
-      DASHBOARD_PRODUCT_NAME: 'Passerelle SMS Admin',
+      // à l'opérateur, dans son application d'authentification et dans la cérémonie WebAuthn. La
+      // valeur diffère du nom de production, comme les décors de test et de scénario — un nom recodé
+      // en dur passerait sinon tout parcours qui le lirait.
+      DASHBOARD_PRODUCT_NAME: 'Cockpit de parcours',
       // Aucun mock n'est lancé : le client sortant n'est appelé par aucun écran, et la configuration
       // ne fait qu'exiger son adresse au démarrage.
       //

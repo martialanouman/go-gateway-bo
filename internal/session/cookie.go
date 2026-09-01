@@ -69,10 +69,11 @@ func Unseal(secret []byte, value string) (tokenHash []byte, ok bool) {
 		return nil, false
 	}
 
-	// `hmac.Equal` plutôt qu'une comparaison ordinaire. Ce qui garde cette ligne est
-	// `TestLeSceauNeSeCompareQuEnTempsConstant` depuis step-031, et non plus la seule revue : jusque-là,
-	// le remplacer par `string(a) != string(b)` laissait la suite entière verte, mesuré le 10/08/2026.
-	// Un test de durée reste écarté — un écart de l'ordre de la nanoseconde est instable en CI.
+	// `hmac.Equal` plutôt qu'une comparaison ordinaire. Ce qui le garde depuis step-031 est
+	// `TestLeSceauNeSeCompareQuEnTempsConstant`, qui exige cet appel **et** refuse toute comparaison
+	// d'octets dans ce corps — la seconde moitié parce qu'un raccourci naïf posé devant l'appel rendrait
+	// le refus en temps variable sans le faire disparaître. Jusqu'à step-031 rien ne le tenait : le
+	// remplacer par `string(a) != string(b)` laissait la suite entière verte, mesuré le 10/08/2026.
 	if !hmac.Equal(sign(secret, text), provided) {
 		return nil, false
 	}

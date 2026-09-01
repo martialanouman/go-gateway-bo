@@ -50,6 +50,13 @@ convention reste : une commande annoncée avant sa step est signalée `(cible)` 
 obligatoire dans les deux modes. Recopier le bloc « Passerelle » de `.env.example` ; le binaire refuse
 sinon de démarrer en nommant chaque variable manquante.
 
+**Un `.env` antérieur à step-031 non plus**, pour deux raisons distinctes. `DASHBOARD_PRODUCT_NAME` y
+est devenue obligatoire — recopier le bloc « Nom du produit » de `.env.example`. Et les trois secrets
+portent désormais une borne de variété : un secret existant qui compte moins de douze symboles
+distincts est refusé. **Le remplacer n'est pas anodin pour l'un des trois** —
+`DASHBOARD_TOTP_ENCRYPTION_KEY` rend illisibles tous les seconds facteurs déjà enrôlés, comme une
+rotation ordinaire ; lire plus bas ce qu'elle coûte avant de la changer.
+
 Go et Node sont tous deux requis **en développement**. En production, ni l'un ni l'autre : le binaire
 embarque les assets et se suffit à lui-même.
 
@@ -63,9 +70,11 @@ session. `openssl rand -base64 48` fait le travail.
 la table des compteurs d'échecs, `DASHBOARD_SESSION_SECRET` (step-022), qui scelle le cookie de
 session, et `DASHBOARD_TOTP_ENCRYPTION_KEY` (step-023), dont se dérive la clé qui chiffre les secrets
 TOTP au repos. Les trois s'obtiennent de la même façon et portent la même borne : 32 caractères, dont
-au moins douze distincts. Le second seuil existe parce que le premier laissait passer trente-deux `a`
-— une longueur ne dit rien d'un tirage. Ce n'est pas une mesure d'entropie mais un minorant grossier,
-qui ferme le seul défaut observé : une valeur posée à la main pour faire démarrer.
+au moins douze **distincts**. Le second seuil existe parce que le premier laissait passer trente-deux
+`a` — une longueur ne dit rien d'un tirage. Il ne mesure pas l'entropie et ne prétend pas la mesurer :
+`Passerelle-SMS-Admin-Preprod-2026` en compte dix-neuf et passe. Ce qu'il ferme est le seul défaut
+observé, une valeur posée à la main pour faire démarrer. Mesuré le 01/09/2026 sur un million de
+tirages `base64` de 32 caractères : jamais moins de seize symboles distincts, donc quatre de marge.
 
 Ce qu'une rotation coûte n'est en revanche pas le même de l'une à l'autre, et l'écart est large :
 changer le sel n'invalide aucun compte ; changer la clé de session **déconnecte tout le monde**, à

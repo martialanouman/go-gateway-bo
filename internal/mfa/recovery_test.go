@@ -133,6 +133,38 @@ func TestUnCodeInconnuNeMatcheAucunHachage(t *testing.T) {
 	}
 }
 
+// La boucle ne court-circuite pas, et ce test **observe l'effet** plutôt que la forme du code : toute
+// sortie anticipée rend le **premier** rang qui colle, quand la boucle entière rend le **dernier**,
+// puisqu'elle écrase `matched` jusqu'au bout. Ce qui est en jeu est la durée du verdict — vingt-six
+// millisecondes par code restant, soit jusqu'à un quart de seconde d'écart entre le premier rang et
+// le dixième, ce qui dit *lequel* a servi.
+//
+// **Une porte structurelle a été écrite d'abord, puis retirée** : elle cherchait l'absence de
+// `return`, `break` et `goto` dans le corps de la première boucle, et trois réécritures mesurées le
+// 01/09/2026 la laissaient verte — une boucle de pré-traitement placée avant elle, un `continue`
+// gardé par `matched`, un `matched < 0` dans la condition du `for`. La propriété n'est pas une forme :
+// c'est que `auth.Verify` soit payé autant de fois quel que soit le rang.
+//
+// Ce que ce test ne distingue pas, et c'est assumé : une réécriture qui garderait le coût entier mais
+// rendrait le premier rang — `if matched < 0 { matched = index }`. Elle rougirait à tort. Aucune des
+// réécritures observées ne prend cette forme.
+func TestLaBoucleDesCodesDeRecuperationNeCourtCircuitePas(t *testing.T) {
+	t.Parallel()
+
+	_, enrollment := testEnrollment(t)
+
+	// Deux hachages du **même** code, aux deux bouts de la liste : deux sels, donc deux lignes
+	// distinctes que `auth.Verify` accepte l'une comme l'autre.
+	duplicate, err := auth.Hash(mfa.NormalizeRecoveryCode(enrollment.RecoveryCodes[0]))
+	require.NoError(t, err)
+
+	hashes := append(append([]string{}, enrollment.RecoveryCodeHashes...), duplicate)
+
+	assert.Equal(t, len(hashes)-1, mfa.MatchRecoveryCode(hashes, enrollment.RecoveryCodes[0]),
+		"la boucle rend le premier rang qui colle et non le dernier : elle s'arrête donc dès qu'elle "+
+			"a trouvé, et la durée du verdict dit à quel rang le code présenté se trouvait")
+}
+
 // Une ligne abîmée ne fait pas échouer la confrontation des neuf autres : un opérateur dont un code
 // est illisible en base doit pouvoir entrer avec les autres.
 func TestUnHachageIllisibleNEmpechePasLesAutresDeMatcher(t *testing.T) {

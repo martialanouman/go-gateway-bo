@@ -83,12 +83,16 @@ const minimumTOTPEncryptionKeyLength = 32
 // trente-deux `a` de suite passaient les bornes ci-dessus, et le README promettait un CSPRNG que rien
 // n'appliquait.
 //
-// Douze, choisi sur ce que la borne doit refuser et non sur les valeurs déjà posées : un tirage
-// base64 de trente-deux caractères en rend vingt-six en espérance, et une valeur de cette longueur
-// qui en compte moins de douze n'est pas sortie d'un générateur. Ce n'est pas une mesure d'entropie
-// mais un minorant grossier ; il suffit à fermer le seul mode d'échec observé — une valeur posée à la
-// main pour faire démarrer.
+// Douze, choisi sur ce que la borne doit refuser et non sur les valeurs déjà posées. Mesuré le
+// 01/09/2026 sur un million de tirages base64 de trente-deux caractères — la longueur minimale — :
+// 25,4 symboles distincts en moyenne, et **jamais moins de seize**. Douze laisse donc quatre symboles
+// de marge sous le pire tirage observé. Ce n'est pas une mesure d'entropie mais un minorant grossier ;
+// il ferme le seul mode d'échec observé — une valeur posée à la main pour faire démarrer.
 const minimumDistinctSymbols = 12
+
+// maximumProductNameLength borne le nom du produit. Soixante-quatre caractères : le label de l'URI
+// otpauth:// porte aussi l'adresse de l'opérateur, et c'est l'ensemble qui doit tenir dans le QR.
+const maximumProductNameLength = 64
 
 // defaultShutdownTimeout laisse aux requêtes en vol de quoi se terminer pendant un déploiement
 // roulant. Un délai a une valeur par défaut, un secret n'en a jamais.
@@ -216,7 +220,7 @@ func Load(lookup Lookup) (Config, error) {
 			Timeout:      r.positiveDuration(EnvGatewayTimeout, defaultGatewayTimeout),
 		},
 		DatabaseURL: r.requiredDatabaseURL(EnvDatabaseURL),
-		ProductName: r.requiredValue(EnvProductName),
+		ProductName: r.productName(EnvProductName),
 		Auth: AuthConfig{
 			BruteForceSalt: r.requiredSecret(EnvBruteForceSalt, minimumBruteForceSaltLength),
 			SessionSecret:  r.requiredSecret(EnvSessionSecret, minimumSessionSecretLength),
@@ -389,6 +393,41 @@ func (r *reader) requiredValue(name string) string {
 // requiredSecret exige une valeur d'au moins `minimum` caractères **et** d'une variété minimale, sans
 // jamais citer ce qu'elle a trouvé — ni sa longueur ni son décompte de symboles, qui sont déjà des
 // informations sur le secret.
+// productName lit le nom du produit et refuse ce que l'URI `otpauth://` ne sait pas porter.
+//
+// `totp.Generate` compose son label en `"/" + issuer + ":" + accountName` et Go n'échappe **ni `:` ni
+// `/`** dans un chemin d'URL. Mesuré le 01/09/2026 : `Preprod:Passerelle` rend
+// `otpauth://totp/Preprod:Passerelle:op@exemple.test`, que l'application découpe sur le **premier**
+// `:` — elle lit alors `Preprod` comme émetteur, en contradiction avec le paramètre `issuer=` de la
+// même URI. `Pass/erelle` rend un label à deux segments. Ce sont exactement les deux séparateurs
+// qu'un exploitant écrit pour distinguer une préproduction, c'est-à-dire le cas qui a motivé la
+// sortie de cette valeur vers la configuration.
+//
+// La borne haute existe parce que le QR est dessiné dans le navigateur : une URI trop longue dépasse
+// la capacité du code et l'écran d'enrôlement rendrait un carré illisible plutôt qu'une erreur.
+func (r *reader) productName(name string) string {
+	value, ok := r.required(name)
+	if !ok {
+		return ""
+	}
+
+	if strings.ContainsAny(value, ":/") {
+		r.reject(name, "ni « : » ni « / » : l'URI otpauth:// découpe son label sur le premier « : », "+
+			"et l'application d'authentification lirait un autre émetteur que celui-ci")
+
+		return ""
+	}
+
+	if len([]rune(value)) > maximumProductNameLength {
+		r.reject(name, "%d caractères au plus : au-delà, le QR d'enrôlement dépasse sa capacité et "+
+			"devient illisible", maximumProductNameLength)
+
+		return ""
+	}
+
+	return value
+}
+
 func (r *reader) requiredSecret(name string, minimum int) []byte {
 	value, ok := r.required(name)
 	if !ok {

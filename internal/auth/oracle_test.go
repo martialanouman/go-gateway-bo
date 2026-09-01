@@ -63,24 +63,36 @@ func loadAuth(t *testing.T) *packages.Package {
 	return loaded[0]
 }
 
-// functionBody rend le corps de la fonction ou de la méthode nommée. Elle **échoue** si le nom
-// n'existe pas : une porte qui ne trouve pas ce qu'elle garde est verte pour la mauvaise raison, et
-// c'est exactement ce qu'un renommage silencieux produirait.
+// functionBody rend le corps de la déclaration nommée, et échoue si le nom est absent **ou porté par
+// deux déclarations**.
+//
+// Le nom absent était la seule borne de la première rédaction. Une revue a montré le 01/09/2026 que
+// l'homonymie en était une autre, et muette : un `func (k APIKey) Verify(…)` dans un fichier trié
+// avant `argon2.go` détournait la porte des comparaisons vers cette méthode — qui appelait bien
+// `subtle.ConstantTimeCompare` — pendant que le vrai `Verify` comparait naïvement. `pkg.Syntax` suit
+// l'ordre des fichiers : « la première trouvée » n'est pas une propriété du code.
 func functionBody(t *testing.T, pkg *packages.Package, name string) *ast.BlockStmt {
 	t.Helper()
+
+	var found *ast.BlockStmt
 
 	for _, file := range pkg.Syntax {
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
-			if isFunction && function.Name.Name == name && function.Body != nil {
-				return function.Body
+			if !isFunction || function.Name.Name != name || function.Body == nil {
+				continue
 			}
+
+			require.Nilf(t, found, "deux déclarations se nomment %s : la porte en garderait une au "+
+				"hasard de l'ordre des fichiers", name)
+
+			found = function.Body
 		}
 	}
 
-	t.Fatalf("la fonction %s n'existe plus : cette porte ne garde plus rien", name)
+	require.NotNilf(t, found, "la fonction %s n'existe plus : cette porte ne garde plus rien", name)
 
-	return nil
+	return found
 }
 
 // nilOperatorBranch rend le corps du premier `if` dont la condition compare quelque chose à `nil`.

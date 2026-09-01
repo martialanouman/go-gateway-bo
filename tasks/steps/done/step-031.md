@@ -34,9 +34,9 @@ deux fois.*
 
 | Ce que la fiche écrivait | Ce que la mesure rend |
 |---|---|
-| l'appel à `VerifyDummy` n'est exigé par aucune porte | **la porte existe** — `internal/auth/oracle_test.go:31`, livrée par step-021 ; seule la cible de durée reste sans garde |
+| l'appel à `VerifyDummy` n'est exigé par aucune porte | **la porte existe** — `internal/auth/oracle_test.go`, livrée par step-021 ; seule la cible de durée reste sans garde |
 | la variable nouvelle se pose « dans le compose de développement » | `docker-compose.yml` ne déclare aucun `DASHBOARD_*` ; le pendant réel est `.env.example`, gardé par `dotenv_test.go` |
-| « les trois branches de course » | la famille est plus large : `bff/webauthn.go` et `mfa/webauthn.go` en portent la forme à **huit sites**, livrés par step-024, que step-023 ne pouvait pas nommer — non audités un à un, un décompte au grep se trompant |
+| « les trois branches de course » | la famille est plus large : les cérémonies WebAuthn de `bff/webauthn.go` et `mfa/webauthn.go` en portent la forme, livrées par step-024 que step-023 ne pouvait pas voir — **non auditées ici**, et un décompte au grep se tromperait |
 
 ### Sept dettes que cette step hérite
 
@@ -75,8 +75,8 @@ personne. Les sept figurent au registre de `todo.md`.*
 - **Trois branches de course ne sont exercées par rien**, et la famille est plus large qu'elles.
   `done/step-023.md` : « elles ne sont atteignables que par deux requêtes en vol ou une désactivation
   entre le middleware et le handler. Aucun test ne les exerce, et c'est écrit ici plutôt que couvert
-  par un test qui ferait semblant. » `bff/webauthn.go` et `mfa/webauthn.go` en portent la forme à huit
-  sites de plus, livrés par step-024 : step-023 lui est antérieure et ne pouvait pas les nommer.
+  par un test qui ferait semblant. » Les cérémonies WebAuthn en portent la forme, livrées par step-024
+  que step-023 ne pouvait pas voir — non auditées ici.
 
 - **Une constante `Key` déclarée sans entrée au catalogue ne fait rougir aucune porte.** step-006 :
   « compile, deux suites vertes, absente du TS engendré. Go ne signale pas une constante exportée

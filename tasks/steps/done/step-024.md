@@ -329,9 +329,11 @@ depuis celle qui a créé. Ce qui suit reste la trace, pas le porteur.
 
 ### N'en ont pas, et c'est assumé
 
-1. **`displayName` est codé en dur** (`internal/mfa/webauthn.go`), comme l'`issuer` du TOTP : deux
-   déploiements du même produit s'affichent sous le même nom dans l'appareil de l'opérateur. La sortie
-   est une variable de plus, le jour où il y a une préproduction — aucune step planifiée n'en a une.
+1. ~~**`displayName` est codé en dur** (`internal/mfa/webauthn.go`), comme l'`issuer` du TOTP.~~
+   **Payé en step-031** : les deux viennent de `DASHBOARD_PRODUCT_NAME`, une seule variable pour les
+   deux surfaces. Le `displayName` n'était gardé par rien — le recoder en dur laissait les
+   quatre-vingt-sept scénarios verts, le nom de partie de confiance ne faisant pas partie des données
+   signées d'une cérémonie — et il l'est désormais par le scénario d'enregistrement.
 2. **« Un seul défi vivant par session et par objet » est une propriété que l'ouverture produit, et
    qu'aucun index n'impose.** Deux ouvertures concurrentes ne se voient pas et insèrent toutes deux ;
    la lecture prend le plus récent, ce qui rend le comportement déterministe sans rendre l'invariant

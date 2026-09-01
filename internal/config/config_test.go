@@ -44,11 +44,11 @@ const (
 	testTOTPEncryptionKey = "une-cle-de-chiffrement-de-test-assez-longue"
 )
 
-// Les deux valeurs WebAuthn ne sont pas des secrets — le navigateur les voit — et rien ici n'ouvre de
-// cérémonie : `Load` n'exige que leur présence, et c'est `webauthn.New` qui juge le domaine.
 // testProductName diffère du nom de production : un nom recodé en dur passerait sinon les tests.
 const testProductName = "Cockpit de test"
 
+// Les deux valeurs WebAuthn ne sont pas des secrets — le navigateur les voit — et rien ici n'ouvre de
+// cérémonie : `Load` n'exige que leur présence, et c'est `webauthn.New` qui juge le domaine.
 const (
 	testWebauthnRPID   = "localhost"
 	testWebauthnOrigin = "http://localhost:3001"

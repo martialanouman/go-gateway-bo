@@ -159,11 +159,18 @@ func TestHacherAvecDesCoutsNulsEstRefuse(t *testing.T) {
 // passer une suite qu'il trouve lente, et personne ne le voit — un hachage moins cher n'a aucun
 // symptôme, il est juste moins cher pour tout le monde, l'attaquant compris.
 //
-// **Le plancher est le profil retenu depuis step-031, plus celui d'OWASP.** Le second laissait
-// descendre de 64 MiB / t=3 à 19 MiB / t=2 — de 26,3 ms à 16,8 ms au tableau qui surplombe
+// **Le plancher est le profil retenu depuis step-031**, là où il était celui d'OWASP. Le second
+// laissait descendre de 64 MiB / t=3 à 19 MiB / t=2 — de 26,3 ms à 16,8 ms au tableau qui surplombe
 // `currentParams` — sans faire rougir quoi que ce soit : il bornait ce qu'argon2id doit rester, pas
-// ce que ce déploiement a décidé. Ce qu'il garde désormais est la décision, et la changer demande
-// une mesure neuve plutôt qu'un chiffre plus commode.
+// ce que ce déploiement a décidé. Ce qu'il garde désormais est la décision, et la changer demande une
+// mesure neuve plutôt qu'un chiffre plus commode. Le minimum d'OWASP n'est plus asséré à part : il
+// est subsumé, et le redire ferait deux rédactions dont une périmerait.
+//
+// **`Parallelism` reste à un, et c'est une correction de revue.** La première rédaction l'avait monté
+// à quatre comme les deux autres. Ce n'est pas un paramètre de même nature : la RFC 9106 le règle sur
+// les cœurs disponibles, et un nœud à deux vCPU a une raison légitime de descendre. Une garde qui
+// refuse du légitime finit retirée — et celui qui l'aurait retirée aurait édité les trois lignes du
+// même geste, emportant la borne mémoire, qui elle méritait d'être tenue.
 func TestLesParametresNeDescendentPasSousLePlancher(t *testing.T) {
 	t.Parallel()
 
@@ -172,9 +179,9 @@ func TestLesParametresNeDescendentPasSousLePlancher(t *testing.T) {
 	assert.GreaterOrEqual(t, params.Memory, uint32(64*1024),
 		"moins de 64 MiB : c'est la mémoire qui rend une carte graphique inintéressante, pas les "+
 			"passes, et 64 est le profil que la mesure du 10/08/2026 a retenu")
-	assert.GreaterOrEqual(t, params.Time, uint32(3), "moins de trois passes que le profil retenu")
-	assert.GreaterOrEqual(t, params.Parallelism, uint8(4),
-		"moins de quatre voies que le profil retenu ; en-dessous de une, argon2.IDKey paniquerait")
+	assert.GreaterOrEqual(t, params.Time, uint32(3),
+		"moins de trois passes que le profil retenu par la mesure du 10/08/2026")
+	assert.GreaterOrEqual(t, params.Parallelism, uint8(1), "aucune voie : argon2.IDKey paniquerait")
 }
 
 // VerifyDummy n'a aucun effet observable : ce qu'il achète est du **temps**, et c'est ce que ce test
