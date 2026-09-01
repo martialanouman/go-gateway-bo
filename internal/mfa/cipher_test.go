@@ -112,7 +112,7 @@ func TestUneAutrePassphraseNeRelitRien(t *testing.T) {
 
 	_, enrollment := testEnrollment(t)
 
-	other, err := mfa.NewAuthenticator([]byte("une-autre-cle-de-chiffrement-assez-longue"))
+	other, err := mfa.NewAuthenticator([]byte("une-autre-cle-de-chiffrement-assez-longue"), testIssuer)
 	require.NoError(t, err)
 
 	_, _, err = other.Verify(enrollment.SealedSecret, testOperatorID,

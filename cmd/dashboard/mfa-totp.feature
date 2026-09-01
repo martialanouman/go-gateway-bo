@@ -21,6 +21,7 @@ Fonctionnalité: Le second facteur TOTP
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 200
     Et l'enrôlement rend l'URI, le secret et dix codes de récupération
+    Et l'URI porte le nom de produit configuré
     # L'enrôlement n'élève rien : sans cette ligne, s'attacher un authentificateur suffirait à
     # franchir le second facteur, ce qui n'en serait plus un.
     Et le second facteur n'est pas encore vérifié

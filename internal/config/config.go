@@ -28,6 +28,7 @@ import (
 const (
 	EnvAddr            = "DASHBOARD_ADDR"
 	EnvShutdownTimeout = "DASHBOARD_SHUTDOWN_TIMEOUT"
+	EnvProductName     = "DASHBOARD_PRODUCT_NAME"
 
 	EnvGatewayMode         = "DASHBOARD_GATEWAY_MODE"
 	EnvGatewayBaseURL      = "DASHBOARD_GATEWAY_BASE_URL"
@@ -118,6 +119,10 @@ type Config struct {
 	// DatabaseURL est le DSN du schéma propre au BFF. Il porte un mot de passe : il ne sort ni dans un
 	// message d'erreur, ni dans un journal.
 	DatabaseURL string
+	// ProductName est le nom sous lequel ce déploiement se présente à l'opérateur : dans son
+	// application d'authentification, et dans la cérémonie WebAuthn du navigateur. Une seule valeur
+	// pour les deux surfaces — c'est le même nom, vu à deux endroits.
+	ProductName string
 	// Auth porte ce dont le premier facteur a besoin au démarrage.
 	Auth AuthConfig
 }
@@ -211,6 +216,7 @@ func Load(lookup Lookup) (Config, error) {
 			Timeout:      r.positiveDuration(EnvGatewayTimeout, defaultGatewayTimeout),
 		},
 		DatabaseURL: r.requiredDatabaseURL(EnvDatabaseURL),
+		ProductName: r.requiredValue(EnvProductName),
 		Auth: AuthConfig{
 			BruteForceSalt: r.requiredSecret(EnvBruteForceSalt, minimumBruteForceSaltLength),
 			SessionSecret:  r.requiredSecret(EnvSessionSecret, minimumSessionSecretLength),

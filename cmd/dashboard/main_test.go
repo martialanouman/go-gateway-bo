@@ -297,6 +297,10 @@ func completeConfiguration() map[string]string {
 		"DASHBOARD_GATEWAY_MODE":     "mock",
 		"DASHBOARD_GATEWAY_BASE_URL": "http://127.0.0.1:4010",
 		"DASHBOARD_DATABASE_URL":     migratedSuiteDSN,
+		// Obligatoire depuis step-031, et sans repli. La valeur diffère délibérément du nom de
+		// production : un `issuer` recodé en dur dans `internal/mfa` passerait sinon le scénario qui
+		// le lit dans l'URI `otpauth://`.
+		"DASHBOARD_PRODUCT_NAME": "Cockpit de scénario",
 		// Obligatoire depuis step-021, et sans repli : le binaire refuse de démarrer sans elle. Sa
 		// valeur ici n'a rien d'un secret — aucun scénario ne relit un HMAC, ils observent le verrou.
 		"DASHBOARD_BRUTEFORCE_SALT": "un-sel-de-scenario-assez-long-pour-la-borne",

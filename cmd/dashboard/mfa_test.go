@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/cucumber/godog"
@@ -79,6 +80,7 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur présente son code sur le challenge du second opérateur$`,
 		w.presentOnTheOtherChallenge)
 	ctx.Then(`^l'enrôlement rend l'URI, le secret et dix codes de récupération$`, w.enrollmentIsComplete)
+	ctx.Then(`^l'URI porte le nom de produit configuré$`, w.uriCarriesConfiguredProductName)
 	ctx.Then(`^le secret rendu diffère du précédent$`, w.secretChanged)
 	ctx.Then(`^le second facteur est vérifié$`, w.secondFactorIsVerified)
 	ctx.Then(`^le second facteur n'est pas encore vérifié$`, w.secondFactorIsNotVerified)
@@ -432,6 +434,24 @@ func (w *mfaWorld) enrollmentIsComplete() error {
 	if len(w.enrolled.RecoveryCodes) != mfa.RecoveryCodeCount {
 		return fmt.Errorf("%d code(s) de récupération rendu(s) pour %d attendus",
 			len(w.enrolled.RecoveryCodes), mfa.RecoveryCodeCount)
+	}
+
+	return nil
+}
+
+// L'`issuer` traverse depuis la variable d'environnement jusqu'au corps servi. Le scénario le lit
+// dans la réponse plutôt qu'un test unitaire dans la structure : c'est la chaîne entière qui a été
+// codée en dur, pas seulement la valeur.
+func (w *mfaWorld) uriCarriesConfiguredProductName() error {
+	parsed, err := url.Parse(w.enrolled.OtpauthURI)
+	if err != nil {
+		return fmt.Errorf("l'URI rendue ne s'analyse pas : %w", err)
+	}
+
+	expected := completeConfiguration()["DASHBOARD_PRODUCT_NAME"]
+	if issuer := parsed.Query().Get("issuer"); issuer != expected {
+		return fmt.Errorf("l'URI annonce %q pour %q configuré : deux déploiements du même produit se "+
+			"confondent dans le téléphone de l'opérateur", issuer, expected)
 	}
 
 	return nil

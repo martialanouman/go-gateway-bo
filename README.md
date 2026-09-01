@@ -79,6 +79,14 @@ un cookie émis par l'une serait refusé par l'autre, un second facteur vérifia
 pour le sel — des compteurs d'anti-brute-force qui se scindent **sans qu'aucun refus ne le signale**,
 donc un verrouillage qui s'affaiblit en silence.
 
+`DASHBOARD_PRODUCT_NAME` (step-031) est obligatoire elle aussi, et n'est pas un secret : c'est le nom
+sous lequel ce déploiement se présente à l'opérateur, dans son application d'authentification et dans
+la cérémonie WebAuthn du navigateur. Une seule variable pour les deux surfaces — c'est le même nom, vu
+à deux endroits. La distinguer d'un déploiement à l'autre est tout son objet : codée en dur, une
+préproduction et une production apparaissaient sous le même nom dans le téléphone d'un opérateur qui
+enrôle les deux, sans rien pour les départager. La changer **n'invalide aucun enrôlement** : les
+applications d'authentification déjà appairées gardent le nom qu'elles ont scanné.
+
 `DASHBOARD_WEBAUTHN_RP_ID` et `DASHBOARD_WEBAUTHN_ORIGIN` (step-024) sont obligatoires de la même
 façon, mais **ne sont pas des secrets** : le navigateur les voit à chaque cérémonie de passkey. Ce
 qu'elles gardent tient à leur provenance — elles viennent de la configuration et jamais de la requête,

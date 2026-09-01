@@ -56,8 +56,10 @@ type Manager struct {
 	enrollments *store.Counter
 }
 
-func NewManager(factors *store.MFA, enrollments *store.Counter, passphrase []byte) (*Manager, error) {
-	authenticator, err := NewAuthenticator(passphrase)
+func NewManager(factors *store.MFA, enrollments *store.Counter, passphrase []byte,
+	issuer string,
+) (*Manager, error) {
+	authenticator, err := NewAuthenticator(passphrase, issuer)
 	if err != nil {
 		return nil, err
 	}

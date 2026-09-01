@@ -54,14 +54,6 @@ const (
 // le défaut de `totp.Generate`, écrit ici plutôt que subi : `hotp.Generate`, lui, en tire dix.
 const secretBytes = 20
 
-// issuer est ce que l'application d'authentification affiche à côté du compte.
-//
-// Codé en dur et non configurable, ce qui a un prix connu : deux déploiements du même produit — une
-// préproduction et une production — apparaissent sous le même nom dans le téléphone d'un opérateur
-// qui enrôle les deux. La sortie serait une variable de plus, et elle appartient à la step qui aura
-// une préproduction.
-const issuer = "Passerelle SMS Admin"
-
 // UnreadableSecretError dit qu'une colonne `mfa_totp_secret` ne se relit pas.
 //
 // **Ce n'est pas un refus de second facteur**, et les confondre coûterait cher : un secret abîmé se
@@ -79,20 +71,25 @@ func (e UnreadableSecretError) Error() string {
 	return "secret de second facteur illisible : " + e.Reason
 }
 
-// Authenticator porte le second facteur TOTP. Il tient la clé de chiffrement dérivée, et rien
-// d'autre : ni pool, ni configuration, ni HTTP.
+// Authenticator porte le second facteur TOTP. Il tient la clé de chiffrement dérivée et le nom que
+// l'application d'authentification affiche à côté du compte, et rien d'autre : ni pool, ni HTTP.
+//
+// L'`issuer` vient de la configuration depuis step-031. Codé en dur, deux déploiements du même
+// produit — une préproduction et une production — apparaissaient sous le même nom dans le téléphone
+// d'un opérateur qui enrôle les deux.
 type Authenticator struct {
-	key []byte
+	key    []byte
+	issuer string
 }
 
 // NewAuthenticator dérive la clé de chiffrement de la passphrase de configuration.
-func NewAuthenticator(passphrase []byte) (*Authenticator, error) {
+func NewAuthenticator(passphrase []byte, issuer string) (*Authenticator, error) {
 	key, err := deriveKey(passphrase)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Authenticator{key: key}, nil
+	return &Authenticator{key: key, issuer: issuer}, nil
 }
 
 // Enrollment est ce qu'un enrôlement produit. Ses deux moitiés ne vont pas au même endroit, et c'est
@@ -114,7 +111,7 @@ type Enrollment struct {
 // L'identifiant de l'opérateur sert de **données associées** au chiffrement : voir `seal`.
 func (a *Authenticator) Enroll(operatorID, accountName string) (Enrollment, error) {
 	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      issuer,
+		Issuer:      a.issuer,
 		AccountName: accountName,
 		Period:      PeriodSeconds,
 		SecretSize:  secretBytes,
