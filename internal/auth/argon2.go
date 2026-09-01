@@ -148,11 +148,11 @@ func HashWith(params Params, secret string) (string, error) {
 // La comparaison passe par `crypto/subtle` : comparer deux hachages avec `==` rend un verdict en un
 // temps qui dépend du nombre d'octets de tête qui coïncident, ce qui se remonte octet par octet.
 //
-// **Aucune porte ne garde cette ligne, et ça a été vérifié plutôt que supposé** (critère 4) : mesuré
-// le 09/08/2026, `subtle.ConstantTimeCompare(key, expected) == 1` remplacé par
-// `string(key) == string(expected)` laisse toute la suite du paquet **verte**. Ce qui manquerait pour
-// la garder serait un test de durée, que la fiche écarte explicitement — instable en CI, et sur un
-// écart de l'ordre de la nanoseconde il le serait partout. Ce qui garde cette ligne est la revue.
+// Ce qui garde cette ligne est `TestUnHachageNeSeCompareQuEnTempsConstant` depuis step-031, et non
+// plus la seule revue : jusque-là, `subtle.ConstantTimeCompare(key, expected) == 1` remplacé par
+// `string(key) == string(expected)` laissait toute la suite du paquet **verte**, mesuré le
+// 09/08/2026. Un test de durée reste écarté — instable en CI sur un écart de l'ordre de la
+// nanoseconde.
 func Verify(encoded, secret string) (bool, error) {
 	params, salt, expected, err := decode(encoded)
 	if err != nil {

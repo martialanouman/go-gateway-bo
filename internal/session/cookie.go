@@ -69,10 +69,10 @@ func Unseal(secret []byte, value string) (tokenHash []byte, ok bool) {
 		return nil, false
 	}
 
-	// `hmac.Equal` plutôt qu'une comparaison ordinaire, et **aucune porte ne le garde** : mesuré le
-	// 10/08/2026, le remplacer par `string(a) != string(b)` laisse la suite entière verte. Un test de
-	// durée sur un écart de l'ordre de la nanoseconde ne prouverait rien de plus. Ce qui garde cette
-	// ligne est la revue — même constat qu'en step-021 pour `subtle.ConstantTimeCompare`.
+	// `hmac.Equal` plutôt qu'une comparaison ordinaire. Ce qui garde cette ligne est
+	// `TestLeSceauNeSeCompareQuEnTempsConstant` depuis step-031, et non plus la seule revue : jusque-là,
+	// le remplacer par `string(a) != string(b)` laissait la suite entière verte, mesuré le 10/08/2026.
+	// Un test de durée reste écarté — un écart de l'ordre de la nanoseconde est instable en CI.
 	if !hmac.Equal(sign(secret, text), provided) {
 		return nil, false
 	}
