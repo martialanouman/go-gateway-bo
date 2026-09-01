@@ -6,8 +6,14 @@ mergée. Découpage par jalon (M0…M9) ; numérotation par blocs de 20, pour la
 d'insertion.
 
 **L'ordre de cette liste fait foi, pas le numéro** — sauf quand la ligne « Dépend de » d'un fichier de
-step le contredit : **les dépendances déclarées priment toujours**. Les sections groupent par jalon,
-donc par thème ; un jalon peut se clore après le début du suivant, et c'est le cas de M1 (voir †).
+step le contredit : **les dépendances déclarées priment toujours**. Les sections groupent par jalon
+**et par phase** — un jalon peut se clore après le début du suivant, et `M1` le fait : ses écrans
+reposent sur la coquille de `M2`. D'où deux sections `M1` et deux sections `M2`, et **plus aucune note
+qui déplace une ligne** : la séquence se lit de haut en bas, telle qu'elle s'exécute. **Une ligne
+cochée est à la place où elle est passée**, pas à celle qu'on lui avait prévue — la liste est un plan
+devant, un enregistrement derrière.
+`TestAucuneStepNEstListeeAvantUneDontElleDepend` confronte les deux règles — il refuse une step listée
+avant une step dont sa fiche déclare dépendre.
 
 Le **plan** donne le cadre : conventions transverses, tranche verticale, critères de sortie par jalon,
 graphe de parallélisation, état réel de la passerelle. Cet index donne le découpage en PRs. Les deux
@@ -108,30 +114,36 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - [x] step-001 — SPA Vite + TanStack Router : squelette d'application, coquille peinte au chargement à froid
 - [x] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
 - [x] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
-- [x] step-009 — Contrat Admin en **4.0.2** : deux majeures depuis 2.5.0, diff du YAML relu §
-- [x] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS ‡
+- [x] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS
 - [x] step-005 — PostgreSQL : `pgx`, migrations, les tables du §3.1, `audit_log` partitionné
 - [x] step-006 — Catalogue de permissions : source Go, génération TS, test de divergence bloquant
 - [x] step-007 — Harnais BDD : `godog`, `testify`, testcontainers, Vitest, Playwright, CI à deux toolchains
+- [x] step-009 — Contrat Admin en **4.0.2** : deux majeures depuis 2.5.0, diff du YAML relu §
 - [x] step-008 — Charte : tokens portés de la v1.0, `/_design`, contraste AA vérifié
 
-§ **Numéro hors bloc, position délibérée — et le pari a tenu.** step-003 s'est arrêtée à 2.5.0 parce
-que la quarantaine de `minimumReleaseAge` refusait plus récent ; elle a expiré d'elle-même
-(`plan.md` §1.12). La step est passée avant que M0 n'engendre du code contre 2.5.0, et c'est ce qui a
-rendu le bump gratuit : **livré le 08/08/2026, il n'a touché aucun appelant** — les six opérations que
-les deux majeures modifient ne sont appelées nulle part, et `go build` est resté vert sur trois
-ruptures de type. Payé sur le seul `internal/gateway/client.gen.go`, comme annoncé.
+§ **Numéro hors bloc, et position tenue par les faits.** Le bloc M0 est `000-019` ; `009` a été
+insérée après coup pour solder une dette de contrat, et **planifiée juste après `003`**. Elle n'y est
+pas passée : mesuré le 02/08 à 09:26 UTC, la quarantaine `minimumReleaseAge` de la 4.0.0 courait
+jusqu'à 17:46 UTC et `pnpm` la refusait encore — la step était matériellement infaisable ce jour-là.
+Elle a été mergée le **08/08/2026 à 17:23 UTC**, entre `007` et `008`, et c'est la place qu'elle
+occupe ici.
+
+**Le pari a tenu quand même.** step-003 s'était arrêtée à 2.5.0 pour cette même quarantaine ; ce qui
+comptait était que le bump passe avant que M0 n'engendre du code contre 2.5.0, non qu'il passe un jour
+donné. `step-004` ne dépendait pas de `009` et n'engendrait aucun code contre le contrat Admin :
+l'argument du renvoi n'était pas entamé, et ce qui restait à payer n'a pas grossi. Vérifié à la
+livraison — **le bump n'a touché aucun appelant** : les six opérations que les deux majeures modifient
+ne sont appelées nulle part, `go build` est resté vert sur trois ruptures de type, et tout s'est payé
+sur le seul `internal/gateway/client.gen.go`.
 
 *(La version épinglée est **4.0.2** et non 4.0.0 : les trois `openapi-admin.yaml` de la série 4.0.x
 sont identiques au sha256, et 4.0.3 était en quarantaine. Voir `steps/done/step-009.md`, DN-1.)*
 
-‡ **step-004 est passée devant step-009, et la position ci-dessus est restée la bonne.** Mesuré le
-02/08 à 09:26 UTC : la quarantaine de 4.0.0 courait jusqu'à 17:46 UTC et `pnpm` la refusait encore —
-step-009 était matériellement infaisable. step-004 ne dépendait pas d'elle et n'engendrait aucun code
-contre le contrat Admin, donc l'argument du renvoi § n'était pas entamé. Vérifié à la livraison : ce
-qui restait à payer au bump n'avait effectivement pas grossi.
+*Jusqu'au 01/09/2026 cette ligne était écrite entre `003` et `004` — la place qu'elle **aurait dû**
+occuper — et une note ‡ rattrapait l'écart. Deux notes racontaient donc l'ordre au lieu que la liste
+le montre, et le marqueur ‡ servait déjà à autre chose en M9.*
 
-## M1 — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
+## M1 (serveur) — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [x] step-020 — Seed auth : les 44 clés de permission et les 9 rôles par défaut, idempotent ¶
 - [x] step-021 — Login email/mot de passe (**argon2id**) + anti-brute-force partagé entre instances
 - [x] step-022 — Session BFF (cookie signé) + `/auth/me` + `/auth/logout`
@@ -141,36 +153,11 @@ qui restait à payer au bump n'avait effectivement pas grossi.
 - [x] step-026 — DTO de sortie déclarés partout + test bloquant  *(invariant a, moitié structurelle)*
 - [ ] step-031 — Durcissement M1 : ce que la revue garde seule ◊◊
 - [ ] step-032 — Le harnais de test : conteneur, délai godog, authentificateur épinglé ◊◊
-- [ ] step-027 — Écrans Login & MFA, branchés sur le BFF Go †
-- [ ] step-028 — Écran d'enrôlement du second facteur †
-- [ ] step-029 — Gestion des opérateurs et des rôles †
 
 ◊◊ **Deux steps ajoutées le 31/08/2026, et leur numéro ne suit pas leur position** — l'ordre de cette
-liste fait foi. Elles se lisent **avant** `027`, qui attend M2 : elles ne dépendent d'aucun écran et
-paient des dettes du code déjà livré. Le bloc M1 est `020-039` ; `030` reste réservé au plan de coupe
-de `step-029`. Précédent : `step-009`, insérée après coup pour solder une dette de contrat.
-
-† **Ces trois steps s'exécutent après `041`, `042` et `040` de M2**, dans cet ordre :
-
-```
-M2 · 041  primitives lot 1  →  M2 · 042  overlays + cinq états
-                            →  M2 · 040  AppShell (+ usePermission / PermissionGate)
-                            →  M1 · 027  login, MFA, garde de route
-                            →  M1 · 028  enrôlement du second facteur
-                            →  M1 · 029  opérateurs & rôles
-```
-
-Ce sont des écrans, et ils reposent sur des fondations qui vivent en M2. La v1.0 avait annoncé
-« M1 entier avant M2 » et cet ordre était **littéralement inexécutable** : l'écran de login déclarait
-dépendre des primitives et des cinq états. La leçon est conservée telle quelle.
-
-`step-028` avant `step-029` : la v1.0 avait rendu le second facteur obligatoire alors qu'aucun écran ne
-permettait de l'enrôler — le premier administrateur se serait connecté, serait arrivé au challenge, et
-n'aurait eu aucun moyen d'en sortir. **Administrer des opérateurs suppose d'abord de pouvoir entrer.**
-
-`usePermission` / `PermissionGate` sont livrés par **`step-040`** et non par `step-027` : le rail de
-navigation filtre ses entrées par permission dès qu'il existe. La `step-027` les **consomme** et porte
-la règle de la charte : un contrôle interdit est désactivé et expliqué, jamais masqué.
+liste fait foi. Elles ne dépendent d'aucun écran et paient des dettes du code déjà livré. Le bloc M1
+est `020-039` ; `030` reste réservé au plan de coupe de `step-029`. Précédent : `step-009`, insérée
+après coup pour solder une dette de contrat.
 
 ¶ **Les `CREATE TABLE` appartiennent à step-005, pas à celle-ci.** Cette ligne s'intitulait « Schéma
 auth » et revendiquait les mêmes tables que la fiche de step-005, qui ne lui cédait que le seed. Le
@@ -180,15 +167,42 @@ step-020 hérite donc d'un schéma déjà en place, et porte en plus la **vérif
 schéma au démarrage** : c'est la première step qui lit la base, donc la première où refuser de servir
 sur un schéma en retard protège quelque chose. *(Arbitré le 02/08/2026, au début de step-005.)*
 
-## M2 — Coquille applicative & temps réel  (§4.1, §4.2, §5.2)
+## M2 (interface) — Primitives portées & coquille applicative  (§4.1, §4.2)
 
-> **Les trois premières steps précèdent les trois dernières de M1** (voir † ci-dessus), et entre elles
-> l'ordre est `041 → 042 → 040` : l'AppShell consomme les primitives et les cinq états de contenu, il
+> L'ordre est `041 → 042 → 040` : l'AppShell consomme les primitives et les cinq états de contenu, il
 > ne les précède pas.
 
 - [ ] step-041 — Primitives lot 1 portées : bouton, champ, select, pilule de statut, tabs, table
 - [ ] step-042 — Primitives lot 2 portées : dialog, menu, tooltip, toast + les cinq états de contenu
 - [ ] step-040 — AppShell : rail, barre supérieure, arborescence de routes en états vides
+
+## M1 (écrans) — Login, MFA, opérateurs & rôles  (§6.9, §6.10, §5.1)
+
+**M1 se clôt ici, après le début de M2 — et cette section existe pour que la liste le montre, au lieu
+de l'annoter.** Ce sont des écrans : ils reposent sur les primitives (`041`), les cinq états de
+contenu (`042`) et la coquille (`040`). La v1.0 avait annoncé « M1 entier avant M2 » et cet ordre
+était **littéralement inexécutable** — l'écran de login déclarait dépendre des primitives et des cinq
+états.
+
+*Jusqu'au 01/09/2026, ces trois lignes vivaient dans la section M1 au-dessus de M2, et une note les
+renvoyait ici. Lire la liste dans l'ordre — ce que ce document demande en toutes lettres — rendait
+donc une séquence fausse sur **cinq positions**, et seule la ligne « Dépend de » de `step-027.md`
+rattrapait l'erreur. Les trois steps de M2 qui la précèdent n'ont pas encore de fiche : pour elles,
+rien ne l'aurait rattrapée.*
+
+- [ ] step-027 — Écrans Login & MFA, branchés sur le BFF Go
+- [ ] step-028 — Écran d'enrôlement du second facteur
+- [ ] step-029 — Gestion des opérateurs et des rôles
+
+`step-028` avant `step-029` : la v1.0 avait rendu le second facteur obligatoire alors qu'aucun écran ne
+permettait de l'enrôler — le premier administrateur se serait connecté, serait arrivé au challenge, et
+n'aurait eu aucun moyen d'en sortir. **Administrer des opérateurs suppose d'abord de pouvoir entrer.**
+
+`usePermission` / `PermissionGate` sont livrés par **`step-040`** et non par `step-027` : le rail de
+navigation filtre ses entrées par permission dès qu'il existe. La `step-027` les **consomme** et porte
+la règle de la charte : un contrôle interdit est désactivé et expliqué, jamais masqué.
+
+## M2 (temps réel) — Hub WebSocket, HA, notifications  (§5.2)
 - [ ] step-043 — Hub WebSocket Go : trois flux passerelle agrégés en une socket client
 - [ ] step-044 — HA : bail Redis + Pub/Sub entre instances, bascule automatique
 - [ ] step-045 — Client WS React : abonnement par sujet, reconnexion, `isLive` / `isStale`

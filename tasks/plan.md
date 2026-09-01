@@ -461,7 +461,7 @@ contrat resté en 2.5.0. Cette ligne a annoncé « 000 → 008 » pendant vingt-
 ## 6. M1 — Authentification, permissions & audit
 
 **Objectif :** savoir qui est connecté, ce qu'il a le droit de faire, et garder trace de ce qu'il fait.
-**Dépend de :** M0 — et, pour ses quatre dernières steps, `041`, `042` et `040` de M2 (voir §14).
+**Dépend de :** M0 — et, pour ses **trois** dernières steps, `041`, `042` et `040` de M2 (voir §15).
 **Steps :** 020 → 029, plus **031** et **032** — *ajoutées le 31/08/2026 pour payer les dettes que
 aucune step ne rencontrait ; `030` reste réservé au plan de coupe de step-029. Elles se lisent avant
 `027` : l'ordre de `todo.md` fait foi, pas le numéro.*
@@ -731,13 +731,20 @@ des écrans qui ne se marchent pas dessus.
 de rien de `M2` et vient d'abord. Mais ses **trois** dernières steps sont des **écrans** : elles
 reposent sur les primitives (041), les cinq états (042) et la coquille (040).
 
-*Cette phrase annonçait « quatre » — `todo.md` en compte trois depuis toujours, et sa note † les
-nomme. Relevé le 31/08/2026 en ajoutant deux steps au jalon.*
+*Cette phrase annonçait « quatre » — `todo.md` en compte trois depuis toujours, et sa section
+`M1 (écrans)` les nomme. Relevé le 31/08/2026 en ajoutant deux steps au jalon ; **le §6 disait encore
+« quatre » et renvoyait au §14, qui est M9** — corrigé le 01/09/2026. Un correctif qui ne cherche pas
+ses jumeaux en laisse un.*
 
 ```
 020…026 ─► 031 ─► 032 ─►  041 ─► 042 ─► 040  ─►  027 ─► 028 ─► 029  ─►  043…047  ─► M3
 └────── M1 serveur ──────┘   └─── M2 interface ───┘   └─ M1 écrans ─┘   └ M2 temps réel ┘
 ```
+
+C'est **l'ordre de `todo.md` redessiné**, pas une seconde source : ce document donne le pourquoi, la
+liste donne la séquence. Une flèche n'y est pas toujours une dépendance — `031 ─► 032` en est une de
+lecture, les deux ne se bloquent pas (`031` n'est attendue par aucune step, `032` ne dépend que de
+`007`).
 
 **Ce qui peut avancer en parallèle une fois `M3` acquis :** `M6`, `M7` et `M8` touchent des écrans,
 des permissions et des endpoints **disjoints**. `M4` doit précéder `M5`. `M9` clôt et exige tout.
