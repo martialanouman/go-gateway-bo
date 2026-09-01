@@ -24,13 +24,24 @@ rencontrent »* (`plan.md` §2.1) — suppose qu'une step les rencontre. Aucune 
   de chiffrement TOTP, l'`issuer` de l'URI `otpauth://`, le `displayName` WebAuthn.
 - **Les trois branches de course non exercées** : `!consumed` et `!elevated` de `VerifyMfa`, `!found`
   de l'enrôlement.
-- **L'appel à `VerifyDummy` et la cible de durée d'argon2id**, qu'aucune porte n'exige : l'oracle
-  d'énumération que le hachage factice ferme repose sur un appel que rien ne réclame.
+- **La cible de durée d'argon2id**, qu'aucune porte n'exige : le plancher exécuté porte sur les
+  nombres, pas sur le temps, et il est très en dessous du profil retenu.
+
+### Trois affirmations de cette fiche que la mesure a corrigées
+
+*Relues le 01/09/2026, avant d'écrire une ligne de code. Une step qui code contre un énoncé faux paie
+deux fois.*
+
+| Ce que la fiche écrivait | Ce que la mesure rend |
+|---|---|
+| l'appel à `VerifyDummy` n'est exigé par aucune porte | **la porte existe** — `internal/auth/oracle_test.go:31`, livrée par step-021 ; seule la cible de durée reste sans garde |
+| la variable nouvelle se pose « dans le compose de développement » | `docker-compose.yml` ne déclare aucun `DASHBOARD_*` ; le pendant réel est `.env.example`, gardé par `dotenv_test.go` |
+| « les trois branches de course » | **dix** : les trois de step-023, plus sept côté WebAuthn que step-023 ne pouvait pas compter, lui étant antérieure |
 
 ### Sept dettes que cette step hérite
 
 *Écrites ici et non seulement dans `steps/done/`, parce qu'une fiche archivée n'est ouverte par
-personne. Les six figurent au registre de `todo.md`.*
+personne. Les sept figurent au registre de `todo.md`.*
 
 - **Les trois comparaisons à temps constant ne sont gardées que par la revue, et c'est mesuré deux
   fois.** `cookie.go` l'écrit depuis le 10/08/2026 ; `recovery.go` depuis le 12/08. **Remesuré le
@@ -60,19 +71,22 @@ personne. Les six figurent au registre de `todo.md`.*
   sortie est une variable de plus, le jour où il y a une préproduction — aucune step planifiée n'en a
   une ». Avec l'entropie de la clé, cela fait trois valeurs et un seul geste, au même endroit.
 
-- **Trois branches de course ne sont exercées par rien.** `done/step-023.md` : « elles ne sont
-  atteignables que par deux requêtes en vol ou une désactivation entre le middleware et le handler.
-  Aucun test ne les exerce, et c'est écrit ici plutôt que couvert par un test qui ferait semblant. »
+- **Trois branches de course ne sont exercées par rien** — et l'inventaire réel en compte **dix**.
+  `done/step-023.md` : « elles ne sont atteignables que par deux requêtes en vol ou une désactivation
+  entre le middleware et le handler. Aucun test ne les exerce, et c'est écrit ici plutôt que couvert
+  par un test qui ferait semblant. » Les sept autres sont côté WebAuthn, livrées par step-024 :
+  step-023 lui est antérieure et ne pouvait pas les voir.
 
 - **Une constante `Key` déclarée sans entrée au catalogue ne fait rougir aucune porte.** step-006 :
   « compile, deux suites vertes, absente du TS engendré. Go ne signale pas une constante exportée
   inutilisée. » Le catalogue est gardé **contre les rôles** — `TestAucuneCleOrphelineHorsDesTrois
   Deliberees` — mais pas contre ses propres constantes, et l'audit des dettes l'avait manqué aussi.
 
-- **L'appel à `VerifyDummy` n'est exigé par aucune porte, et la cible de durée d'argon2id non plus.**
-  L'oracle d'énumération que le hachage factice ferme repose donc sur un appel que rien ne réclame :
-  le retirer laisse la suite verte et rouvre la mesure de temps qui distingue un compte connu d'un
-  compte absent.
+- **La cible de durée d'argon2id n'est exigée par aucune porte.** ~~L'appel à `VerifyDummy` non
+  plus~~ — `oracle_test.go` le garde depuis step-021, et le registre l'ignorait. Ce qui reste ouvert
+  est le coût : le plancher exécuté est celui d'OWASP, 19 MiB et deux passes, quand le profil retenu
+  est 64 MiB et trois passes. Descendre à l'un depuis l'autre divise le temps par 1,6 et laisse tout
+  vert.
 
 ## Points d'implémentation clés
 - **Ce qui manque à la garde des comparaisons n'est pas un test de durée.** Les trois fiches d'origine
@@ -83,12 +97,14 @@ personne. Les six figurent au registre de `todo.md`.*
 - **Une porte qui refuse du légitime finit retirée** : le périmètre de la règle doit être le **chemin
   de vérification**, pas toute comparaison du dépôt. Le confronter à l'inventaire réel avant de
   l'écrire, comme la règle de `writeJSON` l'a été.
-- **Les trois branches de course admettent trois issues, et la DoD les accepte toutes les trois** : un
-  test qui les atteint, leur suppression si elles sont mortes, ou un constat écrit vérifié plutôt que
-  supposé. Ce qu'elle n'accepte pas est le silence.
-- **Sortir trois valeurs vers la configuration touche le démarrage du binaire.** `make check` ne lance
-  jamais le binaire : la variable nouvelle se pose aussi dans la CI, dans le compose de développement
-  et dans Playwright, sans quoi elle échoue là où personne ne la cherche.
+- **Les branches de course admettent trois issues, et la DoD les accepte toutes les trois** : un test
+  qui les atteint, leur suppression si elles sont mortes, ou un constat écrit vérifié plutôt que
+  supposé. Ce qu'elle n'accepte pas est le silence. Aucune n'est morte, et aucune n'est atteignable
+  sans couture : `API.SecondFactor` et `API.Sessions` sont des types concrets.
+- **Sortir des valeurs vers la configuration touche le démarrage du binaire.** `make check` ne lance
+  jamais le binaire : la variable nouvelle se pose aussi dans `.env.example`, dans les décors des
+  scénarios, dans la CI et dans Playwright, sans quoi elle échoue là où personne ne la cherche. Les
+  deux derniers sont hors de `make check`.
 
 ## Tests (écrits dans la même PR)
 - **Mutation, sur les trois comparaisons** : remplacer chacune par sa version naïve doit faire rougir.
@@ -105,8 +121,12 @@ personne. Les six figurent au registre de `todo.md`.*
 - [ ] la mutation « `hmac.Equal` → comparaison naïve » fait rougir — elle est **verte** avant cette PR
 - [ ] la mutation « `matched = index` → `return index` » fait rougir — **verte** avant cette PR
 - [ ] la mutation « `subtle.ConstantTimeCompare` → `==` » fait rougir
-- [ ] une clé de trente-deux caractères identiques est refusée au démarrage
-- [ ] la variable nouvelle est posée dans la CI, le compose et Playwright, pas seulement en local
+- [ ] la mutation « constante `Key` hors catalogue » fait rougir
+- [ ] une clé de trente-deux caractères identiques est refusée au démarrage ; une clé tirée d'un
+      CSPRNG passe
+- [ ] la mutation « profil argon2id ramené au plancher d'OWASP » fait rougir
+- [ ] la variable nouvelle est posée dans `.env.example`, les décors, la CI et Playwright, pas
+      seulement en local
 - [ ] ce qui reste sans garde est écrit là où il vit, avec la mesure qui l'établit
 
 ## Hors périmètre
