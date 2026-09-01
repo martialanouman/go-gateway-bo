@@ -10,6 +10,8 @@ step le contredit : **les dépendances déclarées priment toujours**. Les secti
 **et par phase** — un jalon peut se clore après le début du suivant, et `M1` le fait : ses écrans
 reposent sur la coquille de `M2`. D'où deux sections `M1` et deux sections `M2`, et **plus aucune note
 qui déplace une ligne** : la séquence se lit de haut en bas, telle qu'elle s'exécute.
+`TestAucuneStepNEstListeeAvantUneDontElleDepend` confronte les deux règles — il refuse une step listée
+avant une step dont sa fiche déclare dépendre.
 
 Le **plan** donne le cadre : conventions transverses, tranche verticale, critères de sortie par jalon,
 graphe de parallélisation, état réel de la passerelle. Cet index donne le découpage en PRs. Les deux
