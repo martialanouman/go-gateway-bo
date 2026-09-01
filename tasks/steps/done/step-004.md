@@ -398,3 +398,16 @@ la réponse.
 Non traité ici parce qu'aucune route ne peut encore échouer : la première qui le pourra est celle qui
 appelle la passerelle, en step-060, et c'est elle qui dira quelle forme de journal lui sert. Le
 constat est écrit là où il vit, au-dessus du gestionnaire.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai de toutes.
+
+Un 500 du BFF sans trace côté serveur → **step-060**, « c'est elle qui dira quelle forme de
+journal lui sert ». La validation des requêtes entrantes contre le schéma → **step-060** aussi.

@@ -44,6 +44,22 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		return EnrollTotp401JSONResponse(notAuthenticated()), nil
 	}
 
+	// **Avant toute dépense**, et avant même de lire l'état du facteur : cette route hache dix
+	// argon2id par appel, et jusqu'ici une session de premier facteur suffisait à la répéter sans
+	// qu'aucun compteur la voie — elle réussit, et les compteurs d'échecs ne comptent que les refus.
+	// Compté ici et non au succès : le travail est fait dès qu'on entre, et un client qui coupe la
+	// connexion pendant les dix hachages les a fait payer quand même. Un refus en aval — 401 sur une
+	// session survivante, 409 sur un remplacement sans preuve — a lui aussi coûté, jusqu'aux argon2id
+	// du code présenté.
+	enrollments, err := a.SecondFactor.AdmitEnrollment(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if enrollments.Locked() {
+		return tooManyEnrollments(enrollments.Remaining), nil
+	}
+
 	state, found, err := a.SecondFactor.State(ctx, resolved.OperatorID)
 	if err != nil {
 		return nil, err
@@ -89,6 +105,26 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 			return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
 		}
 
+		// **Le verrou d'essais de second facteur, consulté ici comme il l'est par la vérification.**
+		// Sans lui, ce chemin ouvrait un second seau de cinq essais, indépendant du premier : qui
+		// détient le mot de passe disposait de dix devinettes par quart d'heure au lieu de cinq, la
+		// moitié par une route que la migration 00007 n'avait pas vue. Le compteur d'appels de 00009
+		// bornait le nombre de requêtes, pas le budget de recherche.
+		//
+		// **Consulter et compter sont deux gardes distinctes, et l'une masque l'autre sur un code
+		// faux** — les deux rendent alors le même 429, et la mutation qui retire cette consultation
+		// reste verte. Mesuré. Ce qu'elle tient seule se voit sur un code **juste** : sans elle, un
+		// compte verrouillé remplacerait son authentificateur, c'est-à-dire que le verrou échouerait à
+		// empêcher le succès qu'il existe pour empêcher. C'est ce scénario-là qui la garde.
+		lock, err := a.SecondFactor.Lock(ctx, resolved.OperatorID)
+		if err != nil {
+			return nil, err
+		}
+
+		if lock.Locked() {
+			return enrollmentLockedBySecondFactor(lock.Remaining), nil
+		}
+
 		replace, err = a.verifyPresentedFactor(ctx, resolved.OperatorID, string(*request.Body.Method),
 			*request.Body.Code)
 		if err != nil {
@@ -96,7 +132,7 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		}
 
 		if !replace {
-			return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
+			return a.refuseReplacement(ctx, resolved.OperatorID)
 		}
 	}
 
@@ -111,6 +147,19 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 
 	// Le DTO se compose champ par champ. `Enrollment` porte aussi le secret **chiffré** et les
 	// hachages des codes ; les oublier ici n'est pas une vigilance, c'est qu'ils ne sont pas nommés.
+	// L'état d'après ne porte que ce qu'une enquête doit savoir : un facteur a été posé, et il a
+	// remplacé ou non celui d'avant. Ni le secret, ni les codes — `Fields` n'a d'ailleurs pas de
+	// méthode pour les y mettre.
+	if err = a.audited(ctx, store.Event{
+		OperatorID: resolved.OperatorID,
+		Action:     actionMFAEnroll,
+		TargetType: auditTargetOperator,
+		TargetID:   resolved.OperatorID,
+		After:      store.NewFields().Text("method", "totp").Flag("replaced", replace),
+	}); err != nil {
+		return nil, err
+	}
+
 	return EnrollTotp200JSONResponse{
 		Secret:        enrollment.Secret,
 		OtpauthUri:    enrollment.OtpauthURI,
@@ -211,6 +260,16 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 
 	postCookie(ctx, session.Issued(renewed))
 
+	if err = a.audited(ctx, store.Event{
+		OperatorID: resolved.OperatorID,
+		Action:     actionMFAVerify,
+		TargetType: auditTargetOperator,
+		TargetID:   resolved.OperatorID,
+		After:      store.NewFields().Text("method", string(request.Body.Method)),
+	}); err != nil {
+		return nil, err
+	}
+
 	return VerifyMfa204Response{}, nil
 }
 
@@ -252,11 +311,72 @@ func tooManySecondFactorAttempts(remaining time.Duration) VerifyMfa429JSONRespon
 
 	return VerifyMfa429JSONResponse{
 		Headers: VerifyMfa429ResponseHeaders{RetryAfter: seconds},
+		Body:    secondFactorLocked(seconds),
+	}
+}
+
+// enrollmentLockedBySecondFactor rend le **même** refus sur la route d'enrôlement : c'est le même
+// seau, la même durée et le même remède. Une seconde copie qui dirait « l'enrôlement est bloqué »
+// laisserait croire à deux verrous là où il n'y en a qu'un.
+//
+// Il ne se confond pas avec `tooManyEnrollments`, qui porte le compteur d'**appels** de la migration
+// 00009 : même statut, autre cause, autre phrase. Les deux se distinguent au message, et les
+// scénarios les exercent sur des routes où une seule des deux peut mordre.
+func enrollmentLockedBySecondFactor(remaining time.Duration) EnrollTotp429JSONResponse {
+	seconds := retryAfterSeconds(remaining)
+
+	return EnrollTotp429JSONResponse{
+		Headers: EnrollTotp429ResponseHeaders{RetryAfter: seconds},
+		Body:    secondFactorLocked(seconds),
+	}
+}
+
+func secondFactorLocked(seconds int) Error {
+	return Error{
+		Code: "too_many_attempts",
+		Message: "Le second facteur est temporairement bloqué après plusieurs essais : réessayez " +
+			"dans " + humanDelay(seconds) + ". Le blocage porte sur ce compte, se lève tout seul, et " +
+			"n'empêche pas de se reconnecter.",
+	}
+}
+
+// refuseReplacement compte l'essai raté **dans le seau du second facteur**, et annonce le verrou à
+// l'essai qui le franchit plutôt que de surprendre au suivant — même forme que `refuseSecondFactor`.
+//
+// Le succès, lui, n'efface rien, contrairement à la vérification : ce qui reste au compteur s'éteint
+// de lui-même en un quart d'heure, et le remplacement détruit déjà le facteur qu'il vient de prouver.
+func (a API) refuseReplacement(ctx context.Context, operatorID string) (EnrollTotpResponseObject,
+	error,
+) {
+	lock, err := a.SecondFactor.Fail(ctx, operatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if lock.Locked() {
+		return enrollmentLockedBySecondFactor(lock.Remaining), nil
+	}
+
+	return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
+}
+
+// tooManyEnrollments annonce le verrou d'enrôlement et sa durée. Même construction que les deux
+// autres : les deux durées — l'en-tête et la phrase — sortent du même arrondi.
+//
+// La copie dit **ce que le blocage ne touche pas**, parce qu'un opérateur qui lit « bloqué » sur la
+// route qui mène au second facteur croirait son compte perdu : se connecter et franchir un facteur
+// déjà en place restent ouverts.
+func tooManyEnrollments(remaining time.Duration) EnrollTotp429JSONResponse {
+	seconds := retryAfterSeconds(remaining)
+
+	return EnrollTotp429JSONResponse{
+		Headers: EnrollTotp429ResponseHeaders{RetryAfter: seconds},
 		Body: Error{
 			Code: "too_many_attempts",
-			Message: "Le second facteur est temporairement bloqué après plusieurs essais : réessayez " +
-				"dans " + humanDelay(seconds) + ". Le blocage porte sur ce compte, se lève tout seul, et " +
-				"n'empêche pas de se reconnecter.",
+			Message: "L'enrôlement d'une application d'authentification est temporairement bloqué " +
+				"après plusieurs demandes : réessayez dans " + humanDelay(seconds) + ". Le blocage " +
+				"porte sur ce compte, se lève tout seul, et n'empêche ni de se connecter ni de " +
+				"franchir un second facteur déjà en place.",
 		},
 	}
 }

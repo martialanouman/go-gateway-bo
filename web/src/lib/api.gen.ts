@@ -286,8 +286,14 @@ export interface paths {
          * Retire une passkey
          * @description Retire une passkey de l'opérateur de la session.
          *
-         *     **Seule opération de ce préfixe qui soit une mutation**, et la seule que step-025 devra garder
-         *     plutôt qu'exempter. Elle exige une session élevée — mais **pas** de présenter la passkey qu'on
+         *     **Elle n'exige aucune permission, et c'est délibéré** — l'affirmation inverse a tenu ici de
+         *     step-024 jusqu'à step-025, qui l'a corrigée. Retirer sa propre clé d'accès est du self-service,
+         *     pas un acte sur autrui : aucune clé du catalogue n'y correspond, et en créer une qu'il faudrait
+         *     donner aux neuf rôles pour que le geste marche n'exclurait personne. Ce qui la garde est
+         *     l'élévation, et ce qui en garde la trace est le journal d'audit. C'est `operators:manage` qui
+         *     gardera le retrait **sur autrui**, en step-029.
+         *
+         *     Elle exige donc une session élevée — mais **pas** de présenter la passkey qu'on
          *     retire : on la retire précisément quand on ne l'a plus, appareil perdu ou clé cassée, et
          *     l'exiger rendrait le geste impossible dans le seul cas qui le motive.
          *
@@ -704,6 +710,25 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /**
+             * @description Trop d'enrôlements depuis ce compte sur le dernier quart d'heure. Le compteur porte ici sur
+             *     les **appels** et non sur les échecs : cette route réussit, et une session de premier
+             *     facteur suffisait à la répéter — chaque appel hachant dix codes de récupération, soit dix
+             *     fois le processeur d'une connexion.
+             *
+             *     Le message porte la durée restante, comme les autres verrous : un refus muet ferait
+             *     retenter l'opérateur, puis ouvrir un ticket.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     verifyMfa: {
@@ -812,6 +837,25 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /**
+             * @description Trop de cérémonies ouvertes depuis ce compte sur le dernier quart d'heure. Le compteur
+             *     porte ici sur les **appels** et non sur les échecs : cette route réussit, et une session de
+             *     premier facteur suffisait à la répéter — chaque appel écrivant un défi que rien ne purge.
+             *
+             *     Le seuil est commun aux deux ouvertures, enregistrement et assertion : les séparer
+             *     doublerait le budget disponible pour la même protection. Le message porte la durée
+             *     restante.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     finishWebauthnRegistration: {
@@ -905,6 +949,25 @@ export interface operations {
             /** @description Aucune session vivante. */
             401: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Trop de cérémonies ouvertes depuis ce compte sur le dernier quart d'heure. Le compteur
+             *     porte ici sur les **appels** et non sur les échecs : cette route réussit, et une session de
+             *     premier facteur suffisait à la répéter — chaque appel écrivant un défi que rien ne purge.
+             *
+             *     Le seuil est commun aux deux ouvertures, enregistrement et assertion : les séparer
+             *     doublerait le budget disponible pour la même protection. Le message porte la durée
+             *     restante.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
                     [name: string]: unknown;
                 };
                 content: {

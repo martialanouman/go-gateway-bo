@@ -310,3 +310,16 @@ noms de tokens dans `index.html` — cessent d'être **lus**, au lieu d'être ne
 reste : `var(--danger-border)` fait toujours échouer `make build` en nommant le token, et un token
 déclaré par le `<style>` du document puis consommé par la feuille passe toujours — l'union que le
 plugin juge n'a pas bougé.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai de toutes.
+
+Le raccourci `font:` qui réinitialise `font-variant-numeric`, et les deux dettes de forme
+relevées en revue → **step-041**, qui livre les primitives et les KPI où elles mordent.

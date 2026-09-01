@@ -18,7 +18,7 @@ permette de l'enrôler.
 - Le chemin de sortie : l'écran conduit à la console, et il est atteignable depuis le login d'un
   opérateur sans facteur (step-027).
 
-### Une dette que cette step hérite
+### Deux dettes que cette step hérite
 
 *Écrite ici et non seulement dans `steps/done/step-024.md` : une fiche archivée n'est ouverte par
 personne.*

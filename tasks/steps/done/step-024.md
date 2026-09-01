@@ -151,7 +151,10 @@ relevé l'écart.
 Ce que l'élévation seule ne couvre pas est écrit dans le §6.9 : elle vaut douze heures. Ce qui reste
 est borné par DN-8 et par l'audit de step-025.
 
-**Conséquence pour step-025**, et la première rédaction se trompait. Le retrait est la seule opération
+**Conséquence pour step-025**, et la première rédaction se trompait. *(Correction du 29/08/2026, en
+step-025 : la phrase qui suit se trompe elle aussi. Le retrait n'exige **aucune** permission —
+retirer sa propre clé est du self-service, et aucune clé du catalogue n'y correspond. Voir DN-4 de
+`step-025.md`. Le reste du paragraphe, sur l'audit, était juste.)* Le retrait est la seule opération
 de ce préfixe qui exige une **permission**, mais **pas la seule qui écrive** : `register/finish`
 insère une passkey, et les deux `begin` écrivent un défi. Exempter `/auth/mfa/*` sauf le `DELETE`
 laisserait donc **l'ajout d'un second facteur partir sans écriture d'audit** — précisément
@@ -354,3 +357,17 @@ depuis celle qui a créé. Ce qui suit reste la trace, pas le porteur.
 L'exigence de second facteur sur les écritures → step-025. Le choix d'affichage entre passkey et TOTP,
 et la détection du support par le navigateur → step-028. La réinitialisation du second facteur d'un
 autre opérateur → step-029. La purge des défis morts → step-187.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai des quarante-neuf.
+
+Le `displayName` codé en dur → **step-031**. L'authentificateur au compteur cassé → **step-029**.
+L'index du défi unique → **step-187**. `virtualwebauthn` épinglée → **step-032**. L'ordre du `rp_id`
+→ **step-186**.

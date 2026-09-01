@@ -323,3 +323,17 @@ que recopié du constat, parce qu'un correctif bâti sur un constat non revérif
   meilleur** : laissé où il est.
 - **Le volume de commentaire de cette step est élevé.** Assumé sur les deux tests, dont tout l'intérêt
   est de dire ce qu'ils ne gardent pas ; le changelog d'`errors.go` a en revanche été gardé court.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai de toutes.
+
+Les scopes `cdr:export_bulk` et `msisdn:reveal` absents du jeton machine → **step-104**,
+déjà consigné au renvoi ◊ de `todo.md`. Le manque de `cdr:export_bulk` au contrat amont se corrige
+par une PR dans `go-gateway/api/`.

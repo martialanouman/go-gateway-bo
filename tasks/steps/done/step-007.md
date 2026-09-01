@@ -409,3 +409,17 @@ Les scénarios métier — chacun arrive avec sa step. L'audit d'accessibilité 
 **Ajoutés le 03/08/2026 :** l'amortissement de testcontainers (DN-3, avec son déclencheur de reprise),
 le montage de `QueryClientProvider` (DN-7, renvoyé à la step du premier appel réseau), et la réécriture
 des tests client existants à la forme Étant donné / Quand / Alors (DN-8).
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai de toutes.
+
+`QueryClientProvider` non monté → **step-027**, le premier écran qui parle au BFF, donc la
+première step qui livre un `useQuery`. L'amortissement de testcontainers et la borne de démarrage
+passée de 5 s à 30 s → **step-032**.

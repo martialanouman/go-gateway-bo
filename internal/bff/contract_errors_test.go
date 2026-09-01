@@ -93,7 +93,10 @@ func TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser(t *testing.T) {
 	t.Parallel()
 
 	router := chi.NewRouter()
-	mountContract(router, failingAPI{})
+	// Aucun gestionnaire de session : `Health` est exempté par la table d'autorisation, donc la garde
+	// laisse passer sans jamais lire de permissions. Un `nil` qui serait déréférencé ferait paniquer
+	// ce test plutôt que le laisser vert.
+	mountContract(router, failingAPI{}, nil)
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
 
@@ -30,6 +31,17 @@ func (a API) BeginWebauthnRegistration(ctx context.Context, _ BeginWebauthnRegis
 
 	if !alive {
 		return BeginWebauthnRegistration401JSONResponse(notAuthenticated()), nil
+	}
+
+	if lock, err := a.Passkeys.AdmitCeremony(ctx, resolved.OperatorID); err != nil {
+		return nil, err
+	} else if lock.Locked() {
+		return BeginWebauthnRegistration429JSONResponse{
+			Headers: BeginWebauthnRegistration429ResponseHeaders{
+				RetryAfter: retryAfterSeconds(lock.Remaining),
+			},
+			Body: tooManyCeremonies(lock.Remaining),
+		}, nil
 	}
 
 	held, err := a.SecondFactor.Factors(ctx, resolved.OperatorID)
@@ -105,6 +117,18 @@ func (a API) FinishWebauthnRegistration(ctx context.Context,
 		return FinishWebauthnRegistration401JSONResponse(refusedCeremony()), nil
 	}
 
+	// **Audité bien qu'exempté de garde de permission** : poser un second facteur est précisément
+	// l'événement qu'une enquête sur compte compromis cherche en premier. Exemption de garde et
+	// exemption d'audit ne se confondent pas.
+	if err = a.audited(ctx, store.Event{
+		OperatorID: resolved.OperatorID,
+		Action:     actionPasskeyRegister,
+		TargetType: auditTargetPasskey,
+		TargetID:   id,
+	}); err != nil {
+		return nil, err
+	}
+
 	return FinishWebauthnRegistration200JSONResponse{Id: id}, nil
 }
 
@@ -122,6 +146,17 @@ func (a API) BeginWebauthnAssertion(ctx context.Context, _ BeginWebauthnAssertio
 		return BeginWebauthnAssertion401JSONResponse(notAuthenticated()), nil
 	}
 
+	if lock, err := a.Passkeys.AdmitCeremony(ctx, resolved.OperatorID); err != nil {
+		return nil, err
+	} else if lock.Locked() {
+		return BeginWebauthnAssertion429JSONResponse{
+			Headers: BeginWebauthnAssertion429ResponseHeaders{
+				RetryAfter: retryAfterSeconds(lock.Remaining),
+			},
+			Body: tooManyCeremonies(lock.Remaining),
+		}, nil
+	}
+
 	assertion, err := a.Passkeys.BeginAssertion(ctx, resolved.ID, resolved.OperatorID)
 	if err != nil {
 		if errors.Is(err, mfa.ErrNoPasskey) {
@@ -132,6 +167,24 @@ func (a API) BeginWebauthnAssertion(ctx context.Context, _ BeginWebauthnAssertio
 	}
 
 	return BeginWebauthnAssertion200JSONResponse(assertionOptionsOf(assertion)), nil
+}
+
+// tooManyCeremonies porte la copie commune aux deux ouvertures. Le corps est partagé, les deux types
+// de réponse engendrés ne le sont pas — c'est le code engendré qui l'impose, une réponse par
+// opération.
+//
+// Elle dit **ce que le blocage ne touche pas** : les autres méthodes de second facteur restent
+// ouvertes, et un opérateur qui lirait « bloqué » sur le chemin de sa clé croirait sinon n'avoir plus
+// aucune voie.
+func tooManyCeremonies(remaining time.Duration) Error {
+	seconds := retryAfterSeconds(remaining)
+
+	return Error{
+		Code: "too_many_attempts",
+		Message: "Les cérémonies de clé d'accès sont temporairement bloquées après plusieurs " +
+			"ouvertures : réessayez dans " + humanDelay(seconds) + ". Le blocage porte sur ce compte, " +
+			"se lève tout seul, et laisse ouvertes les autres méthodes de second facteur.",
+	}
 }
 
 // DeleteWebauthnPasskey retire une passkey.
@@ -173,6 +226,15 @@ func (a API) DeleteWebauthnPasskey(ctx context.Context,
 		// ce que possède quelqu'un d'autre.
 		return DeleteWebauthnPasskey401JSONResponse(notAuthenticated()), nil
 	case store.PasskeyRemoved:
+		if err = a.audited(ctx, store.Event{
+			OperatorID: resolved.OperatorID,
+			Action:     actionPasskeyRemove,
+			TargetType: auditTargetPasskey,
+			TargetID:   request.PasskeyId,
+		}); err != nil {
+			return nil, err
+		}
+
 		return DeleteWebauthnPasskey204Response{}, nil
 	}
 

@@ -54,6 +54,8 @@ type enrollment struct {
 func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^l'opérateur enrôle une application d'authentification$`, w.enroll)
 	ctx.When(`^l'opérateur enrôle une application d'authentification$`, w.enroll)
+	ctx.Given(`^l'opérateur enrôle une application d'authentification (\d+) fois$`, w.enrollTimes)
+	ctx.When(`^l'opérateur enrôle une application d'authentification (\d+) fois$`, w.enrollTimes)
 	ctx.Given(`^l'opérateur présente le code du pas courant$`, w.presentCodeAtOffset(0))
 	ctx.When(`^l'opérateur présente le code du pas courant$`, w.presentCodeAtOffset(0))
 	ctx.When(`^l'opérateur présente le code du pas précédent$`, w.presentCodeAtOffset(-1))
@@ -66,6 +68,9 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur représente le même code$`, w.presentTheSameCodeAgain)
 	ctx.When(`^l'opérateur remplace son authentificateur en présentant son code$`,
 		w.replaceProvingTheCurrentCode)
+	ctx.Given(`^l'opérateur tente (\d+) remplacements avec un code faux$`, w.replaceWithWrongCodes)
+	ctx.When(`^l'opérateur tente (\d+) remplacements avec un code faux$`, w.replaceWithWrongCodes)
+	ctx.When(`^l'opérateur tente un remplacement avec un code faux$`, w.replaceWithWrongCode)
 	ctx.When(`^l'opérateur présente un code qui n'est celui d'aucun authentificateur$`,
 		w.presentCodeWithoutEnrolment)
 	ctx.When(`^l'opérateur présente un code démesuré$`, w.presentOversizedCode)
@@ -86,6 +91,20 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 
 func (w *mfaWorld) enroll() error {
 	return w.enrollProving(nil)
+}
+
+// enrollTimes répète l'appel sans juger ce qu'il rend : c'est le scénario qui juge la **dernière**
+// réponse. Les appels intermédiaires sont refusés en 409 dès le second — un second facteur est en
+// place et rien ne le prouve — et c'est justement ce qui rend la borne visible : elle compte des
+// appels, là où le verrou d'essais ne compterait aucun de ceux-là.
+func (w *mfaWorld) enrollTimes(count int) error {
+	for range count {
+		if err := w.enroll(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // enrollProving enrôle en présentant — ou non — une preuve du facteur en place. Le premier
@@ -191,12 +210,22 @@ func (w *mfaWorld) codeAtOffset(ctx context.Context, offset int64) (string, erro
 	return code, nil
 }
 
-// presentWrongCode présente un code de six chiffres qui n'est celui d'aucun pas. Six chiffres et non
-// une chaîne quelconque : ce qui doit être exercé est la comparaison, pas le refus de forme.
+// presentWrongCode devine un code sur la route de vérification.
 func (w *mfaWorld) presentWrongCode(ctx context.Context) error {
-	step, err := w.currentStep(ctx)
+	code, err := w.wrongCode(ctx)
 	if err != nil {
 		return err
+	}
+
+	return w.verify("totp", code)
+}
+
+// wrongCode fabrique un code de six chiffres qui n'est celui d'aucun pas. Six chiffres et non une
+// chaîne quelconque : ce qui doit être exercé est la comparaison, pas le refus de forme.
+func (w *mfaWorld) wrongCode(ctx context.Context) (string, error) {
+	step, err := w.currentStep(ctx)
+	if err != nil {
+		return "", err
 	}
 
 	// Un pas très éloigné produit un code de la bonne forme que la fenêtre ne couvre pas — plus sûr
@@ -206,10 +235,38 @@ func (w *mfaWorld) presentWrongCode(ctx context.Context) error {
 		Algorithm: otp.AlgorithmSHA1,
 	})
 	if err != nil {
-		return fmt.Errorf("fabriquer un code faux : %w", err)
+		return "", fmt.Errorf("fabriquer un code faux : %w", err)
 	}
 
-	return w.verify("totp", code)
+	return code, nil
+}
+
+// replaceWithWrongCode emprunte la **route d'enrôlement** pour deviner un code, ce qui est le chemin
+// que la migration 00007 n'avait pas vu : elle ne bornait que `POST /auth/mfa/verify`.
+func (w *mfaWorld) replaceWithWrongCode(ctx context.Context) error {
+	code, err := w.wrongCode(ctx)
+	if err != nil {
+		return err
+	}
+
+	return w.enrollProving(map[string]string{"method": "totp", "code": code})
+}
+
+func (w *mfaWorld) replaceWithWrongCodes(ctx context.Context, times int) error {
+	for range times {
+		if err := w.replaceWithWrongCode(ctx); err != nil {
+			return err
+		}
+
+		// 409 tant que le seuil n'est pas atteint, 429 à l'essai qui le franchit. Ce qui compte ici est
+		// qu'aucun code faux ne remplace l'authentificateur en place.
+		if status := w.login.process.received.status; status != 409 && status != 429 {
+			return fmt.Errorf("un code faux a été accepté au remplacement : le serveur a répondu %d",
+				status)
+		}
+	}
+
+	return nil
 }
 
 func (w *mfaWorld) presentWrongCodes(ctx context.Context, times int) error {
@@ -394,7 +451,7 @@ func (w *mfaWorld) secretChanged() error {
 }
 
 // secondFactorIsVerified et son contraire lisent `/auth/me`, donc l'état **servi** et non celui de la
-// ligne. C'est ce que step-025 lira pour garder les écritures.
+// ligne. C'est ce que la garde de permission lit pour décider (step-025).
 func (w *mfaWorld) secondFactorIsVerified() error {
 	elevated, err := w.elevation()
 	if err != nil {
@@ -416,7 +473,7 @@ func (w *mfaWorld) secondFactorIsNotVerified() error {
 
 	if elevated {
 		return errors.New("la session est élevée alors que rien n'a franchi le second facteur : " +
-			"step-025 la laisserait écrire")
+			"la garde de permission la laisserait écrire")
 	}
 
 	return nil

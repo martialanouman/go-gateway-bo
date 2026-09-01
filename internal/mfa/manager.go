@@ -20,12 +20,30 @@ import (
 // d'heure qui est **à la fois** la durée du verrou et la fenêtre d'oubli, sans quoi un verrou qui
 // vient d'expirer se refermerait au premier essai suivant.
 //
-// Ce qu'elles coûtent : cinq essais par quart d'heure, sur 10⁶ codes dont trois sont valables à la
-// fois. Une chance sur deux demanderait de l'ordre de quatre-vingts ans.
+// Ce qu'elles achètent, **recalculé en step-025 et corrigé** : cinq essais par quart d'heure, sur 10⁶
+// codes dont trois sont valables à la fois, donc 231 000 essais pour une chance sur deux et
+// 175 200 essais par an — de l'ordre de **seize mois**, pour un attaquant qui détient déjà le mot de
+// passe et s'acharne sans interruption.
+//
+// La rédaction précédente disait « quatre-vingts ans ». Le chiffre était faux d'un facteur soixante,
+// et personne ne l'avait refait : il vivait ici et dans `done/step-023.md`, à côté de ses propres
+// prémisses, qui suffisent à le contredire. Seize mois n'est pas « infaisable » — c'est cher, et
+// c'est la raison pour laquelle l'enrôlement a cessé d'ouvrir un second seau (step-025).
 const (
 	MaxFailures = 5
 	LockWindow  = 15 * time.Minute
 )
+
+// MaxEnrollments borne les **appels** à `POST /auth/mfa/totp/enroll`, réussis compris. Le compteur
+// d'échecs ci-dessus ne voit rien de cette route : elle réussit, et une session de premier facteur
+// suffit à la répéter.
+//
+// Ce qu'elle coûte au serveur est mesuré (step-023) : dix argon2id par appel, soit dix fois le
+// processeur d'une connexion. Cinq par quart d'heure laisse largement l'usage réel — enrôler deux
+// fois de suite est déjà inhabituel — et la même fenêtre que partout ailleurs, pour la raison qui
+// l'a fait choisir : un verrou qui vient d'expirer se refermerait au premier appel suivant si la
+// fenêtre d'oubli était plus courte que lui.
+const MaxEnrollments = 5
 
 // Manager compose l'authentificateur et le stockage, comme `session.Manager` compose le sceau du
 // cookie et sa table. Rien hors de ce paquet ne voit un secret déchiffré ni un code en clair — sauf
@@ -33,15 +51,24 @@ const (
 type Manager struct {
 	authenticator *Authenticator
 	factors       *store.MFA
+	// enrollments borne les appels à l'enrôlement. Il est distinct du compteur d'échecs porté par
+	// `factors` : celui-ci compte des refus de second facteur, celui-là des appels qui réussissent.
+	enrollments *store.Counter
 }
 
-func NewManager(factors *store.MFA, passphrase []byte) (*Manager, error) {
+func NewManager(factors *store.MFA, enrollments *store.Counter, passphrase []byte) (*Manager, error) {
 	authenticator, err := NewAuthenticator(passphrase)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Manager{authenticator: authenticator, factors: factors}, nil
+	return &Manager{authenticator: authenticator, factors: factors, enrollments: enrollments}, nil
+}
+
+// AdmitEnrollment consulte le verrou d'enrôlement puis compte l'appel. Un verrou non nul veut dire
+// « refusé ».
+func (m *Manager) AdmitEnrollment(ctx context.Context, operatorID string) (store.Lock, error) {
+	return m.enrollments.Admit(ctx, operatorID, LockWindow, MaxEnrollments)
 }
 
 // State rend ce qu'un opérateur détient et le pas de temps courant.

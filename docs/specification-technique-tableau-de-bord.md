@@ -335,11 +335,15 @@ POST   /auth/mfa/webauthn/assert/begin     # (Amendement step-024) options d'ass
                                        # opération, ce que la ligne du dessus promettait.
 DELETE /auth/mfa/webauthn/passkeys/{passkeyId} # (Amendement step-024) retire une passkey. REFUSÉ quand
                                        # c'est le dernier facteur : retirer le dernier enferme
-                                       # l'opérateur dehors. Seule route de ce préfixe qui exige une
-                                       # PERMISSION — donc la seule que step-025 doit garder plutôt
-                                       # qu'exempter. Elle n'est en revanche pas la seule à ÉCRIRE :
-                                       # register/finish pose un second facteur, et cet événement-là
-                                       # doit être audité même exempté de garde.
+                                       # l'opérateur dehors. (Amendement step-025) N'exige AUCUNE
+                                       # permission — la ligne précédente disait l'inverse et se
+                                       # trompait : retirer sa propre clé est du self-service, et
+                                       # aucune clé du catalogue n'y correspond. L'élévation la garde,
+                                       # le journal d'audit en garde la trace ; c'est operators:manage
+                                       # qui gardera le retrait SUR AUTRUI, en step-029.
+                                       # Elle n'est pas la seule à ÉCRIRE : register/finish pose un
+                                       # second facteur, et cet événement-là doit être audité même
+                                       # exempté de garde.
 POST   /auth/logout
 GET    /auth/me                        # current operator + resolved permission set (union of held roles)
 

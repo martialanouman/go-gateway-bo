@@ -344,3 +344,16 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | `config.ConnectTimeout` de `pgx.Connect` dans `Seed` | non posée : `VerifySchema` compose la connexion en premier, avec sa borne, et `bootstrap` porte un `ctx` notifié par signal. Constat, pas correctif |
 | `IsoLevel: pgx.ReadCommitted` sur la transaction du seed | aucune porte ne rougit — le conteneur de la suite tourne au défaut `read committed`, où les deux formes coïncident. L'exercer demanderait un serveur configuré autrement |
 | Les descriptions de rôles, **en tant que copie** | la projection est gardée (base contre code), la justesse ne l'est pas : rien ne dit qu'une phrase décrit bien ce que le rôle accorde. **Quatre** ont menti et ont été corrigées à la main, sur trois passes de revue — `ops` deux fois, puis `compliance` et `billing_admin`, que les deux premières passes n'avaient pas relus. C'est la ligne de ce tableau qui a le plus coûté |
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai des quarante-neuf.
+
+Les descriptions des neuf rôles → **step-029**, qui les affiche. Les quatre lignes d'infrastructure
+non gardées → **step-186**.

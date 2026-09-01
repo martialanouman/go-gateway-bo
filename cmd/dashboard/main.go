@@ -111,7 +111,8 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// Avant la liaison du port : dériver la clé de chiffrement est la dernière chose qui puisse
 	// échouer sur la configuration, et un serveur qui écoute déjà refuserait alors chaque enrôlement
 	// sans que rien n'ait dit pourquoi au démarrage.
-	secondFactor, err := mfa.NewManager(store.NewMFA(pool), cfg.Auth.TOTPEncryptionKey)
+	secondFactor, err := mfa.NewManager(store.NewMFA(pool),
+		store.NewCounter(pool, store.ScopeTOTPEnroll), cfg.Auth.TOTPEncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -121,8 +122,19 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// vide — échoue ici. Plus tard, le serveur écouterait en refusant chaque cérémonie sans que rien
 	// n'ait dit pourquoi.
 	passkeys, err := mfa.NewPasskeyManager(store.NewWebauthn(pool),
+		store.NewCounter(pool, store.ScopeWebauthnCeremony),
 		cfg.Auth.WebauthnRPID, cfg.Auth.WebauthnOrigin)
 	if err != nil {
+		return err
+	}
+
+	// Avant la liaison du port, et cette fois le refus est le point : sans partition du mois, toute
+	// écriture d'audit échoue — donc, l'audit partageant la transaction de l'action qu'il trace,
+	// toute action tracée. Démarrer quand même produirait un serveur qui accepte les lectures et
+	// refuse les écritures sur une erreur de contrainte, ce qui ne ressemble à rien de diagnosticable.
+	//
+	// La migration ne les crée qu'une fois : c'est ici que la fenêtre se remet à glisser.
+	if err = store.EnsureAuditPartitions(ctx, pool); err != nil {
 		return err
 	}
 
@@ -133,12 +145,20 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 	logger.Info("le serveur écoute", "addr", ln.Addr().String())
 
+	// Après la liaison, parce que rien n'en dépend pour servir, et avec le contexte d'arrêt : la
+	// boucle s'éteint avec le serveur. Ce qu'elle couvre que l'appel ci-dessus ne couvre pas, c'est
+	// un process qui tourne plus d'un mois — le produit stable qu'on ne redéploie plus.
+	go store.KeepAuditPartitions(ctx, pool, store.PartitionRefresh, func(err error) {
+		logger.Error("les partitions du journal d'audit n'ont pas pu être renouvelées", "error", err)
+	})
+
 	router := bff.NewRouter(bff.Dependencies{
 		Assets:         assets,
 		Authenticator:  authenticator,
 		Sessions:       sessions,
 		SecondFactor:   secondFactor,
 		Passkeys:       passkeys,
+		Audit:          store.NewAudit(pool),
 		TrustedProxies: cfg.Auth.TrustedProxies,
 	})
 
