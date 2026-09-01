@@ -118,16 +118,11 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 
 // passwordMatches est le **seul** endroit où un mot de passe est confronté à quoi que ce soit.
 //
-// **Rien ne garde l'appel à `VerifyDummy` ci-dessous, et il faut le dire sans l'enjoliver.** Une
-// rédaction précédente affirmait que le retirer demanderait d'*ajouter* un retour anticipé, donc que
-// la mutation se verrait en revue : c'est faux. `VerifyDummy(password)` est une instruction isolée
-// dans une branche qui existe déjà, et sa suppression laisse un `if` parfaitement idiomatique. Le
-// test qui la nomme, `TestLeHachageFacticeSExecuteSurNImporteQuelSecret`, l'appelle **directement** :
-// il garde la fonction, jamais son site d'appel.
-//
-// Ce qui reste est la mesure manuelle écrite au-dessus de `VerifyDummy` et la revue. Une porte
-// structurelle est possible — `internal/bff/dto_test.go` descend déjà dans les corps de fonction avec
-// le type-checker — et elle appartient à la step qui reprendra ce chemin.
+// **L'appel à `VerifyDummy` ci-dessous est gardé par `oracle_test.go`**, qui exige l'appel dans cette
+// branche-ci. Sans lui rien ne le tenait : `TestLeHachageFacticeSExecuteSurNImporteQuelSecret` appelle
+// la fonction directement, donc garde la fonction et jamais son site d'appel, et sa suppression laisse
+// un `if` idiomatique que la revue ne voit pas. La **durée**, elle, reste hors de portée d'un test —
+// la mesure est écrite au-dessus de `VerifyDummy`.
 //
 // Un `password_hash` illisible est traité comme un refus et non comme une panne : la ligne est
 // abîmée, mais le dire au navigateur distinguerait ce compte des autres. L'erreur est écartée ici et

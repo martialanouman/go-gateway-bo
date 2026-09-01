@@ -13,10 +13,6 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// displayName est ce que le navigateur affiche pendant la cérémonie. Même contrainte que l'`issuer`
-// du TOTP, et même prix : deux déploiements du même produit s'y ressemblent.
-const displayName = "Passerelle SMS Admin"
-
 // Passkeys mène les deux cérémonies WebAuthn. Il ne tient ni pool ni HTTP — comme `Authenticator`,
 // il reçoit ce qu'il lui faut et rend ce qu'il a produit.
 //
@@ -40,7 +36,9 @@ type Passkeys struct {
 // §5.1.3 dit ce qu'est un domaine valable, la bibliothèque l'applique, et le redire ailleurs en
 // ferait deux rédactions dont une périmerait. L'appelant doit donc construire ceci **avant de lier
 // son port**, sans quoi le serveur écouterait en refusant chaque cérémonie sans avoir rien dit.
-func NewPasskeys(rpID, origin string) (*Passkeys, error) {
+// Le `displayName` vient de la configuration depuis step-031, comme l'`issuer` du TOTP et par la
+// même valeur : c'est le nom du produit, vu par l'opérateur à deux endroits.
+func NewPasskeys(rpID, origin, displayName string) (*Passkeys, error) {
 	ceremonies, err := webauthn.New(&webauthn.Config{
 		RPID:          rpID,
 		RPDisplayName: displayName,
@@ -287,9 +285,9 @@ const MaxCeremonies = 20
 // que la spécification refuse échoue ici, et un serveur qui écoute déjà refuserait chaque cérémonie
 // sans avoir rien dit au démarrage.
 func NewPasskeyManager(credentials *store.Webauthn, openings *store.Counter, rpID,
-	origin string,
+	origin, displayName string,
 ) (*PasskeyManager, error) {
-	ceremonies, err := NewPasskeys(rpID, origin)
+	ceremonies, err := NewPasskeys(rpID, origin, displayName)
 	if err != nil {
 		return nil, err
 	}

@@ -29,7 +29,10 @@ const derivationInfo = "dashboard-totp-secret-v1"
 //
 // **Sans sel**, et c'est un choix plutôt qu'un oubli : HKDF sans sel est défini par la RFC 5869 §2.2,
 // qui emploie alors une chaîne de zéros. Le sel sert à décorréler des entrées de faible entropie ;
-// celle-ci est **minorée** à trente-deux caractères et le README la fait tirer d'un CSPRNG. Un sel
+// celle-ci est **minorée** à trente-deux caractères dont douze distincts, une borne que step-031 a
+// posée parce que la seule longueur laissait passer trente-deux `a` alors que le README promettait
+// déjà un CSPRNG. Douze symboles distincts ne sont pas une preuve d'entropie, seulement un minorant
+// grossier qui écarte une valeur posée à la main — c'est cette hypothèse-là que HKDF suppose. Un sel
 // obligerait par ailleurs à le stocker quelque part, donc à ajouter un état que perdre rendrait la
 // base illisible — précisément ce que cette clé fait déjà toute seule.
 func deriveKey(passphrase []byte) ([]byte, error) {

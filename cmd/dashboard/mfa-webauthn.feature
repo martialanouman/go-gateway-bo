@@ -24,6 +24,7 @@ Fonctionnalité: Le second facteur par passkey
     Quand l'opérateur enregistre une clé d'accès
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 200
+    Et les options d'enregistrement portent le nom de produit configuré
     # L'enregistrement ne prouve rien : il pose un facteur, il ne le franchit pas.
     Et le second facteur n'est pas encore vérifié
     Quand l'opérateur présente sa clé d'accès

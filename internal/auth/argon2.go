@@ -148,11 +148,11 @@ func HashWith(params Params, secret string) (string, error) {
 // La comparaison passe par `crypto/subtle` : comparer deux hachages avec `==` rend un verdict en un
 // temps qui dépend du nombre d'octets de tête qui coïncident, ce qui se remonte octet par octet.
 //
-// **Aucune porte ne garde cette ligne, et ça a été vérifié plutôt que supposé** (critère 4) : mesuré
-// le 09/08/2026, `subtle.ConstantTimeCompare(key, expected) == 1` remplacé par
-// `string(key) == string(expected)` laisse toute la suite du paquet **verte**. Ce qui manquerait pour
-// la garder serait un test de durée, que la fiche écarte explicitement — instable en CI, et sur un
-// écart de l'ordre de la nanoseconde il le serait partout. Ce qui garde cette ligne est la revue.
+// Ce qui la garde depuis step-031 est `TestUnHachageNeSeCompareQuEnTempsConstant`, qui exige cet
+// appel **et** refuse toute comparaison d'octets dans ce corps — la seconde moitié parce que jeter le
+// résultat de l'appel, ou poser un raccourci naïf devant lui, le laisse en place sans qu'il décide.
+// Jusque-là rien ne le tenait : le remplacer par `string(key) == string(expected)` laissait toute la
+// suite du paquet **verte**, mesuré le 09/08/2026.
 func Verify(encoded, secret string) (bool, error) {
 	params, salt, expected, err := decode(encoded)
 	if err != nil {
@@ -175,7 +175,7 @@ var dummySalt = []byte("adresse-inconnue")
 // VerifyDummy paie le coût d'une vérification sans en faire une.
 //
 // **C'est une garde, pas une politesse.** Sans elle, « adresse inconnue » répond en zéro milliseconde
-// là où « mot de passe faux » en coûte des centaines : le corps et le code ont beau être identiques,
+// là où « mot de passe faux » en coûte des dizaines : le corps et le code ont beau être identiques,
 // l'écart de durée dit à l'attaquant lesquelles de ses adresses existent. C'est l'oracle
 // d'énumération que le reste de la route existe pour fermer.
 //
@@ -191,8 +191,8 @@ var dummySalt = []byte("adresse-inconnue")
 //
 // Les deux distributions se recouvrent : l'écart entre les deux chemins est noyé dans le bruit de la
 // requête. Sans cet appel, la seconde ligne tomberait sous la milliseconde et l'écart deviendrait le
-// signal. C'est ce constat, et non un test, qui garde cette fonction — la mutation qui la retire
-// laisse tout vert, ce qui est écrit dans le tableau des mutations de la fiche.
+// signal. Ce que ce constat garde est la **durée**, qu'aucun test n'affirme ; le site d'appel, lui,
+// est tenu par `oracle_test.go` depuis step-021, et les coûts par le plancher de `argon2_test.go`.
 func VerifyDummy(secret string) {
 	runtime.KeepAlive(argon2.IDKey([]byte(secret), dummySalt, currentParams.Time,
 		currentParams.Memory, currentParams.Parallelism, keyLength))

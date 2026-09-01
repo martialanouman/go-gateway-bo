@@ -20,7 +20,7 @@ import (
 func TestDeuxChiffrementsDuMemeSecretSousLaMemeCleDifferent(t *testing.T) {
 	t.Parallel()
 
-	authenticator, err := NewAuthenticator([]byte("une-cle-de-chiffrement-de-test-assez-longue"))
+	authenticator, err := NewAuthenticator([]byte("une-cle-de-chiffrement-de-test-assez-longue"), "Cockpit de test")
 	require.NoError(t, err)
 
 	const (

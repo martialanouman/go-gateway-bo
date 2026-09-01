@@ -203,9 +203,9 @@ a trouvées nues. Les cinq qui comptent :
 
 ## Ce qui n'est pas testé, et pourquoi
 
-- **L'arrêt au premier code de récupération** — le seul rouge manquant. Ce qui le garderait est un test
-  de durée sur un écart de 260 ms, que le dépôt écarte partout pour instabilité en CI. Le constat de la
-  mesure est écrit au-dessus de la boucle, comme `hmac.Equal` en step-022.
+- ~~**L'arrêt au premier code de récupération** — le seul rouge manquant.~~ **Refermé en step-031**,
+  et pas par un test de durée : `TestLaBoucleDesCodesDeRecuperationNeCourtCircuitePas` observe l'effet
+  — toute sortie anticipée rend le premier rang qui colle, quand la boucle entière rend le dernier.
 - **Un journal.** Un secret illisible en base et un hachage de code abîmé sont silencieux : aucun
   journal n'atteint encore `internal/mfa` ni `internal/auth`.
 - **Trois branches de course** — `!consumed`, `!elevated` de `VerifyMfa`, `!found` de l'enrôlement — ne
@@ -248,10 +248,10 @@ ici sans porteur, et une fiche de `done/` n'est ouverte par personne.)*
   aucun opérateur n'est enrôlé : un mot de passe volé pendant cette fenêtre vaut un compte complet,
   second facteur compris. C'est le problème d'amorçage classique du MFA, et DN-6 l'assume — mais la
   fenêtre mérite d'être bornée le jour où step-029 saura enrôler pour le compte d'un autre.
-- **L'`issuer` de l'URI `otpauth://` est codé en dur.** Deux déploiements du même produit apparaissent
-  sous le même nom dans le téléphone d'un opérateur qui enrôle les deux.
-- **`minimumTOTPEncryptionKeyLength` compte des caractères, pas de l'entropie.** Trente-deux `a` de
-  suite passent. Le README recommande un CSPRNG ; rien ne l'applique.
+- ~~**L'`issuer` de l'URI `otpauth://` est codé en dur.**~~ **Payé en step-031** : il vient de
+  `DASHBOARD_PRODUCT_NAME`, et un scénario le lit jusqu'au corps servi.
+- ~~**`minimumTOTPEncryptionKeyLength` compte des caractères, pas de l'entropie.**~~ **Payé en
+  step-031** par une borne de variété — douze symboles distincts — posée sur les **trois** secrets.
 - **Le conteneur PostgreSQL des scénarios meurt parfois sous la charge**, et **ce n'est pas un
   problème d'outillage local** : mesuré le 27/08/2026 en relisant le journal du job en échec de la
   PR 52, c'est lui qui a fait rougir « Tests Go » sur la CI — `connection refused` sur le port du

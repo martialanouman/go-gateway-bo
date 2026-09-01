@@ -157,16 +157,30 @@ func TestHacherAvecDesCoutsNulsEstRefuse(t *testing.T) {
 //
 // Ce que ce test garde est le défaut qui arrive vraiment : quelqu'un abaisse les coûts pour faire
 // passer une suite qu'il trouve lente, et personne ne le voit — un hachage moins cher n'a aucun
-// symptôme, il est juste moins cher pour tout le monde, l'attaquant compris. Le plancher est celui
-// d'OWASP, en-dessous duquel argon2id cesse d'être ce qu'on croit avoir déployé.
+// symptôme, il est juste moins cher pour tout le monde, l'attaquant compris.
+//
+// **Le plancher est le profil retenu depuis step-031**, là où il était celui d'OWASP. Le second
+// laissait descendre de 64 MiB / t=3 à 19 MiB / t=2 — de 26,3 ms à 16,8 ms au tableau qui surplombe
+// `currentParams` — sans faire rougir quoi que ce soit : il bornait ce qu'argon2id doit rester, pas
+// ce que ce déploiement a décidé. Ce qu'il garde désormais est la décision, et la changer demande une
+// mesure neuve plutôt qu'un chiffre plus commode. Le minimum d'OWASP n'est plus asséré à part : il
+// est subsumé, et le redire ferait deux rédactions dont une périmerait.
+//
+// **`Parallelism` reste à un, et c'est une correction de revue.** La première rédaction l'avait monté
+// à quatre comme les deux autres. Ce n'est pas un paramètre de même nature : la RFC 9106 le règle sur
+// les cœurs disponibles, et un nœud à deux vCPU a une raison légitime de descendre. Une garde qui
+// refuse du légitime finit retirée — et celui qui l'aurait retirée aurait édité les trois lignes du
+// même geste, emportant la borne mémoire, qui elle méritait d'être tenue.
 func TestLesParametresNeDescendentPasSousLePlancher(t *testing.T) {
 	t.Parallel()
 
 	params := auth.CurrentParams()
 
-	assert.GreaterOrEqual(t, params.Memory, uint32(19*1024),
-		"moins de 19 MiB : c'est la mémoire qui rend une carte graphique inintéressante, pas les passes")
-	assert.GreaterOrEqual(t, params.Time, uint32(2), "moins de deux passes")
+	assert.GreaterOrEqual(t, params.Memory, uint32(64*1024),
+		"moins de 64 MiB : c'est la mémoire qui rend une carte graphique inintéressante, pas les "+
+			"passes, et 64 est le profil que la mesure du 10/08/2026 a retenu")
+	assert.GreaterOrEqual(t, params.Time, uint32(3),
+		"moins de trois passes que le profil retenu par la mesure du 10/08/2026")
 	assert.GreaterOrEqual(t, params.Parallelism, uint8(1), "aucune voie : argon2.IDKey paniquerait")
 }
 

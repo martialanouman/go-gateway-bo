@@ -50,6 +50,13 @@ convention reste : une commande annoncée avant sa step est signalée `(cible)` 
 obligatoire dans les deux modes. Recopier le bloc « Passerelle » de `.env.example` ; le binaire refuse
 sinon de démarrer en nommant chaque variable manquante.
 
+**Un `.env` antérieur à step-031 non plus**, pour deux raisons distinctes. `DASHBOARD_PRODUCT_NAME` y
+est devenue obligatoire — recopier le bloc « Nom du produit » de `.env.example`. Et les trois secrets
+portent désormais une borne de variété : un secret existant qui compte moins de douze symboles
+distincts est refusé. **Le remplacer n'est pas anodin pour l'un des trois** —
+`DASHBOARD_TOTP_ENCRYPTION_KEY` rend illisibles tous les seconds facteurs déjà enrôlés, comme une
+rotation ordinaire ; lire plus bas ce qu'elle coûte avant de la changer.
+
 Go et Node sont tous deux requis **en développement**. En production, ni l'un ni l'autre : le binaire
 embarque les assets et se suffit à lui-même.
 
@@ -62,7 +69,12 @@ session. `openssl rand -base64 48` fait le travail.
 **Les trois existent** : `DASHBOARD_BRUTEFORCE_SALT` (step-021), qui masque les adresses sources dans
 la table des compteurs d'échecs, `DASHBOARD_SESSION_SECRET` (step-022), qui scelle le cookie de
 session, et `DASHBOARD_TOTP_ENCRYPTION_KEY` (step-023), dont se dérive la clé qui chiffre les secrets
-TOTP au repos. Les trois s'obtiennent de la même façon et portent la même borne de 32 caractères.
+TOTP au repos. Les trois s'obtiennent de la même façon et portent la même borne : 32 caractères, dont
+au moins douze **distincts**. Le second seuil existe parce que le premier laissait passer trente-deux
+`a` — une longueur ne dit rien d'un tirage. Il ne mesure pas l'entropie et ne prétend pas la mesurer :
+`Passerelle-SMS-Admin-Preprod-2026` en compte dix-neuf et passe. Ce qu'il ferme est le seul défaut
+observé, une valeur posée à la main pour faire démarrer. Mesuré le 01/09/2026 sur un million de
+tirages `base64` de 32 caractères : jamais moins de seize symboles distincts, donc quatre de marge.
 
 Ce qu'une rotation coûte n'est en revanche pas le même de l'une à l'autre, et l'écart est large :
 changer le sel n'invalide aucun compte ; changer la clé de session **déconnecte tout le monde**, à
@@ -75,6 +87,14 @@ Les trois doivent être **identiques sur toutes les instances**, mais pour trois
 un cookie émis par l'une serait refusé par l'autre, un second facteur vérifiable ici et pas là, et —
 pour le sel — des compteurs d'anti-brute-force qui se scindent **sans qu'aucun refus ne le signale**,
 donc un verrouillage qui s'affaiblit en silence.
+
+`DASHBOARD_PRODUCT_NAME` (step-031) est obligatoire elle aussi, et n'est pas un secret : c'est le nom
+sous lequel ce déploiement se présente à l'opérateur, dans son application d'authentification et dans
+la cérémonie WebAuthn du navigateur. Une seule variable pour les deux surfaces — c'est le même nom, vu
+à deux endroits. La distinguer d'un déploiement à l'autre est tout son objet : codée en dur, une
+préproduction et une production apparaissaient sous le même nom dans le téléphone d'un opérateur qui
+enrôle les deux, sans rien pour les départager. La changer **n'invalide aucun enrôlement** : les
+applications d'authentification déjà appairées gardent le nom qu'elles ont scanné.
 
 `DASHBOARD_WEBAUTHN_RP_ID` et `DASHBOARD_WEBAUTHN_ORIGIN` (step-024) sont obligatoires de la même
 façon, mais **ne sont pas des secrets** : le navigateur les voit à chaque cérémonie de passkey. Ce

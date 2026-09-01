@@ -23,12 +23,14 @@ const (
 	// canonicalChallenge a la forme d'un challenge émis par `auth.Login` : trente-deux octets en
 	// base64url sans remplissage.
 	canonicalChallenge = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	// testIssuer diffère du nom de production, sans quoi un `issuer` recodé en dur passerait ce test.
+	testIssuer = "Cockpit de test"
 )
 
 func testAuthenticator(t *testing.T) *mfa.Authenticator {
 	t.Helper()
 
-	authenticator, err := mfa.NewAuthenticator([]byte(testPassphrase))
+	authenticator, err := mfa.NewAuthenticator([]byte(testPassphrase), testIssuer)
 	require.NoError(t, err)
 
 	return authenticator
@@ -181,5 +183,7 @@ func TestLUriOtpauthPorteCeQueLApplicationAttend(t *testing.T) {
 	assert.Equal(t, "SHA1", query.Get("algorithm"))
 	assert.Equal(t, "6", query.Get("digits"))
 	assert.Equal(t, "30", query.Get("period"))
-	assert.NotEmpty(t, query.Get("issuer"))
+	assert.Equal(t, testIssuer, query.Get("issuer"),
+		"l'URI porte un `issuer` qui ne vient pas de la configuration : deux déploiements du même "+
+			"produit se confondent dans le téléphone de l'opérateur")
 }

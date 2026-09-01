@@ -24,6 +24,7 @@ func lookupFrom(vars map[string]string) config.Lookup {
 func minimalEnv() map[string]string {
 	return map[string]string{
 		config.EnvAddr:              ":3001",
+		config.EnvProductName:       testProductName,
 		config.EnvGatewayMode:       string(config.GatewayModeMock),
 		config.EnvGatewayBaseURL:    "http://127.0.0.1:4010",
 		config.EnvDatabaseURL:       localDatabaseURL,
@@ -43,6 +44,9 @@ const (
 	testTOTPEncryptionKey = "une-cle-de-chiffrement-de-test-assez-longue"
 )
 
+// testProductName diffère du nom de production : un nom recodé en dur passerait sinon les tests.
+const testProductName = "Cockpit de test"
+
 // Les deux valeurs WebAuthn ne sont pas des secrets — le navigateur les voit — et rien ici n'ouvre de
 // cérémonie : `Load` n'exige que leur présence, et c'est `webauthn.New` qui juge le domaine.
 const (
@@ -59,6 +63,7 @@ const localDatabaseURL = "postgres://dashboard:dashboard@127.0.0.1:5432/dashboar
 func realGatewayEnv() map[string]string {
 	return map[string]string{
 		config.EnvAddr:                ":3001",
+		config.EnvProductName:         testProductName,
 		config.EnvGatewayMode:         string(config.GatewayModeReal),
 		config.EnvGatewayBaseURL:      "https://admin.gateway.internal/v1",
 		config.EnvGatewayTokenURL:     "https://auth.gateway.internal/oauth2/token",
@@ -520,6 +525,7 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		config.EnvAddr,
 		config.EnvShutdownTimeout,
+		config.EnvProductName,
 		config.EnvGatewayMode,
 		config.EnvGatewayBaseURL,
 		config.EnvGatewayTokenURL,

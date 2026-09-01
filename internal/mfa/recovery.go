@@ -107,12 +107,11 @@ func NormalizeRecoveryCode(presented string) string {
 // porteur de session, donc sans rien divulguer de neuf. Ce qui est protégé ici est *lequel* a servi,
 // et ça, la boucle le tient quelle que soit sa longueur.
 //
-// **Aucune porte ne garde cette boucle, et ça a été vérifié plutôt que supposé** (critère 4) : mesuré
-// le 12/08/2026, remplacer `matched = index` par un `return index` laisse `internal/mfa`,
-// `internal/store`, `internal/bff` et les quarante-et-un scénarios **verts**. Ce qui manquerait pour
-// la garder serait un test de durée, que le dépôt écarte partout ailleurs pour la même raison —
-// instable en CI. Ce qui garde ces trois lignes est la revue, comme `hmac.Equal` en step-022 et
-// `subtle.ConstantTimeCompare` en step-021.
+// Ce qui garde cette boucle est `TestLaBoucleDesCodesDeRecuperationNeCourtCircuitePas` depuis
+// step-031, et non plus la seule revue : jusque-là, remplacer `matched = index` par un `return index`
+// laissait `internal/mfa`, `internal/store`, `internal/bff` et les quarante-et-un scénarios **verts**,
+// mesuré le 12/08/2026. Il observe l'effet plutôt que la forme — toute sortie anticipée rend le
+// premier rang qui colle, quand la boucle entière rend le dernier.
 //
 // **Un hachage illisible ne matche pas et n'est pas rapporté**, et c'est un manque assumé plutôt
 // qu'un oubli : aucun journal n'atteint encore ce paquet, comme dans `auth.passwordMatches`. Une

@@ -36,7 +36,7 @@ func TestUnChallengeMalFormeNAtteintPasLaBase(t *testing.T) {
 	t.Parallel()
 
 	manager, err := mfa.NewManager(store.NewMFA(closedPool(t)),
-		store.NewCounter(closedPool(t), store.ScopeTOTPEnroll), []byte(testPassphrase))
+		store.NewCounter(closedPool(t), store.ScopeTOTPEnroll), []byte(testPassphrase), testIssuer)
 	require.NoError(t, err)
 
 	_, live, err := manager.Challenge(context.Background(), "ceci n'est pas un challenge")
@@ -53,7 +53,7 @@ func TestUnManagerSeConstruitAvecSaClef(t *testing.T) {
 	t.Parallel()
 
 	manager, err := mfa.NewManager(store.NewMFA(closedPool(t)),
-		store.NewCounter(closedPool(t), store.ScopeTOTPEnroll), []byte(testPassphrase))
+		store.NewCounter(closedPool(t), store.ScopeTOTPEnroll), []byte(testPassphrase), testIssuer)
 	require.NoError(t, err)
 	assert.NotNil(t, manager)
 }

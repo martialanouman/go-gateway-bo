@@ -112,7 +112,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// échouer sur la configuration, et un serveur qui écoute déjà refuserait alors chaque enrôlement
 	// sans que rien n'ait dit pourquoi au démarrage.
 	secondFactor, err := mfa.NewManager(store.NewMFA(pool),
-		store.NewCounter(pool, store.ScopeTOTPEnroll), cfg.Auth.TOTPEncryptionKey)
+		store.NewCounter(pool, store.ScopeTOTPEnroll), cfg.Auth.TOTPEncryptionKey, cfg.ProductName)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// n'ait dit pourquoi.
 	passkeys, err := mfa.NewPasskeyManager(store.NewWebauthn(pool),
 		store.NewCounter(pool, store.ScopeWebauthnCeremony),
-		cfg.Auth.WebauthnRPID, cfg.Auth.WebauthnOrigin)
+		cfg.Auth.WebauthnRPID, cfg.Auth.WebauthnOrigin, cfg.ProductName)
 	if err != nil {
 		return err
 	}
