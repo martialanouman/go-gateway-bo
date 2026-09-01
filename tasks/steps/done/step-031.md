@@ -147,9 +147,29 @@ l'assertion d'une autre porte ne prouve rien.
 | `RPDisplayName` recodé en dur | le scénario d'enregistrement de passkey | **oui — mesuré vert dans cette PR** |
 
 Et les témoins, sans lesquels un renommage rendrait ces portes vertes pour la mauvaise raison : rendre
-introuvable la fonction gardée dit « la porte n'a plus de sujet » ; pointer `loopBody` vers une
-fonction sans boucle dit « la forme a changé » ; changer `keyTypeName` fait tomber le plancher à zéro.
-Les deux gardes de la porte de `mfa` ont été mutées **séparément** — en retirer une seule est vert.
+introuvable la fonction gardée dit « la porte n'a plus de sujet » ; changer `keyTypeName` fait tomber
+le décompte à zéro.
+
+### Ce que la revue a mis en défaut, et qui a été refait
+
+Trois revues adversariales ont **exercé** ce qui suit : mutation appliquée, porte lancée, verte. Le
+diagnostic commun est le même — ces portes cherchaient un **jeton** là où la propriété est ailleurs.
+
+| Ce qui laissait la porte verte | Correctif |
+|---|---|
+| une boucle de pré-traitement placée **avant** celle qu'on garde | la porte structurelle des codes de récupération est **remplacée** par un test comportemental : toute sortie anticipée rend le premier rang qui colle, la boucle entière rend le dernier |
+| un `continue` gardé par `matched`, ou un `matched < 0` dans la condition du `for` | idem — aucun des deux n'emploie de mot-clé interdit, et les deux rétablissent l'oracle |
+| un raccourci naïf posé **devant** `hmac.Equal` ou `subtle.ConstantTimeCompare` | les deux portes refusent désormais toute comparaison d'octets dans le corps gardé, en plus d'exiger l'appel |
+| jeter le résultat de l'appel à temps constant | idem |
+| une méthode homonyme dans un fichier trié avant la cible | `functionBody` échoue sur l'ambiguïté, plus seulement sur l'absence |
+| une constante de permission écrite **sans son type** | `TestToutLeBlocDesClesPorteSonType` : untyped string reste assignable à `Key`, donc utilisable dans une garde |
+| deux constantes de la **même valeur** | le plancher à quarante devient une **égalité** avec le catalogue |
+| une valeur de `.env.example` contenant un espace, non quotée | `TestAucuneValeurDuDotenvNEstDecoupeeParLeShell` — le défaut avait été livré |
+
+Deux corrections de plus, qui ne sont pas des trous de porte : `Parallelism` revient à un — la RFC
+9106 le règle sur les cœurs, et une garde qui refuse du légitime finit retirée avec ses voisines —, et
+le nom de produit est **validé au démarrage**, `:` et `/` cassant le label de l'URI `otpauth://` alors
+que ce sont les séparateurs qu'on écrit pour nommer une préproduction.
 
 ### Ce que la livraison a élargi
 
