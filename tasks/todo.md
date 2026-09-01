@@ -9,7 +9,9 @@ d'insertion.
 step le contredit : **les dépendances déclarées priment toujours**. Les sections groupent par jalon
 **et par phase** — un jalon peut se clore après le début du suivant, et `M1` le fait : ses écrans
 reposent sur la coquille de `M2`. D'où deux sections `M1` et deux sections `M2`, et **plus aucune note
-qui déplace une ligne** : la séquence se lit de haut en bas, telle qu'elle s'exécute.
+qui déplace une ligne** : la séquence se lit de haut en bas, telle qu'elle s'exécute. **Une ligne
+cochée est à la place où elle est passée**, pas à celle qu'on lui avait prévue — la liste est un plan
+devant, un enregistrement derrière.
 `TestAucuneStepNEstListeeAvantUneDontElleDepend` confronte les deux règles — il refuse une step listée
 avant une step dont sa fiche déclare dépendre.
 
@@ -112,28 +114,34 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - [x] step-001 — SPA Vite + TanStack Router : squelette d'application, coquille peinte au chargement à froid
 - [x] step-002 — Binaire unique : `embed.FS` + fallback SPA **ordonné après `/api`**
 - [x] step-003 — Contrat Admin : `oapi-codegen`, client Go (OAuth2 + mTLS), mock Prism
-- [x] step-009 — Contrat Admin en **4.0.2** : deux majeures depuis 2.5.0, diff du YAML relu §
-- [x] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS ‡
+- [x] step-004 — Contrat BFF : `api/openapi-bff.yaml` → types serveur Go **et** types client TS
 - [x] step-005 — PostgreSQL : `pgx`, migrations, les tables du §3.1, `audit_log` partitionné
 - [x] step-006 — Catalogue de permissions : source Go, génération TS, test de divergence bloquant
 - [x] step-007 — Harnais BDD : `godog`, `testify`, testcontainers, Vitest, Playwright, CI à deux toolchains
+- [x] step-009 — Contrat Admin en **4.0.2** : deux majeures depuis 2.5.0, diff du YAML relu §
 - [x] step-008 — Charte : tokens portés de la v1.0, `/_design`, contraste AA vérifié
 
-§ **Numéro hors bloc, position délibérée — et le pari a tenu.** step-003 s'est arrêtée à 2.5.0 parce
-que la quarantaine de `minimumReleaseAge` refusait plus récent ; elle a expiré d'elle-même
-(`plan.md` §1.12). La step est passée avant que M0 n'engendre du code contre 2.5.0, et c'est ce qui a
-rendu le bump gratuit : **livré le 08/08/2026, il n'a touché aucun appelant** — les six opérations que
-les deux majeures modifient ne sont appelées nulle part, et `go build` est resté vert sur trois
-ruptures de type. Payé sur le seul `internal/gateway/client.gen.go`, comme annoncé.
+§ **Numéro hors bloc, et position tenue par les faits.** Le bloc M0 est `000-019` ; `009` a été
+insérée après coup pour solder une dette de contrat, et **planifiée juste après `003`**. Elle n'y est
+pas passée : mesuré le 02/08 à 09:26 UTC, la quarantaine `minimumReleaseAge` de la 4.0.0 courait
+jusqu'à 17:46 UTC et `pnpm` la refusait encore — la step était matériellement infaisable ce jour-là.
+Elle a été mergée le **08/08/2026 à 17:23 UTC**, entre `007` et `008`, et c'est la place qu'elle
+occupe ici.
+
+**Le pari a tenu quand même.** step-003 s'était arrêtée à 2.5.0 pour cette même quarantaine ; ce qui
+comptait était que le bump passe avant que M0 n'engendre du code contre 2.5.0, non qu'il passe un jour
+donné. `step-004` ne dépendait pas de `009` et n'engendrait aucun code contre le contrat Admin :
+l'argument du renvoi n'était pas entamé, et ce qui restait à payer n'a pas grossi. Vérifié à la
+livraison — **le bump n'a touché aucun appelant** : les six opérations que les deux majeures modifient
+ne sont appelées nulle part, `go build` est resté vert sur trois ruptures de type, et tout s'est payé
+sur le seul `internal/gateway/client.gen.go`.
 
 *(La version épinglée est **4.0.2** et non 4.0.0 : les trois `openapi-admin.yaml` de la série 4.0.x
 sont identiques au sha256, et 4.0.3 était en quarantaine. Voir `steps/done/step-009.md`, DN-1.)*
 
-‡ **step-004 est passée devant step-009, et la position ci-dessus est restée la bonne.** Mesuré le
-02/08 à 09:26 UTC : la quarantaine de 4.0.0 courait jusqu'à 17:46 UTC et `pnpm` la refusait encore —
-step-009 était matériellement infaisable. step-004 ne dépendait pas d'elle et n'engendrait aucun code
-contre le contrat Admin, donc l'argument du renvoi § n'était pas entamé. Vérifié à la livraison : ce
-qui restait à payer au bump n'avait effectivement pas grossi.
+*Jusqu'au 01/09/2026 cette ligne était écrite entre `003` et `004` — la place qu'elle **aurait dû**
+occuper — et une note ‡ rattrapait l'écart. Deux notes racontaient donc l'ordre au lieu que la liste
+le montre, et le marqueur ‡ servait déjà à autre chose en M9.*
 
 ## M1 (serveur) — Authentification, permissions & audit  (§6.9, §6.10, §3.1)
 - [x] step-020 — Seed auth : les 44 clés de permission et les 9 rôles par défaut, idempotent ¶
