@@ -44,6 +44,9 @@ type webauthnWorld struct {
 	// quelle. Le rejeu la renvoie **à la lettre** : en recomposer une signerait un autre défi et ne
 	// prouverait rien de l'anti-rejeu.
 	presented string
+	// relyingPartyName est ce que la réponse d'ouverture a annoncé comme nom de partie de confiance.
+	// Il est retenu ici parce que le corps qui le portait est remplacé par celui de la clôture.
+	relyingPartyName string
 }
 
 // registerSteps vit ici et non dans `initializeScenario`, comme celui de `mfaWorld` : c'est la
@@ -76,6 +79,8 @@ func (w *webauthnWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur ouvre (\d+) enregistrements de clé d'accès$`, w.openRegistrations)
 	ctx.When(`^l'opérateur finit l'enregistrement ouvert$`, w.closeOpenedRegistration)
 	ctx.When(`^l'opérateur présente (\d+) assertions fausses$`, w.presentWrongAssertions)
+	ctx.Then(`^les options d'enregistrement portent le nom de produit configuré$`,
+		w.optionsCarryConfiguredProductName)
 	ctx.Then(`^il lui reste (\d+) clés? d'accès$`, w.passkeysRemaining)
 	ctx.Then(`^le second facteur est refusé$`, w.secondFactorIsRefused)
 	ctx.Then(`^le second facteur est verrouillé$`, w.secondFactorIsLocked)
@@ -88,7 +93,7 @@ func (w *webauthnWorld) registerSteps(ctx *godog.ScenarioContext) {
 
 func (w *webauthnWorld) relyingParty(origin string) virtualwebauthn.RelyingParty {
 	return virtualwebauthn.RelyingParty{
-		Name:   "Passerelle SMS Admin",
+		Name:   completeConfiguration()["DASHBOARD_PRODUCT_NAME"],
 		ID:     ceremonyRelyingPartyID,
 		Origin: origin,
 	}
@@ -126,6 +131,20 @@ func (w *webauthnWorld) registerSignedFor(origin string) error {
 			w.login.process.received.body)
 	}
 
+	var begun struct {
+		PublicKey struct {
+			RelyingParty struct {
+				Name string `json:"name"`
+			} `json:"rp"`
+		} `json:"publicKey"`
+	}
+
+	if err = json.Unmarshal([]byte(w.login.process.received.body), &begun); err != nil {
+		return fmt.Errorf("relire le nom de partie de confiance : %w", err)
+	}
+
+	w.relyingPartyName = begun.PublicKey.RelyingParty.Name
+
 	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 	attestation := virtualwebauthn.CreateAttestationResponse(w.relyingParty(origin),
 		w.authenticator, credential, *options)
@@ -150,6 +169,21 @@ func (w *webauthnWorld) registerSignedFor(origin string) error {
 	w.authenticator.AddCredential(credential)
 	w.credentials = append(w.credentials, credential)
 	w.passkeys = append(w.passkeys, registered.ID)
+
+	return nil
+}
+
+// Le nom de partie de confiance traverse depuis la variable d'environnement jusqu'au corps servi.
+// Sans ce pas, le recoder en dur dans `NewPasskeys` laissait les quatre-vingt-sept scénarios verts —
+// mesuré le 01/09/2026 : il ne fait pas partie des données signées d'une cérémonie, donc aucun
+// authentificateur ne le vérifie.
+func (w *webauthnWorld) optionsCarryConfiguredProductName() error {
+	expected := completeConfiguration()["DASHBOARD_PRODUCT_NAME"]
+	if w.relyingPartyName != expected {
+		return fmt.Errorf("les options annoncent %q pour %q configuré : deux déploiements du même "+
+			"produit se ressemblent dans la cérémonie qu'affiche le navigateur",
+			w.relyingPartyName, expected)
+	}
 
 	return nil
 }
