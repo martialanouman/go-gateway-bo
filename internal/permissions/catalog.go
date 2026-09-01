@@ -87,15 +87,14 @@ const (
 // qui est précisément le golden que la phrase suivante invoquait. Ce qui n'est gardé par rien est
 // plus étroit : une clé retirée **et** régénérée dans le même geste ne laisse qu'un diff à relire.
 //
-// **Le sens inverse, lui, n'est gardé par rien du tout** — une constante déclarée ci-dessous mais
-// qu'aucune entrée du catalogue ne référence. Vérifié plutôt que supposé, le 02/08/2026 : un
-// `const FooBar Key = "foo:bar"` ajouté ici **compile**, laisse les deux suites vertes, et
-// n'apparaît pas dans le TypeScript engendré — Go ne signale pas une constante exportée inutilisée.
-// C'est la faille de DN-3 prise par l'autre bout : en step-025,
-// `RequirePermission(permissions.FooBar)` refuserait alors tout le monde en silence, sans qu'aucune
-// porte n'ait rien dit. Le tenir demanderait de parcourir l'AST du paquet pour croiser les
-// constantes déclarées avec celles que `catalog` référence — un harnais qui pèserait plus que ce
-// qu'il protège, la déclaration et son entrée étant adjacentes dans ce fichier.
+// **Le sens inverse est tenu depuis step-031** par `TestAucuneConstanteNeManqueAuCatalogue`, qui
+// part de la portée du paquet et non de `All()` — une constante déclarée ci-dessous mais qu'aucune
+// entrée ne référence. Jusque-là il n'était gardé par rien, mesuré le 02/08/2026 : un
+// `const FooBar Key = "foo:bar"` ajouté ici **compilait**, laissait les deux suites vertes et
+// n'apparaissait pas dans le TypeScript engendré — Go ne signale pas une constante exportée
+// inutilisée. C'est la faille de DN-3 prise par l'autre bout : `RequirePermission(permissions.FooBar)`
+// refusait alors tout le monde en silence, sans qu'aucune porte n'ait rien dit. La rédaction d'alors
+// jugeait le remède plus lourd que ce qu'il protège ; il tient en une quarantaine de lignes.
 var catalog = []Entry{
 	// ─── routing ───
 	{
