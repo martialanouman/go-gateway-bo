@@ -1,7 +1,10 @@
 package config_test
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"net/netip"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -89,6 +92,41 @@ func TestUneCleDeChiffrementTropCourteEstRefuseeSansEtreCitee(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), config.EnvTOTPEncryptionKey)
 	assert.NotContains(t, err.Error(), "changeme", "le refus recopie le secret qu'il refuse")
+}
+
+// La borne se teste par ses deux côtés, sans quoi elle refuse tout ou n'importe quoi. Trente-deux
+// `a` font la longueur exigée sans avoir rien d'un secret — c'est ce que la borne de longueur
+// laissait passer, et ce que celle de variété ferme.
+func TestUnSecretSansVarieteEstRefuseSansEtreCite(t *testing.T) {
+	t.Parallel()
+
+	uniform := strings.Repeat("a", 32)
+
+	env := minimalEnv()
+	env[config.EnvTOTPEncryptionKey] = uniform
+
+	_, err := config.Load(lookupFrom(env))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvTOTPEncryptionKey)
+	assert.NotContains(t, err.Error(), uniform, "le refus recopie le secret qu'il refuse")
+}
+
+// L'autre côté : une valeur réellement tirée passe. Le tirage est fait ici plutôt qu'écrit en dur —
+// une constante choisie à la main prouverait que cette constante passe, pas que la recette du README
+// passe.
+func TestUnSecretTireDUnCSPRNGPasse(t *testing.T) {
+	t.Parallel()
+
+	material := make([]byte, 48)
+	_, err := rand.Read(material)
+	require.NoError(t, err)
+
+	env := minimalEnv()
+	env[config.EnvTOTPEncryptionKey] = base64.StdEncoding.EncodeToString(material)
+
+	cfg, err := config.Load(lookupFrom(env))
+	require.NoError(t, err)
+	assert.Equal(t, env[config.EnvTOTPEncryptionKey], string(cfg.Auth.TOTPEncryptionKey))
 }
 
 // Les trois secrets sont distincts et le restent. Réutiliser l'un pour l'autre ferait qu'une fuite de

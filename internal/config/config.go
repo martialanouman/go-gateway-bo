@@ -78,6 +78,17 @@ const minimumSessionSecretLength = 32
 // — et qui les déchiffre produit les codes de n'importe quel opérateur.
 const minimumTOTPEncryptionKeyLength = 32
 
+// minimumDistinctSymbols borne la **variété** des trois secrets, que leur longueur ne dit pas :
+// trente-deux `a` de suite passaient les bornes ci-dessus, et le README promettait un CSPRNG que rien
+// n'appliquait.
+//
+// Douze, choisi sur ce que la borne doit refuser et non sur les valeurs déjà posées : un tirage
+// base64 de trente-deux caractères en rend vingt-six en espérance, et une valeur de cette longueur
+// qui en compte moins de douze n'est pas sortie d'un générateur. Ce n'est pas une mesure d'entropie
+// mais un minorant grossier ; il suffit à fermer le seul mode d'échec observé — une valeur posée à la
+// main pour faire démarrer.
+const minimumDistinctSymbols = 12
+
 // defaultShutdownTimeout laisse aux requêtes en vol de quoi se terminer pendant un déploiement
 // roulant. Un délai a une valeur par défaut, un secret n'en a jamais.
 const defaultShutdownTimeout = 15 * time.Second
@@ -369,8 +380,9 @@ func (r *reader) requiredValue(name string) string {
 	return value
 }
 
-// requiredSecret exige une valeur d'au moins `minimum` caractères, sans jamais citer ce qu'elle a
-// trouvé — ni sa longueur, qui est déjà une information sur le secret.
+// requiredSecret exige une valeur d'au moins `minimum` caractères **et** d'une variété minimale, sans
+// jamais citer ce qu'elle a trouvé — ni sa longueur ni son décompte de symboles, qui sont déjà des
+// informations sur le secret.
 func (r *reader) requiredSecret(name string, minimum int) []byte {
 	value, ok := r.required(name)
 	if !ok {
@@ -384,7 +396,24 @@ func (r *reader) requiredSecret(name string, minimum int) []byte {
 		return nil
 	}
 
+	if distinctSymbols(value) < minimumDistinctSymbols {
+		r.reject(name, "secret d'au moins %d symboles distincts attendu : celui-ci n'a pas la variété "+
+			"d'un tirage aléatoire. La valeur n'est pas citée. `openssl rand -base64 48` fait le travail",
+			minimumDistinctSymbols)
+
+		return nil
+	}
+
 	return []byte(value)
+}
+
+func distinctSymbols(value string) int {
+	seen := make(map[rune]struct{})
+	for _, symbol := range value {
+		seen[symbol] = struct{}{}
+	}
+
+	return len(seen)
 }
 
 // prefixList lit une liste de réseaux CIDR séparés par des virgules.

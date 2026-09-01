@@ -62,7 +62,10 @@ session. `openssl rand -base64 48` fait le travail.
 **Les trois existent** : `DASHBOARD_BRUTEFORCE_SALT` (step-021), qui masque les adresses sources dans
 la table des compteurs d'échecs, `DASHBOARD_SESSION_SECRET` (step-022), qui scelle le cookie de
 session, et `DASHBOARD_TOTP_ENCRYPTION_KEY` (step-023), dont se dérive la clé qui chiffre les secrets
-TOTP au repos. Les trois s'obtiennent de la même façon et portent la même borne de 32 caractères.
+TOTP au repos. Les trois s'obtiennent de la même façon et portent la même borne : 32 caractères, dont
+au moins douze distincts. Le second seuil existe parce que le premier laissait passer trente-deux `a`
+— une longueur ne dit rien d'un tirage. Ce n'est pas une mesure d'entropie mais un minorant grossier,
+qui ferme le seul défaut observé : une valeur posée à la main pour faire démarrer.
 
 Ce qu'une rotation coûte n'est en revanche pas le même de l'une à l'autre, et l'écart est large :
 changer le sel n'invalide aucun compte ; changer la clé de session **déconnecte tout le monde**, à
