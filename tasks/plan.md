@@ -112,13 +112,13 @@ Aucune autre bibliothèque pour ces rôles sans décision d'équipe.
 | WebSocket | `coder/websocket` | v1.8.15 |
 | PostgreSQL | `jackc/pgx/v5` | v5.10.0 |
 | Génération OpenAPI | `oapi-codegen/oapi-codegen/v2` | v2.8.0 |
-| WebAuthn | `go-webauthn/webauthn` | v0.17.4 |
+| WebAuthn | `go-webauthn/webauthn` | v0.18.0 |
 | TOTP | `pquerna/otp` | v1.5.0 |
 | Redis Pub/Sub | `redis/go-redis/v9` | v9.21.0 |
 | Hachage | `golang.org/x/crypto/argon2` | — |
 | Assets embarqués | `embed` (stdlib) | — |
 | BDD (scénarios Gherkin) | `cucumber/godog` | v0.16.0 |
-| Assertions | `stretchr/testify` | v1.11.1 |
+| Assertions | `stretchr/testify` | v1.12.1 |
 
 **Moitié client** — versions installées, à revérifier via `ctx7` à chaque bump :
 
@@ -416,7 +416,8 @@ l'écran Clients rendu selon ses permissions, crée un client, et l'action laiss
 **Objectif :** un dépôt qui compile des deux côtés, se teste, démarre ses dépendances, parle aux deux
 contrats, et produit **un binaire qui sert la SPA**.
 **Dépend de :** —
-**Steps :** 000 → 008
+**Steps :** 000 → 009 — *`009` a été insérée après coup, le 08/08/2026, pour solder la dette du
+contrat resté en 2.5.0. Cette ligne a annoncé « 000 → 008 » pendant vingt-trois jours.*
 
 **Livrables**
 - Module Go, `cmd/dashboard`, routeur chi, configuration validée au démarrage (§1.8), arrêt propre.
@@ -461,7 +462,9 @@ contrats, et produit **un binaire qui sert la SPA**.
 
 **Objectif :** savoir qui est connecté, ce qu'il a le droit de faire, et garder trace de ce qu'il fait.
 **Dépend de :** M0 — et, pour ses quatre dernières steps, `041`, `042` et `040` de M2 (voir §14).
-**Steps :** 020 → 029
+**Steps :** 020 → 029, plus **031** et **032** — *ajoutées le 31/08/2026 pour payer les dettes que
+aucune step ne rencontrait ; `030` reste réservé au plan de coupe de step-029. Elles se lisent avant
+`027` : l'ordre de `todo.md` fait foi, pas le numéro.*
 
 **Livrables**
 - Catalogue des ~44 permissions et les **neuf rôles par défaut** du §6.10, seedés et idempotents.
@@ -469,8 +472,9 @@ contrats, et produit **un binaire qui sert la SPA**.
   signée, `/auth/me` renvoyant l'union des permissions.
 - MFA **TOTP** (anti-rejeu, codes de récupération) et **WebAuthn/passkey** (`rpID`/`origin` vérifiés
   côté serveur, compteur de signature).
-- `RequirePermission(key)` en middleware chi + écriture systématique d'`audit_log` + **MFA
-  obligatoire** pour les rôles privilégiés.
+- `RequirePermission(key)` en **middleware strict** — corrigé en step-025 : un middleware chi ne
+  reprend la main qu'après `Visit…Response(w)`, donc sur une réponse déjà écrite — plus l'écriture
+  systématique d'`audit_log` et le **MFA obligatoire** pour les rôles privilégiés.
 - Écrans Login, MFA, enrôlement du second facteur, administration des opérateurs et des rôles —
   **portés** et rebranchés sur les handlers Go.
 
@@ -487,8 +491,11 @@ passerelle elle-même (côté `go-gateway`, voir §15).
 - Table de vérité des neuf rôles vérifiée, **y compris les exclusions** : `ops` sans
   `suppressions:delete`, `script_author` sans `scripts:publish`, `support_readonly` sans
   `content:read`, `account_manager` sans `billing:topup`.
-- **Invariant (c)** : le test d'énumération des routes échoue si une route de mutation n'a ni garde de
-  permission ni écriture d'audit. Il lit le routeur comme une **valeur**, jamais le texte source.
+- **Invariant (c)** : le test d'énumération échoue si une opération de mutation n'a ni garde de
+  permission ni écriture d'audit. Il tire ses cas du **contrat** et non du routeur — mesuré en
+  step-004, `chi.Walk` prouve qu'une route est montée mais n'atteint pas le slice de middlewares,
+  qui vit dans un champ non exporté de closure. L'audit, lui, est lu dans le **code** par le
+  type-checker, jamais dans une déclaration ni dans le texte source.
 - Une session non-MFA ne peut atteindre aucune écriture ni `content:read`.
 - Aucun secret ni corps ne se retrouve dans `audit_log` (payload piégé).
 - Le premier administrateur peut **entrer** : installation → login → enrôlement → console, sans
@@ -720,13 +727,16 @@ M0 ─► M1 ⇄ M2 ─► M3 ─┬─► M4 ─► M5 ─┐
 des écrans qui ne se marchent pas dessus.
 
 **`M1` et `M2` s'imbriquent, ils ne se suivent pas** — d'où le `⇄`. La moitié serveur de `M1`
-(020 → 026 : auth, MFA, permissions, audit, DTO) ne dépend de rien de `M2` et vient d'abord. Mais ses
-quatre dernières steps sont des **écrans** : ils reposent sur les primitives (041), les cinq états
-(042) et la coquille (040).
+(020 → 026 : auth, MFA, permissions, audit, DTO ; puis 031 et 032, ajoutées le 31/08/2026) ne dépend
+de rien de `M2` et vient d'abord. Mais ses **trois** dernières steps sont des **écrans** : elles
+reposent sur les primitives (041), les cinq états (042) et la coquille (040).
+
+*Cette phrase annonçait « quatre » — `todo.md` en compte trois depuis toujours, et sa note † les
+nomme. Relevé le 31/08/2026 en ajoutant deux steps au jalon.*
 
 ```
-020…026  ─►  041 ─► 042 ─► 040  ─►  027 ─► 028 ─► 029  ─►  043…047  ─► M3
-└ M1 serveur ┘   └─── M2 interface ───┘   └─ M1 écrans ─┘   └ M2 temps réel ┘
+020…026 ─► 031 ─► 032 ─►  041 ─► 042 ─► 040  ─►  027 ─► 028 ─► 029  ─►  043…047  ─► M3
+└────── M1 serveur ──────┘   └─── M2 interface ───┘   └─ M1 écrans ─┘   └ M2 temps réel ┘
 ```
 
 **Ce qui peut avancer en parallèle une fois `M3` acquis :** `M6`, `M7` et `M8` touchent des écrans,
@@ -888,10 +898,22 @@ moins : un scénario qui se lit juste inspire une confiance que rien n'a encore 
   analyseur SQL** devant avaler `uuidv7()`, la table partitionnée et le bloc PL/pgSQL — le mode
   d'échec que `internal/store/permissions_catalog_test.go` a précisément corrigé ; et ce que `pgx` nu
   coûte est déjà payé, chaque requête étant exercée contre un PostgreSQL 18 réel par testcontainers.
-  Ce qui doit faire réviser : un store au-delà d'une vingtaine de requêtes, ou une requête à plus de
-  cinq ou six colonnes — c'est dans une liste d'arguments de `Scan` tenue à la main que vit le défaut
-  silencieux que `sqlc` supprime par construction. **Point de réexamen : step-025**, ou la première
-  route de liste de M3, selon celle qui arrive la première.
+  **Réexaminé en step-025, et confirmé.** Les deux déclencheurs alors nommés — « au-delà d'une
+  vingtaine de requêtes », « une requête à plus de cinq ou six colonnes » — avaient tous deux tiré, le
+  second dès step-024 : 29 littéraux SQL nommés, et un `Scan` à dix colonnes dans
+  `internal/store/webauthn.go`. La jambe « `sqlc` n'aurait presque rien à engendrer » est donc tombée.
+  Les deux autres tiennent, et le second analyseur SQL doit désormais avaler une table partitionnée,
+  une fonction PL/pgSQL, `uuidv7()`, `make_interval(secs => $n)` et `nullif($1, '')::inet`.
+
+  Ce qui a tranché est une **mesure et non plus un argument** : le défaut que `sqlc` supprime par
+  construction — deux champs de même type intervertis dans un `Scan`, ce qui compile et passe le
+  typage — a été reproduit sur le pire cas du dépôt, deux fois, et la suite rougit les deux fois.
+
+  **Ces deux déclencheurs étaient un proxy, et il a mal tiré** : ils mesurent une taille, alors que ce
+  qui décide est l'observabilité d'un `Scan` mal ordonné — une propriété du harnais de test, pas du
+  compte de requêtes. Le déclencheur qui les remplace : **un `Scan` dont la mutation d'interversion de
+  deux champs de même type reste verte**. Ce jour-là, `sqlc` reprend l'avantage et la décision se
+  rouvre. `tasks/steps/done/step-025.md` DN-7.
 
   > **Amendement du 02/08/2026, au début de step-005.** Cette décision disait « en step-005 ». Elle y
   > est **indécidable** : le périmètre de cette step écrit noir sur blanc qu'« aucune requête n'est

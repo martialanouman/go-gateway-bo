@@ -207,3 +207,16 @@ donc **le passage du repli de routes à `r.NotFound()`, garde de `/api` retirée
 
 Les deux mutations sont conservées au tableau de la PR : celle qui produit le défaut réel, et celle
 qui prouve que la garde porte bien la forme.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai de toutes.
+
+Le nonce CSP par requête, la rétention d'assets inter-versions et les sondes de
+disponibilité → **step-186**. La preuve du binaire dans un conteneur sans Node → **step-186** aussi.

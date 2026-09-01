@@ -4,6 +4,13 @@ import { defineConfig, devices } from '@playwright/test'
 // du mock Prism (4010) : `make e2e` doit pouvoir tourner pendant que `make dev` occupe les siens.
 const port = 3101
 
+// `localhost` et non `127.0.0.1` depuis step-024 : le second facteur WebAuthn lie les passkeys à un
+// domaine, et une adresse IP n'en est pas un — le navigateur refuse la cérémonie, et la bibliothèque
+// refuse désormais de démarrer. Aucun parcours n'exerce encore de passkey, mais déclarer une origine
+// en `localhost` pendant qu'on visite une IP ferait de la configuration ci-dessous un mensonge, et
+// c'est step-027 qui le paierait.
+const host = 'localhost'
+
 export default defineConfig({
   // Explicite, et pas seulement par rangement : sans lui, Playwright ramasse les fichiers de Vitest —
   // mesuré le 03/08/2026, il a chargé `chargement-a-froid.test.ts` et échoué dans `describe`, faute du
@@ -25,7 +32,7 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['list']] : [['list']],
 
   use: {
-    baseURL: `http://127.0.0.1:${port}`,
+    baseURL: `http://${host}:${port}`,
     trace: 'retain-on-failure',
   },
 
@@ -38,7 +45,7 @@ export default defineConfig({
     // cache et l'embarquement des assets n'existent que dans le déployable ; c'est `make e2e` qui le
     // construit avant d'arriver ici.
     command: '../bin/dashboard',
-    url: `http://127.0.0.1:${port}/`,
+    url: `http://${host}:${port}/`,
     // Ce que ce `false` tient exactement : `_startProcess` (`playwright/lib/runner/index.js` en
     // 1.62.0) sonde l'URL et, si elle répond déjà, **jette** au lieu de s'y raccrocher — les parcours
     // n'exerceront jamais un serveur qu'ils n'ont pas lancé. Le port dédié ci-dessus rend ce refus
@@ -51,7 +58,7 @@ export default defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
-      DASHBOARD_ADDR: `127.0.0.1:${port}`,
+      DASHBOARD_ADDR: `${host}:${port}`,
       // Aucun mock n'est lancé : le client sortant n'est appelé par aucun écran, et la configuration
       // ne fait qu'exiger son adresse au démarrage.
       //
@@ -73,6 +80,12 @@ export default defineConfig({
       DASHBOARD_SESSION_SECRET: 'une-cle-de-parcours-assez-longue-pour-passer-la-borne',
       // Obligatoire depuis step-023, aux mêmes conditions.
       DASHBOARD_TOTP_ENCRYPTION_KEY: 'une-cle-de-chiffrement-de-parcours-assez-longue',
+      // Obligatoires depuis step-024, aux mêmes conditions. Ce ne sont pas des secrets : le
+      // navigateur les voit à chaque cérémonie. Elles doivent s'accorder au `baseURL` ci-dessus,
+      // sans quoi la première cérémonie de step-027 échouerait sur une configuration qu'aucun
+      // parcours d'aujourd'hui n'exerce.
+      DASHBOARD_WEBAUTHN_RP_ID: host,
+      DASHBOARD_WEBAUTHN_ORIGIN: `http://${host}:${port}`,
     },
   },
 })

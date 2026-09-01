@@ -90,7 +90,15 @@ heures.
 La migration 00007 ajoute une troisième dimension à `login_attempt_counters`, sur l'identifiant de
 l'opérateur, et réutilise tel quel l'incrément atomique de step-021. Cinq essais par quart d'heure sur
 10⁶ codes dont trois sont valables à la fois : une chance sur deux demanderait de l'ordre de
-quatre-vingts ans. Le verrou est consulté **avant** toute dépense — sinon il protégerait le compte sans
+quatre-vingts ans.
+
+*(Correction du 29/08/2026, en step-025 : ce chiffre est faux d'un facteur soixante. Sur ses propres
+prémisses — 231 000 essais pour une chance sur deux, 175 200 essais par an à cinq par quart d'heure —
+le verrou achète de l'ordre de **seize mois**. Le calcul refait est dans `internal/mfa/manager.go`.
+step-025 a par ailleurs fermé un second seau que l'enrôlement ouvrait, et qui divisait ce délai par
+deux.)*
+
+Le verrou est consulté **avant** toute dépense — sinon il protégerait le compte sans
 protéger le serveur — et son franchissement rend un 429 avec sa durée, comme la connexion.
 
 **Le compteur par challenge disparaît avec lui.** Au même seuil, celui de l'opérateur compte à travers
@@ -219,6 +227,10 @@ le QR et le téléchargement des codes → step-028. La réinitialisation du sec
 opérateur → step-029.
 
 ## Suivis ouverts
+
+*(Note de step-024 : les deux premiers ont été inscrits dans les fiches qui les paieront —
+`step-025.md` pour la borne de l'enrôlement, `step-029.md` pour la fenêtre d'amorçage. Ils restaient
+ici sans porteur, et une fiche de `done/` n'est ouverte par personne.)*
 - **`POST /auth/mfa/totp/enroll` n'est borné par aucun compteur**, contrairement à la vérification :
   une session de premier facteur suffit à le répéter, puisqu'un remplacement seul exige une preuve.
   À borner par step-025, qui reprend ce chemin.
@@ -240,11 +252,39 @@ opérateur → step-029.
   sous le même nom dans le téléphone d'un opérateur qui enrôle les deux.
 - **`minimumTOTPEncryptionKeyLength` compte des caractères, pas de l'entropie.** Trente-deux `a` de
   suite passent. Le README recommande un CSPRNG ; rien ne l'applique.
-- **Le conteneur PostgreSQL des scénarios meurt parfois sous la charge** (`terminating connection due
-  to unexpected postmaster exit`), observé deux fois pendant les mesures de mutation. Ce n'est pas un
-  défaut du produit, mais ça rend une suite rouge sans cause lisible.
+- **Le conteneur PostgreSQL des scénarios meurt parfois sous la charge**, et **ce n'est pas un
+  problème d'outillage local** : mesuré le 27/08/2026 en relisant le journal du job en échec de la
+  PR 52, c'est lui qui a fait rougir « Tests Go » sur la CI — `connection refused` sur le port du
+  conteneur, en plein milieu de la suite. Cet échec a bloqué un bump de `kin-openapi` pendant huit
+  jours en faisant croire à une rupture de la bibliothèque, alors que la même version passe toute la
+  suite sur un `main` à jour. Le coût n'est donc pas l'inconfort d'une suite rouge : c'est une
+  dépendance qu'on n'ose plus bumper, et un diagnostic qu'il faut refaire à la main.
+
+  *(Une rédaction du 27/08 avait annoncé le retrait de cette entrée et de la suivante, au motif
+  qu'elles n'étaient pas des dettes du produit. Le retrait n'a jamais eu lieu — le message de commit
+  décrivait une intention et non le diff — et il aurait été faux : la preuve ci-dessus est arrivée
+  une heure plus tard.)*
+
+  Le symptôme en local est différent et vient du même défaut : `terminating connection due to
+  unexpected postmaster exit`, observé deux fois pendant les mesures de mutation de step-023 et une
+  fois pendant celles de step-024. Ce n'est pas un défaut du produit, mais ça rend une suite rouge
+  sans cause lisible — et, on le sait maintenant, ça se paie aussi en CI.
 - **Le timeout du harnais godog est passé de 2 s à 15 s** (19/08/2026), parce que l'enrôlement le
   dépassait sur le runner de la CI. C'est une borne anti-suspension et non une assertion de
   performance — la raison est écrite là où elle vit, sur `browser` dans `cmd/dashboard/main_test.go`.
   Ce qu'on perd : une régression qui rendrait une route dix fois plus lente ne rougirait plus ici. Rien
   ne la garderait par ailleurs, et c'était déjà vrai à deux secondes.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai des quarante-neuf.
+
+L'entropie de la clé TOTP, l'`issuer` de l'URI, la boucle des codes de récupération et les trois
+branches de course → **step-031**. Le conteneur PostgreSQL et le délai godog → **step-032**. Le
+journal de `internal/mfa` et `internal/auth` → **step-060**.

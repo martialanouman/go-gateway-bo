@@ -45,12 +45,12 @@ Versions Go relevées sur `proxy.golang.org` le 01/08/2026 ; versions JS telles 
 | WebSocket | `coder/websocket` | v1.8.15 |
 | PostgreSQL | `jackc/pgx/v5` | v5.10.0 |
 | Génération OpenAPI | `oapi-codegen/oapi-codegen/v2` | v2.8.0 |
-| WebAuthn | `go-webauthn/webauthn` | v0.17.4 |
+| WebAuthn | `go-webauthn/webauthn` | v0.18.0 |
 | TOTP | `pquerna/otp` | v1.5.0 |
 | Redis Pub/Sub | `redis/go-redis/v9` | v9.21.0 |
 | Hachage | `golang.org/x/crypto/argon2` | — |
 | Assets embarqués | `embed` (stdlib) | — |
-| **BDD** | `cucumber/godog` + `stretchr/testify` | v0.16.0 / v1.11.1 |
+| **BDD** | `cucumber/godog` + `stretchr/testify` | v0.16.0 / v1.12.1 |
 | Socle client | React + Vite | 19.2.8 / 8.1.5 |
 | Routage | `@tanstack/react-router` + `router-plugin` | 1.170.x |
 | État serveur | `@tanstack/react-query` | 5.101.4 |
@@ -136,12 +136,19 @@ qui restait à payer au bump n'avait effectivement pas grossi.
 - [x] step-021 — Login email/mot de passe (**argon2id**) + anti-brute-force partagé entre instances
 - [x] step-022 — Session BFF (cookie signé) + `/auth/me` + `/auth/logout`
 - [x] step-023 — MFA TOTP : enrôlement, vérification, codes de récupération
-- [ ] step-024 — MFA WebAuthn / passkey
-- [ ] step-025 — `RequirePermission` + journal d'audit + MFA obligatoire  *(invariant c)*
-- [ ] step-026 — DTO de sortie déclarés partout + test bloquant  *(invariant a, moitié structurelle)*
+- [x] step-024 — MFA WebAuthn / passkey
+- [x] step-025 — `RequirePermission` + journal d'audit + MFA obligatoire  *(invariant c)*
+- [x] step-026 — DTO de sortie déclarés partout + test bloquant  *(invariant a, moitié structurelle)*
+- [ ] step-031 — Durcissement M1 : ce que la revue garde seule ◊◊
+- [ ] step-032 — Le harnais de test : conteneur, délai godog, authentificateur épinglé ◊◊
 - [ ] step-027 — Écrans Login & MFA, branchés sur le BFF Go †
 - [ ] step-028 — Écran d'enrôlement du second facteur †
 - [ ] step-029 — Gestion des opérateurs et des rôles †
+
+◊◊ **Deux steps ajoutées le 31/08/2026, et leur numéro ne suit pas leur position** — l'ordre de cette
+liste fait foi. Elles se lisent **avant** `027`, qui attend M2 : elles ne dépendent d'aucun écran et
+paient des dettes du code déjà livré. Le bloc M1 est `020-039` ; `030` reste réservé au plan de coupe
+de `step-029`. Précédent : `step-009`, insérée après coup pour solder une dette de contrat.
 
 † **Ces trois steps s'exécutent après `041`, `042` et `040` de M2**, dans cet ordre :
 
@@ -291,3 +298,96 @@ observable que dans un run de CI : pousser tôt vaut mieux que relire.
 | Pas de lecture unitaire de CDR : la fiche d'un message se **compose** côté BFF (`search-messages` filtré + `get-message-trace`). | Composition et cache à la charge du BFF. | step-101 |
 | L'API Admin s'authentifie en **OAuth2 client_credentials + mTLS** avec un jeton *machine* portant des scopes fixes, dont `content:read`. | Seul le BFF peut restreindre la lecture de corps par opérateur — d'où l'invariant (c). | step-003, step-025, step-103 |
 | **62 des 133 opérations du contrat ne sont pas encore implémentées** côté passerelle. | M2, M4, M5 et M8 se développent contre le mock ; une passe d'intégration réelle par jalon. | `plan.md` §16 |
+
+
+---
+
+## Dettes ouvertes
+
+**Écrites dans les fiches qui les ont créées, et rappelées ici parce qu'« une fiche archivée n'est
+ouverte par personne »** — la phrase est du dépôt, écrite trois fois. Jusqu'au 31/08/2026 le mot
+« dette » n'apparaissait **pas une seule fois dans ce fichier**, et une seule fois dans `plan.md`
+(§1.12, pour en déclarer une **soldée**). Les **soixante-trois** lignes ci-dessous vivaient dans
+dix-sept fiches de `steps/done/`, dans `plan.md` §18-19, et dans des commentaires de code.
+
+Treize d'entre elles manquaient à la première rédaction de ce registre — dont le trou d'audit du
+proxy et l'absence de vérification d'attestation WebAuthn. Un registre qui se déclare complet et ne
+l'est pas enseigne qu'il faut aller voir ailleurs, ce qui est exactement le défaut qu'il corrige.
+
+Le registre est **complet, pas sélectif** : un registre partiel enseigne qu'il faut aller voir
+ailleurs. Une dette payée se **barre sur place**, jamais ne s'efface — une ligne effacée se rouvre en
+silence. `TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` refuse un porteur qui n'existe pas et
+un porteur déjà coché.
+
+### Sécurité et correction
+
+| Dette | Effet si elle dure | Porteur |
+|---|---|---|
+| Trois comparaisons à temps constant ne sont gardées que par la revue : `hmac.Equal` du sceau de cookie, la boucle non court-circuitée des codes de récupération, `subtle.ConstantTimeCompare`. | Remesuré les 30 et 31/08/2026, **les trois séparément** : les remplacer par une comparaison naïve laisse à chaque fois **les quatorze paquets verts**. Un refactor bien intentionné rouvre un oracle temporel sans un seul test rouge. | step-031 |
+| `minimumTOTPEncryptionKeyLength` compte des **caractères**, pas de l'entropie. | « Trente-deux `a` de suite passent. » Le README recommande un CSPRNG ; rien ne l'applique. C'est la clé qui chiffre les secrets TOTP au repos. | step-031 |
+| Trois branches de course ne sont exercées par rien : `!consumed`, `!elevated` de `VerifyMfa`, `!found` de l'enrôlement. | Des chemins de sécurité atteignables par deux requêtes en vol, dont rien ne dit qu'ils refusent. | step-031 |
+| Un refus de permission (403) ne laisse **aucune trace** côté serveur. | `internal/bff` ne reçoit aucun `*slog.Logger`, et le journal d'audit ne porte que les succès. Une enquête qui demande « qui a tenté ce qu'il ne pouvait pas faire » n'a pas la donnée, et elle ne se reconstruit pas. | step-029 |
+| Un 500 du BFF ne laisse aucune trace côté serveur. | Un `password_hash` corrompu en base fait refuser la connexion sans que rien ne le dise. | step-060 |
+| Aucun journal n'atteint `internal/mfa` ni `internal/auth`. | Un secret illisible et un hachage de code abîmé sont **silencieux** ; le symptôme est un code de récupération légitime qui échoue. La tranche 403 de step-029 s'en exclut nommément. | step-060 |
+| Le premier enrôlement d'un second facteur est libre pour toute session de premier facteur. | Sur un déploiement neuf, un mot de passe volé pendant cette fenêtre vaut un compte complet, second facteur compris. Assumé — problème d'amorçage classique du MFA. | step-029 |
+| Aucune politique de mot de passe hors bootstrap. | La seule du produit ne s'applique qu'au premier opérateur ; le second se crée sans contrainte. | step-029 |
+| Les sessions ne sont pas révoquées activement à la désactivation d'un opérateur. | Un compte désactivé garde ses sessions ouvertes jusqu'à leur échéance. | step-029 |
+| Un rôle personnalisé homonyme d'un rôle par défaut est **basculé en `is_default`**, sa description écrasée et ses attributions ramenées à la liste du code. | « Le rapport le compte, donc ce n'est pas silencieux, mais c'est **destructeur par défaut**. » `seed.go` nomme lui-même le porteur : « la seconde moitié de la question léguée à step-029, qui décidera si l'écran interdit ces neuf noms ou ce qu'il fait d'une collision ». | step-029 |
+| Un authentificateur WebAuthn au compteur cassé verrouille l'opérateur sur **tous** ses facteurs. | Cinq assertions refusées ferment aussi le TOTP et les codes de récupération, un quart d'heure. Le découpler rouvrirait le trou que **DN-7** ferme — le verrou d'essais partagé entre méthodes ; la sortie est la réinitialisation par un administrateur. | step-029 |
+| Aucun index n'impose, pour les cérémonies WebAuthn, « un seul défi vivant par session et par objet ». | Deux ouvertures concurrentes ne se voient pas : un double-clic peut faire consommer le défi de l'autre onglet et refuser une cérémonie légitime. **À mesurer avant d'y toucher** — tension avec la CTE qui éteint le précédent. | step-187 |
+| Rien ne purge `webauthn_challenges`. | Croissance non bornée sur une session qui ouvre des cérémonies. | step-187 |
+| Aucune durée de rétention n'existe nulle part ; `audit_log` croît sans borne. | Le §3.1 renvoie à un document compagnon absent du dépôt. | step-187 |
+| Les sessions expirées ne sont jamais purgées. | Même famille : une table qui ne décroît pas. | step-187 |
+| La validation des **requêtes** entrantes contre le schéma n'est pas faite à l'exécution. | Le contrat borne les réponses, pas ce qui entre. | step-060 |
+| `oauth2.reuseTokenSource` : l'attente est bornée mais **pas annulable**. | Un `tokenUrl` en trou noir sérialise les appels concurrents jusqu'au plafond. | step-060 |
+| Les scopes `cdr:export_bulk` et `msisdn:reveal` sont absents du jeton machine. | « Le symptôme sera un **403 de la passerelle** sur du code qui compile. » | step-104 |
+| `cdr:export_bulk` n'est catalogué nulle part au contrat amont. | À corriger par une PR dans `go-gateway/api/`, jamais en le devinant ici. | step-104 |
+| Nonce CSP par requête, rétention d'assets inter-versions, sondes de disponibilité. | « Découverte tardive en production. » Un onglet ouvert avant un déploiement échoue à charger ses chunks **en plein incident**. | step-186 |
+| Quatre lignes d'infrastructure qu'aucune porte ne garde : `config.ConnectTimeout` dans `openSQL`, la position du verrou en tête de transaction, le `ConnectTimeout` de `pgx.Connect` dans `Seed`, `IsoLevel: pgx.ReadCommitted`. | « Aucune porte ne rougit », vérifié plutôt que supposé — et pour le `ConnectTimeout` du `Seed`, il n'y a rien à retirer : la borne n'est **pas posée**, c'est un constat et non un correctif. Précédent : step-021 renvoie déjà une mesure d'infra à step-186. | step-186 |
+| `pg_advisory_xact_lock` de `CreateFirstOperator` n'est exercé par aucun test. | « Deux exécutions concurrentes se croisent trop rarement pour qu'un test qui les lance prouve quoi que ce soit. » Ce n'est donc pas une mutation verte mesurée, c'est une absence de preuve possible. | **sans porteur** — step-021 n'en nomme aucun, et le premier déploiement à plusieurs instances est le seul lieu où la course devient observable. |
+| Le pool est détaché du contexte d'arrêt, et **sa fermeture non plus n'est gardée**. | « Aucune porte, faute d'une requête assez lente pour traverser `SIGTERM` » : ce que la ligne change — une déconnexion annoncée plutôt que découverte — n'est visible d'aucun test du dépôt, et retirer la fermeture laisse tout vert parce que le processus s'arrête juste après. | step-047 |
+| Le scénario du `rp_id` en adresse IP ne garde pas l'**ordre** : construire avant `net.Listen`. | « L'ordre est tenu par un commentaire et par rien d'autre. » | step-186 |
+| Aucune surface Alertmanager au contrat. | Write-through et réconciliation non implémentables ; step-183 **bloquée**, step-180 dégradée. | step-183 |
+| `suspend-smpp-account` déclarée au contrat mais non implémentée. | L'UI passe par le PATCH tant que l'opération n'existe pas. | step-063 |
+| Pas de lecture unitaire de CDR : la fiche d'un message se compose côté BFF. | Composition et cache à la charge du BFF. | step-101 |
+| **62 des 133 opérations du contrat** ne sont pas implémentées côté passerelle — ratio mesuré le 27/07/2026, **jamais revérifié depuis**. | M2, M4, M5 et M8 se développent contre le mock. `plan.md` §16 dit de le relever à l'ouverture de chaque jalon ; M2 s'ouvre, et sa première step dans l'ordre est celle qui doit le relever. *(§18 écrit 63 là où §16 compte 62 : la contradiction est dans la source.)* | step-041 |
+| Le **scan transversal** de l'invariant (a) n'existe pas : logs, URL, exports, cache persisté, attributs de trace. | La moitié structurelle est livrée (step-026) ; celle qui vérifie qu'aucun **autre chemin** ne contourne l'invariant ne l'est pas. | step-103 |
+| Les secrets d'identifiants de bind ne sont gardés par rien — invariant (b). | Aucune porte n'empêche un secret d'être réaffiché ; la règle « montré exactement une fois » tient par la discipline. | step-066 |
+| `GET /audit-log` filtrera sur `target_type` **sans index**. | La table est partitionnée par mois : un filtre par cible balaiera chaque partition retenue. | step-184 |
+| **Aucune attestation WebAuthn n'est vérifiée** : aucun registre de métadonnées, modèle d'authentificateur non contrôlé. `WithExclusions` n'est gardé par rien non plus. | Une passkey posée par un authentificateur logiciel arbitraire est acceptée comme une clé matérielle. | **sans porteur** — step-024 l'écrit sous « ce qui n'est pas testé » sans en nommer un. |
+| Le **trou d'audit du proxy** : pour une action proxyfiée vers la passerelle, `Record` écrit **après** le succès, hors transaction commune. | Une panne entre les deux perd la trace, et l'action reste faite. « M3 en héritera — le découvrir alors coûterait une passe. » | step-060 |
+| `MaxConnsPerHost` n'est pas posé sur le client de la passerelle. | Rien ne borne les connexions ouvertes vers l'API Admin — « le seul cadran qui limiterait la pression de l'**invariant (e)** ». | step-060 |
+| `Proxy` n'est pas posé, là où `http.DefaultTransport` pose `ProxyFromEnvironment`. | Divergence silencieuse d'avec le défaut : un `HTTPS_PROXY` d'environnement est ignoré sans que rien ne le dise. | step-060 |
+| `idempotency_key` est engendré non-pointeur et sans `omitempty`. | « L'oublier compile et envoie l'UUID zéro, **qui a l'air valide** » — la passerelle le prendrait pour une clé. Renvoi de step-003 : « la step qui les appellera ». | step-160 |
+| La calibration argon2id a été mesurée sur un poste de développement. | Les paramètres de coût ne valent que pour cette machine. « À rejouer au premier déploiement réel (step-186). » | step-186 |
+| Une constante `Key` déclarée **sans entrée au catalogue** ne fait rougir aucune porte. | « Compile, deux suites vertes, absente du TS engendré. Go ne signale pas une constante exportée inutilisée. » Le catalogue est gardé contre les rôles, pas contre ses propres constantes. | step-031 |
+| Le hachage factice de `VerifyDummy` **en tant qu'appel**, et la cible de durée d'argon2id : aucune porte. | L'oracle d'énumération que le hachage factice ferme repose sur un appel que rien n'exige. | step-031 |
+| La borne de démarrage du binaire est passée de 5 s à 30 s. | « **Aucun test ne rougit si la valeur revient à 5 s**, vérifié plutôt que supposé. » Jumelle exacte du délai godog, et sans filet comme lui. | step-032 |
+| Un administrateur qui édite un rôle par défaut verra **son édition défaite au déploiement suivant**, et « la seconde sortie ne marche pas en l'état ». | Première moitié de la question léguée par DN-8 de step-020 ; la seconde est la collision de noms ci-dessus. | step-029 |
+| Le préfixe `__Host-` du cookie n'est vu par **aucun scénario**. | Le harnais porte ses cookies à la main et accepterait n'importe quel nom. Seul un vrai navigateur applique le préfixe. | step-027 |
+| La fenêtre d'oubli du compteur glissant est écrite **deux fois** — `internal/store/counters.go` et `internal/store/logins.go`. | Changer la politique d'oubli sans toucher les deux donne au premier et au second facteur **deux politiques anti-brute-force différentes**, et le commentaire qui dit « la même valeur, délibérément » devient faux en silence. Rien ne casse. | **sans porteur** — replier la requête bi-dimension remanierait le chemin consulté avant tout argon2id, pour un gain de forme. Non-attribution rendue le 30/08/2026, avec sa mesure. |
+
+### Forme, confort et outillage
+
+| Dette | Effet si elle dure | Porteur |
+|---|---|---|
+| Le conteneur PostgreSQL des scénarios meurt **parfois** sous la charge — mesuré le 27/08/2026 en relisant le journal du job en échec de la PR 52. | **Coût déjà encaissé**, et l'intermittence est ce qui le rend cher : il a fait rougir « Tests Go » en CI et **bloqué un bump de `kin-openapi` pendant huit jours** en faisant croire à une rupture de la bibliothèque. Le prix n'est pas l'inconfort d'une suite rouge, c'est une dépendance qu'on n'ose plus bumper. | step-032 |
+| Le filet de performance des scénarios n'existe **à aucune valeur** du délai godog, passé de 2 s à 15 s. | « Une régression qui rendrait une route dix fois plus lente ne rougirait plus ici. Rien ne la garderait par ailleurs, **et c'était déjà vrai à deux secondes**. » Le délai est une borne anti-suspension, pas une assertion de performance : le porter à 15 s n'a rien créé, il a rendu visible ce qui manquait. | step-032 |
+| `descope/virtualwebauthn` est épinglée sur `go-webauthn v0.16.5`. | Latente, pas active : « elle fonctionne contre 0.18.0 — les scénarios le montrent — mais un durcissement futur de la bibliothèque serveur **pourrait** la mettre en défaut, et le symptôme serait une suite rouge sans cause lisible dans le produit ». Repli chiffré : un authentificateur à la main, ~150 lignes. | step-032 |
+| L'`issuer` de l'URI `otpauth://` est codé en dur. | Deux déploiements du même produit apparaissent sous le même nom dans le téléphone de l'opérateur. | step-031 |
+| Le `displayName` WebAuthn est codé en dur. | Même geste que l'`issuer` : une valeur de marque qui appartient à la configuration validée. | step-031 |
+| Les **descriptions** des neuf rôles ne sont gardées que par la relecture. | **Quatre corrections sur trois** des neuf descriptions — `ops` deux fois, puis `compliance` et `billing_admin` —, à la main, sur trois passes de revue. L'écran des rôles affichera ces phrases telles quelles à un opérateur qui s'en servira pour décider. | step-029 |
+| La valeur des durées de session (12 h absolue, 2 h d'inactivité) n'est gardée par rien. | Les changer laisse tout vert. C'est une **décision, pas un invariant** — ce que le porteur garde est l'affichage cohérent du décompte, pas la valeur. | step-027 |
+| Aucune passkey ne porte de nom : la table est livrée sans colonne `name`. | « Celle enregistrée le 12 août » n'est pas un nom. Migration + champ au contrat. | step-028 |
+| Laquelle proposer en premier, passkey ou TOTP : la décision n'est écrite nulle part. | Une décision d'écran laissée au hasard de l'implémentation. | step-028 |
+| La réinitialisation du second facteur d'un autre opérateur est **promise par deux messages d'erreur en production**. | Ils deviendront faux si la step ne la livre pas. | step-029 |
+| Le sort de `GET /permissions`, déclarée au §5.1 et sans appelant, n'est pas tranché. | Une opération au contrat que personne n'appelle : la trancher, et écrire la raison. | step-029 |
+| `QueryClientProvider` n'est monté ni dans le produit ni dans le harnais. | Assumé : le monter maintenant serait du code sans utilisateur. Déclencheur écrit par step-007 : « la première step qui livrera un `useQuery` », c'est-à-dire le premier écran qui parle au BFF — dont la fiche re-nomme déjà la dette. | step-027 |
+| L'amortissement de testcontainers n'est pas fait ; `WithReuse` écarté nommément. | Déclencheur écrit : le jour où un second paquet a besoin de PostgreSQL. | step-032 |
+| Le binaire dans un conteneur **sans Node** n'est pas prouvé. | La preuve livrée est plus étroite que l'affirmation. | step-186 |
+| Graphiques : `visx` contre `Recharts`, non tranché. | À décider sur la densité d'un cockpit sombre, pas en principe. | step-080 |
+| Des opérations du contrat n'ont **aucune step passerelle** : groupes de clients, webhooks, sender rewrite, `reorder-routes`. | À poser à l'équipe passerelle **avant M3 et M6**, pas à découvrir en développant. | step-060 |
+| `pgx` nu contre `sqlc` : décision **confirmée**, avec un déclencheur écrit qui la rouvrirait. | « Ce jour-là, `sqlc` reprend l'avantage et la décision se rouvre » — le déclencheur est un événement de mesure, « un `Scan` dont la mutation d'interversion de deux champs de même type reste verte ». Le premier critère était un proxy, reconnu tel. | **sans porteur** — un déclencheur mesurable, pas une step. |
+| Le raccourci `font:` réinitialise `font-variant-numeric`. | « Réel pour les KPI de step-041 » : des chiffres tabulaires qui cessent de s'aligner dans un cockpit dense. | step-041 |
+| Deux dettes de forme relevées en revue de step-008 et non corrigées. | Écrites sous « ce que la revue a signalé et que je n'ai pas corrigé » ; sans effet mesuré aujourd'hui. | step-041 |
+| `request.Body == nil` dans `API.Login` : une garde **inatteignable par le routeur**, conservée. | Lui écrire un test demanderait de l'appeler hors de son routeur : il prouverait la garde et rien du produit. Le constat est écrit au-dessus de la ligne. | **sans porteur** — c'est une décision consignée, pas une dette à payer. La seule action possible serait de retirer la garde. |

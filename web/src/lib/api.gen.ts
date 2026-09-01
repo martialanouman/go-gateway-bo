@@ -139,7 +139,7 @@ export interface paths {
          *     ensemble.
          *
          *     **Deux chemins d'enrôlement et non un seul**, contrairement à ce que le §5.1 annonçait : la
-         *     cérémonie WebAuthn de step-024 rendra une forme entièrement différente, et les réunir sous une
+         *     cérémonie WebAuthn de step-024 rend une forme entièrement différente, et les réunir sous une
          *     opération obligerait à un `oneOf` de réponse dont le code engendré fait un type opaque. La
          *     vérification, elle, rend le même 204 des deux côtés et reste une seule opération.
          */
@@ -160,7 +160,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Second facteur — code TOTP ou code de récupération
+         * Second facteur — code TOTP, code de récupération ou assertion de passkey
          * @description Vérifie le second facteur et **élève** la session ouverte par `POST /auth/login`. Le jeton de
          *     session est régénéré au passage : sans cela, un cookie obtenu avant le second facteur resterait
          *     valable après, ce qui est la fixation de session.
@@ -171,8 +171,10 @@ export interface paths {
          *     facteur volée resterait élevable pendant douze heures par qui obtient un code.
          *
          *     Le challenge n'est consommé qu'en cas de **succès** : une faute de frappe ne doit pas obliger à
-         *     refaire toute la connexion. Il compte en revanche ses échecs et meurt au-delà d'un petit
-         *     nombre, ce qui borne ce qu'un seul challenge peut servir.
+         *     refaire toute la connexion. *(Correction step-024 : une rédaction précédente lui prêtait un
+         *     compteur d'échecs propre. Il a existé le temps d'une revue, puis a été retiré — il doublait le
+         *     compteur par opérateur décrit juste après, et deux gardes dont l'une masque l'autre valent une
+         *     garde et une illusion.)*
          *
          *     Ce qui borne la recherche exhaustive d'un code à six chiffres est **un second compteur, par
          *     opérateur**, toutes connexions confondues : le premier ne suffirait pas, puisqu'une connexion
@@ -184,6 +186,122 @@ export interface paths {
          */
         post: operations["verifyMfa"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/register/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ouvre l'enregistrement d'une passkey
+         * @description Tire les options que le navigateur passera à `navigator.credentials.create()`, et ouvre un défi
+         *     de courte durée **lié à la session en cours**.
+         *
+         *     **Deux opérations et non une**, contrairement à l'enrôlement TOTP : WebAuthn est en deux temps
+         *     par nature — le serveur tire un défi, l'appareil le signe. Les réunir obligerait à rendre le
+         *     défi devinable par l'appelant, ce qui est exactement ce qu'un défi ne doit pas être.
+         *
+         *     Un seul défi vit à la fois pour une session : rappeler cette route en éteint le précédent.
+         *     Deux onglets rendraient sinon indécidable celui que la finition doit relire.
+         *
+         *     Les passkeys déjà détenues sont exclues des options : sans cela, l'appareil en enregistrerait
+         *     une seconde que l'opérateur ne saurait pas distinguer de la première.
+         */
+        post: operations["beginWebauthnRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/register/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enregistre la passkey que l'appareil vient de produire
+         * @description Confronte la réponse de l'authentificateur au défi ouvert par la route précédente, et
+         *     enregistre la passkey.
+         *
+         *     Le défi est consommé quoi qu'il arrive ici — succès comme échec — parce qu'il a été signé :
+         *     contrairement à un code mal tapé, une réponse refusée ne se retente pas sur le même défi.
+         */
+        post: operations["finishWebauthnRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/assert/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ouvre une assertion de passkey
+         * @description Tire les options que le navigateur passera à `navigator.credentials.get()`. Comme
+         *     l'enregistrement, la cérémonie est en deux temps ; contrairement à lui, elle **se finit sur**
+         *     `POST /auth/mfa/verify`, avec `method: webauthn` — la vérification reste une seule opération,
+         *     et rend le même 204 pour les trois méthodes.
+         *
+         *     Elle n'exige pas de challenge de connexion : c'est la finition qui l'exige, comme pour un code
+         *     TOTP. Ouvrir une cérémonie ne prouve rien et n'élève rien.
+         */
+        post: operations["beginWebauthnAssertion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/passkeys/{passkeyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire une passkey
+         * @description Retire une passkey de l'opérateur de la session.
+         *
+         *     **Elle n'exige aucune permission, et c'est délibéré** — l'affirmation inverse a tenu ici de
+         *     step-024 jusqu'à step-025, qui l'a corrigée. Retirer sa propre clé d'accès est du self-service,
+         *     pas un acte sur autrui : aucune clé du catalogue n'y correspond, et en créer une qu'il faudrait
+         *     donner aux neuf rôles pour que le geste marche n'exclurait personne. Ce qui la garde est
+         *     l'élévation, et ce qui en garde la trace est le journal d'audit. C'est `operators:manage` qui
+         *     gardera le retrait **sur autrui**, en step-029.
+         *
+         *     Elle exige donc une session élevée — mais **pas** de présenter la passkey qu'on
+         *     retire : on la retire précisément quand on ne l'a plus, appareil perdu ou clé cassée, et
+         *     l'exiger rendrait le geste impossible dans le seul cas qui le motive.
+         *
+         *     `passkeyId` est l'identifiant de la passkey tel que l'enregistrement l'a rendu, jamais
+         *     l'identifiant que l'authentificateur s'est choisi — celui-là est long, binaire, et n'a aucune
+         *     raison de traverser une URL.
+         */
+        delete: operations["deleteWebauthnPasskey"];
         options?: never;
         head?: never;
         patch?: never;
@@ -228,11 +346,12 @@ export interface components {
          *     à l'enrôlement.
          *
          *     C'est ce qui permet à l'écran de savoir s'il conduit à l'enrôlement ou au challenge, sans
-         *     essayer l'un pour découvrir qu'il fallait l'autre. step-024 y ajoutera le compte de passkeys.
+         *     essayer l'un pour découvrir qu'il fallait l'autre.
          */
         SecondFactors: {
             totp: boolean;
             recoveryCodesRemaining: number;
+            passkeys: number;
         };
         /**
          * @description Ce qu'un enrôlement présente : **rien** la première fois, et une preuve du facteur en place
@@ -274,8 +393,98 @@ export interface components {
         MfaVerification: {
             challenge: string;
             /** @enum {string} */
-            method: "totp" | "recovery_code";
-            code: string;
+            method: "totp" | "recovery_code" | "webauthn";
+            code?: string;
+            assertion?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * @description Une passkey désignée dans des options de cérémonie — exclue d'un enregistrement, ou admise
+         *     pour une assertion. `id` est l'identifiant que l'authentificateur s'est choisi, en base64url.
+         */
+        WebauthnCredentialDescriptor: {
+            /** @enum {string} */
+            type: "public-key";
+            id: string;
+            transports?: string[];
+        };
+        /**
+         * @description Ce que le client passe **tel quel** à `navigator.credentials.create()`. L'enveloppe `publicKey`
+         *     est ce que l'API du navigateur attend ; la retirer obligerait le client à la reconstruire.
+         *
+         *     Chaque champ est déclaré, plutôt que de sérialiser le type de la bibliothèque : c'est en sortie
+         *     que la règle du DTO garde quelque chose — un champ absent d'ici ne peut pas fuir, et un bump de
+         *     la bibliothèque qui en ajouterait un ne le ferait pas traverser en silence.
+         *
+         *     Ce qui n'y figure pas est ce que nous ne demandons pas : aucune extension, aucune préférence
+         *     d'attestation. Nous ne vérifions le modèle d'aucun authentificateur — il n'y a pas de registre
+         *     de métadonnées ici — donc une attestation ne serait pas contrôlée, et une valeur qu'on ne
+         *     contrôle pas vaut moins que son absence.
+         */
+        WebauthnRegistrationOptions: {
+            publicKey: {
+                rp: {
+                    id: string;
+                    name: string;
+                };
+                user: {
+                    id: string;
+                    name: string;
+                    displayName: string;
+                };
+                challenge: string;
+                pubKeyCredParams: {
+                    /** @enum {string} */
+                    type: "public-key";
+                    alg: number;
+                }[];
+                timeout?: number;
+                excludeCredentials?: components["schemas"]["WebauthnCredentialDescriptor"][];
+                authenticatorSelection?: {
+                    residentKey?: string;
+                    userVerification?: string;
+                };
+            };
+        };
+        /**
+         * @description Ce que le client passe **tel quel** à `navigator.credentials.get()`. Même enveloppe et même
+         *     règle que pour l'enregistrement.
+         *
+         *     `allowCredentials` énumère les passkeys de l'opérateur : la session dit déjà de qui il s'agit,
+         *     donc l'assertion n'a pas à être découvrable, et l'appareil sait quoi proposer.
+         */
+        WebauthnAssertionOptions: {
+            publicKey: {
+                challenge: string;
+                timeout?: number;
+                rpId?: string;
+                allowCredentials?: components["schemas"]["WebauthnCredentialDescriptor"][];
+                userVerification?: string;
+            };
+        };
+        /**
+         * @description Ce que `navigator.credentials.create()` a produit, transmis **tel quel**.
+         *
+         *     Un objet libre, pour la même raison que le champ `assertion` de `MfaVerification` : sa forme
+         *     appartient à la spécification WebAuthn, la bibliothèque l'analyse, et la retyper ici en ferait
+         *     deux rédactions dont une périmerait.
+         */
+        WebauthnRegistration: {
+            attestation: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * @description La passkey qui vient d'être enregistrée. **Seul son identifiant**, et c'est ce dont le client a
+         *     besoin : de quoi la retirer plus tard.
+         *
+         *     Rien de la clé, pas même publique. Non qu'elle soit secrète — elle ne l'est pas, et c'est ce
+         *     qui dispense sa table du chiffrement au repos — mais parce qu'aucun écran n'en fait rien, et
+         *     qu'un champ qu'on rend est un champ qu'on doit tenir.
+         */
+        WebauthnCredential: {
+            id: string;
         };
         /**
          * @description De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
@@ -501,6 +710,25 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /**
+             * @description Trop d'enrôlements depuis ce compte sur le dernier quart d'heure. Le compteur porte ici sur
+             *     les **appels** et non sur les échecs : cette route réussit, et une session de premier
+             *     facteur suffisait à la répéter — chaque appel hachant dix codes de récupération, soit dix
+             *     fois le processeur d'une connexion.
+             *
+             *     Le message porte la durée restante, comme les autres verrous : un refus muet ferait
+             *     retenter l'opérateur, puis ouvrir un ticket.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     verifyMfa: {
@@ -558,6 +786,242 @@ export interface operations {
                 headers: {
                     /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
                     "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    beginWebauthnRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les options de création, à passer telles quelles au navigateur. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebauthnRegistrationOptions"];
+                };
+            };
+            /** @description Aucune session vivante. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Un second facteur est déjà en place et la session n'est pas élevée. En ajouter un sans
+             *     l'élévation permettrait à quiconque détient le mot de passe de se donner un second facteur,
+             *     donc de contourner celui qui existe.
+             *
+             *     Ce n'est pas une panne : c'est le cas d'un opérateur qui ajoute un appareil. Le refus dit
+             *     par où passer.
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Trop de cérémonies ouvertes depuis ce compte sur le dernier quart d'heure. Le compteur
+             *     porte ici sur les **appels** et non sur les échecs : cette route réussit, et une session de
+             *     premier facteur suffisait à la répéter — chaque appel écrivant un défi que rien ne purge.
+             *
+             *     Le seuil est commun aux deux ouvertures, enregistrement et assertion : les séparer
+             *     doublerait le budget disponible pour la même protection. Le message porte la durée
+             *     restante.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    finishWebauthnRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebauthnRegistration"];
+            };
+        };
+        responses: {
+            /** @description La passkey est enregistrée. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebauthnCredential"];
+                };
+            };
+            /** @description La requête n'a pas la forme que la route attend. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Aucune session vivante, ou la cérémonie n'a pas abouti. Le corps du second cas est le même
+             *     qu'aucun défi ne soit ouvert, qu'il soit échu ou déjà servi, que l'origine ne soit pas
+             *     celle qu'on attendait, que la signature soit fausse, ou que **cette clé soit déjà
+             *     enregistrée** — ici ou ailleurs : les distinguer dirait à qui détient l'authentificateur
+             *     s'il est enrôlé quelque part.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Un second facteur a été mis en place **entre l'ouverture de la cérémonie et sa finition**,
+             *     et la session n'est pas élevée. Le défi vit cinq minutes : sans ce contrôle, une cérémonie
+             *     ouverte quand l'enrôlement était libre attacherait encore une passkey après coup.
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    beginWebauthnAssertion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les options d'assertion, à passer telles quelles au navigateur. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebauthnAssertionOptions"];
+                };
+            };
+            /** @description Aucune passkey n'est enregistrée ; il n'y a pas de cérémonie à ouvrir. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Aucune session vivante. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Trop de cérémonies ouvertes depuis ce compte sur le dernier quart d'heure. Le compteur
+             *     porte ici sur les **appels** et non sur les échecs : cette route réussit, et une session de
+             *     premier facteur suffisait à la répéter — chaque appel écrivant un défi que rien ne purge.
+             *
+             *     Le seuil est commun aux deux ouvertures, enregistrement et assertion : les séparer
+             *     doublerait le budget disponible pour la même protection. Le message porte la durée
+             *     restante.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteWebauthnPasskey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description L'identifiant rendu à l'enregistrement. */
+                passkeyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La passkey est retirée. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description Aucune session vivante, ou cette passkey n'appartient pas à l'opérateur — le même corps
+             *     pour les deux, parce que distinguer « elle existe mais pas chez vous » de « elle n'existe
+             *     pas » dirait ce que possède quelqu'un d'autre.
+             *
+             *     La session **vivante mais non élevée**, elle, rend un 409 : la confondre avec les deux
+             *     précédentes ferait lire « reconnectez-vous » à un opérateur dont le remède est l'inverse —
+             *     se reconnecter rend une session de premier facteur, donc le même refus.
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Deux causes, deux codes. `mfa_elevation_required` : la session n'a pas franchi le second
+             *     facteur. `mfa_last_factor` : c'est le dernier facteur de l'opérateur, et le retirer
+             *     l'enfermerait dehors.
+             *
+             *     Les deux nomment ce qui manque et par où passer — un contrôle interdit est désactivé et
+             *     expliqué, jamais masqué.
+             */
+            409: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

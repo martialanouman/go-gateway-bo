@@ -257,3 +257,76 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 200
     Et la réponse ne porte ni le secret ni aucun code de récupération
     Et la réponse annonce un second facteur enrôlé
+
+  # Un compteur d'**appels** et non d'échecs : cette route réussit, donc le verrou d'essais ne la voit
+  # jamais passer. Elle hache dix argon2id à chaque fois, et une session de premier facteur suffisait
+  # à la répéter sans borne. Dette de step-023, payée ici.
+  Scénario: six enrôlements d'affilée sont bornés, et le refus dit combien de temps attendre
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur enrôle une application d'authentification 6 fois
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 429
+    Et la réponse porte l'en-tête "Retry-After"
+    Et le message annonce la durée restante
+
+  # Deux choses à la fois, et la seconde ne se voit qu'avec plusieurs appels : le verrou se lève, et
+  # la fenêtre **oublie** — le compteur repart à un plutôt que de reprendre à six. S'il reprenait, le
+  # deuxième appel d'après l'échéance reverrouillerait aussitôt, et le verrou serait en pratique
+  # définitif pour qui a franchi le seuil une fois.
+  Scénario: le verrou de l'enrôlement se lève tout seul, et la fenêtre oublie
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification 6 fois
+    Quand le verrou arrive à échéance
+    Et l'opérateur enrôle une application d'authentification 5 fois
+    # 409 et non 200 : le premier des six appels a réussi, donc un facteur est en place et le
+    # remplacer demande d'en présenter la preuve. Ce qui compte ici est que ce ne soit plus 429 — la
+    # route répond de nouveau pour elle-même.
+    Alors le serveur répond 409
+    Et le refus dit par où passer
+
+  # **Les deux routes partagent un seul seau, et c'est le sujet de ces deux scénarios.** La migration
+  # 00007 ne bornait que la vérification ; le remplacement, qui compare lui aussi un code, ouvrait un
+  # second seau de cinq essais. Qui détient le mot de passe disposait de dix devinettes par quart
+  # d'heure au lieu de cinq — la moitié par une route que personne ne regardait.
+  #
+  # Chaque scénario se termine sur la route où **l'autre** borne ne peut pas mordre : le compteur
+  # d'appels de l'enrôlement ne s'applique pas à la vérification, et il est à zéro quand le second
+  # scénario appelle l'enrôlement pour la première fois. Un 429 ne peut donc venir que du seau commun.
+  #
+  # Quatre remplacements et non cinq, et l'écart n'est pas cosmétique : le compteur d'appels de la
+  # migration 00009 borne l'enrôlement à cinq requêtes par quart d'heure, dont la première a servi à
+  # enrôler. **Le seuil de cinq échecs n'est donc pas atteignable par cette route seule** — ce qui
+  # est une seconde borne, découverte en écrivant ce scénario, et non celle qu'on cherchait. Le
+  # cinquième échec vient de la vérification, et c'est précisément ce qui montre que les deux
+  # alimentent le même seau.
+  Scénario: les codes faux du remplacement comptent dans le seau de la vérification
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Quand l'opérateur tente 4 remplacements avec un code faux
+    Et l'opérateur présente un code faux
+    Et l'opérateur présente le code du pas courant
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 429
+    Et le second facteur n'est pas encore vérifié
+
+  # Le code présenté ici est **juste**, et c'est ce qui rend ce scénario discriminant. Avec un code
+  # faux, le refus viendrait de l'échec compté et non du verrou consulté : les deux rendent le même
+  # 429, et la mutation qui retire la consultation resterait verte — mesuré. Un code juste sépare les
+  # deux : sans consultation, il remplacerait l'authentificateur d'un compte verrouillé, c'est-à-dire
+  # que le verrou échouerait à empêcher le succès qu'il existe pour empêcher.
+  Scénario: un compte verrouillé ne remplace pas son authentificateur, même avec le bon code
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente 5 codes faux
+    Quand l'opérateur remplace son authentificateur en présentant son code
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 429
+    Et le message annonce la durée restante

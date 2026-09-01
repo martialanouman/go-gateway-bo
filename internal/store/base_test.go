@@ -54,8 +54,8 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Given(`^les migrations déjà jouées$`, schema.migrateThenRecordSchema)
 	ctx.When(`^les migrations sont jouées$`, schema.migrate)
 	ctx.When(`^les migrations sont rejouées$`, schema.migrate)
-	ctx.Then(`^les sept migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
-	ctx.Then(`^les treize tables du schéma existent$`, schema.everyTableExists)
+	ctx.Then(`^les huit migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
+	ctx.Then(`^les quinze tables du schéma existent$`, schema.everyTableExists)
 	ctx.Then(`^le journal d'audit accepte un événement daté du (mois courant|mois suivant)$`,
 		schema.auditLogAcceptsEventDated)
 	ctx.Then(`^la seconde exécution n'a rien appliqué$`, schema.lastRunAppliedNothing)
@@ -123,9 +123,11 @@ var initialMigrations = []string{
 	"00005_sessions.sql",
 	"00006_mfa_totp.sql",
 	"00007_second_factor_throttling.sql",
+	"00008_webauthn.sql",
+	"00009_ceremony_throttling.sql",
 }
 
-const latestSchemaVersion = 7
+const latestSchemaVersion = 9
 
 func (w *schemaWorld) everyMigrationWasReported() error {
 	if !slices.Equal(w.lastOutcome.Applied, initialMigrations) {
@@ -142,12 +144,12 @@ func (w *schemaWorld) everyMigrationWasReported() error {
 	return nil
 }
 
-// dashboardTables est l'inventaire du §3.1 — treize tables, ni plus ni moins. Il est écrit ici en
+// dashboardTables est l'inventaire du §3.1 — quinze tables, ni plus ni moins. Il est écrit ici en
 // toutes lettres plutôt que dérivé des fichiers de migration : une liste dérivée du SQL dirait
 // seulement que le SQL fait ce que le SQL dit.
 //
-// Les quatre dernières ne venaient pas du §3.1, qui n'en déclarait que neuf : step-021, step-022 et
-// step-023 l'ont **amendé**, chacune dans sa PR. Livrer une table que la spec ignore la rendrait
+// Les six dernières ne venaient pas du §3.1, qui n'en déclarait que neuf : step-021, step-022,
+// step-023 et step-024 l'ont **amendé**, chacune dans sa PR. Livrer une table que la spec ignore la rendrait
 // invisible à quiconque la relit.
 var dashboardTables = []string{
 	"operators",
@@ -163,12 +165,14 @@ var dashboardTables = []string{
 	"login_attempt_counters",
 	"sessions",
 	"mfa_recovery_codes",
+	"webauthn_credentials",
+	"webauthn_challenges",
 }
 
 // dashboardTableCount est le plancher de l'inventaire ci-dessus. Il n'est pas décoratif : mesuré le
 // 02/08/2026, `dashboardTables = []string{}` laissait cette suite **verte** — le scénario « les neuf
 // tables existent » passait en n'ayant cherché aucune table.
-const dashboardTableCount = 13
+const dashboardTableCount = 15
 
 func (w *schemaWorld) everyTableExists(ctx context.Context) error {
 	if len(dashboardTables) != dashboardTableCount {

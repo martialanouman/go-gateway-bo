@@ -301,3 +301,16 @@ n'importe quel nom ; c'est écrit au-dessus de `CookieName`.
 
 **La porte anti-copie** (`api/openapi-bff.yaml`, en-tête) — re-sondée le 10/08/2026 en rejouant la
 mesure : `openapi-admin.yaml` 0/28, `openapi-public.yaml` 1/5. Inchangé, mais mesuré et non déduit.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai des quarante-neuf.
+
+Le préfixe `__Host-` qu'aucun scénario ne voit, et les durées de session → **step-027**, premier
+parcours authentifié contre le binaire. `hmac.Equal` → **step-031**.

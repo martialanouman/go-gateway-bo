@@ -309,3 +309,14 @@ qui est trompeuse, pas le test.
 
 Le test reste donc écrit, et il peut tomber. Le sens inverse que DN-5 ajoute ne le remplace pas : il
 le complète.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Une constante `Key` déclarée sans entrée au catalogue → **step-031**. Elle avait échappé au premier
+inventaire des dettes comme à sa revue : c'est en cherchant quelles fiches n'avaient pas de pointeur
+qu'elle est ressortie.

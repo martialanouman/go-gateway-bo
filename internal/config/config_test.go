@@ -30,6 +30,8 @@ func minimalEnv() map[string]string {
 		config.EnvBruteForceSalt:    testBruteForceSalt,
 		config.EnvSessionSecret:     testSessionSecret,
 		config.EnvTOTPEncryptionKey: testTOTPEncryptionKey,
+		config.EnvWebauthnRPID:      testWebauthnRPID,
+		config.EnvWebauthnOrigin:    testWebauthnOrigin,
 	}
 }
 
@@ -39,6 +41,13 @@ const (
 	testBruteForceSalt    = "un-sel-de-test-assez-long-pour-passer-la-borne"
 	testSessionSecret     = "une-cle-de-test-assez-longue-pour-passer-la-borne"
 	testTOTPEncryptionKey = "une-cle-de-chiffrement-de-test-assez-longue"
+)
+
+// Les deux valeurs WebAuthn ne sont pas des secrets — le navigateur les voit — et rien ici n'ouvre de
+// cérémonie : `Load` n'exige que leur présence, et c'est `webauthn.New` qui juge le domaine.
+const (
+	testWebauthnRPID   = "localhost"
+	testWebauthnOrigin = "http://localhost:3001"
 )
 
 // localDatabaseURL est le DSN du `docker-compose.yml` de développement : ni un secret d'installation,
@@ -64,6 +73,8 @@ func realGatewayEnv() map[string]string {
 		config.EnvBruteForceSalt:      testBruteForceSalt,
 		config.EnvSessionSecret:       testSessionSecret,
 		config.EnvTOTPEncryptionKey:   testTOTPEncryptionKey,
+		config.EnvWebauthnRPID:        testWebauthnRPID,
+		config.EnvWebauthnOrigin:      testWebauthnOrigin,
 	}
 }
 
@@ -523,6 +534,8 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvSessionSecret,
 		config.EnvTOTPEncryptionKey,
 		config.EnvTrustedProxies,
+		config.EnvWebauthnRPID,
+		config.EnvWebauthnOrigin,
 		config.EnvBootstrapOperatorEmail,
 		config.EnvBootstrapOperatorName,
 		config.EnvBootstrapOperatorPassword,

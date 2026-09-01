@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	"github.com/descope/virtualwebauthn"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers"
@@ -165,7 +166,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
 // mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
 // entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 45
+const minimumScenarios = 77
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -220,11 +221,25 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 		sessions.refusalSaysNothingAboutTheSession)
 	ctx.Then(`^redemander "([^"]*)" est refusé de même$`, sessions.refusedAgain)
 
-	(&mfaWorld{login: login, session: sessions}).registerSteps(ctx)
+	// Un seul `mfaWorld`, partagé : le monde d'audit relit ce que l'enrôlement lui a rendu, donc il
+	// doit voir **cette** instance-là. En enregistrer deux dupliquerait les définitions de step et
+	// laisserait le second monde répondre pour le premier.
+	factors := &mfaWorld{login: login, session: sessions}
+	factors.registerSteps(ctx)
+	(&auditWorld{login: login, mfa: factors}).registerSteps(ctx)
+	(&webauthnWorld{
+		login:         login,
+		session:       sessions,
+		authenticator: virtualwebauthn.NewAuthenticator(),
+	}).registerSteps(ctx)
 
 	ctx.Given(`^une base dont le schéma est en retard d'une migration$`, schema.outdatedSchema)
 	ctx.Given(`^une base vierge$`, schema.freshSchema)
 	ctx.Given(`^l'adresse d'écoute déjà occupée$`, schema.occupyListenAddress)
+	ctx.Given(`^une base migrée dont les partitions d'audit ont été retirées$`,
+		schema.migratedSchemaWithoutAuditPartitions)
+	ctx.Then(`^le journal d'audit accepte une écriture datée du (mois courant|mois suivant)$`,
+		schema.auditLogAcceptsWriteDated)
 	ctx.Then(`^le message d'erreur nomme la version trouvée et la version attendue$`,
 		schema.messageNamesBothVersions)
 	ctx.Then(`^le message d'erreur parle du schéma et non de l'adresse$`,
@@ -292,6 +307,15 @@ func completeConfiguration() map[string]string {
 		// TOTP lui arrive **en clair par la réponse d'enrôlement**, qui existe pour ça, donc aucun
 		// scénario n'a besoin de déchiffrer une colonne.
 		"DASHBOARD_TOTP_ENCRYPTION_KEY": "une-cle-de-chiffrement-de-scenario-assez-longue",
+		// Obligatoires depuis step-024, et sans repli de même. Ce ne sont pas des secrets.
+		//
+		// **Le domaine ne ressemble délibérément pas à l'adresse d'écoute**, qui est
+		// `127.0.0.1:<port éphémère>`. C'est ce qui donne sa preuve aux scénarios de passkey :
+		// l'authentificateur du harnais signe pour `https://dashboard.exemple.test`, et une cérémonie
+		// ne peut aboutir que si le serveur tient cette origine de sa **configuration**. Un code qui
+		// la lirait dans la requête verrait `http://127.0.0.1:…` et refuserait tout.
+		"DASHBOARD_WEBAUTHN_RP_ID":  "dashboard.exemple.test",
+		"DASHBOARD_WEBAUTHN_ORIGIN": "https://dashboard.exemple.test",
 	}
 }
 
@@ -534,6 +558,13 @@ func (p *process) remember(cookies []*http.Cookie) {
 // **méthode** pour retrouver la route dans le YAML.
 func (p *process) post(path, body string) error {
 	return p.send(http.MethodPost, path, "application/json", body)
+}
+
+// remove est le troisième verbe du harnais, et il arrive avec la première opération du contrat qui
+// en emploie un — le retrait d'une passkey (step-024). Aucun corps : ce qu'elle désigne est dans son
+// chemin.
+func (p *process) remove(path string) error {
+	return p.send(http.MethodDelete, path, "", "")
 }
 
 // La coquille référence ses fichiers hachés en absolu : les relire dans le corps rendu, plutôt que

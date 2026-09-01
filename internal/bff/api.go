@@ -6,6 +6,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // API implémente l'interface **stricte** qu'engendre `api/openapi-bff.yaml`. Ce que l'interface
@@ -20,16 +21,31 @@ import (
 // Ce que la porte `TestResponseTypesDeclareTheirFields` couvre est plus étroit que « §1.11 » : la
 // **forme des champs déclarés** — ni map ni interface vide, à n'importe quelle profondeur — et
 // l'embarquement de types que le contrat n'engendre pas. Mesuré le même jour, sur ce type sans champ :
-// la porte reste **verte**. Elle voit pourtant bien ce type — le même, doté d'un champ
-// `map[string]any`, la fait tomber en le nommant.
+// la porte **restait verte**. Elle voyait pourtant bien ce type — le même, doté d'un champ
+// `map[string]any`, la faisait tomber en le nommant.
 //
-// Ce qu'**aucune porte structurelle** ne couvre, donc : un `Visit…` écrit à la main qui sérialise
-// autre chose que ses champs. Ce qui rougit se compte par route et non par propriété — mesuré, le
-// type ci-dessus effectivement servi par `Health` fait tomber deux choses, le test de corps exact
-// `TestHealthProbe` et le scénario godog « la sonde de vivacité rend ce que le contrat décrit », qui
-// confronte la réponse servie au YAML du dépôt (`additionalProperties: false` y refuse `body` et
-// `secret`). Une route livrée sans l'un ni l'autre n'aurait rien. La forme normale reste celle-ci, où
-// `Health200JSONResponse` et son `Visit…` viennent tous deux du contrat.
+// **Ce trou est fermé depuis step-026**, et les deux paragraphes ci-dessus restent parce qu'ils disent
+// ce qui a été mesuré, pas ce qui est encore vrai. `TestResponseTypesDeclareTheirFields` exige
+// désormais que tout type implémentant une interface `…ResponseObject` soit **déclaré dans le fichier
+// engendré** : le type de réponse écrit à la main ci-dessus la fait tomber en le nommant.
+//
+// La règle est une localisation et non une inspection du corps du `Visit…`, ce qui est mesuré aussi :
+// cinq `…429JSONResponse` engendrés encodent `response.Body` et non `response`, trois `…204Response`
+// n'encodent rien.
+//
+// **Elle ne suffisait pas seule, et la revue l'a trouvé** : implémenter l'interface exige bien d'écrire
+// le `Visit…`, le poser sur un type engendré est une redéclaration que le compilateur refuse, et
+// l'hériter par embarquement laisse le type porteur déclaré hors du fichier engendré — mais un
+// `MarshalJSON` écrit à la main **sur un type engendré** compile, parce que le fichier engendré ne
+// déclare pas cette méthode, et le `Visit…` l'appelle en encodant `response`. Sondé le 30/08/2026 : les
+// quatre règles restaient vertes. C'est `handWrittenMethod` qui ferme ce chemin-là, en refusant
+// **toute** méthode déclarée hors du fichier engendré.
+//
+// Ce qui rougissait **avant** step-026 se comptait par route et non par propriété — mesuré, le type
+// ci-dessus effectivement servi par `Health` faisait tomber le test de corps exact `TestHealthProbe`
+// et le scénario godog « la sonde de vivacité rend ce que le contrat décrit », qui confronte la
+// réponse servie au YAML du dépôt (`additionalProperties: false` y refuse `body` et `secret`). Une
+// route livrée sans l'un ni l'autre n'aurait rien eu, et c'est la raison d'être de la porte.
 //
 // Elle n'embarque pas `Unimplemented`, et la raison n'est pas celle qu'on croit : `Unimplemented` ne
 // porte que des méthodes de l'interface **simple**, donc une opération déclarée et non écrite rompt la
@@ -39,9 +55,9 @@ import (
 // lecteur pressé comptera. C'est cette promesse-là que garde
 // `TestTheMountedImplementationDoesNotEmbedUnimplemented`.
 type API struct {
-	// Authenticator porte le premier facteur. `API` cesse ici d'être un struct vide : la remarque
-	// ci-dessus sur les portes structurelles reste vraie, elle parle simplement d'un type qui a
-	// désormais un champ.
+	// Authenticator porte le premier facteur. `API` a cessé d'être un struct vide en step-021 — la
+	// remarque ci-dessus sur la porte structurelle est écrite au passé depuis que step-026 l'a fermée,
+	// et elle ne parlait de toute façon pas de ce type-ci mais des types de **réponse**.
 	Authenticator *auth.Authenticator
 	// Sessions ouvre, résout et ferme les sessions. Le premier facteur et la session sont deux
 	// collaborateurs distincts : c'est ici qu'ils se composent, et nulle part plus bas.
@@ -50,6 +66,14 @@ type API struct {
 	// Ni `auth` ni `session` ne le connaissent : le premier n'a rien à voir avec lui, et le second
 	// n'apprend que le geste d'élévation, qui lui appartient.
 	SecondFactor *mfa.Manager
+	// Passkeys mène les cérémonies WebAuthn et tient ce qu'elles produisent. Un quatrième
+	// collaborateur et non une part de `SecondFactor` : les deux facteurs ne partagent que le verrou
+	// d'essais et l'élévation, et les réunir aurait fait d'un manager la somme de deux protocoles qui
+	// n'ont ni la même forme ni le même nombre d'allers-retours.
+	Passkeys *mfa.PasskeyManager
+	// Audit écrit le journal. Cinquième collaborateur, et le seul dont **toutes** les routes de
+	// mutation dépendent : c'est la moitié « et l'audit avec elle » de l'invariant (c).
+	Audit *store.Audit
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le

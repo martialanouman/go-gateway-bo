@@ -18,6 +18,20 @@ permette de l'enrôler.
 - Le chemin de sortie : l'écran conduit à la console, et il est atteignable depuis le login d'un
   opérateur sans facteur (step-027).
 
+### Deux dettes que cette step hérite
+
+*Écrite ici et non seulement dans `steps/done/step-024.md` : une fiche archivée n'est ouverte par
+personne.*
+
+- **Aucune passkey ne porte de nom.** step-024 a livré la table sans colonne `name`, délibérément —
+  « la colonne s'écrira avec la step qui saura ce qu'elle doit contenir », comme step-005 l'a fait
+  pour `sessions`. C'est cette step-ci : un opérateur qui détient deux clés doit pouvoir dire laquelle
+  retirer, et « celle enregistrée le 12 août » n'est pas un nom. Cela demande une migration, un champ
+  au contrat sur `finishWebauthnRegistration`, et une opération de renommage — ou le nom posé à
+  l'enregistrement, ce qui évite la seconde route.
+- Le serveur accepte TOTP et passkey **à parité** (step-024) : laquelle proposer en premier est une
+  décision de cet écran, et elle n'est écrite nulle part.
+
 ## Points d'implémentation clés
 - **Le QR de la v1.0 était un carré noir de 176 pixels**, et le parcours qui l'assertait « visible »
   restait vert. La règle CSS avait été écrite sans lire ce que la bibliothèque émet. Ici : lire la
