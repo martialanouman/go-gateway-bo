@@ -443,3 +443,14 @@ métier → leurs steps respectives, qui consomment ce middleware sans le redéf
   devinettes par quart d'heure au lieu de cinq. Le remplacement consulte désormais le même verrou et
   compte dans le même seau. La correction a aussi refait le calcul qui rassurait : « quatre-vingts
   ans » était faux d'un facteur soixante, le verrou en achète **seize mois**.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+**La fenêtre d'oubli écrite deux fois y reste sans porteur, délibérément**, avec la raison mesurée
+qu'elle porte déjà. Le registre l'inscrit sous cette forme plutôt que de la taire : une dette qu'on
+choisit de garder n'est pas une dette qu'on oublie.

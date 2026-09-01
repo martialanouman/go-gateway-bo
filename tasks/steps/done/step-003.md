@@ -443,3 +443,17 @@ consignés, et chacun l'est aussi **au-dessus de la ligne concernée** dans le c
 - **`idempotency_key` est engendré non-pointeur et sans `omitempty`** sur les deux opérations de
   crédits que 2.5.0 a durcies : l'oublier compile et envoie l'UUID zéro, qui *a l'air valide*. Aucune
   de ces opérations n'est appelée en M0, mais la step qui les appellera doit le savoir.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai de toutes.
+
+`MaxConnsPerHost` et `Proxy` non posés sur le client de la passerelle → **step-060**, la
+première route qui l'appelle. `idempotency_key` non-pointeur et sans `omitempty` → **step-160**, le
+jalon qui l'utilisera.

@@ -416,7 +416,8 @@ l'écran Clients rendu selon ses permissions, crée un client, et l'action laiss
 **Objectif :** un dépôt qui compile des deux côtés, se teste, démarre ses dépendances, parle aux deux
 contrats, et produit **un binaire qui sert la SPA**.
 **Dépend de :** —
-**Steps :** 000 → 008
+**Steps :** 000 → 009 — *`009` a été insérée après coup, le 08/08/2026, pour solder la dette du
+contrat resté en 2.5.0. Cette ligne a annoncé « 000 → 008 » pendant vingt-trois jours.*
 
 **Livrables**
 - Module Go, `cmd/dashboard`, routeur chi, configuration validée au démarrage (§1.8), arrêt propre.
@@ -461,7 +462,9 @@ contrats, et produit **un binaire qui sert la SPA**.
 
 **Objectif :** savoir qui est connecté, ce qu'il a le droit de faire, et garder trace de ce qu'il fait.
 **Dépend de :** M0 — et, pour ses quatre dernières steps, `041`, `042` et `040` de M2 (voir §14).
-**Steps :** 020 → 029
+**Steps :** 020 → 029, plus **031** et **032** — *ajoutées le 31/08/2026 pour payer les dettes que
+aucune step ne rencontrait ; `030` reste réservé au plan de coupe de step-029. Elles se lisent avant
+`027` : l'ordre de `todo.md` fait foi, pas le numéro.*
 
 **Livrables**
 - Catalogue des ~44 permissions et les **neuf rôles par défaut** du §6.10, seedés et idempotents.
@@ -724,13 +727,16 @@ M0 ─► M1 ⇄ M2 ─► M3 ─┬─► M4 ─► M5 ─┐
 des écrans qui ne se marchent pas dessus.
 
 **`M1` et `M2` s'imbriquent, ils ne se suivent pas** — d'où le `⇄`. La moitié serveur de `M1`
-(020 → 026 : auth, MFA, permissions, audit, DTO) ne dépend de rien de `M2` et vient d'abord. Mais ses
-quatre dernières steps sont des **écrans** : ils reposent sur les primitives (041), les cinq états
-(042) et la coquille (040).
+(020 → 026 : auth, MFA, permissions, audit, DTO ; puis 031 et 032, ajoutées le 31/08/2026) ne dépend
+de rien de `M2` et vient d'abord. Mais ses **trois** dernières steps sont des **écrans** : elles
+reposent sur les primitives (041), les cinq états (042) et la coquille (040).
+
+*Cette phrase annonçait « quatre » — `todo.md` en compte trois depuis toujours, et sa note † les
+nomme. Relevé le 31/08/2026 en ajoutant deux steps au jalon.*
 
 ```
-020…026  ─►  041 ─► 042 ─► 040  ─►  027 ─► 028 ─► 029  ─►  043…047  ─► M3
-└ M1 serveur ┘   └─── M2 interface ───┘   └─ M1 écrans ─┘   └ M2 temps réel ┘
+020…026 ─► 031 ─► 032 ─►  041 ─► 042 ─► 040  ─►  027 ─► 028 ─► 029  ─►  043…047  ─► M3
+└────── M1 serveur ──────┘   └─── M2 interface ───┘   └─ M1 écrans ─┘   └ M2 temps réel ┘
 ```
 
 **Ce qui peut avancer en parallèle une fois `M3` acquis :** `M6`, `M7` et `M8` touchent des écrans,

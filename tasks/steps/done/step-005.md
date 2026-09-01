@@ -341,3 +341,15 @@ Son en-tête dit « `docker compose up -d` puis `pnpm db:migrate` » — reliqua
 alors que le README et `CLAUDE.md` annoncent `make migrate`. Le fichier est nommément dans le
 périmètre de cette step, et un commentaire faux est ce que la DoD traque : il est corrigé dans la PR
 qui crée la cible qu'il doit citer.
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai de toutes.
+
+La purge des sessions expirées et le détachement des partitions → **step-187**.

@@ -262,3 +262,16 @@ où la mesure d'origine mérite d'être conservée.
 ## Hors périmètre
 Le scan transversal de l'invariant (a) — logs, URL, export, cache, trace → step-103. Le corps de
 message et sa garde → step-103. Les secrets d'identifiants de bind → step-066 (invariant b).
+
+## Ses dettes ont un porteur depuis le 31/08/2026
+
+Elles sont inscrites au **registre de `tasks/todo.md`**, qui les rassemble toutes et que
+`TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire` empêche de nommer une step inexistante ou déjà
+cochée. Le texte ci-dessus n'est pas réécrit : il dit ce qui a été mesuré à la date où il a été
+écrit.
+
+Ce qui a changé n'est pas le constat, c'est qu'il cesse de n'exister que dans une fiche archivée —
+« une fiche archivée n'est ouverte par personne », et c'était vrai de toutes.
+
+Le scan transversal de l'invariant (a) — logs, URL, exports, cache, trace → **step-103**.
+Les secrets d'identifiants de bind, moitié restante de l'invariant (b) → **step-066**.

@@ -19,6 +19,26 @@ bon au BFF.
   `errors[]` (§1.4).
 - L'extension d'un **parcours Playwright existant** contre le binaire, jusqu'à la console.
 
+### Deux dettes que cette step hérite
+
+*Écrites ici et non seulement dans `steps/done/`, parce qu'une fiche archivée n'est ouverte par
+personne. Les deux figurent au registre de `todo.md`.*
+
+- **Le préfixe `__Host-` du cookie de session n'est vu par aucun scénario, et c'est cette step qui
+  peut enfin le voir.** step-022 a mesuré le comportement dans Chromium et l'a écrit, mais son propre
+  constat reste vrai : « le harnais porte ses cookies à la main et **accepterait n'importe quel nom** ».
+  Seul un vrai navigateur applique le préfixe — il refuse un cookie `__Host-` porteur d'un `Domain`,
+  d'un `Path` autre que `/`, ou servi sans `Secure`. Le parcours Playwright authentifié que cette step
+  étend est le premier endroit du dépôt où cette règle s'exerce pour de bon.
+
+- **Les valeurs des durées de session — 12 h absolue, 2 h d'inactivité — ne sont gardées par rien** :
+  les changer laisse tout vert. step-022 le dit et l'assume, « c'est une décision, pas un invariant ».
+  Cette step est la **première consommatrice** de la valeur : `expiresAt` a été renommé
+  `absoluteExpiresAt` en step-022 précisément « avant que step-027 en fasse un décompte ». Ce qu'elle
+  a à garder n'est donc pas la valeur mais **l'accord entre ce que le serveur pose et ce que l'écran
+  affiche** — un décompte qui ment sur l'échéance est un défaut, une échéance qui change n'en est pas
+  un.
+
 ## Points d'implémentation clés
 - **La garde doit s'exécuter sur une URL collée.** En v1.0 elle ne s'exécutait jamais dans ce cas
   pendant que trois tests la déclaraient verte — c'est l'un des trois défauts que seul le parcours de
