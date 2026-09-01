@@ -1,6 +1,6 @@
 # step-031 — Durcissement M1 : ce que la revue garde seule
 
-> **Jalon :** M1 (§6.9) · **Statut :** À FAIRE
+> **Jalon :** M1 (§6.9) · **Statut :** LIVRÉE
 > **Dépend de :** step-026 · **Bloque :** — (aucune step ne l'attend)
 >
 > *Elle se lit **avant** step-027, dont le numéro la précède : celle-là attend les primitives de M2,
@@ -118,17 +118,47 @@ personne. Les sept figurent au registre de `todo.md`.*
   permet rien.
 
 ## Definition of Done
-- [ ] `make check` vert
-- [ ] la mutation « `hmac.Equal` → comparaison naïve » fait rougir — elle est **verte** avant cette PR
-- [ ] la mutation « `matched = index` → `return index` » fait rougir — **verte** avant cette PR
-- [ ] la mutation « `subtle.ConstantTimeCompare` → `==` » fait rougir
-- [ ] la mutation « constante `Key` hors catalogue » fait rougir
-- [ ] une clé de trente-deux caractères identiques est refusée au démarrage ; une clé tirée d'un
+- [x] `make check` vert après chaque commit
+- [x] la mutation « `hmac.Equal` → comparaison naïve » fait rougir — elle était **verte** avant
+- [x] la mutation « `matched = index` → `return index` » fait rougir — **verte** avant
+- [x] la mutation « `subtle.ConstantTimeCompare` → `==` » fait rougir — **verte** avant
+- [x] la mutation « constante `Key` hors catalogue » fait rougir
+- [x] une clé de trente-deux caractères identiques est refusée au démarrage ; une clé tirée d'un
       CSPRNG passe
-- [ ] la mutation « profil argon2id ramené au plancher d'OWASP » fait rougir
-- [ ] la variable nouvelle est posée dans `.env.example`, les décors, la CI et Playwright, pas
+- [x] la mutation « profil argon2id ramené au plancher d'OWASP » fait rougir
+- [x] la variable nouvelle est posée dans `.env.example`, les décors, la CI et Playwright, pas
       seulement en local
-- [ ] ce qui reste sans garde est écrit là où il vit, avec la mesure qui l'établit
+- [x] ce qui reste sans garde est écrit là où il vit, avec la mesure qui l'établit
+
+### Les mutations, et où chacune a mordu
+
+Chacune sur **sa propre** frontière, `-count=1`, lue au code de sortie. Une mutation qui rougit sur
+l'assertion d'une autre porte ne prouve rien.
+
+| Mutation | Rouge rendu par | Verte avant |
+|---|---|---|
+| `hmac.Equal` → `string(a) != string(b)` | `TestLeSceauNeSeCompareQuEnTempsConstant`, seul | oui |
+| `subtle.ConstantTimeCompare` → `==` | `TestUnHachageNeSeCompareQuEnTempsConstant`, seul | oui |
+| `matched = index` → `return index` | `TestLaBoucleDesCodesDeRecuperationNeCourtCircuitePas`, seul | oui |
+| `Inventee Key = "inventee:cle"` hors catalogue | `TestAucuneConstanteNeManqueAuCatalogue`, seul | oui |
+| borne de variété retirée de `requiredSecret` | `TestUnSecretSansVarieteEstRefuseSansEtreCite`, seul | oui |
+| profil argon2id → 19 MiB / t=2 | `TestLesParametresNeDescendentPasSousLePlancher`, seul | oui |
+| `issuer` recodé en dur | le scénario d'enrôlement **et** l'unitaire de l'URI | oui |
+| `RPDisplayName` recodé en dur | le scénario d'enregistrement de passkey | **oui — mesuré vert dans cette PR** |
+
+Et les témoins, sans lesquels un renommage rendrait ces portes vertes pour la mauvaise raison : rendre
+introuvable la fonction gardée dit « la porte n'a plus de sujet » ; pointer `loopBody` vers une
+fonction sans boucle dit « la forme a changé » ; changer `keyTypeName` fait tomber le plancher à zéro.
+Les deux gardes de la porte de `mfa` ont été mutées **séparément** — en retirer une seule est vert.
+
+### Ce que la livraison a élargi
+
+- **La borne d'entropie porte les trois secrets**, pas seulement la clé TOTP : elle s'écrit dans
+  `requiredSecret`, que les trois traversent, et le README leur promettait déjà la même recette.
+- **Le `displayName` WebAuthn est gardé par un scénario**, là où la fiche n'attendait qu'un constat.
+  Il n'était gardé par rien — mesuré dans cette PR : le recoder en dur laissait les scénarios verts,
+  le nom de partie de confiance ne faisant pas partie des données signées d'une cérémonie. Il atteint
+  pourtant le corps servi, donc il se lit.
 
 ## Hors périmètre
 **La fenêtre d'oubli du compteur glissant, écrite deux fois** — non-attribution rendue le 30/08/2026
