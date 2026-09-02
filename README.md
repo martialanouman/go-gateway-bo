@@ -332,6 +332,7 @@ La protection de branche exige le seul check **`CI`**, qui les agrège et reste 
 s'ajoute — mais en contrepartie, un job absent du `needs:` de l'agrégateur le laisserait vert : la
 liste se tient dans `ci.yml`, à côté des jobs.
 
-Les conventions, invariants et la Definition of Done sont dans [`CLAUDE.md`](./CLAUDE.md) ; le cadre et
-l'ordre dans [`tasks/plan.md`](./tasks/plan.md) ; le quoi et le pourquoi dans
+Les conventions, invariants et la Definition of Done sont dans [`CLAUDE.md`](./CLAUDE.md), les règles
+propres au client dans [`web/CLAUDE.md`](./web/CLAUDE.md) ; le cadre et l'ordre dans
+[`tasks/plan.md`](./tasks/plan.md) ; le quoi et le pourquoi dans
 [`docs/specification-technique-tableau-de-bord.md`](./docs/specification-technique-tableau-de-bord.md).
