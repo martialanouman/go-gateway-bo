@@ -1,6 +1,6 @@
 # CLAUDE.md — Tableau de bord Admin (BFF Go + SPA React)
 
-Manuel de travail pour Claude Code. **Il ne porte que ce qu'aucune commande ne rend** : le layout, les
+Manuel de travail pour Claude Code. Lis-le en entier avant d'écrire du code. **Il ne porte que ce qu'aucune commande ne rend** : le layout, les
 cibles `make`, les jobs de CI et l'avancement se lisent dans `ls`, `make help`,
 `.github/workflows/ci.yml` et `tasks/todo.md`. Les recopier ici n'épargnerait qu'une commande, et le
 paierait le jour où la copie périme sans que rien ne le voie.
@@ -15,9 +15,12 @@ facturation. Ce n'est **pas** un portail client — les clients n'ont aucun acc�
 
 **Un seul déployable** : un binaire Go sert la SPA *et* porte la logique BFF — carte de la cible, le
 livré du jour se lit dans `ls internal/`. **Client** (`web/`) : React, TanStack Router + Query, une
-WebSocket multiplexée, aucun secret. **Serveur** (`internal/`) : session, permissions, audit, proxy
-vers l'API Admin, hub WebSocket, alertes métier. En production **≥2 instances** derrière un load
-balancer à affinité WS, coordonnées par Redis Pub/Sub — un process unique serait un SPOF.
+WebSocket multiplexée, aucun secret. **Serveur** (`internal/`) : session et
+authentification, permissions, audit, proxy vers l'API Admin, hub WebSocket, alertes métier. Le
+navigateur ne parle qu'au BFF, qui parle à l'API Admin **et à son petit schéma PostgreSQL propre**,
+distinct de celui de la passerelle. En production **≥2 instances** derrière un load balancer à
+affinité WS, coordonnées par Redis Pub/Sub — un process unique serait un SPOF, et la cible de 99,9 %
+inatteignable.
 
 ## Commandes
 
@@ -26,8 +29,9 @@ Poste neuf : séquence complète dans `README.md`, à commencer par l'authentifi
 sans quoi l'installation des contrats échoue sur un 401 qui ne se nomme pas.
 
 **Les bases sont vivantes.** Sans base joignable et migrée le binaire refuse de démarrer — il compare
-la version du schéma avant de lier son port — et la porte qui le lance échoue sans nommer la cause. Un
-avis de sécurité publié ailleurs rend `main` rouge sans qu'aucun fichier ait bougé.
+la version du schéma avant de lier son port —, et **toute porte** qui le lance échoue avec lui : le
+refus nomme la version trouvée et la version attendue (`web/playwright.config.ts:70-73`). Un avis de
+sécurité publié ailleurs rend `main` rouge sans qu'aucun fichier ait bougé.
 
 ## Les cinq invariants — tests bloquants, verts à vie
 
@@ -44,12 +48,16 @@ Le code les cite par leur lettre.
   Aucune action « révéler » n'existe nulle part.
 - **(c) TOUJOURS l'autorisation côté serveur, et l'audit avec elle.** Toute route de mutation porte une
   garde de permission **et** une écriture d'audit. Le rendu conditionnel de l'UI est un confort ; un
-  contrôle masqué dont la route n'est pas gardée est une faille. La garde en middleware
-  (`RequirePermission`) est la cible du **step-025** — elle n'existe pas encore
-  (`internal/permissions/doc.go`).
+  contrôle masqué dont la route n'est pas gardée est une faille. Le middleware `requirePermission`
+  (`internal/bff/guard.go`, monté en `router.go`) est **fermé par défaut** : une opération absente de
+  sa table est refusée. Aucune entrée n'exige encore de clé — le premier `requires` arrive avec
+  `POST /operators`, en step-029.
 - **(d) JAMAIS le navigateur en direct sur l'API Admin.** Le jeton machine, le mTLS et la connexion
   PostgreSQL vivent sous `internal/`, que le langage rend inatteignable : (d) est une propriété du
   compilateur, pas une consigne. Le risque résiduel est côté client — voir `web/CLAUDE.md`.
+- **Un contrôle interdit est désactivé et expliqué**, jamais silencieusement masqué : le refus nomme
+  ce qui manque et par où passer. Vaut aussi pour un 403/409 rédigé dans `api/openapi-bff.yaml` ou
+  dans un handler Go, pas seulement pour un bouton.
 - **(e) JAMAIS sur le chemin critique du plan de données.** Une panne du tableau de bord dégrade la
   visualisation, jamais le débit de SMS ni la détection d'incident (Alertmanager est indépendant).
 
@@ -57,19 +65,23 @@ Le code les cite par leur lettre.
 
 - **Les contrats font foi** : le dépôt consomme `@martialanouman/gateway-api-contracts`, ne copie
   jamais un YAML ; tout manque se corrige par une PR dans `go-gateway/api/`, puis un bump ici.
-- **TOUJOURS relever la version du contrat au début d'une step qui le touche**, consigner l'écart dans
-  la PR, **jamais bumper au milieu**, et **relire le diff du YAML** : une contrainte resserrée
-  (`additionalProperties: false`, un `maximum`, un `enum` réduit) passe le typage et échoue à
-  l'exécution. **La compilation n'est pas le filet qu'on croit.** `plan.md` §1.12.
-- **Versions & API : jamais devinées.** `ctx7` côté JS, `pkg.go.dev` côté Go, avant tout ajout, bump ou
-  usage — et les CVE connues avant d'adopter. Une signature inventée compile parfois.
+- **TOUJOURS relever la version du contrat au début d'une step qui le touche** — il est publié à
+  chaque merge sur `main` de `go-gateway`, à un rythme qui périme toute version notée ici. Consigner
+  l'écart dans la PR, **jamais bumper au milieu**, et **relire le diff du YAML** : une contrainte
+  resserrée (`additionalProperties: false`, un `maximum`, un `enum` réduit) passe le typage et échoue
+  à l'exécution. **La compilation n'est pas le filet qu'on croit** — un type rompu qu'aucun appelant
+  n'exerce passe vert. `tasks/plan.md` §1.12.
+- **Versions & API : jamais devinées.** `ctx7` côté JS, `pkg.go.dev` ou `proxy.golang.org` côté Go,
+  avant tout ajout, bump ou usage — et les CVE connues avant d'adopter. Une signature inventée
+  compile parfois.
 
 ## Code & langue
 
 **Le code est en anglais** — identifiants, packages, types, champs, fonctions. **Le narratif est en
-français** — commentaires, Gherkin, titres de test, copie produit. Détail : `plan.md` §1.7.
+français** — commentaires, Gherkin, titres de test, copie produit. Détail : `tasks/plan.md` §1.7.
 
-**Commentaires avec parcimonie**, seulement là où le code ne peut pas parler : un *pourquoi*
+**Commentaires avec parcimonie.** Un commentaire ne redit jamais ce que le code dit ; il ne subsiste
+que là où le code ne peut pas parler : un *pourquoi*
 contre-intuitif, un arbitrage dont l'alternative évidente est fausse, une contrainte externe
 invérifiable sur place. Partout ailleurs, un meilleur nom ou une fonction extraite — le critère 2
 existe parce que **certains commentaires de la v1.0 mentaient** sur le code qu'ils surplombaient.
@@ -82,14 +94,15 @@ protection couvre et où s'arrête la frontière d'accès. Les états de contenu
 
 **Le comportement s'écrit en Gherkin avant d'exister** — c'est le « rouge d'abord » de la boucle.
 
-- **Scénarios `godog`** (`.feature` en français, `# language: fr`) : le fichier vit **à côté du package
-  qu'il décrit**, ses définitions de step dans un `_test.go` du même package. Contre le **mock Prism**,
-  jamais contre la vraie passerelle.
+- **Scénarios `godog`** (`.feature` en français, `# language: fr`) — le **comportement observable** du
+  BFF, exprimé dans la langue du domaine. Le fichier vit **à côté du package qu'il décrit**, ses
+  définitions de step dans un `_test.go` du même package. Contre le **mock Prism**, jamais contre la
+  vraie passerelle.
 - **Unitaires Go** — les mécanismes aux limites : hachage, curseurs, mappings, sérialisation des DTO.
   La majorité des tests, en nombre. Côté client : `web/CLAUDE.md`.
 
 **Le mock-first n'est pas un confort mais la condition de faisabilité** : une large part des opérations
-du contrat n'existe qu'au contrat. Décompte dans `plan.md` §16.
+du contrat n'existe qu'au contrat, **côté passerelle**. Décompte à jour dans `tasks/plan.md` §16.
 
 **Le mode d'échec est nommé** : un scénario par critère d'acceptation fabrique la suite qu'on n'ose
 plus croire, et Gherkin l'aggrave parce que ça se lit bien. Trois symptômes de dérive, valables autant
@@ -101,9 +114,9 @@ reste obligatoire, critère 3.
 ## Recettes fréquentes
 
 - **Ajouter une route BFF** — six escales, dans l'ordre : la déclarer dans `api/openapi-bff.yaml` →
-  régénérer → écrire le scénario rouge (`cmd/dashboard/`) → le handler avec sa garde, son audit et son
-  **DTO de sortie** → le fichier de route sous `web/src/routes/` → **commiter le généré**. Le détail
-  mécanique du dernier tiers est dans `web/CLAUDE.md`.
+  régénérer → écrire le scénario rouge, à côté du package décrit → le handler avec sa garde, son
+  audit et son **DTO de sortie** → le fichier de route sous `web/src/routes/` → **régénérer l'arbre et
+  commiter `routeTree.gen.ts`**, que `check-routes` garde. Détail client : `web/CLAUDE.md`.
 - **Ajouter une permission** — quatre endroits dans la même PR : le catalogue
   `internal/permissions/catalog.go`, la garde serveur qui l'exige, les rôles par défaut de
   `internal/permissions/roles.go` (§6.10 de la spec), puis `make generate`, qui en dérive le
