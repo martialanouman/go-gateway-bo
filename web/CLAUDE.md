@@ -19,9 +19,8 @@ Copie en **français**, troisième personne, **conséquence d'abord** (règle co
 **Cinq états de contenu, cinq copies distinctes** — chargement (squelette de la vraie mise en page) ·
 vide (rien encore + comment créer) · aucun résultat (filtres trop étroits + comment élargir) · module
 désactivé (dégradation propre, **jamais** une erreur) · erreur (réalité HTTP + « vos données locales
-restent affichées » + Réessayer). **Source : `tasks/plan.md` §1.9** — cette liste en dérive et n'arbitre
-rien ; le chargement à froid y est un sixième *moment*, pas un sixième état. La taxonomie tranche
-aussi côté serveur : `internal/gateway/errors_test.go` sépare un 503 d'un module désactivé.
+restent affichées » + Réessayer). **Source : `tasks/plan.md` §1.9** — cette liste en dérive et
+n'arbitre rien ; le chargement à froid y est un sixième *moment*, pas un sixième état.
 
 **Un écran non encore livré** : route déclarée + état vide explicite nommant le jalon. Jamais une page
 blanche ni un lien mort.
@@ -30,10 +29,10 @@ blanche ni un lien mort.
 
 - **Composants (Vitest + Testing Library)** — états, permissions, clavier, copie. Forme Étant donné /
   Quand / Alors, sans second moteur Cucumber : `describe`/`it` suffit.
-- **Bout en bout (Playwright)** — **cinq parcours au plus** (`tasks/plan.md` §17.4) ; un seul existe
-  aujourd'hui. **Contre le binaire**, jamais `vite dev` :
-  l'ordonnancement `/api` avant le repli SPA et l'embarquement des assets n'existent que dans le
-  déployable. Le critère 1 demande d'**étendre un parcours existant** plutôt que d'ajouter un fichier.
+- **Bout en bout (Playwright)** — **cinq parcours au plus** (`tasks/plan.md` §17.4), **contre le
+  binaire**, jamais `vite dev` : l'ordonnancement `/api` avant le repli SPA et l'embarquement des
+  assets n'existent que dans le déployable. Le critère 1 demande d'**étendre un parcours existant**
+  plutôt que d'ajouter un fichier.
 
 Les trois symptômes de dérive d'un test (racine, « Tests — BDD ») valent ici aussi.
 

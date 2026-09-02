@@ -30,8 +30,9 @@ sans quoi l'installation des contrats échoue sur un 401 qui ne se nomme pas.
 
 **Les bases sont vivantes.** Sans base joignable et migrée le binaire refuse de démarrer — il compare
 la version du schéma avant de lier son port —, et **toute porte** qui le lance échoue avec lui : le
-refus nomme la version trouvée et la version attendue (`web/playwright.config.ts:70-73`). Un avis de
-sécurité publié ailleurs rend `main` rouge sans qu'aucun fichier ait bougé.
+refus nomme la version trouvée et la version attendue (`OutdatedSchemaError`, dans
+`internal/store/schema.go`). Un avis de sécurité publié ailleurs rend rouge la prochaine PR sans
+qu'aucun fichier ait bougé.
 
 ## Les cinq invariants — tests bloquants, verts à vie
 
@@ -50,8 +51,7 @@ Le code les cite par leur lettre.
   garde de permission **et** une écriture d'audit. Le rendu conditionnel de l'UI est un confort ; un
   contrôle masqué dont la route n'est pas gardée est une faille. Le middleware `requirePermission`
   (`internal/bff/guard.go`, monté en `router.go`) est **fermé par défaut** : une opération absente de
-  sa table est refusée. Aucune entrée n'exige encore de clé — le premier `requires` arrive avec
-  `POST /operators`, en step-029.
+  sa table est refusée.
 - **(d) JAMAIS le navigateur en direct sur l'API Admin.** Le jeton machine, le mTLS et la connexion
   PostgreSQL vivent sous `internal/`, que le langage rend inatteignable : (d) est une propriété du
   compilateur, pas une consigne. Le risque résiduel est côté client — voir `web/CLAUDE.md`.
@@ -88,7 +88,9 @@ existe parce que **certains commentaires de la v1.0 mentaient** sur le code qu'i
 
 **La copie produit** — y compris un message de refus écrit dans un handler Go — est en **français**,
 troisième personne, **conséquence d'abord**. « Sécurisé » n'est jamais une promesse : dire ce que la
-protection couvre et où s'arrête la frontière d'accès. Les états de contenu : `web/CLAUDE.md`.
+protection couvre et où s'arrête la frontière d'accès. Les cinq états de contenu font foi dans
+`tasks/plan.md` §1.9 et tranchent aussi côté serveur — `internal/gateway/errors_test.go` sépare un
+503 d'un module désactivé ; leurs copies d'écran sont dans `web/CLAUDE.md`.
 
 ## Tests — BDD
 
