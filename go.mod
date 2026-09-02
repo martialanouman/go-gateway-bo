@@ -6,7 +6,7 @@ require (
 	github.com/cucumber/godog v0.16.0
 	github.com/descope/virtualwebauthn v1.0.5
 	github.com/getkin/kin-openapi v0.147.0
-	github.com/go-chi/chi/v5 v5.3.1
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-webauthn/webauthn v0.18.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/oapi-codegen/runtime v1.6.0
