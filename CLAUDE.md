@@ -5,7 +5,8 @@ qu'aucune commande ne rend** : le layout, les cibles `make`, les jobs de CI et l
 lisent dans `ls`, `make help`, `.github/workflows/ci.yml` et `tasks/todo.md`. Les recopier ici
 n'épargnerait qu'une commande, et le paierait le jour où la copie périme sans que rien ne le voie.
 
-**Les règles propres au client vivent dans `web/CLAUDE.md`**, chargé quand la session y touche.
+**Les règles propres au client vivent dans `web/CLAUDE.md`**, chargé dès qu'un fichier de `web/`
+est lu — ce qu'il faut savoir *avant* d'ouvrir le client reste donc ici.
 
 ## Ce qu'on construit
 
@@ -90,7 +91,7 @@ la v1.0 mentaient** sur le code qu'ils surplombaient.
 troisième personne, **conséquence d'abord**. « Sécurisé » n'est jamais une promesse : dire ce que la
 protection couvre et où s'arrête la frontière d'accès. Les cinq états de contenu font foi dans
 `tasks/plan.md` §1.9 et tranchent aussi côté serveur — `internal/gateway/errors_test.go` sépare un
-503 d'un module désactivé ; leurs copies d'écran sont dans `web/CLAUDE.md`.
+503 d'un module désactivé ; `web/CLAUDE.md` en redonne la liste, sans rien y arbitrer.
 
 ## Tests — BDD
 

@@ -31,7 +31,7 @@ blanche ni un lien mort.
 
 - **Composants (Vitest + Testing Library)** — états, permissions, clavier, copie. Forme Étant donné /
   Quand / Alors, sans second moteur Cucumber : `describe`/`it` suffit.
-- **Bout en bout (Playwright)** — **cinq parcours au plus** (`tasks/plan.md` §17.4), **contre le
+- **Bout en bout (Playwright)** — **cinq parcours seulement** (`tasks/plan.md` §17.4), **contre le
   binaire**, jamais `vite dev` : l'ordonnancement `/api` avant le repli SPA et l'embarquement des
   assets n'existent que dans le déployable. Le critère 1 demande d'**étendre un parcours existant**
   plutôt que d'ajouter un fichier.
@@ -42,5 +42,5 @@ Les trois symptômes de dérive d'un test (racine, « Tests — BDD ») valent i
 
 Dernier tiers de la recette de racine, dont les six escales commencent à `api/openapi-bff.yaml` :
 créer le fichier sous `web/src/routes/`, régénérer l'arbre, **commiter `routeTree.gen.ts`** — c'est
-**`check-routes`** qui le garde (`Makefile:261`), pas `check-generated`, dont la liste `$(GENERATED)`
-ne contient pas l'arbre.
+**`check-routes`** qui le garde, pas `check-generated`, dont la liste `$(GENERATED)` ne contient pas
+l'arbre.
