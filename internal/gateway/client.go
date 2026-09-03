@@ -155,8 +155,8 @@ func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSou
 		// Ces scopes sont **cinq des six** que le contrat catalogue, codés ici et non configurables.
 		// Le jeton machine porte donc `content:read` en permanence : ce qu'un opérateur a le droit de
 		// voir est **entièrement** à la charge du BFF, et le rendre réglable ici laisserait croire
-		// qu'on peut restreindre par là ce qui doit l'être par `RequirePermission()` — c'est l'origine
-		// de l'invariant (c).
+		// qu'on peut restreindre par là ce qui doit l'être par `requirePermission` (`internal/bff`) —
+		// c'est l'origine de l'invariant (c).
 		//
 		// **Ce qui manque est un choix, et aucune porte ne le voit** — oapi-codegen n'engendre rien du
 		// `security`, donc le symptôme sera un **403 à l'exécution** sur du code qui compile. Mesuré
