@@ -1,9 +1,9 @@
 # CLAUDE.md — Tableau de bord Admin (BFF Go + SPA React)
 
-Manuel de travail pour Claude Code. Lis-le en entier avant d'écrire du code. **Il ne porte que ce qu'aucune commande ne rend** : le layout, les
-cibles `make`, les jobs de CI et l'avancement se lisent dans `ls`, `make help`,
-`.github/workflows/ci.yml` et `tasks/todo.md`. Les recopier ici n'épargnerait qu'une commande, et le
-paierait le jour où la copie périme sans que rien ne le voie.
+Manuel de travail pour Claude Code. Lis-le en entier avant d'écrire du code. **Il ne porte que ce
+qu'aucune commande ne rend** : le layout, les cibles `make`, les jobs de CI et l'avancement se
+lisent dans `ls`, `make help`, `.github/workflows/ci.yml` et `tasks/todo.md`. Les recopier ici
+n'épargnerait qu'une commande, et le paierait le jour où la copie périme sans que rien ne le voie.
 
 **Les règles propres au client vivent dans `web/CLAUDE.md`**, chargé quand la session y touche.
 
@@ -81,10 +81,10 @@ Le code les cite par leur lettre.
 français** — commentaires, Gherkin, titres de test, copie produit. Détail : `tasks/plan.md` §1.7.
 
 **Commentaires avec parcimonie.** Un commentaire ne redit jamais ce que le code dit ; il ne subsiste
-que là où le code ne peut pas parler : un *pourquoi*
-contre-intuitif, un arbitrage dont l'alternative évidente est fausse, une contrainte externe
-invérifiable sur place. Partout ailleurs, un meilleur nom ou une fonction extraite — le critère 2
-existe parce que **certains commentaires de la v1.0 mentaient** sur le code qu'ils surplombaient.
+que là où le code ne peut pas parler : un *pourquoi* contre-intuitif, un arbitrage dont
+l'alternative évidente est fausse, une contrainte externe invérifiable sur place. Partout ailleurs,
+un meilleur nom ou une fonction extraite — le critère 2 existe parce que **certains commentaires de
+la v1.0 mentaient** sur le code qu'ils surplombaient.
 
 **La copie produit** — y compris un message de refus écrit dans un handler Go — est en **français**,
 troisième personne, **conséquence d'abord**. « Sécurisé » n'est jamais une promesse : dire ce que la
