@@ -4,9 +4,9 @@ package permissions
 // de répéter leurs littéraux : il n'y a pas deux listes à tenir cohérentes, il y en a une.
 //
 // Ce que ces constantes achètent : `Key` a `string` pour sous-jacent, donc n'importe quelle chaîne
-// s'y convertit — une garde mal orthographiée, `RequirePermission("routes:raed")`, compilerait et
-// refuserait tout le monde en silence. Écrite `RequirePermission(permissions.RoutesRead)`, la faute
-// de frappe ne compile plus.
+// s'y convertit — une garde mal orthographiée, `requires("routes:raed")`, compilerait et refuserait
+// tout le monde en silence. Écrite `requires(permissions.RoutesRead)`, la faute de frappe ne compile
+// plus.
 const (
 	// routing
 	RoutesRead         Key = "routes:read"
@@ -92,7 +92,7 @@ const (
 // entrée ne référence. Jusque-là il n'était gardé par rien, mesuré le 02/08/2026 : un
 // `const FooBar Key = "foo:bar"` ajouté ici **compilait**, laissait les deux suites vertes et
 // n'apparaissait pas dans le TypeScript engendré — Go ne signale pas une constante exportée
-// inutilisée. C'est la faille de DN-3 prise par l'autre bout : `RequirePermission(permissions.FooBar)`
+// inutilisée. C'est la faille de DN-3 prise par l'autre bout : `requires(permissions.FooBar)`
 // refusait alors tout le monde en silence, sans qu'aucune porte n'ait rien dit. La rédaction d'alors
 // jugeait le remède plus lourd que ce qu'il protège ; il tient en une quarantaine de lignes.
 var catalog = []Entry{

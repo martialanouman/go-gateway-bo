@@ -169,7 +169,7 @@ func TestLaTableNeDecidePasDOperationInconnue(t *testing.T) {
 
 // TestChaqueCleCiteeExisteAuCatalogue — propriété 2, et le **seul** endroit du dépôt qui tienne ce
 // sens. `internal/permissions/catalog.go` le documente : une constante déclarée mais absente du
-// catalogue compile, laisse les deux suites vertes, et `RequirePermission(permissions.FooBar)`
+// catalogue compile, laisse les deux suites vertes, et `requires(permissions.FooBar)`
 // refuserait alors tout le monde en silence.
 func TestChaqueCleCiteeExisteAuCatalogue(t *testing.T) {
 	t.Parallel()

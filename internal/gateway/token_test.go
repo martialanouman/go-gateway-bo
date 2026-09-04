@@ -272,7 +272,8 @@ func TestMockModeNeverCallsATokenEndpoint(t *testing.T) {
 // Le jeton machine porte `content:read` en permanence, et les scopes demandés sont ceux du contrat,
 // codés dans le package. Ce que ce test tient n'est pas une préférence de configuration : c'est que
 // la restriction par opérateur ne passe **pas** par là. Elle est entièrement à la charge du BFF —
-// `RequirePermission()` en middleware — et l'invariant (c) n'a pas d'autre point d'appui.
+// `requirePermission` en middleware (`internal/bff`) — et l'invariant (c) n'a pas d'autre point
+// d'appui.
 func TestMachineTokenAlwaysRequestsContentRead(t *testing.T) {
 	t.Parallel()
 

@@ -21,8 +21,10 @@ import (
 
 // `catalog` est un `var` de package : sans la copie de `All()`, chaque appelant recevrait la tranche
 // elle-même, et écrire dedans réécrirait le catalogue **pour tout le process**. Le scénario n'est pas
-// théorique : l'écran d'édition de rôle (step-027) trie et filtre ce qu'on lui donne, et
-// `RequirePermission` (step-025) lirait ensuite un catalogue réordonné sans qu'aucun log ne le dise.
+// théorique : l'écran d'édition de rôle (step-027) trie et filtre ce qu'on lui donne, et les deux
+// lecteurs de `All()` — le semis (`internal/store/seed.go`) et `cmd/permissionsgen` — travailleraient
+// ensuite sur un catalogue réordonné. La garde, elle, ne le lit pas : elle compare la clé de sa table
+// aux droits venus de la base.
 //
 // Ce cas existe parce que la propriété n'était tenue par rien : mesuré le 02/08/2026, remplacer
 // `slices.Clone(catalog)` par `return catalog` laissait `internal/permissions` et

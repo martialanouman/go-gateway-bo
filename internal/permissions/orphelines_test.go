@@ -24,7 +24,7 @@ const keyTypeName = "Key"
 // laisse les deux suites vertes et n'apparaît pas dans le TypeScript engendré, Go ne signalant pas
 // une constante exportée inutilisée.
 //
-// Ce que ça coûte n'est pas cosmétique : `RequirePermission(permissions.FooBar)` compile alors,
+// Ce que ça coûte n'est pas cosmétique : `requires(permissions.FooBar)` compile alors,
 // n'entre dans aucun rôle, et **refuse tout le monde en silence** sur la route qu'elle garde.
 //
 // La porte part de la **portée du paquet** et non de `All()`, qui est justement ce que l'orpheline
@@ -77,7 +77,7 @@ func TestAucuneConstanteNeManqueAuCatalogue(t *testing.T) {
 
 // Une constante de permission écrite **sans son type** est invisible à la porte ci-dessus : son type
 // est alors *untyped string*, pas `Key`. Elle reste pourtant assignable à `Key` — une constante non
-// typée se convertit implicitement —, donc `RequirePermission(permissions.QuotasManage)` compilerait
+// typée se convertit implicitement —, donc `requires(permissions.QuotasManage)` compilerait
 // et refuserait tout le monde en silence, exactement le défaut que l'autre porte ferme.
 //
 // Omettre le type sur une ligne d'un bloc `const` est une écriture Go ordinaire, pas une bizarrerie :

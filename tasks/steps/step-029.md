@@ -25,7 +25,7 @@ personne. Les huit figurent au registre de `todo.md`.*
 
 - **Un refus de permission ne laisse aucune trace côté serveur, et c'est cette step qui le rend
   visible.** `internal/bff` ne reçoit aucun `*slog.Logger` (`router.go:151-156`), et le journal
-  d'audit ne porte que les **succès** — un 403 de `RequirePermission` n'existe donc nulle part.
+  d'audit ne porte que les **succès** — un 403 de `requirePermission` n'existe donc nulle part.
   step-025 renvoyait la dette à step-060, qui apporte le journal avec le premier appel à la
   passerelle : **c'est plus tard que la step qui la fait mordre**, step-029 étant en M1 et step-060
   en M3. Le porteur est corrigé ici.
