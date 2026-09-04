@@ -40,10 +40,14 @@ overrides:
   # Le **même** avis sur la branche 3.x — un seul GHSA couvre les deux, corrigé en 3.15.1 et 4.3.1.
   # Chemin unique : `@stoplight/prism-cli > json-schema-faker > json-schema-ref-parser`.
   'json-schema-ref-parser>js-yaml': '^3.15.1'
-  # fast-uri >=3.0.0 <3.1.5 : confusion d'hôte via une barre oblique inversée dans l'autorité
-  # (GHSA-7p8r-x3mc-p8w7, élevée) — une URL mal découpée peut faire prendre un hôte pour un autre.
+  # fast-uri : quatre avis élevés sur la même bibliothèque, tous corrigés en 3.1.6 —
+  # GHSA-7p8r-x3mc-p8w7 (confusion d'hôte par barre oblique inversée), puis GHSA-5jgf-p345-68v8
+  # (confusion d'hôte, canonicalisation IDN sautée), GHSA-jqff-g426-hqxp (confusion d'hôte par schéma
+  # percent-encodé) et GHSA-f65p-4m7j-42xc / GHSA-fph4-wmhf-6fwf (SSRF par autorité malformée ou
+  # répétée). Le plancher est passé de 3.1.5 à 3.1.6 le 04/09/2026 : les trois derniers sont apparus
+  # après, et `^3.1.5` les laissait tous passer.
   # Arrive par `ajv`, le validateur que Prism utilise pour juger les requêtes.
-  'ajv>fast-uri': '^3.1.5'
+  'ajv>fast-uri': '^3.1.6'
   # nanoid <3.3.17 : un générateur personnalisé boucle indéfiniment quand la taille vaut zéro
   # (GHSA-2v37-7h3g-55p8, élevée). `pnpm audit` l'annonce par huit chemins, mais `pnpm why` n'en voit
   # qu'un seul parent — `postcss`, qui s'en sert pour nommer ses fichiers de source map. Un sélecteur
@@ -53,18 +57,34 @@ overrides:
   # bougé, ce que `CLAUDE.md` annonce des bases vivantes. Corrigé ici plutôt que dans sa propre PR
   # parce qu'il bloquait la porte `vuln-web` de step-009 — le mélange est assumé, pas subi.
   'postcss>nanoid': '^3.3.17'
+  # qs : deux avis, corrigés respectivement en 6.15.4 et 6.16.0 — GHSA-x5fp-wj9c-mxmx (contournement
+  # de la limite de tableau par une clé à virgule entre crochets) et GHSA-4mjr-xmp4-gh2g (déni de
+  # service par un `isBuffer` contrôlé par l'appelant). `^6.16.0` couvre les deux ; c'est aussi la
+  # dernière publiée. Chemin unique : `@stoplight/json-schema-ref-parser > url > qs`, le parseur qui
+  # lit les URL des contrats.
+  'url>qs': '^6.16.0'
 
 # Avis `pnpm audit` triés explicitement. Un avis n'entre ici qu'avec sa justification écrite, et
 # `pnpm vuln` échoue sur tout ce qui n'y figure pas — c'est ce qui rend le triage conscient plutôt
 # qu'un seuil de sévérité relevé en silence. Détail du raisonnement : section « Dépendances » du
 # README.
 auditConfig:
-  # `ignoreGhsas` est vide : l'unique entrée était justifiée par la chaîne
-  # `@tanstack/nitro-v2-vite-plugin > nitropack > archiver > minimatch`, que
-  # step-001 a supprimée. Un ignore dont la justification est morte couvre
-  # désormais n'importe quelle chaîne qui réintroduirait l'avis — c'est une
-  # porte de sécurité qui ment.
-  ignoreGhsas: []
+  # GHSA-qxc2-j82w-r537 — `@faker-js/faker@5.5.3`, exécution de code arbitraire via `helpers.fake`
+  # sur un gabarit contrôlé par l'appelant. Chemin unique, et **de développement seulement** :
+  # `@stoplight/prism-cli > @stoplight/prism-http > @stoplight/http-spec > postman-collection >
+  # @faker-js/faker`. Rien de cette chaîne n'atteint le bundle servi.
+  #
+  # **Non corrigeable, mesuré le 04/09/2026 plutôt que supposé.** L'avis annonce un correctif en
+  # `>=10.4.1` — version qui n'existe pas : la branche va de 10.4.0 à 10.5.0, et aucune 5.x ne porte
+  # le correctif. Forcer `postman-collection` sur la 10.6.0 a été essayé : faker 10 est ESM-only
+  # (`"type": "module"`) et `postman-collection` le charge en CJS, donc **Prism ne démarre plus du
+  # tout** — `postman-collection/lib/superstring/dynamic-variables.js:171`. Le mock est la condition
+  # de faisabilité du dépôt ; le prix de cet override est de le perdre.
+  #
+  # À rouvrir dès que `@stoplight/http-spec` quitte `postman-collection@4.5.0` : c'est le seul
+  # porteur, et passé ce jour l'ignore couvrirait une chaîne qui n'existe plus.
+  ignoreGhsas:
+    - GHSA-qxc2-j82w-r537
 
 # Quarantaine des versions fraîchement publiées. Les compromissions de paquets npm sont détectées et
 # dépubliées en quelques heures ; attendre 24 h avant d'installer une version fait porter le risque
