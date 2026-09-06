@@ -105,8 +105,8 @@ func TestUneMemePassphraseRelitCeQuUneAutreInstanceAEcrit(t *testing.T) {
 	assert.True(t, ok)
 }
 
-// Et l'inverse : changer la passphrase rend illisibles les secrets déjà en base. C'est le prix que le
-// README annonce, vérifié plutôt qu'affirmé.
+// Et l'inverse : changer la passphrase rend illisibles les secrets déjà en base. C'est le prix d'une
+// rotation de cette clé, vérifié plutôt qu'affirmé.
 func TestUneAutrePassphraseNeRelitRien(t *testing.T) {
 	t.Parallel()
 

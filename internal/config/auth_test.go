@@ -112,7 +112,7 @@ func TestUnSecretSansVarieteEstRefuseSansEtreCite(t *testing.T) {
 }
 
 // L'autre côté : une valeur réellement tirée passe. Le tirage est fait ici plutôt qu'écrit en dur —
-// une constante choisie à la main prouverait que cette constante passe, pas que la recette du README
+// une constante choisie à la main prouverait que cette constante passe, pas qu'un tirage de CSPRNG
 // passe.
 func TestUnSecretTireDUnCSPRNGPasse(t *testing.T) {
 	t.Parallel()

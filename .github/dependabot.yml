@@ -15,7 +15,7 @@
 # Le dépôt applique déjà une politique **manuelle et délibérée** sur ses dépendances npm : quarantaine
 # de 24 h sur les versions fraîchement publiées (`minimumReleaseAge`, avec `minimumReleaseAgeStrict`),
 # scripts d'installation refusés sauf autorisation nommée dans `allowBuilds`, et chaque avis
-# `pnpm audit` trié à la main avec son raisonnement écrit. Voir la section « Dépendances » du README.
+# `pnpm audit` trié à la main avec son raisonnement écrit dans `web/pnpm-workspace.yaml`.
 #
 # Un Dependabot npm ouvrirait des PR que cette politique existe pour empêcher — une version publiée il
 # y a deux heures, un paquet dont le script d'installation n'a pas été examiné. Le jour où l'on voudra
@@ -37,8 +37,7 @@ updates:
       prefix: chore(ci)
 
   # Ajouté avec le module Go (step-000). Sans cette entrée, chi, godog, testify,
-  # govulncheck et actionlint n'auraient eu aucun mécanisme de mise à jour, alors
-  # que le README promet que Dependabot fait avancer les dépendances.
+  # govulncheck et actionlint n'auraient eu aucun mécanisme de mise à jour.
   - package-ecosystem: gomod
     directory: /
     schedule:

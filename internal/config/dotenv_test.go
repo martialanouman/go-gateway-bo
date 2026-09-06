@@ -23,11 +23,10 @@ func TestDotenvExampleListsExactlyWhatLoadReads(t *testing.T) {
 	assert.ElementsMatch(t, config.Variables(), documentedVariables(t))
 }
 
-// Trois cibles du `Makefile` sourcent `.env` par `set -a; . ./.env` — la copie de ce fichier-ci,
-// comme le README l'indique. Une valeur non quotée qui porte un espace est alors **découpée par le
-// shell** : `sh` exécute la suite comme une commande, la variable reste vide, et le binaire refuse de
-// démarrer en la nommant absente alors qu'elle est bien dans le fichier. Le message pointe la
-// mauvaise cause.
+// Trois cibles du `Makefile` sourcent `.env` par `set -a; . ./.env` — la copie de ce fichier-ci. Une
+// valeur non quotée qui porte un espace est alors **découpée par le shell** : `sh` exécute la suite
+// comme une commande, la variable reste vide, et le binaire refuse de démarrer en la nommant absente
+// alors qu'elle est bien dans le fichier. Le message pointe la mauvaise cause.
 //
 // Livré une fois, le 01/09/2026, avec la première valeur du fichier à contenir un espace :
 // `DASHBOARD_PRODUCT_NAME=Passerelle SMS Admin` rendait `dotenv: SMS: command not found`. La porte
