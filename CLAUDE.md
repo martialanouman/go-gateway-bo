@@ -26,8 +26,11 @@ inatteignable.
 ## Commandes
 
 `make help` **fait foi** — la lancer plutôt que croire une liste. **`make check` avant toute PR.**
-Poste neuf : séquence complète dans `README.md`, à commencer par l'authentification à GitHub Packages,
-sans quoi l'installation des contrats échoue sur un 401 qui ne se nomme pas.
+Poste neuf : commencer par `gh auth refresh --hostname github.com -s read:packages`, puis
+`pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"` — sans quoi l'installation des
+contrats échoue sur un 401 qui ne se nomme pas. Viennent ensuite `pnpm -C web install`, la copie de
+`.env.example` en `.env`, `docker compose up -d`, `make migrate` puis `make bootstrap`. Le README qui
+portait cette séquence a été retiré ; il sera réécrit en fin de projet.
 
 **Les bases sont vivantes.** Sans base joignable et migrée le binaire refuse de démarrer — il compare
 la version du schéma avant de lier son port —, et **toute porte** qui le lance échoue avec lui : le

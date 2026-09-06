@@ -55,9 +55,9 @@ const (
 )
 
 // minimumBruteForceSaltLength borne le sel d'anti-brute-force. Trente-deux caractères : ce que rend
-// `openssl rand -base64 24`, et le README propose 48 octets. Ce que la borne empêche vraiment est un
-// sel posé « pour faire démarrer » — `changeme`, `dev`, le nom du projet — qui rendrait le HMAC des
-// adresses sources devinable, donc la table de compteurs relisible par qui la vole.
+// `openssl rand -base64 24`. Ce que la borne empêche vraiment est un sel posé « pour faire
+// démarrer » — `changeme`, `dev`, le nom du projet — qui rendrait le HMAC des adresses sources
+// devinable, donc la table de compteurs relisible par qui la vole.
 const minimumBruteForceSaltLength = 32
 
 // minimumSessionSecretLength borne la clé qui signe les cookies de session. Même seuil et même
@@ -71,8 +71,8 @@ const minimumSessionSecretLength = 32
 // s'obtiennent de trois façons différentes finissent par s'obtenir de la plus commode.
 //
 // Ce n'est **pas** la clé AES : celle-ci fait exactement trente-deux octets et se dérive par HKDF
-// dans `internal/mfa`. Exiger ici une valeur de trente-deux octets exactement aurait refusé la
-// recette que le README donne pour les deux autres.
+// dans `internal/mfa`. Exiger ici une valeur de trente-deux octets exactement aurait refusé le
+// `openssl rand -base64` que les deux autres acceptent.
 //
 // La conséquence d'une clé faible n'est encore pas la même : elle ne rend pas une table relisible et
 // ne laisse pas signer une session, elle rend **déchiffrables tous les seconds facteurs** de la base
@@ -80,8 +80,8 @@ const minimumSessionSecretLength = 32
 const minimumTOTPEncryptionKeyLength = 32
 
 // minimumDistinctSymbols borne la **variété** des trois secrets, que leur longueur ne dit pas :
-// trente-deux `a` de suite passaient les bornes ci-dessus, et le README promettait un CSPRNG que rien
-// n'appliquait.
+// trente-deux `a` de suite passaient les bornes ci-dessus, et rien n'imposait le tirage aléatoire
+// que la documentation se contentait alors de recommander.
 //
 // Douze, choisi sur ce que la borne doit refuser et non sur les valeurs déjà posées. Mesuré le
 // 01/09/2026 sur un million de tirages base64 de trente-deux caractères — la longueur minimale — :

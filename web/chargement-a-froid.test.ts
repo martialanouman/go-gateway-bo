@@ -214,8 +214,8 @@ describe('chargement à froid', () => {
   it("n'emporte dans le bundle aucune adresse que le navigateur ne doit pas connaître", async () => {
     // **Invariant (d).** `internal/` met le jeton machine, le mTLS et la base hors de portée du
     // bundle par construction ; le risque résiduel est une adresse écrite en dur dans le client.
-    // README.md et CLAUDE.md présentent ce test comme le dernier rempart — il n'existait pas, et
-    // cette step produit le premier bundle.
+    // `web/CLAUDE.md` présente ce test comme le dernier rempart — il n'existait pas, et cette step
+    // produit le premier bundle.
     // Tout ce qui est servi, et pas seulement `assets/` : Vite recopie `public/` tel quel, et un
     // fichier de configuration déposé là échapperait à une lecture du seul répertoire des bundles.
     // Les binaires sont exclus **par extension** plutôt que lus en `utf8` : depuis que step-008

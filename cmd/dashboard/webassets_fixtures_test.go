@@ -136,8 +136,8 @@ func claimStash(dist, stash string) error {
 // qu'un run interrompu laisse, et le message l'a affirmé « intact » deux versions durant.
 //
 // Rien d'autre ne signale l'état où le refus laisse le poste — le répertoire embarqué est ignoré par
-// git, donc l'arbre reste propre — et ce message est la seule documentation du chemin : ni le README,
-// ni le CLAUDE.md, ni le Makefile n'en disent un mot.
+// git, donc l'arbre reste propre — et ce message est la seule documentation du chemin : ni le
+// CLAUDE.md ni le Makefile n'en disent un mot.
 func refuseClaimedStash(dist, stash string) error {
 	stashed, err := entriesBesidesKeepFile(stash)
 	if err != nil {
@@ -352,8 +352,8 @@ func TestStagingRefusesToRunOverAnInterruptedRun(t *testing.T) {
 	assert.Contains(t, err.Error(), stash, "le message doit nommer où retrouver les vrais assets")
 }
 
-// Le message de refus est la seule documentation de ce chemin : ni le README, ni le CLAUDE.md, ni le
-// Makefile n'en parlent. Ce qu'il dit de faire doit donc être ce qui marche.
+// Le message de refus est la seule documentation de ce chemin : ni le CLAUDE.md ni le Makefile n'en
+// parlent. Ce qu'il dit de faire doit donc être ce qui marche.
 func TestTheRefusalNamesTheTargetThatRefillsTheEmbeddedDirectory(t *testing.T) {
 	t.Parallel()
 

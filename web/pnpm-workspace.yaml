@@ -66,8 +66,7 @@ overrides:
 
 # Avis `pnpm audit` triés explicitement. Un avis n'entre ici qu'avec sa justification écrite, et
 # `pnpm vuln` échoue sur tout ce qui n'y figure pas — c'est ce qui rend le triage conscient plutôt
-# qu'un seuil de sévérité relevé en silence. Détail du raisonnement : section « Dépendances » du
-# README.
+# qu'un seuil de sévérité relevé en silence. Chaque avis porte le sien ci-dessous.
 auditConfig:
   # GHSA-qxc2-j82w-r537 — `@faker-js/faker@5.5.3`, exécution de code arbitraire via `helpers.fake`
   # sur un gabarit contrôlé par l'appelant. Chemin unique, et **de développement seulement** :
