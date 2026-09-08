@@ -27,9 +27,13 @@ var dependencyClause = regexp.MustCompile(`(?s)\*\*Dépend de :\*\*(.*?)\*\*Bloq
 var listedStep = regexp.MustCompile(`^- \[[ x]\] (step-[0-9]{3})`)
 
 // Planchers mesurés le 01/09/2026 : **22 fiches** et **41 couples** (step, dépendance) — pour 78 steps
-// au découpage, dont 56 n'ont pas de fiche. Ce sont des planchers et non des égalités, le découpage
-// grossissant ; mais sans eux, une porte qui ne lirait plus aucune fiche serait verte, et c'est le
-// seul état qu'elle ne doit jamais atteindre.
+// au découpage, dont 56 n'avaient pas de fiche. Ce sont des planchers et non des égalités, le
+// découpage grossissant ; mais sans eux, une porte qui ne lirait plus aucune fiche serait verte, et
+// c'est le seul état qu'elle ne doit jamais atteindre.
+//
+// Remesuré le 08/09/2026, les fiches de `040`, `041` et `042` ajoutées : **25 fiches**, **46 couples**,
+// 78 steps, **53** sans fiche. Les constantes ne bougent pas — la marge est voulue —, mais le chiffre
+// qui les justifie se remesure plutôt que de vieillir en silence.
 const (
 	minimumFiches       = 20
 	minimumDependencies = 35
@@ -47,8 +51,9 @@ const (
 // partir de la deuxième step à faire.
 //
 // La ligne « Dépend de » de `step-027.md` rattrapait ce cas-là. Elle ne rattrapait pas `041`, `042` et
-// `040` : elles n'ont pas de fiche, et pour les **56 steps sur 78** qui n'en ont pas, l'ordre de la
-// liste est la seule source.
+// `040`, qui n'avaient alors pas de fiche — et pour une step qui n'en a pas, l'ordre de la liste est
+// la seule source. *(Les trois en ont une depuis le 08/09/2026, et cette porte les lit : inverser une
+// dépendance dans chacun des trois en-têtes la fait rougir.)*
 func TestAucuneStepNEstListeeAvantUneDontElleDepend(t *testing.T) {
 	t.Parallel()
 
