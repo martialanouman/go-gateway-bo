@@ -15,8 +15,9 @@ remplacera ce corps sans déplacer ce composant. » Son rail contient une phrase
 arrive avec le jalon M2. » Cette step la remplace.
 
 ## Périmètre (ce que fait CETTE PR)
-- Le rail groupé, la barre supérieure et la pile de toasts, plus `Page` et `Toolbar` — les quatre
-  pièces que `plan.md` §7 nomme.
+- Le rail groupé, la barre supérieure, `Page` et `Toolbar` — quatre des cinq pièces que `plan.md` §7
+  nomme, la cinquième étant `usePermission` / `PermissionGate` ci-dessous. La pile de toasts est
+  **montée** ici ; le composant vient de step-042.
 - **L'arborescence de routes**, déclarée en entier, chaque route rendant un état vide explicite qui
   **nomme son jalon** (§1.9). La liste fait foi dans la charte : cinq groupes, quinze entrées —
   Exploitation, Clients, Routage, Conformité, Facturation.
@@ -29,14 +30,15 @@ arrive avec le jalon M2. » Cette step la remplace.
 ## Points d'implémentation clés
 - **Cette step précède step-027 : il n'existe aucun écran de connexion.** Quand `/auth/me` rend 401,
   la coquille ne peut pas rediriger vers `/login`, qui n'existe pas encore. Elle rend donc un état
-  explicite **nommant step-027** — exactement ce que §1.9 exige de toute surface non livrée, « jamais
-  une page blanche, jamais un lien mort, jamais un écran inventé ». step-027 remplacera cet état par
+  explicite **nommant step-027** — exactement ce que §1.9 exige de toute surface non livrée : « Jamais
+  une page blanche, jamais un lien mort, jamais un écran inventé. » step-027 remplacera cet état par
   la redirection et la reprise de la destination demandée.
 - **Le rôle ne s'affiche pas dans la barre supérieure**, et c'est un écart assumé avec la charte, dont
   le `TopBar` rend `opérateur · rôle`. Le contrat le refuse en toutes lettres : « Aucun rôle dans le
   corps, et c'est la raison même : une liste de rôles rendue au navigateur invite à réintroduire le
-  contrôle de rôle côté client, que la spec interdit » (`api/openapi-bff.yaml`, schéma `Me`). Le nom
-  d'affichage seul, donc, et la raison écrite là où le composant la porte.
+  contrôle de rôle côté client, que la spec interdit » (`api/openapi-bff.yaml`, description de
+  l'opération `/auth/me` ; le schéma `Me`, lui, porte le tableau `permissions`). Le nom d'affichage
+  seul, donc, et la raison écrite là où le composant la porte.
 - **Le rail filtre ses entrées par permission, et ce filtre est un confort.** La garde est serveur,
   invariant (c) ; un contrôle masqué dont la route n'est pas gardée reste une faille. Une entrée dont
   la permission manque disparaît du rail — un groupe entier peut donc être vide, et le rail doit le
@@ -48,9 +50,11 @@ arrive avec le jalon M2. » Cette step la remplace.
   correspond à aucun enfant de `_shell`, et `__root.test.tsx` l'asserte. Remplacer le corps du
   composant est le périmètre ; déplacer le composant casserait l'adresse inconnue en silence.
 - **Le squelette de chargement à froid doit tenir après l'ajout de l'AppShell** — c'est un point du
-  Checkpoint M2. `web/chargement-a-froid.test.ts` tient l'égalité littérale entre le `<style>` en ligne
-  d'`index.html` et `app.css` : toute géométrie de coquille qui bouge doit bouger aux deux endroits, ou
-  la première peinture cesse de ressembler à ce qui la remplace.
+  Checkpoint M2. `web/chargement-a-froid.test.ts` tient la fidélité de **quatre tokens que le `<style>`
+  en ligne d'`index.html` duplique** — dont `--shell-rail-width` et `--shell-topbar-height` — face aux
+  fichiers de `src/styles/tokens/`. La duplication est imposée : la première peinture n'a aucune
+  feuille à sa disposition. Toute géométrie de coquille qui bouge doit donc bouger aux deux endroits,
+  ou le rail saute de quelques pixels au montage de React.
 - **Aucune origine absolue dans le bundle.** La garde d'invariant (d) du même test refuse toute URL
   hors liste blanche sur l'ensemble des fichiers textuels émis. Le client `openapi-fetch` se configure
   donc en **relatif**, sur l'origine qui a servi le document — ce que `web/CLAUDE.md` demande déjà.
@@ -90,5 +94,6 @@ Les écrans de connexion et de second facteur → step-027, qui porte aussi la g
 `beforeLoad` sur `_shell`, à l'endroit que le fichier annonce déjà. Le `Menu` et le `Tooltip` →
 step-042, qui écrit pourquoi ils sortent du jalon ; la déconnexion tient dans le slot `actions` de la
 barre, avec un `Button`. Le hub WebSocket, `useTopic` et le centre de notifications persisté →
-step-043 et suivantes : la pile de toasts est livrée ici, sa source ne l'est pas. Les widgets de
+step-043 et suivantes : la pile de toasts est **montée** ici, ni son composant ni sa source ne le
+sont. Les widgets de
 trafic → M4. Tout écran métier — l'arborescence déclare les routes, elle ne les remplit pas.

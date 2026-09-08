@@ -25,9 +25,10 @@ celui de sa voisine.
 
 **Portées veut dire réécrites.** `plan.md` §7 dit « Primitives Base UI portées » et `todo.md` répond
 « Aucune step ne "porte" quoi que ce soit », en date du 01/08/2026. Ce qui est porté, c'est le
-**comportement** de `@base-ui/react` 1.6.0 — installé depuis step-001, importé nulle part à ce jour —
-habillé par les tokens. Les `.jsx` du kit de la charte ne sont pas du code de production : ils
-s'enregistrent sur `window` dans une IIFE et n'ont ni imports ES ni typage.
+**comportement** de `@base-ui/react` 1.6.0 — posé par le commit de remise à neuf, avant même
+step-001, et importé nulle part depuis — habillé par les tokens. Les `.jsx` du kit de la charte ne
+sont pas du code de production : ils s'enregistrent sur `window` dans une IIFE et n'ont ni imports ES
+ni typage.
 
 ### Trois dettes que cette step hérite
 
@@ -105,9 +106,10 @@ personne. Les trois figurent au registre de `todo.md`.*
 - [ ] `components.css` figure dans `STYLED_FILES`, vérifié en l'en retirant — ce qui doit faire rougir
 
 ## Hors périmètre
-Le `Menu` et le `Tooltip` → step-042, qui écrit pourquoi ils sortent du jalon. `Modal`, `Toast` et les
-cinq états de contenu → step-042. `Badge`, `Tag`, `Segmented`, `Card`, `IconButton`, `Checkbox`,
-`Switch`, `RadioGroup`, `MetricTile`, `KeyValueList`, `SpanBar`, `Pagination`, `Banner`,
-`BalanceCard`, `MaskedSecret` → la step qui les consomme, chacune arrivant avec son écran plutôt
-qu'avec une bibliothèque devinée d'avance. La virtualisation des grandes listes → M5. Tout appel
-réseau, et donc toute donnée réelle dans la table → step-040.
+`Modal`, `Toast` et les cinq états de contenu → step-042. Le `Tooltip` → step-084 et le `Menu` → la
+step qui le consomme ; step-042 écrit pourquoi aucun des deux n'est de ce jalon. `Badge`, `Tag`,
+`Segmented`, `Card`, `IconButton`, `Checkbox`, `Switch`, `RadioGroup`, `Textarea`, `MetricTile`,
+`KeyValueList`, `SpanBar`, `Pagination`, `Banner`, `BalanceCard`, `MaskedSecret` → la step qui les
+consomme, chacune arrivant avec son écran plutôt qu'avec une bibliothèque devinée d'avance. La
+virtualisation des grandes listes → M5. Tout appel réseau, et donc toute donnée réelle dans la
+table → step-040.
