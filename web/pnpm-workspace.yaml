@@ -32,14 +32,20 @@ overrides:
   # uuid <11.1.1 : lecture hors bornes quand un buffer est fourni à v3/v5/v6
   # (GHSA-w5hq-g745-h8pq). `postman-collection` épingle 8.3.2, dépréciée par ailleurs.
   'postman-collection>uuid': '^11.1.1'
-  # js-yaml >=4.0.0 <4.3.1 : consommation CPU quadratique à la résolution d'un `!!omap`
-  # (GHSA-5p4m-2wfm-xmqj, élevée). Le correctif de CVE-2026-59870 n'a pas été rétroporté sous 4.3.1.
-  # Chemin unique : `openapi-typescript > @redocly/openapi-core`, qui lit les YAML de contrat pendant
-  # `make generate` — c'est-à-dire exactement le document qu'un attaquant amont contrôlerait.
-  '@redocly/openapi-core>js-yaml': '^4.3.1'
-  # Le **même** avis sur la branche 3.x — un seul GHSA couvre les deux, corrigé en 3.15.1 et 4.3.1.
-  # Chemin unique : `@stoplight/prism-cli > json-schema-faker > json-schema-ref-parser`.
-  'json-schema-ref-parser>js-yaml': '^3.15.1'
+  # js-yaml : deux avis élevés sur la même bibliothèque, et le second a périmé le plancher du
+  # premier. GHSA-5p4m-2wfm-xmqj (consommation CPU quadratique à la résolution d'un `!!omap`,
+  # CVE-2026-59870) est corrigé en 3.15.1 et 4.3.1 ; GHSA-2883-xcg3-v3hh (`maxTotalMergeKeys` ne
+  # borne pas le CPU quand la source de fusion est vide) l'est en 3.15.2 et 4.3.2. Le plancher est
+  # donc passé d'un cran le 08/09/2026 — `^4.3.1` et `^3.15.1` laissaient passer le second, et le
+  # verrou les avait figés exactement sur 4.3.1 et 3.15.1.
+  #
+  # Chemin unique côté 4.x : `openapi-typescript > @redocly/openapi-core`, qui lit les YAML de
+  # contrat pendant `make generate` — c'est-à-dire exactement le document qu'un attaquant amont
+  # contrôlerait.
+  '@redocly/openapi-core>js-yaml': '^4.3.2'
+  # Les mêmes deux avis sur la branche 3.x. Chemin unique : `@stoplight/prism-cli >
+  # json-schema-faker > json-schema-ref-parser`.
+  'json-schema-ref-parser>js-yaml': '^3.15.2'
   # fast-uri : quatre avis élevés sur la même bibliothèque, tous corrigés en 3.1.6 —
   # GHSA-7p8r-x3mc-p8w7 (confusion d'hôte par barre oblique inversée), puis GHSA-5jgf-p345-68v8
   # (confusion d'hôte, canonicalisation IDN sautée), GHSA-jqff-g426-hqxp (confusion d'hôte par schéma
