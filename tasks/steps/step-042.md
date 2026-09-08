@@ -19,11 +19,10 @@ vide à la main, et il est le seul écran du produit.
 - **Les cinq états de contenu** en composants réutilisables : chargement, vide, aucun résultat, module
   désactivé, erreur. `HomeScreen` bascule sur le composant plutôt que de garder sa copie locale.
 
-**Trois des cinq ont une copie de référence, un quatrième une forme, le cinquième rien.** La charte
-rend le chargement, l'état vide, le module désactivé et l'erreur dans
-`guidelines/brand-states.card.html`, avec leurs textes ; **« aucun résultat » n'y figure pas**. Sa
-seule source est `plan.md` §1.9 — « filtres trop étroits + comment élargir » —, et sa copie s'écrit
-ici, pas ailleurs.
+**Trois des cinq ont leur copie écrite dans la charte** — l'état vide, le module désactivé et
+l'erreur, dans `guidelines/brand-states.card.html`. Le chargement n'a pas de copie par nature, c'est
+un squelette. **« Aucun résultat » n'y figure pas du tout** : sa seule source est `plan.md` §1.9 —
+« filtres trop étroits + comment élargir » — et sa copie s'écrit ici, pas ailleurs.
 
 ## Points d'implémentation clés
 - **Un module désactivé n'est jamais une erreur**, et rien en amont ne le signale. `internal/gateway`

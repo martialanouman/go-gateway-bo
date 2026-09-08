@@ -15,8 +15,8 @@ remplacera ce corps sans déplacer ce composant. » Son rail contient une phrase
 arrive avec le jalon M2. » Cette step la remplace.
 
 ## Périmètre (ce que fait CETTE PR)
-- Le rail groupé, la barre supérieure et la pile de toasts, plus `Page` et `Toolbar` —
-  les quatre pièces que `plan.md` §7 nomme.
+- Le rail groupé, la barre supérieure et la pile de toasts, plus `Page` et `Toolbar` — les quatre
+  pièces que `plan.md` §7 nomme.
 - **L'arborescence de routes**, déclarée en entier, chaque route rendant un état vide explicite qui
   **nomme son jalon** (§1.9). La liste fait foi dans la charte : cinq groupes, quinze entrées —
   Exploitation, Clients, Routage, Conformité, Facturation.

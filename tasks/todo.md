@@ -173,8 +173,15 @@ sur un schéma en retard protège quelque chose. *(Arbitré le 02/08/2026, au d�
 > ne les précède pas.
 
 - [ ] step-041 — Primitives lot 1 portées : bouton, champ, select, pilule de statut, tabs, table
-- [ ] step-042 — Primitives lot 2 portées : dialog, menu, tooltip, toast + les cinq états de contenu
+- [ ] step-042 — Primitives lot 2 portées : dialog, toast + les cinq états de contenu †
 - [ ] step-040 — AppShell : rail, barre supérieure, arborescence de routes en états vides
+
+† **`menu` et `tooltip` ont quitté cette ligne le 08/09/2026**, en écrivant la fiche. Le kit de la
+charte n'en porte aucun des deux, et son *open item* 4 désigne lui-même `step-084` comme la première
+step que la règle des identifiants contraint. Aucun consommateur avant elle : `step-041` affiche
+l'identifiant en mono sans substitution, et le rail de `step-040` est libellé seul, sans icône. Ce
+qui manquait n'était pas le comportement — `@base-ui/react` exporte les deux — mais la référence
+visuelle, et on ne la dessine pas à l'aveugle. Détail dans `steps/step-042.md`, « Hors périmètre ».
 
 ## M1 (écrans) — Login, MFA, opérateurs & rôles  (§6.9, §6.10, §5.1)
 
@@ -187,8 +194,9 @@ contenu (`042`) et la coquille (`040`). La v1.0 avait annoncé « M1 entier avan
 *Jusqu'au 01/09/2026, ces trois lignes vivaient dans la section M1 au-dessus de M2, et une note les
 renvoyait ici. Lire la liste dans l'ordre — ce que ce document demande en toutes lettres — rendait
 donc une séquence fausse sur **cinq positions**, et seule la ligne « Dépend de » de `step-027.md`
-rattrapait l'erreur. Les trois steps de M2 qui la précèdent n'ont pas encore de fiche : pour elles,
-rien ne l'aurait rattrapée.*
+rattrapait l'erreur. Les trois steps de M2 qui la précèdent n'avaient alors pas de fiche : pour
+elles, rien ne l'aurait rattrapée. **Elles en ont une depuis le 08/09/2026**, et la porte les lit —
+vérifié en inversant une dépendance dans chacun des trois en-têtes.*
 
 - [ ] step-027 — Écrans Login & MFA, branchés sur le BFF Go
 - [ ] step-028 — Écran d'enrôlement du second facteur

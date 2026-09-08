@@ -47,8 +47,10 @@ const (
 // partir de la deuxième step à faire.
 //
 // La ligne « Dépend de » de `step-027.md` rattrapait ce cas-là. Elle ne rattrapait pas `041`, `042` et
-// `040` : elles n'ont pas de fiche, et pour les **56 steps sur 78** qui n'en ont pas, l'ordre de la
-// liste est la seule source.
+// `040`, qui n'avaient alors pas de fiche — et pour une step qui n'en a pas, l'ordre de la liste est
+// la seule source. *(Les trois en ont une depuis le 08/09/2026, et cette porte les lit : inverser une
+// dépendance dans chacun des trois en-têtes la fait rougir. Le décompte de 56 steps sans fiche est
+// celui du 01/09/2026 et n'est pas remesuré ici.)*
 func TestAucuneStepNEstListeeAvantUneDontElleDepend(t *testing.T) {
 	t.Parallel()
 
