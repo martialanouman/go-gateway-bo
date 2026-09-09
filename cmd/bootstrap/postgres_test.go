@@ -50,6 +50,8 @@ func runSuite(m *testing.M) (int, error) {
 
 	suiteDSN = dsn
 
+	bddtest.DiscardStaleDatabases(ctx, suiteDSN, "bootstrap")
+
 	return m.Run(), nil
 }
 
@@ -71,8 +73,6 @@ func freshDatabase(ctx context.Context, t *testing.T) string {
 	if _, err = admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s", name)); err != nil {
 		t.Fatalf("créer la base de test %s : %v", name, err)
 	}
-
-	t.Cleanup(func() { bddtest.DiscardDatabase(suiteDSN, name) })
 
 	parsed, err := url.Parse(suiteDSN)
 	if err != nil {

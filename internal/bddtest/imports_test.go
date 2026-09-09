@@ -24,6 +24,7 @@ var productionPatterns = []string{"./cmd/...", "./internal/..."}
 // produit exactement cet effet. Mesuré : réduits à `./internal/bddtest/...`, les motifs laissaient la
 // garde ci-dessous verte sans plus rien garder, et l'ancien témoin vert avec elle.
 var harnessImporters = []string{
+	"github.com/martialanouman/go-gateway-bo/cmd/bootstrap",
 	"github.com/martialanouman/go-gateway-bo/cmd/dashboard",
 	"github.com/martialanouman/go-gateway-bo/cmd/migrate",
 	"github.com/martialanouman/go-gateway-bo/internal/gateway",

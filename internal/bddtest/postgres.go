@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -30,8 +33,11 @@ const (
 	postgresAdminDatabase = "dashboard"
 )
 
-// discardTimeout borne le nettoyage d'une base : une suite ne doit pas pendre sur ce qu'elle jette.
-const discardTimeout = 10 * time.Second
+// discardTimeout borne le nettoyage d'ouverture. Deux minutes plutôt que trente secondes, mesuré
+// plutôt que choisi : jeter cent quatre-vingt-quinze bases en prend douze quand la suite est seule,
+// et davantage quand les trois paquets à base démarrent ensemble sous `go test ./...`. Rien ne pend
+// ici — les bases visées n'appartiennent qu'à des processus finis.
+const discardTimeout = 2 * time.Minute
 
 // AdminDSN rend la base d'administration d'un PostgreSQL de test — celle depuis laquelle une suite
 // taille les siennes — et la fonction qui libère ce qu'elle a pris.
@@ -77,35 +83,36 @@ func AdminDSN(ctx context.Context) (string, func(), error) {
 	return dsn, release, nil
 }
 
-// databaseCounter numérote les bases d'une exécution. Il est ici et non dans chaque suite : ce sont
-// des processus distincts, et c'est le PID qui les sépare.
-var databaseCounter atomic.Uint64
-
 // DatabaseName rend un nom de base propre à **cette exécution**, sous le préfixe de la suite.
 //
-// Le PID n'est pas décoratif, et c'est le serveur partagé qui l'exige : un conteneur jetable emportait
-// ses bases en mourant, donc un compteur reparti de 1 ne rencontrait jamais rien. Sur un serveur qui
-// survit, `CREATE DATABASE store_test_1` retrouve celle de l'exécution d'avant et la suite rougit sur
-// le harnais — mesuré, six bases restées derrière ont fait échouer la suivante.
+// Le PID n'est pas décoratif, et le serveur partagé lui donne deux emplois. Il évite d'abord une
+// collision : un conteneur jetable emportait ses bases en mourant, donc un compteur reparti de 1 ne
+// rencontrait jamais rien, là où sur un serveur qui survit `CREATE DATABASE store_test_1` retrouve
+// celle d'avant — mesuré, six bases restées derrière ont fait échouer la suite suivante. Il dit
+// ensuite à `DiscardStaleDatabases` quelles bases appartiennent à un run **fini**.
 func DatabaseName(prefix string) string {
 	return fmt.Sprintf("%s_test_%d_%d", prefix, os.Getpid(), databaseCounter.Add(1))
 }
 
-// DiscardDatabase jette une base taillée par un cas, sur le serveur que `adminDSN` désigne.
+var databaseCounter atomic.Uint64
+
+// DiscardStaleDatabases jette, **au démarrage** d'une suite, les bases que des exécutions finies ont
+// laissées sous ce préfixe. Elle s'appelle juste après [AdminDSN].
 //
-// Un conteneur jetable les emportait toutes en mourant. Un serveur fourni par l'environnement, lui,
-// les garde : `internal/store` en taille plus de quatre-vingt-dix par exécution, et elles
-// s'accumuleraient sur le PostgreSQL d'un poste.
+// Un conteneur jetable emportait tout en mourant ; un serveur fourni par l'environnement, lui, garde
+// ce qu'on y taille — `internal/store` en produit plus de quatre-vingt-dix par exécution.
 //
-// **Son contexte est le sien, et ce n'est pas un détail** : appelée depuis un `t.Cleanup`, elle
-// recevrait un `t.Context()` que Go annule **avant** d'exécuter les nettoyages. La connexion
-// échouerait alors à tous les coups, et le silence ci-dessous rendrait la panne invisible — mesuré,
-// six bases survivaient à une suite verte.
+// **Au démarrage et non à la fin**, ce qui est le contraire de l'intuition et vient d'une mesure :
+// à la fin, les pools que les cas n'ont pas fermés reconnectent aussitôt après le `WITH (FORCE)` et
+// retiennent leur base. Quatre-vingt-dix-neuf suppressions échouaient ainsi en ajoutant vingt-quatre
+// secondes à un paquet qui en dure seize. Au démarrage, plus aucun processus ne les tient.
 //
-// L'échec est muet. Le cas est fini quand cette fonction s'exécute, rien de ce qu'il affirme n'en
-// dépend, et une suite qui rougirait ici accuserait le harnais à la place du produit.
-func DiscardDatabase(adminDSN, name string) {
-	ctx, cancel := context.WithTimeout(context.Background(), discardTimeout)
+// Le PID protège un run concurrent : une base dont le processus vit encore n'est pas à nous.
+//
+// L'échec ne fait pas rougir — la suite qui commence n'en dépend pas, et l'exécution suivante
+// réessaiera.
+func DiscardStaleDatabases(ctx context.Context, adminDSN, prefix string) {
+	ctx, cancel := context.WithTimeout(ctx, discardTimeout)
 	defer cancel()
 
 	admin, err := pgx.Connect(ctx, adminDSN)
@@ -115,7 +122,68 @@ func DiscardDatabase(adminDSN, name string) {
 
 	defer func() { _ = admin.Close(ctx) }()
 
-	// `WITH (FORCE)` ferme les connexions restées ouvertes : sans lui, un pool que le cas n'a pas
-	// fermé retiendrait sa base, et la commande attendrait au lieu de rendre la main.
-	_, _ = admin.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", name))
+	rows, err := admin.Query(ctx,
+		"SELECT datname FROM pg_database WHERE datname LIKE $1", prefix+"_test_%")
+	if err != nil {
+		return
+	}
+
+	stale, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return
+	}
+
+	var failed int
+
+	for _, database := range stale {
+		if processAlive(ownerPID(database)) {
+			continue
+		}
+
+		// `WITH (FORCE)` ferme ce qui traînerait encore : une connexion oubliée par un run tué au
+		// clavier retiendrait sa base, et la commande attendrait au lieu de rendre la main.
+		if _, err = admin.Exec(ctx,
+			fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", database)); err != nil {
+			failed++
+		}
+	}
+
+	// **Il parle sans faire rougir.** La suite qui commence n'en dépend pas, mais un nettoyage muet
+	// est ce qui a fait croire trois fois de suite qu'il avait eu lieu.
+	if failed > 0 {
+		fmt.Fprintf(os.Stderr, "harnais : %d base(s) %s_test_* n'ont pas été jetées : %v\n",
+			failed, prefix, err)
+	}
+}
+
+// ownerPID relit le PID écrit par [DatabaseName]. Zéro pour un nom d'une autre forme — jamais jeté,
+// puisque le PID 0 n'existe pas.
+func ownerPID(database string) int {
+	parts := strings.Split(database, "_")
+	if len(parts) < 4 {
+		return 0
+	}
+
+	pid, err := strconv.Atoi(parts[len(parts)-2])
+	if err != nil {
+		return 0
+	}
+
+	return pid
+}
+
+// processAlive dit si un processus de ce PID tourne encore. Le signal 0 ne fait que poser la
+// question. Un PID recyclé rend un faux positif : la base survit une exécution de plus, ce qui ne
+// coûte rien — l'inverse casserait un run en cours.
+func processAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+
+	return process.Signal(syscall.Signal(0)) == nil
 }
