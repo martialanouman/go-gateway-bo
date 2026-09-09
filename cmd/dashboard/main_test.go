@@ -44,8 +44,7 @@ func TestMain(m *testing.M) {
 // répertoire embarqué appartient à l'arbre de travail, et `os.Exit` n'en déroule aucun. Le code de
 // sortie est nommé parce qu'une restauration ratée le remplace après coup.
 func runTests(m *testing.M) (code int) {
-
-	// Le conteneur naît avant la compilation du binaire : les deux prennent quelques secondes, et
+	// Le serveur est joint avant la compilation du binaire : les deux prennent quelques secondes, et
 	// échouer sur un Docker absent avant d'avoir compilé rend la main plus vite.
 	terminatePostgres, err := startPostgres(context.Background())
 	defer terminatePostgres()
