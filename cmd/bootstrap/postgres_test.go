@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"sync/atomic"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
+	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -21,22 +19,13 @@ import (
 // `store.VerifySchema`, intervertir les deux écrivains passés à `report`, ou supprimer l'appel à
 // `report` — parce que les cas voisins appellent `report` eux-mêmes plutôt que la commande.
 //
-// Même contrat qu'ailleurs : aucun skip. Un Docker absent fait rouge.
+// Même contrat qu'ailleurs : aucun skip. Sans base joignable, la suite est rouge.
 //
 // **Ce que ce `TestMain` coûte, et qui n'est pas gratuit** : les six cas de `main_test.go` — refus
 // d'argument, entrée vide, mise en forme du rapport — n'avaient besoin de rien et tournaient sur un
 // poste sans Docker. Ils ne le peuvent plus, un `TestMain` valant pour tout le paquet. C'est le prix
 // d'exercer la commande pour de bon, et il est assumé ici plutôt que contourné par un `t.Skip` qui
 // rendrait vert un paquet n'ayant rien exercé.
-const postgresImage = "postgres:18-alpine"
-
-const (
-	postgresUser     = "dashboard"
-	postgresPassword = "dashboard"
-	//nolint:gosec // G101 : identifiants d'un conteneur jetable lié à un port éphémère local.
-	postgresAdminDatabase = "dashboard"
-)
-
 var suiteDSN string
 
 func TestMain(m *testing.M) {
@@ -52,37 +41,23 @@ func TestMain(m *testing.M) {
 func runSuite(m *testing.M) (int, error) {
 	ctx := context.Background()
 
-	container, err := postgres.Run(ctx, postgresImage,
-		postgres.WithDatabase(postgresAdminDatabase),
-		postgres.WithUsername(postgresUser),
-		postgres.WithPassword(postgresPassword),
-		postgres.BasicWaitStrategies(),
-	)
-	// Armé avant le contrôle d'erreur : `postgres.Run` rend un conteneur non nil même en échec quand
-	// il a été créé puis n'a pas démarré.
-	defer func() { _ = testcontainers.TerminateContainer(container) }()
+	dsn, release, err := bddtest.AdminDSN(ctx)
+	defer release()
 
 	if err != nil {
-		return 0, fmt.Errorf("démarrer PostgreSQL de test : %w\n\n"+
-			"Cette suite exerce la commande contre une vraie base — elle ne se saute pas", err)
+		return 0, fmt.Errorf("cette suite exerce la commande contre une vraie base : %w", err)
 	}
 
-	// `sslmode=disable` : le conteneur ne présente pas de certificat, et pgx tenterait TLS d'abord.
-	suiteDSN, err = container.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		return 0, fmt.Errorf("lire le DSN de PostgreSQL de test : %w", err)
-	}
+	suiteDSN = dsn
 
 	return m.Run(), nil
 }
-
-var databaseCounter atomic.Uint64
 
 // freshDatabase taille une base vierge : aucune migration, donc le schéma est en version 0.
 func freshDatabase(ctx context.Context, t *testing.T) string {
 	t.Helper()
 
-	name := fmt.Sprintf("bootstrap_test_%d", databaseCounter.Add(1))
+	name := bddtest.DatabaseName("bootstrap")
 
 	admin, err := pgx.Connect(ctx, suiteDSN)
 	if err != nil {
@@ -96,6 +71,8 @@ func freshDatabase(ctx context.Context, t *testing.T) string {
 	if _, err = admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s", name)); err != nil {
 		t.Fatalf("créer la base de test %s : %v", name, err)
 	}
+
+	t.Cleanup(func() { bddtest.DiscardDatabase(suiteDSN, name) })
 
 	parsed, err := url.Parse(suiteDSN)
 	if err != nil {
