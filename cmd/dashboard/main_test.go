@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -44,36 +43,7 @@ func TestMain(m *testing.M) {
 // runTests existe pour que tout ce qui est posé avant les scénarios soit défait par un `defer` : le
 // répertoire embarqué appartient à l'arbre de travail, et `os.Exit` n'en déroule aucun. Le code de
 // sortie est nommé parce qu'une restauration ratée le remplace après coup.
-// MESURE TEMPORAIRE step-032 : les deux bornes élargies se choisissent sur ce que la CI relève.
-var slowestRequest, slowestStartup slowest
-
-type slowest struct {
-	sync.Mutex
-	took time.Duration
-	what string
-}
-
-func recordSlowest(into *slowest, took time.Duration, what string) {
-	into.Lock()
-	defer into.Unlock()
-
-	if took > into.took {
-		into.took, into.what = took, what
-	}
-}
-
-func reportSlowest() {
-	line := fmt.Sprintf("MESURE step-032 : requête la plus lente %v (%s) ; démarrage le plus lent %v\n",
-		slowestRequest.took, slowestRequest.what, slowestStartup.took)
-
-	fmt.Fprint(os.Stderr, line)
-	// `go test` avale la sortie d'un paquet qui passe : le fichier est le seul chemin par lequel la
-	// CI peut la rendre.
-	_ = os.WriteFile("/tmp/step-032-mesure.txt", []byte(line), 0o600)
-}
-
 func runTests(m *testing.M) (code int) {
-	defer reportSlowest()
 
 	// Le conteneur naît avant la compilation du binaire : les deux prennent quelques secondes, et
 	// échouer sur un Docker absent avant d'avoir compilé rend la main plus vite.
@@ -304,16 +274,19 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 // lui aussi sa borne : au-delà, il rend la main sans avoir constaté la mort de l'enfant, ce qui vaut
 // mieux qu'un scénario suspendu, mais reste un abandon.
 //
-// **C'est une borne anti-suspension, pas une assertion de performance**, et deux secondes ne le
-// disaient plus depuis step-023 : `POST /auth/mfa/totp/enroll` hache dix codes de récupération en
-// argon2id, soit 269 ms sur un M4 Pro et 504 ms sur deux cœurs (mesuré le 19/08/2026). Sur le runner
-// de la CI — mémoire plus lente, et `go test ./...` qui fait tourner plusieurs paquets à la fois,
-// chacun avec ses argon2id à 64 MiB — les douze scénarios d'enrôlement dépassaient les deux secondes.
+// **C'est une borne anti-suspension, pas une assertion de performance.** Ce que la performance garde
+// est ailleurs depuis step-032, dans `performance_test.go`, et c'est un budget relatif — cette
+// valeur-ci n'a jamais rien gardé de tel, à quinze secondes comme à deux.
 //
-// Quinze secondes ne masquent aucun défaut du produit : le pic mémoire d'un enrôlement est celui d'un
-// login (131 MiB, les hachages étant séquentiels), et c'est un geste unique par opérateur. Ce que la
-// borne doit attraper est un serveur qui ne répond **plus**, et quinze secondes l'attrapent.
-var browser = &http.Client{Timeout: 15 * time.Second}
+// Huit secondes, et le chiffre vient d'une mesure et non d'un arbitrage : la requête la plus lente de
+// toute la suite est `POST /auth/mfa/totp/enroll`, qui hache dix codes de récupération en argon2id.
+// Relevée le 09/09/2026 sur le runner de la CI, une fois le PostgreSQL fourni par le job : **3,16 s**
+// — 311 ms sur un M4 Pro. La borne laisse donc deux fois et demie le pire relevé.
+//
+// **Les deux secondes d'origine ne peuvent pas revenir, et c'est mesuré plutôt que supposé** : elles
+// tomberaient sous les 3,16 s de l'enrôlement, sur une suite verte. Ce que la borne doit attraper est
+// un serveur qui ne répond **plus**, et huit secondes l'attrapent deux fois plus vite que quinze.
+var browser = &http.Client{Timeout: 8 * time.Second}
 
 // completeConfiguration est le plus petit environnement avec lequel le binaire démarre. Le port 0
 // laisse le système en choisir un libre, et le mode `mock` n'exige de la passerelle que son adresse —
@@ -467,26 +440,27 @@ func (p *process) startAndServe() error {
 	return nil
 }
 
-// startupTimeout vise un démarrage parti en vrille, pas une machine chargée — même arbitrage que
-// `prismStartup` dans `internal/gateway`, et pour une raison mesurée ici le 03/08/2026 : sous un
-// `go test -race ./...`, où dix paquets compilent et tournent de front, le binaire n'avait **rien**
-// écrit au bout des 5 s que cette borne valait alors. Le message d'échec le montrait, son journal
-// étant vide. Le scénario avait tout d'un défaut du produit et n'était qu'une machine occupée ; la
-// même suite lancée seule passait, et le passage suivant sur l'arbre entier aussi.
+// startupTimeout vise un démarrage parti en vrille, pas une machine chargée.
 //
-// Aucun test ne rougit si cette valeur revient à 5 s, ce qui a été vérifié plutôt que supposé : le
-// défaut ne se reproduit que sous une charge qu'aucune porte ne fabrique. C'est un flottement, et un
-// flottement se corrige à la source de son ambiguïté — ici, une borne qui confondait « le serveur ne
-// démarre pas » et « le serveur n'a pas encore eu la main ».
-const startupTimeout = 30 * time.Second
+// **Elle revient aux 5 s qu'elle valait avant step-007**, et la mesure qui l'avait fait passer à 30
+// n'est plus vraie du monde d'aujourd'hui : le 03/08/2026, sous un `go test -race ./...`, le binaire
+// n'avait rien écrit au bout de cinq secondes pendant que dix paquets compilaient — et que trois
+// conteneurs PostgreSQL démarraient de front, ce que step-032 a supprimé. Relevé le 09/09/2026 sur
+// le même arbre : le démarrage le plus lent de toute la suite est de **295 ms** sur le runner de la
+// CI, 504 ms sur un M4 Pro. La borne laisse dix fois le pire relevé.
+//
+// Ce que trente secondes coûtaient n'était pas l'attente mais le diagnostic : sur le job en échec de
+// la PR 52, où le PostgreSQL de la suite refusait les connexions, **chaque scénario a attendu ses
+// trente secondes pour rien** avant de rendre le même message.
+//
+// Aucun test ne rougit si cette valeur remonte à 30 s, ce qui reste vrai et vérifié : une borne
+// haute ne se distingue d'une borne juste que sous une charge qu'aucune porte ne fabrique. Ce qui la
+// garde est la mesure ci-dessus, refaite quand le harnais change.
+const startupTimeout = 5 * time.Second
 
 // awaitListenAddr lit l'adresse effectivement obtenue dans le journal de démarrage. C'est ce qui
 // permet au scénario de demander le port 0 : il ne suppose aucun port libre sur la machine de CI.
 func (p *process) awaitListenAddr(timeout time.Duration) (string, error) {
-	defer func(started time.Time) {
-		recordSlowest(&slowestStartup, time.Since(started), "démarrage du binaire")
-	}(time.Now())
-
 	deadline := time.Now().Add(timeout)
 
 	for time.Now().Before(deadline) {
@@ -550,10 +524,7 @@ func (p *process) send(method, path, contentType, body string) error {
 		request.AddCookie(&http.Cookie{Name: name, Value: value})
 	}
 
-	startedRequest := time.Now()
 	resp, err := browser.Do(request)
-	recordSlowest(&slowestRequest, time.Since(startedRequest), method+" "+path)
-
 	if err != nil {
 		return fmt.Errorf("la requête vers %s a échoué: %w", path, err)
 	}

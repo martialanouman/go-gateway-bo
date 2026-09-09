@@ -847,8 +847,10 @@ teste un mapping ; deux scénarios qui ne diffèrent que par une valeur.
 
 - **Go — unitaires** : gardes de permission, résolution de rôles, mappings de contrat, composition de
   la fiche message, dédoublonnage d'alertes, sérialisation des DTO. La majorité des tests, en nombre.
-- **Go — intégration** : base jetable (testcontainers) ; scénario **deux instances** pour le hub WS et
-  l'évaluateur ; **test de fuite de goroutines** sur le hub.
+- **Go — intégration** : base jetable — une par test, taillée par `CREATE DATABASE` sur le PostgreSQL
+  que `DASHBOARD_TEST_DATABASE_URL` désigne, ou sur un conteneur testcontainers quand elle est
+  absente (step-032) ; scénario **deux instances** pour le hub WS et l'évaluateur ; **test de fuite de
+  goroutines** sur le hub.
 - **TypeScript — composants** (Testing Library) : états, permissions, accessibilité clavier, copie.
   Ils tapent le **mock**, jamais la passerelle.
 - **Bout en bout (Playwright)** : cinq parcours seulement, **contre le binaire** — le seul moyen de
