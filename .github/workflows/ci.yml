@@ -66,7 +66,33 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # SONDE TEMPORAIRE step-032 — retirée dans le commit qui livre le correctif. Elle mesure sur le
+      # runner ce qu'aucun poste ne reproduit : la marge mémoire pendant `make test-go`, et la fin de
+      # vie des trois conteneurs PostgreSQL.
+      - name: Sonde temporaire (step-032)
+        run: |
+          echo "== cpus: $(nproc)"; free -m; df -h /var/lib/docker /
+          # shellcheck disable=SC2016 # la boucle s'expanse dans le shell de fond, pas ici
+          nohup bash -c 'while true; do echo "$(date +%s) $(free -m | awk "/^Mem:/{print \$3, \$7}")"; sleep 3; done' > /tmp/mem.log 2>&1 &
+          echo $! > /tmp/probe.pid
+          nohup docker events --filter type=container \
+            --format '{{.Time}} {{.Actor.Attributes.image}} {{.Action}} exit={{.Actor.Attributes.exitCode}}' > /tmp/events.log 2>&1 &
+          echo $! >> /tmp/probe.pid
+          # shellcheck disable=SC2016 # idem
+          nohup bash -c 'while true; do for c in $(docker ps -q --filter ancestor=postgres:18-alpine); do docker logs --since 12s $c >> /tmp/pg.log 2>&1; done; sleep 10; done' > /dev/null 2>&1 &
+          echo $! >> /tmp/probe.pid
       - run: make test-go
+      - name: Dépouiller la sonde (step-032)
+        if: always()
+        run: |
+          # shellcheck disable=SC2046 # trois PID sur trois lignes, le découpage est voulu
+          kill $(cat /tmp/probe.pid) 2>/dev/null || true
+          echo "== mémoire : minimum disponible observé (MiB)"; sort -k3 -n /tmp/mem.log | head -3
+          echo "== mémoire : maximum utilisé (MiB)"; sort -k2 -rn /tmp/mem.log | head -3
+          echo "== cycle de vie des conteneurs"; grep -v exec_ /tmp/events.log | head -40
+          echo "== journal PostgreSQL : lignes anormales"
+          grep -iE "fatal|panic|terminat|out of memory|shutting down|recovery|too many" /tmp/pg.log | sort -u | head -30 || echo "(rien)"
+          echo "== OOM noyau"; sudo dmesg 2>/dev/null | grep -iE "killed process|out of memory" | tail -10 || echo "(rien)"
 
   lint:
     name: Lint Go
