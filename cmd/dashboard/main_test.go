@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -43,7 +44,37 @@ func TestMain(m *testing.M) {
 // runTests existe pour que tout ce qui est posé avant les scénarios soit défait par un `defer` : le
 // répertoire embarqué appartient à l'arbre de travail, et `os.Exit` n'en déroule aucun. Le code de
 // sortie est nommé parce qu'une restauration ratée le remplace après coup.
+// MESURE TEMPORAIRE step-032 : les deux bornes élargies se choisissent sur ce que la CI relève.
+var slowestRequest, slowestStartup slowest
+
+type slowest struct {
+	sync.Mutex
+	took time.Duration
+	what string
+}
+
+func recordSlowest(into *slowest, took time.Duration, what string) {
+	into.Lock()
+	defer into.Unlock()
+
+	if took > into.took {
+		into.took, into.what = took, what
+	}
+}
+
+func reportSlowest() {
+	line := fmt.Sprintf("MESURE step-032 : requête la plus lente %v (%s) ; démarrage le plus lent %v\n",
+		slowestRequest.took, slowestRequest.what, slowestStartup.took)
+
+	fmt.Fprint(os.Stderr, line)
+	// `go test` avale la sortie d'un paquet qui passe : le fichier est le seul chemin par lequel la
+	// CI peut la rendre.
+	_ = os.WriteFile("/tmp/step-032-mesure.txt", []byte(line), 0o600)
+}
+
 func runTests(m *testing.M) (code int) {
+	defer reportSlowest()
+
 	// Le conteneur naît avant la compilation du binaire : les deux prennent quelques secondes, et
 	// échouer sur un Docker absent avant d'avoir compilé rend la main plus vite.
 	terminatePostgres, err := startPostgres(context.Background())
@@ -452,6 +483,10 @@ const startupTimeout = 30 * time.Second
 // awaitListenAddr lit l'adresse effectivement obtenue dans le journal de démarrage. C'est ce qui
 // permet au scénario de demander le port 0 : il ne suppose aucun port libre sur la machine de CI.
 func (p *process) awaitListenAddr(timeout time.Duration) (string, error) {
+	defer func(started time.Time) {
+		recordSlowest(&slowestStartup, time.Since(started), "démarrage du binaire")
+	}(time.Now())
+
 	deadline := time.Now().Add(timeout)
 
 	for time.Now().Before(deadline) {
@@ -515,7 +550,10 @@ func (p *process) send(method, path, contentType, body string) error {
 		request.AddCookie(&http.Cookie{Name: name, Value: value})
 	}
 
+	startedRequest := time.Now()
 	resp, err := browser.Do(request)
+	recordSlowest(&slowestRequest, time.Since(startedRequest), method+" "+path)
+
 	if err != nil {
 		return fmt.Errorf("la requête vers %s a échoué: %w", path, err)
 	}

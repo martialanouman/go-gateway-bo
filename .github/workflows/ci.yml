@@ -93,6 +93,9 @@ jobs:
         with:
           go-version-file: go.mod
       - run: make test-go
+      # MESURE TEMPORAIRE step-032 — retirée avec le choix des deux bornes.
+      - if: always()
+        run: cat /tmp/step-032-mesure.txt || true
 
   lint:
     name: Lint Go
