@@ -197,6 +197,18 @@ test: test-go test-web ## Les deux suites
 
 lint: lint-go lint-web ## Les deux linters
 
+# Trois paquets exigent un PostgreSQL. Sans rien, chacun monte son conteneur — c'est le repli, et il
+# ne demande qu'un Docker joignable. Avec `DASHBOARD_TEST_DATABASE_URL`, les trois partagent le
+# serveur qu'elle désigne, ce que fait la CI depuis step-032 :
+#
+#   docker compose up -d postgres
+#   DASHBOARD_TEST_DATABASE_URL=postgres://dashboard:dashboard@localhost:5432/dashboard?sslmode=disable \
+#     make test-go
+#
+# Sur un serveur qui survit aux suites, les bases de test s'accumuleraient : chaque suite jette à son
+# démarrage celles qu'un run **fini** a laissées sous son préfixe. Le compte reste donc borné à une
+# exécution — mesuré stable à 174 sur trois passages d'affilée — sans qu'aucune cible n'ait à être
+# lancée à la main.
 test-go: ## Tests Go et scénarios godog, avec -race
 	go test -race ./...
 
