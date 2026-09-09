@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
 // EnvAdminDSN désigne le PostgreSQL que les suites partagent quand l'environnement en fournit un.
@@ -22,65 +20,38 @@ import (
 // le binaire sur la base d'administration de la suite.
 const EnvAdminDSN = "DASHBOARD_TEST_DATABASE_URL"
 
-// L'image suit `docker-compose.yml` et les services de la CI : PostgreSQL **18**, où `uuidv7()` est
-// natif — `audit_log.id` en a fait son défaut, et les migrations échouent sur plus ancien.
-const postgresImage = "postgres:18-alpine"
-
-const (
-	postgresUser     = "dashboard"
-	postgresPassword = "dashboard"
-	//nolint:gosec // G101 : identifiants d'un conteneur jetable lié à un port éphémère local.
-	postgresAdminDatabase = "dashboard"
-)
-
 // discardTimeout borne le nettoyage d'ouverture. Deux minutes plutôt que trente secondes, mesuré
 // plutôt que choisi : jeter cent quatre-vingt-quinze bases en prend douze quand la suite est seule,
 // et davantage quand les trois paquets à base démarrent ensemble sous `go test ./...`. Rien ne pend
 // ici — les bases visées n'appartiennent qu'à des processus finis.
 const discardTimeout = 2 * time.Minute
 
-// AdminDSN rend la base d'administration d'un PostgreSQL de test — celle depuis laquelle une suite
-// taille les siennes — et la fonction qui libère ce qu'elle a pris.
+// SharedAdminDSN rend le PostgreSQL que l'environnement désigne, et `false` quand il n'en désigne
+// aucun — à l'appelant, alors, de monter le sien.
 //
-// **Un serveur pour tout le module quand l'environnement en pose un**, un conteneur par suite sinon.
-// C'est l'amortissement que step-007 laissait ouvert avec son déclencheur écrit — « le jour où un
-// second paquet a besoin de PostgreSQL » —, franchi depuis longtemps : trois paquets en montaient
-// chacun un, et la CI les faisait démarrer de front sur quatre cœurs. Ce n'est **pas** `WithReuse`,
-// écarté nommément par DN-3 : rien ne survit ici entre deux exécutions, puisque personne ne réutilise
-// un conteneur — c'est un serveur **fourni**, dont la CI recrée le service à chaque job.
+// **Un serveur pour tout le module quand la variable est posée.** C'est l'amortissement que step-007
+// laissait ouvert avec son déclencheur écrit — « le jour où un second paquet a besoin de
+// PostgreSQL » —, franchi depuis longtemps : trois paquets montaient chacun leur conteneur, et la CI
+// les faisait démarrer de front sur quatre cœurs. Ce n'est **pas** `WithReuse`, écarté nommément par
+// DN-3 : rien ne survit entre deux exécutions, puisque personne ne réutilise un conteneur.
 //
-// L'isolation ne bouge pas : chaque test taille sa base par `CREATE DATABASE` et la jette après lui.
+// L'isolation ne bouge pas : chaque test taille sa base par `CREATE DATABASE`.
 //
-// Rien ne se saute : ni `t.Skip`, ni `SkipIfProviderIsNotHealthy`. Sans variable **et** sans Docker,
-// la suite est rouge — une suite verte qui n'a rien exercé est ce que ce dépôt refuse.
-func AdminDSN(ctx context.Context) (string, func(), error) {
-	if dsn := os.Getenv(EnvAdminDSN); dsn != "" {
-		return dsn, func() {}, nil
-	}
+// **Le repli reste chez l'appelant, dans son `_test.go`, et ce n'est pas une commodité** : mesuré le
+// 09/09/2026, monter le conteneur ici a fait rougir `make vuln-go` sur deux avis de
+// `golang.org/x/crypto/ssh`, atteint par `postgres.Run`. `govulncheck` analyse le produit et ignore
+// les fichiers de test : y faire entrer le harnais Docker, c'est faire dépendre les portes du
+// produit des dépendances de testcontainers. La garde d'imports de ce paquet dit déjà que le harnais
+// ne doit pas franchir cette frontière.
+//
+// Rien ne se saute nulle part : sans variable **et** sans Docker, la suite est rouge.
+func SharedAdminDSN() (string, bool) {
+	//nolint:forbidigo // Ce n'est pas une configuration du produit mais la désignation du PostgreSQL
+	// de test, que la CI pose sur le job et qu'un poste pose devant `make test-go`. L'exemption est
+	// nommée ici plutôt que posée sur le fichier, comme le veut `.golangci.yml`.
+	dsn := os.Getenv(EnvAdminDSN)
 
-	container, err := postgres.Run(ctx, postgresImage,
-		postgres.WithDatabase(postgresAdminDatabase),
-		postgres.WithUsername(postgresUser),
-		postgres.WithPassword(postgresPassword),
-		postgres.BasicWaitStrategies(),
-	)
-	// Armé avant le contrôle d'erreur : `postgres.Run` rend un conteneur **non nil** même en échec
-	// quand il a été créé puis n'a pas démarré, et celui-là resterait à traîner.
-	release := func() { _ = testcontainers.TerminateContainer(container) }
-
-	if err != nil {
-		return "", release, fmt.Errorf("démarrer PostgreSQL de test : %w\n\n"+
-			"Ces suites exercent une vraie base et ne se sautent pas : soit un Docker joignable, soit "+
-			"un serveur désigné par %s", err, EnvAdminDSN)
-	}
-
-	// `sslmode=disable` : le conteneur ne présente pas de certificat, et pgx tenterait TLS d'abord.
-	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		return "", release, fmt.Errorf("lire le DSN de PostgreSQL de test : %w", err)
-	}
-
-	return dsn, release, nil
+	return dsn, dsn != ""
 }
 
 // DatabaseName rend un nom de base propre à **cette exécution**, sous le préfixe de la suite.

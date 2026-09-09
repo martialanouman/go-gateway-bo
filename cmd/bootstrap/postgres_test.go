@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
@@ -41,7 +43,7 @@ func TestMain(m *testing.M) {
 func runSuite(m *testing.M) (int, error) {
 	ctx := context.Background()
 
-	dsn, release, err := bddtest.AdminDSN(ctx)
+	dsn, release, err := adminDSN(ctx)
 	defer release()
 
 	if err != nil {
@@ -94,4 +96,47 @@ func migratedDatabase(ctx context.Context, t *testing.T) string {
 	}
 
 	return dsn
+}
+
+// L'image suit `docker-compose.yml` et les services de la CI : PostgreSQL **18**, où `uuidv7()` est
+// natif — `audit_log.id` en a fait son défaut, et les migrations échouent sur plus ancien.
+const postgresImage = "postgres:18-alpine"
+
+const (
+	postgresUser     = "dashboard"
+	postgresPassword = "dashboard"
+	//nolint:gosec // G101 : identifiants d'un conteneur jetable lié à un port éphémère local.
+	postgresAdminDatabase = "dashboard"
+)
+
+// adminDSN rend le serveur partagé que l'environnement désigne, ou monte le conteneur de cette
+// suite, avec la fonction qui rend ce qui a été pris.
+func adminDSN(ctx context.Context) (string, func(), error) {
+	if shared, ok := bddtest.SharedAdminDSN(); ok {
+		return shared, func() {}, nil
+	}
+
+	container, err := postgres.Run(ctx, postgresImage,
+		postgres.WithDatabase(postgresAdminDatabase),
+		postgres.WithUsername(postgresUser),
+		postgres.WithPassword(postgresPassword),
+		postgres.BasicWaitStrategies(),
+	)
+	// Armé avant le contrôle d'erreur : `postgres.Run` rend un conteneur **non nil** même en échec
+	// quand il a été créé puis n'a pas démarré, et celui-là resterait à traîner.
+	release := func() { _ = testcontainers.TerminateContainer(container) }
+
+	if err != nil {
+		return "", release, fmt.Errorf("démarrer PostgreSQL de test : %w\n\n"+
+			"Rien ne se saute ici : soit un Docker joignable, soit un serveur désigné par %s",
+			err, bddtest.EnvAdminDSN)
+	}
+
+	// `sslmode=disable` : le conteneur ne présente pas de certificat, et pgx tenterait TLS d'abord.
+	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		return "", release, fmt.Errorf("lire le DSN de PostgreSQL de test : %w", err)
+	}
+
+	return dsn, release, nil
 }
