@@ -190,6 +190,21 @@ Ce qui change est le symptôme. `internal/mfa/webauthn_test.go` exerce les deux 
 sans HTTP et sans binaire : s'il rougit avec les scénarios WebAuthn, la cause est la bibliothèque de
 test ; s'il reste vert pendant qu'ils rougissent, c'est le produit.
 
+### DN-7 — Un serveur disparu faisait pendre la suite, et non rougir
+
+Rencontré pendant la step, le 10/09/2026 : le PostgreSQL du `docker compose` a disparu sous une suite
+en cours, et les trois paquets ont attendu **plus de deux heures** sans rien dire. C'est un mode
+d'échec que la step a **créé** — un conteneur absent faisait rouge en quelques secondes, là où la
+variable a troqué un refus lisible contre une suspension muette.
+
+`bddtest.RequireReachable` contrôle le serveur avant que la suite s'en serve, et son refus nomme la
+variable et les deux remèdes.
+
+Ce que `go test` arme ne couvre pas ce cas, et c'est mesuré plutôt que supposé : sa borne interne ne
+s'arme qu'à partir de `m.Run()`, or tout ceci se passe avant, dans `TestMain`. La mutation, garde
+retirée, sur une adresse qui absorbe les paquets : **plus de 300 s sans rougir malgré un
+`-timeout 150s` explicite**, contre 32 s avec la garde — et 5 s sur un port fermé.
+
 ## Mutations
 
 | Mutation | Attendu | Observé |
@@ -200,6 +215,7 @@ test ; s'il reste vert pendant qu'ils rougissent, c'est le produit.
 | Le harnais WebAuthn signe pour une autre origine | **rouge**, cause nommée | rouge, « Error validating origin » |
 | La réponse d'attestation abîmée d'un octet | **rouge**, cause nommée | rouge, « Parse error for Registration » |
 | L'étalon du filet pris sur la route mesurée *(état initial du code)* | rouge attendu | **vert à 1,2** — le défaut du filet, corrigé |
+| `RequireReachable` retirée, serveur qui absorbe les paquets | **rouge** | **> 300 s sans rougir**, malgré `-timeout 150s` ; 32 s avec la garde |
 
 ## Ce qui n'est pas testé, et pourquoi
 
@@ -209,6 +225,10 @@ test ; s'il reste vert pendant qu'ils rougissent, c'est le produit.
   Une DoD qui n'accepterait pas cette phrase fabriquerait un test de complaisance.
 - **Le nettoyage des bases n'a aucun test.** Il n'affirme rien du produit, et son échec ne doit pas
   faire rougir une suite ; ce qui le garde est l'avertissement sur stderr et le compte mesuré à 174.
+- **Les trois exécutions locales d'affilée n'ont pas été refaites sur l'état final** : le Docker de ce
+  poste a cessé de répondre pendant la dernière série, ce qui a précisément révélé DN-7. Trois
+  exécutions vertes ont été mesurées sur l'état d'avant les bornes courtes, avec le compte de bases
+  stable à 174 ; les trois exécutions de CI, elles, portent bien l'état final.
 - **Aucune porte ne rougit si les deux bornes remontent**, ce qui reste vrai et vérifié : une borne
   haute ne se distingue d'une borne juste que sous une charge qu'aucune porte ne fabrique. Ce qui les
   garde est la mesure écrite au-dessus de chacune, à refaire quand le harnais change.
