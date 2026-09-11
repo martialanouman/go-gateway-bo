@@ -64,8 +64,8 @@ jobs:
     # en échec de la PR 52 nommait le symptôme — `connection refused` sur le port du conteneur, dès
     # la première base d'un paquet.
     #
-    # Sans la variable, `bddtest.AdminDSN` remonte un conteneur : un poste sans compose garde le
-    # comportement d'avant, et rien ne se saute dans aucun des deux cas.
+    # Sans la variable, l'`adminDSN` de chaque suite remonte un conteneur : un poste sans compose
+    # garde le comportement d'avant, et rien ne se saute dans aucun des deux cas.
     env:
       DASHBOARD_TEST_DATABASE_URL: postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable
     # Image, identifiants et healthcheck de `docker-compose.yml`, comme les deux autres jobs.

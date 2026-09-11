@@ -22,8 +22,9 @@ import (
 // connexions. Un double en mémoire ne dirait rien de tout cela.
 //
 // Rien ici ne se saute : ni `t.Skip()`, ni tag exclu, ni build tag — un skip est vert, et une suite
-// verte qui n'a rien exercé est exactement ce que le dépôt refuse. C'est `bddtest.AdminDSN` qui porte
-// le choix du serveur, son image et son refus de se sauter.
+// verte qui n'a rien exercé est exactement ce que le dépôt refuse. L'image, les identifiants et le
+// message de refus vivent dans l'`adminDSN` du bas de ce fichier ; `bddtest` ne porte que la variable
+// qui désigne un serveur partagé, et le contrôle de sa joignabilité.
 //
 // Mesuré le 02/08/2026, et contraire à ce qu'on suppose spontanément : **`DOCKER_HOST` ne suffit pas
 // à détourner testcontainers**. Posé sur une socket inexistante, il a été ignoré et la suite a

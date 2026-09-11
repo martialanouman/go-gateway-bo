@@ -207,7 +207,7 @@ lint: lint-go lint-web ## Les deux linters
 #
 # Sur un serveur qui survit aux suites, les bases de test s'accumuleraient : chaque suite jette à son
 # démarrage celles qu'un run **fini** a laissées sous son préfixe. Le compte reste donc borné à une
-# exécution — mesuré stable à 174 sur trois passages d'affilée — sans qu'aucune cible n'ait à être
+# exécution — mesuré stable à 175 sur trois passages d'affilée — sans qu'aucune cible n'ait à être
 # lancée à la main.
 test-go: ## Tests Go et scénarios godog, avec -race
 	go test -race ./...

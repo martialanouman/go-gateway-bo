@@ -24,7 +24,8 @@ import (
 //
 // Rien ne se saute ici non plus : pas de `t.Skip`, pas de `SkipIfProviderIsNotHealthy`. Un skip est
 // vert, et une suite verte qui n'a rien exercé est ce que ce dépôt refuse. Le serveur, son image et
-// ce refus vivent dans `bddtest.AdminDSN`.
+// ce refus vivent dans l'`adminDSN` du bas de ce fichier ; `bddtest` ne porte que la variable qui
+// désigne un serveur partagé, et le contrôle de sa joignabilité.
 
 // suiteDSN désigne la base d'administration du conteneur de la suite ; migratedSuiteDSN désigne une
 // base à jour, celle avec laquelle démarrent les scénarios qui n'ont rien à dire du schéma. Toutes
@@ -37,13 +38,13 @@ var suiteDSN, migratedSuiteDSN string
 var suiteSchemaVersion int64
 
 // startPostgres ouvre le PostgreSQL de la suite et taille la base à jour que la configuration
-// complète désigne. Elle rend la fonction qui rend ce qu'elle a pris : les bases du run, puis le
-// conteneur quand c'est elle qui l'a monté.
+// complète désigne. Elle rend la fonction qui jette le conteneur, quand c'est elle qui l'a monté.
+//
+// **Elle ne jette aucune base, et c'est délibéré** : sur un serveur fourni, celles du run sont
+// laissées derrière et jetées à l'ouverture du run suivant, par `bddtest.DiscardStaleDatabases`. À la
+// fermeture, les pools que les cas n'ont pas fermés les retiennent encore.
 func startPostgres(ctx context.Context) (func(), error) {
-	dsn, releaseServer, err := adminDSN(ctx)
-
-	release := releaseServer
-
+	dsn, release, err := adminDSN(ctx)
 	if err != nil {
 		return release, fmt.Errorf("ces scénarios lancent le binaire, qui contrôle la version du "+
 			"schéma au démarrage : %w", err)

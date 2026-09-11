@@ -88,7 +88,7 @@ func waitingForSeedLock(ctx context.Context, t *testing.T, conn *pgx.Conn) bool 
 		"SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted "+
 			// `objsubid = 1` est la forme `bigint` du verrou, celle que prend le seed ; `database`
 			// borne la question à la base de ce test, `pg_locks` étant visible pour tout le cluster
-			// et cette suite tournant en parallèle contre un conteneur unique.
+			// et cette suite tournant en parallèle contre un PostgreSQL unique.
 			"AND objsubid = 1 AND database = (SELECT oid FROM pg_database WHERE datname = "+
 			"current_database()) AND ((classid::bigint << 32) | objid::bigint) = $1)",
 		store.SeedLockKey).Scan(&waiting))

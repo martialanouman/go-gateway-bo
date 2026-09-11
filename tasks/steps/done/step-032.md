@@ -1,6 +1,6 @@
 # step-032 — Le harnais de test : conteneur, délai godog, authentificateur épinglé
 
-> **Jalon :** M1 (§17.4, `plan.md`) · **Statut :** À FAIRE
+> **Jalon :** M1 (§17.4, `plan.md`) · **Statut :** LIVRÉE
 > **Dépend de :** step-007 · **Bloque :** — (mais elle allège toutes les suivantes)
 >
 > *Elle se lit **avant** M2, et c'est le seul argument qui compte : un harnais qui casse sous la charge
@@ -24,7 +24,7 @@ Cette step-ci n'est pas une prévention : elle paie un coût **déjà encaissé*
 ### Cinq dettes que cette step hérite
 
 *Écrites ici et non seulement dans `steps/done/`, parce qu'une fiche archivée n'est ouverte par
-personne. Les trois figurent au registre de `todo.md`.*
+personne. Les cinq figurent au registre de `todo.md`.*
 
 - **Le conteneur PostgreSQL meurt sous la charge, et c'est la seule dette du projet dont le coût est
   chiffré.** `done/step-023.md`, mesuré le 27/08/2026 : « c'est lui qui a fait rougir "Tests Go" sur
@@ -137,28 +137,38 @@ Trois défauts, aucun prévu, tous mesurés :
    leur base : quatre-vingt-dix-neuf suppressions échouaient en ajoutant vingt-quatre secondes à un
    paquet qui en dure seize.
 
-Le compte de bases est mesuré **stable à 174** sur trois `go test ./...` d'affilée — borné à une
+Le compte de bases est mesuré **stable à 175** sur trois `go test ./...` d'affilée — borné à une
 exécution au lieu de croître.
 
 *Trois échecs de nettoyage sont passés inaperçus parce que la fonction se taisait, et c'est la leçon
 de cette step au petit pied : un harnais muet fait croire à ce qu'il n'a pas fait. D'où
 l'avertissement sur stderr, qui ne fait pas rougir.*
 
-### DN-4 — Le filet de performance est un budget relatif, et son premier étalon ne gardait rien
+### DN-4 — Le filet de performance est un budget relatif, et **deux** rédactions n'ont rien gardé
 
 La lecture de session est comparée à `/api/health`, sonde de vivacité qui ne touche ni la base ni la
 passerelle, mesurée **en alternance** dans le même run. Les deux enflent ensemble quand la machine
 charge, et le rapport l'annule : cinq passages tiennent dans 15,5–19,4 là où un seuil en
 millisecondes aurait rougi au hasard — et une suite qui rougit au hasard cesse d'être lue.
 
-**Le premier étalon écrit était `/api/auth/me` sans cookie, et il ne gardait rien** : le refus traverse
-le *même* handler, donc la mutation gonflait les deux branches ensemble et restait verte à 1,2. Un
-étalon pris à l'intérieur de ce qu'il mesure annule exactement ce qu'il devait voir. Il n'a été
-découvert que par la mutation.
+Les deux défauts n'ont été vus que parce qu'on a muté, et le second, que parce qu'une revue a relu le
+code de la mesure :
 
-Ce que le budget de soixante attrape, mesuré et non déduit : **39,7 à +5 ms (vert), 66,3 à +10 ms
-(rouge), 86,9 à +30 ms (rouge)**. Sur une route à trois millisecondes, il mord à partir d'un facteur
-trois — bien avant le facteur dix que step-023 nomme.
+1. **Le premier étalon était `/api/auth/me` sans cookie** : le refus traverse le *même* handler, donc
+   la mutation gonflait les deux branches ensemble et restait verte à 1,2. Un étalon pris à
+   l'intérieur de ce qu'il mesure annule ce qu'il devait voir.
+2. **La sonde était appelée par un `browser.Get` qui fermait son corps sans le lire.** `net/http` ne
+   rend alors pas la connexion au pool : elle repayait une poignée de main à chaque tour quand la
+   session réutilisait la sienne. L'étalon mesurait le socle **plus** un établissement de connexion,
+   ce que son commentaire ne disait pas. Les deux branches remises sur le même chemin, le rapport des
+   temps totaux est tombé de 15–19 à **1,2–1,6** : l'écart que le budget de soixante croyait garder
+   était surtout celui des deux chemins de harnais. Et la mutation cessait d'être monotone — +3 ms
+   rouge, +5 ms vert.
+
+Ce qui est jugé est donc le **surcoût** — `(session − sonde) / sonde` —, ce que la route fait en plus
+du socle. Cinq passages sains : 0,25 · 0,26 · 0,33 · 0,38 · 0,46, pour un budget de 1,5. Muté, et
+monotone : **0,88 à +1 ms (vert), 1,57 à +2 ms (rouge), 2,62 à +5 ms, 4,83 à +10 ms**. Le travail
+propre de la route valant quatre dixièmes de milliseconde, le filet mord quand elle quadruple.
 
 ### DN-5 — Les deux bornes reviennent, chacune à ce que la mesure permet
 
@@ -190,6 +200,26 @@ Ce qui change est le symptôme. `internal/mfa/webauthn_test.go` exerce les deux 
 sans HTTP et sans binaire : s'il rougit avec les scénarios WebAuthn, la cause est la bibliothèque de
 test ; s'il reste vert pendant qu'ils rougissent, c'est le produit.
 
+### DN-8 — Le nettoyage ne jetait pas que ses propres bases
+
+Trouvé en revue le 11/09/2026, et prouvé plutôt que soupçonné : une base `storeXtestY_1` créée pour la
+mesure a été **supprimée** par le nettoyage d'ouverture. Deux causes se cumulaient, et la seconde est
+un commentaire qui mentait :
+
+- les candidates étaient retenues par `datname LIKE 'store_test_%'`, où `_` est un **joker** SQL —
+  `'storeXtestY_1' LIKE 'store_test_%'` rend vrai ;
+- `ownerPID` rendait zéro pour un nom d'une autre forme, et son commentaire promettait qu'un tel nom
+  n'était « jamais jeté ». Zéro, que nul processus ne porte, était lu comme « fini », donc jetable.
+
+La décision est devenue `Discardable`, fonction pure **fermée par défaut** : tout ce qu'elle ne
+reconnaît pas est gardé, et le tri se fait en Go sans joker SQL. Elle a son test parce qu'elle décide
+de ce qu'on détruit. Vérifié sur le livré : la même base étrangère, recréée, survit à une exécution
+complète de `internal/store`.
+
+**Ce que cette protection suppose, et que le harnais ne peut pas vérifier** : un seul hôte par
+serveur. Un PID n'a de sens que pour le noyau qui l'attribue, donc deux machines pointées sur le même
+PostgreSQL se jetteraient mutuellement des bases. C'est écrit là où la garde vit.
+
 ### DN-7 — Un serveur disparu faisait pendre la suite, et non rougir
 
 Rencontré pendant la step, le 10/09/2026 : le PostgreSQL du `docker compose` a disparu sous une suite
@@ -209,12 +239,16 @@ retirée, sur une adresse qui absorbe les paquets : **plus de 300 s sans rougir 
 
 | Mutation | Attendu | Observé |
 |---|---|---|
-| `time.Sleep(5ms)` dans le handler `Me` | vert (sous le budget) | vert, rapport 39,7 |
-| `time.Sleep(10ms)` dans le handler `Me` | **rouge** | rouge, rapport 66,3 |
-| `time.Sleep(30ms)` dans le handler `Me` | **rouge** | rouge, rapport 86,9 |
+| `time.Sleep(1ms)` dans le handler `Me` | vert (sous le budget) | vert, surcoût 0,88 |
+| `time.Sleep(2ms)` dans le handler `Me` | **rouge** | rouge, surcoût 1,57 |
+| `time.Sleep(5ms)` dans le handler `Me` | **rouge** | rouge, surcoût 2,62 |
+| `time.Sleep(10ms)` dans le handler `Me` | **rouge** | rouge, surcoût 4,83 |
+| La forme du nom relâchée dans `Discardable` | **rouge** | rouge, les trois cas de nom illisible |
+| Le préfixe non comparé dans `Discardable` | **rouge** | rouge, « une base d'une autre suite du module » |
 | Le harnais WebAuthn signe pour une autre origine | **rouge**, cause nommée | rouge, « Error validating origin » |
 | La réponse d'attestation abîmée d'un octet | **rouge**, cause nommée | rouge, « Parse error for Registration » |
-| L'étalon du filet pris sur la route mesurée *(état initial du code)* | rouge attendu | **vert à 1,2** — le défaut du filet, corrigé |
+| L'étalon du filet pris sur la route mesurée *(première rédaction)* | rouge attendu | **vert à 1,2** — défaut corrigé |
+| La sonde mesurée par un autre chemin que la session *(deuxième rédaction)* | monotone attendu | **non monotone** — +3 ms rouge, +5 ms vert ; défaut corrigé |
 | `RequireReachable` retirée, serveur qui absorbe les paquets | **rouge** | **> 300 s sans rougir**, malgré `-timeout 150s` ; 32 s avec la garde |
 
 ## Ce qui n'est pas testé, et pourquoi
@@ -224,7 +258,7 @@ retirée, sur une adresse qui absorbe les paquets : **plus de 300 s sans rougir 
   corrige le défaut observé » mais « le mécanisme qui pouvait le produire n'est plus là où il vivait ».
   Une DoD qui n'accepterait pas cette phrase fabriquerait un test de complaisance.
 - **Le nettoyage des bases n'a aucun test.** Il n'affirme rien du produit, et son échec ne doit pas
-  faire rougir une suite ; ce qui le garde est l'avertissement sur stderr et le compte mesuré à 174.
+  faire rougir une suite ; ce qui le garde est l'avertissement sur stderr et le compte mesuré à 175.
 - **Les trois exécutions locales ont bien été refaites sur l'état final**, vertes, avec le compte de
   bases stable à 175. La série intermédiaire qui avait échoué ne disait rien du livré : le Docker du
   poste tombait — c'est elle qui a révélé DN-7 —, et le premier passage d'après butait sur des
@@ -233,7 +267,10 @@ retirée, sur une adresse qui absorbe les paquets : **plus de 300 s sans rougir 
   mais aucun des deux n'a été supposé tel : les deux ont été lus avant d'être écartés.
 - **Aucune porte ne rougit si les deux bornes remontent**, ce qui reste vrai et vérifié : une borne
   haute ne se distingue d'une borne juste que sous une charge qu'aucune porte ne fabrique. Ce qui les
-  garde est la mesure écrite au-dessus de chacune, à refaire quand le harnais change.
+  garde est la mesure écrite au-dessus de chacune, à refaire quand le harnais change. Une revue a
+  demandé si les 5 s tenaient aussi en **mode repli**, où trois conteneurs démarrent de front comme au
+  03/08/2026 : vérifié plutôt qu'argumenté, `go test -race -count=1 ./...` sans la variable rend les
+  quatorze paquets verts.
 
 ## Definition of Done
 - [x] `make check` vert, **et la suite Go lancée trois fois de suite sans rougir**

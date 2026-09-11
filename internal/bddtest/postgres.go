@@ -21,9 +21,10 @@ import (
 const EnvAdminDSN = "DASHBOARD_TEST_DATABASE_URL"
 
 // discardTimeout borne le nettoyage d'ouverture. Deux minutes plutôt que trente secondes, mesuré
-// plutôt que choisi : jeter cent quatre-vingt-quinze bases en prend douze quand la suite est seule,
-// et davantage quand les trois paquets à base démarrent ensemble sous `go test ./...`. Rien ne pend
-// ici — les bases visées n'appartiennent qu'à des processus finis.
+// plutôt que choisi — le 10/09/2026, sur ce poste : jeter cent quatre-vingt-quinze bases en prend
+// douze quand la suite est seule, et davantage quand les trois paquets à base démarrent ensemble sous
+// `go test ./...`, où trente secondes ne suffisaient plus. Rien ne pend ici : les bases visées
+// n'appartiennent qu'à des processus finis.
 const discardTimeout = 2 * time.Minute
 
 // SharedAdminDSN rend le PostgreSQL que l'environnement désigne, et `false` quand il n'en désigne
@@ -96,7 +97,8 @@ func DatabaseName(prefix string) string {
 var databaseCounter atomic.Uint64
 
 // DiscardStaleDatabases jette, **au démarrage** d'une suite, les bases que des exécutions finies ont
-// laissées sous ce préfixe. Elle s'appelle juste après [AdminDSN].
+// laissées sous ce préfixe. Elle s'appelle juste après [SharedAdminDSN], au moment où la suite
+// vient d'obtenir son serveur.
 //
 // Un conteneur jetable emportait tout en mourant ; un serveur fourni par l'environnement, lui, garde
 // ce qu'on y taille — `internal/store` en produit plus de quatre-vingt-dix par exécution.
@@ -107,6 +109,12 @@ var databaseCounter atomic.Uint64
 // secondes à un paquet qui en dure seize. Au démarrage, plus aucun processus ne les tient.
 //
 // Le PID protège un run concurrent : une base dont le processus vit encore n'est pas à nous.
+//
+// **Cette protection suppose un seul hôte par serveur**, et le harnais ne peut pas le vérifier : un
+// PID n'a de sens que pour le noyau qui l'attribue. Deux machines — ou deux conteneurs de
+// développement — pointées sur le même PostgreSQL verraient chacune les PID de l'autre comme finis,
+// et se jetteraient mutuellement des bases sous les pieds, `WITH (FORCE)` compris. Le serveur de test
+// est prévu pour un poste ou pour un job de CI, jamais pour être partagé entre les deux.
 //
 // L'échec ne fait pas rougir — la suite qui commence n'en dépend pas, et l'exécution suivante
 // réessaiera.

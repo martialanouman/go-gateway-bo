@@ -906,7 +906,8 @@ moins : un scénario qui se lit juste inspire une confiance que rien n'a encore 
   `tool`, un `sqlc.yaml` et une cinquième entrée dans `$(GENERATED)` ; il introduirait un **second
   analyseur SQL** devant avaler `uuidv7()`, la table partitionnée et le bloc PL/pgSQL — le mode
   d'échec que `internal/store/permissions_catalog_test.go` a précisément corrigé ; et ce que `pgx` nu
-  coûte est déjà payé, chaque requête étant exercée contre un PostgreSQL 18 réel par testcontainers.
+  coûte est déjà payé, chaque requête étant exercée contre un PostgreSQL 18 réel — celui que
+  `DASHBOARD_TEST_DATABASE_URL` désigne, ou un conteneur testcontainers à défaut (step-032).
   **Réexaminé en step-025, et confirmé.** Les deux déclencheurs alors nommés — « au-delà d'une
   vingtaine de requêtes », « une requête à plus de cinq ou six colonnes » — avaient tous deux tiré, le
   second dès step-024 : 29 littéraux SQL nommés, et un `Scan` à dix colonnes dans

@@ -60,7 +60,7 @@ func TestNoProductionPackageReachesTheHarness(t *testing.T) {
 
 // Le témoin positif. Sans lui, la garde ci-dessus serait verte pour la pire des raisons — un
 // chargement qui ne rend rien, un motif qui ne désigne aucun paquet, un chemin d'import mal écrit — et
-// personne ne le saurait. Le même parcours, sur les mêmes motifs, **doit** retrouver les quatre
+// personne ne le saurait. Le même parcours, sur les mêmes motifs, **doit** retrouver les cinq
 // paquets nommés dès qu'on lui demande aussi les fichiers de test.
 func TestTheSameWalkSeesTheHarnessWhenTestFilesAreIncluded(t *testing.T) {
 	var reaching []string

@@ -279,8 +279,9 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 //
 // Huit secondes, et le chiffre vient d'une mesure et non d'un arbitrage : la requête la plus lente de
 // toute la suite est `POST /auth/mfa/totp/enroll`, qui hache dix codes de récupération en argon2id.
-// Relevée le 09/09/2026 sur le runner de la CI, une fois le PostgreSQL fourni par le job : **3,16 s**
-// — 311 ms sur un M4 Pro. La borne laisse donc deux fois et demie le pire relevé.
+// Relevée le 09/09/2026 par une sonde temporaire du job « Tests Go », une fois le PostgreSQL fourni
+// par celui-ci : **3,16 s** — et 311 ms le même jour sur un M4 Pro, suite entière en parallèle. La
+// borne laisse donc deux fois et demie le pire relevé.
 //
 // **Les deux secondes d'origine ne peuvent pas revenir, et c'est mesuré plutôt que supposé** : elles
 // tomberaient sous les 3,16 s de l'enrôlement, sur une suite verte. Ce que la borne doit attraper est
@@ -445,12 +446,24 @@ func (p *process) startAndServe() error {
 // n'est plus vraie du monde d'aujourd'hui : le 03/08/2026, sous un `go test -race ./...`, le binaire
 // n'avait rien écrit au bout de cinq secondes pendant que dix paquets compilaient — et que trois
 // conteneurs PostgreSQL démarraient de front, ce que step-032 a supprimé. Relevé le 09/09/2026 sur
-// le même arbre : le démarrage le plus lent de toute la suite est de **295 ms** sur le runner de la
-// CI, 504 ms sur un M4 Pro. La borne laisse dix fois le pire relevé.
+// le même arbre, par la même sonde : le démarrage le plus lent de toute la suite est de **295 ms** sur
+// le runner de la CI, et de 504 ms sur un M4 Pro — le poste est ici le plus lent des deux, ses
+// quatorze cœurs compilant et exécutant les quatorze paquets de front quand le runner en fait moins
+// à la fois. C'est donc sur les 504 ms que la borne laisse dix fois le pire relevé.
+//
+// *(Le 504 ms d'un texte antérieur désignait tout autre chose — l'enrôlement TOTP sur deux cœurs, le
+// 19/08/2026. La coïncidence des deux nombres est fortuite, et elle est notée ici pour qu'on ne
+// relise pas l'un pour l'autre.)*
 //
 // Ce que trente secondes coûtaient n'était pas l'attente mais le diagnostic : sur le job en échec de
 // la PR 52, où le PostgreSQL de la suite refusait les connexions, **chaque scénario a attendu ses
 // trente secondes pour rien** avant de rendre le même message.
+//
+// **Les deux modes ont été mesurés**, et pas seulement celui de la CI : une revue a fait remarquer
+// que le repli — sans `DASHBOARD_TEST_DATABASE_URL`, chaque suite montant son conteneur — reproduit
+// exactement la charge du 03/08/2026 qui avait fait élargir cette borne. Vérifié le 11/09/2026 plutôt
+// qu'argumenté : `go test -race -count=1 ./...` sans la variable, donc à trois conteneurs, rend les
+// quatorze paquets verts avec les 5 s.
 //
 // Aucun test ne rougit si cette valeur remonte à 30 s, ce qui reste vrai et vérifié : une borne
 // haute ne se distingue d'une borne juste que sous une charge qu'aucune porte ne fabrique. Ce qui la

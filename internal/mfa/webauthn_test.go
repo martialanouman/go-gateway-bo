@@ -11,7 +11,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// Ce test-ci existe pour **nommer une cause**, et c'est sa seule raison d'être : les onze scénarios
+// Ce test-ci existe pour **nommer une cause**, et c'est sa seule raison d'être : les scénarios
 // de `cmd/dashboard` exercent déjà les deux cérémonies, mieux et plus loin que lui.
 //
 // La dette qu'il paie est écrite en DN-12 de step-024 : `descope/virtualwebauthn` déclare
