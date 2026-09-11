@@ -57,6 +57,32 @@ jobs:
     permissions:
       contents: read
       packages: read
+    # Le PostgreSQL des suites est **fourni par le job**, et n'est plus monté trois fois par
+    # testcontainers depuis les tests eux-mêmes — step-032. Ce que ce bloc supprime n'est pas une
+    # lenteur mais une classe entière de pannes : trois conteneurs qui démarrent de front sur quatre
+    # cœurs, un port éphémère par paquet, et le reaper de testcontainers entre eux. Le journal du job
+    # en échec de la PR 52 nommait le symptôme — `connection refused` sur le port du conteneur, dès
+    # la première base d'un paquet.
+    #
+    # Sans la variable, l'`adminDSN` de chaque suite remonte un conteneur : un poste sans compose
+    # garde le comportement d'avant, et rien ne se saute dans aucun des deux cas.
+    env:
+      DASHBOARD_TEST_DATABASE_URL: postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable
+    # Image, identifiants et healthcheck de `docker-compose.yml`, comme les deux autres jobs.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: dashboard
+          POSTGRES_PASSWORD: dashboard
+          POSTGRES_DB: dashboard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dashboard -d dashboard"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

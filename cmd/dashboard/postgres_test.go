@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"sync/atomic"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
+	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -23,18 +23,9 @@ import (
 // « retirer la garde » deviendrait indistinguable de la configuration normale des scénarios.
 //
 // Rien ne se saute ici non plus : pas de `t.Skip`, pas de `SkipIfProviderIsNotHealthy`. Un skip est
-// vert, et une suite verte qui n'a rien exercé est ce que ce dépôt refuse.
-//
-// L'image suit `docker-compose.yml` et `internal/store` : PostgreSQL **18**, où `uuidv7()` est
-// natif — sur une image plus ancienne, les migrations échouent.
-const postgresImage = "postgres:18-alpine"
-
-const (
-	postgresUser     = "dashboard"
-	postgresPassword = "dashboard"
-	//nolint:gosec // G101 : identifiants d'un conteneur jetable lié à un port éphémère local.
-	postgresAdminDatabase = "dashboard"
-)
+// vert, et une suite verte qui n'a rien exercé est ce que ce dépôt refuse. Le serveur, son image et
+// ce refus vivent dans l'`adminDSN` du bas de ce fichier ; `bddtest` ne porte que la variable qui
+// désigne un serveur partagé, et le contrôle de sa joignabilité.
 
 // suiteDSN désigne la base d'administration du conteneur de la suite ; migratedSuiteDSN désigne une
 // base à jour, celle avec laquelle démarrent les scénarios qui n'ont rien à dire du schéma. Toutes
@@ -46,34 +37,26 @@ var suiteDSN, migratedSuiteDSN string
 // et le scénario affirmerait alors une version que le message ne porte plus.
 var suiteSchemaVersion int64
 
-// startPostgres monte le conteneur de la suite et taille la base à jour que la configuration
-// complète désigne. Elle rend la fonction qui jette le conteneur.
+// startPostgres ouvre le PostgreSQL de la suite et taille la base à jour que la configuration
+// complète désigne. Elle rend la fonction qui jette le conteneur, quand c'est elle qui l'a monté.
+//
+// **Elle ne jette aucune base, et c'est délibéré** : sur un serveur fourni, celles du run sont
+// laissées derrière et jetées à l'ouverture du run suivant, par `bddtest.DiscardStaleDatabases`. À la
+// fermeture, les pools que les cas n'ont pas fermés les retiennent encore.
 func startPostgres(ctx context.Context) (func(), error) {
-	container, err := postgres.Run(ctx, postgresImage,
-		postgres.WithDatabase(postgresAdminDatabase),
-		postgres.WithUsername(postgresUser),
-		postgres.WithPassword(postgresPassword),
-		postgres.BasicWaitStrategies(),
-	)
-	// Armé avant le contrôle d'erreur : `postgres.Run` rend un conteneur **non nil** même en échec
-	// quand il a été créé puis n'a pas démarré, et celui-là resterait à traîner.
-	terminate := func() { _ = testcontainers.TerminateContainer(container) }
-
+	dsn, release, err := adminDSN(ctx)
 	if err != nil {
-		return terminate, fmt.Errorf("démarrer PostgreSQL de test : %w\n\n"+
-			"Ces scénarios lancent le binaire, qui contrôle la version du schéma au démarrage : ils "+
-			"exigent un Docker joignable et ne se sautent pas", err)
+		return release, fmt.Errorf("ces scénarios lancent le binaire, qui contrôle la version du "+
+			"schéma au démarrage : %w", err)
 	}
 
-	// `sslmode=disable` : le conteneur ne présente pas de certificat, et pgx tenterait TLS d'abord.
-	suiteDSN, err = container.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		return terminate, fmt.Errorf("lire le DSN de PostgreSQL de test : %w", err)
-	}
+	suiteDSN = dsn
+
+	bddtest.DiscardStaleDatabases(ctx, suiteDSN, "dashboard")
 
 	migratedSuiteDSN, err = migratedDatabase(ctx)
 	if err != nil {
-		return terminate, err
+		return release, err
 	}
 
 	// Relevée **ici et nulle part ailleurs**, sur une base déjà migrée. La version précédente
@@ -81,15 +64,15 @@ func startPostgres(ctx context.Context) (func(), error) {
 	// aujourd'hui, godog exécutant en séquence, mais une écriture non synchronisée qui aurait viré au
 	// rouge sous `-race` le jour où quelqu'un pose `Concurrency`.
 	if suiteSchemaVersion, err = appliedSchemaVersion(ctx, migratedSuiteDSN); err != nil {
-		return terminate, err
+		return release, err
 	}
 
 	if suiteSchemaVersion == 0 {
-		return terminate, fmt.Errorf("les migrations n'ont pas relevé de version : le scénario du " +
+		return release, fmt.Errorf("les migrations n'ont pas relevé de version : le scénario du " +
 			"schéma en retard comparerait à zéro")
 	}
 
-	return terminate, nil
+	return release, nil
 }
 
 // appliedSchemaVersion lit la version que la base porte, sans passer par le produit : ce que le
@@ -112,12 +95,10 @@ func appliedSchemaVersion(ctx context.Context, dsn string) (int64, error) {
 	return version, nil
 }
 
-var databaseCounter atomic.Uint64
-
 // freshDatabase taille une base **vierge** : aucune migration n'y a été jouée, donc son schéma est
 // en version 0. C'est le cas de l'installation qu'on a oublié de migrer.
 func freshDatabase(ctx context.Context) (string, error) {
-	name := fmt.Sprintf("dashboard_test_%d", databaseCounter.Add(1))
+	name := bddtest.DatabaseName("dashboard")
 
 	admin, err := pgx.Connect(ctx, suiteDSN)
 	if err != nil {
@@ -197,4 +178,49 @@ func databaseDSN(database string) (string, error) {
 	parsed.Path = "/" + database
 
 	return parsed.String(), nil
+}
+
+// L'image suit `docker-compose.yml` et les services de la CI : PostgreSQL **18**, où `uuidv7()` est
+// natif — `audit_log.id` en a fait son défaut, et les migrations échouent sur plus ancien.
+const postgresImage = "postgres:18-alpine"
+
+const (
+	postgresUser     = "dashboard"
+	postgresPassword = "dashboard"
+	//nolint:gosec // G101 : identifiants d'un conteneur jetable lié à un port éphémère local.
+	postgresAdminDatabase = "dashboard"
+)
+
+// adminDSN rend le serveur partagé que l'environnement désigne, ou monte le conteneur de cette
+// suite, avec la fonction qui rend ce qui a été pris.
+func adminDSN(ctx context.Context) (string, func(), error) {
+	if shared, ok := bddtest.SharedAdminDSN(); ok {
+		// Contrôlé avant de s'en servir : sans cela, un serveur disparu fait **pendre** la suite au
+		// lieu de la faire rougir.
+		return shared, func() {}, bddtest.RequireReachable(ctx, shared)
+	}
+
+	container, err := postgres.Run(ctx, postgresImage,
+		postgres.WithDatabase(postgresAdminDatabase),
+		postgres.WithUsername(postgresUser),
+		postgres.WithPassword(postgresPassword),
+		postgres.BasicWaitStrategies(),
+	)
+	// Armé avant le contrôle d'erreur : `postgres.Run` rend un conteneur **non nil** même en échec
+	// quand il a été créé puis n'a pas démarré, et celui-là resterait à traîner.
+	release := func() { _ = testcontainers.TerminateContainer(container) }
+
+	if err != nil {
+		return "", release, fmt.Errorf("démarrer PostgreSQL de test : %w\n\n"+
+			"Rien ne se saute ici : soit un Docker joignable, soit un serveur désigné par %s",
+			err, bddtest.EnvAdminDSN)
+	}
+
+	// `sslmode=disable` : le conteneur ne présente pas de certificat, et pgx tenterait TLS d'abord.
+	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		return "", release, fmt.Errorf("lire le DSN de PostgreSQL de test : %w", err)
+	}
+
+	return dsn, release, nil
 }

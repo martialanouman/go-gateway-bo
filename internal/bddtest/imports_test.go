@@ -24,6 +24,7 @@ var productionPatterns = []string{"./cmd/...", "./internal/..."}
 // produit exactement cet effet. Mesuré : réduits à `./internal/bddtest/...`, les motifs laissaient la
 // garde ci-dessous verte sans plus rien garder, et l'ancien témoin vert avec elle.
 var harnessImporters = []string{
+	"github.com/martialanouman/go-gateway-bo/cmd/bootstrap",
 	"github.com/martialanouman/go-gateway-bo/cmd/dashboard",
 	"github.com/martialanouman/go-gateway-bo/cmd/migrate",
 	"github.com/martialanouman/go-gateway-bo/internal/gateway",
@@ -59,7 +60,7 @@ func TestNoProductionPackageReachesTheHarness(t *testing.T) {
 
 // Le témoin positif. Sans lui, la garde ci-dessus serait verte pour la pire des raisons — un
 // chargement qui ne rend rien, un motif qui ne désigne aucun paquet, un chemin d'import mal écrit — et
-// personne ne le saurait. Le même parcours, sur les mêmes motifs, **doit** retrouver les quatre
+// personne ne le saurait. Le même parcours, sur les mêmes motifs, **doit** retrouver les cinq
 // paquets nommés dès qu'on lui demande aussi les fichiers de test.
 func TestTheSameWalkSeesTheHarnessWhenTestFilesAreIncluded(t *testing.T) {
 	var reaching []string

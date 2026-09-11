@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"sync/atomic"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -14,6 +13,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
+	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -21,37 +21,23 @@ import (
 // façon d'observer ce que ce package produit : des partitions, un verrou de session, un pool de
 // connexions. Un double en mémoire ne dirait rien de tout cela.
 //
-// Rien ici ne se saute : ni `t.Skip()`, ni tag exclu, ni build tag. testcontainers propose bien
-// `SkipIfProviderIsNotHealthy`, et il n'est pas appelé — un skip est vert, et une suite verte qui
-// n'a rien exercé est exactement ce que le dépôt refuse. Un fournisseur qui ne rend pas de conteneur
-// fait **rouge** : vérifié le 02/08/2026 en pointant l'image sur un tag inexistant, la suite sort en
-// `FAIL` sur le message ci-dessous, sans qu'aucun test ne s'exécute.
+// Rien ici ne se saute : ni `t.Skip()`, ni tag exclu, ni build tag — un skip est vert, et une suite
+// verte qui n'a rien exercé est exactement ce que le dépôt refuse. L'image, les identifiants et le
+// message de refus vivent dans l'`adminDSN` du bas de ce fichier ; `bddtest` ne porte que la variable
+// qui désigne un serveur partagé, et le contrôle de sa joignabilité.
 //
-// Mesuré le même jour, et contraire à ce qu'on suppose spontanément : **`DOCKER_HOST` ne suffit pas
+// Mesuré le 02/08/2026, et contraire à ce qu'on suppose spontanément : **`DOCKER_HOST` ne suffit pas
 // à détourner testcontainers**. Posé sur une socket inexistante, il a été ignoré et la suite a
-// tourné contre le démon du contexte Docker courant (`orbstack`). C'est ce contexte qui décide ici,
-// pas la variable — donc rien à exporter sur un poste dont le contexte est déjà bon, runners
-// `ubuntu-latest` compris.
-//
-// L'image suit `docker-compose.yml` : PostgreSQL **18**, et pas seulement pour rester cohérent —
-// `audit_log.id` a pour défaut `uuidv7()`, fonction native introduite en 18. Sur une image plus
-// ancienne, les migrations échoueraient.
-const postgresImage = "postgres:18-alpine"
+// tourné contre le démon du contexte Docker courant (`orbstack`). C'est ce contexte qui décide du
+// repli, pas la variable — `DASHBOARD_TEST_DATABASE_URL`, elle, décide du serveur.
 
-const (
-	postgresUser     = "dashboard"
-	postgresPassword = "dashboard"
-	//nolint:gosec // G101 : identifiants d'un conteneur jetable lié à un port éphémère local.
-	postgresAdminDatabase = "dashboard"
-)
-
-// suiteDSN désigne la base d'administration du conteneur de la suite — celle depuis laquelle chaque
-// test taille la sienne. Elle est posée par TestMain avant tout test, et lue seulement ensuite.
+// suiteDSN désigne la base d'administration de la suite — celle depuis laquelle chaque test taille
+// la sienne. Elle est posée par TestMain avant tout test, et lue seulement ensuite.
 var suiteDSN string
 
-// **Un conteneur par suite** (DN-8), pas un par test : le démarrage coûte quelques secondes, la
-// création d'une base en coûte quelques millisecondes. L'amortissement *entre suites*
-// (`Snapshot`/`Restore`) appartient à step-007 et n'est pas ici.
+// **Un serveur par suite** (DN-8), pas un par test : la création d'une base coûte quelques
+// millisecondes, et depuis step-032 le serveur lui-même est partagé par tout le module quand
+// l'environnement en fournit un.
 func TestMain(m *testing.M) {
 	code, err := runSuite(m)
 	if err != nil {
@@ -65,35 +51,19 @@ func TestMain(m *testing.M) {
 func runSuite(m *testing.M) (int, error) {
 	ctx := context.Background()
 
-	container, err := postgres.Run(ctx, postgresImage,
-		postgres.WithDatabase(postgresAdminDatabase),
-		postgres.WithUsername(postgresUser),
-		postgres.WithPassword(postgresPassword),
-		postgres.BasicWaitStrategies(),
-	)
-	// Le `defer` est armé avant le contrôle d'erreur : `postgres.Run` rend un conteneur **non nil**
-	// même en échec quand il a été créé puis n'a pas démarré, et celui-là resterait à traîner.
-	defer func() { _ = testcontainers.TerminateContainer(container) }()
+	dsn, release, err := adminDSN(ctx)
+	defer release()
 
 	if err != nil {
-		return 0, fmt.Errorf("démarrer PostgreSQL de test : %w\n\n"+
-			"Cette suite exige un Docker joignable — elle ne se saute pas. Sur un poste : lancer "+
-			"Docker ou OrbStack, puis vérifier que `docker context show` désigne bien ce démon", err)
+		return 0, fmt.Errorf("cette suite observe un PostgreSQL réel : %w", err)
 	}
 
-	// `sslmode=disable` : le conteneur ne présente pas de certificat, et pgx tenterait TLS d'abord.
-	suiteDSN, err = container.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		return 0, fmt.Errorf("lire le DSN de PostgreSQL de test : %w", err)
-	}
+	suiteDSN = dsn
+
+	bddtest.DiscardStaleDatabases(ctx, suiteDSN, "store")
 
 	return m.Run(), nil
 }
-
-// databaseCounter nomme des bases distinctes. Le compteur est atomique parce que les tests de ce
-// package peuvent tourner en parallèle, et que deux `CREATE DATABASE` du même nom se marcheraient
-// dessus sous `-race` comme sans lui.
-var databaseCounter atomic.Uint64
 
 // freshDatabase taille une base **vierge** dans le conteneur de la suite et rend son DSN.
 //
@@ -145,7 +115,7 @@ func queryOn(t *testing.T, dsn, query string, into any, args ...any) {
 // createDatabase est la forme que les steps `godog` appellent : elles n'ont pas de `*testing.T` sous
 // la main, seulement un `context.Context` et une erreur à rendre.
 func createDatabase(ctx context.Context) (string, error) {
-	name := fmt.Sprintf("store_test_%d", databaseCounter.Add(1))
+	name := bddtest.DatabaseName("store")
 
 	admin, err := pgx.Connect(ctx, suiteDSN)
 	if err != nil {
@@ -175,4 +145,49 @@ func databaseDSN(database string) (string, error) {
 	parsed.Path = "/" + database
 
 	return parsed.String(), nil
+}
+
+// L'image suit `docker-compose.yml` et les services de la CI : PostgreSQL **18**, où `uuidv7()` est
+// natif — `audit_log.id` en a fait son défaut, et les migrations échouent sur plus ancien.
+const postgresImage = "postgres:18-alpine"
+
+const (
+	postgresUser     = "dashboard"
+	postgresPassword = "dashboard"
+	//nolint:gosec // G101 : identifiants d'un conteneur jetable lié à un port éphémère local.
+	postgresAdminDatabase = "dashboard"
+)
+
+// adminDSN rend le serveur partagé que l'environnement désigne, ou monte le conteneur de cette
+// suite, avec la fonction qui rend ce qui a été pris.
+func adminDSN(ctx context.Context) (string, func(), error) {
+	if shared, ok := bddtest.SharedAdminDSN(); ok {
+		// Contrôlé avant de s'en servir : sans cela, un serveur disparu fait **pendre** la suite au
+		// lieu de la faire rougir.
+		return shared, func() {}, bddtest.RequireReachable(ctx, shared)
+	}
+
+	container, err := postgres.Run(ctx, postgresImage,
+		postgres.WithDatabase(postgresAdminDatabase),
+		postgres.WithUsername(postgresUser),
+		postgres.WithPassword(postgresPassword),
+		postgres.BasicWaitStrategies(),
+	)
+	// Armé avant le contrôle d'erreur : `postgres.Run` rend un conteneur **non nil** même en échec
+	// quand il a été créé puis n'a pas démarré, et celui-là resterait à traîner.
+	release := func() { _ = testcontainers.TerminateContainer(container) }
+
+	if err != nil {
+		return "", release, fmt.Errorf("démarrer PostgreSQL de test : %w\n\n"+
+			"Rien ne se saute ici : soit un Docker joignable, soit un serveur désigné par %s",
+			err, bddtest.EnvAdminDSN)
+	}
+
+	// `sslmode=disable` : le conteneur ne présente pas de certificat, et pgx tenterait TLS d'abord.
+	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		return "", release, fmt.Errorf("lire le DSN de PostgreSQL de test : %w", err)
+	}
+
+	return dsn, release, nil
 }
