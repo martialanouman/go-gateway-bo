@@ -121,21 +121,27 @@ func DiscardStaleDatabases(ctx context.Context, adminDSN, prefix string) {
 
 	defer func() { _ = admin.Close(ctx) }()
 
-	rows, err := admin.Query(ctx,
-		"SELECT datname FROM pg_database WHERE datname LIKE $1", prefix+"_test_%")
+	// Toutes les bases, et le tri se fait en Go. Un `LIKE` aurait été plus court et plus faux : le
+	// caractère `_` y est un **joker**, si bien que `store_test_%` retenait aussi `storeXtestY_1`.
+	// Mesuré en revue le 11/09/2026, sur une base étrangère créée pour l'occasion : elle a été
+	// supprimée.
+	rows, err := admin.Query(ctx, "SELECT datname FROM pg_database")
 	if err != nil {
 		return
 	}
 
-	stale, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	existing, err := pgx.CollectRows(rows, pgx.RowTo[string])
 	if err != nil {
 		return
 	}
 
-	var failed int
+	var (
+		failed   int
+		firstErr error
+	)
 
-	for _, database := range stale {
-		if processAlive(ownerPID(database)) {
+	for _, database := range existing {
+		if !Discardable(database, prefix) {
 			continue
 		}
 
@@ -144,6 +150,12 @@ func DiscardStaleDatabases(ctx context.Context, adminDSN, prefix string) {
 		if _, err = admin.Exec(ctx,
 			fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", database)); err != nil {
 			failed++
+
+			// La **première**, et pas la dernière : une itération réussie après un échec remettrait
+			// `err` à nil, et le message annoncerait alors une panne sans cause.
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
 
@@ -151,24 +163,35 @@ func DiscardStaleDatabases(ctx context.Context, adminDSN, prefix string) {
 	// est ce qui a fait croire trois fois de suite qu'il avait eu lieu.
 	if failed > 0 {
 		fmt.Fprintf(os.Stderr, "harnais : %d base(s) %s_test_* n'ont pas été jetées : %v\n",
-			failed, prefix, err)
+			failed, prefix, firstErr)
 	}
 }
 
-// ownerPID relit le PID écrit par [DatabaseName]. Zéro pour un nom d'une autre forme — jamais jeté,
-// puisque le PID 0 n'existe pas.
-func ownerPID(database string) int {
-	parts := strings.Split(database, "_")
-	if len(parts) < 4 {
-		return 0
+// Discardable dit si cette base a été taillée par [DatabaseName] sous ce préfixe, **et** si le
+// processus qui l'a taillée est fini.
+//
+// C'est elle qui décide de ce qu'on détruit, donc elle est **fermée par défaut** : tout ce qu'elle ne
+// reconnaît pas est gardé. La version qu'une revue a corrigée le 11/09/2026 faisait l'inverse sans le
+// dire — son commentaire promettait qu'un nom d'une autre forme n'était « jamais jeté », quand un PID
+// illisible rendait zéro, que nul processus ne porte, donc « fini », donc jetable. Une base étrangère
+// créée pour la mesure a bien été supprimée.
+func Discardable(database, prefix string) bool {
+	suffix, ours := strings.CutPrefix(database, prefix+"_test_")
+	if !ours {
+		return false
 	}
 
-	pid, err := strconv.Atoi(parts[len(parts)-2])
-	if err != nil {
-		return 0
+	pid, _, wellFormed := strings.Cut(suffix, "_")
+	if !wellFormed {
+		return false
 	}
 
-	return pid
+	owner, err := strconv.Atoi(pid)
+	if err != nil || owner <= 0 {
+		return false
+	}
+
+	return !processAlive(owner)
 }
 
 // processAlive dit si un processus de ce PID tourne encore. Le signal 0 ne fait que poser la
