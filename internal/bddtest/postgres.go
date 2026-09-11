@@ -54,6 +54,34 @@ func SharedAdminDSN() (string, bool) {
 	return dsn, dsn != ""
 }
 
+// reachTimeout borne le contrôle d'ouverture. Trente secondes laissent le temps à un `docker compose
+// up` lancé dans la foulée d'achever son démarrage, sans transformer une absence en attente.
+const reachTimeout = 30 * time.Second
+
+// RequireReachable rend une erreur quand le serveur désigné ne répond pas, **avant** que la suite ne
+// s'en serve.
+//
+// Elle existe pour un mode d'échec que step-032 a créé et qu'elle a rencontré : le serveur du
+// `docker compose` a disparu sous une suite en cours, et les trois paquets ont **attendu plus de deux
+// heures** au lieu de rougir. Un conteneur absent, lui, faisait rouge en quelques secondes — la
+// variable avait donc troqué un refus lisible contre une suspension muette.
+//
+// Ce que `go test` arme ne suffit pas ici : sa borne interne ne l'est qu'à partir de `m.Run()`, et
+// tout ceci se passe avant, dans `TestMain`.
+func RequireReachable(ctx context.Context, dsn string) error {
+	ctx, cancel := context.WithTimeout(ctx, reachTimeout)
+	defer cancel()
+
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		return fmt.Errorf("le PostgreSQL de test ne répond pas : %w\n\n"+
+			"Il est désigné par %s. Sur un poste : `docker compose up -d postgres`, ou retirer la "+
+			"variable pour que la suite monte son propre conteneur", err, EnvAdminDSN)
+	}
+
+	return conn.Close(ctx)
+}
+
 // DatabaseName rend un nom de base propre à **cette exécution**, sous le préfixe de la suite.
 //
 // Le PID n'est pas décoratif, et le serveur partagé lui donne deux emplois. Il évite d'abord une

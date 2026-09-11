@@ -161,7 +161,9 @@ const (
 // suite, avec la fonction qui rend ce qui a été pris.
 func adminDSN(ctx context.Context) (string, func(), error) {
 	if shared, ok := bddtest.SharedAdminDSN(); ok {
-		return shared, func() {}, nil
+		// Contrôlé avant de s'en servir : sans cela, un serveur disparu fait **pendre** la suite au
+		// lieu de la faire rougir.
+		return shared, func() {}, bddtest.RequireReachable(ctx, shared)
 	}
 
 	container, err := postgres.Run(ctx, postgresImage,
