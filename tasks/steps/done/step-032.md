@@ -225,10 +225,12 @@ retirée, sur une adresse qui absorbe les paquets : **plus de 300 s sans rougir 
   Une DoD qui n'accepterait pas cette phrase fabriquerait un test de complaisance.
 - **Le nettoyage des bases n'a aucun test.** Il n'affirme rien du produit, et son échec ne doit pas
   faire rougir une suite ; ce qui le garde est l'avertissement sur stderr et le compte mesuré à 174.
-- **Les trois exécutions locales d'affilée n'ont pas été refaites sur l'état final** : le Docker de ce
-  poste a cessé de répondre pendant la dernière série, ce qui a précisément révélé DN-7. Trois
-  exécutions vertes ont été mesurées sur l'état d'avant les bornes courtes, avec le compte de bases
-  stable à 174 ; les trois exécutions de CI, elles, portent bien l'état final.
+- **Les trois exécutions locales ont bien été refaites sur l'état final**, vertes, avec le compte de
+  bases stable à 175. La série intermédiaire qui avait échoué ne disait rien du livré : le Docker du
+  poste tombait — c'est elle qui a révélé DN-7 —, et le premier passage d'après butait sur des
+  fixtures d'assets laissées par un run que j'avais tué au clavier, ce que le harnais nomme lui-même
+  avec son remède (`webassets_fixtures_test.go`). Aucun des deux n'était un défaut de cette step,
+  mais aucun des deux n'a été supposé tel : les deux ont été lus avant d'être écartés.
 - **Aucune porte ne rougit si les deux bornes remontent**, ce qui reste vrai et vérifié : une borne
   haute ne se distingue d'une borne juste que sous une charge qu'aucune porte ne fabrique. Ce qui les
   garde est la mesure écrite au-dessus de chacune, à refaire quand le harnais change.
