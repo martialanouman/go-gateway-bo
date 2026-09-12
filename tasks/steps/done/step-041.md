@@ -166,6 +166,31 @@ de référence est chargée à la demande. **Le premier écran qui les branchera
 le chunk d'entrée**, et c'est là que sa taille deviendra un sujet : la mesure est à refaire à ce
 moment-là, pas à supposer d'après celle-ci.
 
+### Ce que la revue a corrigé après coup
+
+Trois relecteurs en lecture seule, et **quinze constats confirmés en rejouant chaque mutation
+moi-même** plutôt qu'en les prenant au mot. Les quatre qui comptent :
+
+1. **L'anneau de focus n'était pas gardé — par le test écrit pour le garder.** Repeint en `--n-700`
+   (1,23:1 sur la page, invisible), les 214 tests, `vite build` **et le parcours Playwright**
+   restaient verts : le test de charte résolvait `--teal-500` en dur sous un titre qui parlait de
+   l'anneau, et l'assertion de bout en bout comptait les deux *couches* de l'ombre, jamais leur
+   couleur. C'est la forme exacte du piège connu — une mutation mal construite se lit comme un succès.
+2. **Le jeu de glyphes en portait 21, la charte en dessine 22.** `ellipsis-vertical` avait disparu
+   entre la lecture du kit et l'écriture du module, et le test qui devait l'attraper recopiait le
+   compte faux. Deux recopies de la même main, au même moment, ne font pas une vérification.
+3. **Une classe renommée dans le CSS seul laissait toute la suite verte.** Les quarante assertions de
+   classe relisaient la chaîne que le composant venait de construire, sans jamais traverser la
+   feuille. La porte qui croise les deux a trouvé au passage `ui-table__head`, qu'aucun relecteur
+   n'avait vue.
+4. **`error=''` fabriquait un champ invalide muet** — bordure rouge, `aria-invalid`, message vide
+   relié, aide effacée — sur `error={apiError ?? ''}`, le geste le plus naturel qui soit.
+
+S'y ajoutent des affirmations qui ne tenaient pas devant leur source : « la seule animation en boucle
+du système » (le spinner de cette step en est une), « les quatre autres primitives de saisie » (il y
+en a une), deux renvois par numéro de ligne périmés — dont l'un dans le paragraphe même qui
+expliquait qu'un numéro se périme.
+
 ### Ce qui n'est pas testé, et pourquoi
 
 - **Les deux dettes de forme de step-008.** Le trou de portée du plugin (`@media print { :root }`)

@@ -42,11 +42,11 @@ describe('StatusPill — link_status', () => {
     // La seule animation en boucle du système : le pouls de 1,8 s. Le poser sur un instantané
     // ferait mentir le seul signal de fraîcheur du produit.
     const snapshot = render(<StatusPill kind="link" state="up" />)
-    expect(snapshot.container.querySelector('.ui-dot--live')).toBeNull()
+    expect(snapshot.container.querySelector('.ui-dot')).not.toHaveClass('ui-dot--live')
     snapshot.unmount()
 
     const live = render(<StatusPill kind="link" state="up" live />)
-    expect(live.container.querySelector('.ui-dot--live')).not.toBeNull()
+    expect(live.container.querySelector('.ui-dot')).toHaveClass('ui-dot--live')
   })
 
   it('n’est une région live que lorsqu’elle est réellement en direct', () => {

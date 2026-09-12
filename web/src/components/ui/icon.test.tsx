@@ -73,11 +73,15 @@ describe('Dot', () => {
     // Le pouls est le seul signal de fraîcheur du produit : le poser sur un instantané le ferait
     // mentir. Le kit de la charte posait la classe sur le point alors que son CSS visait le parent,
     // si bien qu'un point isolé ne battait jamais — c'est ce défaut-là qui est fermé ici.
+    // **Sur le point lui-même**, et non « quelque part dans l'arbre » : `.ui-dot--live` porte
+    // l'animation, et un `querySelector` large laissait passer exactement le défaut que ce test
+    // raconte fermer — mesuré en déplaçant la classe sur une enveloppe, 19 tests verts et le pouls
+    // disparu.
     const snapshot = render(<Dot tone="up" />)
-    expect(snapshot.container.querySelector('.ui-dot--live')).toBeNull()
+    expect(snapshot.container.querySelector('.ui-dot')).not.toHaveClass('ui-dot--live')
     snapshot.unmount()
 
     const live = render(<Dot tone="up" live />)
-    expect(live.container.querySelector('.ui-dot--live')).not.toBeNull()
+    expect(live.container.querySelector('.ui-dot')).toHaveClass('ui-dot--live')
   })
 })

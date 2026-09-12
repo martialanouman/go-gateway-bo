@@ -1,5 +1,6 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { createAppRouter } from '~/router'
 
@@ -62,6 +63,24 @@ describe('la référence visuelle', () => {
     // Et pas une de plus qui ne soit annoncée : la liste ci-dessus est la page, pas un
     // échantillon d'elle.
     expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(sections.length)
+  })
+
+  it('rend un en-tête de tri réellement actionnable', async () => {
+    // **Ce que ce test ferme.** La page passait `sort` sans `onSortChange` : la table rendait alors
+    // ses en-têtes triables en **texte inerte**, et posait un `aria-sort` sur une colonne que rien
+    // ne rendait actionnable. La référence visuelle ne montrait donc jamais l'état le plus important
+    // d'un tableau, dans la page dont la docstring promet qu'on y lit « l'état exact d'un contrôle ».
+    await visitDesign()
+    const user = userEvent.setup()
+
+    const tri = screen.getByRole('button', { name: /Débit/ })
+    // La colonne triée s'annonce, et c'est la seule qui le fait.
+    expect(tri.closest('th')).toHaveAttribute('aria-sort', 'descending')
+
+    // Et le contrôle répond — la page est un spécimen, le tri n'a rien à trier, mais un en-tête qui
+    // ne se laisse pas activer n'est pas un en-tête triable.
+    await user.click(tri)
+    expect(tri).toBeInTheDocument()
   })
 
   it('rend une paire de contraste par ligne de la table que le test de charte vérifie', async () => {

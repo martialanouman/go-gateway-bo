@@ -234,12 +234,23 @@ describe('tokens de la charte', () => {
       'utf8',
     ).replace(/\/\*[\s\S]*?\*\//g, '')
 
+    // **Dans `:root`, et pas seulement « quelque part ».** La première rédaction cherchait le nom
+    // dans tout le fichier : mesuré en déplaçant les trois déclarations de `:root` vers
+    // `.ui-select__popup`, les 126 tests et `vite build` restaient verts — alors que l'indicateur
+    // d'onglets n'a plus aucun ancêtre qui les déclare. C'est le trou de portée que le plugin
+    // documente lui-même, reproduit dans le test censé le compenser.
+    const root = /:root\s*\{([^}]*)\}/.exec(components)?.[1]
+    expect(root, 'components.css ne déclare plus de bloc :root').toBeDefined()
+
     const declared = new Set(
-      [...components.matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name as string),
+      [...(root ?? '').matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name as string),
     )
 
     for (const name of RUNTIME_VARIABLES) {
-      expect(declared, `${name} n'a pas de repli : le premier rendu le lira vide`).toContain(name)
+      expect(
+        declared,
+        `${name} n'est pas déclarée dans :root : ses consommateurs la liront vide`,
+      ).toContain(name)
     }
   })
 

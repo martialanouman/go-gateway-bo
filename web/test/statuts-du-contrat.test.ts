@@ -74,17 +74,33 @@ describe('les statuts peints suivent le contrat', () => {
 
   it('le statut d’un client ou d’un compte SMPP : les mêmes valeurs', () => {
     // `Customer.status` et `SmppAccount.status` n'ont pas de schéma nommé : ils déclarent leur
-    // énumération sur place. Elle est écrite plusieurs fois dans le contrat, et ces occurrences
-    // doivent rester identiques entre elles — sans quoi « le statut d'une entité » ne voudrait rien
-    // dire et cette primitive en peindrait deux vocabulaires sous un seul nom.
-    const occurrences = [
-      ...contract.matchAll(/status: *\{ *type: string, enum: *\[(active[^\]]*)\]/g),
-    ].map(([, values]) => (values as string).split(',').map((value) => value.trim()))
+    // énumération sur place. On les ancre donc par **nom de schéma**, et le cardinal est fixé.
+    //
+    // **La première rédaction filtrait les occurrences sur `includes('suspended')`** — c'est-à-dire
+    // sur le contenu de ce qu'elle jugeait. Mesuré : renommer une seule des quatre en
+    // `[active, paused, closed]` la faisait sortir de l'échantillon au lieu de rougir, et les cinq
+    // tests restaient verts. `<StatusPill kind="entity" state="paused" />` aurait alors peint un
+    // client au gris, exactement le mode d'échec que ce fichier existe pour fermer. Une porte dont
+    // les cas viennent de la donnée qu'elle garde ne voit pas sa dérive.
+    const PORTEURS = ['Customer', 'CustomerUpdate', 'SmppAccount', 'SmppAccountUpdate'] as const
 
-    const entity = occurrences.filter((values) => values.includes('suspended'))
-    expect(entity.length).toBeGreaterThan(0)
-    for (const values of entity) {
-      expect(values.sort()).toEqual(Object.keys(ENTITY_TONES).sort())
+    const attendu = Object.keys(ENTITY_TONES).sort()
+
+    for (const schema of PORTEURS) {
+      // Le bloc du schéma : de sa déclaration au premier schéma suivant, au même niveau.
+      const bloc = new RegExp(`^    ${schema}:$([\\s\\S]*?)(?=^    [A-Z])`, 'm').exec(contract)?.[1]
+      expect(bloc, `${schema} a disparu du contrat`).toBeDefined()
+
+      const declaration = /status: *\{ *type: string, enum: *\[([^\]]*)\]/.exec(bloc ?? '')?.[1]
+      expect(declaration, `${schema} ne déclare plus de statut sur place`).toBeDefined()
+
+      expect(
+        (declaration ?? '')
+          .split(',')
+          .map((value) => value.trim())
+          .sort(),
+        `${schema} ne porte plus le même vocabulaire que les autres entités`,
+      ).toEqual(attendu)
     }
   })
 })

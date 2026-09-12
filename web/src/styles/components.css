@@ -249,7 +249,8 @@
  * l'écran pendant que la sémantique dirait l'inverse.
  *
  * `content: '*' / ''` donne au pseudo-élément un texte de remplacement **vide** : la marque est
- * peinte sans être annoncée. `required` sur le contrôle porte déjà l'information pour les
+ * peinte sans être annoncée. Le ` / ''` est la moitié qui compte, et le parcours l'assertit
+ * littéralement — une assertion qui cherchait seulement l'astérisque laissait passer sa disparition. `required` sur le contrôle porte déjà l'information pour les
  * technologies d'assistance, et entendre « étoile » n'aide personne.
  */
 .ui-field:has(.ui-input:required) .ui-field__label::after {

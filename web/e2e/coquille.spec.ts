@@ -118,7 +118,11 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
     .locator('.ui-field:has(.ui-input:required) .ui-field__label')
     .first()
     .evaluate((element) => getComputedStyle(element, '::after').content)
-  expect(required, 'le champ requis ne porte pas sa marque').toContain('*')
+  // `'"*" / ""'` et non `toContain('*')` : c'est le ` / ""` — le texte de remplacement **vide** —
+  // qui empêche le lecteur d'écran d'annoncer « étoile » sur chaque libellé de champ requis. Mesuré
+  // en le retirant : `toContain('*')` passait, et le commentaire du CSS affirmait le contraire de ce
+  // que le parcours mesurait.
+  expect(required, "le champ requis ne porte pas sa marque, ou l'annonce").toBe('"*" / ""')
 
   // **Les deux formes de statut ne se confondent pas**, et c'est la règle la plus stricte du
   // système : un disjoncteur ouvert sur un lien vivant et un bind mort demandent des actions
