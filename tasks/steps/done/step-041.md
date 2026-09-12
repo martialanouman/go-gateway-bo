@@ -1,6 +1,6 @@
 # step-041 — Primitives lot 1 : bouton, champ, select, pilule de statut, tabs, table
 
-> **Jalon :** M2 (§4.2, `plan.md` §7) · **Statut :** À FAIRE
+> **Jalon :** M2 (§4.2, `plan.md` §7) · **Statut :** FAIT
 > **Dépend de :** step-008 · **Bloque :** step-042, step-040, step-027
 >
 > *Elle ouvre M2 dans l'ordre d'exécution — `041 → 042 → 040` —, et c'est à ce titre qu'elle porte une
@@ -42,7 +42,8 @@ personne. Les trois figurent au registre de `todo.md`.*
   **numérateur** est périmé, et il ne se lit pas dans le contrat : il se lit dans `go-gateway`. Aucune
   primitive de cette step ne touche une opération du contrat ; la tâche est documentaire et lui échoit
   par sa position. Elle tranche du même coup la contradiction de la source : §16 compte 62 opérations
-  manquantes, `plan.md:877` en écrit 63.
+  manquantes, §18 en écrit 63. *(La fiche renvoyait à `plan.md:877` ; la ligne est `:879`. Un renvoi
+  par numéro se périme au premier paragraphe inséré — d'où le renvoi par section.)*
 
 - **Le raccourci `font:` défait `font-variant-numeric`, et cette step livre la table.** step-008 :
   « les `tabular-nums` que `base.css` pose sur `body` sont défaits partout où un rôle typographique
@@ -96,14 +97,82 @@ personne. Les trois figurent au registre de `todo.md`.*
 - Pour les deux dettes de forme : ce que la mesure rend, et le constat écrit là où elle ne rend rien.
 
 ## Definition of Done
-- [ ] `make check` vert
-- [ ] clavier et libellés accessibles (WCAG 2.1 AA) sur chaque primitive livrée
-- [ ] le décompte du contrat est relevé **dans `go-gateway`**, le tableau de `plan.md` §16 corrigé, et
-      l'écart 62/63 avec `plan.md:877` tranché — mesuré, pas recopié
-- [ ] la mutation « retirer l'anneau de focus d'une primitive » fait rougir
-- [ ] la mutation « dériver `breaker_state` de `link_status` » fait rougir
-- [ ] `vite build` passe **sans** liste d'exemptions ajoutée au plugin de tokens
-- [ ] `components.css` figure dans `STYLED_FILES`, vérifié en l'en retirant — ce qui doit faire rougir
+- [x] `make check` vert
+- [x] clavier et libellés accessibles (WCAG 2.1 AA) sur chaque primitive livrée
+- [x] le décompte du contrat est relevé **dans `go-gateway`**, le tableau de `plan.md` §16 corrigé, et
+      l'écart 62/63 tranché — mesuré, pas recopié
+- [x] la mutation « retirer l'anneau de focus d'une primitive » fait rougir
+- [x] la mutation « dériver `breaker_state` de `link_status` » fait rougir
+- [x] `vite build` passe **sans** liste d'exemptions ajoutée au plugin de tokens
+- [x] `components.css` figure dans `STYLED_FILES`, vérifié en l'en retirant — ce qui doit faire rougir
+
+## Ce que la step a mesuré, et ce que la mesure a changé
+
+### Le décompte : 71/133 → **103/133**, et quatre lignes du tableau §16 étaient fausses
+
+L'amont avait avancé de **32 opérations** depuis le 27/07. Il en reste **30** non implémentées, pas
+62 ni 63 : les deux chiffres de la source étaient faux, et leur contradiction s'éteint avec eux.
+
+La mesure est refaisable : le routage de `go-gateway` est déclaratif — huma v2 sur chi, une opération
+= un `huma.Operation{OperationID}` dans `internal/adminapi/`. Croiser les `OperationID` des fichiers
+non-test avec les `operationId` du YAML **est** la mesure. Aucun des 103 n'est une souche.
+
+**Ce que ça change pour le plan, et qui dépasse la correction d'un chiffre** : `M2` et `M5` cessent
+d'être des jalons développés sur mock — les trois flux du hub WebSocket et les trois opérations du
+CDR Explorer sont livrées —, et `M8` fond à la seule politique de contenu, les 17 opérations de
+facturation (17, pas 13) et `gdpr-erase` étant livrées.
+
+*Écart consigné et non corrigé : le BO consomme le contrat **4.0.2** quand la source publie **4.2.0**.
+Aucune primitive ne touche une opération, et `CLAUDE.md` interdit de bumper au milieu d'une step.*
+
+### Les mutations : trois ont rougi d'emblée, une était verte
+
+| Mutation | Résultat |
+|---|---|
+| Retirer l'anneau de focus (`:focus-visible` de `base.css`) | **214 tests Vitest verts, `vite build` rc=0.** Seul le parcours Playwright rougit — le même défaut que step-008 avait mesuré à 137 tests, et la raison d'être de l'extension du parcours. |
+| Dériver `breaker_state` de `link_status` | Rouge, 3 tests. |
+| Retirer le repli `:root` d'`--anchor-width` | `vite build` rc=1 (« 1 token consommé sans être déclaré »), **et** le test de charte rouge. Deux gardes indépendantes. |
+| Retirer `components.css` de `STYLED_FILES` | **Verte.** Les gardes de charte *parcourent* la liste : en retirer une entrée n'en fait échouer aucune, elles vérifient une feuille de moins en silence. La liste était nommée à la main mais rien n'exigeait qu'elle soit **complète**. Un test l'exige désormais, et la mutation rougit. |
+
+### Ce que la vérification a corrigé, au-delà du périmètre annoncé
+
+- **`CdrStatus` n'a pas six valeurs mais huit.** La v1.0 omettait `accepted` et `cancelled`, qui
+  retombaient donc sur le repli gris et disparaissaient de l'œil de l'opérateur balayant la colonne à
+  la recherche des rouges. `test/statuts-du-contrat.test.ts` lit désormais le YAML installé : une
+  valeur qui apparaît, disparaît ou se renomme en amont fait rougir.
+- **Le plafond de la feuille d'entrée mesurait le brut pour protéger le transfert.** Son commentaire
+  annonçait lui-même que `components.css` mangerait sa marge. Plutôt qu'un cran arbitraire, il mesure
+  les deux coûts sur leur objet : 4 967 octets compressés (fenêtre de congestion initiale), 21 202
+  bruts (coût d'analyse). *Mesuré avec `gzipSync` — celui du test. `gzip -9` rend 4 974 : l'écart est
+  le niveau de compression, pas une divergence, et le noter évite de le rechercher deux fois.*
+- **Le test qui comptait une ligne par paire de contraste comptait les lignes de la page entière.**
+  Il a cessé d'être vrai dès qu'une `DataTable` est apparue sur `/_design` — et aurait pu devenir
+  faux en restant vert si deux changements s'étaient compensés.
+- **`required` n'est pas une prop du `Field`.** Le découpage `Field` + `Input` l'empêche de
+  l'atteindre, et le déclarer des deux côtés recréait l'oubli que ce découpage ferme : l'astérisque
+  aurait fini par affirmer le contraire de la sémantique. Il se pose sur le contrôle, la marque en
+  découle par `:has()`. jsdom n'applique pas le CSS : cette marque-là se vérifie sur le parcours.
+
+### Ce que step-040 héritera
+
+**`@base-ui/react` n'est aujourd'hui que dans le chunk de `/_design`.** Mesuré sur le livré : le
+chunk d'entrée passe de 276,07 à 276,12 Ko, celui de `/_design` de 6,07 à 152,89 Ko (52,29
+compressés). C'est correct — aucun écran de production ne consomme encore les primitives, et la page
+de référence est chargée à la demande. **Le premier écran qui les branchera fera passer Base UI dans
+le chunk d'entrée**, et c'est là que sa taille deviendra un sujet : la mesure est à refaire à ce
+moment-là, pas à supposer d'après celle-ci.
+
+### Ce qui n'est pas testé, et pourquoi
+
+- **Les deux dettes de forme de step-008.** Le trou de portée du plugin (`@media print { :root }`)
+  reste ouvert : le fermer demande un analyseur CSS complet là où le plugin fait 50 lignes.
+  `design-reference.css` reste dans la feuille d'entrée — la cause est la génération de l'arbre de
+  routes, pas les primitives, et le geste vaut sa propre mesure. Le coût est désormais **chiffré** au
+  lieu d'être signalé : ~1,9 Ko servis à tous pour une page que seul un développeur visite.
+- **La liste blanche des origines gagne une entrée**, `base-ui.com/production-error`. Vérifié sur le
+  bundle livré : l'adresse est interpolée dans un message d'erreur, cible d'aucun `fetch` ni `src` —
+  même mécanisme que `react.dev/errors`, déjà autorisé. `web/CLAUDE.md` le dit : « l'élargir n'est
+  gardé que par la revue ».
 
 ## Hors périmètre
 `Modal`, `Toast` et les cinq états de contenu → step-042. Le `Tooltip` → step-084 et le `Menu` → la

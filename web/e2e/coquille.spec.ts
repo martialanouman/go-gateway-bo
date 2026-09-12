@@ -86,8 +86,9 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // test de composant ne peut observer, quoi qu'il affirme.
 
   // **L'anneau de focus, WCAG 2.4.7.** Les tests de composant vérifient qu'un contrôle *reçoit* le
-  // focus ; aucun ne peut dire qu'il se **voit**. step-008 a mesuré le contraire du confort : retirer
-  // l'import qui porte `:focus-visible` laissait 137 tests verts et le build à rc=0.
+  // focus ; aucun ne peut dire qu'il se **voit**. Mesuré deux fois plutôt que supposé : step-008 en
+  // retirant l'import qui porte `:focus-visible` — 137 tests verts, build rc=0 — et step-041 en
+  // retirant la déclaration elle-même — 214 tests verts, build rc=0. Seule cette ligne-ci rougit.
   const button = page.getByRole('button', { name: 'Nouveau client' })
   await button.focus()
   await expect(button).toBeFocused()

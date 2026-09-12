@@ -172,7 +172,7 @@ sur un schéma en retard protège quelque chose. *(Arbitré le 02/08/2026, au d�
 > L'ordre est `041 → 042 → 040` : l'AppShell consomme les primitives et les cinq états de contenu, il
 > ne les précède pas.
 
-- [ ] step-041 — Primitives lot 1 portées : bouton, champ, select, pilule de statut, tabs, table
+- [x] step-041 — Primitives lot 1 portées : bouton, champ, select, pilule de statut, tabs, table
 - [ ] step-042 — Primitives lot 2 portées : dialog, toast + les cinq états de contenu †
 - [ ] step-040 — AppShell : rail, barre supérieure, arborescence de routes en états vides
 
@@ -319,7 +319,7 @@ observable que dans un run de CI : pousser tôt vaut mieux que relire.
 | `suspend-smpp-account` est déclarée au contrat mais **non implémentée** ; la suspension passe par `update-smpp-account` (PATCH `status`). | L'UI utilise le PATCH tant que l'opération n'est pas livrée. | step-063, step-064 |
 | Pas de lecture unitaire de CDR : la fiche d'un message se **compose** côté BFF (`search-messages` filtré + `get-message-trace`). | Composition et cache à la charge du BFF. | step-101 |
 | L'API Admin s'authentifie en **OAuth2 client_credentials + mTLS** avec un jeton *machine* portant des scopes fixes, dont `content:read`. | Seul le BFF peut restreindre la lecture de corps par opérateur — d'où l'invariant (c). | step-003, step-025, step-103 |
-| **62 des 133 opérations du contrat ne sont pas encore implémentées** côté passerelle. | M2, M4, M5 et M8 se développent contre le mock ; une passe d'intégration réelle par jalon. | `plan.md` §16 |
+| **30 des 133 opérations du contrat ne sont pas encore implémentées** côté passerelle. | M3, M4, M6 et M8 se développent en partie contre le mock ; une passe d'intégration réelle par jalon. | `plan.md` §16 |
 
 
 ---
@@ -372,7 +372,7 @@ un porteur déjà coché.
 | Aucune surface Alertmanager au contrat. | Write-through et réconciliation non implémentables ; step-183 **bloquée**, step-180 dégradée. | step-183 |
 | `suspend-smpp-account` déclarée au contrat mais non implémentée. | L'UI passe par le PATCH tant que l'opération n'existe pas. | step-063 |
 | Pas de lecture unitaire de CDR : la fiche d'un message se compose côté BFF. | Composition et cache à la charge du BFF. | step-101 |
-| **62 des 133 opérations du contrat** ne sont pas implémentées côté passerelle — ratio mesuré le 27/07/2026, **jamais revérifié depuis**. | M2, M4, M5 et M8 se développent contre le mock. `plan.md` §16 dit de le relever à l'ouverture de chaque jalon ; M2 s'ouvre, et sa première step dans l'ordre est celle qui doit le relever. *(§18 écrit 63 là où §16 compte 62 : la contradiction est dans la source.)* | step-041 |
+| ~~**62 des 133 opérations du contrat** ne sont pas implémentées côté passerelle — ratio mesuré le 27/07/2026, **jamais revérifié depuis**.~~ **Relevé le 12/09/2026 : 30 sur 133.** | L'amont avait avancé de 32 opérations. **M2 et M5 cessent d'être des jalons sur mock** — les trois flux du hub WebSocket et les trois opérations du CDR Explorer sont livrées. Restent M3, M4, M6 et M8, ce dernier réduit à la politique de contenu. La contradiction 62/63 entre §16 et §18 s'éteint avec les deux chiffres. Détail dans `plan.md` §16. | ~~step-041~~ ✔ |
 | Le **scan transversal** de l'invariant (a) n'existe pas : logs, URL, exports, cache persisté, attributs de trace. | La moitié structurelle est livrée (step-026) ; celle qui vérifie qu'aucun **autre chemin** ne contourne l'invariant ne l'est pas. | step-103 |
 | Les secrets d'identifiants de bind ne sont gardés par rien — invariant (b). | Aucune porte n'empêche un secret d'être réaffiché ; la règle « montré exactement une fois » tient par la discipline. | step-066 |
 | `GET /audit-log` filtrera sur `target_type` **sans index**. | La table est partitionnée par mois : un filtre par cible balaiera chaque partition retenue. | step-184 |
@@ -410,6 +410,6 @@ un porteur déjà coché.
 | Graphiques : `visx` contre `Recharts`, non tranché. | À décider sur la densité d'un cockpit sombre, pas en principe. | step-080 |
 | Des opérations du contrat n'ont **aucune step passerelle** : groupes de clients, webhooks, sender rewrite, `reorder-routes`. | À poser à l'équipe passerelle **avant M3 et M6**, pas à découvrir en développant. | step-060 |
 | `pgx` nu contre `sqlc` : décision **confirmée**, avec un déclencheur écrit qui la rouvrirait. | « Ce jour-là, `sqlc` reprend l'avantage et la décision se rouvre » — le déclencheur est un événement de mesure, « un `Scan` dont la mutation d'interversion de deux champs de même type reste verte ». Le premier critère était un proxy, reconnu tel. | **sans porteur** — un déclencheur mesurable, pas une step. |
-| Le raccourci `font:` réinitialise `font-variant-numeric`. | « Réel pour les KPI de step-041 » : des chiffres tabulaires qui cessent de s'aligner dans un cockpit dense. | step-041 |
-| Deux dettes de forme relevées en revue de step-008 et non corrigées. | Écrites sous « ce que la revue a signalé et que je n'ai pas corrigé » ; sans effet mesuré aujourd'hui. | step-041 |
+| ~~Le raccourci `font:` réinitialise `font-variant-numeric`.~~ | **Payée, et plus étroitement que l'énoncé le laissait croire.** La dette ne mord que là où des chiffres sont rendus en police **proportionnelle** : `.ui-table`, qui pose `font: var(--text-body)`. Les autres surfaces de chiffres de la step — méta de pilule, compteur d'onglet, cellules mono — portent des rôles en IBM Plex Mono, dont la chasse est déjà fixe ; les en décorer aurait fait croire à une protection qui n'agit sur rien. Mesuré sur le peint : `font-variant-numeric` se lit dans le parcours Playwright, jamais dans jsdom. | step-041 |
+| Deux dettes de forme relevées en revue de step-008 : le plugin accepte un token déclaré dans une portée qui ne s'applique pas, et `design-reference.css` atterrit dans la feuille d'entrée. | **Toujours ouvertes, et l'une a maintenant un coût chiffré** : ~1,9 Ko servis à tous pour une page que seul un développeur visite — step-041 l'a mesuré en versant `components.css` dans la même feuille. Aucune des deux n'est du ressort des primitives : la première demande un analyseur CSS là où le plugin fait 50 lignes, la seconde tient à la génération de l'arbre de routes (`autoCodeSplitting` scinde le composant, pas sa feuille). *(Porteur passé de step-041 à step-042 le 12/09/2026 : c'est la prochaine step à ajouter une feuille et à toucher `/_design`, donc la prochaine à payer le même prix.)* | step-042 |
 | `request.Body == nil` dans `API.Login` : une garde **inatteignable par le routeur**, conservée. | Lui écrire un test demanderait de l'appeler hors de son routeur : il prouverait la garde et rien du produit. Le constat est écrit au-dessus de la ligne. | **sans porteur** — c'est une décision consignée, pas une dette à payer. La seule action possible serait de retirer la garde. |
