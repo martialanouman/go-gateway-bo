@@ -93,9 +93,10 @@
 }
 
 /*
- * **La seule animation en boucle de tout le système** : le pouls de 1,8 s du point vivant. Il ne
- * marque que les valeurs alimentées par la WebSocket — le poser sur un instantané ferait mentir le
- * seul signal de fraîcheur dont dispose l'opérateur.
+ * **La seule animation en boucle qui porte un état** : le pouls de 1,8 s du point vivant. Deux
+ * autres tournent dans le produit — le spinner d'un bouton, plus bas, et le scintillement du
+ * squelette dans `index.html` — mais elles disent qu'on attend, jamais ce qui est vrai. Ce pouls-ci
+ * ne marque que les valeurs alimentées par la WebSocket.
  *
  * La classe est portée par le point lui-même. Le kit de la charte la posait là aussi mais ciblait un
  * descendant, si bien qu'un point isolé ne battait jamais.

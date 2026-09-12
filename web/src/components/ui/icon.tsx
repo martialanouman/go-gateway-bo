@@ -12,6 +12,14 @@ import type { CSSProperties, ReactElement } from 'react'
  * absent, la réponse est son libellé texte. Substituer une forme voisine ferait passer une icône
  * décorative pour un glyphe fonctionnel.
  *
+ * Les **vingt-deux** de la charte, tenus égaux au kit par `test/glyphes-de-la-charte.test.ts` — le
+ * premier portage en avait perdu un, `ellipsis-vertical`, sous cette phrase même qui promettait le
+ * jeu complet, et le test qui devait l'attraper recopiait le compte faux.
+ *
+ * Ce qui n'est **pas** porté : la trentaine d'alias du kit (`x`, `close`, `lock`, `trash-2`…), qui
+ * absorbent des noms hérités de bibliothèques tierces. Aucun consommateur ici, et ils adouciraient
+ * la règle qu'ils prétendent servir : un nom hors du jeu doit tomber, pas trouver un voisin.
+ *
  * Les glyphes sont des **éléments**, pas des fonctions qui en rendent : ils sont immuables, React
  * les réutilise sans les recréer, et le module n'expose aucune fonction que personne n'appelle.
  */
@@ -95,6 +103,13 @@ const GLYPHS = {
       <circle cx="12.4" cy="8" r=".9" fill="currentColor" stroke="none" />
     </>
   ),
+  'ellipsis-vertical': (
+    <>
+      <circle cx="8" cy="3.6" r=".9" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="8" r=".9" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="12.4" r=".9" fill="currentColor" stroke="none" />
+    </>
+  ),
 } satisfies Record<string, ReactElement>
 
 export type GlyphName = keyof typeof GLYPHS
@@ -163,9 +178,10 @@ export type DotTone = 'up' | 'degraded' | 'down' | 'restricted' | 'accent' | 'in
 export type DotProps = {
   readonly tone?: DotTone
   /**
-   * Valeur alimentée par la WebSocket. Le pouls de 1,8 s est la **seule animation en boucle** du
-   * système, et le seul signal de fraîcheur dont dispose l'opérateur : le poser sur un instantané le
-   * ferait mentir.
+   * Valeur alimentée par la WebSocket. Le pouls de 1,8 s est la seule animation en boucle qui porte
+   * un **état** — le spinner d'un bouton et le scintillement du squelette tournent aussi, mais ils
+   * disent qu'on attend, pas ce qui est vrai. C'est le seul signal de fraîcheur dont dispose
+   * l'opérateur : le poser sur un instantané le ferait mentir.
    */
   readonly live?: boolean
   readonly className?: string

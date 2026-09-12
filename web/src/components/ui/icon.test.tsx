@@ -28,9 +28,13 @@ describe('Icon', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('dessine les vingt-et-un glyphes du jeu', () => {
-    // Un plancher sur le jeu lui-même : sans lui, en perdre la moitié laisserait tout vert.
-    expect(GLYPH_NAMES).toHaveLength(21)
+  it('dessine chacun des glyphes du jeu', () => {
+    // **Pas de nombre écrit ici.** La première rédaction annonçait « vingt-et-un » alors que la
+    // charte en dessine vingt-deux : le compte du test et celui du composant venaient de la même
+    // main, au même moment, et se confirmaient l'un l'autre. C'est
+    // `test/glyphes-de-la-charte.test.ts` qui confronte le jeu à sa source ; ce test-ci vérifie
+    // seulement que chaque nom déclaré rend bien quelque chose.
+    expect(GLYPH_NAMES.length).toBeGreaterThan(0)
 
     for (const name of GLYPH_NAMES) {
       const { container, unmount } = render(<Icon name={name} />)
