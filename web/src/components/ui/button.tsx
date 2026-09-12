@@ -73,12 +73,14 @@ export function Button({
   onClick,
   ...rest
 }: ButtonProps) {
+  // Ni `--loading` ni `--blocked` : les deux états sont peints par `.ui-button[aria-disabled]`,
+  // l'attribut que ce composant pose déjà et que la feuille cible. Les émettre en plus aurait mis
+  // deux classes mortes sur chaque bouton — « une entrée morte élargit la surface sans que personne
+  // ne s'en aperçoive », et le défaut vaut dans les deux sens.
   const classes = [
     'ui-button',
     `ui-button--${variant}`,
     size === 'md' ? '' : `ui-button--${size}`,
-    loading ? 'ui-button--loading' : '',
-    blocked ? 'ui-button--blocked' : '',
     className,
   ]
     .filter(Boolean)

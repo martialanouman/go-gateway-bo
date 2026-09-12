@@ -73,6 +73,36 @@ describe('Field et Input composés', () => {
     expect(screen.queryByText('Onze caractères au plus.')).toBeNull()
   })
 
+  it('ne tient pas une chaîne vide pour un refus', () => {
+    // **Le geste le plus naturel du monde** : `error={apiError ?? ''}`, ou un champ d'erreur que le
+    // serveur rend vide. Une comparaison à `undefined`/`null`/`false` laissait passer `''`, et
+    // fabriquait un champ **invalide muet** — bordure rouge, `aria-invalid`, message vide relié, et
+    // l'aide effacée au passage. L'opérateur voit un refus sans motif.
+    render(
+      <Field label="Adresse e-mail" hint="Celle du compte opérateur." error="">
+        <Input />
+      </Field>,
+    )
+
+    const input = screen.getByLabelText('Adresse e-mail')
+    expect(input).not.toHaveAttribute('aria-invalid', 'true')
+    // Et l'aide n'a pas été effacée par un refus qui n'existe pas.
+    expect(screen.getByText('Celle du compte opérateur.')).toBeInTheDocument()
+  })
+
+  it('annonce le refus qui arrive après coup, sans que le focus ait bougé', () => {
+    // Un refus vient du serveur : il apparaît **après** la soumission, alors que le focus n'a pas
+    // bougé. Base UI ne pose ni rôle ni région live sur `Field.Error` — le message atterrit dans un
+    // élément inerte que les lecteurs d'écran ne relisent pas. WCAG 2.1 AA, 4.1.3.
+    render(
+      <Field label="Sender ID" error="Ce sender ID est déjà pris.">
+        <Input />
+      </Field>,
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Ce sender ID est déjà pris.')
+  })
+
   it('porte le caractère obligatoire sur le contrôle, où il est annoncé', () => {
     // L'astérisque du libellé n'est pas une prop du `Field` : il découle de cet état-ci, par
     // `:has()` dans la feuille. Le déclarer deux fois laisserait la marque visuelle affirmer le

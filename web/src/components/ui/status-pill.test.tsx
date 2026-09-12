@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { StatusPill } from './status-pill'
+import { BREAKER_STATES, DELIVERY_TONES, ENTITY_TONES, LINK_TONES, StatusPill } from './status-pill'
 
 /**
  * La règle la plus stricte du système visuel.
@@ -33,7 +33,7 @@ describe('StatusPill — link_status', () => {
 
     for (const { state, tone } of cases) {
       const { container, unmount } = render(<StatusPill kind="link" state={state} />)
-      expect(container.querySelector(`.ui-status--${tone}`)).not.toBeNull()
+      expect(container.querySelector(`.ui-dot--${tone}`)).not.toBeNull()
       unmount()
     }
   })
@@ -112,17 +112,36 @@ describe('StatusPill — la dimension est déclarée, jamais devinée', () => {
     // Ni pilule de disjoncteur, ni rouge de panne : une fin de vie administrative n'appelle aucune
     // intervention, et la peindre en alerte enverrait chercher une panne qui n'existe pas.
     expect(container.querySelector('.ui-breaker')).toBeNull()
-    expect(container.querySelector('.ui-status--idle')).not.toBeNull()
+    expect(container.querySelector('.ui-dot--idle')).not.toBeNull()
     expect(screen.getByText('closed')).toBeInTheDocument()
   })
 
-  it('distingue un compte suspendu d’un lien tombé', () => {
-    const entity = render(<StatusPill kind="entity" state="suspended" />)
-    expect(entity.container.querySelector('.ui-status--down')).not.toBeNull()
-    entity.unmount()
+  it('ne laisse aucune valeur vivre dans deux dimensions à la fois', () => {
+    // **Ce qui remplace un test qui ne prouvait rien.** La version précédente rendait un compte
+    // suspendu puis un lien tombé et assertait *deux fois la même classe* sous le titre « distingue
+    // l'un de l'autre » : elle prouvait qu'ils sont identiques.
+    //
+    // Ce qui compte vraiment est en amont — `closed` appartient à deux vocabulaires, et c'est la
+    // seule collision que le contrat porte aujourd'hui. Ce test rougit le jour où une valeur en
+    // rejoint une autre dimension : la fusion des tables, que la docstring déclare avoir rejetée,
+    // redeviendrait alors silencieusement possible.
+    const dimensions = [
+      { nom: 'link', valeurs: Object.keys(LINK_TONES) },
+      { nom: 'entity', valeurs: Object.keys(ENTITY_TONES) },
+      { nom: 'delivery', valeurs: Object.keys(DELIVERY_TONES) },
+      { nom: 'breaker', valeurs: [...BREAKER_STATES] },
+    ]
 
-    const link = render(<StatusPill kind="link" state="down" />)
-    expect(link.container.querySelector('.ui-status--down')).not.toBeNull()
+    const collisions = dimensions.flatMap(({ nom, valeurs }) =>
+      dimensions
+        .filter((autre) => autre.nom !== nom)
+        .flatMap((autre) => valeurs.filter((valeur) => autre.valeurs.includes(valeur)))
+        .map((valeur) => `${valeur} (${nom})`),
+    )
+
+    // `closed` est la collision connue, et la raison d'être de `kind` : elle est attendue, les
+    // autres ne le sont pas.
+    expect(collisions.sort()).toEqual(['closed (breaker)', 'closed (entity)'])
   })
 
   it('couvre les huit valeurs de `CdrStatus`, sans en laisser tomber au gris', () => {
@@ -145,7 +164,7 @@ describe('StatusPill — la dimension est déclarée, jamais devinée', () => {
 
     for (const { state, tone } of cases) {
       const { container, unmount } = render(<StatusPill kind="delivery" state={state} />)
-      expect(container.querySelector(`.ui-status--${tone}`), `${state}`).not.toBeNull()
+      expect(container.querySelector(`.ui-dot--${tone}`), `${state}`).not.toBeNull()
       unmount()
     }
   })

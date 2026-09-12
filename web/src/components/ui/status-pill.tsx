@@ -132,7 +132,10 @@ export function StatusPill(props: StatusPillProps) {
 
   return (
     <span
-      className={['ui-status', `ui-status--${tone}`, className].filter(Boolean).join(' ')}
+      // Pas de `ui-status--${tone}` ici : la tonalité est peinte par `.ui-dot--${tone}`, et une
+      // seconde classe que rien ne cible serait une classe morte sur chaque ligne de chaque tableau.
+      // Les tests de tonalité visent donc le point, qui peint, plutôt qu'une étiquette décorative.
+      className={['ui-status', className].filter(Boolean).join(' ')}
       // `role="status"` **seulement** sur une valeur en direct, et jamais par défaut. Un `role`
       // inconditionnel ferait de chaque pilule une région live : un tableau de 50 connecteurs à deux
       // dimensions en compterait cent, et la première salve WebSocket les annoncerait toutes, en

@@ -431,13 +431,32 @@ describe('contraste WCAG 2.1 AA', () => {
   })
 
   it('l’anneau de focus tranche sur le canvas', () => {
-    // Un focus invisible rend la navigation au clavier impraticable (WCAG 2.4.7). L'anneau est en
-    // teal ; on vérifie la couleur qui le compose, pas l'ombre portée qui l'assemble.
-    const ring = resolveColor(tokens, '--teal-500')
-    const page = resolveColor(tokens, '--surface-page')
+    // Un focus invisible rend la navigation au clavier impraticable (WCAG 2.4.7).
+    //
+    // **Ce test lit `--focus-ring`, et c'est tout son intérêt.** Il résolvait auparavant `--teal-500`
+    // en dur, sous un titre qui parlait de l'anneau : il mesurait donc un token *voisin*, pas celui
+    // que le produit peint. Mesuré en repeignant l'anneau en `--n-700` — un gris à 1,64:1 sur la
+    // page, invisible — **les 214 tests, `vite build` et le parcours Playwright restaient verts**.
+    // L'assertion de bout en bout ne le voyait pas non plus : elle comptait les deux *couches* de
+    // l'ombre, jamais leur couleur.
+    //
+    // La dernière couleur de l'ombre est celle qu'on voit : la première est un repli de la couleur
+    // de la page, qui sépare l'anneau du contrôle.
+    const declared = resolveToken(tokens, '--focus-ring')
+    expect(declared, '--focus-ring a disparu de la charte').toBeDefined()
 
-    expect(contrastRatio(ring as string, page as string)).toBeGreaterThanOrEqual(
-      AA_LARGE_TEXT_OR_UI,
+    const composed = [...(declared as string).matchAll(/var\(\s*(--[\w-]+)/g)].map(
+      ([, name]) => name as string,
     )
+    expect(composed.length, "l'anneau ne compose plus aucun token").toBeGreaterThanOrEqual(2)
+
+    const page = resolveColor(tokens, '--surface-page') as string
+    const visible = resolveColor(tokens, composed[composed.length - 1] as string, page)
+    expect(visible, `${composed.at(-1)} n'est pas résoluble`).toBeDefined()
+
+    expect(
+      contrastRatio(visible as string, page),
+      `l'anneau de focus ne tranche pas sur la page : ${composed.at(-1)}`,
+    ).toBeGreaterThanOrEqual(AA_LARGE_TEXT_OR_UI)
   })
 })

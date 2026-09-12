@@ -11,10 +11,15 @@ import { Icon } from './icon'
  * au-dessus. Le risque du découpage est connu — un écran finit par composer une bordure rouge sans
  * message lié, visible pour qui voit l'écran, invisible pour tous les autres.
  *
- * Il est fermé sans rien demander à l'appelant : `Field.Root` engendre les identifiants et
- * `Field.Control` s'y relie par le contexte. `aria-describedby` et `aria-invalid` sont posés par la
- * bibliothèque dès que l'`Input` est dans le `Field`. Personne n'écrit d'`id`, donc personne ne peut
- * le désynchroniser au premier renommage.
+ * Il est fermé pour les contrôles de ce dossier : `Field.Root` engendre les identifiants et
+ * `Field.Control` s'y relie par le contexte, donc `aria-describedby` et `aria-invalid` sont posés
+ * par la bibliothèque dès que l'`Input` est dans le `Field`. Personne n'écrit d'`id`, donc personne
+ * ne peut le désynchroniser au premier renommage.
+ *
+ * **Ce que la garantie ne couvre pas**, et le dire vaut mieux que le laisser croire : le lien passe
+ * par les contrôles Base UI. Un `<input>` nu ou un contrôle maison placé dans un `Field` reçoit la
+ * bordure rouge et le message, mais **aucun lien** — exactement le défaut que ce découpage ferme
+ * pour `Input`. `children` est un `ReactNode` ; ni le type ni l'exécution ne l'empêchent.
  *
  * ## Refus ou aide, jamais les deux
  *
@@ -43,7 +48,12 @@ export type FieldProps = {
 }
 
 export function Field({ label, hint, error, badge, children, className }: FieldProps) {
-  const invalid = error !== undefined && error !== null && error !== false
+  // `Boolean` et non trois comparaisons : `error={apiError ?? ''}` — le geste le plus naturel quand
+  // le serveur rend une chaîne vide — passait les trois, et fabriquait un champ **invalide muet** :
+  // bordure rouge, `aria-invalid`, un message vide enregistré dans `aria-describedby`, et l'aide
+  // effacée. L'opérateur voyait un refus sans motif ; celui qui écoute entendait « invalide » suivi
+  // de rien. `0` faisait de même. Un élément React reste truthy, donc rien d'utile n'est perdu.
+  const invalid = Boolean(error)
 
   return (
     <BaseField.Root className={['ui-field', className].filter(Boolean).join(' ')} invalid={invalid}>
@@ -60,7 +70,11 @@ export function Field({ label, hint, error, badge, children, className }: FieldP
         // `match` vaut `true` et non une clé de `ValidityState` : nos refus viennent du serveur —
         // « ce sender ID est déjà pris », « cette adresse n'est pas reconnue » — et aucune règle de
         // validation HTML ne les connaît.
-        <BaseField.Error className="ui-field__error" match>
+        // `role="alert"` : Base UI ne pose ni rôle ni région live sur `Field.Error` — vérifié dans
+        // `FieldError.js`, qui ne rend que `{ id, children }`. Or nos refus arrivent **après** une
+        // réponse du serveur, sans que le focus ait bougé : le message apparaît alors dans un
+        // élément inerte que les lecteurs d'écran ne relisent pas. WCAG 2.1 AA, 4.1.3.
+        <BaseField.Error className="ui-field__error" match role="alert">
           <Icon name="bang" size={12} />
           {error}
         </BaseField.Error>

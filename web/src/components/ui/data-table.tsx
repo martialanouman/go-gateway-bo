@@ -23,6 +23,7 @@
  */
 
 import type { ReactNode } from 'react'
+import { Icon } from './icon'
 
 export type SortDirection = 'ascending' | 'descending'
 
@@ -72,7 +73,7 @@ export function DataTable<Row>({
       */}
       <caption className="ui-table__caption">{caption}</caption>
 
-      <thead className="ui-table__head">
+      <thead>
         <tr>
           {columns.map((column) => (
             <th
@@ -93,6 +94,21 @@ export function DataTable<Row>({
                   onClick={() => onSortChange(column.key)}
                 >
                   {column.header}
+                  {/*
+                    Le sens du tri, **pour l'œil**. `aria-sort` l'annonce déjà à qui écoute ; sans ce
+                    glyphe, l'opérateur voyant ne peut pas savoir laquelle des neuf colonnes porte le
+                    tri. Décoratif : l'information est portée par `aria-sort`, et l'entendre deux
+                    fois n'aide personne.
+                  */}
+                  <Icon
+                    className="ui-table__sort-glyph"
+                    name={
+                      sort?.key === column.key && sort.direction === 'descending'
+                        ? 'arrow-down'
+                        : 'arrow-up'
+                    }
+                    size={12}
+                  />
                 </button>
               ) : (
                 column.header

@@ -511,8 +511,14 @@
   font-weight: var(--fw-medium);
 }
 
+/*
+ * `--text-faint` et non `--n-500`, une valeur de palette brute à **1,64:1** sur la page — un
+ * masquage, pas une désactivation. Les deux autres contrôles désactivés du fichier (`.ui-button`,
+ * `.ui-select`) emploient déjà `--text-faint` : un onglet interdit doit rester lisible, « désactivé
+ * **et expliqué**, jamais silencieusement masqué ».
+ */
 .ui-tab[data-disabled] {
-  color: var(--n-500);
+  color: var(--text-faint);
   cursor: not-allowed;
 }
 
@@ -602,6 +608,12 @@
  * et une cellule ne se focalise pas.
  */
 .ui-table__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  /* Un `<button>` porte 1px/6px de padding par défaut : sans cette remise à zéro, un en-tête
+     triable se décale de son voisin inerte et de la colonne qu'il coiffe. */
+  padding: 0;
   border: none;
   background: none;
   color: inherit;
@@ -609,6 +621,23 @@
   letter-spacing: inherit;
   text-transform: inherit;
   cursor: pointer;
+}
+
+/*
+ * **Le sens du tri doit se voir.** `aria-sort` l'annonce aux technologies d'assistance, et rien ne
+ * le rendait perceptible à l'œil : sur neuf colonnes, l'opérateur voyant ne pouvait pas savoir
+ * laquelle porte le tri. Le glyphe vient du jeu fermé, il n'est pas dessiné ici.
+ */
+.ui-table__sort-glyph {
+  color: var(--text-faint);
+}
+
+.ui-table__header[aria-sort] .ui-table__sort {
+  color: var(--text-primary);
+}
+
+.ui-table__header[aria-sort] .ui-table__sort-glyph {
+  color: var(--teal-500);
 }
 
 .ui-table__cell {
@@ -623,8 +652,7 @@
   height: var(--row-height-dense);
 }
 
-.ui-table__cell--end,
-.ui-table__header.ui-table__cell--end {
+.ui-table__cell--end {
   text-align: end;
 }
 
