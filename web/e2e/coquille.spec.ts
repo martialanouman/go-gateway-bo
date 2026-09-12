@@ -78,5 +78,74 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // endroit de la suite où l'on lit ce qui est **réellement peint**.
   await expect(page.locator('h1')).toHaveCSS('font-family', /IBM Plex Sans/)
 
+  // ── Les primitives, peintes pour de bon (step-041) ──────────────────────────────────────────
+  //
+  // Ce bloc prolonge le parcours plutôt que d'ouvrir un fichier : les primitives n'ont pas d'écran
+  // à elles, et ce qu'il faut vérifier — ce qui est **réellement peint** — n'existe qu'ici. Trois
+  // propriétés tiennent à des `var()` et des `color-mix()` que jsdom ne résout pas, donc qu'aucun
+  // test de composant ne peut observer, quoi qu'il affirme.
+
+  // **L'anneau de focus, WCAG 2.4.7.** Les tests de composant vérifient qu'un contrôle *reçoit* le
+  // focus ; aucun ne peut dire qu'il se **voit**. Mesuré deux fois plutôt que supposé : step-008 en
+  // retirant l'import qui porte `:focus-visible` — 137 tests verts, build rc=0 — et step-041 en
+  // retirant la déclaration elle-même — 214 tests verts, build rc=0. Seule cette ligne-ci rougit.
+  const button = page.getByRole('button', { name: 'Nouveau client' })
+  await button.focus()
+  await expect(button).toBeFocused()
+  const ring = await button.evaluate((element) => getComputedStyle(element).boxShadow)
+  expect(ring, 'le bouton focalisé ne porte aucun anneau visible').not.toBe('none')
+  // Deux couches, et non une ombre quelconque : le repli couleur page puis l'anneau teal, sans quoi
+  // l'anneau se confondrait avec la surface sur laquelle il est posé.
+  expect(ring.match(/rgb/g) ?? [], "l'anneau n'a pas ses deux couches").toHaveLength(2)
+
+  // **La chasse tabulaire de la table.** Le raccourci `font:` des rôles typographiques réinitialise
+  // `font-variant-numeric`, donc défait ce que `body` posait : une colonne de nombres perd sa chasse
+  // commune et danse à chaque rafraîchissement. C'est la seule lecture possible de cette propriété —
+  // elle est calculée, jamais présente dans le DOM.
+  await expect(page.locator('.ui-table').first()).toHaveCSS('font-variant-numeric', 'tabular-nums')
+
+  // **Un contrôle interdit reste visible et atteignable.** « Désactivé et expliqué, jamais masqué. »
+  const blocked = page.getByRole('button', { name: 'Effectuer la rotation' })
+  await expect(blocked).toBeVisible()
+  await expect(blocked).toHaveAttribute('aria-disabled', 'true')
+  await blocked.focus()
+  await expect(blocked).toBeFocused()
+
+  // **L'astérisque du champ requis**, qui n'est pas une prop mais une conséquence de l'état du
+  // contrôle — donc invisible à jsdom, qui n'applique pas le CSS. C'est ici qu'on vérifie que le
+  // `:has()` trouve sa cible, et que la marque n'est pas annoncée.
+  const required = await page
+    .locator('.ui-field:has(.ui-input:required) .ui-field__label')
+    .first()
+    .evaluate((element) => getComputedStyle(element, '::after').content)
+  // `'"*" / ""'` et non `toContain('*')` : c'est le ` / ""` — le texte de remplacement **vide** —
+  // qui empêche le lecteur d'écran d'annoncer « étoile » sur chaque libellé de champ requis. Mesuré
+  // en le retirant : `toContain('*')` passait, et le commentaire du CSS affirmait le contraire de ce
+  // que le parcours mesurait.
+  expect(required, "le champ requis ne porte pas sa marque, ou l'annonce").toBe('"*" / ""')
+
+  // **Les deux formes de statut ne se confondent pas**, et c'est la règle la plus stricte du
+  // système : un disjoncteur ouvert sur un lien vivant et un bind mort demandent des actions
+  // opposées. Sur la page, les deux sont côte à côte ; la pilule n'emprunte jamais le point.
+  //
+  // Compter les pilules serait compter la page, pas la règle : la première rédaction attendait une
+  // `half_open` et en a trouvé deux — la rangée de spécimens et la ligne MTN de la table. Ce qui se
+  // vérifie ici est la **séparation**, dans les deux sens, sur toutes les occurrences.
+  const breakers = await page.locator('.ui-breaker').count()
+  const dots = await page.locator('.ui-status .ui-dot').count()
+  expect(
+    breakers,
+    'aucune pilule de disjoncteur sur la page : la règle ne garde rien',
+  ).toBeGreaterThan(0)
+  expect(dots, 'aucun point de lien sur la page : la règle ne garde rien').toBeGreaterThan(0)
+  expect(
+    await page.locator('.ui-breaker .ui-dot').count(),
+    'une pilule de disjoncteur a emprunté le rendu du lien',
+  ).toBe(0)
+  expect(
+    await page.locator('.ui-status .ui-breaker').count(),
+    'un point de lien a emprunté le rendu du disjoncteur',
+  ).toBe(0)
+
   expect(problems).toEqual([])
 })

@@ -756,26 +756,47 @@ M3 → M4 → M5 → M9`.
 
 ## 16. Dépendance externe : l'état réel de la passerelle
 
-**C'est la contrainte de planification la plus importante de ce document, et elle n'a pas bougé avec
-la bascule.** Le contrat décrit **133 opérations** — chiffre mesuré le 01/08/2026 sur le YAML, les
-documents hérités disaient 134. La passerelle n'en avait implémenté que **71 au 27/07/2026** ; les 62
-restantes existent au contrat, sont servies par le mock, mais **ne répondaient pas encore en réel**.
+**C'était la contrainte de planification la plus importante de ce document. Elle s'est desserrée, et
+c'est la mesure qui le dit.** Le contrat décrit **133 opérations** — chiffre mesuré le 01/08/2026 sur
+le YAML, les documents hérités disaient 134. La passerelle en implémente **103 au 12/09/2026** ; les
+**30** restantes existent au contrat, sont servies par le mock, mais ne répondent pas encore en réel.
 
-> ⚠️ **Le ratio 71/133 date du 27/07 et n'a toujours pas été revérifié.** Le contrat a pris seize
-> versions depuis, dont trois majeures — l'implémentation amont a probablement avancé. Le
-> dénominateur, lui, est vérifié : **133 opérations en 4.0.2 comme en 2.5.0**, les deux majeures
-> n'en ayant ajouté ni retiré aucune (step-009, 08/08/2026). C'est le numérateur qui est périmé, et il
-> ne se relève pas ici — il se lit dans `go-gateway`, pas dans le contrat. **Le relever à l'ouverture
-> de chaque jalon**, et corriger le tableau ci-dessous plutôt que de le croire.
+> ✅ **Relevé le 12/09/2026, à l'ouverture de M2 (step-041) — le ratio est passé de 71/133 à
+> 103/133.** Il datait du 27/07 et n'avait jamais été revérifié : l'implémentation amont avait avancé
+> de **32 opérations**, et quatre des six lignes du tableau ci-dessous étaient fausses. Le
+> dénominateur, lui, n'a pas bougé : **133 opérations** en 4.0.2 comme en 4.2.0, vérifié sur les
+> quatre versions publiées depuis (step-009 l'avait établi pour 2.5.0).
+>
+> **Comment le chiffre a été obtenu**, pour qu'il soit refaisable et non recopié : le routage de
+> `go-gateway` est déclaratif — huma v2 sur chi, une opération = un `huma.Operation{OperationID}`
+> enregistré dans `internal/adminapi/`. Compter les `OperationID` des fichiers non-test et les
+> croiser avec les `operationId` du YAML **est** la mesure, pas une approximation. Aucun des 103
+> n'est une souche : ni `501`, ni « not implemented », ni `TODO` dans ces handlers.
+>
+> **Le relever à l'ouverture de chaque jalon**, et corriger le tableau ci-dessous plutôt que de le
+> croire — c'est exactement ce qui vient de se produire.
 
-| Jalon | Opérations manquantes | Jalon passerelle attendu |
+| Jalon | Opérations manquantes | n |
 |---|---|---|
-| **M2** — hub WS | `stream-metrics`, `stream-sessions`, `stream-billing-alerts` | `M11` |
-| **M3** — groupes, webhooks | `*-customer-group`, `*-webhook` | non planifié |
-| **M4** — trafic, connecteurs, sessions | `get-traffic-metrics`, `get-connector-status`, `list-sessions`… | `M8`/`M11` |
-| **M5** — CDR, contenu | `search-messages`, `get-message-trace`, `get-message-content` | `M10`/`M11` |
-| **M6** — routes, sender rewrite | `reorder-routes`, `*-sender-rewrite-rule` | partiel / non planifié |
-| **M8** — facturation, RGPD | les 13 opérations `billing` + `*-content-policy`, `gdpr-erase` | `M9`/`M10` |
+| **M3** — groupes de clients, webhooks de compte | `*-customer-group*` (6), `list-group-customers`, `set-customer-group`, `*-webhook*` (4) | 11 |
+| **M4** — trafic, sessions | `get-traffic-metrics`, `get-metrics-summary`, `list-sessions`, `list-account-sessions`, `disconnect-session` | 5 |
+| **M6** — routes, sender rewrite | `reorder-routes`, `*-sender-rewrite-rule*` (5) | 6 |
+| **M8** — politique de contenu | `*-platform-content-policy` (2), `*-customer-content-policy` (2) | 4 |
+| **M3/M4** — comptes SMPP | `suspend-smpp-account`, `set-account-sender-id-policy`, `set-account-smpp-ops`, `list-customer-accounts` | 4 |
+
+**Ce que le relevé a changé, ligne par ligne** — quatre des six lignes précédentes ont disparu ou
+fondu, et c'est le principal résultat de cette mesure :
+
+- **M2 n'est plus concerné du tout.** `stream-metrics`, `stream-sessions` et `stream-billing-alerts`
+  sont livrées (`internal/adminapi/stream.go`). Le hub WebSocket se développera contre du réel.
+- **M5 non plus.** `search-messages`, `get-message-trace` et `get-message-content` sont livrées : le
+  CDR Explorer n'est plus un jalon sur mock.
+- **M8 fond à 4 opérations.** Les **17** opérations de facturation — et non 13, le contrat en compte
+  17 — sont livrées, `gdpr-erase` aussi. Seule la politique de contenu manque.
+- **M4 perd `get-connector-status`**, livrée.
+
+*(Les quatre opérations de compte SMPP sont listées à part : elles touchent M3 et M4 sans appartenir
+en propre à l'un des deux.)*
 
 **Ce que ça implique**
 
@@ -876,7 +897,7 @@ moins : un scénario qui se lit juste inspire une confiance que rien n'a encore 
 
 | Risque | Effet | Traitement |
 |---|---|---|
-| **63 opérations non livrées côté passerelle** (§16) | Quatre jalons développés sur mock | Mock-first assumé + passe d'intégration réelle par jalon, chiffrée comme du travail |
+| **30 opérations non livrées côté passerelle** (§16) | Deux jalons développés sur mock — M2 et M5 en sont sortis au relevé du 12/09/2026 | Mock-first assumé + passe d'intégration réelle par jalon, chiffrée comme du travail |
 | **Réécriture de l'authentification** — argon2id, TOTP, WebAuthn, sessions | C'est l'endroit exact où naissent les failles ; ~18 000 lignes réécrites dont celles-là | Aucune step ne porte deux mécanismes ; chaque garde est **mutée** avant d'être crue ; la table de vérité des neuf rôles est rejouée à l'identique |
 | **Catalogue de permissions à cheval sur deux langages** (§1.10) | Une divergence silencieuse affiche des contrôles que le serveur refuse | Source unique Go, génération, **test de divergence bloquant en CI** |
 | **Fallback SPA vs `/api`** | Un `/api` inconnu rendrait 200 + HTML ; le client lit `response.ok` puis `.json()` et lèverait | Ordonnancement testé **sur le binaire**, pas en dev — critère d'acceptation de M0 |
