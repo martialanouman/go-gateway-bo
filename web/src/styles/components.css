@@ -202,7 +202,7 @@
  * `cursor: not-allowed` sur les deux, et une teinte qui dit « pas maintenant » sans effacer.
  */
 .ui-button[data-disabled],
-.ui-button[aria-disabled='true'] {
+.ui-button[aria-disabled="true"] {
   border-color: var(--border-subtle);
   background: var(--surface-disabled);
   color: var(--text-faint);
@@ -252,7 +252,7 @@
  * technologies d'assistance, et entendre « étoile » n'aide personne.
  */
 .ui-field:has(.ui-input:required) .ui-field__label::after {
-  content: '*' / '';
+  content: "*" / "";
   color: var(--text-danger);
 }
 
@@ -283,11 +283,6 @@
   pointer-events: none;
 }
 
-.ui-input-wrap--icon .ui-input,
-.ui-input-wrap .ui-input {
-  padding-left: var(--sp-10);
-}
-
 .ui-input {
   width: 100%;
   height: var(--control-height);
@@ -299,6 +294,18 @@
   font-family: var(--font-sans);
   font-size: var(--fs-13);
   transition: var(--transition-control);
+}
+
+/*
+ * Après `.ui-input`, dont elle l'emporte de toute façon en spécificité : l'écrire avant se lisait
+ * comme une règle écrasée par le raccourci `padding` qui suit, ce qu'elle n'est pas.
+ *
+ * Un seul sélecteur : le composant n'émet l'enveloppe **que** s'il y a une icône. Un
+ * `.ui-input-wrap--icon` de plus n'aurait correspondu à rien, et une entrée morte élargit la surface
+ * sans que personne ne s'en aperçoive.
+ */
+.ui-input-wrap .ui-input {
+  padding-left: var(--sp-10);
 }
 
 .ui-input::placeholder {
@@ -534,7 +541,8 @@
   height: 2px;
   background: var(--teal-500);
   transform: translateX(var(--active-tab-left));
-  transition: transform var(--dur-base) var(--ease-productive),
+  transition:
+    transform var(--dur-base) var(--ease-productive),
     width var(--dur-base) var(--ease-productive);
 }
 

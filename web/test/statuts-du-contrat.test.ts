@@ -33,7 +33,9 @@ import {
  * `node_modules/…` en dur survivrait à une désinstallation du paquet et lirait un fichier fantôme.
  */
 const contract = readFileSync(
-  createRequire(import.meta.url).resolve('@martialanouman/gateway-api-contracts/openapi-admin.yaml'),
+  createRequire(import.meta.url).resolve(
+    '@martialanouman/gateway-api-contracts/openapi-admin.yaml',
+  ),
   'utf8',
 )
 
