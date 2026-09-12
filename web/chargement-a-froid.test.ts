@@ -187,9 +187,17 @@ describe('chargement à froid', () => {
     // - **Ce qui s'analyse** est l'octet brut, un coût réel mais d'un autre ordre, qu'un plafond
     //   large suffit à tenir.
     //
-    // Remesuré ce jour sur la sortie livrée, `components.css` versé : **21 202 octets bruts, 4 967
-    // compressés**. La feuille des primitives est sur le chemin critique **à sa place** — tout écran
-    // la consomme au premier rendu, et la scinder ajouterait un aller-retour au lieu d'en retirer un.
+    // Ordre de grandeur sur la sortie livrée, `components.css` versé : **~21 Ko bruts, ~5 Ko
+    // compressés** — soit le tiers de la borne de transfert. Volontairement pas au chiffre près : la
+    // première rédaction écrivait « 21 202 / 4 967 », exact le jour même et **périmé par les deux
+    // commits suivants**, qui ont ajouté des règles à la feuille. Un chiffre figé dans un
+    // commentaire se démode au prochain diff, et c'est la borne qui garde, pas le récit.
+    //
+    // *(Et l'instrument compte : `gzipSync` par défaut, celui de ce test. `gzip -9` et le rapport de
+    // Vite rendent trois valeurs différentes pour la même feuille.)*
+    //
+    // La feuille des primitives est sur le chemin critique **à sa place** — tout écran la consomme
+    // au premier rendu, et la scinder ajouterait un aller-retour au lieu d'en retirer un.
     //
     // Reste `design-reference.css`, qui n'y a rien à faire : ~1,9 Ko servis à tous pour une page que
     // seul un développeur visite. La cause est mesurée depuis step-008 — l'import de la route est

@@ -18,7 +18,7 @@ celui de sa voisine.
 - `Icon` et `Dot` : le jeu de glyphes de la charte, **dessiné une seule fois**. Elle n'admet ni
   bibliothèque d'icônes, ni police d'icônes, ni CDN, et *« A name outside the set renders nothing »*.
 - La couche `components.css`, importée par `app.css` et **inscrite dans `STYLED_FILES`**
-  (`web/test/charte.test.ts:45`) : cette liste est écrite à la main, pas construite par motif, donc
+  (`web/test/charte.test.ts`) : cette liste est écrite à la main, pas construite par motif, donc
   une feuille qui n'y figure pas n'est gardée par rien.
 - Les primitives **rendues sur `/_design`**, qui n'affiche aujourd'hui que des tokens et l'écrit :
   « les primitives habillées (boutons, tables, pilules) […] arrivent en step-041 et step-042 ».
@@ -42,8 +42,10 @@ personne. Les trois figurent au registre de `todo.md`.*
   **numérateur** est périmé, et il ne se lit pas dans le contrat : il se lit dans `go-gateway`. Aucune
   primitive de cette step ne touche une opération du contrat ; la tâche est documentaire et lui échoit
   par sa position. Elle tranche du même coup la contradiction de la source : §16 compte 62 opérations
-  manquantes, §18 en écrit 63. *(La fiche renvoyait à `plan.md:877` ; la ligne est `:879`. Un renvoi
-  par numéro se périme au premier paragraphe inséré — d'où le renvoi par section.)*
+  manquantes, §18 en écrit 63. *(La fiche renvoyait à `plan.md:877`. Le renvoi par numéro est retiré
+  plutôt que corrigé : la première rédaction l'avait « corrigé » en `:879` — juste avant que la
+  réécriture de §16 n'insère vingt lignes et ne le périme à son tour, dans le paragraphe même qui
+  expliquait qu'un numéro se périme.)*
 
 - **Le raccourci `font:` défait `font-variant-numeric`, et cette step livre la table.** step-008 :
   « les `tabular-nums` que `base.css` pose sur `body` sont défaits partout où un rôle typographique
@@ -142,9 +144,11 @@ Aucune primitive ne touche une opération, et `CLAUDE.md` interdit de bumper au 
   valeur qui apparaît, disparaît ou se renomme en amont fait rougir.
 - **Le plafond de la feuille d'entrée mesurait le brut pour protéger le transfert.** Son commentaire
   annonçait lui-même que `components.css` mangerait sa marge. Plutôt qu'un cran arbitraire, il mesure
-  les deux coûts sur leur objet : 4 967 octets compressés (fenêtre de congestion initiale), 21 202
-  bruts (coût d'analyse). *Mesuré avec `gzipSync` — celui du test. `gzip -9` rend 4 974 : l'écart est
-  le niveau de compression, pas une divergence, et le noter évite de le rechercher deux fois.*
+  les deux coûts sur leur objet : **~5 Ko compressés** (fenêtre de congestion initiale, borne
+  14 336) et **~21 Ko bruts** (coût d'analyse, borne 32 768). *Ordre de grandeur et non chiffre
+  exact, délibérément : la première rédaction écrivait « 4 967 / 21 202 », vrai le jour même et périmé
+  par les deux commits suivants. Et l'instrument compte — `gzipSync`, `gzip -9` et le rapport de Vite
+  rendent trois valeurs pour la même feuille.*
 - **Le test qui comptait une ligne par paire de contraste comptait les lignes de la page entière.**
   Il a cessé d'être vrai dès qu'une `DataTable` est apparue sur `/_design` — et aurait pu devenir
   faux en restant vert si deux changements s'étaient compensés.
@@ -156,7 +160,7 @@ Aucune primitive ne touche une opération, et `CLAUDE.md` interdit de bumper au 
 ### Ce que step-040 héritera
 
 **`@base-ui/react` n'est aujourd'hui que dans le chunk de `/_design`.** Mesuré sur le livré : le
-chunk d'entrée passe de 276,07 à 276,12 Ko, celui de `/_design` de 6,07 à 152,89 Ko (52,29
+chunk d'entrée ne bouge pas (~276 Ko), celui de `/_design` passe de 6 Ko à **~153 Ko** (~52
 compressés). C'est correct — aucun écran de production ne consomme encore les primitives, et la page
 de référence est chargée à la demande. **Le premier écran qui les branchera fera passer Base UI dans
 le chunk d'entrée**, et c'est là que sa taille deviendra un sujet : la mesure est à refaire à ce
@@ -180,5 +184,5 @@ step qui le consomme ; step-042 écrit pourquoi aucun des deux n'est de ce jalon
 `Segmented`, `Card`, `IconButton`, `Checkbox`, `Switch`, `RadioGroup`, `Textarea`, `MetricTile`,
 `KeyValueList`, `SpanBar`, `Pagination`, `Banner`, `BalanceCard`, `MaskedSecret` → la step qui les
 consomme, chacune arrivant avec son écran plutôt qu'avec une bibliothèque devinée d'avance. La
-virtualisation des grandes listes → M5. Tout appel réseau, et donc toute donnée réelle dans la
+virtualisation des grandes listes → `step-085` (M4), première à en avoir besoin. Tout appel réseau, et donc toute donnée réelle dans la
 table → step-040.

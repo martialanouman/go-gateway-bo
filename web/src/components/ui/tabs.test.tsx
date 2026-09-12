@@ -107,9 +107,10 @@ describe('keepMounted', () => {
 
   it('le garde monté quand l’écran le demande', () => {
     // **Ce que ce réglage protège.** Un panneau démonté perd son état local — une saisie en cours,
-    // une cérémonie préparée. L'enrôlement du second facteur l'a payé cher : un aller-retour
-    // d'onglet détruisait un secret déjà scanné, puis des codes de récupération que rien ne peut
-    // réafficher.
+    // une cérémonie préparée. La v1.0 l'a payé sur son écran d'enrôlement du second facteur : un
+    // aller-retour d'onglet détruisait un secret déjà scanné, puis des codes de récupération que
+    // rien ne peut réafficher. Aucun écran de ce dépôt n'est encore dans ce cas — `step-028` sera le
+    // premier.
     render(
       <Tabs
         defaultValue="a"

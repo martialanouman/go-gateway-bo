@@ -13,7 +13,6 @@
 
 import { Select as BaseSelect } from '@base-ui/react/select'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
-import { useId } from 'react'
 
 export type SelectOption = {
   readonly value: string
@@ -29,10 +28,9 @@ export type SelectProps = Omit<
    * **Obligatoire**, et c'est le seul champ du lot à l'exiger.
    *
    * Sans lui, le nom accessible du `combobox` se réduit au texte de la valeur : un lecteur d'écran
-   * annonce « Pool partagé, zone de liste » sans jamais dire de quoi on choisit la portée. Les
-   * quatre autres primitives de saisie portent leur libellé ; celle-ci l'oubliait, et c'était le
+   * annonce « Pool partagé, zone de liste » sans jamais dire de quoi on choisit la portée. C'est le
    * point le plus fragile de l'abandon du `<select>` natif — celui-là s'associait à un `<label>`
-   * gratuitement.
+   * gratuitement, et la v1.0 avait livré ce champ sans libellé obligatoire.
    */
   readonly label: ReactNode
   readonly options: readonly SelectOption[]
@@ -50,7 +48,6 @@ export function Select({
   size = 'md',
   ...rest
 }: SelectProps) {
-  const labelId = useId()
   const triggerClasses = ['ui-select', size === 'sm' ? 'ui-select--sm' : '', className]
     .filter(Boolean)
     .join(' ')
@@ -61,11 +58,16 @@ export function Select({
     // déclencheur fermé afficherait la **valeur brute** (`per_account`) au lieu de son libellé —
     // c'est-à-dire un identifiant technique là où la charte veut une phrase.
     <BaseSelect.Root items={options as SelectOption[]} {...rest}>
-      <span className="ui-select__label" id={labelId}>
-        {label}
-      </span>
+      {/*
+        `Select.Label` et non un `<span>` + `aria-labelledby` écrit à la main : la part de Base UI
+        enregistre l'identifiant **et** rend le libellé cliquable — un clic focalise le déclencheur,
+        ce que le `<select>` natif faisait gratuitement. La réécriture manuelle donnait le nom
+        accessible et perdait la cible de clic, alors que cette docstring promet de « redonner ce que
+        le natif offrait ».
+      */}
+      <BaseSelect.Label className="ui-select__label">{label}</BaseSelect.Label>
 
-      <BaseSelect.Trigger className={triggerClasses} aria-labelledby={labelId}>
+      <BaseSelect.Trigger className={triggerClasses}>
         <BaseSelect.Value placeholder={placeholder} />
         <BaseSelect.Icon className="ui-select__caret" aria-hidden="true" />
       </BaseSelect.Trigger>

@@ -17,7 +17,7 @@
  *
  * ## Ce qui n'est pas ici
  *
- * La virtualisation (des dizaines de milliers de lignes, step-06x) et la pagination par curseur
+ * La virtualisation (des dizaines de milliers de lignes, `step-085`) et la pagination par curseur
  * (charte §09). Toutes deux ont besoin d'un écran réel pour être éprouvées ; les poser à vide
  * reviendrait à écrire du code que rien n'exerce.
  */

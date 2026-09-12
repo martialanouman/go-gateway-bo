@@ -1,6 +1,6 @@
 import { Field as BaseField } from '@base-ui/react/field'
 import type { ComponentPropsWithRef, ReactNode } from 'react'
-import { Icon } from './icon'
+import { type GlyphName, Icon } from './icon'
 
 /**
  * Le champ : l'enveloppe qui énonce, et le contrôle qui saisit.
@@ -97,8 +97,14 @@ export function Field({ label, hint, error, badge, children, className }: FieldP
  */
 export type InputProps = Omit<ComponentPropsWithRef<'input'>, 'className' | 'size'> & {
   readonly className?: string
-  /** Glyphe de tête — `search` dans une barre de filtre. Décoratif : le libellé porte le sens. */
-  readonly icon?: string
+  /**
+   * Glyphe de tête — `search` dans une barre de filtre. Décoratif : le libellé porte le sens.
+   *
+   * Typé sur le jeu, et non `string` : `icon.tsx` promet qu'« un nom absent se voit au typecheck,
+   * bien avant de ne rien rendre à l'écran », et un `string` ici faisait passer la promesse à côté
+   * du seul appelant qui existe.
+   */
+  readonly icon?: GlyphName
   /**
    * Valeur machine : identifiant, compteur, MSISDN, sender ID. La charte réserve le mono à
    * celles-ci — « jamais pour du texte narratif ».

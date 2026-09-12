@@ -224,18 +224,19 @@ function DesignReference() {
           </Button>
         </div>
         <p className="design__meta" id="refus-demo">
-          Un contrôle interdit reste visible, atteignable au clavier, et dit ce qui le débloquerait.
+          La rotation demande la permission <code>credentials:rotate</code>, qu'un propriétaire
+          accorde depuis Opérateurs et rôles.
         </p>
 
         <div className="design__row">
-          <Field label="Sender ID" hint="Onze caractères au plus.">
+          <Field label="Sender ID" hint="Un sender ID refusé par l'opérateur fait échouer l'envoi.">
             <Input mono placeholder="BANQUE-CI" required />
           </Field>
           <Field label="Adresse e-mail" error="Cette adresse n’est pas reconnue.">
             <Input defaultValue="operatrice@" />
           </Field>
           <Select
-            label="balance_scope"
+            label="Portée du solde"
             options={[
               { value: 'shared', label: 'Pool partagé' },
               { value: 'per_account', label: 'Par compte' },
@@ -290,12 +291,17 @@ function DesignReference() {
           ]}
           rows={SPECIMEN_ROWS}
           sort={{ key: 'throughput', direction: 'descending' }}
+          // Sans `onSortChange`, la table rend ses en-têtes triables en texte inerte : la référence
+          // n'aurait jamais montré l'état le plus important d'un tableau, et aurait posé un
+          // `aria-sort` sur une colonne que rien ne rend actionnable. La page est un spécimen, il
+          // n'y a rien à trier — mais le contrôle doit être là.
+          onSortChange={() => undefined}
         />
 
         <ul className="design__list">
           {GLYPH_NAMES.map((name) => (
             <li className="design__row" key={name}>
-              <Icon name={name} size={16} />
+              <Icon name={name} size={18} />
               <code className="design__meta">{name}</code>
             </li>
           ))}
