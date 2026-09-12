@@ -28,7 +28,7 @@
  * step-008, elles arrivent en step-041/042.)*
  */
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -44,7 +44,12 @@ const tokens = readTokens()
  * `components.css` y entre avec step-041. Il reste une feuille à venir, celle des surfaces
  * flottantes et des cinq états de contenu (step-042).
  */
-const STYLED_FILES = ['app.css', 'components.css', 'design-reference.css', 'tokens/base.css'] as const
+const STYLED_FILES = [
+  'app.css',
+  'components.css',
+  'design-reference.css',
+  'tokens/base.css',
+] as const
 
 function readStyledCss(): string {
   const here = dirname(fileURLToPath(import.meta.url))
@@ -135,6 +140,39 @@ describe('tokens de la charte', () => {
     expect(assembled).toEqual([...TOKEN_FILES.map((file) => `tokens/${file}`), 'tokens/base.css'])
   })
 
+  it('inscrit dans STYLED_FILES chaque feuille qui existe', () => {
+    // **Ce que ce test ferme, et qui manquait.** Les gardes ci-dessous **parcourent** `STYLED_FILES`.
+    // En retirer une entrée n'en fait donc échouer aucune : elles vérifient simplement une feuille
+    // de moins, en silence. Mesuré en retirant `components.css` de la liste : les 125 tests restaient
+    // verts, alors que la feuille des primitives — la plus grosse du produit — n'était plus gardée
+    // par rien.
+    //
+    // La liste reste **nommée plutôt que globbée**, parce qu'on veut la relire. Ce test dit
+    // seulement qu'elle est *complète* : une feuille posée dans `src/styles/` sans y être inscrite
+    // fait rougir ici, et son auteur choisit alors où elle va.
+    const here = dirname(fileURLToPath(import.meta.url))
+    const styles = resolve(here, '..', 'src', 'styles')
+
+    const onDisk = readdirSync(styles, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.css'))
+      .map((entry) =>
+        join(entry.parentPath, entry.name)
+          .slice(styles.length + 1)
+          .replaceAll('\\', '/'),
+      )
+
+    // Les fichiers de `tokens/` sont gardés autrement — `readTokens()` les lit tous pour en tirer les
+    // déclarations. `tokens/base.css`, lui, porte des **règles** et non des tokens : il est dans
+    // STYLED_FILES.
+    const accounted = new Set<string>([
+      ...STYLED_FILES,
+      ...TOKEN_FILES.map((file) => `tokens/${file}`),
+    ])
+
+    expect(onDisk.length, 'aucune feuille trouvée : ce test ne garde rien').toBeGreaterThan(5)
+    expect(onDisk.filter((file) => !accounted.has(file)).sort()).toEqual([])
+  })
+
   it('sert chaque feuille que STYLED_FILES prétend garder', () => {
     // Une feuille qu'aucun module n'importe n'est pas servie, et la garantie ci-dessus se met alors à
     // juger un fichier mort. Mesuré le 08/08/2026 : retirer `import '~/styles/design-reference.css'`
@@ -175,9 +213,9 @@ describe('tokens de la charte', () => {
 
     const fromRuntime = new Set<string>(RUNTIME_VARIABLES)
 
-    expect(
-      [...used].filter((name) => !tokens.has(name) && !fromRuntime.has(name)).sort(),
-    ).toEqual([])
+    expect([...used].filter((name) => !tokens.has(name) && !fromRuntime.has(name)).sort()).toEqual(
+      [],
+    )
   })
 
   it('donne une valeur de repli à chaque variable que le JavaScript écrira', () => {
