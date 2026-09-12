@@ -38,11 +38,13 @@ import { contrastRatio, readTokens, resolveColor, resolveToken, TOKEN_FILES } fr
 const tokens = readTokens()
 
 /**
- * Le CSS que step-008 livre. `components.css` de la v1.0 n'en fait pas partie : les primitives
- * habillées sont de step-041/042. La liste est **nommée plutôt que globbée** — un fichier de style
+ * Le CSS que le produit sert. La liste est **nommée plutôt que globbée** — un fichier de style
  * ajouté sans y être inscrit échapperait à la garantie, et l'oubli se voit en relisant cette ligne.
+ *
+ * `components.css` y entre avec step-041. Il reste une feuille à venir, celle des surfaces
+ * flottantes et des cinq états de contenu (step-042).
  */
-const STYLED_FILES = ['app.css', 'design-reference.css', 'tokens/base.css'] as const
+const STYLED_FILES = ['app.css', 'components.css', 'design-reference.css', 'tokens/base.css'] as const
 
 function readStyledCss(): string {
   const here = dirname(fileURLToPath(import.meta.url))
@@ -150,6 +152,18 @@ describe('tokens de la charte', () => {
     }
   })
 
+  /**
+   * Les variables que **Base UI écrit à l'exécution**, et qui ne sont donc pas des tokens de la
+   * charte : l'indicateur d'onglets et le positionneur du select les posent par `style.setProperty()`
+   * une fois la mesure faite. La garde ci-dessous exige que tout `var()` vienne de `tokens/` ; ces
+   * trois-là n'en viendront jamais.
+   *
+   * Elles sont **nommées** plutôt que tolérées par un motif : trois lignes qu'on relit, et tout le
+   * reste demeure fermé. Le test suivant vérifie qu'aucune ne vit sans repli — sans quoi cette
+   * liste les rendrait simplement invisibles, ce qui est le contraire de ce qu'on veut.
+   */
+  const RUNTIME_VARIABLES = ['--active-tab-left', '--active-tab-width', '--anchor-width'] as const
+
   it('n’en consomme aucun qui n’existe pas', () => {
     // On part de ce que le CSS **consomme réellement**, jamais d'une liste écrite à la main : une
     // liste ne voit jamais le token qu'on vient d'inventer. `vite-plugin-tokens` tient déjà ce front
@@ -159,7 +173,36 @@ describe('tokens de la charte', () => {
       [...readStyledCss().matchAll(/var\(\s*(--[\w-]+)/g)].map(([, name]) => name as string),
     )
 
-    expect([...used].filter((name) => !tokens.has(name)).sort()).toEqual([])
+    const fromRuntime = new Set<string>(RUNTIME_VARIABLES)
+
+    expect(
+      [...used].filter((name) => !tokens.has(name) && !fromRuntime.has(name)).sort(),
+    ).toEqual([])
+  })
+
+  it('donne une valeur de repli à chaque variable que le JavaScript écrira', () => {
+    // **Ce que ce test ferme.** `vite-plugin-tokens` fait échouer la construction sur un `var()` que
+    // rien ne déclare, et il nomme lui-même ces trois variables comme le cas qui l'avait mis en
+    // défaut. Le repli est la sortie qu'il préfère à une liste d'exemptions, pour une raison de plus
+    // que le build : il donne une valeur **au premier rendu**, avant que le composant n'ait mesuré
+    // quoi que ce soit — sans lui, l'indicateur d'onglet apparaîtrait à largeur nulle le temps d'une
+    // image.
+    //
+    // Sans ce test, `RUNTIME_VARIABLES` ci-dessus suffirait à faire taire la garde précédente, et le
+    // repli pourrait disparaître sans que rien ne bouge.
+    const here = dirname(fileURLToPath(import.meta.url))
+    const components = readFileSync(
+      join(resolve(here, '..'), 'src', 'styles', 'components.css'),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '')
+
+    const declared = new Set(
+      [...components.matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name as string),
+    )
+
+    for (const name of RUNTIME_VARIABLES) {
+      expect(declared, `${name} n'a pas de repli : le premier rendu le lira vide`).toContain(name)
+    }
   })
 
   it('en consomme assez pour que ce test garde quelque chose', () => {

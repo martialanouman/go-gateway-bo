@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
+import { gzipSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { readTokens, resolveToken } from './test/tokens'
 
@@ -174,20 +175,36 @@ describe('chargement à froid', () => {
 
   it("garde la feuille d'entrée assez petite pour que l'aller-retour reste le seul coût", async () => {
     // step-001 mesurait 680 octets et concluait « négligeable tant que la feuille est petite ».
-    // C'était une hypothèse ; ce plafond en fait une condition. Remesuré le 08/08/2026 sur la sortie
-    // livrée, tokens, polices et feuille de `/_design` versés : **12 635 octets bruts, 3 420
-    // compressés** — la marge sous le plafond est de 3,7 Ko, pas celle de `components.css` (1 568
-    // lignes en v1.0, qui arrive en step-041).
+    // C'était une hypothèse ; ce plafond en fait une condition.
     //
-    // *(Le chiffre a d'abord été écrit à 10 723 : c'était la mesure d'avant `/_design`, prise au
-    // commit précédent et jamais refaite. Une revue l'a relevée. C'est le critère 2 — l'affirmation se
-    // confronte à la sortie, pas à l'intention du diff.)*
+    // **Deux bornes, parce qu'il y a deux coûts distincts** — la version précédente n'en mesurait
+    // qu'un, le brut, pour protéger l'autre, le transfert. Elle avait prévu sa propre fin : « la
+    // marge sous le plafond n'est pas celle de `components.css`, qui arrive en step-041 ». Elle y
+    // est, et le bon geste n'était pas de relever le chiffre d'un cran arbitraire.
+    //
+    // - **Ce qui voyage** est l'octet *compressé* : c'est lui qui décide si la feuille tient dans la
+    //   fenêtre de congestion initiale (~14 Ko), donc si elle arrive en un aller-retour.
+    // - **Ce qui s'analyse** est l'octet brut, un coût réel mais d'un autre ordre, qu'un plafond
+    //   large suffit à tenir.
+    //
+    // Remesuré ce jour sur la sortie livrée, `components.css` versé : **21 202 octets bruts, 4 967
+    // compressés**. La feuille des primitives est sur le chemin critique **à sa place** — tout écran
+    // la consomme au premier rendu, et la scinder ajouterait un aller-retour au lieu d'en retirer un.
+    //
+    // Reste `design-reference.css`, qui n'y a rien à faire : ~1,9 Ko servis à tous pour une page que
+    // seul un développeur visite. La cause est mesurée depuis step-008 — l'import de la route est
+    // statique dans `routeTree.gen.ts`, donc `autoCodeSplitting` scinde le composant et pas sa
+    // feuille. Non corrigé ici : le geste touche la génération de l'arbre de routes, pas les
+    // primitives, et il vaut sa propre mesure.
     const entry = /<link rel="stylesheet"[^>]*href="([^"]+)"/.exec(html)?.[1]
     expect(entry, "le document ne lie plus de feuille d'entrée").toBeDefined()
 
-    const bytes = (await readFile(join(outDir, (entry as string).replace(/^\//, '')))).byteLength
+    const sheet = await readFile(join(outDir, (entry as string).replace(/^\//, '')))
 
-    expect(bytes).toBeLessThan(16_384)
+    expect(gzipSync(sheet).byteLength, 'la feuille ne tient plus en un aller-retour').toBeLessThan(
+      14_336,
+    )
+    expect(sheet.byteLength, 'la feuille coûte trop cher à analyser').toBeLessThan(32_768)
   })
 
   it("annonce le chargement aux technologies d'assistance", () => {

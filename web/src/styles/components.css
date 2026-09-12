@@ -1,0 +1,631 @@
+/*
+ * La couche des primitives.
+ *
+ * Elle n'invente **aucune valeur** : couleurs, graisses, espacements, rayons et durées viennent des
+ * tokens de `tokens/`. Si une primitive a besoin d'une valeur qui n'y est pas, c'est une question à
+ * poser à la charte, pas un littéral à écrire ici.
+ *
+ * Deux règles de la charte traversent tout le fichier :
+ *
+ * - **Contour et teinte, jamais un aplat**, y compris pour le bouton principal. Sur des surfaces
+ *   quasi-noires, un aplat teal capte le regard plus fort qu'une alerte rouge, et l'accent unique du
+ *   système perdrait son sens.
+ * - **Ni `scale` ni translation au press.** `--transition-control` ne porte que des couleurs, et
+ *   c'est délibéré : un contrôle qui bouge sous le curseur fabrique des clics ratés, et « a
+ *   mis-click here disconnects a live bind ».
+ *
+ * L'anneau de focus n'est pas redéclaré ici : `tokens/base.css` le pose sur tout `:focus-visible`.
+ * Le kit de la charte y déroge pour les champs — bordure teal et halo de 3 px, qui l'emporte en
+ * spécificité — et cette dérogation **n'est pas portée** : la fiche demande le même anneau sur tout
+ * élément interactif, et deux indicateurs de focus concurrents en font un que l'œil n'apprend pas.
+ */
+
+/*
+ * Les variables que Base UI **pose à l'exécution**, avec un repli.
+ *
+ * `vite-plugin-tokens` refuse tout `var(--…)` que rien ne déclare, et il a raison sur la lettre : un
+ * token inconnu ne casse rien, le navigateur hérite, et l'écran s'affiche presque juste. Ces
+ * trois-là n'existent pourtant dans aucune feuille — l'indicateur d'onglets et le positionneur du
+ * select les écrivent par `style.setProperty()` une fois la mesure faite.
+ *
+ * Un repli plutôt qu'une liste d'exemptions dans le plugin : il ne demande aucun code, et il donne
+ * en plus une valeur **au premier rendu**, avant que le JavaScript n'ait mesuré quoi que ce soit.
+ * Sans lui, l'indicateur d'onglet apparaîtrait à une largeur nulle le temps d'une image.
+ */
+:root {
+  --active-tab-left: 0px;
+  --active-tab-width: 0px;
+  /* Le popup du select retombe sur la largeur de son contenu tant que l'ancre n'est pas mesurée. */
+  --anchor-width: auto;
+}
+
+/* ─── Glyphes ──────────────────────────────────────────────────────────────────────────────── */
+.ui-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: currentcolor;
+}
+
+.ui-icon svg {
+  display: block;
+}
+
+/*
+ * Le point de statut. Sa couleur vient d'une classe et jamais d'un style composé en JavaScript : le
+ * plugin de tokens ne lit que le CSS émis, et un token renommé passerait sinon la construction.
+ */
+.ui-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-round);
+  background: var(--status-idle);
+}
+
+.ui-dot--up {
+  background: var(--status-up);
+}
+
+.ui-dot--degraded {
+  background: var(--status-degraded);
+}
+
+.ui-dot--down {
+  background: var(--status-down);
+}
+
+.ui-dot--restricted {
+  background: var(--status-restricted);
+}
+
+.ui-dot--accent {
+  background: var(--teal-500);
+}
+
+.ui-dot--info {
+  background: var(--sev-info);
+}
+
+.ui-dot--idle {
+  background: var(--status-idle);
+}
+
+/*
+ * **La seule animation en boucle de tout le système** : le pouls de 1,8 s du point vivant. Il ne
+ * marque que les valeurs alimentées par la WebSocket — le poser sur un instantané ferait mentir le
+ * seul signal de fraîcheur dont dispose l'opérateur.
+ *
+ * La classe est portée par le point lui-même. Le kit de la charte la posait là aussi mais ciblait un
+ * descendant, si bien qu'un point isolé ne battait jamais.
+ */
+.ui-dot--live {
+  animation: ui-pulse var(--dur-pulse) var(--ease-expressive) infinite;
+}
+
+@keyframes ui-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* ─── Bouton ───────────────────────────────────────────────────────────────────────────────── */
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  height: var(--control-height);
+  padding: 0 var(--pad-control-x);
+  border: 1px solid transparent;
+  border-radius: var(--r-field);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-control);
+}
+
+.ui-button--sm {
+  height: var(--control-height-sm);
+  gap: var(--sp-3);
+  padding: 0 var(--sp-5);
+  font-size: var(--fs-12);
+}
+
+.ui-button--lg {
+  height: var(--control-height-lg);
+  padding: 0 var(--sp-8);
+}
+
+.ui-button--primary {
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-bg);
+  color: var(--action-primary-fg);
+}
+
+.ui-button--primary:hover:not([aria-disabled], [data-disabled]) {
+  border-color: var(--teal-500);
+  background: var(--action-primary-bg-hover);
+}
+
+.ui-button--secondary {
+  border-color: var(--action-secondary-border);
+  background: var(--action-secondary-bg);
+  color: var(--action-secondary-fg);
+}
+
+.ui-button--secondary:hover:not([aria-disabled], [data-disabled]) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.ui-button--secondary:active:not([aria-disabled], [data-disabled]) {
+  background: var(--surface-active);
+}
+
+.ui-button--danger {
+  border-color: var(--action-danger-border);
+  background: var(--action-danger-bg);
+  color: var(--action-danger-fg);
+}
+
+.ui-button--danger:hover:not([aria-disabled], [data-disabled]) {
+  border-color: var(--red-500);
+  background: var(--action-danger-bg-hover);
+}
+
+.ui-button--link {
+  height: auto;
+  padding: 0;
+  border: 0;
+  color: var(--text-link);
+}
+
+.ui-button--link:hover:not([aria-disabled], [data-disabled]) {
+  color: var(--text-link-hover);
+  text-decoration: underline;
+}
+
+/*
+ * Un contrôle indisponible garde sa place. `[data-disabled]` vient du `disabled` de Base UI,
+ * `[aria-disabled]` du contrôle **interdit** ou occupé, qui reste dans le parcours clavier — d'où
+ * `cursor: not-allowed` sur les deux, et une teinte qui dit « pas maintenant » sans effacer.
+ */
+.ui-button[data-disabled],
+.ui-button[aria-disabled='true'] {
+  border-color: var(--border-subtle);
+  background: var(--surface-disabled);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.ui-button__spinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: var(--r-round);
+  animation: ui-spin var(--dur-spin) linear infinite;
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Champ ────────────────────────────────────────────────────────────────────────────────── */
+.ui-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.ui-field__label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--text-muted);
+  font: var(--text-overline);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+/*
+ * L'astérisque **découle** de l'état du contrôle, il n'est pas déclaré une seconde fois sur le
+ * libellé : deux déclarations se contredisent tôt ou tard, et c'est l'ornement qui gagnerait à
+ * l'écran pendant que la sémantique dirait l'inverse.
+ *
+ * `content: '*' / ''` donne au pseudo-élément un texte de remplacement **vide** : la marque est
+ * peinte sans être annoncée. `required` sur le contrôle porte déjà l'information pour les
+ * technologies d'assistance, et entendre « étoile » n'aide personne.
+ */
+.ui-field:has(.ui-input:required) .ui-field__label::after {
+  content: '*' / '';
+  color: var(--text-danger);
+}
+
+.ui-field__hint {
+  color: var(--text-faint);
+  font: var(--text-caption);
+}
+
+.ui-field__error {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  color: var(--text-danger);
+  font: var(--text-caption);
+}
+
+.ui-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ui-input-wrap__icon {
+  position: absolute;
+  left: var(--sp-5);
+  display: flex;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.ui-input-wrap--icon .ui-input,
+.ui-input-wrap .ui-input {
+  padding-left: var(--sp-10);
+}
+
+.ui-input {
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--sp-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  transition: var(--transition-control);
+}
+
+.ui-input::placeholder {
+  color: var(--text-faint);
+}
+
+.ui-input:hover {
+  border-color: var(--border-strong);
+}
+
+.ui-input--mono {
+  font-family: var(--font-mono);
+  letter-spacing: var(--ls-mono);
+}
+
+.ui-input--sm {
+  height: var(--control-height-sm);
+  font-size: var(--fs-12);
+}
+
+.ui-input[data-invalid] {
+  border-color: var(--red-500);
+}
+
+.ui-input[data-disabled] {
+  background: var(--surface-disabled);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+/* ─── Sélecteur ────────────────────────────────────────────────────────────────────────────── */
+.ui-select__label {
+  display: block;
+  margin-bottom: var(--sp-4);
+  color: var(--text-muted);
+  font: var(--text-overline);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.ui-select {
+  display: inline-flex;
+  width: 100%;
+  height: var(--control-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-field);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  cursor: pointer;
+  transition: var(--transition-control);
+}
+
+.ui-select:hover {
+  border-color: var(--border-strong);
+}
+
+.ui-select--sm {
+  height: var(--control-height-sm);
+  font-size: var(--fs-12);
+}
+
+.ui-select[data-disabled] {
+  background: var(--surface-disabled);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.ui-select__caret {
+  display: flex;
+  color: var(--text-muted);
+}
+
+/*
+ * La liste s'aligne sur la largeur du déclencheur : une liste plus étroite que son champ tronquerait
+ * les libellés qu'elle sert à choisir. `--anchor-width` est mesurée par Base UI à l'ouverture, et
+ * son repli est déclaré en tête de ce fichier.
+ */
+.ui-select__positioner {
+  z-index: var(--z-popover);
+  min-width: var(--anchor-width);
+}
+
+.ui-select__popup {
+  overflow: auto;
+  max-height: 18rem;
+  padding: var(--sp-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-card);
+  background: var(--surface-card);
+  box-shadow: var(--elevation-popover);
+}
+
+.ui-select__item {
+  display: flex;
+  align-items: center;
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-field);
+  color: var(--text-secondary);
+  font-size: var(--fs-13);
+  cursor: pointer;
+}
+
+.ui-select__item[data-highlighted] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.ui-select__item[data-selected] {
+  background: var(--tint-teal);
+  color: var(--text-accent);
+}
+
+/* ─── Statut ───────────────────────────────────────────────────────────────────────────────── */
+/*
+ * Deux rendus, deux dimensions, jamais confondus : le point porte `link_status`, la pilule porte
+ * `breaker_state`. Un disjoncteur ouvert sur un lien vivant et un bind mort demandent des actions
+ * opposées.
+ */
+.ui-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ui-status__label {
+  color: var(--text-primary);
+  font: var(--text-data);
+  letter-spacing: var(--ls-mono);
+}
+
+.ui-status__meta {
+  color: var(--text-faint);
+  font: var(--text-data-sm);
+}
+
+.ui-breaker {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-pill);
+  font: var(--text-pill);
+}
+
+/*
+ * `open` suit la charte, qui range « breaker open » avec l'ambre : un disjoncteur ouvert est un état
+ * **dégradé** dont on attend la reprise, pas une panne qui appelle un rebind.
+ */
+.ui-breaker--closed {
+  background: var(--tint-green);
+  color: var(--breaker-closed);
+}
+
+.ui-breaker--open {
+  background: var(--tint-amber);
+  color: var(--breaker-open);
+}
+
+.ui-breaker--half_open {
+  background: var(--tint-amber);
+  color: var(--breaker-half-open);
+}
+
+/* ─── Onglets ──────────────────────────────────────────────────────────────────────────────── */
+.ui-tabs__list {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-7);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.ui-tab {
+  display: inline-flex;
+  height: var(--subbar-height);
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--pad-control-x);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  cursor: pointer;
+  transition: var(--transition-control);
+}
+
+.ui-tab:hover:not([data-disabled]) {
+  color: var(--text-primary);
+}
+
+.ui-tab[data-selected] {
+  color: var(--teal-500);
+  font-weight: var(--fw-medium);
+}
+
+.ui-tab[data-disabled] {
+  color: var(--n-500);
+  cursor: not-allowed;
+}
+
+.ui-tab__count {
+  color: var(--text-faint);
+  font: var(--text-data-sm);
+}
+
+.ui-tab[data-selected] .ui-tab__count {
+  color: var(--teal-500);
+}
+
+/*
+ * Le trait de l'onglet actif est **un élément qui glisse**, pas une bordure posée sur chaque onglet :
+ * une bordure décalerait la ligne de base au changement d'onglet. Base UI mesure l'onglet
+ * sélectionné et écrit les deux variables ; leur repli est en tête de fichier.
+ *
+ * C'est la seule translation du système, et elle ne se produit pas sous un curseur : elle suit un
+ * choix déjà fait, elle ne déplace aucune cible de clic.
+ */
+.ui-tabs__indicator {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: var(--active-tab-width);
+  height: 2px;
+  background: var(--teal-500);
+  transform: translateX(var(--active-tab-left));
+  transition: transform var(--dur-base) var(--ease-productive),
+    width var(--dur-base) var(--ease-productive);
+}
+
+.ui-tabs__panel {
+  padding: var(--pad-panel) 0 0;
+}
+
+/* ─── Tableau ──────────────────────────────────────────────────────────────────────────────── */
+/*
+ * **Ici vit la dette du raccourci `font:`.** `font: var(--text-body)` réinitialise
+ * `font-variant-numeric`, donc défait les `tabular-nums` que `tokens/base.css` pose sur `body`. Une
+ * colonne de nombres en police proportionnelle perd alors sa chasse commune et **danse** à chaque
+ * rafraîchissement — dans un cockpit où les compteurs défilent, c'est le défaut qu'on remarque sans
+ * savoir le nommer.
+ *
+ * Reposé ici et **nulle part ailleurs** : les autres surfaces de chiffres de cette step —
+ * `.ui-status__meta`, `.ui-tab__count`, les cellules mono — portent des rôles en IBM Plex Mono, dont
+ * la chasse est déjà fixe. Les en décorer ferait croire à une protection qui n'agit sur rien.
+ */
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * La légende nomme le tableau pour qui ne le voit pas. Elle est retirée de l'affichage — le titre de
+ * section la porte déjà à l'écran — mais **jamais** par `display: none`, qui la retirerait aussi de
+ * l'arbre d'accessibilité et rendrait le tableau anonyme.
+ */
+.ui-table__caption {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ui-table__header {
+  position: sticky;
+  top: 0;
+  padding: var(--pad-cell-y) var(--pad-cell-x);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-muted);
+  font: var(--text-overline);
+  letter-spacing: var(--ls-caps);
+  text-align: start;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/*
+ * Un **bouton**, et non un `onClick` sur la cellule d'en-tête : le tri doit s'atteindre au clavier,
+ * et une cellule ne se focalise pas.
+ */
+.ui-table__sort {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.ui-table__cell {
+  height: var(--row-height);
+  padding: var(--pad-cell-y) var(--pad-cell-x);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.ui-table--dense .ui-table__cell {
+  height: var(--row-height-dense);
+}
+
+.ui-table__cell--end,
+.ui-table__header.ui-table__cell--end {
+  text-align: end;
+}
+
+.ui-table__cell--mono {
+  color: var(--text-primary);
+  font: var(--text-data);
+  letter-spacing: var(--ls-mono);
+}
+
+.ui-table__row:hover .ui-table__cell {
+  background: var(--surface-hover);
+}
