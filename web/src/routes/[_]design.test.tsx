@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { createAppRouter } from '~/router'
 
@@ -51,13 +51,16 @@ describe('la référence visuelle', () => {
       'Espacements',
       'Rayons',
       'Contraste',
+      // step-041. La page ne montrait que des tokens ; elle montre maintenant ce qu'ils habillent.
+      'Primitives',
     ]
 
     for (const section of sections) {
       expect(screen.getByRole('heading', { level: 2, name: section })).toBeInTheDocument()
     }
 
-    // Et pas de septième non annoncée : la liste ci-dessus est la page, pas un échantillon d'elle.
+    // Et pas une de plus qui ne soit annoncée : la liste ci-dessus est la page, pas un
+    // échantillon d'elle.
     expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(sections.length)
   })
 
@@ -65,11 +68,20 @@ describe('la référence visuelle', () => {
     await visitDesign()
 
     const { CONTRAST_PAIRS } = await import('~/lib/design-tokens')
-    const rows = screen.getAllByRole('row')
 
-    // `-1` : l'en-tête du tableau est une ligne comme les autres pour ARIA. Ce qui compte est que la
-    // page rende **toute** la table — sinon « chaque paire utilisée par /_design » deviendrait faux
-    // sans que rien ne le dise, et le test de contraste garderait des paires que personne n'affiche.
+    // **La table de contraste, pas toutes les lignes de la page.** La version précédente comptait
+    // `getAllByRole('row')` sur le document entier : elle a cessé d'être vraie à la minute où la
+    // section « Primitives » a rendu un spécimen de `DataTable`, et elle aurait aussi bien pu
+    // devenir fausse **en restant verte** si deux changements s'étaient compensés.
+    const contrast = screen
+      .getAllByRole('table')
+      .find((table) => table.className.includes('design__table'))
+    expect(contrast, 'la table de contraste a disparu de la page').toBeDefined()
+
+    // `-1` : l'en-tête est une ligne comme les autres pour ARIA. Ce qui compte est que la page rende
+    // **toute** la table — sinon « chaque paire utilisée par /_design » deviendrait faux sans que
+    // rien ne le dise, et le test de contraste garderait des paires que personne n'affiche.
+    const rows = within(contrast as HTMLElement).getAllByRole('row')
     expect(rows.length - 1).toBe(CONTRAST_PAIRS.length)
   })
 })

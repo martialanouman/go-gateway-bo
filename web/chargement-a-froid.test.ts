@@ -264,6 +264,12 @@ describe('chargement à froid', () => {
     const allowedPrefixes = [
       'http://www.w3.org/', // espaces de noms SVG et XML, émis par React
       'https://react.dev/errors/', // messages d'erreur de React en production
+      // Même mécanisme, côté Base UI, entré avec les primitives de step-041. Vérifié sur le bundle
+      // livré plutôt que supposé : l'adresse est **interpolée dans une chaîne** — « … error #n;
+      // visit <url> for the full message. » — et n'est la cible d'aucun `fetch` ni d'aucun `src`.
+      // Le navigateur ne la demande donc jamais, ce que le parcours Playwright observe pour de bon
+      // en refusant toute requête hors origine.
+      'https://base-ui.com/production-error',
     ]
     const allowedExactly = ['http://localhost'] // repli d'origine de TanStack Router hors navigateur
 
