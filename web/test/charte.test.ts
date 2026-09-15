@@ -33,23 +33,16 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { CONTRAST_PAIRS, RADII, SPACINGS, SURFACES, TYPE_ROLES } from '../src/lib/design-tokens'
-import { contrastRatio, readTokens, resolveColor, resolveToken, TOKEN_FILES } from './tokens'
+import {
+  contrastRatio,
+  readTokens,
+  resolveColor,
+  resolveToken,
+  STYLED_FILES,
+  TOKEN_FILES,
+} from './tokens'
 
 const tokens = readTokens()
-
-/**
- * Le CSS que le produit sert. La liste est **nommée plutôt que globbée** — un fichier de style
- * ajouté sans y être inscrit échapperait à la garantie, et l'oubli se voit en relisant cette ligne.
- *
- * `components.css` y entre avec step-041. Il reste une feuille à venir, celle des surfaces
- * flottantes et des cinq états de contenu (step-042).
- */
-const STYLED_FILES = [
-  'app.css',
-  'components.css',
-  'design-reference.css',
-  'tokens/base.css',
-] as const
 
 function readStyledCss(): string {
   const here = dirname(fileURLToPath(import.meta.url))
