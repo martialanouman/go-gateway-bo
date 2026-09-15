@@ -140,3 +140,14 @@
   border-radius: var(--r-pill);
   font: var(--text-pill);
 }
+
+/*
+ * La ligne d'un squelette de table : trois colonnes qui décroissent, comme la vraie. La page rend un
+ * spécimen de chargement, et cette géométrie est ce qui le distingue d'un rectangle générique.
+ */
+.design__skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: var(--sp-4) 0;
+}
