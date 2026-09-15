@@ -169,5 +169,86 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
     'un point de lien a emprunté le rendu du disjoncteur',
   ).toBe(0)
 
+  // ── Les surfaces flottantes et les états, peints pour de bon (step-042) ─────────────────────
+  //
+  // Même raison que le bloc précédent, et quatre propriétés de plus qu'aucun test de composant ne
+  // peut observer : jsdom n'applique aucun CSS, n'a pas d'ordre de tabulation réel, et ne connaît
+  // ni `prefers-reduced-motion` ni `backdrop-filter`.
+
+  // **Le voile ne floute pas.** La charte tranche — « blurring live metrics behind a dialog costs
+  // more than it gives » —, et `--scrim-blur` reste donc déclaré sans consommateur. Un test de
+  // composant ne peut rien en dire : la propriété n'existe qu'une fois la règle appliquée.
+  await page.getByRole('button', { name: 'Ouvrir la modale' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Déconnecter la session ?' })
+  await expect(dialog).toBeVisible()
+
+  const scrim = page.locator('.ui-scrim')
+  await expect(scrim).toHaveCSS('backdrop-filter', 'none')
+  await expect(scrim).toHaveCSS('background-color', 'rgba(6, 8, 11, 0.72)')
+
+  // **Le piège du focus, et c'est ici qu'il se mesure.** jsdom n'a ni ordre de tabulation réel, ni
+  // `inert`, ni visibilité calculée : y « vérifier » un piège donnerait un vert qui ne prouve rien.
+  // On tabule plus de fois qu'il n'y a de contrôles dans la modale, et le focus doit y rester.
+  for (let i = 0; i < 8; i += 1) await page.keyboard.press('Tab')
+  expect(
+    await page.evaluate(() => document.activeElement?.closest('.ui-modal') !== null),
+    'le focus est sorti de la modale : le piège ne tient pas',
+  ).toBe(true)
+
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+
+  // **La source du toast, résolue par le navigateur.** Le token est lu à l'exécution plutôt que
+  // recopié en `rgb(…)` : deux recopies de la même main se confirment l'une l'autre sans rien
+  // mesurer, et c'est le piège qu'une revue de step-041 avait trouvé sur l'anneau de focus.
+  await page.getByRole('button', { name: 'Toast · alertmanager' }).click()
+  await page.getByRole('button', { name: 'Toast · bff' }).click()
+
+  const couleursDeSource = await page.evaluate(() =>
+    (['--source-alertmanager', '--source-bff'] as const).map((token) => {
+      const sonde = document.createElement('span')
+      sonde.style.color = `var(${token})`
+      document.body.append(sonde)
+      const peint = getComputedStyle(sonde).color
+      sonde.remove()
+      return peint
+    }),
+  )
+
+  await expect(page.locator('.ui-toast__source--alertmanager')).toHaveCSS(
+    'color',
+    couleursDeSource[0] ?? '',
+  )
+  await expect(page.locator('.ui-toast__source--bff')).toHaveCSS('color', couleursDeSource[1] ?? '')
+  expect(couleursDeSource[0], 'les deux étages se peignent de la même couleur').not.toBe(
+    couleursDeSource[1],
+  )
+
+  // **Le plafond plafonne à l'écran.** Base UI marque les excédentaires `data-limited` sans cesser
+  // de les rendre : c'est la règle `display: none` qui les retire, et le test Vitest ne peut que
+  // constater le marquage. Mesuré : remplacer cette règle par une opacité y laisse tout vert.
+  for (let i = 0; i < 3; i += 1) {
+    await page.getByRole('button', { name: 'Toast · bff' }).click()
+  }
+  await expect(page.locator('.ui-toast:visible')).toHaveCount(3)
+
+  // **`prefers-reduced-motion` coupe le scintillement — vérifié, pas déclaré.** La règle vit dans
+  // `tokens/base.css`, sur `*`, et aucune feuille de composant ne la redit. Sa disparition ne se
+  // verrait donc nulle part ailleurs.
+  //
+  // La durée est comparée en **secondes**, jamais en chaîne : Chromium rend `0.01ms` sous la forme
+  // `1e-05s`, et recopier cette sortie dans l'assertion ne vérifierait que ma propre recopie.
+  const squelette = page.locator('.ui-skeleton').first()
+  const dureeAnimation = () =>
+    squelette.evaluate((element) => Number.parseFloat(getComputedStyle(element).animationDuration))
+
+  expect(await dureeAnimation(), 'le squelette ne bat pas au rythme de la charte').toBeCloseTo(1.4)
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  expect(await dureeAnimation(), 'le mouvement réduit ne coupe pas le scintillement').toBeLessThan(
+    0.001,
+  )
+  await page.emulateMedia({ reducedMotion: null })
+
   expect(problems).toEqual([])
 })
