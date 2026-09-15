@@ -180,9 +180,16 @@
   color: var(--action-danger-fg);
 }
 
+/*
+ * **Le texte change de token avec le fond.** `--action-danger-fg` est `--red-500`, qui tient sur une
+ * surface nue (4,90 sur la page, 4,64 en carte) et **tombe à 4,05 sur sa propre teinte** — la
+ * combinaison que `colors.css` décrit et pour laquelle il déclare `--text-danger-on-tint` (4,70 en
+ * carte). Le survol était la seule règle du fichier à poser la teinte sans reprendre la couleur.
+ */
 .ui-button--danger:hover:not([aria-disabled], [data-disabled]) {
   border-color: var(--red-500);
   background: var(--action-danger-bg-hover);
+  color: var(--text-danger-on-tint);
 }
 
 .ui-button--link {

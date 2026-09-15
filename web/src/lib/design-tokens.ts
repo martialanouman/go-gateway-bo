@@ -116,4 +116,19 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     over: '--surface-page',
     usage: 'Ligne sélectionnée dans une table',
   },
+  // Les deux combinaisons que les primitives de step-041 ont introduites sans les inscrire ici. La
+  // porteuse est `--surface-card` et non la page : c'est la plus sévère des deux, et DN-5 a été
+  // trompée une fois par le contraire.
+  {
+    text: '--text-danger-on-tint',
+    background: '--action-danger-bg-hover',
+    over: '--surface-card',
+    usage: 'Bouton destructif survolé',
+  },
+  {
+    text: '--action-primary-fg',
+    background: '--action-primary-bg',
+    over: '--surface-card',
+    usage: 'Bouton principal · option sélectionnée',
+  },
 ] as const

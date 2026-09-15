@@ -104,6 +104,28 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // elle est calculée, jamais présente dans le DOM.
   await expect(page.locator('.ui-table').first()).toHaveCSS('font-variant-numeric', 'tabular-nums')
 
+  // **Le bouton destructif change de token de texte au survol.** `--action-danger-fg` est
+  // `--red-500` : il tient sur une surface nue et **tombe à 4,05 sur sa propre teinte**, la
+  // combinaison que le survol peint. `design-tokens.ts` juge le ratio de la paire ; cette ligne-ci
+  // vérifie que la feuille peint bien ce token-là, sans quoi la table décrirait une intention.
+  //
+  // Le token est résolu **par le navigateur** plutôt que recopié en `rgb(…)` : une valeur écrite ici
+  // et une valeur écrite dans `colors.css` sont deux recopies de la même main, qui se confirment
+  // l'une l'autre sans rien mesurer.
+  const danger = page.getByRole('button', { name: 'Déconnecter la session' })
+  const attendu = await page.evaluate(() => {
+    const sonde = document.createElement('span')
+    sonde.style.color = 'var(--text-danger-on-tint)'
+    document.body.append(sonde)
+    const resolu = getComputedStyle(sonde).color
+    sonde.remove()
+    return resolu
+  })
+  const auRepos = await danger.evaluate((element) => getComputedStyle(element).color)
+  await danger.hover()
+  await expect(danger).toHaveCSS('color', attendu)
+  expect(auRepos, 'le repos et le survol peignent déjà la même couleur').not.toBe(attendu)
+
   // **Un contrôle interdit reste visible et atteignable.** « Désactivé et expliqué, jamais masqué. »
   const blocked = page.getByRole('button', { name: 'Effectuer la rotation' })
   await expect(blocked).toBeVisible()
