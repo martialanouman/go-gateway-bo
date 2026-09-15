@@ -140,20 +140,25 @@ describe('ToastStack', () => {
   })
 
   /**
-   * **Le plafond plafonne à l'écran, pas seulement dans l'état.**
+   * **Ce que ce test prouve, et ce qu'il ne prouve pas.**
    *
-   * Base UI marque les excédentaires `data-limited` et **continue de les rendre** : sans la règle
-   * `display: none` de la feuille, une pile « plafonnée à 3 » en afficherait quatre. C'est pourquoi
-   * ce test compte ce qui est **visible**, et non les nœuds.
+   * Il prouve que le quatrième toast est *marqué* : Base UI le rend avec `data-limited` plutôt que
+   * de le retirer. Il ne prouve **pas** qu'il disparaît de l'écran — c'est la règle `display: none`
+   * de la feuille qui le fait, et jsdom n'applique aucun CSS. Mesuré en remplaçant cette règle par
+   * une opacité : les 254 tests restaient verts.
+   *
+   * La preuve manquante est donc dans le parcours Playwright, seul endroit où l'on lit ce qui est
+   * peint. Les deux ensemble tiennent le plafond ; ni l'une ni l'autre ne suffit.
    */
-  it('n’en montre jamais plus de trois', async () => {
+  it('marque comme excédentaire tout toast au-delà du troisième', async () => {
     await pousser([{ title: 'Un' }, { title: 'Deux' }, { title: 'Trois' }, { title: 'Quatre' }])
 
-    const visibles = screen
-      .getAllByRole('dialog')
-      .filter((toast) => !toast.hasAttribute('data-limited'))
+    const tous = screen.getAllByRole('dialog')
+    const marques = tous.filter((toast) => toast.hasAttribute('data-limited'))
 
-    expect(visibles).toHaveLength(3)
+    expect(tous).toHaveLength(4)
+    expect(marques).toHaveLength(1)
+    expect(marques[0]).toHaveTextContent('Un')
   })
 
   /**
