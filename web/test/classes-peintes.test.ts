@@ -1,11 +1,11 @@
 // @vitest-environment node
 
 /**
- * Les classes que les primitives émettent sont-elles peintes ? Et la feuille peint-elle des classes
- * que personne n'émet ?
+ * Les classes que les primitives émettent sont-elles peintes ? Et les feuilles peignent-elles des
+ * classes que personne n'émet ?
  *
  * **Le trou que ce fichier ferme est large.** Une quarantaine d'assertions de test visent une classe
- * — `toHaveClass('ui-button--danger')`, `querySelector('.ui-dot--down')`. Aucune ne traverse la
+ * — `toHaveClass('ui-button--danger')`, `querySelector('.ui-dot--down')`. Aucune ne traverse une
  * feuille : elles relisent la chaîne que le composant vient de construire. Mesuré le 12/09/2026 en
  * renommant `.ui-table__cell--mono` en `.ui-table__cell--machine` **dans le CSS seulement** : les
  * 214 tests, `vite build` et le parcours Playwright restaient verts, et toutes les valeurs machine
@@ -23,6 +23,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { STYLED_FILES } from './tokens'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const ui = resolve(here, '..', 'src', 'components', 'ui')
@@ -52,19 +53,29 @@ function couvertePar(name: string, literals: Set<string>): boolean {
   return [...literals].some((literal) => literal.endsWith('--') && name.startsWith(literal))
 }
 
-/** Les classes que la feuille cible. */
+/**
+ * Les classes que les feuilles servies ciblent.
+ *
+ * **Toutes les feuilles, jamais une seule.** La première rédaction ne lisait que `components.css`,
+ * la seule qui portait des `ui-*` à l'époque. Une primitive peinte ailleurs — ce que step-042 fait
+ * avec `feedback.css` — serait sortie de la bijection sans qu'aucun test ne le dise : les deux
+ * assertions ci-dessous auraient simplement jugé une feuille de moins, en silence. C'est exactement
+ * le défaut que `STYLED_FILES` avait déjà eu, et il se referme de la même façon — une liste, deux
+ * lecteurs.
+ */
 function painted(): Set<string> {
-  const css = readFileSync(resolve(here, '..', 'src', 'styles', 'components.css'), 'utf8').replace(
-    /\/\*[\s\S]*?\*\//g,
-    '',
+  const css = STYLED_FILES.map((file) =>
+    readFileSync(resolve(here, '..', 'src', 'styles', file), 'utf8'),
   )
+    .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
 
   return new Set([...css.matchAll(/\.(ui-[\w-]+)/g)].map(([, name]) => name as string))
 }
 
 /**
  * Les crochets : des classes émises pour être **ciblées par l'appelant ou par un test**, jamais
- * peintes par cette feuille. Nommées une à une, et non tolérées par un motif — c'est la liste qu'on
+ * peintes par aucune d'elles. Nommées une à une, et non tolérées par un motif — c'est la liste qu'on
  * relit.
  */
 const HOOKS = new Set([
@@ -76,7 +87,7 @@ const HOOKS = new Set([
 ])
 
 describe('les classes des primitives', () => {
-  it('sont toutes peintes par la feuille, ou nommées comme crochets', () => {
+  it('sont toutes peintes par une feuille servie, ou nommées comme crochets', () => {
     const rules = painted()
     const orphelines = [...emitted()]
       .filter((name) => !HOOKS.has(name))

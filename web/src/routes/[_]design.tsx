@@ -1,15 +1,25 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
 import {
   Button,
   DataTable,
   Dot,
+  EmptyState,
+  ErrorState,
   Field,
   GLYPH_NAMES,
   Icon,
   Input,
+  LoadingState,
+  Modal,
+  ModuleDisabled,
+  NoResults,
   Select,
+  Skeleton,
   StatusPill,
   Tabs,
+  ToastStack,
+  useToast,
 } from '~/components/ui'
 import {
   ACCENT_COLORS,
@@ -48,8 +58,12 @@ import '~/styles/design-reference.css'
  *
  * Elle rend aussi les **primitives** depuis step-041 : un écran y lit l'état exact d'un contrôle
  * refusé, d'un champ en erreur ou d'une pilule de disjoncteur, plutôt que de le déduire d'une
- * capture. Ce qu'elle ne montre pas encore : les surfaces flottantes et les cinq états de contenu,
- * qui arrivent en step-042.
+ * capture. step-042 y ajoute les surfaces flottantes et les cinq états de contenu.
+ *
+ * **La modale et les toasts démarrent fermés**, et c'est structurel plutôt que cosmétique :
+ * `Dialog.Title` et `Toast.Title` rendent un `<h2>`, que le test de cette page compte. Un spécimen
+ * ouvert au repos ajouterait deux titres de section fantômes à une page dont la liste des sections
+ * fait foi.
  */
 export const Route = createFileRoute('/_design')({ component: DesignReference })
 
@@ -311,6 +325,120 @@ function DesignReference() {
           </li>
         </ul>
       </section>
+
+      <section className="design__section">
+        <h2 id="etats">Retour et états</h2>
+
+        <div className="design__row">
+          <EmptyState
+            action={
+              <Button size="sm" variant="primary">
+                Nouvelle règle
+              </Button>
+            }
+            description="Créez une règle pour être notifié des incidents."
+            inline
+            title="Aucune règle d’alerte"
+          />
+          <NoResults onReset={() => undefined} title="Aucun message trouvé" />
+          <ModuleDisabled module="Facturation" />
+        </div>
+
+        <div className="design__row">
+          <ErrorState
+            description="La passerelle n’a pas répondu (504). Vos données locales restent affichées."
+            onRetry={() => undefined}
+            request="GET /api/connectors · 504 · req_8f2c…"
+          />
+
+          {/*
+            Le chargement reproduit la géométrie d'une vraie ligne de table — trois colonnes qui
+            décroissent. Un rectangle unique ne distinguerait plus le chargement de l'attente.
+          */}
+          <LoadingState label="Chargement des connecteurs">
+            {[150, 130, 160].map((largeur) => (
+              <div className="design__skeleton-row" key={largeur}>
+                <Skeleton width={largeur} />
+                <Skeleton width={70} />
+                <Skeleton width={48} />
+              </div>
+            ))}
+          </LoadingState>
+        </div>
+
+        <SurfacesFlottantes />
+      </section>
     </main>
+  )
+}
+
+/**
+ * Les deux surfaces qui se superposent, derrière le geste qui les ouvre.
+ *
+ * Fermées au repos pour la raison écrite en tête de fichier — leurs titres sont des `<h2>`. Les
+ * ouvrir demande un clic, ce qui est aussi la façon dont un écran les rencontre.
+ */
+function SurfacesFlottantes() {
+  const [modaleOuverte, setModaleOuverte] = useState(false)
+
+  return (
+    <ToastStack>
+      <div className="design__row">
+        <Button onClick={() => setModaleOuverte(true)}>Ouvrir la modale</Button>
+        <PousseursDeToast />
+      </div>
+
+      <Modal
+        footer={
+          <>
+            <Button onClick={() => setModaleOuverte(false)} variant="link">
+              Annuler
+            </Button>
+            <Button variant="danger">Déconnecter</Button>
+          </>
+        }
+        onClose={() => setModaleOuverte(false)}
+        open={modaleOuverte}
+        title="Déconnecter la session ?"
+      >
+        <p>
+          Un unbind gracieux sera envoyé à <code>ses_9f2a…</code>. Le compte devra se reconnecter.
+        </p>
+        <code className="design__meta">Action journalisée dans audit_log.</code>
+      </Modal>
+    </ToastStack>
+  )
+}
+
+function PousseursDeToast() {
+  const pousser = useToast()
+
+  return (
+    <>
+      <Button
+        onClick={() =>
+          pousser({
+            description: 'Évalué par Alertmanager, indépendamment du tableau de bord.',
+            severity: 'critical',
+            source: 'alertmanager',
+            title: 'mtn-ci : taux d’erreur au-dessus de 5 %',
+          })
+        }
+      >
+        Toast · alertmanager
+      </Button>
+      <Button
+        onClick={() =>
+          pousser({
+            description: 'Évalué par le BFF sur une source durable.',
+            severity: 'warning',
+            source: 'bff',
+            title: 'Solde bas sur bulk-sms-ci',
+          })
+        }
+      >
+        Toast · bff
+      </Button>
+    </>
   )
 }

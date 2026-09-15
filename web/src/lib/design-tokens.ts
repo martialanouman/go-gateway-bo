@@ -131,4 +131,34 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     over: '--surface-card',
     usage: 'Bouton principal · option sélectionnée',
   },
+  // Les cinq combinaisons que step-042 introduit. Le panneau d'erreur pose trois niveaux de texte
+  // sur sa propre teinte, et les deux sources leur couleur sur la carte.
+  {
+    text: '--text-primary',
+    background: '--tint-red',
+    over: '--surface-card',
+    usage: 'Titre du panneau d’erreur',
+  },
+  {
+    text: '--text-muted',
+    background: '--tint-red',
+    over: '--surface-card',
+    usage: 'Corps du panneau d’erreur',
+  },
+  {
+    text: '--text-faint',
+    background: '--tint-red',
+    over: '--surface-card',
+    usage: 'Trace de requête dans une erreur',
+  },
+  {
+    text: '--source-alertmanager',
+    background: '--surface-card',
+    usage: 'Source d’un toast · alertmanager',
+  },
+  {
+    text: '--source-bff',
+    background: '--surface-card',
+    usage: 'Source d’un toast · bff',
+  },
 ] as const

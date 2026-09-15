@@ -54,6 +54,9 @@ describe('la référence visuelle', () => {
       'Contraste',
       // step-041. La page ne montrait que des tokens ; elle montre maintenant ce qu'ils habillent.
       'Primitives',
+      // step-042. La modale et les toasts y sont **fermés** : leurs titres sont des `h2`, et cette
+      // liste les compterait comme des sections.
+      'Retour et états',
     ]
 
     for (const section of sections) {
@@ -115,5 +118,94 @@ describe('la référence visuelle', () => {
     // rien ne le dise, et le test de contraste garderait des paires que personne n'affiche.
     const rows = within(contrast as HTMLElement).getAllByRole('row')
     expect(rows.length - 1).toBe(CONTRAST_PAIRS.length)
+  })
+
+  /**
+   * **Pourquoi les spécimens flottants démarrent fermés.**
+   *
+   * `Dialog.Title` et `Toast.Title` de Base UI rendent tous deux un `<h2>`. Le test des sections
+   * ci-dessus compte les `h2` de la page et les compare à une liste écrite à la main : une modale
+   * ouverte au repos y ajouterait un titre fantôme, et la liste devrait mentir pour rester verte.
+   *
+   * Ce test exerce le geste **et** montre le mécanisme : le titre de la modale n'est pas là au
+   * repos, il l'est une fois ouverte.
+   */
+  it('ouvre la modale au clic, et son titre n’existe pas avant', async () => {
+    const user = userEvent.setup()
+    await visitDesign()
+
+    expect(screen.queryByRole('heading', { name: 'Déconnecter la session ?' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Ouvrir la modale' }))
+
+    expect(screen.getByRole('dialog', { name: 'Déconnecter la session ?' })).toBeInTheDocument()
+  })
+
+  it('referme la modale par son bouton Annuler', async () => {
+    const user = userEvent.setup()
+    await visitDesign()
+
+    await user.click(screen.getByRole('button', { name: 'Ouvrir la modale' }))
+    await user.click(screen.getByRole('button', { name: 'Annuler' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('referme la modale par sa croix', async () => {
+    // Les deux sorties, parce que ce sont deux chemins distincts : `Annuler` est une action de
+    // l'écran, la croix est celle de la primitive. Une page de référence où seule l'une des deux
+    // marcherait laisserait croire que l'autre marche aussi.
+    const user = userEvent.setup()
+    await visitDesign()
+
+    await user.click(screen.getByRole('button', { name: 'Ouvrir la modale' }))
+    await user.click(screen.getByRole('button', { name: 'Fermer' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('rend actionnables les deux issues que les états proposent', async () => {
+    // « Réinitialiser » et « Réessayer » sont la moitié utile de leur état : un `NoResults` qui ne
+    // réinitialise rien et un `ErrorState` qui ne réessaie pas sont deux boutons décoratifs, et la
+    // page de référence les montrerait comme s'ils agissaient.
+    const user = userEvent.setup()
+    await visitDesign()
+
+    // Ciblés **dans leur état**, et non par leur nom seul : la section « Primitives » rend déjà un
+    // bouton « Réinitialiser » comme spécimen de bouton. Deux homonymes sur une page de référence
+    // sont normaux ; un test qui les confond ne l'est pas.
+    const aucunResultat = screen.getByText('Aucun message trouvé').closest('.ui-empty')
+    const erreur = screen.getByText('Impossible de joindre l’API Admin').closest('.ui-error')
+
+    await user.click(
+      within(aucunResultat as HTMLElement).getByRole('button', { name: 'Réinitialiser' }),
+    )
+    await user.click(within(erreur as HTMLElement).getByRole('button', { name: 'Réessayer' }))
+
+    expect(screen.getByText('Aucun message trouvé')).toBeInTheDocument()
+    expect(screen.getByText('Impossible de joindre l’API Admin')).toBeInTheDocument()
+  })
+
+  it('pousse un toast par étage de détection, chacun avec sa source', async () => {
+    const user = userEvent.setup()
+    await visitDesign()
+
+    await user.click(screen.getByRole('button', { name: 'Toast · alertmanager' }))
+    await user.click(screen.getByRole('button', { name: 'Toast · bff' }))
+
+    expect(screen.getByText('source · alertmanager')).toBeInTheDocument()
+    expect(screen.getByText('source · bff')).toBeInTheDocument()
+  })
+
+  it('rend les cinq états de contenu, chacun avec sa copie', async () => {
+    await visitDesign()
+
+    // Les cinq, et surtout **cinq copies distinctes** : c'est la page où un relecteur vérifie qu'un
+    // module désactivé ne se lit pas comme une panne.
+    expect(screen.getByText('Aucune règle d’alerte')).toBeInTheDocument()
+    expect(screen.getByText('Aucun message trouvé')).toBeInTheDocument()
+    expect(screen.getByText('Facturation indisponible')).toBeInTheDocument()
+    expect(screen.getByText('Impossible de joindre l’API Admin')).toBeInTheDocument()
+    expect(screen.getByText('Chargement des connecteurs')).toBeInTheDocument()
   })
 })

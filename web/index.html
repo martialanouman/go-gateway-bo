@@ -40,15 +40,16 @@
     -->
     <style>
       /*
-        Ces quatre valeurs peignent le squelette avant toute requête. Elles **recopient** les tokens
+        Ces cinq valeurs peignent le squelette avant toute requête. Elles **recopient** les tokens
         de la charte que la coquille consomme — `--nav-width`, `--topbar-height`, `--surface-page`,
-        `--border-subtle` — parce qu'aucune feuille n'est encore chargée à cet instant : c'est une
-        duplication que la première peinture impose, pas un choix.
+        `--border-subtle`, `--dur-skeleton` — parce qu'aucune feuille n'est encore chargée à cet
+        instant : c'est une duplication que la première peinture impose, pas un choix.
 
         Les noms restent distincts : ils désignent « ce que le squelette peint », pas les tokens
-        eux-mêmes. Ce qui est testé, c'est donc que la **copie soit fidèle** — quatre paires
+        eux-mêmes. Ce qui est testé, c'est donc que la **copie soit fidèle** — cinq paires
         confrontées aux tokens dans `chargement-a-froid.test.ts`. Non alignées, le rail sauterait de
-        4 px et le canvas changerait de luminance au montage de React.
+        4 px, le canvas changerait de luminance au montage de React, et le squelette du document
+        battrait à un autre rythme que celui des écrans.
       */
       :root {
         color-scheme: dark;
@@ -56,6 +57,7 @@
         --shell-topbar-height: 56px;
         --skeleton-surface: #0c0f14;
         --skeleton-shape: #1c242f;
+        --skeleton-duration: 1400ms;
       }
 
       * {
@@ -139,7 +141,7 @@
       */
       @media (prefers-reduced-motion: no-preference) {
         .skeleton__block {
-          animation: skeleton-pulse 1.6s ease-in-out infinite;
+          animation: skeleton-pulse var(--skeleton-duration) ease-in-out infinite;
         }
       }
 

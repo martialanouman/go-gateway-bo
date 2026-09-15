@@ -1,0 +1,459 @@
+/*
+ * Les surfaces flottantes et les cinq états de contenu.
+ *
+ * Feuille annoncée par `test/charte.test.ts` depuis step-041 — « il reste une feuille à venir, celle
+ * des surfaces flottantes et des cinq états de contenu ». Son nom vient de la taxonomie de la charte,
+ * dont le groupe `feedback/` réunit exactement Modal, Toast, EmptyState, ErrorState et Skeleton.
+ *
+ * Comme `components.css`, elle n'invente **aucune valeur** : elle assemble les tokens de
+ * `tokens/`. Si une surface a besoin d'une valeur qui n'y est pas, c'est une question à poser à la
+ * charte, pas un chiffre à écrire ici.
+ *
+ * Elle arrive **après** `components.css` : un toast et une modale contiennent des primitives, et
+ * doivent pouvoir l'emporter à spécificité égale sur leur mise en page.
+ */
+
+/* ─── Les états de contenu ─────────────────────────────────────────────────────────────────── */
+/*
+ * Un seul encadré pour trois états — vide, aucun résultat, module désactivé. Ce que la charte
+ * dessine, et ce qui se justifie : les trois disent « il n'y a rien ici », et seuls l'icône, la
+ * copie et la présence d'une action les séparent. L'erreur, elle, a son propre panneau plus bas.
+ */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+  padding: var(--sp-11) var(--sp-9);
+  border: 1px dashed var(--border-dashed);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+
+/* Dans une carte ou une colonne : mêmes traits, la respiration en moins. */
+.ui-empty--inline {
+  padding: var(--sp-9);
+}
+
+.ui-empty__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+}
+
+.ui-empty__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 42ch : une largeur de mesure. La charte n'a pas de token pour ça — elle en donne la valeur dans le
+ * kit, et c'est la seule de cette feuille qui ne soit pas un token.
+ */
+.ui-empty__text {
+  max-width: 42ch;
+  color: var(--text-faint);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-normal);
+}
+
+/*
+ * L'erreur, et ce qu'elle laisse debout.
+ *
+ * Panneau teinté plutôt qu'encadré pointillé, parce qu'une panne n'est pas une absence : elle se
+ * distingue au premier coup d'œil des trois états ci-dessus, et c'est tout l'objet de la règle
+ * « empty ≠ error ≠ disabled ».
+ */
+.ui-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-9);
+  border: 1px solid color-mix(in srgb, var(--red-500) 30%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--tint-red);
+  text-align: center;
+}
+
+/*
+ * `--text-danger-on-tint` et non `--red-500` : sur sa propre teinte, le rouge de la charte rend
+ * 4,05 et tombe sous AA. C'est le défaut exact qu'une revue de step-041 a trouvé sur le bouton
+ * destructif survolé, et la teinte est ici sur toute la surface.
+ */
+.ui-error__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--red-500) 18%, var(--surface-card));
+  color: var(--text-danger-on-tint);
+}
+
+.ui-error__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-error__text {
+  max-width: 44ch;
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-normal);
+}
+
+/* La trace, telle qu'on la retrouve dans les logs : mono, donc déjà à chasse fixe. */
+.ui-error__request {
+  color: var(--text-faint);
+  font: var(--text-data-sm);
+}
+
+/* ─── Le chargement ────────────────────────────────────────────────────────────────────────── */
+.ui-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+/*
+ * Masqué à l'œil, jamais à l'oreille. `display: none` le retirerait de l'arbre d'accessibilité et
+ * rendrait la région muette au moment précis où elle a quelque chose à dire.
+ */
+.ui-loading__label {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * Le scintillement de la charte : un dégradé qui balaie, 1,4 s, linéaire. `--dur-skeleton` porte
+ * cette valeur depuis step-008 sans qu'aucune règle ne la consomme ; c'est la première.
+ *
+ * Aucun `@media (prefers-reduced-motion)` ici : `tokens/base.css` le pose déjà sur `*`, avec le seul
+ * `!important` du dépôt. En rajouter un se lirait comme la protection alors qu'il ne protégerait
+ * rien de plus.
+ */
+.ui-skeleton {
+  display: block;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--n-700) 0%, var(--n-600) 50%, var(--n-700) 100%);
+  background-size: 200% 100%;
+  animation: ui-shimmer var(--dur-skeleton) linear infinite;
+}
+
+@keyframes ui-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ─── La modale ────────────────────────────────────────────────────────────────────────────── */
+/*
+ * Le voile **ne floute pas**. `--scrim-blur` existe dans les tokens et n'est consommé nulle part,
+ * délibérément : « blurring live metrics behind a dialog costs more than it gives ». Dans un cockpit,
+ * les compteurs qui continuent de défiler derrière une confirmation valent mieux qu'une profondeur.
+ */
+.ui-scrim {
+  position: fixed;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 96px var(--sp-9) var(--sp-9);
+  background: var(--scrim-modal);
+  inset: 0;
+  animation: ui-fade var(--dur-base) var(--ease-entrance);
+}
+
+/*
+ * La modale se pose **dans** le voile, qui la centre. Base UI rend les deux en frères sous le
+ * portail plutôt qu'en parent-enfant : le positionnement est donc porté ici, pas hérité.
+ */
+.ui-modal {
+  position: fixed;
+  z-index: var(--z-modal);
+  top: 96px;
+  left: 50%;
+  width: calc(100% - 2 * var(--sp-9));
+  max-width: 520px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--elevation-modal);
+  transform: translateX(-50%);
+  animation: ui-rise var(--dur-slow) var(--ease-entrance);
+}
+
+/* Création d'identifiant, résultats de simulation : ce qui ne tient pas en 520. */
+.ui-modal--wide {
+  max-width: 820px;
+}
+
+.ui-modal__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-7) var(--sp-8);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ui-modal__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Poussée à droite par `margin-left`, et non par un `justify-content: space-between` : le titre peut
+ * être suivi d'une pastille de statut, et l'espacement ne doit pas se répartir entre eux.
+ */
+.ui-modal__close {
+  display: flex;
+  margin-left: auto;
+  padding: var(--sp-2);
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.ui-modal__close:hover {
+  color: var(--text-primary);
+}
+
+/*
+ * `62vh` : la modale ne pousse jamais la page à défiler, c'est son corps qui défile. Une
+ * confirmation dont le bouton sort de l'écran est une confirmation qu'on ne donne pas.
+ */
+.ui-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-7);
+  overflow: auto;
+  max-height: 62vh;
+  padding: var(--sp-8);
+  color: var(--text-secondary);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La destructive à droite de tout : c'est la position la plus loin du geste réflexe. */
+.ui-modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-5);
+  padding: var(--sp-6) var(--sp-8);
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  background: var(--surface-sunken);
+}
+
+@keyframes ui-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
+
+/* ─── Les toasts ───────────────────────────────────────────────────────────────────────────── */
+/*
+ * Bas à droite, au-dessus de la modale (`--z-toast` 80 contre `--z-modal` 60) : une alerte
+ * d'infrastructure doit rester lisible pendant qu'une confirmation est ouverte.
+ */
+.ui-toaststack {
+  position: fixed;
+  z-index: var(--z-toast);
+  right: var(--sp-9);
+  bottom: var(--sp-9);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+/*
+ * Barre latérale de 3 px, pas un fond teinté : le `Banner` porte la teinte sur toute sa surface, le
+ * toast garde la sienne neutre. Les deux ne doivent pas se confondre — l'un reste à l'écran, l'autre
+ * s'efface en six secondes.
+ */
+.ui-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  overflow: hidden;
+  min-width: 320px;
+  max-width: 440px;
+  padding: var(--sp-5) var(--sp-6) var(--sp-5) var(--sp-7);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--elevation-popover);
+  color: var(--text-secondary);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+  animation: ui-slide var(--dur-slow) var(--ease-entrance);
+}
+
+/*
+ * **Sans cette règle, le plafond de trois ne plafonne rien.** Base UI marque les toasts
+ * excédentaires `data-limited` et continue de les rendre : la pile en afficherait quatre.
+ */
+.ui-toast[data-limited] {
+  display: none;
+}
+
+.ui-toast::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--sev-info);
+  content: "";
+}
+
+.ui-toast--warning::before {
+  background: var(--sev-warning);
+}
+
+.ui-toast--critical::before {
+  background: var(--sev-critical);
+}
+
+.ui-toast--success::before {
+  background: var(--status-up);
+}
+
+.ui-toast__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: var(--r-round);
+  background: var(--sev-info);
+}
+
+.ui-toast--warning .ui-toast__dot {
+  background: var(--sev-warning);
+}
+
+.ui-toast--critical .ui-toast__dot {
+  background: var(--sev-critical);
+}
+
+.ui-toast--success .ui-toast__dot {
+  background: var(--status-up);
+}
+
+.ui-toast__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+/*
+ * Le titre est un `h2` — Base UI le rend ainsi, et un `h2` nu prendrait la taille par défaut du
+ * navigateur au milieu d'une pile de 13 px. Le poids seul le distingue du corps, comme dans le kit :
+ * pas de rôle typographique pour cette combinaison, et en inventer un serait un token de plus pour
+ * une seule règle.
+ */
+.ui-toast__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-toast__text {
+  margin: 0;
+  color: var(--text-faint);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * L'étage qui a détecté, en mono et coloré : bleu pour Alertmanager, violet pour le BFF.
+ *
+ * Les deux tokens existaient depuis step-008 sans qu'aucune règle ne les consomme. La couleur n'est
+ * pas le seul porteur — le mot est écrit à côté, en toutes lettres (WCAG 1.4.1) ; elle sert à
+ * reconnaître l'étage d'un coup d'œil sur une pile de trois.
+ */
+.ui-toast__source {
+  font: var(--text-data-sm);
+}
+
+.ui-toast__source--alertmanager {
+  color: var(--source-alertmanager);
+}
+
+.ui-toast__source--bff {
+  color: var(--source-bff);
+}
+
+.ui-toast__close {
+  display: flex;
+  margin-left: auto;
+  padding: var(--sp-2);
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.ui-toast__close:hover {
+  color: var(--text-primary);
+}
+
+@keyframes ui-slide {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

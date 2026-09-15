@@ -27,6 +27,7 @@
 .design__title {
   margin: 0;
   font: var(--text-page-title);
+  font-variant-numeric: tabular-nums;
 }
 
 .design__lede {
@@ -34,6 +35,7 @@
   max-width: 60ch;
   color: var(--text-secondary);
   font: var(--text-body);
+  font-variant-numeric: tabular-nums;
   line-height: var(--lh-relaxed);
 }
 
@@ -48,6 +50,7 @@
   padding-bottom: var(--sp-4);
   border-bottom: 1px solid var(--border-subtle);
   font: var(--text-section-title);
+  font-variant-numeric: tabular-nums;
 }
 
 .design__list {
@@ -68,6 +71,7 @@
 .design__meta {
   color: var(--text-muted);
   font: var(--text-label);
+  font-variant-numeric: tabular-nums;
 }
 
 .design__sample {
@@ -117,6 +121,7 @@
   width: 100%;
   border-collapse: collapse;
   font: var(--text-body);
+  font-variant-numeric: tabular-nums;
 }
 
 .design__table th,
@@ -130,6 +135,7 @@
 .design__table th {
   color: var(--text-muted);
   font: var(--text-overline);
+  font-variant-numeric: tabular-nums;
   letter-spacing: var(--ls-caps);
   text-transform: uppercase;
 }
@@ -139,4 +145,15 @@
   padding: var(--sp-2) var(--sp-6);
   border-radius: var(--r-pill);
   font: var(--text-pill);
+}
+
+/*
+ * La ligne d'un squelette de table : trois colonnes qui décroissent, comme la vraie. La page rend un
+ * spécimen de chargement, et cette géométrie est ce qui le distingue d'un rectangle générique.
+ */
+.design__skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: var(--sp-4) 0;
 }

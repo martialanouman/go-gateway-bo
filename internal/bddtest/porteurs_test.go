@@ -70,10 +70,21 @@ var separatorCell = regexp.MustCompile(`^:?-{3,}:?$`)
 // Le compte ne décroît pas dans le cours normal des choses : une dette payée se **barre**, elle reste.
 const registerRowCount = 60
 
-// maxUnattributed borne la démission. Cinq lignes sont sans porteur aujourd'hui, chacune avec sa raison
+// maxUnattributed borne la démission. Six lignes sont sans porteur aujourd'hui, chacune avec sa raison
 // mesurée ; sans cette borne, un registre dont **toutes** les lignes seraient marquées « sans porteur »
 // passerait vert — la porte tenait les porteurs faux, pas l'abandon.
-const maxUnattributed = 5
+//
+// Passé de cinq à six le 15/09/2026, par step-042, et la raison est ce qui distingue un relèvement
+// d'un contournement. Les deux dettes de forme de step-008 ont été attribuées **trois fois** — à
+// step-008, puis step-041, puis step-042 — sans qu'aucune ne les paie, parce qu'aucune n'en avait les
+// moyens : la première demande un analyseur CSS de portée là où le plugin fait 50 lignes, la seconde
+// tient à la génération de l'arbre de routes. Une quatrième attribution nominale se serait relue
+// comme de la prudence en ne reposant sur rien. La ligne porte désormais deux déclencheurs chiffrés à
+// la place d'un nom.
+//
+// Ce que cette borne doit continuer d'empêcher : relever ce chiffre **sans** écrire, ici, la mesure
+// qui le justifie. Le seuil n'est pas un quota à consommer.
+const maxUnattributed = 6
 
 // Toute dette du registre nomme un porteur qui existe et qui reste à faire.
 //

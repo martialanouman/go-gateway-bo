@@ -35,6 +35,25 @@ const TOKENS_DIRECTORY = join(
   'tokens',
 )
 
+/**
+ * Le CSS que le produit sert, hors fichiers de tokens. La liste est **nommée plutôt que globbée** —
+ * un fichier de style ajouté sans y être inscrit échapperait à la garantie, et l'oubli se voit en
+ * relisant cette ligne. `charte.test.ts` en exige la complétude.
+ *
+ * Elle vit ici, à côté de `TOKEN_FILES` qui joue le même rôle, parce qu'elle a **deux lecteurs** :
+ * `charte.test.ts` y tient le contraste et les tokens consommés, `classes-peintes.test.ts` la
+ * bijection classe émise ↔ classe peinte. Ce second lecteur ne lisait que `components.css` : une
+ * feuille inscrite ici sortait donc de la bijection sans que rien ne le dise. Une constante, deux
+ * lecteurs — c'est ce qui fait qu'inscrire une feuille suffit désormais à la soumettre aux deux.
+ */
+export const STYLED_FILES = [
+  'app.css',
+  'components.css',
+  'feedback.css',
+  'design-reference.css',
+  'tokens/base.css',
+]
+
 /** Les fichiers de tokens, dans l'ordre où `app.css` les assemble. */
 export const TOKEN_FILES = [
   'fonts.css',
