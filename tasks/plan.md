@@ -778,7 +778,7 @@ le YAML, les documents hérités disaient 134. La passerelle en implémente **10
 
 | Jalon | Opérations manquantes | n |
 |---|---|---|
-| **M3** — groupes de clients, webhooks de compte | `*-customer-group*` (6), `list-group-customers`, `set-customer-group`, `*-webhook*` (4) | 11 |
+| **M3** — groupes de clients, webhooks de compte | `*-customer-group*` (6, dont `set-customer-group`), `list-group-customers`, `*-webhook*` (4) | 11 |
 | **M4** — trafic, sessions | `get-traffic-metrics`, `get-metrics-summary`, `list-sessions`, `list-account-sessions`, `disconnect-session` | 5 |
 | **M6** — routes, sender rewrite | `reorder-routes`, `*-sender-rewrite-rule*` (5) | 6 |
 | **M8** — politique de contenu | `*-platform-content-policy` (2), `*-customer-content-policy` (2) | 4 |

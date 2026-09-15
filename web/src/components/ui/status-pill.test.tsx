@@ -39,8 +39,13 @@ describe('StatusPill — link_status', () => {
   })
 
   it('n’anime le point que sur une valeur en direct', () => {
-    // La seule animation en boucle du système : le pouls de 1,8 s. Le poser sur un instantané
-    // ferait mentir le seul signal de fraîcheur du produit.
+    // Le pouls de 1,8 s est la seule animation en boucle qui porte un **état** : le spinner d'un
+    // bouton et le scintillement du squelette tournent aussi, mais ils disent qu'on attend, pas ce
+    // qui est vrai. Le poser sur un instantané ferait mentir le seul signal de fraîcheur du produit.
+    //
+    // *(Cette ligne écrivait « la seule animation en boucle du système », corrigé ailleurs et pas
+    // ici : trois porteurs, deux relus. Aucune porte ne lit un commentaire — le seul recours est de
+    // parcourir la famille entière, pas les deux premiers.)*
     const snapshot = render(<StatusPill kind="link" state="up" />)
     expect(snapshot.container.querySelector('.ui-dot')).not.toHaveClass('ui-dot--live')
     snapshot.unmount()

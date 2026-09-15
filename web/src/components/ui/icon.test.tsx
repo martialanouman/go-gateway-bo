@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { Dot, GLYPH_NAMES, Icon } from './icon'
+import { Dot, GLYPH_NAMES, type GlyphName, Icon } from './icon'
 
 /**
  * Le jeu de glyphes, et la règle qui le ferme.
@@ -23,7 +23,13 @@ describe('Icon', () => {
 
   it('ne rend rien pour un nom hors du jeu, plutôt qu’une forme approchante', () => {
     // `key-round` est un nom Lucide : il n'appartient pas au jeu de la charte.
-    const { container } = render(<Icon name="key-round" />)
+    //
+    // **Le `as` est la démonstration, pas un contournement.** `name` est typé sur le jeu : ce test
+    // ne compile qu'en forçant, c'est-à-dire par le seul chemin qui reste à une valeur venue d'une
+    // charge utile. C'est exactement ce que le repli `null` du composant couvre. Tant que `IconProps`
+    // acceptait `string & {}`, cette ligne compilait toute seule — et la promesse « un nom absent se
+    // voit au typecheck » était fausse sans que rien ne rougisse.
+    const { container } = render(<Icon name={'key-round' as GlyphName} />)
 
     expect(container).toBeEmptyDOMElement()
   })

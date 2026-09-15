@@ -119,11 +119,17 @@ export const GLYPH_NAMES = Object.keys(GLYPHS) as readonly GlyphName[]
 
 export type IconProps = {
   /**
-   * Typé sur le jeu plutôt que `string` : un nom absent se voit au typecheck, bien avant de ne rien
-   * rendre à l'écran. Le repli `null` reste, parce qu'une valeur venue d'une charge utile échappe
-   * au compilateur.
+   * Typé sur le jeu, **et rien d'autre** : un nom absent se voit au typecheck, bien avant de ne rien
+   * rendre à l'écran. Une première rédaction écrivait `GlyphName | (string & {})` pour garder
+   * l'autocomplétion tout en acceptant n'importe quelle chaîne — c'est-à-dire en désarmant la
+   * promesse que la phrase précédente fait, sous cette phrase même. `InputProps.icon` était déjà
+   * strict et citait la même promesse : les deux ne pouvaient pas être vraies ensemble.
+   *
+   * Le repli `null` du rendu reste. Il ne couvre plus le typecheck mais ce qui lui échappe pour de
+   * bon : une valeur venue d'une charge utile, qui n'atteint ce composant qu'au prix d'un `as`
+   * visible en revue.
    */
-  readonly name: GlyphName | (string & {})
+  readonly name: GlyphName
   /** 14 px dans les contrôles et les lignes, 16 px dans les en-têtes. Jamais sous 12. */
   readonly size?: number
   readonly strokeWidth?: number
@@ -141,7 +147,10 @@ export function Icon({
   style,
   title,
 }: IconProps): ReactElement | null {
-  const glyph = GLYPHS[name as GlyphName]
+  // Le type dit `ReactElement`, jamais `undefined` : le repli n'existe que pour ce que le typage ne
+  // couvre pas — un appelant qui aurait casté une valeur venue d'une charge utile. L'annoter est ce
+  // qui rend cette branche atteignable, et donc honnête.
+  const glyph: ReactElement | undefined = GLYPHS[name]
   if (glyph === undefined) return null
 
   return (

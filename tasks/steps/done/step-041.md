@@ -91,7 +91,8 @@ personne. Les trois figurent au registre de `todo.md`.*
   contrôle désactivé avec son explication.
 - **Charte** : le contrôle de contraste s'étend aux paires que les primitives introduisent, par la
   table de `design-tokens.ts` que `/_design` rend déjà — une seule liste, deux lecteurs, DN-5 de
-  step-008.
+  step-008. *(Oublié à la première rédaction, et c'est ce qui a laissé passer le bouton destructif
+  survolé — voir « ce que la seconde revue a corrigé ».)*
 - **Mutation, sur l'anneau de focus** : le retirer d'une primitive fait rougir. C'est WCAG 2.4.7, et
   step-008 a mesuré que sa disparition pouvait laisser 137 tests verts.
 - **Mutation, sur la pilule** : dériver `breaker_state` de `link_status` fait rougir. Les deux
@@ -191,7 +192,59 @@ du système » (le spinner de cette step en est une), « les quatre autres primi
 en a une), deux renvois par numéro de ligne périmés — dont l'un dans le paragraphe même qui
 expliquait qu'un numéro se périme.
 
-### Ce qui n'est pas testé, et pourquoi
+#### Ce que la seconde revue a corrigé
+
+Six constats, dont deux d'accessibilité sur du peint. Le décompte du contrat a été **re-mesuré
+indépendamment** au passage — 103 `OperationID` non-test dans `internal/adminapi/`, tous présents
+dans les 133 `operationId` du YAML, 30 manquantes qui se répartissent exactement en 11+5+6+4+4 comme
+le tableau §16. La mesure tient, ligne par ligne.
+
+1. **Le bouton destructif survolé tombait sous AA.** `--action-danger-fg` est `--red-500` : il tient
+   sur une surface nue (4,90 sur la page, 4,64 en carte) et rend **4,05 sur sa propre teinte**, le
+   fond que `:hover` peint. `colors.css` décrit cette combinaison et déclare `--text-danger-on-tint`
+   pour elle (4,70 en carte) ; le survol était la seule règle du fichier à poser la teinte sans
+   reprendre la couleur.
+
+   **La cause est en amont** : `CONTRAST_PAIRS` n'a jamais été étendue, alors que la section « Tests »
+   ci-dessus l'annonçait — `design-tokens.ts` n'apparaît pas dans le diff de la step. Les deux paires
+   neuves y sont, sur `--surface-card`, la porteuse la plus sévère : DN-5 a été trompée une fois par
+   la plus clémente. Et la table seule ne suffisait pas — elle juge un **ratio**, pas ce que la
+   feuille peint. Le parcours vérifie le token peint, en le résolvant par le navigateur plutôt qu'en
+   recopiant un `rgb(…)` : deux recopies de la même main se confirment sans rien mesurer.
+
+2. **Une colonne non triée annonçait un sens de tri.** Le glyphe était rendu sur *chaque* colonne
+   triable et pointait vers le haut par défaut : « Connecteur », que rien ne trie, affichait une
+   flèche montante qui se lit « trié ascendant ». Seule la couleur — teal contre `--text-faint` — la
+   séparait de la vraie, et un signal porté par la seule couleur est ce que WCAG 1.4.1 refuse. Les
+   deux commentaires se contredisaient d'ailleurs : `data-table.tsx` disait le glyphe « décoratif,
+   l'information est portée par `aria-sort` » pendant que `components.css` disait que sans lui
+   « l'opérateur voyant ne pouvait pas savoir laquelle porte le tri ». Rendu sur la seule colonne
+   triée ; ce qu'une colonne triable perd au repos, un `:hover` sur le `<button>` le rend.
+
+3. **`IconProps.name` promettait un typecheck qu'il n'avait pas.** `GlyphName | (string & {})`
+   accepte n'importe quelle chaîne, sous la phrase même qui promet qu'« un nom absent se voit au
+   typecheck » — et `InputProps.icon` était déjà strict en citant la même promesse. Resserré ; le
+   test qui rend un nom hors du jeu force désormais par un `as` visible, c'est-à-dire par le seul
+   chemin qui reste à une valeur venue d'une charge utile — exactement ce que le repli `null` couvre.
+
+4. **« La seule animation en boucle du système » avait survécu à sa propre correction.** La section
+   précédente consigne cette affirmation comme fausse et corrigée ; elle l'était dans `icon.tsx` et
+   `components.css`, pas dans `status-pill.test.tsx`. Trois porteurs, deux relus.
+
+5. **L'assertion qui suivait le clic sur `/_design` ne portait sur rien** — `toBeInTheDocument()` sur
+   l'élément qu'on venait de cliquer, sur une page dont l'`onSortChange` ne fait rien. Remplacée par
+   l'effet que le correctif 2 rend observable : les deux états du tri côte à côte.
+
+6. **§16, cellule M3 :** `set-customer-group` était énuméré à part alors qu'il est déjà dans
+   `*-customer-group*` (6). Le `n = 11` était juste, l'énumération redondante.
+
+| Mutation | Résultat |
+|---|---|
+| Retirer `color: var(--text-danger-on-tint)` du survol destructif | Rouge sur le parcours Playwright. La table de contraste, elle, reste verte : elle juge la paire déclarée, pas la règle — c'est pourquoi il en fallait deux. |
+| Rendre à nouveau le glyphe sur chaque colonne triable | Rouge, 2 tests, dans les deux fichiers (`data-table`, `/_design`). |
+| Rétablir `GlyphName \| (string & {})` | Le typecheck redevient vert avec `name="key-round"` écrit nu : c'est la mutation qui *montre* le défaut, la garde étant `tsc` et non un test. |
+
+## Ce qui n'est pas testé, et pourquoi
 
 - **Les deux dettes de forme de step-008.** Le trou de portée du plugin (`@media print { :root }`)
   reste ouvert : le fermer demande un analyseur CSS complet là où le plugin fait 50 lignes.
