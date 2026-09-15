@@ -77,10 +77,23 @@ describe('la référence visuelle', () => {
     // La colonne triée s'annonce, et c'est la seule qui le fait.
     expect(tri.closest('th')).toHaveAttribute('aria-sort', 'descending')
 
-    // Et le contrôle répond — la page est un spécimen, le tri n'a rien à trier, mais un en-tête qui
-    // ne se laisse pas activer n'est pas un en-tête triable.
+    // **Et les deux états du tri sont montrés côte à côte**, ce qui est tout l'objet d'une page de
+    // référence : « Débit » porte le sens du tri, « Connecteur » est triable sans rien annoncer.
+    //
+    // *(La rédaction précédente cliquait puis assertait `toBeInTheDocument()` sur l'élément qu'elle
+    // venait de cliquer — un `Alors` qui porte sur une structure et non sur un effet. La page est un
+    // spécimen, son `onSortChange` ne fait rien : il n'y avait aucun effet à observer.)*
+    const auRepos = screen.getByRole('button', { name: /Connecteur/ })
+    expect(auRepos.closest('th')).not.toHaveAttribute('aria-sort')
+    expect(tri.querySelector('.ui-table__sort-glyph')).not.toBeNull()
+    expect(
+      auRepos.querySelector('.ui-table__sort-glyph'),
+      'une colonne non triée annonce un sens de tri',
+    ).toBeNull()
+
+    // Le contrôle répond : un en-tête qui ne se laisse pas activer n'est pas un en-tête triable.
     await user.click(tri)
-    expect(tri).toBeInTheDocument()
+    expect(tri.closest('th')).toHaveAttribute('aria-sort', 'descending')
   })
 
   it('rend une paire de contraste par ligne de la table que le test de charte vérifie', async () => {

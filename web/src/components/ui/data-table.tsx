@@ -95,20 +95,23 @@ export function DataTable<Row>({
                 >
                   {column.header}
                   {/*
-                    Le sens du tri, **pour l'œil**. `aria-sort` l'annonce déjà à qui écoute ; sans ce
-                    glyphe, l'opérateur voyant ne peut pas savoir laquelle des neuf colonnes porte le
-                    tri. Décoratif : l'information est portée par `aria-sort`, et l'entendre deux
-                    fois n'aide personne.
+                    Le sens du tri, **pour l'œil** — `aria-sort` le dit déjà à qui écoute, d'où
+                    l'`aria-hidden` de `Icon` : l'entendre deux fois n'aide personne.
+
+                    **Rendu sur la seule colonne triée**, et c'est ce qui le rend honnête. Posé sur
+                    chaque colonne triable, il pointait vers le haut par défaut : une colonne non
+                    triée affichait donc une flèche montante, qui se lit « trié ascendant », et seule
+                    la couleur séparait la vraie de la fausse — ce que WCAG 1.4.1 refuse. La présence
+                    est le signal ; la couleur ne fait que le renforcer. Ce qu'une colonne triable
+                    perd ainsi au repos, le survol du `<button>` le rend.
                   */}
-                  <Icon
-                    className="ui-table__sort-glyph"
-                    name={
-                      sort?.key === column.key && sort.direction === 'descending'
-                        ? 'arrow-down'
-                        : 'arrow-up'
-                    }
-                    size={12}
-                  />
+                  {sort?.key === column.key ? (
+                    <Icon
+                      className="ui-table__sort-glyph"
+                      name={sort.direction === 'descending' ? 'arrow-down' : 'arrow-up'}
+                      size={12}
+                    />
+                  ) : null}
                 </button>
               ) : (
                 column.header

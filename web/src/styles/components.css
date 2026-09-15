@@ -633,19 +633,25 @@
 }
 
 /*
- * **Le sens du tri doit se voir.** `aria-sort` l'annonce aux technologies d'assistance, et rien ne
- * le rendait perceptible à l'œil : sur neuf colonnes, l'opérateur voyant ne pouvait pas savoir
- * laquelle porte le tri. Le glyphe vient du jeu fermé, il n'est pas dessiné ici.
+ * **Qu'une colonne soit triable se découvre au survol**, puisque le glyphe ne marque plus que la
+ * colonne triée. Sans cette règle, rien ne distinguerait un en-tête actionnable d'un en-tête inerte
+ * avant de cliquer dessus. Le focus, lui, est déjà porté par l'anneau de `base.css`.
  */
-.ui-table__sort-glyph {
-  color: var(--text-faint);
+.ui-table__sort:hover {
+  color: var(--text-primary);
 }
 
 .ui-table__header[aria-sort] .ui-table__sort {
   color: var(--text-primary);
 }
 
-.ui-table__header[aria-sort] .ui-table__sort-glyph {
+/*
+ * Le glyphe n'est rendu que sur la colonne triée — voir `data-table.tsx`. Sa couleur renforce donc
+ * un signal que sa présence porte déjà, au lieu d'en être le seul support : posé sur chaque colonne
+ * triable, il ne se distinguait de ses voisins que par ce teal, ce que WCAG 1.4.1 refuse. Le glyphe
+ * vient du jeu fermé, il n'est pas dessiné ici.
+ */
+.ui-table__sort-glyph {
   color: var(--teal-500);
 }
 

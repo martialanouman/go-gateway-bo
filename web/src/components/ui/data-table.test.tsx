@@ -113,6 +113,42 @@ describe('Table', () => {
     expect(head?.querySelectorAll('.ui-table__cell--end')).toHaveLength(1)
   })
 
+  it('ne montre le sens du tri que sur la colonne réellement triée', () => {
+    // **Le glyphe était rendu sur chaque colonne triable, toujours vers le haut.** Une colonne non
+    // triée affichait donc une flèche montante, qui se lit « trié ascendant » ; seule la couleur —
+    // teal contre `--text-faint` — séparait la vraie de la fausse. Un signal porté par la seule
+    // couleur est aussi ce que WCAG 1.4.1 refuse.
+    //
+    // La présence du glyphe est désormais le signal, et la couleur ne fait que le renforcer.
+    const { container } = render(
+      <DataTable
+        caption="Connecteurs"
+        columns={COLUMNS}
+        rows={ROWS}
+        rowKey={(row) => row.id}
+        sort={{ key: 'throughput', direction: 'descending' }}
+        onSortChange={vi.fn()}
+      />,
+    )
+
+    const entetes = screen.getAllByRole('columnheader')
+    const triee = entetes.find((entete) => entete.hasAttribute('aria-sort'))
+    const triableAuRepos = entetes.find(
+      (entete) => entete.querySelector('.ui-table__sort') && !entete.hasAttribute('aria-sort'),
+    )
+
+    expect(triee, 'aucune colonne triée : ce test ne garde rien').toBeDefined()
+    expect(triableAuRepos, 'aucune colonne triable au repos : ce test ne garde rien').toBeDefined()
+
+    expect(triee?.querySelector('.ui-table__sort-glyph')).not.toBeNull()
+    expect(
+      triableAuRepos?.querySelector('.ui-table__sort-glyph'),
+      'une colonne non triée annonce un sens de tri',
+    ).toBeNull()
+    // Et un seul sur tout le tableau : deux glyphes, c'est deux colonnes qui se disent triées.
+    expect(container.querySelectorAll('.ui-table__sort-glyph')).toHaveLength(1)
+  })
+
   it('ne rend aucune ligne quand il n’y en a pas — sans inventer de message', () => {
     // L'état vide est un composant à part (step-042) : le tableau ne doit pas improviser sa copie,
     // sinon chaque écran finit avec sa propre version du vide.
