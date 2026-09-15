@@ -246,6 +246,7 @@
   gap: var(--sp-4);
   color: var(--text-muted);
   font: var(--text-overline);
+  font-variant-numeric: tabular-nums;
   letter-spacing: var(--ls-caps);
   text-transform: uppercase;
 }
@@ -268,6 +269,7 @@
 .ui-field__hint {
   color: var(--text-faint);
   font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
 }
 
 .ui-field__error {
@@ -276,6 +278,7 @@
   gap: var(--sp-3);
   color: var(--text-danger);
   font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
 }
 
 .ui-input-wrap {
@@ -351,6 +354,7 @@
   margin-bottom: var(--sp-4);
   color: var(--text-muted);
   font: var(--text-overline);
+  font-variant-numeric: tabular-nums;
   letter-spacing: var(--ls-caps);
   text-transform: uppercase;
 }
@@ -606,6 +610,7 @@
   background: var(--surface-card);
   color: var(--text-muted);
   font: var(--text-overline);
+  font-variant-numeric: tabular-nums;
   letter-spacing: var(--ls-caps);
   text-align: start;
   text-transform: uppercase;

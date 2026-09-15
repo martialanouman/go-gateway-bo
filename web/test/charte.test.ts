@@ -463,4 +463,55 @@ describe('contraste WCAG 2.1 AA', () => {
       `l'anneau de focus ne tranche pas sur la page : ${composed.at(-1)}`,
     ).toBeGreaterThanOrEqual(AA_LARGE_TEXT_OR_UI)
   })
+
+  /**
+   * **La dette du raccourci `font:`, fermée sur son mécanisme plutôt que sur ses symptômes.**
+   *
+   * `font: var(--text-body)` est un raccourci : il réinitialise `font-variant-numeric`, et défait
+   * donc les `tabular-nums` que `tokens/base.css` pose sur `body`. Une colonne de nombres en police
+   * proportionnelle perd sa chasse commune et **danse** à chaque rafraîchissement — dans un cockpit
+   * où les compteurs défilent, c'est le défaut qu'on remarque sans savoir le nommer.
+   *
+   * step-041 l'avait rebouché **là où il mordait**, sur `.ui-table`, et l'avait écrit : « le
+   * mécanisme, lui, reste ouvert — six autres règles posent un rôle proportionnel et le
+   * réinitialisent tout autant. Aucune ne porte de chiffre aujourd'hui ; un compteur dans un libellé,
+   * une plage dans un message d'aide, et la dette revient sans qu'aucune porte ne bouge. » C'est
+   * exactement ce qui est arrivé : les cinq états de contenu rendent « (504) » dans un corps de
+   * texte.
+   *
+   * La garde ne juge donc pas une liste de règles mais la **propriété** : toute règle qui pose un
+   * rôle en police proportionnelle doit reprendre `tabular-nums`. Les rôles concernés sont dérivés de
+   * `typography.css` — ceux qui composent `--font-sans` — et non recopiés : une liste écrite à la
+   * main ne verrait jamais le rôle qu'on vient d'ajouter.
+   */
+  it('reprend tabular-nums partout où un rôle proportionnel est posé', () => {
+    const proportional = new Set(
+      [...tokens.entries()]
+        .filter(([name, value]) => name.startsWith('--text-') && value.includes('--font-sans'))
+        .map(([name]) => name),
+    )
+
+    expect(
+      proportional.size,
+      'aucun rôle proportionnel trouvé : cette garde ne garde rien',
+    ).toBeGreaterThan(4)
+
+    // Un bloc CSS, de son sélecteur à son accolade fermante. On juge **le bloc** et non la ligne :
+    // l'ordre des deux déclarations est indifférent au navigateur, seule leur coexistence compte.
+    const blocks = readStyledCss().matchAll(/([^{}]+)\{([^{}]*)\}/g)
+
+    const fautives: string[] = []
+    for (const [, selector, body] of blocks) {
+      const role = /font:\s*var\((--text-[\w-]+)\)/.exec(body ?? '')?.[1]
+      if (role === undefined || !proportional.has(role)) continue
+      if ((body ?? '').includes('font-variant-numeric')) continue
+
+      fautives.push(`${(selector ?? '').trim()} { font: var(${role}) }`)
+    }
+
+    expect(
+      fautives,
+      'un rôle proportionnel posé sans reprendre `tabular-nums` : les chiffres y perdent leur chasse commune',
+    ).toEqual([])
+  })
 })

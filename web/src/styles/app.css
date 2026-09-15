@@ -63,4 +63,5 @@
   margin: 0;
   color: var(--text-muted);
   font: var(--text-label);
+  font-variant-numeric: tabular-nums;
 }
