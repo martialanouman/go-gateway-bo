@@ -37,7 +37,7 @@ describe('chargement à froid', () => {
 
     // Le build passe par la **même commande que la production**, dans son propre process. Appeler
     // l'API de Vite depuis Vitest héritait de `NODE_ENV=test` : React s'y résolvait en développement
-    // et l'artefact pesait 490 kB d'avertissements au lieu des 276 kB livrés — le test décrivait
+    // et l'artefact pesait 490 kB d'avertissements au lieu des 291 kB livrés — le test décrivait
     // alors quelque chose que personne ne sert. Par cette voie, l'octet produit est le même.
     await promisify(execFile)(
       'node_modules/.bin/vite',
@@ -219,6 +219,39 @@ describe('chargement à froid', () => {
       14_336,
     )
     expect(sheet.byteLength, 'la feuille coûte trop cher à analyser').toBeLessThan(32_768)
+  })
+
+  it("garde le script d'entrée exempt de ce qu'une seule route consomme", async () => {
+    // Le script d'entrée n'avait aucune borne, et il a coûté 163 Ko sans que rien ne le dise :
+    // `package.json` ne déclarait pas `sideEffects`, donc Rollup tenait chaque module de `src/` pour
+    // susceptible d'en avoir, et un import depuis la façade `components/ui` tirait **tous** ses
+    // modules — dont `@base-ui/react`, que seule `/_design` consomme. Mesuré sur la sortie livrée :
+    // 453,78 Ko bruts / 147,44 gzip sans la déclaration, 290,60 / 93,03 avec, pour un total inchangé
+    // à l'octet près. Ce n'était donc pas le prix de la façade, mais celui d'une autorisation de
+    // secouer qui manquait.
+    //
+    // Deux bornes pour les deux coûts, comme pour la feuille — sauf qu'ici c'est le **brut** qui
+    // domine : le moteur l'analyse et le compile avant le premier rendu.
+    //
+    // Le motif retenu est `["**/*.css"]` et non `false`, alors que les deux rendent ici **la même
+    // feuille à l'empreinte près** : Vite ne laisse pas secouer ses propres modules CSS, mesuré en
+    // jouant `false`. Le motif ne protège donc rien aujourd'hui ; il dit ce qui est vrai du graphe,
+    // pour que la déclaration reste juste si cette protection cesse d'être implicite.
+    //
+    // La marge est d'environ 15 %, et elle n'est pas là pour absorber la croissance ordinaire : elle
+    // est là pour que la bascule de Base UI dans l'entrée, que step-040 fera en montant la pile de
+    // toasts dans la coquille, se présente comme une question plutôt que comme un rouge à faire
+    // taire.
+    const entry = /<script\b[^>]*\bsrc="([^"]+)"/.exec(html)?.[1]
+    expect(entry, "le document ne charge plus de script d'entrée").toBeDefined()
+
+    const bundle = await readFile(join(outDir, (entry as string).replace(/^\//, '')))
+
+    expect(
+      gzipSync(bundle).byteLength,
+      "le script d'entrée coûte trop cher à transférer",
+    ).toBeLessThan(110_000)
+    expect(bundle.byteLength, "le script d'entrée coûte trop cher à analyser").toBeLessThan(340_000)
   })
 
   it("annonce le chargement aux technologies d'assistance", () => {

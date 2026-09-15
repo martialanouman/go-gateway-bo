@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "description": "Tableau de bord Admin / Exploitation — moitié client (SPA React servie par le BFF Go)",
   "engines": {
     "node": ">=24"
