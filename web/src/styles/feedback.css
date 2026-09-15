@@ -1,0 +1,170 @@
+/*
+ * Les surfaces flottantes et les cinq états de contenu.
+ *
+ * Feuille annoncée par `test/charte.test.ts` depuis step-041 — « il reste une feuille à venir, celle
+ * des surfaces flottantes et des cinq états de contenu ». Son nom vient de la taxonomie de la charte,
+ * dont le groupe `feedback/` réunit exactement Modal, Toast, EmptyState, ErrorState et Skeleton.
+ *
+ * Comme `components.css`, elle n'invente **aucune valeur** : elle assemble les tokens de
+ * `tokens/`. Si une surface a besoin d'une valeur qui n'y est pas, c'est une question à poser à la
+ * charte, pas un chiffre à écrire ici.
+ *
+ * Elle arrive **après** `components.css` : un toast et une modale contiennent des primitives, et
+ * doivent pouvoir l'emporter à spécificité égale sur leur mise en page.
+ */
+
+/* ─── Les états de contenu ─────────────────────────────────────────────────────────────────── */
+/*
+ * Un seul encadré pour trois états — vide, aucun résultat, module désactivé. Ce que la charte
+ * dessine, et ce qui se justifie : les trois disent « il n'y a rien ici », et seuls l'icône, la
+ * copie et la présence d'une action les séparent. L'erreur, elle, a son propre panneau plus bas.
+ */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+  padding: var(--sp-11) var(--sp-9);
+  border: 1px dashed var(--border-dashed);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+
+/* Dans une carte ou une colonne : mêmes traits, la respiration en moins. */
+.ui-empty--inline {
+  padding: var(--sp-9);
+}
+
+.ui-empty__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+}
+
+.ui-empty__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 42ch : une largeur de mesure. La charte n'a pas de token pour ça — elle en donne la valeur dans le
+ * kit, et c'est la seule de cette feuille qui ne soit pas un token.
+ */
+.ui-empty__text {
+  max-width: 42ch;
+  color: var(--text-faint);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-normal);
+}
+
+/*
+ * L'erreur, et ce qu'elle laisse debout.
+ *
+ * Panneau teinté plutôt qu'encadré pointillé, parce qu'une panne n'est pas une absence : elle se
+ * distingue au premier coup d'œil des trois états ci-dessus, et c'est tout l'objet de la règle
+ * « empty ≠ error ≠ disabled ».
+ */
+.ui-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-9);
+  border: 1px solid color-mix(in srgb, var(--red-500) 30%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--tint-red);
+  text-align: center;
+}
+
+/*
+ * `--text-danger-on-tint` et non `--red-500` : sur sa propre teinte, le rouge de la charte rend
+ * 4,05 et tombe sous AA. C'est le défaut exact qu'une revue de step-041 a trouvé sur le bouton
+ * destructif survolé, et la teinte est ici sur toute la surface.
+ */
+.ui-error__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--red-500) 18%, var(--surface-card));
+  color: var(--text-danger-on-tint);
+}
+
+.ui-error__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-error__text {
+  max-width: 44ch;
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-normal);
+}
+
+/* La trace, telle qu'on la retrouve dans les logs : mono, donc déjà à chasse fixe. */
+.ui-error__request {
+  color: var(--text-faint);
+  font: var(--text-data-sm);
+}
+
+/* ─── Le chargement ────────────────────────────────────────────────────────────────────────── */
+.ui-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+/*
+ * Masqué à l'œil, jamais à l'oreille. `display: none` le retirerait de l'arbre d'accessibilité et
+ * rendrait la région muette au moment précis où elle a quelque chose à dire.
+ */
+.ui-loading__label {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * Le scintillement de la charte : un dégradé qui balaie, 1,4 s, linéaire. `--dur-skeleton` porte
+ * cette valeur depuis step-008 sans qu'aucune règle ne la consomme ; c'est la première.
+ *
+ * Aucun `@media (prefers-reduced-motion)` ici : `tokens/base.css` le pose déjà sur `*`, avec le seul
+ * `!important` du dépôt. En rajouter un se lirait comme la protection alors qu'il ne protégerait
+ * rien de plus.
+ */
+.ui-skeleton {
+  display: block;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--n-700) 0%, var(--n-600) 50%, var(--n-700) 100%);
+  background-size: 200% 100%;
+  animation: ui-shimmer var(--dur-skeleton) linear infinite;
+}
+
+@keyframes ui-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}

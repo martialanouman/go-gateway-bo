@@ -46,7 +46,13 @@ const TOKENS_DIRECTORY = join(
  * feuille inscrite ici sortait donc de la bijection sans que rien ne le dise. Une constante, deux
  * lecteurs — c'est ce qui fait qu'inscrire une feuille suffit désormais à la soumettre aux deux.
  */
-export const STYLED_FILES = ['app.css', 'components.css', 'design-reference.css', 'tokens/base.css']
+export const STYLED_FILES = [
+  'app.css',
+  'components.css',
+  'feedback.css',
+  'design-reference.css',
+  'tokens/base.css',
+]
 
 /** Les fichiers de tokens, dans l'ordre où `app.css` les assemble. */
 export const TOKEN_FILES = [
