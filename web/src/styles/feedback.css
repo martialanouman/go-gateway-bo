@@ -293,3 +293,167 @@
     transform: translateX(-50%);
   }
 }
+
+/* ─── Les toasts ───────────────────────────────────────────────────────────────────────────── */
+/*
+ * Bas à droite, au-dessus de la modale (`--z-toast` 80 contre `--z-modal` 60) : une alerte
+ * d'infrastructure doit rester lisible pendant qu'une confirmation est ouverte.
+ */
+.ui-toaststack {
+  position: fixed;
+  z-index: var(--z-toast);
+  right: var(--sp-9);
+  bottom: var(--sp-9);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+/*
+ * Barre latérale de 3 px, pas un fond teinté : le `Banner` porte la teinte sur toute sa surface, le
+ * toast garde la sienne neutre. Les deux ne doivent pas se confondre — l'un reste à l'écran, l'autre
+ * s'efface en six secondes.
+ */
+.ui-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  overflow: hidden;
+  min-width: 320px;
+  max-width: 440px;
+  padding: var(--sp-5) var(--sp-6) var(--sp-5) var(--sp-7);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--elevation-popover);
+  color: var(--text-secondary);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+  animation: ui-slide var(--dur-slow) var(--ease-entrance);
+}
+
+/*
+ * **Sans cette règle, le plafond de trois ne plafonne rien.** Base UI marque les toasts
+ * excédentaires `data-limited` et continue de les rendre : la pile en afficherait quatre.
+ */
+.ui-toast[data-limited] {
+  display: none;
+}
+
+.ui-toast::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--sev-info);
+  content: "";
+}
+
+.ui-toast--warning::before {
+  background: var(--sev-warning);
+}
+
+.ui-toast--critical::before {
+  background: var(--sev-critical);
+}
+
+.ui-toast--success::before {
+  background: var(--status-up);
+}
+
+.ui-toast__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: var(--r-round);
+  background: var(--sev-info);
+}
+
+.ui-toast--warning .ui-toast__dot {
+  background: var(--sev-warning);
+}
+
+.ui-toast--critical .ui-toast__dot {
+  background: var(--sev-critical);
+}
+
+.ui-toast--success .ui-toast__dot {
+  background: var(--status-up);
+}
+
+.ui-toast__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+/*
+ * Le titre est un `h2` — Base UI le rend ainsi, et un `h2` nu prendrait la taille par défaut du
+ * navigateur au milieu d'une pile de 13 px. Le poids seul le distingue du corps, comme dans le kit :
+ * pas de rôle typographique pour cette combinaison, et en inventer un serait un token de plus pour
+ * une seule règle.
+ */
+.ui-toast__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-toast__text {
+  margin: 0;
+  color: var(--text-faint);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * L'étage qui a détecté, en mono et coloré : bleu pour Alertmanager, violet pour le BFF.
+ *
+ * Les deux tokens existaient depuis step-008 sans qu'aucune règle ne les consomme. La couleur n'est
+ * pas le seul porteur — le mot est écrit à côté, en toutes lettres (WCAG 1.4.1) ; elle sert à
+ * reconnaître l'étage d'un coup d'œil sur une pile de trois.
+ */
+.ui-toast__source {
+  font: var(--text-data-sm);
+}
+
+.ui-toast__source--alertmanager {
+  color: var(--source-alertmanager);
+}
+
+.ui-toast__source--bff {
+  color: var(--source-bff);
+}
+
+.ui-toast__close {
+  display: flex;
+  margin-left: auto;
+  padding: var(--sp-2);
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.ui-toast__close:hover {
+  color: var(--text-primary);
+}
+
+@keyframes ui-slide {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
