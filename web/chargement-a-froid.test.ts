@@ -154,6 +154,12 @@ describe('chargement à froid', () => {
       ['--shell-topbar-height', '--topbar-height'],
       ['--skeleton-surface', '--surface-page'],
       ['--skeleton-shape', '--border-subtle'],
+      // Cinquième paire, step-042. Le document battait à `1.6s` en dur quand la charte dit 1,4 s et
+      // que `--dur-skeleton` porte cette valeur depuis step-008 sans consommateur. Rien ne
+      // justifiait l'écart : le commentaire qui surplombait la règle ne parlait que de
+      // `prefers-reduced-motion`. Les deux squelettes du produit — celui du document et celui des
+      // écrans — battent désormais au même rythme, depuis la même source.
+      ['--skeleton-duration', '--dur-skeleton'],
     ] as const
 
     for (const [inDocument, inCharter] of copies) {
