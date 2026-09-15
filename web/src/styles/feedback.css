@@ -168,3 +168,128 @@
     background-position: -200% 0;
   }
 }
+
+/* ─── La modale ────────────────────────────────────────────────────────────────────────────── */
+/*
+ * Le voile **ne floute pas**. `--scrim-blur` existe dans les tokens et n'est consommé nulle part,
+ * délibérément : « blurring live metrics behind a dialog costs more than it gives ». Dans un cockpit,
+ * les compteurs qui continuent de défiler derrière une confirmation valent mieux qu'une profondeur.
+ */
+.ui-scrim {
+  position: fixed;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 96px var(--sp-9) var(--sp-9);
+  background: var(--scrim-modal);
+  inset: 0;
+  animation: ui-fade var(--dur-base) var(--ease-entrance);
+}
+
+/*
+ * La modale se pose **dans** le voile, qui la centre. Base UI rend les deux en frères sous le
+ * portail plutôt qu'en parent-enfant : le positionnement est donc porté ici, pas hérité.
+ */
+.ui-modal {
+  position: fixed;
+  z-index: var(--z-modal);
+  top: 96px;
+  left: 50%;
+  width: calc(100% - 2 * var(--sp-9));
+  max-width: 520px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--elevation-modal);
+  transform: translateX(-50%);
+  animation: ui-rise var(--dur-slow) var(--ease-entrance);
+}
+
+/* Création d'identifiant, résultats de simulation : ce qui ne tient pas en 520. */
+.ui-modal--wide {
+  max-width: 820px;
+}
+
+.ui-modal__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-7) var(--sp-8);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ui-modal__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Poussée à droite par `margin-left`, et non par un `justify-content: space-between` : le titre peut
+ * être suivi d'une pastille de statut, et l'espacement ne doit pas se répartir entre eux.
+ */
+.ui-modal__close {
+  display: flex;
+  margin-left: auto;
+  padding: var(--sp-2);
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.ui-modal__close:hover {
+  color: var(--text-primary);
+}
+
+/*
+ * `62vh` : la modale ne pousse jamais la page à défiler, c'est son corps qui défile. Une
+ * confirmation dont le bouton sort de l'écran est une confirmation qu'on ne donne pas.
+ */
+.ui-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-7);
+  overflow: auto;
+  max-height: 62vh;
+  padding: var(--sp-8);
+  color: var(--text-secondary);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La destructive à droite de tout : c'est la position la plus loin du geste réflexe. */
+.ui-modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-5);
+  padding: var(--sp-6) var(--sp-8);
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  background: var(--surface-sunken);
+}
+
+@keyframes ui-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
