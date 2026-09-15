@@ -1,4 +1,5 @@
 import { Shell } from '~/components/shell'
+import { EmptyState } from '~/components/ui'
 
 /**
  * L'état de contenu d'une adresse qui ne correspond à aucun écran.
@@ -14,13 +15,11 @@ import { Shell } from '~/components/shell'
 export function UnknownAddress() {
   return (
     <Shell>
-      <section className="empty">
-        <h1 className="empty__title">Cette adresse ne correspond à aucun écran</h1>
-        <p className="empty__body">
-          Le lien est peut-être incomplet, ou l'écran n'est pas encore livré. Les écrans arrivent
-          jalon par jalon, et chacun apparaît dans la navigation dès qu'il existe.
-        </p>
-      </section>
+      <EmptyState
+        description="Le lien est peut-être incomplet, ou l'écran n'est pas encore livré. Les écrans arrivent jalon par jalon, et chacun apparaît dans la navigation dès qu'il existe."
+        title="Cette adresse ne correspond à aucun écran"
+        titleAs="h1"
+      />
     </Shell>
   )
 }

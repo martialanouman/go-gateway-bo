@@ -64,19 +64,3 @@
   color: var(--text-muted);
   font: var(--text-label);
 }
-
-/* 42rem : une largeur de mesure, que la charte ne définit pas — elle n'a pas de token de mesure. */
-.empty {
-  max-width: 42rem;
-}
-
-.empty__title {
-  margin: 0 0 var(--sp-6);
-  font: var(--text-page-title);
-}
-
-.empty__body {
-  margin: 0 0 var(--sp-6);
-  color: var(--text-secondary);
-  line-height: var(--lh-relaxed);
-}
