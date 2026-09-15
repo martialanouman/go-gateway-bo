@@ -1,5 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
 import {
+  Button,
+  DataTable,
+  Dot,
+  Field,
+  GLYPH_NAMES,
+  Icon,
+  Input,
+  Select,
+  StatusPill,
+  Tabs,
+} from '~/components/ui'
+import {
   ACCENT_COLORS,
   CONTRAST_PAIRS,
   RADII,
@@ -34,10 +46,43 @@ import '~/styles/design-reference.css'
  * fuiter. En contrepartie elle permet de vérifier qu'un déploiement rend bien la charte, polices
  * comprises — ce qu'aucune capture d'écran locale ne prouve.
  *
- * Ce qu'elle ne montre pas : les primitives habillées (boutons, tables, pilules) et les cinq états
- * de contenu, qui arrivent en step-041 et step-042. Elle ne montre que des **tokens**.
+ * Elle rend aussi les **primitives** depuis step-041 : un écran y lit l'état exact d'un contrôle
+ * refusé, d'un champ en erreur ou d'une pilule de disjoncteur, plutôt que de le déduire d'une
+ * capture. Ce qu'elle ne montre pas encore : les surfaces flottantes et les cinq états de contenu,
+ * qui arrivent en step-042.
  */
 export const Route = createFileRoute('/_design')({ component: DesignReference })
+
+/**
+ * Des lignes **inventées**, et elles doivent le rester : cette page ne parle à personne. Le premier
+ * tableau branché sur le BFF est de step-040, et c'est elle qui apportera `QueryClientProvider`.
+ */
+const SPECIMEN_ROWS = [
+  {
+    id: 'orange-ci',
+    name: 'Orange CI',
+    link: 'up',
+    breaker: 'closed',
+    bind: 'bnd_8f2c',
+    throughput: '1 208',
+  },
+  {
+    id: 'mtn-ci',
+    name: 'MTN CI',
+    link: 'reconnecting',
+    breaker: 'half_open',
+    bind: 'bnd_31a0',
+    throughput: '504',
+  },
+  {
+    id: 'moov-ci',
+    name: 'Moov CI',
+    link: 'down',
+    breaker: 'open',
+    bind: 'bnd_77de',
+    throughput: '0',
+  },
+] as const
 
 function DesignReference() {
   return (
@@ -155,6 +200,116 @@ function DesignReference() {
             ))}
           </tbody>
         </table>
+      </section>
+
+      <section className="design__section">
+        <h2 id="primitives">Primitives</h2>
+        <p className="design__lede">
+          Les contrôles dans les états où ils se lisent mal ailleurs : un refus, un champ invalide,
+          un disjoncteur. La règle la plus stricte du système est ici — <code>link_status</code>{' '}
+          rend un point, <code>breaker_state</code> une pilule, et les deux ne se déduisent jamais
+          l'une de l'autre.
+        </p>
+
+        <div className="design__row">
+          <Button variant="primary" size="sm">
+            Nouveau client
+          </Button>
+          <Button>Réinitialiser</Button>
+          <Button variant="danger">Déconnecter la session</Button>
+          <Button variant="link">Voir la trace</Button>
+          <Button loading>Export…</Button>
+          <Button blocked aria-describedby="refus-demo">
+            Effectuer la rotation
+          </Button>
+        </div>
+        <p className="design__meta" id="refus-demo">
+          La rotation demande la permission <code>credentials:rotate</code>, qu'un propriétaire
+          accorde depuis Opérateurs et rôles.
+        </p>
+
+        <div className="design__row">
+          <Field label="Sender ID" hint="Un sender ID refusé par l'opérateur fait échouer l'envoi.">
+            <Input mono placeholder="BANQUE-CI" required />
+          </Field>
+          <Field label="Adresse e-mail" error="Cette adresse n’est pas reconnue.">
+            <Input defaultValue="operatrice@" />
+          </Field>
+          <Select
+            label="Portée du solde"
+            options={[
+              { value: 'shared', label: 'Pool partagé' },
+              { value: 'per_account', label: 'Par compte' },
+            ]}
+            defaultValue="shared"
+          />
+        </div>
+
+        <div className="design__row">
+          <StatusPill kind="link" state="up" live meta="3/4 binds" />
+          <StatusPill kind="link" state="reconnecting" />
+          <StatusPill kind="link" state="down" />
+          <StatusPill kind="breaker" state="closed" />
+          <StatusPill kind="breaker" state="open" />
+          <StatusPill kind="breaker" state="half_open" />
+          <StatusPill kind="entity" state="closed" />
+          <StatusPill kind="delivery" state="rejected" />
+        </div>
+
+        <Tabs
+          defaultValue="sessions"
+          tabs={[
+            { value: 'sessions', label: 'Sessions', count: 8 },
+            { value: 'webhooks', label: 'Webhooks MO/DLR' },
+            { value: 'contenu', label: 'Contenu', disabled: true },
+          ]}
+        />
+
+        <DataTable
+          caption="Connecteurs — spécimen de la référence visuelle"
+          rowKey={(row) => row.id}
+          columns={[
+            { key: 'name', header: 'Connecteur', cell: (row) => row.name, sortable: true },
+            {
+              key: 'link',
+              header: 'link_status',
+              cell: (row) => <StatusPill kind="link" state={row.link} />,
+            },
+            {
+              key: 'breaker',
+              header: 'breaker_state',
+              cell: (row) => <StatusPill kind="breaker" state={row.breaker} />,
+            },
+            { key: 'id', header: 'Bind', cell: (row) => row.bind, mono: true },
+            {
+              key: 'throughput',
+              header: 'Débit',
+              cell: (row) => row.throughput,
+              align: 'end',
+              sortable: true,
+            },
+          ]}
+          rows={SPECIMEN_ROWS}
+          sort={{ key: 'throughput', direction: 'descending' }}
+          // Sans `onSortChange`, la table rend ses en-têtes triables en texte inerte : la référence
+          // n'aurait jamais montré l'état le plus important d'un tableau, et aurait posé un
+          // `aria-sort` sur une colonne que rien ne rend actionnable. La page est un spécimen, il
+          // n'y a rien à trier — mais le contrôle doit être là.
+          onSortChange={() => undefined}
+        />
+
+        <ul className="design__list">
+          {GLYPH_NAMES.map((name) => (
+            <li className="design__row" key={name}>
+              <Icon name={name} size={18} />
+              <code className="design__meta">{name}</code>
+            </li>
+          ))}
+          <li className="design__row">
+            <Dot tone="up" live />
+            <code className="design__meta">Dot — le glyphe le plus employé</code>
+          </li>
+        </ul>
       </section>
     </main>
   )

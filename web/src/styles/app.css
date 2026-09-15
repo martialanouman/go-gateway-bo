@@ -14,9 +14,9 @@
  * et froides, pensées pour des veilles longues. `color-scheme: dark` le dit aussi au navigateur, pour
  * que les contrôles natifs et les barres de défilement suivent.
  *
- * La couche des primitives — `components.css` de la v1.0 — n'est **pas** ici : les composants
- * habillés arrivent en step-041 et step-042. Ce fichier ne porte que les tokens et la coquille
- * inerte que step-040 remplacera.
+ * La couche des primitives arrive **après** les tokens qu'elle assemble, et avant la coquille : une
+ * primitive ne doit jamais dépendre de l'ordre pour l'emporter sur la mise en page, et la coquille
+ * inerte que step-040 remplacera n'habille aucune primitive.
  */
 
 @import "./tokens/fonts.css";
@@ -28,6 +28,7 @@
 @import "./tokens/motion.css";
 @import "./tokens/layout.css";
 @import "./tokens/base.css";
+@import "./components.css";
 
 /*
  * La coquille inerte. Sa géométrie vient des tokens de la charte, et le `<style>` d'`index.html` en

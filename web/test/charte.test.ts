@@ -28,7 +28,7 @@
  * step-008, elles arrivent en step-041/042.)*
  */
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -38,11 +38,18 @@ import { contrastRatio, readTokens, resolveColor, resolveToken, TOKEN_FILES } fr
 const tokens = readTokens()
 
 /**
- * Le CSS que step-008 livre. `components.css` de la v1.0 n'en fait pas partie : les primitives
- * habillées sont de step-041/042. La liste est **nommée plutôt que globbée** — un fichier de style
+ * Le CSS que le produit sert. La liste est **nommée plutôt que globbée** — un fichier de style
  * ajouté sans y être inscrit échapperait à la garantie, et l'oubli se voit en relisant cette ligne.
+ *
+ * `components.css` y entre avec step-041. Il reste une feuille à venir, celle des surfaces
+ * flottantes et des cinq états de contenu (step-042).
  */
-const STYLED_FILES = ['app.css', 'design-reference.css', 'tokens/base.css'] as const
+const STYLED_FILES = [
+  'app.css',
+  'components.css',
+  'design-reference.css',
+  'tokens/base.css',
+] as const
 
 function readStyledCss(): string {
   const here = dirname(fileURLToPath(import.meta.url))
@@ -133,6 +140,39 @@ describe('tokens de la charte', () => {
     expect(assembled).toEqual([...TOKEN_FILES.map((file) => `tokens/${file}`), 'tokens/base.css'])
   })
 
+  it('inscrit dans STYLED_FILES chaque feuille qui existe', () => {
+    // **Ce que ce test ferme, et qui manquait.** Les gardes ci-dessous **parcourent** `STYLED_FILES`.
+    // En retirer une entrée n'en fait donc échouer aucune : elles vérifient simplement une feuille
+    // de moins, en silence. Mesuré en retirant `components.css` de la liste : les 125 tests restaient
+    // verts, alors que la feuille des primitives — la plus grosse du produit — n'était plus gardée
+    // par rien.
+    //
+    // La liste reste **nommée plutôt que globbée**, parce qu'on veut la relire. Ce test dit
+    // seulement qu'elle est *complète* : une feuille posée dans `src/styles/` sans y être inscrite
+    // fait rougir ici, et son auteur choisit alors où elle va.
+    const here = dirname(fileURLToPath(import.meta.url))
+    const styles = resolve(here, '..', 'src', 'styles')
+
+    const onDisk = readdirSync(styles, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.css'))
+      .map((entry) =>
+        join(entry.parentPath, entry.name)
+          .slice(styles.length + 1)
+          .replaceAll('\\', '/'),
+      )
+
+    // Les fichiers de `tokens/` sont gardés autrement — `readTokens()` les lit tous pour en tirer les
+    // déclarations. `tokens/base.css`, lui, porte des **règles** et non des tokens : il est dans
+    // STYLED_FILES.
+    const accounted = new Set<string>([
+      ...STYLED_FILES,
+      ...TOKEN_FILES.map((file) => `tokens/${file}`),
+    ])
+
+    expect(onDisk.length, 'aucune feuille trouvée : ce test ne garde rien').toBeGreaterThan(5)
+    expect(onDisk.filter((file) => !accounted.has(file)).sort()).toEqual([])
+  })
+
   it('sert chaque feuille que STYLED_FILES prétend garder', () => {
     // Une feuille qu'aucun module n'importe n'est pas servie, et la garantie ci-dessus se met alors à
     // juger un fichier mort. Mesuré le 08/08/2026 : retirer `import '~/styles/design-reference.css'`
@@ -150,6 +190,18 @@ describe('tokens de la charte', () => {
     }
   })
 
+  /**
+   * Les variables que **Base UI écrit à l'exécution**, et qui ne sont donc pas des tokens de la
+   * charte : l'indicateur d'onglets et le positionneur du select les posent par `style.setProperty()`
+   * une fois la mesure faite. La garde ci-dessous exige que tout `var()` vienne de `tokens/` ; ces
+   * trois-là n'en viendront jamais.
+   *
+   * Elles sont **nommées** plutôt que tolérées par un motif : trois lignes qu'on relit, et tout le
+   * reste demeure fermé. Le test suivant vérifie qu'aucune ne vit sans repli — sans quoi cette
+   * liste les rendrait simplement invisibles, ce qui est le contraire de ce qu'on veut.
+   */
+  const RUNTIME_VARIABLES = ['--active-tab-left', '--active-tab-width', '--anchor-width'] as const
+
   it('n’en consomme aucun qui n’existe pas', () => {
     // On part de ce que le CSS **consomme réellement**, jamais d'une liste écrite à la main : une
     // liste ne voit jamais le token qu'on vient d'inventer. `vite-plugin-tokens` tient déjà ce front
@@ -159,7 +211,47 @@ describe('tokens de la charte', () => {
       [...readStyledCss().matchAll(/var\(\s*(--[\w-]+)/g)].map(([, name]) => name as string),
     )
 
-    expect([...used].filter((name) => !tokens.has(name)).sort()).toEqual([])
+    const fromRuntime = new Set<string>(RUNTIME_VARIABLES)
+
+    expect([...used].filter((name) => !tokens.has(name) && !fromRuntime.has(name)).sort()).toEqual(
+      [],
+    )
+  })
+
+  it('donne une valeur de repli à chaque variable que le JavaScript écrira', () => {
+    // **Ce que ce test ferme.** `vite-plugin-tokens` fait échouer la construction sur un `var()` que
+    // rien ne déclare, et il nomme lui-même ces trois variables comme le cas qui l'avait mis en
+    // défaut. Le repli est la sortie qu'il préfère à une liste d'exemptions, pour une raison de plus
+    // que le build : il donne une valeur **au premier rendu**, avant que le composant n'ait mesuré
+    // quoi que ce soit — sans lui, l'indicateur d'onglet apparaîtrait à largeur nulle le temps d'une
+    // image.
+    //
+    // Sans ce test, `RUNTIME_VARIABLES` ci-dessus suffirait à faire taire la garde précédente, et le
+    // repli pourrait disparaître sans que rien ne bouge.
+    const here = dirname(fileURLToPath(import.meta.url))
+    const components = readFileSync(
+      join(resolve(here, '..'), 'src', 'styles', 'components.css'),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '')
+
+    // **Dans `:root`, et pas seulement « quelque part ».** La première rédaction cherchait le nom
+    // dans tout le fichier : mesuré en déplaçant les trois déclarations de `:root` vers
+    // `.ui-select__popup`, les 126 tests et `vite build` restaient verts — alors que l'indicateur
+    // d'onglets n'a plus aucun ancêtre qui les déclare. C'est le trou de portée que le plugin
+    // documente lui-même, reproduit dans le test censé le compenser.
+    const root = /:root\s*\{([^}]*)\}/.exec(components)?.[1]
+    expect(root, 'components.css ne déclare plus de bloc :root').toBeDefined()
+
+    const declared = new Set(
+      [...(root ?? '').matchAll(/(--[\w-]+)\s*:/g)].map(([, name]) => name as string),
+    )
+
+    for (const name of RUNTIME_VARIABLES) {
+      expect(
+        declared,
+        `${name} n'est pas déclarée dans :root : ses consommateurs la liront vide`,
+      ).toContain(name)
+    }
   })
 
   it('en consomme assez pour que ce test garde quelque chose', () => {
@@ -350,13 +442,32 @@ describe('contraste WCAG 2.1 AA', () => {
   })
 
   it('l’anneau de focus tranche sur le canvas', () => {
-    // Un focus invisible rend la navigation au clavier impraticable (WCAG 2.4.7). L'anneau est en
-    // teal ; on vérifie la couleur qui le compose, pas l'ombre portée qui l'assemble.
-    const ring = resolveColor(tokens, '--teal-500')
-    const page = resolveColor(tokens, '--surface-page')
+    // Un focus invisible rend la navigation au clavier impraticable (WCAG 2.4.7).
+    //
+    // **Ce test lit `--focus-ring`, et c'est tout son intérêt.** Il résolvait auparavant `--teal-500`
+    // en dur, sous un titre qui parlait de l'anneau : il mesurait donc un token *voisin*, pas celui
+    // que le produit peint. Mesuré en repeignant l'anneau en `--n-700` — un gris à 1,64:1 sur la
+    // page, invisible — **les 214 tests, `vite build` et le parcours Playwright restaient verts**.
+    // L'assertion de bout en bout ne le voyait pas non plus : elle comptait les deux *couches* de
+    // l'ombre, jamais leur couleur.
+    //
+    // La dernière couleur de l'ombre est celle qu'on voit : la première est un repli de la couleur
+    // de la page, qui sépare l'anneau du contrôle.
+    const declared = resolveToken(tokens, '--focus-ring')
+    expect(declared, '--focus-ring a disparu de la charte').toBeDefined()
 
-    expect(contrastRatio(ring as string, page as string)).toBeGreaterThanOrEqual(
-      AA_LARGE_TEXT_OR_UI,
+    const composed = [...(declared as string).matchAll(/var\(\s*(--[\w-]+)/g)].map(
+      ([, name]) => name as string,
     )
+    expect(composed.length, "l'anneau ne compose plus aucun token").toBeGreaterThanOrEqual(2)
+
+    const page = resolveColor(tokens, '--surface-page') as string
+    const visible = resolveColor(tokens, composed[composed.length - 1] as string, page)
+    expect(visible, `${composed.at(-1)} n'est pas résoluble`).toBeDefined()
+
+    expect(
+      contrastRatio(visible as string, page),
+      `l'anneau de focus ne tranche pas sur la page : ${composed.at(-1)}`,
+    ).toBeGreaterThanOrEqual(AA_LARGE_TEXT_OR_UI)
   })
 })
