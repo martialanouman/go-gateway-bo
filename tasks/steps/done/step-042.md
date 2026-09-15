@@ -112,13 +112,29 @@ la totalité, pas seulement `Button`. Mesuré sur le livré, trois variantes du 
 |---|---|---|
 | step-041 | 276,12 Ko (87,98 gzip) | 153,92 Ko |
 | `HomeScreen` important en profondeur | 290,60 Ko (93,03) | 175,72 Ko |
-| **via la façade — le livré** | **453,78 Ko (147,44)** | 12,62 Ko |
+| via la façade, `sideEffects` absent | 453,78 Ko (147,44) | 12,62 Ko |
 
-Le total ne bouge pas (~466 Ko) : c'est la **répartition** qui change. La façade verse dans le premier
-chargement +163 Ko bruts / +54 Ko gzip que seul `/_design` consomme aujourd'hui. La règle de la façade
-est écrite et normative — « un écran importe d'ici, jamais d'un fichier » —, et la contourner en
-silence pour un gain de poids serait l'inverse de ce que ce dépôt tient. Le surcoût va donc au
-registre, porteur **step-040**, qui consommera réellement ces primitives et rendra le coût légitime.
+Le total ne bouge pas (~466 Ko) : c'est la **répartition** qui change.
+
+**Et la conclusion que j'en avais tirée était fausse à son tour.** J'ai lu ces trois lignes comme le
+prix de la façade, arbitré de la garder — sa règle est normative — et inscrit les +163 Ko au registre
+avec porteur step-040. Le vrai coupable est ailleurs : `web/package.json` ne déclarait **pas**
+`sideEffects`. Rollup tient alors chaque module de `src/` pour susceptible d'en avoir, et un import
+depuis un baril tire **tous** ses modules, quoi qu'en dise la façade. Déclaration posée, rien d'autre
+changé :
+
+| | entrée | `/_design` |
+|---|---|---|
+| **via la façade, `sideEffects` déclaré — le livré** | **290,60 Ko (93,03)** | 175,73 Ko |
+
+C'est l'import profond **à l'octet près**. La façade ne coûtait rien ; il manquait l'autorisation de
+secouer. La dette est barrée au registre le jour de son inscription, et step-040 n'hérite de rien —
+sinon de la bascule réelle, quand la pile de toasts montera dans la coquille.
+
+Ce qui a permis à 163 Ko de s'y loger sans un rouge : le script d'entrée n'avait **aucune borne**,
+là où la feuille en a deux depuis step-041. Il en a deux maintenant, 340 Ko bruts / 110 Ko gzip,
+dans `chargement-a-froid.test.ts`. Marge ~15 %, dimensionnée pour que la bascule de step-040 se
+présente comme une question et non comme un rouge à faire taire.
 
 Feuille d'entrée : **27,37 Ko bruts / 5,89 Ko gzip**, contre 21,37 / 5,00 avant la step. Bornes
 32 768 / 14 336 — 84 % et 41 %. La borne **brute** est celle qui se resserre.
@@ -130,6 +146,8 @@ Feuille d'entrée : **27,37 Ko bruts / 5,89 Ko gzip**, contre 21,37 / 5,00 avant
 | `ModuleDisabled` rend `ErrorState` | Rouge, 1 test. Le test « nomme le module éteint » **reste vert** : le titre survit à la confusion, et c'est pourquoi les quatre assertions du même `it` étaient nécessaires. |
 | `onOpenChange` filtré sur `reason === 'close-press'` | Rouge, « ferme sur Échap ». |
 | `<Dialog.Portal keepMounted>` | Rouge, « ne laisse rien de son contenu dans le document ». La seule preuve que la modale **démonte** — invariant (b), six steps avant l'écran qui en dépendra. |
+| `sideEffects` retiré de `package.json` | Rouge, « garde le script d'entrée exempt de ce qu'une seule route consomme » : 145 796 gzip pour une borne à 110 000. |
+| `"sideEffects": false` au lieu de `["**/*.css"]` | **Verte, et instructive** : la feuille émise est identique à l'empreinte près — Vite ne laisse pas secouer ses propres modules CSS. Le motif ne protège donc rien aujourd'hui ; il dit ce qui est vrai du graphe. Le premier message de commit lui prêtait la protection : corrigé sur la mesure. |
 | `modal={false}` | Rouge **deux fois** : en jsdom, l'extérieur reste dans l'arbre d'accessibilité ; en Chromium, le focus sort de la modale. |
 | `@media (prefers-reduced-motion: reduce)` retiré de `base.css` | Rouge sur le parcours seulement. |
 | `.ui-toast[data-limited]` en opacité plutôt qu'en `display: none` | **Verte en Vitest**, rouge sur le parcours (5 toasts visibles sur 3). Voir ci-dessous. |
