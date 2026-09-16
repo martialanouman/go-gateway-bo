@@ -189,11 +189,19 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // **Le piège du focus, et c'est ici qu'il se mesure.** jsdom n'a ni ordre de tabulation réel, ni
   // `inert`, ni visibilité calculée : y « vérifier » un piège donnerait un vert qui ne prouve rien.
   // On tabule plus de fois qu'il n'y a de contrôles dans la modale, et le focus doit y rester.
-  for (let i = 0; i < 8; i += 1) await page.keyboard.press('Tab')
-  expect(
-    await page.evaluate(() => document.activeElement?.closest('.ui-modal') !== null),
-    'le focus est sorti de la modale : le piège ne tient pas',
-  ).toBe(true)
+  //
+  // La lecture attend, parce que le piège passe **hors** de la modale : Base UI pose ses gardes de
+  // focus à côté du popup, et une garde atteinte par `Tab` ne rend le focus qu'à l'image suivante
+  // (`enqueueFocus`, par `requestAnimationFrame`). Lue aussitôt, elle a rougi deux fois en CI sur un
+  // piège intact. Une vraie fuite ne revient pas, et l'attente expire.
+  const focusIsInModal = () =>
+    page.evaluate(() => document.activeElement?.closest('.ui-modal') !== null)
+  for (let i = 0; i < 8; i += 1) {
+    await page.keyboard.press('Tab')
+    await expect
+      .poll(focusIsInModal, 'le focus est sorti de la modale : le piège ne tient pas')
+      .toBe(true)
+  }
 
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
