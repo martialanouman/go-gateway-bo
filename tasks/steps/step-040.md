@@ -1,7 +1,7 @@
 # step-040 — AppShell : rail, barre supérieure, arborescence de routes en états vides
 
 > **Jalon :** M2 (§4.2, `plan.md` §7) · **Statut :** À FAIRE
-> **Dépend de :** step-022, step-041, step-042 · **Bloque :** step-027, step-028, step-029
+> **Dépend de :** step-022, step-041, step-042, step-048 · **Bloque :** step-027, step-028, step-029
 >
 > *Elle se lit **après** les deux lots de primitives, et son numéro ne le dit pas : l'AppShell
 > consomme le bouton, les onglets et les cinq états, il ne les précède pas. L'ordre de `todo.md` fait

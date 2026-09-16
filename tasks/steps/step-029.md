@@ -1,7 +1,7 @@
 # step-029 — Gestion des opérateurs et des rôles
 
 > **Jalon :** M1 (§6.10, §5.1) · **Statut :** À FAIRE
-> **Dépend de :** step-025, step-026, step-028 · **Bloque :** — (clôt M1)
+> **Dépend de :** step-025, step-026, step-028, step-033 · **Bloque :** — (clôt M1)
 
 ## But
 Administrer qui entre et ce qu'il peut faire, depuis l'interface plutôt que depuis la base. C'est la
