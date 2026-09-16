@@ -110,6 +110,15 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
+  it('bloqué, il ne compile pas sans son explication', () => {
+    // La garde est le typecheck : sans l'union de `ButtonProps`, la directive ci-dessous devient
+    // inutile et `tsc` rougit. Le rendu, lui, reste bloqué quoi qu'on en fasse.
+    // @ts-expect-error — `blocked` exige `aria-describedby`.
+    render(<Button blocked>Effectuer la rotation</Button>)
+
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true')
+  })
+
   it('interdit, il reste visible, atteignable et relié à son explication', async () => {
     // « Un contrôle interdit est désactivé **et expliqué**, jamais silencieusement masqué. » Le
     // masquer laisse l'opérateur chercher un bouton qui n'apparaît pas ; un `disabled` nu le retire
