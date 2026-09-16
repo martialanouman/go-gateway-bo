@@ -169,11 +169,12 @@ sur un schéma en retard protège quelque chose. *(Arbitré le 02/08/2026, au d�
 
 ## M2 (interface) — Primitives portées & coquille applicative  (§4.1, §4.2)
 
-> L'ordre est `041 → 042 → 040` : l'AppShell consomme les primitives et les cinq états de contenu, il
-> ne les précède pas.
+> L'ordre est `041 → 042 → 048 → 040` : l'AppShell consomme les primitives et les cinq états de
+> contenu, il ne les précède pas, et `048` rend leurs tests capables de rougir avant qu'elle les monte.
 
 - [x] step-041 — Primitives lot 1 portées : bouton, champ, select, pilule de statut, tabs, table
 - [x] step-042 — Primitives lot 2 portées : dialog, toast + les cinq états de contenu †
+- [ ] step-048 — Filet des primitives : toasts, classes peintes, états, gardes de câblage ◊◊◊
 - [ ] step-040 — AppShell : rail, barre supérieure, arborescence de routes en états vides
 
 † **`menu` et `tooltip` ont quitté cette ligne le 08/09/2026**, en écrivant la fiche. Le kit de la
@@ -182,6 +183,21 @@ step que la règle des identifiants contraint. Aucun consommateur avant elle : `
 l'identifiant en mono sans substitution, et le rail de `step-040` est libellé seul, sans icône. Ce
 qui manquait n'était pas le comportement — `@base-ui/react` exporte les deux — mais la référence
 visuelle, et on ne la dessine pas à l'aveugle. Détail dans `steps/step-042.md`, « Hors périmètre ».
+
+## Durcissement — constats de l'audit du 16/09/2026  (M1)
+
+- [ ] step-033 — Audit atomique des actions locales  *(invariant c)*
+- [ ] step-034 — Verrous d'essais sous concurrence, coût d'argon2id borné
+- [ ] step-035 — Filet de mutation M1, refus qui nomment ce qui manque
+- [ ] step-036 — Durcissement HTTP et configuration : origine des mutations, en-têtes, échéance
+- [ ] step-037 — Élagage
+- [ ] step-038 — Commentaires : corriger les faux, ramener les blocs
+
+◊◊◊ **Sept steps issues de l'audit du 16/09/2026**, placées avant les écrans de M1 : `step-029` ajoute
+des mutations qui doivent naître avec l'audit transactionnel de `033`, `step-027` est le premier écran
+à envoyer un `POST` et suppose le contrôle d'origine de `036`, et `step-040` monte les toasts que `048`
+teste. Les numéros sont les derniers libres des blocs M1 (`030` reste réservé) et M2. Chaque constat
+est au registre des dettes ci-dessous, avec sa step.
 
 ## M1 (écrans) — Login, MFA, opérateurs & rôles  (§6.9, §6.10, §5.1)
 
@@ -329,7 +345,7 @@ observable que dans un run de CI : pousser tôt vaut mieux que relire.
 **Écrites dans les fiches qui les ont créées, et rappelées ici parce qu'« une fiche archivée n'est
 ouverte par personne »** — la phrase est du dépôt, écrite trois fois. Jusqu'au 31/08/2026 le mot
 « dette » n'apparaissait **pas une seule fois dans ce fichier**, et une seule fois dans `plan.md`
-(§1.12, pour en déclarer une **soldée**). Les **soixante-trois** lignes ci-dessous vivaient dans
+(§1.12, pour en déclarer une **soldée**). Les **soixante-trois** lignes de sa première rédaction vivaient dans
 dix-sept fiches de `steps/done/`, dans `plan.md` §18-19, et dans des commentaires de code.
 
 Treize d'entre elles manquaient à la première rédaction de ce registre — dont le trou d'audit du
@@ -388,6 +404,18 @@ un porteur déjà coché.
 | Un administrateur qui édite un rôle par défaut verra **son édition défaite au déploiement suivant**, et « la seconde sortie ne marche pas en l'état ». | Première moitié de la question léguée par DN-8 de step-020 ; la seconde est la collision de noms ci-dessus. | step-029 |
 | Le préfixe `__Host-` du cookie n'est vu par **aucun scénario**. | Le harnais porte ses cookies à la main et accepterait n'importe quel nom. Seul un vrai navigateur applique le préfixe. | step-027 |
 | La fenêtre d'oubli du compteur glissant est écrite **deux fois** — `internal/store/counters.go` et `internal/store/logins.go`. | Changer la politique d'oubli sans toucher les deux donne au premier et au second facteur **deux politiques anti-brute-force différentes**, et le commentaire qui dit « la même valeur, délibérément » devient faux en silence. Rien ne casse. | **sans porteur** — replier la requête bi-dimension remanierait le chemin consulté avant tout argon2id, pour un gain de forme. Non-attribution rendue le 30/08/2026, avec sa mesure. |
+| **L'audit d'une action locale s'écrit hors de sa transaction** : `audited` passe par `Record` sur le pool, une fois l'action validée. Enrôlement TOTP, enregistrement et retrait de passkey, élévation, connexion, déconnexion. | Un audit en échec rend 500 et laisse l'action faite, sans trace : avec `replace=true`, l'ancien TOTP est détruit et le nouveau secret jamais montré. Relevé par l'audit du 16/09/2026. | step-033 |
+| `RecordTx` n'a pas de témoin, les audits de `Logout` et de `passkey.register` ne sont comptés par aucun scénario, et le pas d'adresse ne vérifie que `IS NOT NULL`. | Trois mutations lancées le 16/09/2026 restent vertes : `RecordTx` rend `nil`, l'audit est placé dans un `if false {}`, une adresse forgée constante est écrite. | step-033 |
+| **Le verrou d'essais vérifie puis agit** : `LockFor` lit, argon2id tourne, l'échec n'est compté qu'ensuite. Premier et second facteur. | Une rafale franchit le seuil de cinq tout entière : autant d'essais que de requêtes simultanées, TOTP compris pour qui détient le mot de passe. Le commentaire de la migration 00004 est faux sous concurrence. | step-034 |
+| **Aucune borne de concurrence sur argon2id**, à 64 MiB par vérification, adresse inconnue comprise ; dix vérifications par essai de code de récupération. | Environ deux cents connexions simultanées, sans identifiants, font tuer une instance pour manque de mémoire. | step-034 |
+| `login_attempt_counters` n'est jamais purgée. | Une ligne par adresse soumise : la table croît avec chaque tentative sur une adresse nouvelle. | step-187 |
+| **La seule défense CSRF est `SameSite=Lax`**, et le décodeur engendré accepte un corps JSON en `text/plain`. | Un sous-domaine voisin compromis déclenche les mutations `/api` avec le cookie de l'opérateur, sans pré-vol. | step-036 |
+| La coquille, les assets et `/api` sont servis sans `nosniff`, `X-Frame-Options` ni `Referrer-Policy`. | Encadrement par une page du même site ; aucune seconde barrière hors CSP. | step-036 |
+| Un `DASHBOARD_TRUSTED_PROXIES` absent est accepté en silence. | Derrière le load balancer, cinq mots de passe faux bloquent **tous** les opérateurs quinze minutes, indéfiniment renouvelable. | step-036 |
+| Aucune échéance ne borne une requête `/api` ; seul `ReadHeaderTimeout` est posé. | Un corps envoyé à un octet par minute tient une goroutine et un descripteur sans limite. | step-036 |
+| Une URL de configuration rejetée est citée avec ses identifiants ; `DASHBOARD_WEBAUTHN_ORIGIN` accepte `http://` partout ; `DASHBOARD_GATEWAY_MODE=mock` n'est contrôlé par rien. | Un secret part dans les logs ; une erreur de configuration dégrade la production sans que le démarrage le dise. | step-036 |
+| **Six gardes de M1 se retirent sans un rouge** : le 401 d'une passkey inconnue, quatre contrôles de forme de `mfa.go`, la panne de résolution de `guard.go:122`, la boucle de `KeepAuditPartitions`, l'échéance de `ConsumeChallenge`, `Strict()` du sceau (vert onze fois sur douze). | Mesuré le 16/09/2026, mutation par mutation. Un refactor les défait sans que la suite le dise. | step-035 |
+| **Quatre refus disent autre chose que ce qui s'est passé** : « reconnectez-vous » sur une session élevée, l'horloge TOTP pour une passkey, un 409 de procédure pour un code faux, un 401 pour une cérémonie refusée. | L'opérateur obéit au message et perd son élévation, ou corrige ce qui n'est pas en cause. | step-035 |
 
 ### Forme, confort et outillage
 
@@ -414,3 +442,7 @@ un porteur déjà coché.
 | Deux dettes de forme relevées en revue de step-008 : le plugin accepte un token déclaré dans une portée qui ne s'applique pas, et `design-reference.css` atterrit dans la feuille d'entrée. | **Toujours ouvertes, et le coût rechiffré sur le livré de step-042 : 2,21 Ko bruts / 0,38 Ko gzip**, mesurés en vidant la feuille et en comparant les deux constructions — elle a grossi depuis les ~1,9 Ko de step-041, et grossira encore à chaque section ajoutée à `/_design`. **Aucune des deux n'est du ressort d'une step de primitives**, et c'est ce que le passage de porteur de step-041 à step-042 n'a pas changé : la première demande un analyseur CSS de portée là où le plugin fait 50 lignes, la seconde tient à `autoCodeSplitting`, qui scinde le composant et pas sa feuille. Les **re-attribuer une troisième fois à la step suivante** reproduirait un ajournement qui se relit comme de la prudence et ne repose sur rien. | **sans porteur** — deux déclencheurs mesurables : pour le plugin, un token déclaré hors portée qui cause un défaut réel (jamais observé à ce jour) ; pour la feuille, la borne gzip de `chargement-a-froid.test.ts` approchée à moins de 2 Ko — au 15/09/2026, 5,89 Ko sur 14,34. |
 | ~~La façade `components/ui/index.ts` verse **tout Base UI dans le chunk d'entrée** dès qu'un écran de production importe une seule primitive.~~ | **Dette annulée le 15/09/2026, le jour de son inscription : elle n'existait pas.** La première mesure — entrée à 453,78 Ko (147,44 gzip) via la façade contre 290,60 (93,03) en import profond — était juste, son attribution était fausse. `web/package.json` ne déclarait pas `sideEffects` : Rollup tient alors chaque module de `src/` pour susceptible d'en avoir, et un import depuis un baril tire **tous** ses modules. La déclaration posée, la façade rend **290,60 Ko / 93,03 gzip** — l'import profond à l'octet près —, et les 163 Ko partent dans le chunk de `/_design`, qui est leur place. Total inchangé dans les trois cas. Le script d'entrée n'avait **aucune borne**, ce qui est la raison pour laquelle 163 Ko avaient pu s'y loger sans un rouge ; il en a deux depuis, dans `chargement-a-froid.test.ts`. | **payée — step-042** |
 | `request.Body == nil` dans `API.Login` : une garde **inatteignable par le routeur**, conservée. | Lui écrire un test demanderait de l'appeler hors de son routeur : il prouverait la garde et rien du produit. Le constat est écrit au-dessus de la ligne. | **sans porteur** — c'est une décision consignée, pas une dette à payer. La seule action possible serait de retirer la garde. |
+| Des tests de M1 qui ne gardent rien ou affirment faux : « deux bits significatifs sur six » (deux fichiers), `TestLesTroisSecretsNeSeConfondentPas` qui teste un mapping, un test HKDF toujours vrai, « huit migrations » pour neuf ; `processAlive` lit EPERM comme la mort d'un processus. | Des tests qu'on croit et qui ne prouvent rien ; un nettoyage qui supprime une base encore utilisée. | step-035 |
+| **Les tests des primitives restent verts** quand la durée critique d'un toast, son `aria-label`, une classe peinte, la phrase d'un état d'erreur ou le câblage du plugin de tokens disparaît ; `useToast` ne passe jamais la priorité haute ; `blocked` n'exige pas d'explication. | Mesuré le 16/09/2026 sur une partie d'entre eux. La coquille de step-040 monterait des primitives que rien ne garde. | step-048 |
+| Du code sans usage ni consommateur planifié : `Dependencies` recopie `API`, trois délégations pures du verrou MFA, `Fields.Number`, un `fs.Stat` refait, deux recettes identiques du Makefile, trois paquets Prism jamais importés, trois refus morts d'`allowBuilds`. | Rien ne casse ; chaque lecteur paie la lecture. | step-037 |
+| **Onze commentaires faux**, et 29,8 % des lignes non vides en commentaires (38,5 % en production), dont 292 blocs de plus de huit lignes et 307 lignes d'historique. | Un commentaire faux se croit plus volontiers que le code ; un bloc de cinquante lignes ne se relit plus. Mesuré le 16/09/2026. | step-038 |

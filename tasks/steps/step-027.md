@@ -2,7 +2,7 @@
 
 > **Jalon :** M1 (§6.9, §4.2) · **Statut :** À FAIRE
 > **Dépend de :** step-025, **step-040** (AppShell, `usePermission`, `PermissionGate`), step-041,
-> step-042 · **Bloque :** step-028, step-029
+> step-042, step-036 (contrôle d'origine des mutations) · **Bloque :** step-028, step-029
 
 ## But
 La porte d'entrée : deux écrans hors de la coquille, une garde de route qui s'exécute **aussi sur une
