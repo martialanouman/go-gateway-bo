@@ -7,17 +7,18 @@
  * ne casse rien, le navigateur applique la valeur héritée et l'écran s'affiche *presque* juste.
  *
  * Trois preuves, parce qu'aucune ne suffit seule : la fonction pure décide correctement ; une
- * construction réelle échoue vraiment ; et le plugin est bien câblé dans `vite.config.ts`. La
- * troisième est faible par nature, mais c'est la leçon écrite dans la recette `check-routes` — un
+ * construction réelle échoue vraiment ; et le plugin est bien câblé dans `vite.config.ts`, chargée
+ * comme Vite la charge. La troisième est la leçon écrite dans la recette `check-routes` — un
  * générateur retiré de la configuration passait la porte.
  */
 
-import { mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
+import { mkdtemp, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { build } from 'vite'
+import { fileURLToPath } from 'node:url'
+import { build, loadConfigFromFile } from 'vite'
 import { describe, expect, it } from 'vitest'
-import { undeclaredTokens } from './vite-plugin-tokens'
+import { declaredTokens, undeclaredTokens } from './vite-plugin-tokens'
 
 describe('les tokens qu’une source consomme sans les déclarer', () => {
   it('nomme ceux qu’aucune source ne déclare', () => {
@@ -70,16 +71,23 @@ describe('la construction', () => {
     await writeFile(join(root, 'x.js'), "import './x.css'\n")
     await writeFile(join(root, 'x.css'), '.x { color: var(--token-inexistant); }')
 
-    const { declaredTokens } = await import('./vite-plugin-tokens')
-
     await expect(
       build({ root, logLevel: 'silent', plugins: [declaredTokens()], build: { outDir: 'dist' } }),
     ).rejects.toThrow(/--token-inexistant/)
   }, 60_000)
 
   it('est câblée dans la configuration, faute de quoi rien de ce qui précède ne protège', async () => {
-    const config = await readFile(new URL('./vite.config.ts', import.meta.url), 'utf8')
+    // La configuration exécutée, et non son texte : `// declaredTokens(),` contient la chaîne.
+    const loaded = await loadConfigFromFile(
+      { command: 'build', mode: 'production' },
+      fileURLToPath(new URL('./vite.config.ts', import.meta.url)),
+    )
+    const names = ((loaded?.config.plugins ?? []) as unknown[])
+      .flat(Number.POSITIVE_INFINITY)
+      .map((plugin) =>
+        plugin && typeof plugin === 'object' && 'name' in plugin ? plugin.name : '',
+      )
 
-    expect(config).toContain('declaredTokens()')
+    expect(names).toContain(declaredTokens().name)
   })
 })
