@@ -346,7 +346,7 @@ function DesignReference() {
 
         <div className="design__row">
           <ErrorState
-            description="La passerelle n’a pas répondu (504). Vos données locales restent affichées."
+            description="La passerelle n’a pas répondu (504)."
             onRetry={() => undefined}
             request="GET /api/connectors · 504 · req_8f2c…"
           />

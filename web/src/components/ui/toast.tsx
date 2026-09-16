@@ -23,8 +23,8 @@ import { Icon } from './icon'
  * `.jsx` n'est pas du code de production : il montre une apparence, et n'a jamais eu ni piège de
  * focus ni parcours clavier.
  *
- * L'`aria-label` du viewport est réécrit en français : Base UI le pose en « Notifications », et
- * c'est de la copie produit.
+ * Le viewport tient son nom, « Notifications », du défaut de Base UI — déjà du français. Le test de
+ * la région le fixe, et rougira si une montée de version le change.
  */
 
 /** Les quatre du kit. Pas de `danger` ni d'`error` : `critical` est le mot de la charte. */
@@ -67,6 +67,7 @@ export function useToast() {
     return manager.add<ToastData>({
       data: { source: toast.source },
       description: toast.description,
+      priority: severity === 'critical' ? 'high' : 'low',
       timeout: severity === 'critical' ? TOAST_TIMEOUT.critical : TOAST_TIMEOUT.default,
       title: toast.title,
       type: severity,
@@ -95,7 +96,7 @@ export function ToastStack({ children }: ToastStackProps) {
     <BaseToast.Provider limit={3}>
       {children}
       <BaseToast.Portal>
-        <BaseToast.Viewport aria-label="Notifications" className="ui-toaststack">
+        <BaseToast.Viewport className="ui-toaststack">
           <ToastList />
         </BaseToast.Viewport>
       </BaseToast.Portal>

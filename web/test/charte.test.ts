@@ -31,6 +31,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseAst, preprocessCSS, resolveConfig } from 'vite'
 import { describe, expect, it } from 'vitest'
 import { CONTRAST_PAIRS, RADII, SPACINGS, SURFACES, TYPE_ROLES } from '../src/lib/design-tokens'
 import {
@@ -166,19 +167,34 @@ describe('tokens de la charte', () => {
     expect(onDisk.filter((file) => !accounted.has(file)).sort()).toEqual([])
   })
 
-  it('sert chaque feuille que STYLED_FILES prétend garder', () => {
+  it('sert chaque feuille que STYLED_FILES prétend garder', async () => {
     // Une feuille qu'aucun module n'importe n'est pas servie, et la garantie ci-dessus se met alors à
     // juger un fichier mort. Mesuré le 08/08/2026 : retirer `import '~/styles/design-reference.css'`
     // de la route laissait les 137 tests verts et `vite build` à rc=0 — la page rendait nue, et ce
     // fichier continuait de lire la feuille **sur disque** comme si de rien n'était.
-    const here = dirname(fileURLToPath(import.meta.url))
-    const sources = ['src/styles/app.css', 'src/routes/[_]design.tsx', 'src/main.tsx']
-      .map((file) => readFileSync(join(resolve(here, '..'), file), 'utf8'))
-      .join('\n')
+    //
+    // Les imports sont lus par l'analyseur et les `@import` résolus par Vite : un import commenté
+    // contient encore le nom de la feuille, et une recherche dans le texte le comptait.
+    const web = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+    const config = await resolveConfig({ root: web, logLevel: 'silent' }, 'build')
 
+    const imported = ['src/main.tsx', 'src/routes/[_]design.tsx'].flatMap((file) =>
+      parseAst(readFileSync(join(web, file), 'utf8'), { lang: 'tsx' })
+        .body.flatMap((node) => (node.type === 'ImportDeclaration' ? [node.source.value] : []))
+        .filter((specifier) => specifier.endsWith('.css'))
+        .map((specifier) => join(web, 'src', specifier.replace(/^~\//, ''))),
+    )
+
+    const served = new Set(imported)
+    for (const sheet of imported) {
+      const { deps } = await preprocessCSS(readFileSync(sheet, 'utf8'), sheet, config)
+      for (const dep of deps ?? []) served.add(dep)
+    }
+
+    expect(served.size, 'aucune feuille trouvée : ce test ne garde rien').toBeGreaterThan(5)
     for (const file of STYLED_FILES) {
-      expect(sources, `${file} n'est importée par aucun module : elle n'est pas servie`).toContain(
-        file.replace('tokens/', './tokens/').replace(/^(app|design-reference)/, 'styles/$1'),
+      expect(served, `${file} n'est importée par aucun module : elle n'est pas servie`).toContain(
+        join(web, 'src', 'styles', file),
       )
     }
   })

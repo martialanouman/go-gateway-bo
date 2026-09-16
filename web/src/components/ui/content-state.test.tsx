@@ -111,13 +111,14 @@ describe('ErrorState', () => {
       <ErrorState
         onRetry={() => {}}
         request="GET /api/connectors · 504 · req_8f2c…"
-        description="La passerelle n’a pas répondu (504). Vos données locales restent affichées."
+        description="La passerelle n’a pas répondu (504)."
       />,
     )
 
     expect(screen.getByRole('alert')).toBeInTheDocument()
     expect(screen.getByText('Impossible de joindre l’API Admin')).toBeInTheDocument()
-    expect(screen.getByText(/Vos données locales restent affichées/)).toBeInTheDocument()
+    expect(screen.getByText('La passerelle n’a pas répondu (504).')).toBeInTheDocument()
+    expect(screen.getByText('Vos données locales restent affichées.')).toBeInTheDocument()
     expect(screen.getByText('GET /api/connectors · 504 · req_8f2c…')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument()
   })

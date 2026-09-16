@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Button } from './button'
 import { TOAST_TIMEOUT, type ToastSeverity, type ToastSource, ToastStack, useToast } from './toast'
 
@@ -66,6 +66,16 @@ async function pousser(
   await userEvent.click(screen.getByRole('button', { name: 'Pousser' }))
 }
 
+/**
+ * Le titre du toast, et non son écho : un toast prioritaire est doublé par Base UI dans une région
+ * `role="alert"` visuellement masquée, qui répète le même texte.
+ */
+const TITRE = '.ui-toast__title'
+
+function titre(texte: string) {
+  return screen.getByText(texte, { selector: TITRE })
+}
+
 describe('ToastStack', () => {
   it('annonce la région en français, poliment', async () => {
     // Base UI pose « Notifications » — de la copie produit, donc en français. Et `polite` parce
@@ -85,9 +95,11 @@ describe('ToastStack', () => {
       },
     ])
 
-    expect(screen.getByText('mtn-ci : taux d’erreur au-dessus de 5 %')).toBeInTheDocument()
+    expect(titre('mtn-ci : taux d’erreur au-dessus de 5 %')).toBeInTheDocument()
     expect(
-      screen.getByText('Évalué par Alertmanager, indépendamment du tableau de bord.'),
+      screen.getByText('Évalué par Alertmanager, indépendamment du tableau de bord.', {
+        selector: '.ui-toast__text',
+      }),
     ).toBeInTheDocument()
   })
 
@@ -98,9 +110,9 @@ describe('ToastStack', () => {
       { title: 'Information' },
     ])
 
-    expect(screen.getByText('Critique').closest('.ui-toast--critical')).not.toBeNull()
-    expect(screen.getByText('Avertissement').closest('.ui-toast--warning')).not.toBeNull()
-    expect(screen.getByText('Information').closest('.ui-toast--info')).not.toBeNull()
+    expect(titre('Critique').closest('.ui-toast--critical')).not.toBeNull()
+    expect(titre('Avertissement').closest('.ui-toast--warning')).not.toBeNull()
+    expect(titre('Information').closest('.ui-toast--info')).not.toBeNull()
   })
 
   /**
@@ -116,8 +128,8 @@ describe('ToastStack', () => {
       { severity: 'warning', source: 'bff', title: 'Solde bas sur bulk-sms-ci' },
     ])
 
-    const infra = screen.getByText('Lien orange-sn-1 en panne').closest('.ui-toast')
-    const metier = screen.getByText('Solde bas sur bulk-sms-ci').closest('.ui-toast')
+    const infra = titre('Lien orange-sn-1 en panne').closest('.ui-toast')
+    const metier = titre('Solde bas sur bulk-sms-ci').closest('.ui-toast')
 
     expect(infra?.querySelector('.ui-toast__source--alertmanager')).toHaveTextContent(
       'source · alertmanager',
@@ -132,10 +144,7 @@ describe('ToastStack', () => {
     await pousser([{ severity: 'success', title: 'Route enregistrée' }])
 
     expect(
-      screen
-        .getByText('Route enregistrée')
-        .closest('.ui-toast')
-        ?.querySelector('[class*="ui-toast__source"]'),
+      titre('Route enregistrée').closest('.ui-toast')?.querySelector('[class*="ui-toast__source"]'),
     ).toBeNull()
   })
 
@@ -184,15 +193,58 @@ describe('ToastStack', () => {
     await userEvent.click(fermer)
 
     await waitFor(() => {
-      expect(screen.queryByText('Route enregistrée')).toBeNull()
+      expect(screen.queryByText('Route enregistrée', { selector: TITRE })).toBeNull()
     })
   })
 
-  it('laisse une alerte critique trois secondes de plus que les autres', () => {
-    // Pas un test de rendu : une affirmation sur la valeur que la charte fixe — « éphémères,
-    // auto-disparition ». Les deux durées sont lues ici pour qu'un changement se voie.
-    expect(TOAST_TIMEOUT.critical).toBe(9000)
-    expect(TOAST_TIMEOUT.default).toBe(6000)
-    expect(TOAST_TIMEOUT.critical - TOAST_TIMEOUT.default).toBe(3000)
+  // Horloge simulée : relire `TOAST_TIMEOUT` ne dit pas si la durée est transmise à Base UI.
+  it('laisse une alerte critique trois secondes de plus que les autres', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      render(
+        <Ecran
+          toasts={[
+            { severity: 'critical', title: 'Lien orange-sn-1 en panne' },
+            { severity: 'success', title: 'Route enregistrée' },
+          ]}
+        />,
+      )
+      await userEvent
+        .setup({ advanceTimers: vi.advanceTimersByTime })
+        .click(screen.getByRole('button', { name: 'Pousser' }))
+
+      await act(() => vi.advanceTimersByTimeAsync(TOAST_TIMEOUT.default + 500))
+      await waitFor(() =>
+        expect(screen.queryByText('Route enregistrée', { selector: TITRE })).toBeNull(),
+      )
+      expect(titre('Lien orange-sn-1 en panne')).toBeInTheDocument()
+
+      await act(() => vi.advanceTimersByTimeAsync(TOAST_TIMEOUT.critical - TOAST_TIMEOUT.default))
+      await waitFor(() =>
+        expect(screen.queryByText('Lien orange-sn-1 en panne', { selector: TITRE })).toBeNull(),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('annonce une alerte critique d’urgence, et le reste poliment', async () => {
+    // `priority: 'high'` : Base UI 1.6.0 rend alors le toast en `alertdialog` et répète son titre
+    // dans une région `role="alert"` — lu dans `ToastRoot.mjs` et `ToastViewport.mjs`. `hidden` :
+    // la pile repliée masque tout toast qui n'est pas au premier plan, et c'est le rôle posé qu'on
+    // juge ici.
+    await pousser([
+      { severity: 'critical', title: 'Lien orange-sn-1 en panne' },
+      { severity: 'warning', title: 'Solde bas sur bulk-sms-ci' },
+    ])
+
+    expect(screen.getByRole('alertdialog', { hidden: true })).toHaveTextContent(
+      'Lien orange-sn-1 en panne',
+    )
+    expect(screen.getByRole('dialog', { hidden: true })).toHaveTextContent(
+      'Solde bas sur bulk-sms-ci',
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('Lien orange-sn-1 en panne')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Solde bas')
   })
 })

@@ -46,20 +46,26 @@ export type ButtonProps = Omit<
    * perd le fil au moment précis où l'opérateur attend une nouvelle.
    */
   readonly loading?: boolean
-  /**
-   * Action **interdite pour l'instant**, dont l'existence doit rester visible.
-   *
-   * Même mécanique que `loading` : `aria-disabled` plutôt que `disabled`. « Un contrôle interdit est
-   * désactivé **et expliqué**, jamais silencieusement masqué » — or un `disabled` nu le retire de
-   * l'arbre d'accessibilité, et l'opérateur au lecteur d'écran ne sait ni qu'il existe ni ce qui le
-   * débloquerait.
-   *
-   * L'appelant reste tenu de dire **pourquoi**, par `aria-describedby`. Le rendu conditionnel n'est
-   * qu'un confort : la garde est côté serveur, invariant (c).
-   */
-  readonly blocked?: boolean
   readonly children?: ReactNode
-}
+} & (
+    | { readonly blocked?: false }
+    | {
+        /**
+         * Action **interdite pour l'instant**, dont l'existence doit rester visible.
+         *
+         * Même mécanique que `loading` : `aria-disabled` plutôt que `disabled`. « Un contrôle
+         * interdit est désactivé **et expliqué**, jamais silencieusement masqué » — or un
+         * `disabled` nu le retire de l'arbre d'accessibilité, et l'opérateur au lecteur d'écran ne
+         * sait ni qu'il existe ni ce qui le débloquerait.
+         *
+         * D'où `aria-describedby` exigé par le type. Il ne garantit pas qu'un élément porte cet
+         * identifiant : c'est à l'écran de le rendre. Le rendu conditionnel n'est qu'un confort :
+         * la garde est côté serveur, invariant (c).
+         */
+        readonly blocked: true
+        readonly 'aria-describedby': string
+      }
+  )
 
 export function Button({
   variant = 'secondary',

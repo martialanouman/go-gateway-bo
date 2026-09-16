@@ -42,7 +42,9 @@ describe('Select', () => {
     expect(screen.getByRole('combobox')).toHaveFocus()
 
     await user.keyboard('{Enter}')
-    await user.click(await screenOption('Par compte'))
+    // Ouverte par Entrée, la liste met en évidence la première option : une flèche mène à la seconde.
+    await screenOption('Par compte')
+    await user.keyboard('{ArrowDown}{Enter}')
 
     expect(onValueChange).toHaveBeenCalledWith('per_account', expect.anything())
   })
