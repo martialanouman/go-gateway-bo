@@ -23,6 +23,10 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import type { ButtonSize, ButtonVariant } from '../src/components/ui/button'
+import type { DotTone } from '../src/components/ui/icon'
+import type { BreakerState } from '../src/components/ui/status-pill'
+import type { ToastSeverity, ToastSource } from '../src/components/ui/toast'
 import { STYLED_FILES } from './tokens'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -38,19 +42,56 @@ function emitted(): Set<string> {
     .replace(/\/\/[^\n]*/g, '')
 
   // Deux formes, et il faut les distinguer : `'ui-status'` est une classe entière, tandis que
-  // `` `ui-dot--${tone}` `` n'en donne que le **préfixe** — la valeur est calculée à l'exécution.
-  // Un préfixe se reconnaît à ce qu'il se termine par `--`, et on le compare alors par début de
-  // chaîne : c'est tout ce qu'une lecture statique peut honnêtement affirmer.
+  // `` `ui-dot--${tone}` `` n'en donne que le **préfixe** — il se termine par `--`, et ses valeurs
+  // viennent de `FAMILIES`.
   return new Set(
     [...sources.matchAll(/['"`](ui-[\w-]*)/g)].map(([, name]) => name as string).filter(Boolean),
   )
 }
 
-/** Une classe peinte est-elle couverte par un littéral entier, ou par un préfixe composé ? */
-function couvertePar(name: string, literals: Set<string>): boolean {
-  if (literals.has(name)) return true
+/**
+ * Les valeurs de chaque classe calculée.
+ *
+ * Comparer une règle au seul préfixe tenait une famille pour peinte dès qu'une de ses valeurs
+ * l'était : retirer `.ui-dot--degraded` laissait le test vert, et une règle morte `.ui-dot--x`
+ * aussi. `Record<Union, true>` rend la liste exhaustive par le typecheck : une valeur ajoutée à
+ * l'union sans l'être ici, ou l'inverse, casse `tsc`.
+ */
+function values<T extends string>(record: Record<T, true>): readonly string[] {
+  return Object.keys(record)
+}
 
-  return [...literals].some((literal) => literal.endsWith('--') && name.startsWith(literal))
+const FAMILIES: Readonly<Record<string, readonly string[]>> = {
+  // `md` n'émet aucune classe : c'est la hauteur par défaut.
+  'ui-button--': values<ButtonVariant | Exclude<ButtonSize, 'md'>>({
+    danger: true,
+    lg: true,
+    link: true,
+    primary: true,
+    secondary: true,
+    sm: true,
+  }),
+  'ui-dot--': values<DotTone>({
+    accent: true,
+    degraded: true,
+    down: true,
+    idle: true,
+    info: true,
+    restricted: true,
+    up: true,
+  }),
+  'ui-breaker--': values<BreakerState>({ closed: true, half_open: true, open: true }),
+  'ui-toast--': values<ToastSeverity>({ critical: true, info: true, success: true, warning: true }),
+  'ui-toast__source--': values<ToastSource>({ alertmanager: true, bff: true }),
+}
+
+/** Les classes émises, chaque préfixe remplacé par les classes entières de sa famille. */
+function expanded(): Set<string> {
+  return new Set(
+    [...emitted()].flatMap((name) =>
+      name.endsWith('--') ? (FAMILIES[name] ?? []).map((value) => name + value) : [name],
+    ),
+  )
 }
 
 /**
@@ -81,6 +122,8 @@ function painted(): Set<string> {
 const HOOKS = new Set([
   // Racine des onglets : Base UI y pose ses `data-*`, la mise en page vient de `__list`.
   'ui-tabs',
+  // La sévérité par défaut : `.ui-toast` la peint, et la classe ne sert qu'à la nommer.
+  'ui-toast--info',
   // Le point à l'intérieur d'une pilule : `Dot` porte déjà `.ui-dot`, qui peint. Cette classe-ci
   // sert au parcours et aux tests à distinguer un point *de pilule* d'un point isolé.
   'ui-status__dot',
@@ -89,16 +132,7 @@ const HOOKS = new Set([
 describe('les classes des primitives', () => {
   it('sont toutes peintes par une feuille servie, ou nommées comme crochets', () => {
     const rules = painted()
-    const orphelines = [...emitted()]
-      .filter((name) => !HOOKS.has(name))
-      .filter((name) =>
-        name.endsWith('--')
-          ? // Un préfixe composé est couvert dès qu'une règle le prolonge : `ui-dot--` par
-            // `.ui-dot--up`. Zéro règle veut dire que **toute** la famille de tonalités est morte.
-            ![...rules].some((rule) => rule.startsWith(name))
-          : !rules.has(name),
-      )
-      .sort()
+    const orphelines = [...expanded()].filter((name) => !HOOKS.has(name) && !rules.has(name)).sort()
 
     expect(orphelines, 'classes émises que rien ne peint').toEqual([])
   })
@@ -106,15 +140,23 @@ describe('les classes des primitives', () => {
   it('ne laissent aucune règle sans émetteur', () => {
     // L'autre sens : une règle dont plus personne ne porte la classe est du poids mort servi à tous,
     // et elle se lit comme une protection qui n'agit sur rien.
-    const literals = emitted()
-    const sansEmetteur = [...painted()].filter((name) => !couvertePar(name, literals)).sort()
+    const emitters = expanded()
+    const sansEmetteur = [...painted()].filter((name) => !emitters.has(name)).sort()
 
     expect(sansEmetteur, 'règles CSS que plus aucun composant n’émet').toEqual([])
   })
 
+  it('énumèrent chaque famille calculée, et seulement celles-là', () => {
+    // Un préfixe absent de `FAMILIES` ne s'étendrait en rien, et ses classes échapperaient aux deux
+    // tests ci-dessus.
+    const prefixes = [...emitted()].filter((name) => name.endsWith('--')).sort()
+
+    expect(Object.keys(FAMILIES).sort()).toEqual(prefixes)
+  })
+
   it('sont assez nombreuses pour que ce test garde quelque chose', () => {
     // Sans ce plancher, une expression régulière qui cesserait de reconnaître les classes rendrait
-    // les deux tests ci-dessus verts et vides — la panne la plus discrète qu'un test puisse avoir.
+    // les tests ci-dessus verts et vides — la panne la plus discrète qu'un test puisse avoir.
     expect(emitted().size).toBeGreaterThan(20)
     expect(painted().size).toBeGreaterThan(20)
   })
