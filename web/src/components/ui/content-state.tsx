@@ -161,8 +161,8 @@ export type ErrorStateProps = {
 /**
  * Une panne, et ce qu'elle laisse debout.
  *
- * La copie promet que « vos données locales restent affichées », et cette promesse est une
- * contrainte de rendu avant d'être une phrase : **l'appelant ne doit pas effacer l'écran pour poser
+ * Le composant promet lui-même que « vos données locales restent affichées », et cette promesse
+ * est une contrainte de rendu avant d'être une phrase : **l'appelant ne doit pas effacer l'écran pour poser
  * cet état**. Vider la vue pour annoncer une panne est le contraire de ce que demande l'invariant
  * (e) — la chute d'un flux amont dégrade l'affichage, elle ne le supprime pas.
  *
@@ -184,6 +184,7 @@ export function ErrorState({
       </span>
       <TitleTag className="ui-error__title">{title}</TitleTag>
       {description === undefined ? null : <div className="ui-error__text">{description}</div>}
+      <div className="ui-error__text">Vos données locales restent affichées.</div>
       {request === undefined ? null : <span className="ui-error__request">{request}</span>}
       {onRetry === undefined ? null : (
         <Button onClick={onRetry} size="sm">
