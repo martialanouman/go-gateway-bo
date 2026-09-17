@@ -77,10 +77,13 @@ func (a API) Logout(ctx context.Context, _ LogoutRequestObject) (LogoutResponseO
 		return nil, err
 	}
 
-	if err = a.audited(ctx, store.Event{
+	// **La seule action locale dont l'audit reste hors transaction**, et c'est un arbitrage : la
+	// session est supprimée même si la trace échoue, et la route rend alors 500. Un opérateur qui se
+	// croit parti et reste connecté court un risque plus grave qu'une déconnexion absente du journal.
+	if err = a.Audit.Record(ctx, a.event(ctx, store.Event{
 		OperatorID: resolved.OperatorID,
 		Action:     actionLogout,
-	}); err != nil {
+	})); err != nil {
 		return nil, err
 	}
 

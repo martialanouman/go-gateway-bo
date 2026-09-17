@@ -53,7 +53,7 @@ type Grants struct {
 // L'échéance est calculée par le serveur de base, comme les verrous de 00004 : deux instances aux
 // horloges décalées ouvriraient sinon des sessions qui n'expirent pas au même moment.
 func (s *Sessions) Create(ctx context.Context, operatorID string, tokenHash []byte,
-	lifetime time.Duration,
+	lifetime time.Duration, event Event,
 ) (Session, error) {
 	const query = `
 		INSERT INTO sessions (operator_id, token_hash, expires_at)
@@ -62,10 +62,17 @@ func (s *Sessions) Create(ctx context.Context, operatorID string, tokenHash []by
 
 	session := Session{OperatorID: operatorID}
 
-	err := s.pool.QueryRow(ctx, query, operatorID, tokenHash, lifetime.Seconds()).
-		Scan(&session.ID, &session.ExpiresAt)
+	err := inTx(ctx, s.pool, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, query, operatorID, tokenHash, lifetime.Seconds()).
+			Scan(&session.ID, &session.ExpiresAt)
+		if err != nil {
+			return fmt.Errorf("ouvrir la session : %w", err)
+		}
+
+		return record(ctx, tx, event)
+	})
 	if err != nil {
-		return Session{}, fmt.Errorf("ouvrir la session : %w", err)
+		return Session{}, err
 	}
 
 	return session, nil
@@ -132,7 +139,7 @@ func (s *Sessions) Resolve(ctx context.Context, tokenHash []byte, idle time.Dura
 // `expires_at` n'est pas repoussée : l'élévation n'achète pas du temps, elle change ce que la session
 // autorise.
 func (s *Sessions) Elevate(ctx context.Context, id string, renewedTokenHash []byte,
-	idle time.Duration,
+	idle time.Duration, event Event,
 ) (bool, error) {
 	const query = `
 		UPDATE sessions AS s
@@ -144,12 +151,24 @@ func (s *Sessions) Elevate(ctx context.Context, id string, renewedTokenHash []by
 		  AND now() < s.expires_at
 		  AND now() < s.last_seen_at + make_interval(secs => $3)`
 
-	tag, err := s.pool.Exec(ctx, query, id, renewedTokenHash, idle.Seconds(), StatusActive)
-	if err != nil {
-		return false, fmt.Errorf("élever la session : %w", err)
-	}
+	var elevated bool
 
-	return tag.RowsAffected() > 0, nil
+	err := inTx(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, query, id, renewedTokenHash, idle.Seconds(), StatusActive)
+		if err != nil {
+			return fmt.Errorf("élever la session : %w", err)
+		}
+
+		// Une élévation refusée n'est pas une élévation : rien à tracer.
+		elevated = tag.RowsAffected() > 0
+		if !elevated {
+			return nil
+		}
+
+		return record(ctx, tx, event)
+	})
+
+	return elevated, err
 }
 
 // Delete ferme la session. C'est ce que le logout fait vraiment : expirer le cookie ne protège rien,

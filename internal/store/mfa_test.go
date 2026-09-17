@@ -34,7 +34,7 @@ func mfaOn(t *testing.T) (*store.MFA, string) {
 func enroll(t *testing.T, m *store.MFA, operatorID, sealed string, hashes []string) {
 	t.Helper()
 
-	written, err := m.Enroll(t.Context(), operatorID, sealed, hashes, true)
+	written, err := m.Enroll(t.Context(), operatorID, sealed, hashes, true, store.Event{})
 	require.NoError(t, err)
 	require.True(t, written, "l'enrôlement n'a rien écrit")
 }
@@ -165,11 +165,11 @@ func TestUnEnrolementSansRemplacementNEcrasePasUnFacteurEnPlace(t *testing.T) {
 
 	// Le témoin : sur une base sans facteur, le même appel écrit. Sans lui, ce cas serait vert sur un
 	// `Enroll` qui n'écrirait jamais rien.
-	written, err := mfa.Enroll(t.Context(), operator, "v1.premier", []string{"ancien"}, false)
+	written, err := mfa.Enroll(t.Context(), operator, "v1.premier", []string{"ancien"}, false, store.Event{})
 	require.NoError(t, err)
 	require.True(t, written)
 
-	written, err = mfa.Enroll(t.Context(), operator, "v1.second", []string{"neuf"}, false)
+	written, err = mfa.Enroll(t.Context(), operator, "v1.second", []string{"neuf"}, false, store.Event{})
 	require.NoError(t, err)
 	assert.False(t, written)
 

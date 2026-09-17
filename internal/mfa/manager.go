@@ -86,16 +86,16 @@ func (m *Manager) Factors(ctx context.Context, operatorID string) (store.SecondF
 // Enroll tire un authentificateur, l'écrit, et rend ce qui n'est montré qu'une fois. `false` dit
 // qu'un second facteur était déjà en place et que `replace` ne l'autorisait pas — la garde est
 // appliquée par l'écriture elle-même, voir `store.MFA.Enroll`.
-func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, replace bool) (Enrollment,
-	bool, error,
-) {
+func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, replace bool,
+	event store.Event,
+) (Enrollment, bool, error) {
 	enrollment, err := m.authenticator.Enroll(operatorID, accountName)
 	if err != nil {
 		return Enrollment{}, false, err
 	}
 
 	written, err := m.factors.Enroll(ctx, operatorID, enrollment.SealedSecret,
-		enrollment.RecoveryCodeHashes, replace)
+		enrollment.RecoveryCodeHashes, replace, event)
 	if err != nil || !written {
 		return Enrollment{}, false, err
 	}

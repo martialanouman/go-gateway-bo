@@ -56,7 +56,7 @@ func insertSession(t *testing.T, dsn, operatorID string) string {
 func registerPasskey(t *testing.T, w *store.Webauthn, operatorID, credentialID string) string {
 	t.Helper()
 
-	id, err := w.Register(t.Context(), operatorID, samplePasskey(credentialID))
+	id, err := w.Register(t.Context(), operatorID, samplePasskey(credentialID), store.Event{})
 	require.NoError(t, err)
 	require.NotEmpty(t, id)
 
@@ -145,7 +145,7 @@ func TestUneMemeCleNeSEnregistrePasDeuxFois(t *testing.T) {
 	// Un identifiant vide et **non une erreur** : la violation d'unicité est traduite en refus, ce qui
 	// ferme un oracle — un 500 face à un 200 dirait à qui détient l'authentificateur si sa clé est
 	// enrôlée quelque part dans le déploiement, fût-ce sous un autre compte.
-	id, err := passkeys.Register(t.Context(), martin, samplePasskey("la-meme"))
+	id, err := passkeys.Register(t.Context(), martin, samplePasskey("la-meme"), store.Event{})
 	require.NoError(t, err)
 	assert.Empty(t, id)
 
@@ -231,7 +231,7 @@ func TestRetirerUnePasskeyQuandIlEnResteUneAutreReussit(t *testing.T) {
 	first := registerPasskey(t, passkeys, operator, "premiere")
 	registerPasskey(t, passkeys, operator, "seconde")
 
-	outcome, err := passkeys.Remove(t.Context(), operator, first)
+	outcome, err := passkeys.Remove(t.Context(), operator, first, store.Event{})
 	require.NoError(t, err)
 	assert.Equal(t, store.PasskeyRemoved, outcome)
 
@@ -247,7 +247,7 @@ func TestRetirerLaDernierePasskeySansTOTPEstRefuse(t *testing.T) {
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 	only := registerPasskey(t, passkeys, operator, "la-seule")
 
-	outcome, err := passkeys.Remove(t.Context(), operator, only)
+	outcome, err := passkeys.Remove(t.Context(), operator, only, store.Event{})
 	require.NoError(t, err)
 	assert.Equal(t, store.PasskeyIsLastFactor, outcome,
 		"retirer le dernier facteur enfermerait l'opérateur dehors")
@@ -268,7 +268,7 @@ func TestRetirerLaDernierePasskeyAvecUnTOTPReussit(t *testing.T) {
 
 	execOn(t, dsn, `UPDATE operators SET mfa_totp_secret = 'v1.peu-importe' WHERE id = $1`, operator)
 
-	outcome, err := passkeys.Remove(t.Context(), operator, only)
+	outcome, err := passkeys.Remove(t.Context(), operator, only, store.Event{})
 	require.NoError(t, err)
 	assert.Equal(t, store.PasskeyRemoved, outcome)
 }
@@ -284,7 +284,7 @@ func TestRetirerLaPasskeyDUnAutreOperateurNeLaTrouvePas(t *testing.T) {
 	his := registerPasskey(t, passkeys, martin, "celle-de-martin")
 	registerPasskey(t, passkeys, martin, "autre-de-martin")
 
-	outcome, err := passkeys.Remove(t.Context(), camille, his)
+	outcome, err := passkeys.Remove(t.Context(), camille, his, store.Event{})
 	require.NoError(t, err)
 	assert.Equal(t, store.PasskeyUnknown, outcome)
 
@@ -475,7 +475,7 @@ func TestUnRetraitConcurrentNEmportePasLaDernierePasskey(t *testing.T) {
 	outcome := make(chan store.PasskeyRemoval, 1)
 
 	go func() {
-		removal, removeErr := passkeys.Remove(context.WithoutCancel(ctx), operator, second)
+		removal, removeErr := passkeys.Remove(context.WithoutCancel(ctx), operator, second, store.Event{})
 		assert.NoError(t, removeErr)
 		outcome <- removal
 	}()

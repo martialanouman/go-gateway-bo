@@ -344,7 +344,7 @@ func (p *PasskeyManager) BeginRegistration(ctx context.Context, sessionID,
 // d'authentificateur est signée pour un défi précis et ne se retente jamais sur le même. Le garder en
 // vie n'offrirait qu'une cible.
 func (p *PasskeyManager) FinishRegistration(ctx context.Context, sessionID, operatorID string,
-	attestation []byte,
+	attestation []byte, event store.Event,
 ) (string, error) {
 	owner, found, err := p.credentials.OwnerOf(ctx, operatorID)
 	if err != nil {
@@ -368,7 +368,7 @@ func (p *PasskeyManager) FinishRegistration(ctx context.Context, sessionID, oper
 	// Une chaîne vide dit « cette clé est déjà enregistrée ». L'appelant en fait le même refus que
 	// pour une signature fausse — le distinguer dirait à qui détient l'authentificateur qu'il est
 	// enrôlé quelque part.
-	return p.credentials.Register(ctx, operatorID, passkey)
+	return p.credentials.Register(ctx, operatorID, passkey, event)
 }
 
 // BeginAssertion ouvre une cérémonie d'assertion sur les passkeys que l'opérateur détient.
@@ -430,10 +430,10 @@ func (p *PasskeyManager) VerifyAssertion(ctx context.Context, sessionID, operato
 }
 
 // Remove retire une passkey, et le store refuse d'emporter le dernier facteur.
-func (p *PasskeyManager) Remove(ctx context.Context, operatorID, passkeyID string) (
-	store.PasskeyRemoval, error,
-) {
-	return p.credentials.Remove(ctx, operatorID, passkeyID)
+func (p *PasskeyManager) Remove(ctx context.Context, operatorID, passkeyID string,
+	event store.Event,
+) (store.PasskeyRemoval, error) {
+	return p.credentials.Remove(ctx, operatorID, passkeyID, event)
 }
 
 func (p *PasskeyManager) openCeremony(ctx context.Context, sessionID, purpose string,

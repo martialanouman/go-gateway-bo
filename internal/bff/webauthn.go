@@ -102,7 +102,18 @@ func (a API) FinishWebauthnRegistration(ctx context.Context,
 		return FinishWebauthnRegistration409JSONResponse(elevationRequiredToAddAFactor()), nil
 	}
 
-	id, err := a.Passkeys.FinishRegistration(ctx, resolved.ID, resolved.OperatorID, attestation)
+	// **Audité bien qu'exempté de garde de permission** : poser un second facteur est précisément
+	// l'événement qu'une enquête sur compte compromis cherche en premier. Exemption de garde et
+	// exemption d'audit ne se confondent pas.
+	//
+	// Sans `TargetID` : la passkey n'a pas encore d'identifiant, et c'est le store qui le pose une
+	// fois l'insertion faite.
+	id, err := a.Passkeys.FinishRegistration(ctx, resolved.ID, resolved.OperatorID, attestation,
+		a.event(ctx, store.Event{
+			OperatorID: resolved.OperatorID,
+			Action:     actionPasskeyRegister,
+			TargetType: auditTargetPasskey,
+		}))
 	if err != nil {
 		if mfa.IsRefusedCeremony(err) {
 			return FinishWebauthnRegistration401JSONResponse(refusedCeremony()), nil
@@ -115,18 +126,6 @@ func (a API) FinishWebauthnRegistration(ctx context.Context,
 		// Aucun défi vivant, ou un autre l'a fermé d'abord. Le même refus que pour une signature
 		// fausse : les distinguer dirait à une machine où elle en est.
 		return FinishWebauthnRegistration401JSONResponse(refusedCeremony()), nil
-	}
-
-	// **Audité bien qu'exempté de garde de permission** : poser un second facteur est précisément
-	// l'événement qu'une enquête sur compte compromis cherche en premier. Exemption de garde et
-	// exemption d'audit ne se confondent pas.
-	if err = a.audited(ctx, store.Event{
-		OperatorID: resolved.OperatorID,
-		Action:     actionPasskeyRegister,
-		TargetType: auditTargetPasskey,
-		TargetID:   id,
-	}); err != nil {
-		return nil, err
 	}
 
 	return FinishWebauthnRegistration200JSONResponse{Id: id}, nil
@@ -213,7 +212,13 @@ func (a API) DeleteWebauthnPasskey(ctx context.Context,
 		return DeleteWebauthnPasskey409JSONResponse(elevationRequiredToRemoveAFactor()), nil
 	}
 
-	outcome, err := a.Passkeys.Remove(ctx, resolved.OperatorID, request.PasskeyId)
+	outcome, err := a.Passkeys.Remove(ctx, resolved.OperatorID, request.PasskeyId,
+		a.event(ctx, store.Event{
+			OperatorID: resolved.OperatorID,
+			Action:     actionPasskeyRemove,
+			TargetType: auditTargetPasskey,
+			TargetID:   request.PasskeyId,
+		}))
 	if err != nil {
 		return nil, err
 	}
@@ -226,15 +231,6 @@ func (a API) DeleteWebauthnPasskey(ctx context.Context,
 		// ce que possède quelqu'un d'autre.
 		return DeleteWebauthnPasskey401JSONResponse(notAuthenticated()), nil
 	case store.PasskeyRemoved:
-		if err = a.audited(ctx, store.Event{
-			OperatorID: resolved.OperatorID,
-			Action:     actionPasskeyRemove,
-			TargetType: auditTargetPasskey,
-			TargetID:   request.PasskeyId,
-		}); err != nil {
-			return nil, err
-		}
-
 		return DeleteWebauthnPasskey204Response{}, nil
 	}
 

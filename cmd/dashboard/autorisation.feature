@@ -81,7 +81,7 @@ Fonctionnalité: Le journal d'audit
     Et les partitions du journal sont retirées
     Quand l'opérateur remplace son application d'authentification
     Alors la requête est refusée
-    Et l'ancienne application d'authentification est toujours en place
+    Et l'ancien second facteur est toujours en place
     Et le journal porte 0 événement "mfa.enroll"
 
   Scénario: une clé d'accès dont la trace ne peut pas s'écrire n'est pas enregistrée

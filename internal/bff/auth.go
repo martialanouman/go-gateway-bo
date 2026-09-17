@@ -114,19 +114,15 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 			return nil, sessionErr
 		}
 
-		value, sessionErr := a.Sessions.Issue(ctx, verdict.OperatorID)
+		value, sessionErr := a.Sessions.Issue(ctx, verdict.OperatorID, a.event(ctx, store.Event{
+			OperatorID: verdict.OperatorID,
+			Action:     actionLogin,
+		}))
 		if sessionErr != nil {
 			return nil, sessionErr
 		}
 
 		postCookie(ctx, session.Issued(value))
-
-		if auditErr := a.audited(ctx, store.Event{
-			OperatorID: verdict.OperatorID,
-			Action:     actionLogin,
-		}); auditErr != nil {
-			return nil, auditErr
-		}
 
 		return Login200JSONResponse{Challenge: verdict.Challenge, ExpiresAt: verdict.ExpiresAt}, nil
 	case auth.OutcomeLocked:

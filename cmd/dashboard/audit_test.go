@@ -29,8 +29,7 @@ func (w *auditWorld) registerSteps(ctx *godog.ScenarioContext) {
 		w.mfa.replaceProvingTheCurrentCode)
 	ctx.When(`^l'opérateur retire sa clé d'accès$`, w.removeTheRegisteredPasskey)
 	ctx.Then(`^la requête est refusée$`, w.requestIsRefused)
-	ctx.Then(`^l'ancienne application d'authentification est toujours en place$`,
-		w.oldAuthenticatorStillWorks)
+	ctx.Then(`^l'ancien second facteur est toujours en place$`, w.oldSecondFactorStillWorks)
 	ctx.Then(`^l'opérateur ne détient aucune clé d'accès$`, func() error { return w.passkeysHeld(0) })
 	// Deux clés au décor, à cause de la garde du dernier facteur (§6.9) : en retirer une laisserait
 	// toujours en compter deux si le retrait n'a pas eu lieu, une seule si le journal manquant ne l'a
@@ -194,9 +193,9 @@ func (w *auditWorld) auditPartitionsRemoved(ctx context.Context) error {
 	return nil
 }
 
-// requestIsRefused observe ce que le navigateur reçoit quand l'audit ne peut pas s'écrire : `audited`
-// remonte l'erreur, et le contrat n'a qu'une réponse pour une erreur qui remonte ainsi — 500
-// `internal_error`, la même que toute panne côté serveur.
+// requestIsRefused observe ce que le navigateur reçoit quand l'audit ne peut pas s'écrire : la
+// transaction de l'action emporte son écriture, l'erreur remonte, et le contrat n'a qu'une réponse
+// pour une erreur qui remonte ainsi — 500 `internal_error`, la même que toute panne côté serveur.
 func (w *auditWorld) requestIsRefused() error {
 	if status := w.login.process.received.status; status != http.StatusInternalServerError {
 		return fmt.Errorf("la requête a répondu %d et non 500 : l'action semble avoir eu lieu malgré "+
@@ -206,26 +205,48 @@ func (w *auditWorld) requestIsRefused() error {
 	return nil
 }
 
-// oldAuthenticatorStillWorks présente, sur le second facteur, le code que l'ancienne application
-// produirait encore. Un remplacement qui aurait abouti malgré le refus de la requête l'aurait déjà
-// détruit : la vérification y répondrait 401, comme pour n'importe quel code faux.
-func (w *auditWorld) oldAuthenticatorStillWorks(ctx context.Context) error {
-	if w.mfa.enrolled.Secret == "" {
-		return errors.New("aucun enrôlement : le scénario n'a pas d'ancien secret à présenter")
+// oldSecondFactorStillWorks présente un code de récupération de l'enrôlement d'avant. Le secret et
+// ses dix codes sont écrits dans la même transaction : des codes qui ouvrent encore disent que rien
+// de l'ancien facteur n'a été remplacé.
+//
+// **Pas un code TOTP, et ce n'est pas un choix** : la preuve qu'exige le remplacement vient de
+// consommer le pas de temps, et l'anti-rejeu — qui, lui, s'écrit hors de la transaction de
+// l'enrôlement — refuserait ensuite les deux seuls pas encore dans la fenêtre de dérive. Le 401 dirait
+// alors « rejeu » là où ce pas veut lire « secret disparu », et il le dirait dans les deux cas.
+//
+// Les partitions sont rétablies d'abord : sans journal inscriptible, **toute** route répond 500 — y
+// compris celle-ci — et ce pas passerait sans avoir rien observé.
+func (w *auditWorld) oldSecondFactorStillWorks(ctx context.Context) error {
+	if len(w.mfa.enrolled.RecoveryCodes) == 0 {
+		return errors.New("aucun enrôlement : le scénario n'a pas d'ancien facteur à présenter")
 	}
 
-	code, err := w.mfa.codeAtOffset(ctx, 0)
+	if err := w.auditPartitionsRestored(ctx); err != nil {
+		return err
+	}
+
+	if err := w.mfa.presentFirstRecoveryCode(); err != nil {
+		return err
+	}
+
+	if status := w.login.process.received.status; status != http.StatusNoContent {
+		return fmt.Errorf("un code de récupération de l'ancien facteur est refusé (%d) : le "+
+			"remplacement a détruit ce que la trace manquante devait retenir", status)
+	}
+
+	return nil
+}
+
+func (w *auditWorld) auditPartitionsRestored(ctx context.Context) error {
+	conn, err := w.connect(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err = w.mfa.verify("totp", code); err != nil {
-		return err
-	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
 
-	if w.login.process.received.status == http.StatusUnauthorized {
-		return errors.New("le code de l'ancienne application est refusé : l'authentificateur en " +
-			"place n'est plus le sien")
+	if _, err = conn.Exec(ctx, "SELECT ensure_audit_log_partitions(now())"); err != nil {
+		return fmt.Errorf("rétablir les partitions du journal : %w", err)
 	}
 
 	return nil

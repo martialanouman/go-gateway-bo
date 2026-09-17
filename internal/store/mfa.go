@@ -144,7 +144,7 @@ func (m *MFA) ConsumeStep(ctx context.Context, operatorID string, step int64) (b
 // précédent vient de disparaître. Le garder pourrait refuser pendant une demi-minute le premier code
 // du secret neuf, si l'ancien avait été validé par un téléphone en avance.
 func (m *MFA) Enroll(ctx context.Context, operatorID, sealedSecret string, codeHashes []string,
-	replace bool,
+	replace bool, event Event,
 ) (bool, error) {
 	tx, err := m.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
@@ -175,6 +175,10 @@ func (m *MFA) Enroll(ctx context.Context, operatorID, sealedSecret string, codeH
 		if err != nil {
 			return false, fmt.Errorf("écrire un code de récupération : %w", err)
 		}
+	}
+
+	if err = record(ctx, tx, event); err != nil {
+		return false, err
 	}
 
 	if err = tx.Commit(ctx); err != nil {

@@ -138,7 +138,17 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		}
 	}
 
-	enrollment, written, err := a.SecondFactor.Enroll(ctx, resolved.OperatorID, state.Email, replace)
+	// L'état d'après ne porte que ce qu'une enquête doit savoir : un facteur a été posé, et il a
+	// remplacé ou non celui d'avant. Ni le secret, ni les codes — `Fields` n'a d'ailleurs pas de
+	// méthode pour les y mettre.
+	enrollment, written, err := a.SecondFactor.Enroll(ctx, resolved.OperatorID, state.Email, replace,
+		a.event(ctx, store.Event{
+			OperatorID: resolved.OperatorID,
+			Action:     actionMFAEnroll,
+			TargetType: auditTargetOperator,
+			TargetID:   resolved.OperatorID,
+			After:      store.NewFields().Text("method", "totp").Flag("replaced", replace),
+		}))
 	if err != nil {
 		return nil, err
 	}
@@ -149,19 +159,6 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 
 	// Le DTO se compose champ par champ. `Enrollment` porte aussi le secret **chiffré** et les
 	// hachages des codes ; les oublier ici n'est pas une vigilance, c'est qu'ils ne sont pas nommés.
-	// L'état d'après ne porte que ce qu'une enquête doit savoir : un facteur a été posé, et il a
-	// remplacé ou non celui d'avant. Ni le secret, ni les codes — `Fields` n'a d'ailleurs pas de
-	// méthode pour les y mettre.
-	if err = a.audited(ctx, store.Event{
-		OperatorID: resolved.OperatorID,
-		Action:     actionMFAEnroll,
-		TargetType: auditTargetOperator,
-		TargetID:   resolved.OperatorID,
-		After:      store.NewFields().Text("method", "totp").Flag("replaced", replace),
-	}); err != nil {
-		return nil, err
-	}
-
 	return EnrollTotp200JSONResponse{
 		Secret:        enrollment.Secret,
 		OtpauthUri:    enrollment.OtpauthURI,
@@ -266,7 +263,13 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 		return VerifyMfa401JSONResponse(refusedSecondFactor()), nil
 	}
 
-	renewed, elevated, err := a.Sessions.Elevate(ctx, resolved.ID)
+	renewed, elevated, err := a.Sessions.Elevate(ctx, resolved.ID, a.event(ctx, store.Event{
+		OperatorID: resolved.OperatorID,
+		Action:     actionMFAVerify,
+		TargetType: auditTargetOperator,
+		TargetID:   resolved.OperatorID,
+		After:      store.NewFields().Text("method", string(request.Body.Method)),
+	}))
 	if err != nil {
 		return nil, err
 	}
@@ -282,16 +285,6 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 	}
 
 	postCookie(ctx, session.Issued(renewed))
-
-	if err = a.audited(ctx, store.Event{
-		OperatorID: resolved.OperatorID,
-		Action:     actionMFAVerify,
-		TargetType: auditTargetOperator,
-		TargetID:   resolved.OperatorID,
-		After:      store.NewFields().Text("method", string(request.Body.Method)),
-	}); err != nil {
-		return nil, err
-	}
 
 	return VerifyMfa204Response{}, nil
 }

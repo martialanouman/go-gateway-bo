@@ -162,9 +162,9 @@ func (w *Webauthn) passkeysOf(ctx context.Context, operatorID string) ([]Passkey
 // La violation est traduite en refus plutôt que remontée en erreur, et c'est ce qui ferme un oracle :
 // un 500 face à un 200 dirait à qui détient un authentificateur si sa clé est enrôlée quelque part
 // dans le déploiement, y compris sous un autre opérateur.
-func (w *Webauthn) Register(ctx context.Context, operatorID string, passkey Passkey) (string,
-	error,
-) {
+func (w *Webauthn) Register(ctx context.Context, operatorID string, passkey Passkey,
+	event Event,
+) (string, error) {
 	const query = `
 		INSERT INTO webauthn_credentials (
 			operator_id, credential_id, public_key, sign_count, aaguid, transports,
@@ -174,17 +174,30 @@ func (w *Webauthn) Register(ctx context.Context, operatorID string, passkey Pass
 
 	var id string
 
-	err := w.pool.QueryRow(ctx, query, operatorID, passkey.CredentialID, passkey.PublicKey,
-		int64(passkey.SignCount), passkey.AAGUID, passkey.Transports, passkey.Attachment,
-		passkey.UserVerified, passkey.BackupEligible, passkey.BackupState).Scan(&id)
+	err := inTx(ctx, w.pool, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, query, operatorID, passkey.CredentialID, passkey.PublicKey,
+			int64(passkey.SignCount), passkey.AAGUID, passkey.Transports, passkey.Attachment,
+			passkey.UserVerified, passkey.BackupEligible, passkey.BackupState).Scan(&id)
+		if err != nil {
+			return fmt.Errorf("enregistrer la passkey : %w", err)
+		}
 
+		// La cible n'existe qu'ici : l'identifiant est rendu par l'insertion.
+		event.TargetID = id
+
+		return record(ctx, tx, event)
+	})
+
+	// **La violation se traduit dehors, et il le faut** : l'instruction fautive avorte la transaction,
+	// où plus rien ne passe — la rendre ici en refus laisserait `inTx` commiter une transaction morte,
+	// qui rend « commit unexpectedly resulted in rollback ». Le rollback différé l'a déjà refermée.
 	var violation *pgconn.PgError
 	if errors.As(err, &violation) && violation.Code == uniqueViolation {
 		return "", nil
 	}
 
 	if err != nil {
-		return "", fmt.Errorf("enregistrer la passkey : %w", err)
+		return "", err
 	}
 
 	return id, nil
@@ -232,9 +245,9 @@ func (w *Webauthn) ConsumeSignCount(ctx context.Context, credentialID []byte, si
 //
 // La seconde instruction, elle, prend son propre snapshot **après** l'attente : elle voit ce que la
 // transaction précédente a commité. C'est ce qui rend le compte juste.
-func (w *Webauthn) Remove(ctx context.Context, operatorID, passkeyID string) (PasskeyRemoval,
-	error,
-) {
+func (w *Webauthn) Remove(ctx context.Context, operatorID, passkeyID string,
+	event Event,
+) (PasskeyRemoval, error) {
 	tx, err := w.pool.Begin(ctx)
 	if err != nil {
 		return PasskeyUnknown, fmt.Errorf("ouvrir la transaction de retrait : %w", err)
@@ -294,6 +307,10 @@ func (w *Webauthn) Remove(ctx context.Context, operatorID, passkeyID string) (Pa
 
 	if _, err = tx.Exec(ctx, removal, passkeyID, operatorID); err != nil {
 		return PasskeyUnknown, fmt.Errorf("retirer la passkey : %w", err)
+	}
+
+	if err = record(ctx, tx, event); err != nil {
+		return PasskeyUnknown, err
 	}
 
 	if err = tx.Commit(ctx); err != nil {
