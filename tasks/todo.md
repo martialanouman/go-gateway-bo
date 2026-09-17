@@ -175,7 +175,7 @@ sur un schéma en retard protège quelque chose. *(Arbitré le 02/08/2026, au d�
 - [x] step-041 — Primitives lot 1 portées : bouton, champ, select, pilule de statut, tabs, table
 - [x] step-042 — Primitives lot 2 portées : dialog, toast + les cinq états de contenu †
 - [x] step-048 — Filet des primitives : toasts, classes peintes, états, gardes de câblage ◊◊◊
-- [ ] step-040 — AppShell : rail, barre supérieure, arborescence de routes en états vides
+- [x] step-040 — AppShell : rail, barre supérieure, arborescence de routes en états vides
 
 † **`menu` et `tooltip` ont quitté cette ligne le 08/09/2026**, en écrivant la fiche. Le kit de la
 charte n'en porte aucun des deux, et son *open item* 4 désigne lui-même `step-084` comme la première
@@ -432,7 +432,7 @@ un porteur déjà coché.
 | Laquelle proposer en premier, passkey ou TOTP : la décision n'est écrite nulle part. | Une décision d'écran laissée au hasard de l'implémentation. | step-028 |
 | La réinitialisation du second facteur d'un autre opérateur est **promise par deux messages d'erreur en production**. | Ils deviendront faux si la step ne la livre pas. | step-029 |
 | Le sort de `GET /permissions`, déclarée au §5.1 et sans appelant, n'est pas tranché. | Une opération au contrat que personne n'appelle : la trancher, et écrire la raison. | step-029 |
-| `QueryClientProvider` n'est monté ni dans le produit ni dans le harnais. | Assumé : le monter maintenant serait du code sans utilisateur. Déclencheur écrit par step-007 : « la première step qui livrera un `useQuery` ». *(Porteur passé de step-027 à step-040 le 08/09/2026, en écrivant la fiche de step-040 : `usePermission` lit `/auth/me`, donc le déclencheur tire dans la coquille, une step **avant** le premier écran. step-027 reste le premier écran à parler au BFF ; elle n'est plus la première step à le faire.)* | step-040 |
+| ~~`QueryClientProvider` n'est monté ni dans le produit ni dans le harnais.~~ | Assumé : le monter maintenant serait du code sans utilisateur. Déclencheur écrit par step-007 : « la première step qui livrera un `useQuery` ». *(Porteur passé de step-027 à step-040 le 08/09/2026, en écrivant la fiche de step-040 : `usePermission` lit `/auth/me`, donc le déclencheur tire dans la coquille, une step **avant** le premier écran. step-027 reste le premier écran à parler au BFF ; elle n'est plus la première step à le faire.)* **Payée** : `createAppRouter` construit un `QueryClient` par routeur et le fournit par son `Wrap` (`web/src/router.tsx`) — dans le produit, et par la fabrique que les tests de routes empruntent, donc sans provider de harnais. | step-040 |
 | ~~L'amortissement de testcontainers n'est pas fait ; `WithReuse` écarté nommément.~~ | **Payée sans rouvrir `WithReuse`** : c'est l'environnement qui désigne le serveur, et rien ne survit entre deux exécutions. Les bases taillées sur un serveur qui, lui, survit sont jetées **au démarrage** de chaque suite et non à la fin — à la fin, les pools qu'un cas n'a pas fermés reconnectent après le `WITH (FORCE)` et retiennent leur base. Compte mesuré stable à 175 sur trois passages, borné à une exécution. | step-032 |
 | Le binaire dans un conteneur **sans Node** n'est pas prouvé. | La preuve livrée est plus étroite que l'affirmation. | step-186 |
 | Graphiques : `visx` contre `Recharts`, non tranché. | À décider sur la densité d'un cockpit sombre, pas en principe. | step-080 |
