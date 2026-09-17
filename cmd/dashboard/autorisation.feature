@@ -51,6 +51,20 @@ Fonctionnalité: Le journal d'audit
     # geste, et le journal qui en garde la trace.
     Alors le journal porte 1 événement "passkey.remove"
 
+  Scénario: une déconnexion laisse sa trace
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur se déconnecte
+    Alors le journal porte 1 événement "operator.logout"
+
+  Scénario: enregistrer une clé d'accès laisse sa trace
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur enregistre une clé d'accès
+    Alors le journal porte 1 événement "passkey.register"
+
   Scénario: franchir le second facteur laisse une trace
     Étant donné une installation avec un opérateur
     Et un serveur démarré

@@ -69,8 +69,9 @@ func (w *auditWorld) journalHolds(ctx context.Context, expected int, action stri
 	return nil
 }
 
-// eventCarriesTheAddress observe ce que l'enquête cherche en second, après le nom de l'action. Un
-// journal qui perdrait l'adresse ne le dirait nulle part : la colonne est nullable.
+// eventCarriesTheAddress compare à l'adresse que le décor présente réellement — celle que
+// `loginWorld.callerAddress` lit sur la connexion. Un simple `IS NOT NULL` laisserait passer une
+// adresse forgée ; ici une valeur qui ne serait pas celle de l'appelant fait rougir le pas.
 func (w *auditWorld) eventCarriesTheAddress(ctx context.Context) error {
 	conn, err := w.connect(ctx)
 	if err != nil {
@@ -79,17 +80,20 @@ func (w *auditWorld) eventCarriesTheAddress(ctx context.Context) error {
 
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
 
-	var addressed int
+	expected := w.login.callerAddress()
+
+	var found string
 
 	err = conn.QueryRow(ctx,
-		`SELECT count(*) FROM audit_log WHERE ip_address IS NOT NULL`).Scan(&addressed)
+		`SELECT coalesce(host(ip_address), '') FROM audit_log ORDER BY created_at DESC LIMIT 1`).
+		Scan(&found)
 	if err != nil {
-		return fmt.Errorf("lire les adresses du journal : %w", err)
+		return fmt.Errorf("lire l'adresse du dernier événement : %w", err)
 	}
 
-	if addressed == 0 {
-		return fmt.Errorf("aucun événement ne porte d'adresse : une enquête ne saurait pas d'où " +
-			"l'action est partie")
+	if found != expected {
+		return fmt.Errorf("l'événement porte l'adresse %q, attendue %q : ce n'est pas celle de "+
+			"l'appelant", found, expected)
 	}
 
 	return nil
