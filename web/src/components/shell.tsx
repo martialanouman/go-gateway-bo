@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { EmptyState, ErrorState, LoadingState, Skeleton, ToastStack } from '~/components/ui'
 import { HttpError, isUnauthenticated, meQueryOptions } from '~/lib/api'
 import { Rail } from './rail'
+import { TopBar } from './top-bar'
 
 /**
  * La coquille reprend la silhouette que `index.html` a peinte — rail, barre supérieure, contenu —
@@ -45,9 +46,9 @@ export function Shell({ children }: { readonly children: ReactNode }) {
   // l'écran (invariant e).
   if (me.data !== undefined) {
     return (
-      <ToastStack>
-        <Frame rail={<Rail />}>{children}</Frame>
-      </ToastStack>
+      <Frame rail={<Rail />} topbar={<TopBar operator={me.data.operator} />}>
+        {children}
+      </Frame>
     )
   }
 
@@ -92,27 +93,31 @@ function Frame({
   readonly children: ReactNode
 }) {
   return (
-    <div className="shell">
-      {/* biome-ignore lint/a11y/useValidAnchor: `#contenu` est une vraie destination ; le clic ne fait qu'y porter le focus. */}
-      <a
-        className="shell__skip"
-        href="#contenu"
-        onClick={(event) => {
-          // Le fragment seul ne déplace pas le focus : `main` ne le prend que si on le lui donne, et le
-          // test du lien d'évitement rougit sans `focus()`. `preventDefault` garde `#contenu` hors de
-          // l'adresse ; aucun test ne rougit s'il disparaît — l'historique en mémoire du test ne voit
-          // pas le fragment.
-          event.preventDefault()
-          document.getElementById('contenu')?.focus()
-        }}
-      >
-        Aller au contenu
-      </a>
-      {rail ?? <div className="shell__rail" />}
-      <header className="shell__topbar">{topbar}</header>
-      <main className="shell__content" id="contenu" tabIndex={-1}>
-        {children}
-      </main>
-    </div>
+    // La pile de toasts enveloppe **tous** les états : montée dans la seule branche de session, elle
+    // change la forme de l'arbre à l'arrivée de la session, et React remonte le cadre entier.
+    <ToastStack>
+      <div className="shell">
+        {/* biome-ignore lint/a11y/useValidAnchor: `#contenu` est une vraie destination ; le clic ne fait qu'y porter le focus. */}
+        <a
+          className="shell__skip"
+          href="#contenu"
+          onClick={(event) => {
+            // Le fragment seul ne déplace pas le focus : `main` ne le prend que si on le lui donne, et le
+            // test du lien d'évitement rougit sans `focus()`. `preventDefault` garde `#contenu` hors de
+            // l'adresse ; aucun test ne rougit s'il disparaît — l'historique en mémoire du test ne voit
+            // pas le fragment.
+            event.preventDefault()
+            document.getElementById('contenu')?.focus()
+          }}
+        >
+          Aller au contenu
+        </a>
+        {rail ?? <div className="shell__rail" />}
+        <header className="shell__topbar">{topbar}</header>
+        <main className="shell__content" id="contenu" tabIndex={-1}>
+          {children}
+        </main>
+      </div>
+    </ToastStack>
   )
 }

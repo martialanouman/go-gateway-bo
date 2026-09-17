@@ -83,6 +83,18 @@
   padding: var(--pad-panel);
 }
 
+.topbar__end {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  margin-left: auto;
+}
+
+.topbar__operator {
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+}
+
 .rail__brand {
   display: flex;
   flex: none;

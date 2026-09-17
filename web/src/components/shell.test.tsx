@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { createAppRouter } from '~/router'
-import { type SessionOutcome, stubSession } from '../../test/session'
+import { OPERATOR_NAME, type SessionOutcome, stubSession } from '../../test/session'
 
 /**
  * La coquille telle que l'application la monte : vrai routeur, vrai `QueryClient`, vrai client HTTP.
@@ -105,6 +105,29 @@ describe('pendant la lecture de la session', () => {
 
     expect(await screen.findByText('Ouverture de la session')).toBeInTheDocument()
     expect(document.querySelector('.shell__rail')).not.toBeNull()
+  })
+})
+
+describe('la barre supérieure', () => {
+  it('nomme l’opérateur connecté', async () => {
+    visit('/', { permissions: [] })
+    const banner = await screen.findByRole('banner')
+    expect(await within(banner).findByText(OPERATOR_NAME)).toBeInTheDocument()
+  })
+
+  it('ferme la session et revient à l’état qui l’explique', async () => {
+    const user = userEvent.setup()
+    const fetch = visit('/', { permissions: [] })
+
+    await user.click(await screen.findByRole('button', { name: 'Se déconnecter' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Aucune session ouverte' }),
+    ).toBeInTheDocument()
+    const logout = fetch.mock.calls
+      .map(([request]) => request as Request)
+      .find((request) => request.method === 'POST')
+    expect(new URL(logout?.url ?? '').pathname).toBe('/api/auth/logout')
   })
 })
 
