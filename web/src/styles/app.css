@@ -15,8 +15,7 @@
  * que les contrôles natifs et les barres de défilement suivent.
  *
  * La couche des primitives arrive **après** les tokens qu'elle assemble, et avant la coquille : une
- * primitive ne doit jamais dépendre de l'ordre pour l'emporter sur la mise en page, et la coquille
- * inerte que step-040 remplacera n'habille aucune primitive. Les surfaces flottantes et les états de
+ * primitive ne doit jamais dépendre de l'ordre pour l'emporter sur la mise en page. Les surfaces flottantes et les états de
  * contenu viennent après les primitives, pour la même raison : un toast et une modale en
  * contiennent.
  */
@@ -34,36 +33,118 @@
 @import "./feedback.css";
 
 /*
- * La coquille inerte. Sa géométrie vient des tokens de la charte, et le `<style>` d'`index.html` en
- * porte une copie littérale pour peindre le squelette sans attendre cette feuille — les quatre
- * valeurs sont tenues égales par un test, faute de quoi le rail sauterait au montage de React.
+ * La coquille. Sa géométrie et ses surfaces viennent des tokens de la charte, et le `<style>`
+ * d'`index.html` en porte une copie littérale pour peindre le squelette sans attendre cette feuille —
+ * les copies sont tenues égales par un test, faute de quoi le rail sauterait au montage de React.
  */
 .shell {
   display: grid;
   grid-template-columns: var(--nav-width) 1fr;
   grid-template-rows: var(--topbar-height) 1fr;
   min-height: 100vh;
+  position: relative;
+}
+
+.shell__skip {
+  position: absolute;
+  top: var(--sp-5);
+  left: var(--sp-5);
+  z-index: var(--z-nav);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-control);
+  background: var(--surface-page);
+  transform: translateY(-200%);
+}
+
+.shell__skip:focus-visible {
+  transform: none;
 }
 
 .shell__rail {
   grid-row: 1 / 3;
-  border-right: 1px solid var(--border-subtle);
-  padding: var(--sp-7);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-bottom: var(--sp-7);
+  background: var(--surface-chrome);
+  border-right: 1px solid var(--border-chrome);
 }
 
 .shell__topbar {
-  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-7);
+  background: var(--surface-chrome);
+  border-bottom: 1px solid var(--border-chrome);
 }
 
 .shell__content {
   padding: var(--pad-panel);
 }
 
-.shell__placeholder {
+.rail__brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: var(--topbar-height);
+  padding: 0 var(--sp-7);
+  border-bottom: 1px solid var(--border-chrome);
+  color: var(--text-primary);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide);
+  text-decoration: none;
+}
+
+/* Le style de lien global souligne et recolore au survol : le rail n'est pas du texte courant. */
+.rail__brand:hover {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.rail__group {
+  padding: var(--sp-6) var(--sp-5) var(--sp-2);
+}
+
+.rail__label {
   margin: 0;
-  color: var(--text-muted);
-  font: var(--text-label);
+  padding: 0 var(--sp-5) var(--sp-4);
+  color: var(--text-faint);
+  font: var(--text-overline);
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+
+.rail__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rail__item {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--sp-5);
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  font-size: var(--fs-13);
+  text-decoration: none;
+  transition: var(--transition-control);
+}
+
+.rail__item:hover {
+  background: var(--surface-chrome-hover);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.rail__item[aria-current="page"] {
+  background: var(--tint-teal);
+  color: var(--action-primary-fg);
+  font-weight: var(--fw-medium);
 }
 
 .page {
