@@ -98,8 +98,10 @@ function Frame({
         className="shell__skip"
         href="#contenu"
         onClick={(event) => {
-          // Le fragment seul ne suffit pas : le routeur réécrirait l'URL, et `main` ne prend le focus
-          // que si on le lui donne.
+          // Le fragment seul ne déplace pas le focus : `main` ne le prend que si on le lui donne, et le
+          // test du lien d'évitement rougit sans `focus()`. `preventDefault` garde `#contenu` hors de
+          // l'adresse ; aucun test ne rougit s'il disparaît — l'historique en mémoire du test ne voit
+          // pas le fragment.
           event.preventDefault()
           document.getElementById('contenu')?.focus()
         }}
