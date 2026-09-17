@@ -49,7 +49,8 @@ var auditExemptions = map[string]string{
 }
 
 // event pose l'adresse de l'appelant sur l'événement que le handler compose. L'écriture, elle, a lieu
-// dans la transaction de l'action, côté `store` : ou les deux, ou aucune.
+// dans la transaction de l'action, côté `store` : ou les deux, ou aucune. **Sauf pour `Logout`**, qui
+// passe encore par `Audit.Record` sur le pool — l'arbitrage est écrit sur le handler.
 //
 // **Seuls les succès sont journalisés.** Un refus est déjà compté par le verrou d'essais, et
 // journaliser les échecs de connexion ouvrirait une écriture par requête non authentifiée — ce que

@@ -27,7 +27,9 @@ que l'audit de sur-ingénierie a relevé est écarté ci-dessous, avec sa raison
 - **`@tanstack/react-query`, `openapi-fetch`, `openapi-typescript`** : step-040 les consomme.
   **`@simplewebauthn/browser`, `qrcode.react`** : step-027 et step-028.
 - **`chi` → `ServeMux`** : aucune ligne gagnée, et le serveur engendré serait à régénérer.
-- **`Audit.RecordTx`** : step-033 lui donne ses appelants.
+- **`Audit.RecordTx`** : step-033 ne lui a **pas** donné d'appelants de production — les cinq
+  écritures en transaction vivent dans `internal/store` et appellent `record` en direct. Elle reste le seul accès à
+  l'écriture en transaction depuis le paquet de test externe, qui la garde.
 - **Le token `--qr-paper`** : step-028 affiche le QR. Son commentaire dit pourtant qu'il est gardé par
   un test, ce qui est faux → step-038.
 - **Les types réexportés par `components/ui/index.ts`** : step-040 est le premier écran à les
