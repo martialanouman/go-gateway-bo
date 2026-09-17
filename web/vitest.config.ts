@@ -52,10 +52,10 @@ export default mergeConfig(
         // `CLAUDE_CODE`. L'option écrite ici est spreadée **après** le défaut, donc elle gagne.
         //
         // Ce que ça évite, mesuré le 03/08/2026 en retirant cette ligne : lu par un agent, le tableau
-        // perd `main.tsx` et `router.ts`, tous deux à 100 %, et n'en montre plus que deux. Un
+        // perd `main.tsx` et `router.tsx`, tous deux à 100 %, et n'en montre plus que deux. Un
         // relecteur en a conclu que `perFile` ne contraignait que deux fichiers ; il en contraint
         // quatre — même date, `src/main.test.tsx` écarté du run, les `ERROR` tombent aussi sur
-        // `src/main.tsx` et `src/router.ts`.
+        // `src/main.tsx` et `src/router.tsx`.
         //
         // Rien ne **survit** au run, ce qui n'est pas dire que rien n'est écrit : le fournisseur v8
         // dépose `coverage/.tmp/coverage-N.json` pendant l'exécution — observés, `coverage-0` à

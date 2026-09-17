@@ -143,7 +143,7 @@ describe('chargement à froid', () => {
     // document et du CSS émis : il couvre les 236 tokens au lieu de quatre, et il fait échouer
     // `vite build` plutôt qu'un test.
     //
-    // Ce qui reste ici est ce que le build ne peut pas voir : le `<style>` inline **duplique** quatre
+    // Ce qui reste ici est ce que le build ne peut pas voir : le `<style>` inline **duplique** des
     // tokens de la charte, parce que la première peinture n'a aucune feuille à sa disposition. La
     // duplication est imposée ; ce qui se teste, c'est qu'elle soit fidèle. Non alignées, ces valeurs
     // font sauter le rail de 4 px et changent la luminance du canvas au montage de React.
@@ -160,6 +160,10 @@ describe('chargement à froid', () => {
       // `prefers-reduced-motion`. Les deux squelettes du produit — celui du document et celui des
       // écrans — battent désormais au même rythme, depuis la même source.
       ['--skeleton-duration', '--dur-skeleton'],
+      // Le rail et la barre de step-040 peignent le chrome, plus sombre que le canvas : sans ces
+      // deux copies, leur luminance sauterait au montage.
+      ['--skeleton-chrome', '--surface-chrome'],
+      ['--skeleton-chrome-border', '--border-chrome'],
     ] as const
 
     for (const [inDocument, inCharter] of copies) {
@@ -177,6 +181,8 @@ describe('chargement à froid', () => {
     )
     expect(consumed).toContain('--nav-width')
     expect(consumed).toContain('--topbar-height')
+    expect(consumed).toContain('--surface-chrome')
+    expect(consumed).toContain('--border-chrome')
   })
 
   it("garde la feuille d'entrée assez petite pour que l'aller-retour reste le seul coût", async () => {
@@ -238,10 +244,10 @@ describe('chargement à froid', () => {
     // jouant `false`. Le motif ne protège donc rien aujourd'hui ; il dit ce qui est vrai du graphe,
     // pour que la déclaration reste juste si cette protection cesse d'être implicite.
     //
-    // La marge est d'environ 15 %, et elle n'est pas là pour absorber la croissance ordinaire : elle
-    // est là pour que la bascule de Base UI dans l'entrée, que step-040 fera en montant la pile de
-    // toasts dans la coquille, se présente comme une question plutôt que comme un rouge à faire
-    // taire.
+    // La marge n'était pas là pour absorber la croissance ordinaire : elle était là pour que la
+    // bascule de Base UI dans l'entrée, que step-040 a faite en montant la pile de toasts dans la
+    // coquille, se présente comme une question plutôt que comme un rouge à faire taire. Elle l'a
+    // absorbée : des 15 % d'origine il reste environ 8 % sous la borne brute.
     const entry = /<script\b[^>]*\bsrc="([^"]+)"/.exec(html)?.[1]
     expect(entry, "le document ne charge plus de script d'entrée").toBeDefined()
 

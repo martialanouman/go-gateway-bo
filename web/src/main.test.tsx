@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { stubSession } from '../test/session'
 
 /**
  * Le montage lui-même n'était traversé par aucun test : remplacer `#app` par un identifiant inexistant
@@ -33,6 +34,7 @@ describe("l'entrée de l'application", () => {
     await loadServedDocument()
     expect(document.querySelector('[data-skeleton="rail"]')).not.toBeNull()
 
+    stubSession({ permissions: [] })
     await import('./main')
 
     // Le rendu de React 19 n'est pas synchrone : sans attente, le squelette est encore là et le test

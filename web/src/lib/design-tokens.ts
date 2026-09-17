@@ -161,4 +161,19 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     background: '--surface-card',
     usage: 'Source d’un toast · bff',
   },
+  // Le rail de step-040. Le gris de groupe de la charte (`--n-400`) n'atteint pas 4,5:1 sur
+  // `--n-950` : le titre de groupe prend `--text-faint`.
+  { text: '--text-muted', background: '--surface-chrome', usage: 'Entrée du rail · opérateur' },
+  { text: '--text-faint', background: '--surface-chrome', usage: 'Titre de groupe du rail' },
+  {
+    text: '--text-primary',
+    background: '--surface-chrome-hover',
+    usage: 'Entrée du rail survolée',
+  },
+  {
+    text: '--action-primary-fg',
+    background: '--tint-teal',
+    over: '--surface-chrome',
+    usage: 'Entrée active du rail',
+  },
 ] as const

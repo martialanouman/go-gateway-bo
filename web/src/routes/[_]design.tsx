@@ -68,8 +68,8 @@ import '~/styles/design-reference.css'
 export const Route = createFileRoute('/_design')({ component: DesignReference })
 
 /**
- * Des lignes **inventées**, et elles doivent le rester : cette page ne parle à personne. Le premier
- * tableau branché sur le BFF est de step-040, et c'est elle qui apportera `QueryClientProvider`.
+ * Des lignes **inventées**, et elles doivent le rester : cette page ne parle à personne. step-040 a
+ * monté `QueryClientProvider` dans `createAppRouter`, mais aucun tableau n'est encore branché au BFF.
  */
 const SPECIMEN_ROWS = [
   {

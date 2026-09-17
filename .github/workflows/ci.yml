@@ -365,11 +365,9 @@ jobs:
       contents: read
       packages: read
     # Même raison que `build-web` : ces parcours lancent le déployable, qui refuse de servir sur un
-    # schéma en retard depuis step-020. Le DSN doit coïncider avec celui de `web/playwright.config.ts`,
-    # qui lance le binaire — les deux portent `?sslmode=disable`, le service ne présentant aucun
-    # certificat.
-    env:
-      DASHBOARD_DATABASE_URL: postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable
+    # schéma en retard depuis step-020. Le service ci-dessous n'a rien à migrer ici — `make e2e` s'y
+    # connecte par `E2E_ADMIN_URL`, y recrée la base des parcours, la migre et y sème leur compte. Ce
+    # DSN d'administration doit donc coïncider avec les identifiants du service.
     services:
       postgres:
         image: postgres:18-alpine
@@ -397,10 +395,6 @@ jobs:
       # système que le runner n'a pas ; la version du navigateur vient de `@playwright/test`, épinglé
       # dans le lockfile, donc rien à répéter ici.
       - run: pnpm -C web exec playwright install --with-deps chromium
-      # Avant `make e2e`, qui construit le binaire puis le lance : un schéma en retard le ferait
-      # refuser de démarrer, et Playwright n'aurait rien à interroger.
-      - name: Migrer la base du service
-        run: make migrate
       - run: make e2e
       # Les traces ne sont conservées que d'un parcours tombé : `trace: 'retain-on-failure'`. Sans cette
       # étape, un parcours qui échoue en CI ne laisse rien à examiner et se rejoue à l'aveugle.

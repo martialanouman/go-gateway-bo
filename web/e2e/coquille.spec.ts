@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * Le seul parcours de M0, et il tourne contre le **binaire**. Ce qu'il prouve que rien d'autre ne
- * prouve : le bundle **embarqué dans le déployable** démarre dans un vrai navigateur. Les scénarios
+ * Le seul parcours du dépôt — né en M0, étendu à la coquille de M2 par step-040 — et il tourne contre
+ * le **binaire**. Ce qu'il prouve que rien d'autre ne prouve : le bundle **embarqué dans le
+ * déployable** démarre dans un vrai navigateur. Les scénarios
  * `godog` exercent déjà le binaire, mais ils lisent ce qu'il sert sans jamais exécuter le JavaScript ;
  * le job « Build client et déployable » compare des octets. Aucun des deux ne verrait une application
  * servie intacte et incapable de se monter.
@@ -32,7 +33,10 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   page.on('requestfailed', (r) => problems.push(`requête échouée : ${r.url()}`))
   page.on('pageerror', (error) => problems.push(`exception : ${error.message}`))
   page.on('console', (message) => {
-    if (message.type() === 'error') problems.push(`console : ${message.text()}`)
+    if (message.type() !== 'error') return
+    // Le seul refus attendu : la coquille lit la session avant la connexion.
+    if (message.location().url.endsWith('/api/auth/me') && message.text().includes('401')) return
+    problems.push(`console : ${message.text()}`)
   })
 
   // Étant donné le document que le binaire sert, avant qu'aucun script ne s'exécute — c'est la
@@ -41,15 +45,63 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   expect(served.ok()).toBe(true)
   expect(await served.text()).toContain('data-skeleton="rail"')
 
-  // Quand un opérateur ouvre l'application
+  // Quand un opérateur ouvre l'application sans session
   await page.goto('/')
 
-  // Alors le squelette cède la place à l'écran, et la coquille reste autour.
+  // Alors le squelette cède la place à un état qui nomme l'écran à venir — step-027 n'est pas livrée
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Aucune session ouverte')
+  await expect(page.getByText(/step-027/)).toBeVisible()
+  await expect(page.locator('[data-skeleton="rail"]')).toHaveCount(0)
+
+  // Étant donné une session ouverte par l'API, **depuis la page** : c'est le navigateur qui range le
+  // cookie, avec ses propres règles, et non le client de requêtes de Playwright.
+  const status = await page.evaluate(
+    async (credentials) =>
+      (
+        await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(credentials),
+        })
+      ).status,
+    {
+      email: fromEnv('DASHBOARD_E2E_OPERATOR_EMAIL'),
+      password: fromEnv('DASHBOARD_E2E_OPERATOR_PASSWORD'),
+    },
+  )
+  expect(status).toBe(200)
+
+  // Alors l'AppShell remplace l'état, et nomme l'opérateur
+  await page.reload()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     "Le cockpit d'exploitation se construit",
   )
-  await expect(page.locator('[data-skeleton="rail"]')).toHaveCount(0)
-  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible()
+  const nav = page.getByRole('navigation', { name: 'Navigation principale' })
+  await expect(nav).toBeVisible()
+  await expect(page.getByRole('banner')).toContainText(fromEnv('DASHBOARD_E2E_OPERATOR_NAME'))
+
+  // Et une entrée du rail mène à un état vide qui nomme son jalon
+  const routes = nav.getByRole('link', { name: 'Routes' })
+  await routes.click()
+  await expect(page).toHaveURL(/\/routes$/)
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Routes')
+  await expect(page.getByText(/jalon M6 /)).toBeVisible()
+
+  // L'entrée active peint le token que `CONTRAST_PAIRS` juge — résolu par le navigateur, pas recopié.
+  await expect(routes).toHaveAttribute('aria-current', 'page')
+  const actif = await page.evaluate(() => {
+    const sonde = document.createElement('span')
+    sonde.style.color = 'var(--action-primary-fg)'
+    document.body.append(sonde)
+    const resolu = getComputedStyle(sonde).color
+    sonde.remove()
+    return resolu
+  })
+  await expect(routes).toHaveCSS('color', actif)
+
+  // Et une adresse profonde s'ouvre sur le binaire, fallback SPA compris
+  await page.goto('/billing')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Soldes & crédits')
 
   // Et le navigateur n'est sorti nulle part. C'est la moitié « vérifiée sur le binaire » de la DoD de
   // step-008 : la charte est servie par le déployable, jamais par un tiers. Le test de bundle attrape
@@ -260,3 +312,10 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
 
   expect(problems).toEqual([])
 })
+
+function fromEnv(name: string) {
+  const value = process.env[name]
+  if (!value)
+    throw new Error(`${name} est vide : les parcours se lancent par make e2e, qui sème le compte`)
+  return value
+}

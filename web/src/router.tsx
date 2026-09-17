@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRouter, type RouterHistory } from '@tanstack/react-router'
 import { routeTree } from './routeTree.gen'
 
@@ -13,9 +14,22 @@ import { routeTree } from './routeTree.gen'
  * d'audit pour une lecture que personne n'a faite. Le journal d'audit est la preuve de l'invariant
  * (a) ; le remplir de lectures fictives l'affaiblit en tant que preuve. Le préchargement se décidera
  * route par route, là où l'on sait ce qu'il coûte.
+ *
+ * **Le `QueryClient` naît ici**, et `Wrap` le fournit : l'application et chaque test passent par la
+ * même fabrique, donc par le même provider. Un client par routeur, aussi, pour qu'aucun cache ne
+ * survive d'un test au suivant.
  */
 export function createAppRouter(history?: RouterHistory) {
-  return createRouter({ routeTree, scrollRestoration: true, ...(history ? { history } : {}) })
+  const queryClient = new QueryClient()
+
+  return createRouter({
+    routeTree,
+    scrollRestoration: true,
+    ...(history ? { history } : {}),
+    Wrap: ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  })
 }
 
 declare module '@tanstack/react-router' {

@@ -75,7 +75,8 @@ port — il compare la version du schéma d'abord — et toute porte qui le lanc
   embarqué. `make build-go` compile sans reconstruire le client.
 - **`make e2e`** lance les parcours Playwright **contre le binaire**, jamais contre `make dev` :
   c'est le seul endroit qui exerce l'embarquement des assets et l'ordre du repli SPA. Hors de
-  `make check`, et exige un PostgreSQL migré.
+  `make check`. Il n'exige plus qu'un PostgreSQL joignable : la base des parcours lui appartient, et
+  il la recrée, la migre et y sème leur compte à chaque passage.
 
 ## Où sont les choses
 

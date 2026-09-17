@@ -1,6 +1,6 @@
 # step-040 — AppShell : rail, barre supérieure, arborescence de routes en états vides
 
-> **Jalon :** M2 (§4.2, `plan.md` §7) · **Statut :** À FAIRE
+> **Jalon :** M2 (§4.2, `plan.md` §7) · **Statut :** FAIT
 > **Dépend de :** step-022, step-041, step-042, step-048 · **Bloque :** step-027, step-028, step-029
 >
 > *Elle se lit **après** les deux lots de primitives, et son numéro ne le dit pas : l'AppShell
@@ -78,15 +78,15 @@ arrive avec le jalon M2. » Cette step la remplace.
   première fois sur du code qui appelle le réseau.
 
 ## Definition of Done
-- [ ] `make check` vert et `make e2e` vert
-- [ ] clavier et libellés accessibles (WCAG 2.1 AA) sur le rail et la barre supérieure
-- [ ] chaque route déclarée rend un état explicite qui nomme son jalon — aucune page blanche, vérifié
+- [x] `make check` vert et `make e2e` vert
+- [x] clavier et libellés accessibles (WCAG 2.1 AA) sur le rail et la barre supérieure
+- [x] chaque route déclarée rend un état explicite qui nomme son jalon — aucune page blanche, vérifié
       route par route et non sur un échantillon
-- [ ] la mutation « retirer le filtre de permission du rail » fait rougir
-- [ ] la mutation « `PermissionGate` laisse passer une clé absente » fait rougir
-- [ ] le squelette de chargement à froid tient toujours, et `chargement-a-froid.test.ts` le prouve sur
+- [x] la mutation « retirer le filtre de permission du rail » fait rougir
+- [x] la mutation « `PermissionGate` laisse passer une clé absente » fait rougir
+- [x] le squelette de chargement à froid tient toujours, et `chargement-a-froid.test.ts` le prouve sur
       le bundle de production, pas sur l'intention
-- [ ] l'absence de rôle dans la barre supérieure est écrite là où elle se constate, avec le renvoi au
+- [x] l'absence de rôle dans la barre supérieure est écrite là où elle se constate, avec le renvoi au
       contrat qui la décide
 
 ## Hors périmètre
