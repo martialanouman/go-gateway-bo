@@ -243,7 +243,7 @@ test-web: ## Vitest
 # session pour rendre la coquille, et la base de développement a déjà un propriétaire dont le mot de
 # passe n'est écrit nulle part. Rien d'un secret : l'hôte et les identifiants sont ceux du conteneur
 # local et du service de la CI.
-E2E_ADMIN_URL ?= postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable
+E2E_ADMIN_URL = postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable
 E2E_DATABASE_URL = postgres://dashboard:dashboard@127.0.0.1:5432/dashboard_e2e?sslmode=disable
 E2E_OPERATOR_EMAIL = parcours@example.test
 E2E_OPERATOR_NAME = Opératrice de parcours

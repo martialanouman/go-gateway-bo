@@ -10,6 +10,10 @@ import { afterEach, beforeEach, vi } from 'vitest'
 // éléments, et le test accuse le composant d'un défaut qui appartient au harnais.
 afterEach(cleanup)
 
+// jsdom n'implémente pas `scrollTo`, que la restauration de défilement du routeur appelle à chaque
+// navigation : sans ce talon, 41 erreurs « Not implemented » noient la sortie où se lisent les vraies.
+globalThis.scrollTo = () => {}
+
 // Un appel réseau qu'aucun test n'a déclaré rougit au lieu de partir : jsdom n'a pas de BFF, et un
 // `fetch` réel échouerait plus loin, sur un message qui ne nomme pas l'appel.
 beforeEach(() => {
