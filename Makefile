@@ -239,8 +239,28 @@ test-web: ## Vitest
 # mesuré le 03/08/2026 en pointant `PLAYWRIGHT_BROWSERS_PATH` sur un répertoire vide, « Executable
 # doesn't exist at … Please run the following command to download new browsers ». Un contrôle de plus
 # dirait la même chose, moins bien.
+# Les parcours ont leur base, remise à neuf à chaque passage, et leur compte : le binaire exige une
+# session pour rendre la coquille, et la base de développement a déjà un propriétaire dont le mot de
+# passe n'est écrit nulle part. Rien d'un secret : l'hôte et les identifiants sont ceux du conteneur
+# local et du service de la CI.
+E2E_ADMIN_URL ?= postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable
+E2E_DATABASE_URL = postgres://dashboard:dashboard@127.0.0.1:5432/dashboard_e2e?sslmode=disable
+E2E_OPERATOR_EMAIL = parcours@example.test
+E2E_OPERATOR_NAME = Opératrice de parcours
+E2E_OPERATOR_PASSWORD = un-mot-de-passe-de-parcours
+
 e2e: build ## Parcours Playwright, contre le binaire (:3101)
-	pnpm -C web e2e
+	@printf '%s' "$(E2E_ADMIN_URL)" | go run ./scripts/e2edb
+	@printf '%s' "$(E2E_DATABASE_URL)" | go run ./cmd/migrate
+	@printf '%s' "$(E2E_DATABASE_URL)" | \
+		DASHBOARD_BOOTSTRAP_OPERATOR_EMAIL='$(E2E_OPERATOR_EMAIL)' \
+		DASHBOARD_BOOTSTRAP_OPERATOR_NAME='$(E2E_OPERATOR_NAME)' \
+		DASHBOARD_BOOTSTRAP_OPERATOR_PASSWORD='$(E2E_OPERATOR_PASSWORD)' \
+		go run ./cmd/bootstrap
+	DASHBOARD_E2E_OPERATOR_EMAIL='$(E2E_OPERATOR_EMAIL)' \
+		DASHBOARD_E2E_OPERATOR_NAME='$(E2E_OPERATOR_NAME)' \
+		DASHBOARD_E2E_OPERATOR_PASSWORD='$(E2E_OPERATOR_PASSWORD)' \
+		pnpm -C web e2e
 
 # `pnpm-workspace.yaml` porte tout un appareil de triage — `ignoreGhsas: []`, deux `overrides` — dont
 # aucune porte ne vérifiait qu'il tient encore. Le versant client est la moitié à la plus grosse
