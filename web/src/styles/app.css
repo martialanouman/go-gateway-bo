@@ -65,3 +65,27 @@
   font: var(--text-label);
   font-variant-numeric: tabular-nums;
 }
+
+.page {
+  display: grid;
+  gap: var(--sp-9);
+  align-content: start;
+  max-width: var(--content-max);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: var(--subbar-height);
+  padding: var(--sp-4) var(--sp-7);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.toolbar__end {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-left: auto;
+}
