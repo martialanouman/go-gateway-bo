@@ -244,10 +244,10 @@ describe('chargement à froid', () => {
     // jouant `false`. Le motif ne protège donc rien aujourd'hui ; il dit ce qui est vrai du graphe,
     // pour que la déclaration reste juste si cette protection cesse d'être implicite.
     //
-    // La marge est d'environ 15 %, et elle n'est pas là pour absorber la croissance ordinaire : elle
-    // est là pour que la bascule de Base UI dans l'entrée, que step-040 fera en montant la pile de
-    // toasts dans la coquille, se présente comme une question plutôt que comme un rouge à faire
-    // taire.
+    // La marge n'était pas là pour absorber la croissance ordinaire : elle était là pour que la
+    // bascule de Base UI dans l'entrée, que step-040 a faite en montant la pile de toasts dans la
+    // coquille, se présente comme une question plutôt que comme un rouge à faire taire. Elle l'a
+    // absorbée : des 15 % d'origine il reste environ 8 % sous la borne brute.
     const entry = /<script\b[^>]*\bsrc="([^"]+)"/.exec(html)?.[1]
     expect(entry, "le document ne charge plus de script d'entrée").toBeDefined()
 

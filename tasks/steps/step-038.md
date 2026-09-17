@@ -21,7 +21,7 @@ auront corrigé ou déplacé certains.
 |---|---|---|
 | `internal/bff/api.go:12-60` | la porte laisse passer un type de réponse écrit à la main ; il avoue lui-même ne plus être vrai | 45 lignes à ramener à environ 5 ; les lignes 58-60 racontent des steps, pas le champ |
 | `internal/permissions/catalog.go:91` | constantes « déclarées ci-dessous » | elles sont au-dessus ; le bloc 83-96 est de l'historique |
-| `web/src/components/ui/toast.tsx:79-81` | step-040 monte la pile au niveau de la coquille | step-040 n'est pas livrée ; la pile n'est montée que dans `[_]design.tsx` |
+| ~~`web/src/components/ui/toast.tsx:79-81`~~ | step-040 monte la pile au niveau de la coquille | **Devenu vrai** : step-040 monte `ToastStack` dans `shell.tsx`. |
 | `toast.tsx:53-54` | « six lignes plutôt qu'une abstraction » | `useToast` en fait vingt |
 | `toast.tsx:21-22` | chaque toast a `role="dialog"` | `alertdialog` en priorité haute |
 | `web/vite-plugin-tokens.ts:23-30` | step-041 devra déclarer trois variables | step-041 est livrée et les déclare dans `components.css` |
