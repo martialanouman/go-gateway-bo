@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net"
 	"strings"
 	"time"
 
@@ -93,6 +94,17 @@ func (w *loginWorld) pointTheServerAt(dsn string) error {
 
 func (w *loginWorld) signInWithTheRightPassword() error {
 	return w.postCredentials(scenarioEmail, scenarioPassword)
+}
+
+// callerAddress est celle que le serveur voit sur la connexion : aucun pas du décor n'envoie
+// `X-Forwarded-For`, donc c'est l'hôte de la boucle locale par lequel `process` le joint.
+func (w *loginWorld) callerAddress() string {
+	host, _, err := net.SplitHostPort(w.process.addr)
+	if err != nil {
+		return w.process.addr
+	}
+
+	return host
 }
 
 func (w *loginWorld) signInWithAWrongPassword() error {

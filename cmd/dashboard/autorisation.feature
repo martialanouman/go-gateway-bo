@@ -51,6 +51,20 @@ Fonctionnalité: Le journal d'audit
     # geste, et le journal qui en garde la trace.
     Alors le journal porte 1 événement "passkey.remove"
 
+  Scénario: une déconnexion laisse sa trace
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur se déconnecte
+    Alors le journal porte 1 événement "operator.logout"
+
+  Scénario: enregistrer une clé d'accès laisse sa trace
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur enregistre une clé d'accès
+    Alors le journal porte 1 événement "passkey.register"
+
   Scénario: franchir le second facteur laisse une trace
     Étant donné une installation avec un opérateur
     Et un serveur démarré
@@ -67,3 +81,44 @@ Fonctionnalité: Le journal d'audit
     # Un défi tiré n'a aucun effet durable. L'enregistrement qui le suit, lui, en a un — et il est
     # tracé.
     Alors le journal porte 0 événement "passkey.register"
+
+  # Les trois scénarios qui suivent tiennent la seconde moitié de (c) : la trace n'est pas un
+  # supplément qu'une action réussie laisserait derrière elle, elle en est une condition. Le mois où
+  # plus personne ne renouvelle les partitions, toute écriture au journal échoue — et aujourd'hui
+  # l'action aboutit quand même, silencieusement, pendant que la requête répond un refus.
+
+  Scénario: un enrôlement dont la trace ne peut pas s'écrire n'a pas lieu
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et les partitions du journal sont retirées
+    Quand l'opérateur remplace son application d'authentification
+    Alors la requête est refusée
+    Et l'ancien second facteur est toujours en place
+    Et le journal porte 0 événement "mfa.enroll"
+
+  Scénario: une clé d'accès dont la trace ne peut pas s'écrire n'est pas enregistrée
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et les partitions du journal sont retirées
+    Quand l'opérateur enregistre une clé d'accès
+    Alors la requête est refusée
+    Et l'opérateur ne détient aucune clé d'accès
+
+  Scénario: un retrait de clé d'accès dont la trace ne peut pas s'écrire n'a pas lieu
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et une clé d'accès enregistrée
+    # L'élévation, sans quoi le retrait serait refusé sur ce seul motif (409) — avant même d'atteindre
+    # l'écriture dont ce scénario observe l'absence. Et une seconde clé, sans quoi retirer l'unique
+    # second facteur du compte serait refusé de même : ce que ce scénario observe est le refus de
+    # l'audit, pas celui de ces deux gardes.
+    Et l'opérateur a présenté sa clé d'accès
+    Et une seconde clé d'accès enregistrée
+    Et les partitions du journal sont retirées
+    Quand l'opérateur retire sa clé d'accès
+    Alors la requête est refusée
+    Et l'opérateur détient toujours sa clé d'accès

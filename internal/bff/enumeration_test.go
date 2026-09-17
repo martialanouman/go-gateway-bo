@@ -344,20 +344,33 @@ func operationsThatAudit(t *testing.T) []string {
 	return auditingOperations(audits)
 }
 
-// writesAudit reconnaît le puits : les deux écritures de `store.Audit`. Le nom seul ne suffirait pas
-// — `Record` est un nom trop commun pour qu'un homonyme d'un autre paquet ne finisse pas par exister.
+// writesAudit reconnaît le puits : soit une écriture directe de `store.Audit` — ce que seule la
+// déconnexion fait encore —, soit un appel qui **porte un `store.Event`**, donc qui confie l'écriture
+// à la transaction de l'action. Le type est résolu par le type-checker : un homonyme d'un autre
+// paquet ne passe pas.
 func writesAudit(fn *types.Func) bool {
-	if fn.Pkg() == nil ||
-		fn.Pkg().Path() != "github.com/martialanouman/go-gateway-bo/internal/store" {
+	if fn.Pkg() == nil {
 		return false
 	}
 
-	receiver := fn.Signature().Recv()
-	if receiver == nil || !strings.HasSuffix(receiver.Type().String(), "store.Audit") {
-		return false
+	const storePath = "github.com/martialanouman/go-gateway-bo/internal/store"
+
+	if fn.Pkg().Path() == storePath {
+		if receiver := fn.Signature().Recv(); receiver != nil &&
+			strings.HasSuffix(receiver.Type().String(), "store.Audit") &&
+			(fn.Name() == "Record" || fn.Name() == "RecordTx") {
+			return true
+		}
 	}
 
-	return fn.Name() == "Record" || fn.Name() == "RecordTx"
+	params := fn.Signature().Params()
+	for i := range params.Len() {
+		if params.At(i).Type().String() == storePath+".Event" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func calledFunction(pkg *packages.Package, call *ast.CallExpr) *types.Func {

@@ -105,17 +105,23 @@ func TestUnAuditAnnuleAvecSaTransactionNeLaissePasDeTrace(t *testing.T) {
 	tx, err := pool.Begin(t.Context())
 	require.NoError(t, err)
 
-	require.NoError(t, audit.RecordTx(t.Context(), tx, store.Event{
-		OperatorID: operator,
-		Action:     "passkey.remove",
-	}))
+	event := store.Event{OperatorID: operator, Action: "passkey.remove"}
+
+	require.NoError(t, audit.RecordTx(t.Context(), tx, event))
+
+	// Le témoin : sans lui, un `RecordTx` qui n'écrirait rien passerait ce test, puisqu'il n'observe
+	// que l'absence après annulation.
+	var written int
+	require.NoError(t, tx.QueryRow(t.Context(),
+		`SELECT count(*) FROM audit_log WHERE action = $1`, event.Action).Scan(&written))
+	require.Equal(t, 1, written, "la ligne n'a jamais été écrite : l'annulation ne prouve rien")
 
 	require.NoError(t, tx.Rollback(t.Context()))
 
-	var written int64
+	var survived int64
 
-	queryOn(t, dsn, `SELECT count(*) FROM audit_log`, &written)
-	assert.Zero(t, written, "l'action a été annulée : sa trace ne doit pas survivre")
+	queryOn(t, dsn, `SELECT count(*) FROM audit_log`, &survived)
+	assert.Zero(t, survived, "l'action a été annulée : sa trace ne doit pas survivre")
 }
 
 func TestUnEtatVideNeLaissePasDObjetVide(t *testing.T) {

@@ -95,16 +95,25 @@ func NewAudit(pool *pgxpool.Pool) *Audit {
 	return &Audit{pool: pool}
 }
 
-// Record écrit une ligne hors de toute transaction. C'est la forme des actions **proxyfiées** vers la
-// passerelle, qui n'ont pas de transaction commune avec leur audit : l'écriture suit le succès, et
-// une panne entre les deux perd la trace. Le trou est réel, il est écrit, et M3 en héritera.
+// Record écrit une ligne hors de toute transaction : l'écriture suit le succès, et une panne entre
+// les deux perd la trace.
+//
+// **Un seul appelant en production aujourd'hui** : `bff.API.Logout`, dont l'audit reste dehors par
+// arbitrage — la raison est écrite sur le handler. Les actions **proxyfiées** vers la passerelle
+// n'auront pas d'autre forme, faute de transaction commune avec leur audit ; aucune n'existe encore
+// au contrat, et le trou est inscrit au registre (step-060).
 func (a *Audit) Record(ctx context.Context, event Event) error {
 	return record(ctx, a.pool, event)
 }
 
-// RecordTx écrit dans la transaction de l'action. C'est la forme des actions **locales** : ou les
-// deux, ou aucune. C'est ce qui rend la trace non contournable — et c'est aussi pourquoi une
-// partition manquante ferait tomber l'action elle-même.
+// RecordTx écrit dans la transaction de l'action : ou les deux, ou aucune. C'est ce qui rend la trace
+// non contournable — et c'est aussi pourquoi une partition manquante fait tomber l'action elle-même.
+//
+// **Aucun appelant en production** : les cinq écritures en transaction vivent dans ce paquet
+// (`Sessions.Create`, `Sessions.Elevate`, `MFA.Enroll`, `Webauthn.Register`, `Webauthn.Remove`) et
+// appellent `record` en direct. Ce qu'elle porte est l'observabilité de la propriété depuis dehors —
+// `TestUnAuditAnnuleAvecSaTransactionNeLaissePasDeTrace` est dans le paquet de test externe et ne
+// peut pas atteindre `record`.
 func (a *Audit) RecordTx(ctx context.Context, tx pgx.Tx, event Event) error {
 	return record(ctx, tx, event)
 }

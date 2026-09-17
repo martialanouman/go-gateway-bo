@@ -136,7 +136,7 @@ func TestUneSessionOuverteSeRetrouveParSonEmpreinte(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "$argon2id$peu$importe")
 
-	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	resolved, alive, err := sessions.Resolve(t.Context(), tokenHash("jeton"), testIdle)
@@ -167,7 +167,7 @@ func TestUneSessionAuDelaDeSonEcheanceAbsolueNEstPlusVivante(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	expire(t, dsn, tokenHash("jeton"))
@@ -185,7 +185,7 @@ func TestUneSessionOisiveAuDelaDeLaFenetreNEstPlusVivante(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	idleFor(t, dsn, tokenHash("jeton"), testIdle+time.Hour)
@@ -203,7 +203,7 @@ func TestUnRefusNeProlongeJamaisLaSession(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	idleFor(t, dsn, tokenHash("jeton"), testIdle+time.Hour)
@@ -237,7 +237,7 @@ func TestLEcheanceAbsolueNEstJamaisRepoussee(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	// La session est celle d'un opérateur connecté il y a quatre heures. Il lui en reste huit, et
@@ -272,12 +272,12 @@ func TestUneSessionOisiveNeSEleveJamais(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	opened, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	idleFor(t, dsn, tokenHash("avant"), testIdle+time.Hour)
 
-	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("après"), testIdle)
+	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("après"), testIdle, store.Event{})
 	require.NoError(t, err)
 	require.False(t, elevated)
 
@@ -294,12 +294,12 @@ func TestUnOperateurDesactiveNEleveJamaisSaSession(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	opened, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	execOn(t, dsn, `UPDATE operators SET status = 'disabled' WHERE id = $1`, operator)
 
-	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("après"), testIdle)
+	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("après"), testIdle, store.Event{})
 	require.NoError(t, err)
 	assert.False(t, elevated)
 }
@@ -312,10 +312,10 @@ func TestLElevationInvalideLeJetonPrecedent(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	opened, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("avant"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
-	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("après"), testIdle)
+	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("après"), testIdle, store.Event{})
 	require.NoError(t, err)
 	require.True(t, elevated)
 
@@ -339,12 +339,12 @@ func TestUneSessionMorteNeSEleveJamais(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	expire(t, dsn, tokenHash("jeton"))
 
-	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("neuf"), testIdle)
+	elevated, err := sessions.Elevate(t.Context(), opened.ID, tokenHash("neuf"), testIdle, store.Event{})
 	require.NoError(t, err)
 	assert.False(t, elevated)
 }
@@ -357,7 +357,7 @@ func TestFermerUneSessionEmpecheDeLaRejouer(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	opened, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	require.NoError(t, sessions.Delete(t.Context(), opened.ID))
@@ -380,7 +380,7 @@ func TestDeuxPoolsDistinctsResolventLaMemeSession(t *testing.T) {
 
 	second := store.NewSessions(pool)
 
-	opened, err := first.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	opened, err := first.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	resolved, alive, err := second.Resolve(t.Context(), tokenHash("jeton"), testIdle)
@@ -434,7 +434,7 @@ func TestUnOperateurDesactiveNeResoutPlusSaSession(t *testing.T) {
 	sessions, dsn := sessionsOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime)
+	_, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
 	require.NoError(t, err)
 
 	execOn(t, dsn, `UPDATE operators SET status = 'disabled' WHERE id = $1`, operator)

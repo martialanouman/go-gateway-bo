@@ -46,13 +46,13 @@ func NewManager(sessions *store.Sessions, secret []byte) *Manager {
 
 // Issue ouvre une session de **premier facteur** — non élevée — et rend la valeur à mettre dans le
 // cookie. Pourquoi elle naît là plutôt qu'après le second facteur : voir `API.Login`.
-func (m *Manager) Issue(ctx context.Context, operatorID string) (string, error) {
+func (m *Manager) Issue(ctx context.Context, operatorID string, event store.Event) (string, error) {
 	value, tokenHash, err := newSealedToken(m.secret)
 	if err != nil {
 		return "", err
 	}
 
-	if _, err = m.sessions.Create(ctx, operatorID, tokenHash, AbsoluteLifetime); err != nil {
+	if _, err = m.sessions.Create(ctx, operatorID, tokenHash, AbsoluteLifetime, event); err != nil {
 		return "", err
 	}
 
@@ -80,13 +80,15 @@ func (m *Manager) Resolve(ctx context.Context, value string) (store.Session, boo
 // présenté n'existe **nulle part** sur ce chemin : rendre l'ancien laisserait le client sur un jeton
 // que la base ne connaît plus, donc déconnecté à la requête suivante, et rouvrirait à l'identique la
 // fixation de session que la régénération doit fermer. Le compilateur le tient seul, sans test.
-func (m *Manager) Elevate(ctx context.Context, sessionID string) (string, bool, error) {
+func (m *Manager) Elevate(ctx context.Context, sessionID string, event store.Event) (string, bool,
+	error,
+) {
 	renewed, renewedHash, err := newSealedToken(m.secret)
 	if err != nil {
 		return "", false, err
 	}
 
-	elevated, err := m.sessions.Elevate(ctx, sessionID, renewedHash, IdleWindow)
+	elevated, err := m.sessions.Elevate(ctx, sessionID, renewedHash, IdleWindow, event)
 	if err != nil || !elevated {
 		return "", false, err
 	}

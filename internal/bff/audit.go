@@ -48,19 +48,17 @@ var auditExemptions = map[string]string{
 		"de lui faire écarter autre chose",
 }
 
-// audited écrit une ligne au journal si un journal est branché.
+// event pose l'adresse de l'appelant sur l'événement que le handler compose. L'écriture, elle, a lieu
+// dans la transaction de l'action, côté `store` : ou les deux, ou aucune. **Sauf pour `Logout`**, qui
+// passe encore par `Audit.Record` sur le pool — l'arbitrage est écrit sur le handler.
 //
 // **Seuls les succès sont journalisés.** Un refus est déjà compté par le verrou d'essais, et
 // journaliser les échecs de connexion ouvrirait une écriture par requête non authentifiée — ce que
 // `login_attempt_counters` existe précisément pour éviter d'exposer.
-//
-// L'erreur remonte : une action qui ne peut pas être tracée n'a pas eu lieu. C'est ce qui rend la
-// trace non contournable, et c'est aussi pourquoi les partitions du journal sont entretenues au
-// démarrage — sans elles, l'écriture échoue et l'action tombe avec.
-func (a API) audited(ctx context.Context, event store.Event) error {
+func (a API) event(ctx context.Context, event store.Event) store.Event {
 	if address, ok := clientAddressFrom(ctx); ok {
 		event.IPAddress = address
 	}
 
-	return a.Audit.Record(ctx, event)
+	return event
 }
