@@ -267,6 +267,13 @@ func (m *MFA) RecordFailure(ctx context.Context, operatorID string, window time.
 	return m.attempts.count(ctx, operatorID, window, threshold)
 }
 
+// Reserve réserve un essai de second facteur sur cet opérateur, avant tout déchiffrement et tout
+// hachage.
+func (m *MFA) Reserve(ctx context.Context, operatorID string, window time.Duration, threshold int,
+) (Lock, error) {
+	return m.attempts.reserve(ctx, operatorID, window, threshold)
+}
+
 // ClearFailures efface le compteur après un second facteur franchi.
 //
 // **Il n'y a pas ici la dissymétrie du premier facteur**, qui n'efface que le compteur d'adresse et

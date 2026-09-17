@@ -274,6 +274,81 @@ func TestDeuxChallengesNePeuventPasPorterLaMemeEmpreinte(t *testing.T) {
 	require.Error(t, err, "deux challenges partagent la même empreinte sans que la base s'en plaigne")
 }
 
+// TestTrenteReservationsSimultaneesNEnAdmettentQueCinq — le plafond ne vaut rien s'il ne tient que
+// pour des essais qui arrivent l'un après l'autre.
+//
+// Ce que ce test ferme : `lockFor` puis `count` sont deux instructions, et trente requêtes entrées
+// ensemble lisaient toutes « pas de verrou » avant qu'aucune n'ait compté.
+func TestTrenteReservationsSimultaneesNEnAdmettentQueCinq(t *testing.T) {
+	t.Parallel()
+
+	logins, _ := loginsOn(t)
+
+	const attempts = 30
+
+	var (
+		depart   sync.WaitGroup
+		termine  sync.WaitGroup
+		mutex    sync.Mutex
+		admitted int
+		refused  int
+	)
+
+	depart.Add(1)
+	termine.Add(attempts)
+
+	for range attempts {
+		go func() {
+			defer termine.Done()
+			depart.Wait()
+
+			lock, err := logins.Reserve(t.Context(), "concurrence@example.test", time.Minute, 5)
+
+			mutex.Lock()
+			defer mutex.Unlock()
+
+			switch {
+			case err != nil:
+				t.Error(err)
+			case lock.Locked():
+				refused++
+			default:
+				admitted++
+			}
+		}()
+	}
+
+	depart.Done()
+	termine.Wait()
+
+	assert.Equal(t, 5, admitted, "le plafond de cinq essais ne tient pas sous concurrence")
+	assert.Equal(t, attempts-5, refused)
+}
+
+// TestUnEssaiPendantLeVerrouNeRepoussePasLEcheance — sinon un attaquant qui s'acharne garde le compte
+// de sa victime verrouillé indéfiniment.
+func TestUnEssaiPendantLeVerrouNeRepoussePasLEcheance(t *testing.T) {
+	t.Parallel()
+
+	logins, _ := loginsOn(t)
+	const subject = "acharnement@example.test"
+
+	for range 5 {
+		_, err := logins.Reserve(t.Context(), subject, time.Minute, 5)
+		require.NoError(t, err)
+	}
+
+	locked, err := logins.Reserve(t.Context(), subject, time.Minute, 5)
+	require.NoError(t, err)
+	require.True(t, locked.Locked())
+
+	again, err := logins.Reserve(t.Context(), subject, time.Minute, 5)
+	require.NoError(t, err)
+
+	assert.LessOrEqual(t, again.Remaining, locked.Remaining,
+		"l'essai refusé a repoussé l'échéance : le verrou ne s'ouvrirait jamais")
+}
+
 // ageCounters recule l'horodatage de tous les compteurs, pour observer une échéance sans attendre.
 func ageCounters(t *testing.T, dsn string, by time.Duration) {
 	t.Helper()

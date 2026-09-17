@@ -191,6 +191,14 @@ func (l *Logins) RecordFailure(ctx context.Context, emailKey, sourceKey string, 
 	return strongest, nil
 }
 
+// Reserve réserve un essai sur l'adresse soumise, avant tout hachage. La dimension **source** n'est
+// pas réservée : elle ne compte que les échecs, sans quoi cinq connexions réussies depuis une même
+// IP verrouilleraient tout un bureau.
+func (l *Logins) Reserve(ctx context.Context, emailKey string, window time.Duration, threshold int,
+) (Lock, error) {
+	return l.emails.reserve(ctx, emailKey, window, threshold)
+}
+
 // ClearFailures efface le compteur de l'adresse après une connexion réussie.
 //
 // **Celui de la source n'est pas effacé**, et ce n'est pas un oubli : un attaquant qui possède un
