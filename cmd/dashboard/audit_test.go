@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/cucumber/godog"
@@ -21,6 +24,18 @@ func (w *auditWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^le journal porte (\d+) événement "([^"]+)"$`, w.journalHolds)
 	ctx.Then(`^l'événement porte l'adresse de l'appelant$`, w.eventCarriesTheAddress)
 	ctx.Then(`^le journal ne porte ni le secret ni les codes de récupération$`, w.journalHidesSecrets)
+	ctx.Given(`^les partitions du journal sont retirées$`, w.auditPartitionsRemoved)
+	ctx.When(`^l'opérateur remplace son application d'authentification$`,
+		w.mfa.replaceProvingTheCurrentCode)
+	ctx.When(`^l'opérateur retire sa clé d'accès$`, w.removeTheRegisteredPasskey)
+	ctx.Then(`^la requête est refusée$`, w.requestIsRefused)
+	ctx.Then(`^l'ancienne application d'authentification est toujours en place$`,
+		w.oldAuthenticatorStillWorks)
+	ctx.Then(`^l'opérateur ne détient aucune clé d'accès$`, func() error { return w.passkeysHeld(0) })
+	// Deux clés au décor, à cause de la garde du dernier facteur (§6.9) : en retirer une laisserait
+	// toujours en compter deux si le retrait n'a pas eu lieu, une seule si le journal manquant ne l'a
+	// pas empêché.
+	ctx.Then(`^l'opérateur détient toujours sa clé d'accès$`, func() error { return w.passkeysHeld(2) })
 }
 
 func (w *auditWorld) connect(ctx context.Context) (*pgx.Conn, error) {
@@ -114,6 +129,148 @@ func (w *auditWorld) journalHidesSecrets(ctx context.Context) error {
 		if strings.Contains(journal, code) {
 			return fmt.Errorf("un code de récupération est dans le journal d'audit")
 		}
+	}
+
+	return nil
+}
+
+// auditPartitionsRemoved place la base dans l'état du mois où plus personne ne renouvelle les
+// partitions : toute écriture au journal échoue. C'est la seule façon d'observer, de bout en bout,
+// qu'une action refuse d'aboutir sans sa trace.
+//
+// Le SQL est celui de `internal/store/audit_partitions_test.go`, recopié parce que ce helper-là est
+// privé à son paquet de test : l'exporter du produit pour un décor ferait entrer le harnais dans le
+// livré.
+func (w *auditWorld) auditPartitionsRemoved(ctx context.Context) error {
+	conn, err := w.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	const partitions = `
+		SELECT child.relname
+		FROM pg_inherits
+		JOIN pg_class AS parent ON parent.oid = pg_inherits.inhparent
+		JOIN pg_class AS child ON child.oid = pg_inherits.inhrelid
+		WHERE parent.relname = 'audit_log'`
+
+	rows, err := conn.Query(ctx, partitions)
+	if err != nil {
+		return fmt.Errorf("lister les partitions du journal : %w", err)
+	}
+
+	var names []string
+
+	for rows.Next() {
+		var name string
+		if err = rows.Scan(&name); err != nil {
+			rows.Close()
+
+			return fmt.Errorf("lire le nom d'une partition : %w", err)
+		}
+
+		names = append(names, name)
+	}
+
+	rows.Close()
+
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("parcourir les partitions du journal : %w", err)
+	}
+
+	if len(names) == 0 {
+		return errors.New("aucune partition à retirer : le décor n'exercerait rien")
+	}
+
+	for _, name := range names {
+		// Le nom vient du catalogue de cette base, jamais d'une donnée reçue.
+		if _, err = conn.Exec(ctx, "DROP TABLE "+name); err != nil {
+			return fmt.Errorf("retirer la partition %s : %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+// requestIsRefused observe ce que le navigateur reçoit quand l'audit ne peut pas s'écrire : `audited`
+// remonte l'erreur, et le contrat n'a qu'une réponse pour une erreur qui remonte ainsi — 500
+// `internal_error`, la même que toute panne côté serveur.
+func (w *auditWorld) requestIsRefused() error {
+	if status := w.login.process.received.status; status != http.StatusInternalServerError {
+		return fmt.Errorf("la requête a répondu %d et non 500 : l'action semble avoir eu lieu malgré "+
+			"la trace manquante", status)
+	}
+
+	return nil
+}
+
+// oldAuthenticatorStillWorks présente, sur le second facteur, le code que l'ancienne application
+// produirait encore. Un remplacement qui aurait abouti malgré le refus de la requête l'aurait déjà
+// détruit : la vérification y répondrait 401, comme pour n'importe quel code faux.
+func (w *auditWorld) oldAuthenticatorStillWorks(ctx context.Context) error {
+	if w.mfa.enrolled.Secret == "" {
+		return errors.New("aucun enrôlement : le scénario n'a pas d'ancien secret à présenter")
+	}
+
+	code, err := w.mfa.codeAtOffset(ctx, 0)
+	if err != nil {
+		return err
+	}
+
+	if err = w.mfa.verify("totp", code); err != nil {
+		return err
+	}
+
+	if w.login.process.received.status == http.StatusUnauthorized {
+		return errors.New("le code de l'ancienne application est refusé : l'authentificateur en " +
+			"place n'est plus le sien")
+	}
+
+	return nil
+}
+
+// removeTheRegisteredPasskey retire la clé d'accès du compte, désignée par son identifiant en base :
+// c'est par lui que la route la retrouve, jamais par celui que l'authentificateur s'est choisi.
+func (w *auditWorld) removeTheRegisteredPasskey(ctx context.Context) error {
+	conn, err := w.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var id string
+
+	err = conn.QueryRow(ctx, `SELECT id FROM webauthn_credentials LIMIT 1`).Scan(&id)
+	if err != nil {
+		return fmt.Errorf("lire la clé d'accès enregistrée : %w", err)
+	}
+
+	return w.login.process.remove("/api/auth/mfa/webauthn/passkeys/" + id)
+}
+
+// passkeysHeld relit `/auth/me`, seul endroit d'où le client apprend ce qu'il détient.
+func (w *auditWorld) passkeysHeld(expected int) error {
+	if err := w.login.process.fetch("/api/auth/me"); err != nil {
+		return err
+	}
+
+	if w.login.process.received.status != http.StatusOK {
+		return fmt.Errorf("/auth/me a répondu %d : ce pas ne peut rien affirmer du compte",
+			w.login.process.received.status)
+	}
+
+	var decoded me
+
+	if err := json.Unmarshal([]byte(w.login.process.received.body), &decoded); err != nil {
+		return fmt.Errorf("relire le corps de /auth/me : %w", err)
+	}
+
+	if decoded.SecondFactors.Passkeys != expected {
+		return fmt.Errorf("l'opérateur détient %d clé(s) d'accès pour %d attendue(s)",
+			decoded.SecondFactors.Passkeys, expected)
 	}
 
 	return nil
