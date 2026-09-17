@@ -161,6 +161,18 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 429
     Et le second facteur n'est pas encore vérifié
 
+  # Même défaut qu'au premier facteur, en pire : un échec ne consomme pas le challenge, donc qui
+  # détient le mot de passe rejoue le même trente fois d'un coup et essaie trente codes pour un
+  # plafond de cinq.
+  Scénario: trente vérifications simultanées ne consomment que cinq essais
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand trente vérifications simultanées présentent un mauvais code
+    Alors 4 réponses refusent le second facteur
+    Et 26 réponses annoncent le verrou
+    Et 5 essais seulement ont été consommés
+
   # Le verrou porte sur l'opérateur et pas sur la connexion : se reconnecter ne le lève pas. Sans quoi
   # il ne bornerait rien — c'est exactement le trou que le compteur du premier facteur laissait.
   Scénario: se reconnecter ne lève pas le verrou du second facteur

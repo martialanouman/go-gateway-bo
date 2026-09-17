@@ -189,6 +189,15 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.When(`^l'opérateur se connecte avec un mauvais mot de passe$`, login.signInWithAWrongPassword)
 	ctx.When(`^quelqu'un se connecte avec une adresse qui n'existe pas$`, login.signInWithAnUnknownAddress)
 	ctx.When(`^le verrou arrive à échéance$`, login.lockExpires)
+	ctx.When(`^trente connexions simultanées présentent un mauvais mot de passe$`,
+		login.burstOfWrongPasswords)
+	ctx.When(`^trente vérifications simultanées présentent un mauvais code$`, login.burstOfWrongCodes)
+	ctx.Then(`^(\d+) réponses refusent les identifiants$`,
+		login.answersCounting(401, "invalid_credentials"))
+	ctx.Then(`^(\d+) réponses refusent le second facteur$`,
+		login.answersCounting(401, "invalid_second_factor"))
+	ctx.Then(`^(\d+) réponses annoncent le verrou$`, login.answersCounting(429, "too_many_attempts"))
+	ctx.Then(`^(\d+) essais seulement ont été consommés$`, login.attemptsConsumed)
 	ctx.When(`^le navigateur envoie un corps qui n'est pas du JSON à la connexion$`, login.postMalformedBody)
 	ctx.Then(`^un challenge est émis avec son échéance$`, login.challengeIsIssued)
 	ctx.Then(`^le navigateur reçoit un cookie de session$`, p.receivedASessionCookie)
