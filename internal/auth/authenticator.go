@@ -101,6 +101,17 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 	emailKey := normalizeEmail(email)
 	sourceKey := SourceKey(a.salt, clientAddress)
 
+	// Le verrou de la source se lit d'abord, et en lecture seule : une source déjà verrouillée ne doit
+	// pas consommer le quota de l'adresse qu'elle vise.
+	source, err := a.logins.SourceLock(ctx, sourceKey, LockWindow, MaxFailures)
+	if err != nil {
+		return Verdict{}, err
+	}
+
+	if source.Locked() {
+		return Verdict{Outcome: OutcomeLocked, RetryAfter: source.Remaining}, nil
+	}
+
 	lock, err := a.logins.Reserve(ctx, emailKey, LockWindow, MaxFailures)
 	if err != nil {
 		return Verdict{}, err
@@ -151,13 +162,12 @@ func (a *Authenticator) passwordMatches(operator *store.Operator, password strin
 // puisque la réservation vient de poser `last_failure_at` à `now()`. La charte l'exige : un contrôle
 // qui refuse dit ce qu'il refuse et jusqu'à quand.
 //
-// **Le verrou de la source n'est pas relu ici.** Sous une rafale sur une seule adresse, son compteur
+// **Le verrou de la source n'est pas relu ici**, il l'a été à l'entrée. Sous une rafale sur une seule adresse, son compteur
 // avance au même rythme que la réservation, mais à un instant différent — après le hachage, pas
 // avant — donc dans un ordre qui peut diverger de celui des réservations. Le relire annoncerait
-// parfois le verrou depuis une requête différente de la cinquième réservation. Résidu connu et
-// assumé, de la même famille que le pré-contrôle de la source retiré avec `LockFor` : une rafale
-// visant plusieurs adresses depuis une même source paie encore son hachage jusqu'à épuiser son
-// propre compteur.
+// parfois le verrou depuis une requête différente de la cinquième réservation. Le pré-contrôle d'entrée
+// arrête la rafale suivante, pas celle en cours : une source qui vise plusieurs adresses paie donc
+// son hachage jusqu'à épuiser son compteur, puis se voit refusée sans hacher.
 func (a *Authenticator) refuse(ctx context.Context, sourceKey string, reserved store.Lock) (Verdict,
 	error,
 ) {

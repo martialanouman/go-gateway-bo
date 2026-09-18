@@ -47,6 +47,16 @@ Fonctionnalité: Le premier facteur, et la porte qui le limite
     Et la réponse porte l'en-tête "Retry-After"
     Et le message annonce la durée restante
 
+  # La seconde dimension, celle de la source : elle n'est pas réservée — la réserver verrouillerait un
+  # bureau entier derrière une IP partagée — mais elle est lue avant tout hachage. Sans cette lecture,
+  # une source épuisée continue d'être servie sur chaque nouvelle adresse qu'elle essaie.
+  Scénario: une source épuisée est refusée même sur une adresse qu'elle n'a pas encore essayée
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Quand l'opérateur se connecte 5 fois avec un mauvais mot de passe
+    Et quelqu'un se connecte avec une adresse qui n'existe pas
+    Alors le serveur répond 429
+
   # Le plafond de cinq ne vaut que si les essais arrivent l'un après l'autre : lu puis compté, il
   # laisse passer autant de vérifications que la rafale envoie de requêtes.
   #

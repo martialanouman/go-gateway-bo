@@ -202,6 +202,18 @@ func (l *Logins) Reserve(ctx context.Context, emailKey string, window time.Durat
 	return l.emails.reserve(ctx, emailKey, window, threshold)
 }
 
+// SourceLock rend le verrou qui pèse sur une source, en lecture seule et **avant** tout hachage.
+//
+// La source n'est pas réservée — la réservation verrouillerait un bureau derrière une IP partagée —
+// donc elle se lit, puis se compte sur le chemin d'échec. Deux rafales entrées ensemble peuvent
+// franchir ce contrôle, et c'est assumé : ce que la source borne est le balayage de plusieurs
+// adresses, pas la rafale sur une seule, que la réservation de l'adresse arrête.
+func (l *Logins) SourceLock(ctx context.Context, sourceKey string, window time.Duration,
+	threshold int,
+) (Lock, error) {
+	return l.sources.lockFor(ctx, sourceKey, window, threshold)
+}
+
 // RecordSourceFailure compte un échec sur la seule dimension de la source. L'adresse ne s'y ajoute
 // plus depuis que `Login` la réserve avant de hacher (`Reserve`) : l'y recompter au refus doublerait
 // son incrément, et diviserait son plafond par deux — c'est `RecordFailure`, gardé pour son propre
