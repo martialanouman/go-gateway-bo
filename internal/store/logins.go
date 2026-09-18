@@ -18,19 +18,22 @@ import (
 // le site d'appel que `NewPool` annonce depuis step-005.
 type Logins struct {
 	pool *pgxpool.Pool
-	// emails est le compteur de la dimension de l'adresse, et il n'en sert qu'un geste : l'effacement
-	// d'un succès. Les deux autres accès de ce fichier couvrent **deux** dimensions en une
-	// instruction, ce que `Counter` ne sait pas faire et n'a pas à apprendre.
-	//
-	// **Le risque résiduel est nommé plutôt que tu** : lui faire porter `lockFor` ou `count`
-	// retirerait la dimension de la source du chemin, sans erreur et sans test rouge — aucun cas de
-	// `logins_test.go` n'y passe. Ce qui le borne est que les méthodes de `Counter` sont **privées** :
-	// hors de ce paquet, personne ne peut l'écrire.
-	emails *Counter
+	// emails porte la réservation de l'adresse (`Reserve`) et son effacement (`ClearFailures`).
+	// sources porte le seul geste que la source connaisse : compter un échec, jamais réserver — la
+	// réserver verrouillerait tout un bureau derrière une IP partagée dès qu'un seul poste y multiplie
+	// les essais. `LockFor` et `RecordFailure` ci-dessous couvrent encore les **deux** dimensions en
+	// une instruction pour le verrou consulté avant hachage ; `sources` sert le seul cas où compter
+	// l'adresse une seconde fois diviserait son plafond par deux : le refus de `Authenticator.refuse`.
+	emails  *Counter
+	sources *Counter
 }
 
 func NewLogins(pool *pgxpool.Pool) *Logins {
-	return &Logins{pool: pool, emails: NewCounter(pool, ScopeEmail)}
+	return &Logins{
+		pool:    pool,
+		emails:  NewCounter(pool, ScopeEmail),
+		sources: NewCounter(pool, ScopeSource),
+	}
 }
 
 // Operator est ce que le premier facteur a besoin de savoir, et rien de plus. Ni le secret TOTP, ni
@@ -197,6 +200,16 @@ func (l *Logins) RecordFailure(ctx context.Context, emailKey, sourceKey string, 
 func (l *Logins) Reserve(ctx context.Context, emailKey string, window time.Duration, threshold int,
 ) (Lock, error) {
 	return l.emails.reserve(ctx, emailKey, window, threshold)
+}
+
+// RecordSourceFailure compte un échec sur la seule dimension de la source. L'adresse ne s'y ajoute
+// plus depuis que `Login` la réserve avant de hacher (`Reserve`) : l'y recompter au refus doublerait
+// son incrément, et diviserait son plafond par deux — c'est `RecordFailure`, gardé pour son propre
+// test, qui portait encore ce défaut.
+func (l *Logins) RecordSourceFailure(ctx context.Context, sourceKey string, window time.Duration,
+	threshold int,
+) (Lock, error) {
+	return l.sources.count(ctx, sourceKey, window, threshold)
 }
 
 // ClearFailures efface le compteur de l'adresse après une connexion réussie.

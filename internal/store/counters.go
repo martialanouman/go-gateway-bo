@@ -140,11 +140,11 @@ func (c *Counter) reset(ctx context.Context, subject string) error {
 // fermé indéfiniment — c'est ce que l'ordre inverse protégeait, et qu'il fallait reprendre en
 // passant au compte-d'abord.
 //
-// **Le plafond se lit `>` et non `>=`** : sous trente essais entrés ensemble, `>=` fige `failures` à
-// `threshold` dès le seuil atteint, et l'essai qui l'atteint légitimement devient indiscernable de
-// ceux qu'il faut refuser ensuite — les deux rendent la même valeur. `>` laisse le premier refusé
-// grimper d'un cran, une fois, ce qui sépare les deux groupes ; `>= threshold+1` ensuite le fige à son
-// tour. Mesuré : sans ce cran, `TestTrenteReservationsSimultaneesNEnAdmettentQueCinq` admet les trente.
+// **Le plafond se lit `>=`, et c'est `admitted` qui tranche, pas `failures` seul.** Sous trente
+// essais entrés ensemble, geler `failures` à `threshold` rend le cinquième essai — celui qui atteint
+// légitimement le seuil — indiscernable des vingt-cinq qu'il faut refuser après lui : les deux
+// rendraient la même valeur de `failures`. `admitted` sépare les deux : vrai seulement quand **cet**
+// appel vient d'écrire `last_failure_at`, jamais quand il relit l'ancienne valeur d'un refusé.
 func (c *Counter) reserve(ctx context.Context, subject string, window time.Duration, threshold int,
 ) (Lock, error) {
 	const query = `
@@ -153,7 +153,7 @@ func (c *Counter) reserve(ctx context.Context, subject string, window time.Durat
 		ON CONFLICT (scope, subject) DO UPDATE
 		SET failures = CASE
 		        WHEN c.last_failure_at + make_interval(secs => $2) <= now() THEN 1
-		        WHEN c.failures > $4 THEN c.failures
+		        WHEN c.failures >= $4 THEN c.failures
 		        ELSE c.failures + 1
 		    END,
 		    last_failure_at = CASE
@@ -162,18 +162,34 @@ func (c *Counter) reserve(ctx context.Context, subject string, window time.Durat
 		        ELSE now()
 		    END
 		RETURNING scope, failures,
-		          EXTRACT(EPOCH FROM (last_failure_at + make_interval(secs => $2) - now()))`
+		          EXTRACT(EPOCH FROM (last_failure_at + make_interval(secs => $2) - now())),
+		          (last_failure_at = now()) AS admitted`
 
-	lock, err := scanLock(c.pool.QueryRow(ctx, query, subject, window.Seconds(), c.scope, threshold))
-	if err != nil {
+	var (
+		lock     Lock
+		seconds  float64
+		admitted bool
+	)
+
+	row := c.pool.QueryRow(ctx, query, subject, window.Seconds(), c.scope, threshold)
+	if err := row.Scan(&lock.Scope, &lock.Failures, &seconds, &admitted); err != nil {
 		return Lock{}, fmt.Errorf("réserver un essai sur la dimension %s : %w", c.scope, err)
 	}
 
-	if lock.Failures <= threshold {
+	lock.Remaining = time.Duration(seconds * float64(time.Second))
+
+	if !admitted {
+		return lock, nil
+	}
+
+	if lock.Failures < threshold {
 		return Lock{}, nil
 	}
 
-	return lock, nil
+	// Admis, à hauteur du seuil : l'appelant vérifie encore cet essai, et n'annonce le verrou que si
+	// la vérification échoue. `Remaining` n'est pas repris ici — il vaudrait la fenêtre entière,
+	// puisque `last_failure_at` vient d'être posé à `now()`, et ferait croire à un verrou déjà posé.
+	return Lock{Scope: lock.Scope, Failures: lock.Failures}, nil
 }
 
 // Admit réserve l'appel — voir `reserve`, dont c'est la seule rédaction — et rend le verrou qui pèse :

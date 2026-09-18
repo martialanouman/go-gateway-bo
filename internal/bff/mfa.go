@@ -107,18 +107,18 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 			return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
 		}
 
-		// **Le verrou d'essais de second facteur, consulté ici comme il l'est par la vérification.**
-		// Sans lui, ce chemin ouvrait un second seau de cinq essais, indépendant du premier : qui
+		// **La réservation d'essai de second facteur, prise ici comme elle l'est par la vérification.**
+		// Sans elle, ce chemin ouvrait un second seau de cinq essais, indépendant du premier : qui
 		// détient le mot de passe disposait de dix devinettes par quart d'heure au lieu de cinq, la
 		// moitié par une route que la migration 00007 n'avait pas vue. Le compteur d'appels de 00009
 		// bornait le nombre de requêtes, pas le budget de recherche.
 		//
-		// **Consulter et compter sont deux gardes distinctes, et l'une masque l'autre sur un code
-		// faux** — les deux rendent alors le même 429, et la mutation qui retire cette consultation
+		// **Réserver et compter sont deux gardes distinctes, et l'une masque l'autre sur un code
+		// faux** — les deux rendent alors le même 429, et la mutation qui retire cette réservation
 		// reste verte. Mesuré. Ce qu'elle tient seule se voit sur un code **juste** : sans elle, un
 		// compte verrouillé remplacerait son authentificateur, c'est-à-dire que le verrou échouerait à
 		// empêcher le succès qu'il existe pour empêcher. C'est ce scénario-là qui la garde.
-		lock, err := a.SecondFactor.Lock(ctx, resolved.OperatorID)
+		lock, err := a.SecondFactor.Reserve(ctx, resolved.OperatorID)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +134,7 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		}
 
 		if !replace {
-			return a.refuseReplacement(ctx, resolved.OperatorID)
+			return refuseReplacement(lock), nil
 		}
 	}
 
@@ -171,16 +171,18 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 // **L'ordre des gestes est la garde**, et chacun a sa raison d'être là :
 //
 //  1. la session vivante, qui dit de qui il s'agit ;
-//  2. **le verrou d'essais de l'opérateur, avant toute dépense** — c'est ce qui borne la recherche
-//     exhaustive, et le consulter après aurait fait payer au serveur le déchiffrement et les argon2id
-//     de chaque essai qu'il refuse ;
+//  2. **la réservation de l'essai, avant toute dépense** — c'est ce qui borne la recherche exhaustive
+//     y compris sous une rafale, et la réserver après aurait fait payer au serveur le déchiffrement et
+//     les argon2id de chaque essai qu'il refuse, en plus de laisser une rafale entrée ensemble lire
+//     toutes « pas de verrou » avant qu'aucune n'ait compté ;
 //  3. le challenge vivant **et le sien** — sans cette seconde moitié, le challenge d'un opérateur
 //     élèverait la session d'un autre ;
 //  4. le code, dont la vérification consomme déjà ce qu'elle valide — le pas de temps ou la ligne du
-//     code de récupération, dans les deux cas par un `WHERE` qui tranche le rejeu ;
-//  5. l'échec compté sur l'opérateur, ce qui borne ce que toutes ses connexions peuvent servir ;
-//  6. le challenge consommé, une seule fois ;
-//  7. la session élevée, jeton régénéré, et le compteur effacé.
+//     code de récupération, dans les deux cas par un `WHERE` qui tranche le rejeu ; un échec ne
+//     recompte rien — l'essai est déjà porté par la réservation du pas 2, et le recompter diviserait
+//     le plafond par deux ;
+//  5. le challenge consommé, une seule fois ;
+//  6. la session élevée, jeton régénéré, et le compteur effacé.
 //
 // **Tous les refus rendent le même 401**, sauf le verrou : un code faux ou déjà servi, un challenge
 // inconnu, échu, consommé ou appartenant à un autre, l'absence de session et sa mort en cours
@@ -224,7 +226,7 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 		return VerifyMfa401JSONResponse(refusedSecondFactor()), nil
 	}
 
-	lock, err := a.SecondFactor.Lock(ctx, resolved.OperatorID)
+	lock, err := a.SecondFactor.Reserve(ctx, resolved.OperatorID)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +250,7 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 	}
 
 	if !verified {
-		return a.refuseSecondFactor(ctx, resolved.OperatorID)
+		return refuseSecondFactor(lock), nil
 	}
 
 	consumed, err := a.SecondFactor.ConsumeChallenge(ctx, challenge.ID)
@@ -289,34 +291,19 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 	return VerifyMfa204Response{}, nil
 }
 
-// refuseSecondFactor compte l'essai raté et refuse.
+// refuseSecondFactor refuse. L'essai est déjà compté — par la réservation prise avant la vérification,
+// au pas 2 de `VerifyMfa` — et le recompter ici diviserait le plafond par deux.
 //
-// Le challenge n'est **pas** consommé : une faute de frappe ne doit pas obliger à refaire toute la
-// connexion. Elle coûte en revanche un essai à l'opérateur, et c'est ce qui borne la recherche
-// exhaustive.
-//
-// **Il n'y a qu'un compteur, et c'est délibéré.** Une première rédaction en portait deux — un par
-// challenge, un par opérateur — au même seuil de cinq. Celui de l'opérateur compte à travers toutes
-// les connexions, donc il mord toujours le premier : celui du challenge n'était plus observable, ni
-// par un test ni par une mutation. Deux gardes dont l'une masque l'autre valent une garde et une
-// illusion.
-//
-// L'échec qui **franchit** le seuil annonce le verrou tout de suite, plutôt que de rendre un refus nu
-// et de surprendre à l'essai suivant : la charte exige qu'un contrôle qui refuse dise jusqu'à quand.
-// Même forme qu'au premier facteur.
-func (a API) refuseSecondFactor(ctx context.Context, operatorID string) (VerifyMfaResponseObject,
-	error,
-) {
-	lock, err := a.SecondFactor.Fail(ctx, operatorID)
-	if err != nil {
-		return nil, err
+// **`lock.Failures` à hauteur du seuil annonce le verrou tout de suite** : la réservation qui vient de
+// l'atteindre n'était pas encore verrouillée — l'appelant a dû vérifier ce dernier essai — et c'est cet
+// échec-ci qui pose le verrou, pour la fenêtre entière puisque `last_failure_at` vient d'être posé à
+// `now()`.
+func refuseSecondFactor(lock store.Lock) VerifyMfaResponseObject {
+	if lock.Failures >= mfa.MaxFailures {
+		return tooManySecondFactorAttempts(mfa.LockWindow)
 	}
 
-	if lock.Locked() {
-		return tooManySecondFactorAttempts(lock.Remaining), nil
-	}
-
-	return VerifyMfa401JSONResponse(refusedSecondFactor()), nil
+	return VerifyMfa401JSONResponse(refusedSecondFactor())
 }
 
 // tooManySecondFactorAttempts annonce le verrou **et sa durée**. Les deux durées — l'en-tête et la
@@ -356,24 +343,15 @@ func secondFactorLocked(seconds int) Error {
 	}
 }
 
-// refuseReplacement compte l'essai raté **dans le seau du second facteur**, et annonce le verrou à
-// l'essai qui le franchit plutôt que de surprendre au suivant — même forme que `refuseSecondFactor`.
-//
-// Le succès, lui, n'efface rien, contrairement à la vérification : ce qui reste au compteur s'éteint
-// de lui-même en un quart d'heure, et le remplacement détruit déjà le facteur qu'il vient de prouver.
-func (a API) refuseReplacement(ctx context.Context, operatorID string) (EnrollTotpResponseObject,
-	error,
-) {
-	lock, err := a.SecondFactor.Fail(ctx, operatorID)
-	if err != nil {
-		return nil, err
+// refuseReplacement refuse le remplacement. Même forme que `refuseSecondFactor` : l'essai est déjà
+// compté par la réservation prise plus haut dans `EnrollTotp`, et c'est elle qui annonce le verrou
+// quand elle vient d'atteindre le seuil.
+func refuseReplacement(lock store.Lock) EnrollTotpResponseObject {
+	if lock.Failures >= mfa.MaxFailures {
+		return enrollmentLockedBySecondFactor(mfa.LockWindow)
 	}
 
-	if lock.Locked() {
-		return enrollmentLockedBySecondFactor(lock.Remaining), nil
-	}
-
-	return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
+	return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled())
 }
 
 // tooManyEnrollments annonce le verrou d'enrôlement et sa durée. Même construction que les deux
