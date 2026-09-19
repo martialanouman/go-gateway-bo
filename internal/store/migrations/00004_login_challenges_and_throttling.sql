@@ -70,9 +70,11 @@ CREATE TABLE login_attempt_counters (
 );
 
 -- La clé primaire sert le chemin de lecture ; cet index-ci servira la purge des lignes oisives
--- (step-187). Ce qui borne réellement la croissance de la table n'est pas un index mais **l'ordre du
--- handler** : le verrou est consulté avant qu'un échec ne soit enregistré, donc une source ne peut
--- pas créer plus de lignes que son seuil par durée de verrou.
+-- (step-187). Ce qui borne la croissance de la table est le **plafond d'essais par fenêtre**, tenu
+-- par la réservation atomique de `Counter.reserve` (step-034) : une ligne par sujet, et son compteur
+-- se fige au seuil. L'affirmation d'origine invoquait l'ordre du handler — lire le verrou puis
+-- enregistrer l'échec —, et elle était fausse sous concurrence : des requêtes entrées ensemble
+-- lisaient toutes un verrou absent.
 CREATE INDEX login_attempt_counters_last_failure_at_idx ON login_attempt_counters (last_failure_at);
 
 -- +goose Down
