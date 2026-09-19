@@ -81,21 +81,38 @@ func NewAuthenticator(logins *store.Logins, bruteForceSalt []byte) *Authenticato
 //
 // **L'ordre des quatre gestes est la garde elle-même**, et chacun a sa raison d'être là :
 //
-//  1. lire les verrous **avant** de hacher — sinon une attaque verrouillée coûterait quand même ses
-//     64 MiB et ses dizaines de millisecondes par tentative, et le verrou ne protégerait que le
-//     compte, pas le serveur ;
+//  1. réserver l'essai sur l'adresse **avant** de hacher — l'incrément et la décision sont le même
+//     geste, sinon une rafale entrée ensemble lirait toutes « pas de verrou » avant qu'aucune n'ait
+//     compté, et vérifierait toutes leur mot de passe ;
 //  2. chercher l'opérateur, et faire payer le hachage **même s'il n'existe pas** ;
-//  3. sur échec, compter les deux dimensions et refuser ;
+//  3. sur échec, compter la source et refuser — l'adresse est déjà comptée par la réservation du
+//     pas 1, et la recompter ici diviserait son plafond par deux ;
 //  4. sur succès, effacer le compteur d'adresse et émettre le challenge.
 //
 // Les compteurs sont clés sur l'adresse **soumise**, existante ou non. Les clé sur l'opérateur trouvé
 // ferait qu'une adresse inconnue ne se verrouille jamais — et « celle-ci ne verrouille pas » est
 // exactement le signal que le hachage factice vient de fermer par ailleurs.
+//
+// **La réservation ne porte que sur l'adresse, jamais sur la source.** La source ne fait que compter
+// ses échecs, au pas 3 : la réserver aussi verrouillerait tout un bureau derrière une IP partagée dès
+// qu'un seul poste y multiplie les essais, alors que réserver l'adresse ne pèse que sur qui tape ce
+// compte précis.
 func (a *Authenticator) Login(ctx context.Context, email, password, clientAddress string) (Verdict, error) {
 	emailKey := normalizeEmail(email)
 	sourceKey := SourceKey(a.salt, clientAddress)
 
-	lock, err := a.logins.LockFor(ctx, emailKey, sourceKey, LockWindow, MaxFailures)
+	// Le verrou de la source se lit d'abord, et en lecture seule : une source déjà verrouillée ne doit
+	// pas consommer le quota de l'adresse qu'elle vise.
+	source, err := a.logins.SourceLock(ctx, sourceKey, LockWindow, MaxFailures)
+	if err != nil {
+		return Verdict{}, err
+	}
+
+	if source.Locked() {
+		return Verdict{Outcome: OutcomeLocked, RetryAfter: source.Remaining}, nil
+	}
+
+	lock, err := a.logins.Reserve(ctx, emailKey, LockWindow, MaxFailures)
 	if err != nil {
 		return Verdict{}, err
 	}
@@ -109,8 +126,13 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 		return Verdict{}, err
 	}
 
-	if !a.passwordMatches(operator, password) {
-		return a.refuse(ctx, emailKey, sourceKey)
+	matches, err := a.passwordMatches(ctx, operator, password)
+	if err != nil {
+		return Verdict{}, err
+	}
+
+	if !matches {
+		return a.refuse(ctx, sourceKey, lock)
 	}
 
 	return a.challenge(ctx, emailKey, operator.ID)
@@ -128,29 +150,45 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 // abîmée, mais le dire au navigateur distinguerait ce compte des autres. L'erreur est écartée ici et
 // c'est un manque assumé — aucun journal n'atteint encore ce paquet (voir `internal/bff/router.go`),
 // donc une ligne corrompue est silencieuse. Le premier journal du BFF devra la remonter.
-func (a *Authenticator) passwordMatches(operator *store.Operator, password string) bool {
+//
+// **`ErrOverloaded` seul remonte.** Il ne dit rien d'un compte : les dix places de `Hold` manquaient,
+// et `internal/bff` le sert en 503, jamais en 401 — le confondre avec un hachage illisible ferait
+// annoncer un refus d'identifiants à une machine qui n'a encore rien vérifié.
+func (a *Authenticator) passwordMatches(ctx context.Context, operator *store.Operator, password string) (
+	bool, error,
+) {
 	if operator == nil {
-		VerifyDummy(password)
-
-		return false
+		return false, VerifyDummy(ctx, password)
 	}
 
-	ok, err := Verify(operator.PasswordHash, password)
+	ok, err := Verify(ctx, operator.PasswordHash, password)
+	if errors.Is(err, ErrOverloaded) {
+		return false, err
+	}
 
-	return err == nil && ok && operator.Status == store.StatusActive
+	return ok && operator.Status == store.StatusActive, nil
 }
 
-func (a *Authenticator) refuse(ctx context.Context, emailKey, sourceKey string) (Verdict, error) {
-	lock, err := a.logins.RecordFailure(ctx, emailKey, sourceKey, LockWindow, MaxFailures)
-	if err != nil {
+// refuse compte l'échec sur la source, et refuse. `reserved` est le verrou rendu par la réservation
+// du pas 1 : c'est elle seule qui annonce le verrou, à hauteur du seuil, pour la fenêtre entière
+// puisque la réservation vient de poser `last_failure_at` à `now()`. La charte l'exige : un contrôle
+// qui refuse dit ce qu'il refuse et jusqu'à quand.
+//
+// **Le verrou de la source n'est pas relu ici**, il l'a été à l'entrée. Sous une rafale sur une seule adresse, son compteur
+// avance au même rythme que la réservation, mais à un instant différent — après le hachage, pas
+// avant — donc dans un ordre qui peut diverger de celui des réservations. Le relire annoncerait
+// parfois le verrou depuis une requête différente de la cinquième réservation. Le pré-contrôle d'entrée
+// arrête la rafale suivante, pas celle en cours : une source qui vise plusieurs adresses paie donc
+// son hachage jusqu'à épuiser son compteur, puis se voit refusée sans hacher.
+func (a *Authenticator) refuse(ctx context.Context, sourceKey string, reserved store.Lock) (Verdict,
+	error,
+) {
+	if _, err := a.logins.RecordSourceFailure(ctx, sourceKey, LockWindow, MaxFailures); err != nil {
 		return Verdict{}, err
 	}
 
-	// L'échec qui **franchit** le seuil annonce le verrou tout de suite, plutôt que de rendre un refus
-	// nu et de surprendre à la tentative suivante. La charte l'exige : un contrôle qui refuse dit ce
-	// qu'il refuse et jusqu'à quand.
-	if lock.Locked() {
-		return Verdict{Outcome: OutcomeLocked, RetryAfter: lock.Remaining}, nil
+	if reserved.Failures >= MaxFailures {
+		return Verdict{Outcome: OutcomeLocked, RetryAfter: LockWindow}, nil
 	}
 
 	return Verdict{Outcome: OutcomeRefused}, nil

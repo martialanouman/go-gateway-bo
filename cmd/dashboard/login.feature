@@ -47,6 +47,31 @@ Fonctionnalité: Le premier facteur, et la porte qui le limite
     Et la réponse porte l'en-tête "Retry-After"
     Et le message annonce la durée restante
 
+  # La seconde dimension, celle de la source : elle n'est pas réservée — la réserver verrouillerait un
+  # bureau entier derrière une IP partagée — mais elle est lue avant tout hachage. Sans cette lecture,
+  # une source épuisée continue d'être servie sur chaque nouvelle adresse qu'elle essaie.
+  Scénario: une source épuisée est refusée même sur une adresse qu'elle n'a pas encore essayée
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Quand l'opérateur se connecte 5 fois avec un mauvais mot de passe
+    Et quelqu'un se connecte avec une adresse qui n'existe pas
+    Alors le serveur répond 429
+
+  # Le plafond de cinq ne vaut que si les essais arrivent l'un après l'autre : lu puis compté, il
+  # laisse passer autant de vérifications que la rafale envoie de requêtes.
+  #
+  # Le dernier pas lit le compteur et non les réponses, et ce n'est pas un détour : un essai vérifié
+  # puis refusé parce qu'il dépasse le seuil rend le **même** 429 que celui qu'on arrête à la porte,
+  # le hachage étant déjà payé. La répartition 4/26 vaut donc des deux côtés du correctif — c'est ce
+  # que le compteur sépare. Rien n'est mesuré en temps.
+  Scénario: trente connexions simultanées ne consomment que cinq essais
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Quand trente connexions simultanées présentent un mauvais mot de passe
+    Alors 4 réponses refusent les identifiants
+    Et 26 réponses annoncent le verrou
+    Et 5 essais seulement ont été consommés
+
   Scénario: le verrou tient même quand le mot de passe est le bon
     Étant donné une installation avec un opérateur
     Et un serveur démarré

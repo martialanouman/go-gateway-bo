@@ -1,6 +1,7 @@
 package mfa
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"strings"
@@ -117,16 +118,25 @@ func NormalizeRecoveryCode(presented string) string {
 // qu'un oubli : aucun journal n'atteint encore ce paquet, comme dans `auth.passwordMatches`. Une
 // ligne abîmée est donc silencieuse, et son symptôme est un code de récupération légitime qui échoue.
 // Le premier journal du BFF devra la remonter.
-func MatchRecoveryCode(hashes []string, presented string) int {
+//
+// **Une seule place de `auth.Hold` pour les dix hachages**, prise autour de la boucle et non dedans :
+// une place par candidat ferait d'un seul essai de récupération dix places, et la borne protégerait
+// dix fois moins que le chemin qu'elle protège. `auth.VerifyHeld` porte donc le calcul sans en
+// redemander une.
+func MatchRecoveryCode(ctx context.Context, hashes []string, presented string) (int, error) {
 	normalized := NormalizeRecoveryCode(presented)
 	matched := -1
 
-	for index, hash := range hashes {
-		ok, err := auth.Verify(hash, normalized)
-		if err == nil && ok {
-			matched = index
+	err := auth.Hold(ctx, func() error {
+		for index, hash := range hashes {
+			ok, err := auth.VerifyHeld(hash, normalized)
+			if err == nil && ok {
+				matched = index
+			}
 		}
-	}
 
-	return matched
+		return nil
+	})
+
+	return matched, err
 }

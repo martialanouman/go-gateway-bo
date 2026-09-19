@@ -120,6 +120,14 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: |
+            Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir — les dix places de
+            hachage argon2id sont occupées. Ce n'est pas un refus d'identifiants : la tentative
+            compte tout de même dans le quota d'essais, posé avant le hachage.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /auth/me:
     get:
@@ -246,6 +254,15 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: |
+            Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir — les dix places de
+            hachage argon2id sont occupées, ici par la preuve à présenter pour remplacer un
+            authentificateur en place. Ce n'est pas un refus : l'essai compte tout de même dans le
+            quota, posé avant le hachage.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /auth/mfa/verify:
     post:
@@ -309,6 +326,15 @@ paths:
               description: Secondes restant à attendre. Un entier et jamais une date HTTP.
               required: true
               schema: { type: integer, minimum: 1 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: |
+            Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir — les dix places de
+            hachage argon2id sont occupées, ici par le code TOTP ou de récupération présenté. Ce
+            n'est pas un refus de second facteur : l'essai compte tout de même dans le quota, posé
+            avant le hachage.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

@@ -100,6 +100,10 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 
 	verdict, err := a.Authenticator.Login(ctx, request.Body.Email, request.Body.Password, address)
 	if err != nil {
+		if errors.Is(err, auth.ErrOverloaded) {
+			return Login503JSONResponse(overloaded()), nil
+		}
+
 		return nil, err
 	}
 
@@ -175,6 +179,24 @@ func badRequest() Error {
 	return Error{
 		Code:    "bad_request",
 		Message: "Cette requête a été refusée : sa forme ne correspond pas à ce que la route attend.",
+	}
+}
+
+// overloaded est le refus d'une machine saturée, pas celui d'un opérateur : les dix places de
+// `auth.Hold` manquaient dans l'échéance de la requête.
+//
+// **La phrase ne dit pas qu'aucun essai n'a été consommé, parce que ce serait faux ici.** Sur les
+// trois routes qui la rendent, la réservation d'essai — celle du compte pour `Login`, celle du
+// second facteur pour `VerifyMfa` et `EnrollTotp` — est posée **avant** le hachage, pour la raison
+// inverse de la saturation : fermer la fenêtre où une rafale lirait toutes « pas de verrou » avant
+// qu'aucune n'ait compté (voir `auth.Authenticator.Login`). La retirer sur ce chemin referait cette
+// course. La phrase dit donc l'inverse de la rédaction du brief.
+func overloaded() Error {
+	return Error{
+		Code: "overloaded",
+		Message: "Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir. La connexion est " +
+			"à retenter dans quelques secondes ; cette tentative compte tout de même dans le quota " +
+			"d'essais autorisés.",
 	}
 }
 

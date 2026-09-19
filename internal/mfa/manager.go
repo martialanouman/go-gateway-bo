@@ -137,7 +137,11 @@ func (m *Manager) VerifyRecoveryCode(ctx context.Context, operatorID, presented 
 		hashes[index] = code.Hash
 	}
 
-	matched := MatchRecoveryCode(hashes, presented)
+	matched, err := MatchRecoveryCode(ctx, hashes, presented)
+	if err != nil {
+		return false, err
+	}
+
 	if matched < 0 {
 		return false, nil
 	}
@@ -166,17 +170,11 @@ func (m *Manager) ConsumeChallenge(ctx context.Context, id string) (bool, error)
 	return m.factors.ConsumeChallenge(ctx, id)
 }
 
-// Lock rend le verrou d'essais qui pèse sur cet opérateur. L'appelant le consulte **avant** toute
-// dépense : sinon le verrou protégerait le compte sans protéger le serveur.
-func (m *Manager) Lock(ctx context.Context, operatorID string) (store.Lock, error) {
-	return m.factors.LockFor(ctx, operatorID, LockWindow, MaxFailures)
-}
-
-// Fail compte un essai raté et rend le verrou qui en résulte. Il annonce le verrou **à l'échec qui le
-// franchit**, plutôt que de rendre un refus nu et de surprendre à l'essai suivant : la charte exige
-// qu'un contrôle qui refuse dise jusqu'à quand.
-func (m *Manager) Fail(ctx context.Context, operatorID string) (store.Lock, error) {
-	return m.factors.RecordFailure(ctx, operatorID, LockWindow, MaxFailures)
+// Reserve réserve un essai de second facteur **avant** le déchiffrement du secret et les hachages des
+// codes de récupération : consulter sans réserver laissait une rafale essayer autant de codes qu'elle
+// envoyait de requêtes.
+func (m *Manager) Reserve(ctx context.Context, operatorID string) (store.Lock, error) {
+	return m.factors.Reserve(ctx, operatorID, LockWindow, MaxFailures)
 }
 
 // Succeed efface le compteur d'un opérateur qui vient de franchir son second facteur.

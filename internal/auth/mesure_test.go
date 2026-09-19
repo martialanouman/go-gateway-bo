@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -51,7 +52,7 @@ func BenchmarkVerification(b *testing.B) {
 		b.Run(fmt.Sprintf("m=%dMiB/t=%d/p=%d", params.Memory/1024, params.Time, params.Parallelism),
 			func(b *testing.B) {
 				for b.Loop() {
-					if _, err := auth.Verify(encoded, "un mot de passe d'opérateur"); err != nil {
+					if _, err := auth.Verify(context.Background(), encoded, "un mot de passe d'opérateur"); err != nil {
 						b.Fatal(err)
 					}
 				}

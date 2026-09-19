@@ -128,32 +128,78 @@ func (c *Counter) reset(ctx context.Context, subject string) error {
 	return nil
 }
 
-// Admit consulte le verrou **puis** compte l'appel, et rend le verrou trouvé — non nul veut dire
-// « refusé », et rien n'a alors été compté.
+// reserve compte l'essai **avant** qu'il soit vérifié, et rend le verrou qui pèse — non nul veut dire
+// « refusé », et l'essai n'a alors rien ajouté.
 //
-// **L'ordre est le point, et il n'est écrit qu'ici.** Compter d'abord ferait qu'un client qui
-// s'acharne pendant son verrou repousse sa propre échéance à chaque appel : `last_failure_at`
-// avancerait sans cesse et seul l'abandon libérerait l'opérateur. Le chemin de connexion tient déjà
-// cette propriété ; l'écrire une seconde fois dans chaque appelant la ferait diverger dans l'un
-// d'eux, où aucun test ne la cherche.
+// **Une seule instruction, pour la raison écrite sur `count`** : consulter puis compter laissait
+// trente requêtes entrées ensemble lire toutes « pas de verrou ». Ici, l'incrément et la décision
+// sont le même `ON CONFLICT DO UPDATE`.
 //
-// **Le verrou que `count` rend est délibérément jeté.** L'appel qui atteint le seuil a fait un travail
-// légitime et n'est pas refusé ; c'est le **suivant** qu'`Admit` arrête, sur le `LockFor` d'entrée. Le
-// rendre ici décalerait d'un cran chaque borne du produit — cinq enrôlements deviendraient quatre.
+// **Un essai reçu pendant le verrou ne repousse pas l'échéance** : `last_failure_at` n'avance que
+// lorsque l'essai est admis. Sans cette dissymétrie, qui s'acharne garderait le compte de sa victime
+// fermé indéfiniment — c'est ce que l'ordre inverse protégeait, et qu'il fallait reprendre en
+// passant au compte-d'abord.
+//
+// **Le plafond se lit `>=`, et c'est `admitted` qui tranche, pas `failures` seul.** Sous trente
+// essais entrés ensemble, geler `failures` à `threshold` rend le cinquième essai — celui qui atteint
+// légitimement le seuil — indiscernable des vingt-cinq qu'il faut refuser après lui : les deux
+// rendraient la même valeur de `failures`. `admitted` sépare les deux : vrai seulement quand **cet**
+// appel vient d'écrire `last_failure_at`, jamais quand il relit l'ancienne valeur d'un refusé.
+func (c *Counter) reserve(ctx context.Context, subject string, window time.Duration, threshold int,
+) (Lock, error) {
+	const query = `
+		INSERT INTO login_attempt_counters AS c (scope, subject, failures, last_failure_at)
+		VALUES ($3, $1, 1, now())
+		ON CONFLICT (scope, subject) DO UPDATE
+		SET failures = CASE
+		        WHEN c.last_failure_at + make_interval(secs => $2) <= now() THEN 1
+		        WHEN c.failures >= $4 THEN c.failures
+		        ELSE c.failures + 1
+		    END,
+		    last_failure_at = CASE
+		        WHEN c.last_failure_at + make_interval(secs => $2) > now() AND c.failures >= $4
+		            THEN c.last_failure_at
+		        ELSE now()
+		    END
+		RETURNING scope, failures,
+		          EXTRACT(EPOCH FROM (last_failure_at + make_interval(secs => $2) - now())),
+		          (last_failure_at = now()) AS admitted`
+
+	var (
+		lock     Lock
+		seconds  float64
+		admitted bool
+	)
+
+	row := c.pool.QueryRow(ctx, query, subject, window.Seconds(), c.scope, threshold)
+	if err := row.Scan(&lock.Scope, &lock.Failures, &seconds, &admitted); err != nil {
+		return Lock{}, fmt.Errorf("réserver un essai sur la dimension %s : %w", c.scope, err)
+	}
+
+	lock.Remaining = time.Duration(seconds * float64(time.Second))
+
+	if !admitted {
+		return lock, nil
+	}
+
+	if lock.Failures < threshold {
+		return Lock{}, nil
+	}
+
+	// Admis, à hauteur du seuil : l'appelant vérifie encore cet essai, et n'annonce le verrou que si
+	// la vérification échoue. `Remaining` n'est pas repris ici — il vaudrait la fenêtre entière,
+	// puisque `last_failure_at` vient d'être posé à `now()`, et ferait croire à un verrou déjà posé.
+	return Lock{Scope: lock.Scope, Failures: lock.Failures}, nil
+}
+
+// Admit réserve l'appel — voir `reserve`, dont c'est la seule rédaction — et rend le verrou qui pèse :
+// non nul veut dire « refusé », et l'appel n'a alors rien ajouté au compteur.
 //
 // **`Admit` est la seule des quatre méthodes qui soit exportée, et c'est une garde et non un style.**
 // Les trois autres sont privées parce que `internal/mfa` détient un `*Counter` : exportées, un appelant
-// pourrait compter sans consulter, ce que les deux paragraphes ci-dessus existent pour interdire — et
-// il n'en resterait alors que ces paragraphes. Le compilateur les tient maintenant. `MFA` et `Logins`
-// les atteignent parce qu'ils vivent dans ce paquet, et c'est exactement la portée voulue.
+// pourrait compter sans passer par `reserve`, ce que le compilateur interdit désormais. `MFA` et
+// `Logins` les atteignent parce qu'ils vivent dans ce paquet, et c'est exactement la portée voulue.
 func (c *Counter) Admit(ctx context.Context, subject string, window time.Duration, threshold int,
 ) (Lock, error) {
-	lock, err := c.lockFor(ctx, subject, window, threshold)
-	if err != nil || lock.Locked() {
-		return lock, err
-	}
-
-	_, err = c.count(ctx, subject, window, threshold)
-
-	return Lock{}, err
+	return c.reserve(ctx, subject, window, threshold)
 }

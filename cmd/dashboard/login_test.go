@@ -7,9 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"net"
+	"net/http"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -39,6 +43,9 @@ type loginWorld struct {
 	// retenu ici et non relu plus tard : `received` ne porte que la **dernière** réponse, et les
 	// scénarios du second facteur en émettent d'autres avant de s'en servir.
 	challenge string
+	// answers est ce que la dernière rafale a recueilli. `received` ne porterait que la réponse
+	// arrivée en dernier, et une rafale se juge sur les trente.
+	answers []response
 }
 
 func (w *loginWorld) installationWithOneOperator(ctx context.Context) error {
@@ -348,4 +355,186 @@ func (w *loginWorld) messageAnnouncesTheRemainingDelay() error {
 	}
 
 	return nil
+}
+
+// burstSize est la rafale que les deux scénarios tirent : trente essais pour un plafond de cinq. Ce
+// qui doit rester vrai est que vingt-cinq d'entre eux ne coûtent aucune vérification.
+const burstSize = 30
+
+func (w *loginWorld) burstOfWrongPasswords(ctx context.Context) error {
+	body, err := json.Marshal(map[string]string{
+		"email": scenarioEmail, "password": "ce n'est pas le bon",
+	})
+	if err != nil {
+		return fmt.Errorf("composer le corps de la requête : %w", err)
+	}
+
+	return w.burst(ctx, "/api/auth/login", string(body))
+}
+
+// burstOfWrongCodes rejoue le **même** challenge trente fois : un échec ne le consomme pas, et c'est
+// précisément ce qui rend la rafale possible pour qui détient le mot de passe.
+func (w *loginWorld) burstOfWrongCodes(ctx context.Context) error {
+	if w.challenge == "" {
+		return errors.New("aucun challenge en attente : la connexion n'en a pas émis")
+	}
+
+	body, err := json.Marshal(map[string]string{
+		"challenge": w.challenge, "method": "totp", "code": "123456",
+	})
+	if err != nil {
+		return fmt.Errorf("composer le corps du second facteur : %w", err)
+	}
+
+	return w.burst(ctx, "/api/auth/mfa/verify", string(body))
+}
+
+// burst tire `burstSize` requêtes **ensemble** — relâchées par un seul `WaitGroup` — et retient les
+// réponses.
+//
+// Il n'emprunte pas `process.post` : celui-ci écrase un unique `received` et mute une map de cookies
+// sans verrou, et ce tir-ci en ferait une course plutôt qu'une mesure.
+func (w *loginWorld) burst(ctx context.Context, path, body string) error {
+	var (
+		release  sync.WaitGroup
+		finished sync.WaitGroup
+		mutex    sync.Mutex
+		failure  error
+	)
+
+	url, cookies := w.process.url(path), maps.Clone(w.process.cookies)
+	w.answers = nil
+
+	release.Add(1)
+	finished.Add(burstSize)
+
+	for range burstSize {
+		go func() {
+			defer finished.Done()
+			release.Wait()
+
+			answer, err := postAlone(ctx, url, body, cookies)
+
+			mutex.Lock()
+			defer mutex.Unlock()
+
+			if err != nil {
+				failure = errors.Join(failure, err)
+
+				return
+			}
+
+			w.answers = append(w.answers, answer)
+		}()
+	}
+
+	release.Done()
+	finished.Wait()
+
+	return failure
+}
+
+// postAlone reprend la forme de `process.send` sans aucun état partagé : les cookies lui sont donnés,
+// et la réponse lui est rendue plutôt qu'écrite dans le harnais.
+func postAlone(ctx context.Context, url, body string, cookies map[string]string) (response, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(body))
+	if err != nil {
+		return response{}, fmt.Errorf("composer la requête vers %s : %w", url, err)
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+
+	for name, value := range cookies {
+		request.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
+
+	resp, err := browser.Do(request)
+	if err != nil {
+		return response{}, fmt.Errorf("la requête vers %s a échoué : %w", url, err)
+	}
+
+	defer resp.Body.Close()
+
+	received, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return response{}, fmt.Errorf("lecture de la réponse de %s : %w", url, err)
+	}
+
+	return response{status: resp.StatusCode, header: resp.Header, body: string(received)}, nil
+}
+
+// answersCounting compte les réponses de la rafale par **statut et code d'erreur**. Le message d'échec
+// nomme la répartition observée : sous concurrence elle change à chaque exécution, et cette instabilité
+// est elle-même le symptôme.
+func (w *loginWorld) answersCounting(status int, code string) func(int) error {
+	return func(expected int) error {
+		seen := 0
+
+		for _, answer := range w.answers {
+			if answer.status == status && errorCode(answer.body) == code {
+				seen++
+			}
+		}
+
+		if seen != expected {
+			return fmt.Errorf("%d réponses portent %d %s, %d attendues sur %d tirées — répartition "+
+				"observée : %s", seen, status, code, expected, len(w.answers), w.distribution())
+		}
+
+		return nil
+	}
+}
+
+func (w *loginWorld) distribution() string {
+	counted := map[string]int{}
+
+	for _, answer := range w.answers {
+		counted[fmt.Sprintf("%d %s", answer.status, errorCode(answer.body))]++
+	}
+
+	seen := make([]string, 0, len(counted))
+	for _, kind := range slices.Sorted(maps.Keys(counted)) {
+		seen = append(seen, fmt.Sprintf("%d × %s", counted[kind], kind))
+	}
+
+	return strings.Join(seen, ", ")
+}
+
+// attemptsConsumed lit ce que la rafale a réellement coûté, dans la seule trace qui le porte : le
+// compteur en base. La répartition des réponses ne le dit pas — un essai vérifié puis refusé parce
+// qu'il dépasse le seuil rend le **même** 429 que celui qu'on arrête à la porte, et le hachage est
+// déjà payé.
+func (w *loginWorld) attemptsConsumed(ctx context.Context, expected int) error {
+	conn, err := pgx.Connect(ctx, w.dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var consumed int
+
+	err = conn.QueryRow(ctx,
+		`SELECT COALESCE(MAX(failures), 0) FROM login_attempt_counters`).Scan(&consumed)
+	if err != nil {
+		return fmt.Errorf("lire les compteurs d'essais : %w", err)
+	}
+
+	if consumed != expected {
+		return fmt.Errorf("%d essais ont été consommés, %d attendus : autant de vérifications payées "+
+			"pour un plafond qui en autorise %d — répartition des réponses : %s",
+			consumed, expected, expected, w.distribution())
+	}
+
+	return nil
+}
+
+func errorCode(body string) string {
+	var refusal struct {
+		Code string `json:"code"`
+	}
+
+	_ = json.Unmarshal([]byte(body), &refusal)
+
+	return refusal.Code
 }

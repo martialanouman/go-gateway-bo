@@ -23,12 +23,17 @@ import (
 // **Le périmètre est nominatif et non topologique, et c'est mesuré** : une règle « toute comparaison
 // atteignable depuis un chemin de vérification » compte onze faux positifs, dont sept dans ce paquet
 // seul — `decode` compare un nom d'algorithme, une version PHC et des paramètres re-sérialisés, et
-// `Verify` l'appelle en première instruction. La contrepartie est écrite : extraire la comparaison
-// dans une fonction voisine ferait rougir cette porte à tort.
+// `VerifyHeld` l'appelle en première instruction. La contrepartie est écrite : extraire la
+// comparaison dans une fonction voisine ferait rougir cette porte à tort.
+//
+// **La cible est `VerifyHeld` et non `Verify` depuis la borne de concurrence (step-034)** : `Verify`
+// ne fait plus que prendre une place de `Hold` autour de `VerifyHeld`, qui seul porte le calcul et la
+// comparaison — pointer la porte sur `Verify` la laisserait chercher dans un corps qui ne contient
+// plus l'appel.
 //
 // `loadAuth` et `functionBody` viennent d'`oracle_test.go`, même paquet de test.
 const (
-	hashVerifier           = "Verify"
+	hashVerifier           = "VerifyHeld"
 	constantTimeComparison = "crypto/subtle.ConstantTimeCompare"
 )
 

@@ -595,6 +595,19 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /**
+             * @description Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir — les dix places de
+             *     hachage argon2id sont occupées. Ce n'est pas un refus d'identifiants : la tentative
+             *     compte tout de même dans le quota d'essais, posé avant le hachage.
+             */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     me: {
@@ -729,6 +742,20 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /**
+             * @description Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir — les dix places de
+             *     hachage argon2id sont occupées, ici par la preuve à présenter pour remplacer un
+             *     authentificateur en place. Ce n'est pas un refus : l'essai compte tout de même dans le
+             *     quota, posé avant le hachage.
+             */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     verifyMfa: {
@@ -786,6 +813,20 @@ export interface operations {
                 headers: {
                     /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
                     "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir — les dix places de
+             *     hachage argon2id sont occupées, ici par le code TOTP ou de récupération présenté. Ce
+             *     n'est pas un refus de second facteur : l'essai compte tout de même dans le quota, posé
+             *     avant le hachage.
+             */
+            503: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

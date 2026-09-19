@@ -6,9 +6,11 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -139,7 +141,48 @@ func HashWith(params Params, secret string) (string, error) {
 	return encode(params, salt, key), nil
 }
 
-// Verify dit si le secret présenté est celui qui a produit ce hachage.
+// HashSlots borne le nombre de hachages en vol. argon2id alloue 64 MiB **par vérification** : dix
+// places réservent 640 MiB, ce que le conteneur encaisse, là où deux cents connexions simultanées
+// sans identifiants faisaient tuer l'instance.
+const HashSlots = 10
+
+// ErrOverloaded dit qu'aucune place n'était libre dans l'échéance de la requête. Ce n'est pas un
+// refus d'identifiants : l'appelant le sert en 503, jamais en 401 ni en 429.
+var ErrOverloaded = errors.New("toutes les places de vérification sont occupées")
+
+var hashSlots = make(chan struct{}, HashSlots)
+
+// Hold prend une place et la rend. Les codes de récupération l'appellent **une fois** pour leurs dix
+// hachages : une place par hachage ferait d'un seul essai dix places, et la borne protégerait moins
+// que le chemin qu'elle protège.
+func Hold(ctx context.Context, do func() error) error {
+	select {
+	case hashSlots <- struct{}{}:
+		defer func() { <-hashSlots }()
+
+		return do()
+	case <-ctx.Done():
+		return ErrOverloaded
+	}
+}
+
+// Verify dit si le secret présenté est celui qui a produit ce hachage, sous une des dix places de
+// `Hold` : c'est elle qui borne combien de vérifications tournent à la fois.
+func Verify(ctx context.Context, encoded, secret string) (bool, error) {
+	var matched bool
+
+	err := Hold(ctx, func() error {
+		var verifyErr error
+		matched, verifyErr = VerifyHeld(encoded, secret)
+
+		return verifyErr
+	})
+
+	return matched, err
+}
+
+// VerifyHeld porte le calcul de Verify, **sans prendre de place** — c'est ce qui permet à
+// `MatchRecoveryCode` d'en tenir dix sous une seule place de `Hold`, plutôt qu'une par code.
 //
 // Les paramètres viennent de **l'encodage**, jamais de `currentParams` : les lire ailleurs ferait
 // qu'un relèvement fermerait la porte à tous les opérateurs déjà inscrits, sans qu'aucune migration
@@ -153,7 +196,7 @@ func HashWith(params Params, secret string) (string, error) {
 // résultat de l'appel, ou poser un raccourci naïf devant lui, le laisse en place sans qu'il décide.
 // Jusque-là rien ne le tenait : le remplacer par `string(key) == string(expected)` laissait toute la
 // suite du paquet **verte**, mesuré le 09/08/2026.
-func Verify(encoded, secret string) (bool, error) {
+func VerifyHeld(encoded, secret string) (bool, error) {
 	params, salt, expected, err := decode(encoded)
 	if err != nil {
 		return false, err
@@ -172,7 +215,10 @@ func Verify(encoded, secret string) (bool, error) {
 // jamais stocké ni comparé — il n'existe que pour **passer le temps** qu'un vrai aurait passé.
 var dummySalt = []byte("adresse-inconnue")
 
-// VerifyDummy paie le coût d'une vérification sans en faire une.
+// VerifyDummy paie le coût d'une vérification sans en faire une, sous une place de `Hold` comme les
+// autres. **Sans cette place, la borne rouvrirait l'oracle qu'elle ferme** : dix vraies vérifications
+// en vol feraient attendre une onzième derrière `hashSlots`, alors qu'une adresse inconnue passerait
+// devant la file — la durée redeviendrait le signal que ce paquet existe pour taire.
 //
 // **C'est une garde, pas une politesse.** Sans elle, « adresse inconnue » répond en zéro milliseconde
 // là où « mot de passe faux » en coûte des dizaines : le corps et le code ont beau être identiques,
@@ -193,9 +239,13 @@ var dummySalt = []byte("adresse-inconnue")
 // requête. Sans cet appel, la seconde ligne tomberait sous la milliseconde et l'écart deviendrait le
 // signal. Ce que ce constat garde est la **durée**, qu'aucun test n'affirme ; le site d'appel, lui,
 // est tenu par `oracle_test.go` depuis step-021, et les coûts par le plancher de `argon2_test.go`.
-func VerifyDummy(secret string) {
-	runtime.KeepAlive(argon2.IDKey([]byte(secret), dummySalt, currentParams.Time,
-		currentParams.Memory, currentParams.Parallelism, keyLength))
+func VerifyDummy(ctx context.Context, secret string) error {
+	return Hold(ctx, func() error {
+		runtime.KeepAlive(argon2.IDKey([]byte(secret), dummySalt, currentParams.Time,
+			currentParams.Memory, currentParams.Parallelism, keyLength))
+
+		return nil
+	})
 }
 
 // validate refuse trois coûts nuls et deux coûts démesurés — mais pas tous pour la même raison, et
