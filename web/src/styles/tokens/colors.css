@@ -14,7 +14,8 @@
      qui sont le vrai point bas : sur une ligne sélectionnée (`--surface-selected`, teinte teal à
      14 %), la première valeur essayée retombait à 4,04. La hiérarchie à trois niveaux reste
      lisible. C'est **le seul écart de valeur** avec la charte ; deux tokens y sont par ailleurs
-     ajoutés (`--red-400` plus bas, `--qr-paper`). Les trois sont gardés par un test. */
+     ajoutés (`--red-400` plus bas, `--qr-paper`). `--qr-paper` n'est consommé par aucune règle et nommé
+     par aucun test : il attend step-028, qui affiche le QR. */
   --n-300: #848f9e;
   --n-400: #4a5563;
   --n-500: #2f3945;

@@ -2,9 +2,7 @@
 # une cible qui dépend de l'autre toolchain : quatre des cinq jobs Go n'ont ni pnpm ni `node_modules`
 # — « Tests Go » est l'exception — et une cible composite les enverrait chercher un `pnpm` absent.
 #
-# Aucune cible vide ici : une cible qui ne fait rien passe pour verte. C'est pourquoi `bootstrap`
-# n'apparaît qu'avec step-020, qui lui donne son code — et n'en sème encore que la moitié, la
-# création du premier opérateur revenant à step-021.
+# Aucune cible vide ici : une cible qui ne fait rien passe pour verte.
 
 BIN := bin/dashboard
 WEBASSETS := internal/webassets/dist

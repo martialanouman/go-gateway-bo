@@ -9,55 +9,23 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// API implémente l'interface **stricte** qu'engendre `api/openapi-bff.yaml`. Ce que l'interface
-// stricte achète tient en une phrase : elle **retire le `http.ResponseWriter` de la signature du
-// handler**, qui rend une valeur là où l'interface simple lui tendait un writer nu.
+// API implémente l'interface **stricte** qu'engendre `api/openapi-bff.yaml` : elle retire le
+// `http.ResponseWriter` de la signature du handler, qui rend une valeur là où l'interface simple lui
+// tendait un writer nu.
 //
-// Elle ne tient pas le DTO de sortie pour autant, et il vaut mieux le savoir que le croire : la seule
-// méthode de `HealthResponseObject` prend elle-même un `ResponseWriter` nu. Mesuré le 02/08/2026, un
-// type de réponse écrit à la main qui l'implémente compile et écrit ce qu'il veut,
-// `{"status":"ok","body":"http://passerelle.interne.svc:8443","secret":"fuite"}` compris.
+// **Cela ne tient pas le DTO de sortie pour autant** : les méthodes `Visit…Response` prennent
+// elles-mêmes un writer nu, si bien qu'un type de réponse écrit à la main y écrirait ce qu'il veut.
+// Ce qui le tient est `TestResponseTypesDeclareTheirFields`, qui exige que tout type implémentant une
+// interface `…ResponseObject` — **et toute méthode posée sur un tel type** — soit déclaré dans le
+// fichier engendré.
 //
-// Ce que la porte `TestResponseTypesDeclareTheirFields` couvre est plus étroit que « §1.11 » : la
-// **forme des champs déclarés** — ni map ni interface vide, à n'importe quelle profondeur — et
-// l'embarquement de types que le contrat n'engendre pas. Mesuré le même jour, sur ce type sans champ :
-// la porte **restait verte**. Elle voyait pourtant bien ce type — le même, doté d'un champ
-// `map[string]any`, la faisait tomber en le nommant.
-//
-// **Ce trou est fermé depuis step-026**, et les deux paragraphes ci-dessus restent parce qu'ils disent
-// ce qui a été mesuré, pas ce qui est encore vrai. `TestResponseTypesDeclareTheirFields` exige
-// désormais que tout type implémentant une interface `…ResponseObject` soit **déclaré dans le fichier
-// engendré** : le type de réponse écrit à la main ci-dessus la fait tomber en le nommant.
-//
-// La règle est une localisation et non une inspection du corps du `Visit…`, ce qui est mesuré aussi :
-// cinq `…429JSONResponse` engendrés encodent `response.Body` et non `response`, trois `…204Response`
-// n'encodent rien.
-//
-// **Elle ne suffisait pas seule, et la revue l'a trouvé** : implémenter l'interface exige bien d'écrire
-// le `Visit…`, le poser sur un type engendré est une redéclaration que le compilateur refuse, et
-// l'hériter par embarquement laisse le type porteur déclaré hors du fichier engendré — mais un
-// `MarshalJSON` écrit à la main **sur un type engendré** compile, parce que le fichier engendré ne
-// déclare pas cette méthode, et le `Visit…` l'appelle en encodant `response`. Sondé le 30/08/2026 : les
-// quatre règles restaient vertes. C'est `handWrittenMethod` qui ferme ce chemin-là, en refusant
-// **toute** méthode déclarée hors du fichier engendré.
-//
-// Ce qui rougissait **avant** step-026 se comptait par route et non par propriété — mesuré, le type
-// ci-dessus effectivement servi par `Health` faisait tomber le test de corps exact `TestHealthProbe`
-// et le scénario godog « la sonde de vivacité rend ce que le contrat décrit », qui confronte la
-// réponse servie au YAML du dépôt (`additionalProperties: false` y refuse `body` et `secret`). Une
-// route livrée sans l'un ni l'autre n'aurait rien eu, et c'est la raison d'être de la porte.
-//
-// Elle n'embarque pas `Unimplemented`, et la raison n'est pas celle qu'on croit : `Unimplemented` ne
-// porte que des méthodes de l'interface **simple**, donc une opération déclarée et non écrite rompt la
-// compilation de toute façon — mesuré, `type API struct{ bff.Unimplemented }` sans `Health` strict est
-// refusé avec « wrong type for method Health ». Ce que l'embarquer coûterait est une promesse
-// trompeuse dans le type : un repli en 501 que le langage n'honorera jamais ici, et sur lequel un
-// lecteur pressé comptera. C'est cette promesse-là que garde
-// `TestTheMountedImplementationDoesNotEmbedUnimplemented`.
+// Elle n'embarque **pas** `Unimplemented`, et pas pour la raison qu'on croit : celui-ci ne porte que
+// des méthodes de l'interface simple, donc une opération déclarée et non écrite rompt de toute façon
+// la compilation. Ce que l'embarquer coûterait est une promesse trompeuse dans le type — un repli en
+// 501 que le langage n'honorera jamais ici, et sur lequel un lecteur pressé compterait.
+// `TestTheMountedImplementationDoesNotEmbedUnimplemented` garde cette absence.
 type API struct {
-	// Authenticator porte le premier facteur. `API` a cessé d'être un struct vide en step-021 — la
-	// remarque ci-dessus sur la porte structurelle est écrite au passé depuis que step-026 l'a fermée,
-	// et elle ne parlait de toute façon pas de ce type-ci mais des types de **réponse**.
+	// Authenticator porte le premier facteur.
 	Authenticator *auth.Authenticator
 	// Sessions ouvre, résout et ferme les sessions. Le premier facteur et la session sont deux
 	// collaborateurs distincts : c'est ici qu'ils se composent, et nulle part plus bas.
@@ -66,10 +34,9 @@ type API struct {
 	// Ni `auth` ni `session` ne le connaissent : le premier n'a rien à voir avec lui, et le second
 	// n'apprend que le geste d'élévation, qui lui appartient.
 	SecondFactor *mfa.Manager
-	// Passkeys mène les cérémonies WebAuthn et tient ce qu'elles produisent. Un quatrième
-	// collaborateur et non une part de `SecondFactor` : les deux facteurs ne partagent que le verrou
-	// d'essais et l'élévation, et les réunir aurait fait d'un manager la somme de deux protocoles qui
-	// n'ont ni la même forme ni le même nombre d'allers-retours.
+	// Passkeys mène les cérémonies WebAuthn. Distinct de `SecondFactor` : les deux facteurs ne
+	// partagent que le verrou d'essais et l'élévation, et les réunir ferait d'un manager la somme de
+	// deux protocoles qui n'ont ni la même forme ni le même nombre d'allers-retours.
 	Passkeys *mfa.PasskeyManager
 	// Audit écrit le journal. Cinquième collaborateur, et le seul dont **toutes** les routes de
 	// mutation dépendent : c'est la moitié « et l'audit avec elle » de l'invariant (c).

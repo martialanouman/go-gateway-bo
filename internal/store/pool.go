@@ -54,7 +54,8 @@ const (
 	// est un écran figé.
 	//
 	// Ce que cette borne ne couvre pas — l'attente d'une place quand les 10 connexions sont prises —
-	// revient au `context` de la requête, donc à la step qui écrira la première route.
+	// revient au `context` de la requête : `bff.withAPIDeadlines` le borne à trente secondes, faute
+	// d'échéance d'acquisition chez `pgxpool`.
 	connectTimeout = 5 * time.Second
 )
 
@@ -97,15 +98,11 @@ func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config.MinConns = minConnections
 	config.MinIdleConns = minIdleConnections
 
-	// Les quatre lignes qui suivent ne sont gardées par aucun test, et c'est **mesuré, pas supposé** :
-	// les retirer toutes les quatre laisse la suite verte (vérifié le 02/08/2026). Ce qu'elles règlent
-	// ne devient observable qu'avec le temps — une connexion qui atteint trente minutes, une base
-	// injoignable qu'on attend — ou sur le cas « DSN bien formé, base injoignable », que DN-7 laisse
-	// explicitement à la step qui lira la base.
-	//
-	// Les tester ici demanderait de faire passer une demi-heure à la suite, ou de dépendre d'un hôte
-	// qui avale les paquets sans répondre — un test que le réseau du runner rendrait faux un jour sur
-	// dix. Le dire vaut mieux qu'un test qui fait semblant.
+	// Les quatre lignes qui suivent ne sont gardées par aucun test, et c'est **mesuré** : les retirer
+	// toutes les quatre laisse la suite verte. Ce qu'elles règlent ne devient observable qu'avec le
+	// temps — une connexion qui atteint trente minutes, une base injoignable qu'on attend — et les
+	// tester demanderait de faire passer une demi-heure à la suite, ou de dépendre d'un hôte qui
+	// avale les paquets sans répondre.
 	config.MaxConnLifetime = connectionLifetime
 	config.MaxConnLifetimeJitter = connectionLifetimeJitter
 	config.MaxConnIdleTime = idleConnectionTimeout

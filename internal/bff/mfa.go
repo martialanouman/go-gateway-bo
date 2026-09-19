@@ -205,7 +205,7 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 // Aucune n'est atteignable par un test non plus — `a.SecondFactor` et `a.Sessions` sont des types
 // concrets, et poser une couture remanierait le câblage. Ce qui est couvert, et que « aucun test ne
 // les exerce » disait trop largement : les trois `false` le sont **au niveau du store**
-// (`TestUnChallengeNeSeConsommeQuUneFois`, les trois `…NEleveJamais…` de `sessions_test.go`) ; ce qui
+// (`TestUnChallengeNeSeConsommeQuUneFois`, les trois refus d'élévation de `sessions_test.go`) ; ce qui
 // ne l'est pas est leur traduction en 401 ici.
 //
 // La couverture ne peut pas trancher à leur place : les scénarios lancent le binaire en

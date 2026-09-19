@@ -97,8 +97,8 @@ export type InputProps = Omit<ComponentPropsWithRef<'input'>, 'className' | 'siz
    * Glyphe de tête — `search` dans une barre de filtre. Décoratif : le libellé porte le sens.
    *
    * Typé sur le jeu, et non `string` : `icon.tsx` promet qu'« un nom absent se voit au typecheck,
-   * bien avant de ne rien rendre à l'écran », et un `string` ici faisait passer la promesse à côté
-   * du seul appelant qui existe.
+   * bien avant de ne rien rendre à l'écran », qu'un `string` ici ferait passer à côté. Aucun appelant
+   * de production ne pose encore cette prop.
    */
   readonly icon?: GlyphName
   /**

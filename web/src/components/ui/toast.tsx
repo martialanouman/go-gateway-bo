@@ -17,7 +17,8 @@ import { Icon } from './icon'
  * ## Les rôles viennent de Base UI, et c'est un écart assumé avec le kit
  *
  * Le `Toast.jsx` de la charte pose `role="status"` sur le toast. Base UI suit le motif APG : le
- * **viewport** porte `role="region"` + `aria-live="polite"`, et chaque toast `role="dialog"`. C'est
+ * **viewport** porte `role="region"` + `aria-live="polite"`, et chaque toast `role="dialog"` — ou
+ * `alertdialog` en priorité haute, donc pour `critical`. C'est
  * ce motif qui rend le bouton Fermer atteignable au clavier — reposer `role="status"` par-dessus le
  * casserait, et « toujours fermable » cesserait d'être vrai pour qui n'a pas de souris. Le kit
  * `.jsx` n'est pas du code de production : il montre une apparence, et n'a jamais eu ni piège de
@@ -50,7 +51,7 @@ export const TOAST_TIMEOUT = { critical: 9000, default: 6000 } as const
 /**
  * Pousse un toast, avec la durée que sa sévérité commande.
  *
- * Six lignes plutôt qu'une abstraction : c'est l'API que step-045 appellera quand la WebSocket
+ * Une fonction plutôt qu'une abstraction : c'est l'API que la WebSocket appellera quand elle
  * alimentera la pile, et elle n'a rien à porter de plus aujourd'hui.
  */
 export function useToast() {
