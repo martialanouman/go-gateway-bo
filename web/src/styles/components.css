@@ -143,10 +143,6 @@
   font-size: var(--fs-12);
 }
 
-.ui-button--lg {
-  height: var(--control-height-lg);
-  padding: 0 var(--sp-8);
-}
 
 .ui-button--primary {
   border-color: var(--action-primary-border);

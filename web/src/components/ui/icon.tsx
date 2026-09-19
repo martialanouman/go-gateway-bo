@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactElement } from 'react'
+import type { ReactElement } from 'react'
 
 /**
  * Le jeu de glyphes de la charte, dessiné une seule fois.
@@ -132,9 +132,7 @@ export type IconProps = {
   readonly name: GlyphName
   /** 14 px dans les contrôles et les lignes, 16 px dans les en-têtes. Jamais sous 12. */
   readonly size?: number
-  readonly strokeWidth?: number
   readonly className?: string
-  readonly style?: CSSProperties
   /** Libellé accessible. Sans lui, le glyphe est décoratif et sort de l'arbre d'accessibilité. */
   readonly title?: string
 }
@@ -142,9 +140,7 @@ export type IconProps = {
 export function Icon({
   name,
   size = 14,
-  strokeWidth = 1.5,
   className,
-  style,
   title,
 }: IconProps): ReactElement | null {
   // Le type dit `ReactElement`, jamais `undefined` : le repli n'existe que pour ce que le typage ne
@@ -156,7 +152,7 @@ export function Icon({
   return (
     <span
       className={['ui-icon', className].filter(Boolean).join(' ')}
-      style={{ width: size, height: size, ...style }}
+      style={{ width: size, height: size }}
     >
       {/*
         Le rôle et le libellé vivent sur le `<svg>`, pas sur l'enveloppe : celle-ci ne porte que la
@@ -168,7 +164,7 @@ export function Icon({
         viewBox="0 0 16 16"
         fill="none"
         stroke="currentColor"
-        strokeWidth={strokeWidth}
+        strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden={title === undefined ? 'true' : undefined}

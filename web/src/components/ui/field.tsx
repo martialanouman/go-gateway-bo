@@ -42,12 +42,11 @@ export type FieldProps = {
   /** Message de refus. Sa présence rend le contrôle `aria-invalid` et le lui relie. */
   readonly error?: ReactNode
   /** Emplacement à côté du libellé, pour une pilule de portée ou de permission. */
-  readonly badge?: ReactNode
   readonly children?: ReactNode
   readonly className?: string
 }
 
-export function Field({ label, hint, error, badge, children, className }: FieldProps) {
+export function Field({ label, hint, error, children, className }: FieldProps) {
   // `Boolean` et non trois comparaisons : `error={apiError ?? ''}` — le geste le plus naturel quand
   // le serveur rend une chaîne vide — passait les trois, et fabriquait un champ **invalide muet** :
   // bordure rouge, `aria-invalid`, un message vide enregistré dans `aria-describedby`, et l'aide
@@ -60,7 +59,6 @@ export function Field({ label, hint, error, badge, children, className }: FieldP
       {label === undefined ? null : (
         <BaseField.Label className="ui-field__label">
           {label}
-          {badge}
         </BaseField.Label>
       )}
 
