@@ -33,6 +33,7 @@ func minimalEnv() map[string]string {
 		config.EnvTOTPEncryptionKey: testTOTPEncryptionKey,
 		config.EnvWebauthnRPID:      testWebauthnRPID,
 		config.EnvWebauthnOrigin:    testWebauthnOrigin,
+		config.EnvTrustedProxies:    config.NoTrustedProxy,
 	}
 }
 
@@ -80,6 +81,7 @@ func realGatewayEnv() map[string]string {
 		config.EnvTOTPEncryptionKey:   testTOTPEncryptionKey,
 		config.EnvWebauthnRPID:        testWebauthnRPID,
 		config.EnvWebauthnOrigin:      testWebauthnOrigin,
+		config.EnvTrustedProxies:      config.NoTrustedProxy,
 	}
 }
 
@@ -546,4 +548,182 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvBootstrapOperatorName,
 		config.EnvBootstrapOperatorPassword,
 	}, config.Variables())
+}
+
+// Cette origine est celle des cérémonies WebAuthn **et** celle dont le BFF exige que vienne toute
+// mutation. En clair sur un vrai domaine, les deux se lisent et se rejouent sur le fil ; sur le poste
+// de développement, il n'y a pas de réseau à écouter.
+func TestUneOrigineEnClairNEstAcceptéeQueSurLePosteLocal(t *testing.T) {
+	t.Parallel()
+
+	for origin, accepted := range map[string]bool{
+		"http://localhost:3000":          true,
+		"http://127.0.0.1:3000":          true,
+		"http://[::1]:3000":              true,
+		"https://dashboard.exemple.test": true,
+		"http://dashboard.exemple.test":  false,
+		"http://192.168.1.10:3000":       false,
+	} {
+		t.Run(origin, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+				config.EnvWebauthnOrigin: origin,
+			})))
+
+			if accepted {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.EnvWebauthnOrigin)
+			assert.Contains(t, err.Error(), "https attendu")
+		})
+	}
+}
+
+// Ce qui empêche `mock` d'atteindre la production, et la seule chose qui le puisse sans variable
+// supplémentaire : un mock est un processus lancé à côté, jamais un mode d'exploitation.
+func TestLeModeMockExigeUnePasserelleSurLePosteLocal(t *testing.T) {
+	t.Parallel()
+
+	_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+		config.EnvGatewayBaseURL: "https://admin.gateway.internal/v1",
+	})))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvGatewayMode)
+	assert.Contains(t, err.Error(), "adresse de bouclage")
+}
+
+// Le refus doit nommer la variable pour être actionnable, et ne peut pas citer sa valeur pour l'être
+// sans danger. Le découpage est textuel parce qu'une URL qu'on refuse est précisément celle que
+// `net/url` peut refuser d'abord — un repli sur la valeur intacte rendrait le mot de passe.
+func TestUneURLCitéeDansUnRefusPerdSesIdentifiants(t *testing.T) {
+	t.Parallel()
+
+	for raw, expected := range map[string]string{
+		"postgres://dashboard:tres-secret@base.exemple.test/db": "postgres://…@base.exemple.test/db",
+		"https://client:secret@api.exemple.test/v1?a=b@c":       "https://…@api.exemple.test/v1?a=b@c",
+		"https://api.exemple.test/v1":                           "https://api.exemple.test/v1",
+		"https://api.exemple.test/chemin@bizarre":               "https://api.exemple.test/chemin@bizarre",
+		// La forme **opaque**, sans les deux barres qui annoncent l'autorité : `net/url` la lit
+		// (`Scheme="dashboard"`, `Host=""`), `absoluteURL` la refuse pour son hôte vide, et le refus
+		// citait alors la valeur entière. C'est le schéma oublié au copier-coller.
+		"dashboard:tres-secret@passerelle.exemple.test/v1": "dashboard:…@passerelle.exemple.test/v1",
+		"u:p@h:443": "u:…@h:443",
+		// Ce qui n'est pas une URL et ne porte aucun identifiant traverse inchangé : `127.0.0.1:4010`
+		// se coupe sur son `:` sans qu'aucun `@` ne suive.
+		"127.0.0.1:4010": "127.0.0.1:4010",
+		// Un port démesuré, que `url.Parse` **accepte** — `validOptionalPort` n'exige que des
+		// chiffres, vérifié le 19/09/2026. Il est ici pour la forme, pas comme témoin du découpage
+		// textuel : ce témoin-là est la forme opaque ci-dessous, que `absoluteURL` refuse pour son
+		// hôte vide et que le refus citait alors en entier.
+		"http://u:p@hôte.test:99999999999/x": "http://…@hôte.test:99999999999/x",
+		"pas-une-url":                        "pas-une-url",
+	} {
+		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, expected, config.RedactURL(raw))
+		})
+	}
+}
+
+// Le refus nomme la variable **et** dit comment l'écrire sur un poste sans proxy : un refus qui
+// nommerait seulement la variable ferait chercher une valeur qui n'existe pas.
+func TestUnReseauDeConfianceNonDeclaréEstRefuséEnNommantSaSortie(t *testing.T) {
+	t.Parallel()
+
+	env := minimalEnv()
+	delete(env, config.EnvTrustedProxies)
+
+	_, err := config.Load(lookupFrom(env))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvTrustedProxies)
+	assert.Contains(t, err.Error(), config.NoTrustedProxy)
+}
+
+func TestAucunProxyDeConfianceSeDeclareEtNeFaitCroireAAucun(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+		config.EnvTrustedProxies: config.NoTrustedProxy,
+	})))
+
+	require.NoError(t, err)
+	assert.Empty(t, cfg.Auth.TrustedProxies)
+}
+
+// Une liste qui ne porte que des séparateurs rendait `nil` sans un mot — c'est-à-dire exactement le
+// silence que l'obligation venait de fermer, atteignable depuis n'importe quel gabarit qui joint sur
+// des virgules.
+func TestUneListeDeProxysSansAucunReseauEstRefusee(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{",", ",,", " , "} {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+				config.EnvTrustedProxies: value,
+			})))
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.EnvTrustedProxies)
+			assert.Contains(t, err.Error(), config.NoTrustedProxy)
+		})
+	}
+}
+
+// Une origine n'a **que** un schéma et un hôte. Un chemin y passait la configuration et ne cassait
+// qu'à moitié : les navigateurs modernes annoncent `Sec-Fetch-Site` et passaient, ceux qui ne
+// l'annoncent pas se faisaient refuser par une comparaison d'origine que le chemin faisait échouer.
+func TestUneOrigineNaNiCheminNiIdentifiants(t *testing.T) {
+	t.Parallel()
+
+	for _, origin := range []string{
+		"https://dashboard.exemple.test/app",
+		"https://dashboard.exemple.test?a=b",
+		"https://dashboard.exemple.test#ancre",
+		"https://operateur:secret@dashboard.exemple.test",
+	} {
+		t.Run(origin, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+				config.EnvWebauthnOrigin: origin,
+			})))
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.EnvWebauthnOrigin)
+		})
+	}
+}
+
+// La barre oblique finale et la casse de l'hôte sont **normalisées**, pas refusées : les deux
+// désignent la même origine, et un refus ferait chercher une faute là où il n'y en a pas. La
+// normalisation vit ici, à l'entrée de la valeur, et non dans la garde qui la consomme.
+func TestUneOrigineEstRendueSousSaFormeCanonique(t *testing.T) {
+	t.Parallel()
+
+	for raw, canonical := range map[string]string{
+		"https://Dashboard.Exemple.TEST/": "https://dashboard.exemple.test",
+		"https://dashboard.exemple.test":  "https://dashboard.exemple.test",
+		"http://LOCALHOST:3000":           "http://localhost:3000",
+	} {
+		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
+
+			cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+				config.EnvWebauthnOrigin: raw,
+			})))
+
+			require.NoError(t, err)
+			assert.Equal(t, canonical, cfg.Auth.WebauthnOrigin)
+		})
+	}
 }

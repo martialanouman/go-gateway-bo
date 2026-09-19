@@ -1,6 +1,6 @@
 # step-036 — Durcissement HTTP et configuration
 
-> **Jalon :** M1 (§6.9, §1.2) · **Statut :** À FAIRE
+> **Jalon :** M1 (§6.9, §1.2) · **Statut :** FAIT
 > **Dépend de :** step-022, step-031 · **Bloque :** step-027
 >
 > *Issue de l'audit du 16/09/2026. Elle se lit **avant** step-027, le premier écran qui envoie un

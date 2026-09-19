@@ -110,8 +110,12 @@ func Issued(value string) *http.Cookie {
 		Secure:   true,
 		// `Lax` et non `Strict` : le tableau de bord est atteint par des liens depuis les alertes et
 		// les tickets, et `Strict` ferait arriver l'opérateur déconnecté sur l'écran qu'on lui a
-		// envoyé. `Lax` refuse déjà les requêtes intersites qui écrivent, qui sont ce qu'il faut
-		// refuser.
+		// envoyé.
+		//
+		// **Ce n'est pas la défense contre le CSRF, et ça ne l'a jamais été** : `Lax` raisonne par
+		// *site*, donc il laisse passer le `POST` d'un sous-domaine voisin — le même site — avec ce
+		// cookie. C'est le contrôle d'origine de `internal/bff/durcissement.go` qui refuse celui-là,
+		// depuis step-036 ; cet attribut n'est que la première des deux barrières.
 		SameSite: http.SameSiteLaxMode,
 	}
 }

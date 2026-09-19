@@ -52,6 +52,18 @@ expectTypeOf<HealthOperation['parameters']['query']>().toEqualTypeOf<undefined>(
  * le reste en production, sur l'écran de connexion, c'est-à-dire au pire endroit.
  */
 
+/**
+ * **403 et 415 accompagnent désormais les huit opérations mutantes du contrat** — step-036. Ils ne
+ * viennent d'aucun handler : le contrôle d'origine du BFF les rend *avant* que la requête n'atteigne
+ * l'opération, sur toute méthode non sûre.
+ *
+ * Ce qu'ils veulent dire pour le client, et pourquoi ils ne se traitent pas comme les autres refus :
+ * ni l'un ni l'autre n'est réessayable, et aucun ne dépend de ce que l'opérateur a saisi. Les deux
+ * disent que la requête n'a pas été composée depuis l'application — un onglet resté ouvert pendant
+ * un changement d'origine, un client écrit à la main. La sortie est de recharger, jamais de
+ * réessayer ni de reformuler.
+ */
+
 type LoginOperation = paths['/auth/login']['post']
 
 // Le corps envoyé. `toEqualTypeOf` : un champ ajouté au schéma doit rougir ici plutôt que d'être
@@ -81,7 +93,9 @@ expectTypeOf<LoginOperation['responses'][401]['content']['application/json']>().
 // Le 503 est le cinquième depuis step-034 : les dix places de hachage argon2id manquaient. Le client
 // doit le distinguer du 401 et du 429 — ni un refus d'identifiants, ni un compte à faire patienter,
 // mais une machine saturée à retenter sans attendre une durée précise.
-expectTypeOf<keyof LoginOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 429 | 503>()
+expectTypeOf<keyof LoginOperation['responses']>().toEqualTypeOf<
+  200 | 400 | 401 | 403 | 415 | 429 | 503
+>()
 
 /**
  * `GET /api/auth/me` — step-022. Le **seul** endroit d'où le client apprend ses droits.
@@ -116,7 +130,7 @@ expectTypeOf<keyof MeOperation['responses']>().toEqualTypeOf<200 | 401>()
 
 type LogoutOperation = paths['/auth/logout']['post']
 
-expectTypeOf<keyof LogoutOperation['responses']>().toEqualTypeOf<204>()
+expectTypeOf<keyof LogoutOperation['responses']>().toEqualTypeOf<204 | 403 | 415>()
 
 // Aucun corps à envoyer : rien à composer, donc rien à oublier de composer.
 expectTypeOf<LogoutOperation['requestBody']>().toEqualTypeOf<undefined>()
@@ -149,7 +163,7 @@ expectTypeOf<EnrollOperation['responses'][200]['content']['application/json']>()
 // Le 503, depuis step-034, ne se rend que sur un remplacement : c'est la preuve présentée qui hache,
 // et les dix places de `auth.Hold` peuvent manquer là où le premier enrôlement n'en demande aucune.
 expectTypeOf<keyof EnrollOperation['responses']>().toEqualTypeOf<
-  200 | 400 | 401 | 409 | 429 | 503
+  200 | 400 | 401 | 403 | 409 | 415 | 429 | 503
 >()
 
 // Les deux champs sont **facultatifs**, et c'est ce que le type doit dire : un premier enrôlement n'a
@@ -192,7 +206,9 @@ expectTypeOf<VerifyOperation['requestBody']['content']['application/json']>().to
 //
 // Le 503, cinquième depuis step-034, ne se rend que sur un code TOTP ou de récupération : l'assertion
 // WebAuthn ne hache rien et ne peut jamais y mener.
-expectTypeOf<keyof VerifyOperation['responses']>().toEqualTypeOf<204 | 400 | 401 | 429 | 503>()
+expectTypeOf<keyof VerifyOperation['responses']>().toEqualTypeOf<
+  204 | 400 | 401 | 403 | 415 | 429 | 503
+>()
 
 /**
  * `POST /api/auth/mfa/webauthn/*` — step-024. Les deux cérémonies de passkey.
@@ -223,7 +239,9 @@ expectTypeOf<
 // explication serait le pire des rendus.
 // Le 429 borne les **ouvertures**, sur un seuil commun à l'enregistrement et à l'assertion : un
 // écran qui les traiterait séparément se tromperait sur ce qui reste possible après un refus.
-expectTypeOf<keyof BeginRegistrationOperation['responses']>().toEqualTypeOf<200 | 401 | 409 | 429>()
+expectTypeOf<keyof BeginRegistrationOperation['responses']>().toEqualTypeOf<
+  200 | 401 | 403 | 409 | 415 | 429
+>()
 
 // Aucun corps à envoyer : le serveur sait qui demande par le cookie, et ce que l'opérateur détient
 // par sa propre lecture. Rien à composer, donc rien à oublier de composer.
@@ -251,7 +269,7 @@ expectTypeOf<
 // une session réellement close — ce qui compte ici : `isUnauthenticated` traite tout 401 comme telle
 // sans lire le corps, et renvoyait donc au login un opérateur dont la clé avait mal signé.
 expectTypeOf<keyof FinishRegistrationOperation['responses']>().toEqualTypeOf<
-  200 | 400 | 401 | 409
+  200 | 400 | 401 | 403 | 409 | 415
 >()
 
 type BeginAssertionOperation = paths['/auth/mfa/webauthn/assert/begin']['post']
@@ -268,7 +286,9 @@ expectTypeOf<
 
 // Le 400 dit « aucune passkey enregistrée », et c'est une impasse et non une panne : l'écran doit
 // conduire à l'enrôlement. Le distinguer du 401 est ce qui lui permet de le faire.
-expectTypeOf<keyof BeginAssertionOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 429>()
+expectTypeOf<keyof BeginAssertionOperation['responses']>().toEqualTypeOf<
+  200 | 400 | 401 | 403 | 415 | 429
+>()
 
 type DeletePasskeyOperation = paths['/auth/mfa/webauthn/passkeys/{passkeyId}']['delete']
 
@@ -284,4 +304,6 @@ expectTypeOf<DeletePasskeyOperation['parameters']['path']>().toEqualTypeOf<{ pas
 // **Le 404 est arrivé en step-035** : une clé que le compte ne porte pas rendait 401, donc « cette
 // session n'est plus ouverte » d'une session vivante et élevée. Le 401 ne reste que pour une session
 // réellement close.
-expectTypeOf<keyof DeletePasskeyOperation['responses']>().toEqualTypeOf<204 | 401 | 404 | 409>()
+expectTypeOf<keyof DeletePasskeyOperation['responses']>().toEqualTypeOf<
+  204 | 401 | 403 | 404 | 409 | 415
+>()

@@ -153,11 +153,11 @@ type AuthConfig struct {
 	TOTPEncryptionKey []byte
 	// TrustedProxies énumère les réseaux dont on croit l'en-tête `X-Forwarded-For`.
 	//
-	// **Vide est une valeur sûre et non un défaut manquant** : sans liste, l'en-tête est ignoré et le
-	// compteur porte sur l'adresse de pair. C'est exact en développement, où rien ne s'interpose. En
-	// production, ne pas la renseigner ferait compter toutes les tentatives sur l'adresse du load
-	// balancer — le verrou se refermerait alors sur tout le monde d'un coup, ce qui se remarque, au
-	// lieu de laisser passer, ce qui ne se remarque pas.
+	// **Vide veut dire « aucun proxy », et se déclare** : la valeur littérale `NoTrustedProxy`. Sans
+	// liste, l'en-tête est ignoré et le compteur porte sur l'adresse de pair, ce qui est exact en
+	// développement où rien ne s'interpose. Ce que l'obligation a fermé depuis step-036 est l'oubli,
+	// qui se lisait pareil : en production, il ferait compter toutes les tentatives sur l'adresse du
+	// load balancer, et le verrou se refermerait sur tout le monde d'un coup.
 	TrustedProxies []netip.Prefix
 	// WebauthnRPID est le domaine auquel les passkeys sont liées, et WebauthnOrigin l'origine exacte
 	// depuis laquelle une cérémonie est acceptée.
@@ -226,14 +226,16 @@ func Load(lookup Lookup) (Config, error) {
 			SessionSecret:  r.requiredSecret(EnvSessionSecret, minimumSessionSecretLength),
 			TOTPEncryptionKey: r.requiredSecret(EnvTOTPEncryptionKey,
 				minimumTOTPEncryptionKeyLength),
-			TrustedProxies: r.prefixList(EnvTrustedProxies),
+			TrustedProxies: r.requiredPrefixList(EnvTrustedProxies),
 			WebauthnRPID:   r.requiredValue(EnvWebauthnRPID),
-			WebauthnOrigin: r.requiredAbsoluteURL(EnvWebauthnOrigin, "http", "https"),
+			WebauthnOrigin: r.webauthnOrigin(EnvWebauthnOrigin),
 		},
 	}
 
 	r.requireRealGatewayMaterial(cfg.Gateway.Mode)
 	r.requireEncryptedGatewayBaseURL(cfg.Gateway.Mode, cfg.Gateway.BaseURL)
+	r.requireLocalMockGateway(cfg.Gateway.Mode, cfg.Gateway.BaseURL)
+	r.requireLoopbackForClearOrigin(cfg.Auth.WebauthnOrigin)
 
 	if err := errors.Join(r.problems...); err != nil {
 		return Config{}, fmt.Errorf("configuration invalide :\n%w", err)
@@ -345,8 +347,102 @@ func (r *reader) requireEncryptedGatewayBaseURL(mode GatewayMode, baseURL string
 	// ($GOROOT/src/net/url/url.go:454) : `HTTPS://` a passé la garde ci-dessus, refuser ici serait
 	// refuser une URL que le programme joint parfaitement.
 	if scheme, _, _ := strings.Cut(baseURL, ":"); !strings.EqualFold(scheme, "https") {
-		r.reject(EnvGatewayBaseURL, "URL absolue en https attendue en mode %s, reçu %q", GatewayModeReal, baseURL)
+		r.reject(EnvGatewayBaseURL, "URL absolue en https attendue en mode %s, reçu %q",
+			GatewayModeReal, RedactURL(baseURL))
 	}
+}
+
+// requireLocalMockGateway est **ce qui empêche `mock` d'atteindre la production**, et c'est la seule
+// chose qui puisse le faire sans variable supplémentaire : un mock n'est pas un mode d'exploitation,
+// c'est un processus lancé à côté. Une passerelle désignée hors du bouclage est donc une vraie
+// passerelle, quoi que le mode annonce — et le contraire est un tableau de bord qui sert des données
+// inventées à des opérateurs qui les croient.
+//
+// Ce qu'elle laisse passer, délibérément : les quatre décors du dépôt — `.env.example`, la CI, les
+// parcours Playwright et les scénarios — désignent tous `127.0.0.1:4010`, l'adresse de Prism.
+func (r *reader) requireLocalMockGateway(mode GatewayMode, baseURL string) {
+	if mode != GatewayModeMock || baseURL == "" {
+		return
+	}
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil || isLoopbackHost(parsed.Hostname()) {
+		return
+	}
+
+	r.reject(EnvGatewayMode, "mode %s réservé à un mock lancé sur le poste : %s désigne %q, "+
+		"qui n'est pas une adresse de bouclage. Une passerelle jointe pour de vrai se déclare en %s",
+		GatewayModeMock, EnvGatewayBaseURL, RedactURL(baseURL), GatewayModeReal)
+}
+
+// requireLoopbackForClearOrigin n'accepte `http://` que là où il n'y a pas de réseau à écouter. Cette
+// origine est celle que le navigateur présente à chaque cérémonie WebAuthn **et**, depuis step-036,
+// celle qu'une mutation doit annoncer : en clair sur un vrai domaine, les deux se lisent et se
+// rejouent sur le fil.
+func (r *reader) requireLoopbackForClearOrigin(origin string) {
+	// Vide, ou déjà refusée plus haut : la redire ferait deux lignes pour un seul problème.
+	if origin == "" {
+		return
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme != "http" || isLoopbackHost(parsed.Hostname()) {
+		return
+	}
+
+	r.reject(EnvWebauthnOrigin, "https attendu hors du poste de développement, reçu %q : "+
+		"en clair, la cérémonie de clé d'accès et le cookie de session se lisent sur le fil",
+		RedactURL(origin))
+}
+
+// isLoopbackHost reconnaît le poste local sous ses trois écritures. `localhost` est traité par son
+// nom et non résolu : la résolution dépend de `/etc/hosts`, donc du conteneur, et une configuration
+// se juge au démarrage sans dépendre de ce qui l'entoure.
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+
+	address, err := netip.ParseAddr(host)
+
+	return err == nil && address.IsLoopback()
+}
+
+// RedactURL masque les identifiants qu'une URL porte avant qu'un refus ne la cite — le refus doit
+// nommer la variable pour être actionnable, et ne peut pas citer sa valeur pour l'être sans danger.
+//
+// Le découpage est **textuel et non `net/url`** : une URL qu'on refuse est précisément celle que
+// l'analyse peut refuser d'abord, et un `url.Parse` en échec rendrait alors la valeur intacte, mot
+// de passe compris.
+func RedactURL(value string) string {
+	separator := "//"
+
+	scheme, rest, found := strings.Cut(value, separator)
+	if !found {
+		// **La forme opaque**, celle d'un schéma oublié au copier-coller :
+		// `dashboard:secret@hôte/v1`. `net/url` la lit sans erreur et lui rend un hôte vide, donc
+		// `absoluteURL` la refuse — et c'est précisément ce refus qui citait la valeur entière.
+		separator = ":"
+		scheme, rest, found = strings.Cut(value, separator)
+
+		if !found {
+			return value
+		}
+	}
+
+	// L'autorité s'arrête au premier `/`, `?` ou `#` : au-delà, un `@` appartient au chemin et ne
+	// sépare aucun identifiant.
+	authority, tail := rest, ""
+	if end := strings.IndexAny(rest, "/?#"); end >= 0 {
+		authority, tail = rest[:end], rest[end:]
+	}
+
+	at := strings.LastIndexByte(authority, '@')
+	if at < 0 {
+		return value
+	}
+
+	return scheme + separator + "…@" + authority[at+1:] + tail
 }
 
 // requiredDatabaseURL valide le DSN sans ouvrir de connexion : `pgxpool.ParseConfig` analyse et rend
@@ -461,14 +557,62 @@ func distinctSymbols(value string) int {
 	return len(seen)
 }
 
-// prefixList lit une liste de réseaux CIDR séparés par des virgules.
+// NoTrustedProxy est la façon d'écrire « aucun proxy ne s'interpose ». Elle existe parce que vide ne
+// se distinguait pas d'un oubli : les deux se lisaient « ignore l'en-tête », et derrière un load
+// balancer l'oubli fait compter toutes les tentatives sur l'adresse de celui-ci — cinq mots de passe
+// faux verrouillent alors tous les opérateurs à la fois, indéfiniment renouvelable.
+const NoTrustedProxy = "none"
+
+// webauthnOrigin lit l'origine et la rend **canonique** : un schéma et un hôte en minuscules, rien
+// d'autre. C'est la forme exacte que le navigateur sérialise dans `Origin`, donc la seule à laquelle
+// une comparaison ait un sens — pour la cérémonie WebAuthn comme pour le contrôle d'origine du BFF.
+//
+// La barre oblique finale et la casse de l'hôte sont **normalisées et non refusées** : elles
+// désignent la même origine, et un refus ferait chercher une faute là où il n'y en a pas. Un
+// **chemin** l'est en revanche : accepté, il ne cassait qu'à moitié — les navigateurs qui annoncent
+// `Sec-Fetch-Site` passaient, ceux qui ne l'annoncent pas se faisaient refuser par une comparaison
+// d'origine que le chemin faisait échouer, sur un refus qui accusait l'appelant.
+//
+// La normalisation vit **ici**, à l'entrée de la valeur, et non dans la garde qui la consomme : une
+// garde qui normalise son paramètre à chaque requête laisse deux formes circuler dans le produit.
+func (r *reader) webauthnOrigin(name string) string {
+	value := r.requiredAbsoluteURL(name, "http", "https")
+	if value == "" {
+		return ""
+	}
+
+	// L'erreur est écartée parce qu'elle ne peut plus survenir : `absoluteURL` vient d'analyser cette
+	// même valeur, et rend `""` quand elle échoue. En réécrire le refus ici ferait deux rédactions
+	// d'un seul verdict, qui divergeraient.
+	parsed, _ := url.Parse(value)
+
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
+		(parsed.Path != "" && parsed.Path != "/") {
+		r.reject(name, "une origine est un schéma et un hôte, rien d'autre : ni chemin, ni "+
+			"paramètre, ni identifiants. Le navigateur n'en envoie jamais, et c'est à ce qu'il "+
+			"envoie que cette valeur est comparée")
+
+		return ""
+	}
+
+	return parsed.Scheme + "://" + strings.ToLower(parsed.Host)
+}
+
+// requiredPrefixList lit une liste de réseaux CIDR séparés par des virgules, et l'exige.
 //
 // Une adresse nue est **refusée** plutôt que promue en /32 : `10.0.0.1` et `10.0.0.1/32` se lisent
 // pareil pour un humain, et accepter les deux ferait passer `10.0.0.0` pour un hôte là où l'auteur
 // pensait à un réseau. Exiger le préfixe force à écrire ce qu'on veut dire.
-func (r *reader) prefixList(name string) []netip.Prefix {
-	value := r.optional(name)
-	if value == "" {
+func (r *reader) requiredPrefixList(name string) []netip.Prefix {
+	value, found := r.lookup(name)
+	if value = strings.TrimSpace(value); !found || value == "" {
+		r.reject(name, "variable obligatoire absente : les réseaux CIDR dont l'en-tête "+
+			"X-Forwarded-For est cru, ou %q sur un poste où rien ne s'interpose", NoTrustedProxy)
+
+		return nil
+	}
+
+	if value == NoTrustedProxy {
 		return nil
 	}
 
@@ -482,12 +626,22 @@ func (r *reader) prefixList(name string) []netip.Prefix {
 
 		prefix, err := netip.ParsePrefix(field)
 		if err != nil {
-			r.reject(name, "réseau CIDR attendu (par exemple 10.0.0.0/8), reçu %q", field)
+			r.reject(name, "réseau CIDR attendu (par exemple 10.0.0.0/8), ou %q sur un poste où rien "+
+				"ne s'interpose ; reçu %q", NoTrustedProxy, field)
 
 			return nil
 		}
 
 		prefixes = append(prefixes, prefix)
+	}
+
+	// Une valeur qui ne porte que des séparateurs — `,`, `,,`, `" , "` — passait les deux gardes
+	// ci-dessus et rendait `nil` sans un mot, c'est-à-dire exactement le silence que l'obligation
+	// venait de fermer. Elle est atteignable depuis n'importe quel gabarit qui joint une liste sur
+	// des virgules.
+	if len(prefixes) == 0 {
+		r.reject(name, "aucun réseau dans la liste : écrire les préfixes, ou %q sur un poste où rien "+
+			"ne s'interpose", NoTrustedProxy)
 	}
 
 	return prefixes
@@ -517,7 +671,8 @@ func (r *reader) optionalAbsoluteURL(name string, schemes ...string) string {
 func (r *reader) absoluteURL(name, value string, schemes []string) string {
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Host == "" || !slices.Contains(schemes, parsed.Scheme) {
-		r.reject(name, "URL absolue en %s attendue, reçu %q", strings.Join(schemes, " ou "), value)
+		r.reject(name, "URL absolue en %s attendue, reçu %q",
+			strings.Join(schemes, " ou "), RedactURL(value))
 
 		return ""
 	}

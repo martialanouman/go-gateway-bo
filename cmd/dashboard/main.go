@@ -162,6 +162,9 @@ func run(ctx context.Context, logger *slog.Logger) error {
 			Audit:         store.NewAudit(pool),
 		},
 		TrustedProxies: cfg.Auth.TrustedProxies,
+		// La même valeur que l'origine des cérémonies WebAuthn, et c'est délibéré : un déploiement a
+		// une origine, pas deux.
+		Origin: cfg.Auth.WebauthnOrigin,
 	})
 
 	return serve(ctx, ln, router, cfg.ShutdownTimeout, logger)

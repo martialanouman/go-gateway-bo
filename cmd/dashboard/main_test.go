@@ -262,6 +262,9 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.When(`^le navigateur demande le script que la coquille référence$`, p.fetchReferencedScript)
 	ctx.Then(`^le serveur refuse de démarrer$`, p.refusesToStart)
 	ctx.Then(`^le message d'erreur nomme "([^"]*)"$`, p.messageNames)
+	ctx.Then(`^aucune sortie ne porte "([^"]*)"$`, p.outputHides)
+
+	(&hardeningWorld{process: p}).registerSteps(ctx)
 	ctx.Then(`^le serveur s'arrête sans erreur$`, p.exitsCleanly)
 	ctx.Then(`^le tableau de bord s'affiche$`, p.servesDashboard)
 	ctx.Then(`^le script est servi$`, p.servesScript)
@@ -335,9 +338,19 @@ func completeConfiguration() map[string]string {
 		// ne peut aboutir que si le serveur tient cette origine de sa **configuration**. Un code qui
 		// la lirait dans la requête verrait `http://127.0.0.1:…` et refuserait tout.
 		"DASHBOARD_WEBAUTHN_RP_ID":  "dashboard.exemple.test",
-		"DASHBOARD_WEBAUTHN_ORIGIN": "https://dashboard.exemple.test",
+		"DASHBOARD_WEBAUTHN_ORIGIN": configuredOrigin,
+		// Obligatoire depuis step-036, et `none` est la façon d'écrire « aucun proxy » : vide se
+		// lisait aussi bien comme ça que comme un oubli, et l'oubli verrouille tous les opérateurs
+		// d'un coup derrière un load balancer.
+		"DASHBOARD_TRUSTED_PROXIES": "none",
 	}
 }
+
+// configuredOrigin est l'origine que le serveur tient de sa **configuration**, et celle que le
+// harnais annonce sur toute méthode non sûre — comme un navigateur. Elle ne ressemble délibérément
+// pas à l'adresse d'écoute, qui est `127.0.0.1:<port éphémère>` : un contrôle d'origine qui lirait
+// `Host` plutôt que la configuration refuserait tout, et un qui ne lirait rien accepterait tout.
+const configuredOrigin = "https://dashboard.exemple.test"
 
 type process struct {
 	visited  *bddtest.OperationLedger
@@ -534,15 +547,44 @@ func (p *process) fetch(path string) error {
 // une cause étrangère au produit. Et le rejeu après déconnexion a besoin de renvoyer un cookie qu'un
 // jar aurait justement supprimé.
 func (p *process) send(method, path, contentType, body string) error {
+	// Ce qu'un navigateur pose de lui-même : une origine sur toute méthode non sûre, aucune sur une
+	// lecture. La poser ici plutôt que dans chaque step est ce qui fait traverser le contrôle
+	// d'origine à **tous** les scénarios de mutation, et non aux seuls qui le décrivent.
+	origin := ""
+	if method != http.MethodGet && method != http.MethodHead {
+		origin = configuredOrigin
+	}
+
+	return p.sendFrom(method, path, origin, contentType, body)
+}
+
+// browserHeaders pose ce qu'un navigateur pose de lui-même. **Un seul endroit pour les deux
+// composeurs du harnais** — `sendFrom` et le `postAlone` des rafales : deux copies auraient divergé,
+// et la divergence se serait lue comme un refus du produit plutôt que comme un décor incomplet.
+// C'est exactement ce qui est arrivé le jour où l'origine est devenue obligatoire.
+//
+// Une valeur vide ne pose **pas** l'en-tête, et n'en pose pas un vide : ce que le scénario « sans
+// annoncer d'origine » décrit est une absence.
+func browserHeaders(request *http.Request, origin, contentType string) {
+	if contentType != "" {
+		request.Header.Set("Content-Type", contentType)
+	}
+
+	if origin != "" {
+		request.Header.Set("Origin", origin)
+	}
+}
+
+// sendFrom est `send` avec l'origine annoncée en paramètre. Une origine vide n'en pose **aucune** —
+// ce qui n'est pas un navigateur, et c'est le point du scénario qui l'emploie.
+func (p *process) sendFrom(method, path, origin, contentType, body string) error {
 	request, err := http.NewRequestWithContext(context.Background(), method, p.url(path),
 		strings.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("composer la requête vers %s: %w", path, err)
 	}
 
-	if contentType != "" {
-		request.Header.Set("Content-Type", contentType)
-	}
+	browserHeaders(request, origin, contentType)
 
 	for name, value := range p.cookies {
 		request.AddCookie(&http.Cookie{Name: name, Value: value})

@@ -301,6 +301,16 @@ type WebauthnRegistrationOptions struct {
 // WebauthnRegistrationOptionsPublicKeyPubKeyCredParamsType defines model for WebauthnRegistrationOptions.PublicKey.PubKeyCredParams.Type.
 type WebauthnRegistrationOptionsPublicKeyPubKeyCredParamsType string
 
+// OrigineRefusee La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
+// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
+// première route qui relaie la passerelle (step-060).
+type OrigineRefusee = Error
+
+// TypeDeContenuRefuse La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
+// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
+// première route qui relaie la passerelle (step-060).
+type TypeDeContenuRefuse = Error
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -719,6 +729,10 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	return r
 }
 
+type OrigineRefuseeJSONResponse Error
+
+type TypeDeContenuRefuseJSONResponse Error
+
 type LoginRequestObject struct {
 	Body *LoginJSONRequestBody
 }
@@ -765,6 +779,36 @@ func (response Login401JSONResponse) VisitLoginResponse(w http.ResponseWriter) e
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Login403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response Login403JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Login415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response Login415JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -818,6 +862,36 @@ type Logout204Response struct {
 func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type Logout403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response Logout403JSONResponse) VisitLogoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Logout415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response Logout415JSONResponse) VisitLogoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type MeRequestObject struct {
@@ -905,6 +979,20 @@ func (response EnrollTotp401JSONResponse) VisitEnrollTotpResponse(w http.Respons
 	return err
 }
 
+type EnrollTotp403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response EnrollTotp403JSONResponse) VisitEnrollTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type EnrollTotp409JSONResponse Error
 
 func (response EnrollTotp409JSONResponse) VisitEnrollTotpResponse(w http.ResponseWriter) error {
@@ -915,6 +1003,22 @@ func (response EnrollTotp409JSONResponse) VisitEnrollTotpResponse(w http.Respons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnrollTotp415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response EnrollTotp415JSONResponse) VisitEnrollTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -995,6 +1099,36 @@ func (response VerifyMfa401JSONResponse) VisitVerifyMfaResponse(w http.ResponseW
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyMfa403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response VerifyMfa403JSONResponse) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyMfa415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response VerifyMfa415JSONResponse) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1084,6 +1218,36 @@ func (response BeginWebauthnAssertion401JSONResponse) VisitBeginWebauthnAssertio
 	return err
 }
 
+type BeginWebauthnAssertion403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response BeginWebauthnAssertion403JSONResponse) VisitBeginWebauthnAssertionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginWebauthnAssertion415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response BeginWebauthnAssertion415JSONResponse) VisitBeginWebauthnAssertionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type BeginWebauthnAssertion429ResponseHeaders struct {
 	RetryAfter int
 }
@@ -1136,6 +1300,20 @@ func (response DeleteWebauthnPasskey401JSONResponse) VisitDeleteWebauthnPasskeyR
 	return err
 }
 
+type DeleteWebauthnPasskey403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response DeleteWebauthnPasskey403JSONResponse) VisitDeleteWebauthnPasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteWebauthnPasskey404JSONResponse Error
 
 func (response DeleteWebauthnPasskey404JSONResponse) VisitDeleteWebauthnPasskeyResponse(w http.ResponseWriter) error {
@@ -1160,6 +1338,22 @@ func (response DeleteWebauthnPasskey409JSONResponse) VisitDeleteWebauthnPasskeyR
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteWebauthnPasskey415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response DeleteWebauthnPasskey415JSONResponse) VisitDeleteWebauthnPasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1199,6 +1393,20 @@ func (response BeginWebauthnRegistration401JSONResponse) VisitBeginWebauthnRegis
 	return err
 }
 
+type BeginWebauthnRegistration403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response BeginWebauthnRegistration403JSONResponse) VisitBeginWebauthnRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type BeginWebauthnRegistration409JSONResponse Error
 
 func (response BeginWebauthnRegistration409JSONResponse) VisitBeginWebauthnRegistrationResponse(w http.ResponseWriter) error {
@@ -1209,6 +1417,22 @@ func (response BeginWebauthnRegistration409JSONResponse) VisitBeginWebauthnRegis
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginWebauthnRegistration415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response BeginWebauthnRegistration415JSONResponse) VisitBeginWebauthnRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1285,6 +1509,20 @@ func (response FinishWebauthnRegistration401JSONResponse) VisitFinishWebauthnReg
 	return err
 }
 
+type FinishWebauthnRegistration403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response FinishWebauthnRegistration403JSONResponse) VisitFinishWebauthnRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type FinishWebauthnRegistration409JSONResponse Error
 
 func (response FinishWebauthnRegistration409JSONResponse) VisitFinishWebauthnRegistrationResponse(w http.ResponseWriter) error {
@@ -1295,6 +1533,22 @@ func (response FinishWebauthnRegistration409JSONResponse) VisitFinishWebauthnReg
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FinishWebauthnRegistration415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response FinishWebauthnRegistration415JSONResponse) VisitFinishWebauthnRegistrationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
 	_, err := buf.WriteTo(w)
 	return err
 }

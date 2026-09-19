@@ -55,11 +55,22 @@ func testAssets() fs.FS {
 func call(t *testing.T, method, target string) *http.Response {
 	t.Helper()
 
+	request := httptest.NewRequest(method, target, nil)
+	// Ce qu'un navigateur annonce de lui-même sur une méthode non sûre, et que le contrôle d'origine
+	// de step-036 exige avant tout routage. Sans lui, un `POST /api/health` recevrait 403 — le refus
+	// du **contrôle d'origine** — au lieu du 405 que ce fichier décrit ; le décor mentirait sur la
+	// route qu'il croit exercer.
+	request.Header.Set("Sec-Fetch-Site", "same-origin")
+
 	rec := httptest.NewRecorder()
-	bff.NewRouter(bff.Dependencies{Assets: testAssets()}).ServeHTTP(rec, httptest.NewRequest(method, target, nil))
+	bff.NewRouter(bff.Dependencies{Assets: testAssets(), Origin: testOrigin}).ServeHTTP(rec, request)
 
 	return rec.Result()
 }
+
+// testOrigin est l'origine que la configuration donnerait au routeur. Elle n'est comparée qu'à un
+// `Origin` d'en-tête ; les requêtes d'ici annoncent `Sec-Fetch-Site`, qui tranche avant elle.
+const testOrigin = "https://tableau.exemple.test"
 
 func bodyOf(t *testing.T, resp *http.Response) string {
 	t.Helper()

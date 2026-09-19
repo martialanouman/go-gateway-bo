@@ -125,7 +125,7 @@ func encryptedEndpoints(cfg config.GatewayConfig) error {
 	} {
 		if scheme, _, _ := strings.Cut(endpoint.rawURL, ":"); !strings.EqualFold(scheme, "https") {
 			return fmt.Errorf("%s de la passerelle : https attendu en mode %s, reçu %q",
-				endpoint.name, config.GatewayModeReal, endpoint.rawURL)
+				endpoint.name, config.GatewayModeReal, config.RedactURL(endpoint.rawURL))
 		}
 	}
 
