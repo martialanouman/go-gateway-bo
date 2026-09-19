@@ -13,138 +13,94 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
 )
 
-// Le registre des dettes et la façon dont il se lit. Le titre de section **est** la définition du
-// registre : le déplacer déplace la porte avec lui, et le renommer la fait rougir plutôt que de la
-// laisser regarder un document vide.
 const (
+	// debtsDirectory porte **une dette par fichier**. Le registre vivait auparavant dans un tableau
+	// de `planningDocument`, et cette forme avait un défaut qu'aucune garde ne rattrapait : une ligne
+	// retirée d'un tableau de plusieurs centaines de lignes ne se voit pas en revue. Un plancher sur
+	// le nombre de lignes tentait de le tenir, mais il était prélevé sur la donnée même qu'il gardait
+	// — il dérivait à chaque ajout, et valait 60 pour 80 lignes le jour où on l'a remesuré.
+	//
+	// Un fichier supprimé, lui, apparaît nommément dans un diff. La structure supprime le mode
+	// d'échec au lieu d'essayer de le garder, et c'est pourquoi aucun plancher ne le remplace ici.
+	debtsDirectory = "debts"
+	// planningDocument n'est plus lu que pour une chose : savoir quelles steps sont cochées.
 	planningDocument = "tasks/todo.md"
-	registerHeading  = "## Dettes ouvertes"
+	// conventionDocument décrit la forme d'une dette. Ce n'en est pas une.
+	conventionDocument = "README.md"
 )
 
 // unattributed est ce qu'écrit une dette qu'on choisit de ne pas porter. La porte l'accepte, et
-// **seulement sous cette forme** : « à désigner » est un porteur qui n'existe pas, et une case vide
-// ne se distingue pas d'un oubli.
+// **seulement sous cette forme** : « à désigner » est un porteur qui n'existe pas, et une mention
+// vide ne se distingue pas d'un oubli.
 //
-// La cellule doit **commencer** par ce marqueur, et non le contenir quelque part : avec un
-// `strings.Contains`, une ligne dont la prose citerait ces deux mots sortirait entièrement du
-// contrôle, **porteur compris**. C'est le saut qui doit être précis, pas la lecture.
+// L'en-tête doit **commencer** par ce marqueur, et non le contenir quelque part : avec un
+// `strings.Contains`, une dette dont la prose citerait ces deux mots sortirait entièrement du
+// contrôle, porteur compris.
 const unattributed = "**sans porteur**"
 
-// settledMark ouvre la cellule d'une dette **payée**. Le registre exige qu'une dette payée se barre
-// sur place plutôt que de s'effacer — « une ligne effacée se rouvre en silence ».
-//
-// **Sans ce cas, la porte contredirait le registre** : le jour où une step est cochée, les lignes
-// qu'elle porte rougiraient, et la seule sortie compatible serait d'effacer le porteur — exactement
-// ce que le registre interdit.
-const settledMark = "~~"
+// carrierLine lit l'en-tête d'une dette, cherché par son libellé et jamais par un numéro de ligne :
+// celui-ci se périmerait au premier paragraphe ajouté au-dessus.
+var carrierLine = regexp.MustCompile(`(?m)^> \*\*Porteur :\*\* (.+?)(?: ·|$)`)
 
 // stepReference reconnaît un renvoi de step tel que tout le dépôt l'écrit.
 var stepReference = regexp.MustCompile(`step-[0-9]{3}`)
 
-// tableRow reconnaît une ligne de table Markdown.
-var tableRow = regexp.MustCompile(`^\|(?:[^|]*\|){2,}`)
+// checkedStep reconnaît une step cochée dans la liste de `planningDocument`.
+var checkedStep = regexp.MustCompile(`- \[x\] (step-[0-9]{3})`)
 
-// separatorCell reconnaît une cellule de ligne de séparation — et **seulement** cela.
+// maxUnattributed borne la démission : sans elle, un registre dont **toutes** les dettes seraient
+// marquées « sans porteur » passerait vert — la porte tient les porteurs faux, pas l'abandon.
 //
-// Chercher `---` n'importe où dans la ligne prendrait pour un séparateur une dette dont le texte en
-// contient — une plage écrite `2---5`, un tiret triple dans un `code span` : elle sortirait du
-// contrôle **et** emporterait la ligne précédente avec elle, deux dettes en trois caractères, sans un
-// mot.
-var separatorCell = regexp.MustCompile(`^:?-{3,}:?$`)
-
-// registerRowCount est un **plancher**, pas une égalité. Un plancher trop bas n'empêche pas ce qu'il
-// existe pour empêcher : laisser dix points sous le compte réel autorise à vider un bloc entier de
-// dettes sans un rougissement, sous couvert de « refonte de forme ». Quelques lignes de marge
-// suffisent à une fusion de formulation.
-//
-// Le compte ne décroît pas dans le cours normal des choses : une dette payée se **barre**, elle reste
-// — le registre en porte quatre-vingts au moment où ce plancher est relu.
-const registerRowCount = 60
-
-// maxUnattributed borne la démission. Six lignes sont sans porteur aujourd'hui, chacune avec sa raison
-// mesurée ; sans cette borne, un registre dont **toutes** les lignes seraient marquées « sans porteur »
-// passerait vert — la porte tient les porteurs faux, pas l'abandon.
-//
-// Ce que cette borne doit continuer d'empêcher : relever ce chiffre **sans** écrire, ici, la mesure
-// qui le justifie. Le seuil n'est pas un quota à consommer, et une attribution nominale de plus se
-// relit comme de la prudence en ne reposant sur rien.
+// Six, et six dettes le sont aujourd'hui : **la borne est pleine**. C'est délibéré et c'est ce
+// qu'elle existe pour provoquer — la prochaine non-attribution se discute au lieu de s'ajouter. La
+// relever sans écrire ici la mesure qui le justifie serait consommer un quota, pas trancher.
 const maxUnattributed = 6
 
-// Toute dette du registre nomme un porteur qui existe et qui reste à faire.
-//
-// Le registre existe parce que les dettes du projet vivaient dans des fiches archivées et des
-// commentaires, et que le dépôt écrit lui-même pourquoi c'est un problème : *« une fiche archivée
-// n'est ouverte par personne »*.
-//
-// Un registre se périme comme le reste. Deux façons, et cette porte tient les deux :
-//
-//   - un porteur qui **n'existe pas** — une step inventée, ou renumérotée ailleurs ;
-//   - un porteur **déjà coché**, c'est-à-dire une dette renvoyée à une step qui est passée sans la
-//     payer. C'est la moitié qui compte : elle est silencieuse, et le registre continue d'affirmer que
-//     quelqu'un s'en occupe.
-//
-// La porte lit le **document de pilotage** et lui seul. Elle ne parcourt pas les fiches de `done/` :
-// celles-ci racontent une décision datée, et un renvoi qui y devient faux relève de la relecture, pas
-// d'une porte — même tri que `internal/gateway/version_test.go`, qui l'écrit en toutes lettres.
-func TestChaqueDetteNommeUnPorteurQuiExisteEtResteAFaire(t *testing.T) {
-	t.Parallel()
-
-	document := readPlanningDocument(t)
-	rows := registerRows(t, document)
-
-	require.GreaterOrEqualf(t, len(rows), registerRowCount,
-		"%d ligne(s) au registre pour %d attendues au moins : la porte ne regarde plus les dettes",
-		len(rows), registerRowCount)
-
-	pending, done := plannedSteps(t, document)
-	abandoned := 0
-
-	for _, row := range rows {
-		if strings.HasPrefix(row.carrier, unattributed) {
-			abandoned++
-
-			continue
-		}
-
-		named := stepReference.FindAllString(row.carrier, -1)
-		assert.NotEmptyf(t, named,
-			"« %s » ne nomme ni une step ni « %s » : une case qu'on ne sait pas remplir ne se "+
-				"distingue pas d'un oubli", row.carrier, unattributed)
-
-		for _, step := range named {
-			assert.Truef(t, pending[step] || done[step],
-				"le registre renvoie à %s, qui n'existe nulle part dans %s", step, planningDocument)
-
-			// Une dette **barrée** est payée : son porteur doit être coché, et c'est ce qui le prouve.
-			// Le sens de la vérification s'inverse donc avec l'état de la ligne, au lieu de rendre
-			// impossible de barrer quoi que ce soit.
-			if strings.HasPrefix(row.debt, settledMark) {
-				assert.Truef(t, done[step],
-					"la dette est barrée — donc payée — mais %s reste à faire : ou la ligne est "+
-						"barrée trop tôt, ou son porteur n'est pas celui qui l'a payée", step)
-
-				continue
-			}
-
-			assert.Falsef(t, done[step],
-				"le registre renvoie à %s, qui est **déjà cochée** : la dette a survécu à la step "+
-					"censée la payer, et le registre affirme encore que quelqu'un s'en occupe. Si elle "+
-					"a bien été payée, la ligne se **barre** au lieu de s'effacer", step)
-		}
-	}
-
-	assert.LessOrEqualf(t, abandoned, maxUnattributed,
-		"%d ligne(s) sans porteur pour %d tolérées : chacune demande une raison mesurée, et une "+
-			"démission de masse passerait sans cela pour un registre en règle", abandoned, maxUnattributed)
-}
-
-// registerRow est une ligne du registre : ce qu'elle nomme, et qui la porte.
-type registerRow struct {
-	debt    string
+// debt est ce qu'un fichier de `debts/` déclare de vérifiable.
+type debt struct {
+	file    string
 	carrier string
 }
 
-// readPlanningDocument rend le document de pilotage, ou fait rougir.
+// readDebts rend une dette par fichier. Elle fait rougir sur un dossier vide ou illisible : une
+// porte qui ne lit rien est verte sans rien garder, et c'est le seul état qu'on ne saurait pas
+// distinguer d'un registre en règle.
+func readDebts(t *testing.T) []debt {
+	t.Helper()
+
+	root := filepath.Join(bddtest.RepositoryRoot(t), debtsDirectory)
+
+	entries, err := os.ReadDir(root)
+	require.NoErrorf(t, err, "%s est illisible : le registre des dettes a disparu ou changé de place",
+		debtsDirectory)
+
+	var debts []debt
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".md") || name == conventionDocument {
+			continue
+		}
+
+		content, err := os.ReadFile(filepath.Join(root, name))
+		require.NoErrorf(t, err, "%s est illisible", name)
+
+		match := carrierLine.FindSubmatch(content)
+		require.NotNilf(t, match,
+			"%s ne déclare aucun porteur : la ligne « > **Porteur :** … » manque, et une dette dont "+
+				"personne ne dit qui la paiera est une dette que personne ne paiera", name)
+
+		debts = append(debts, debt{file: name, carrier: strings.TrimSpace(string(match[1]))})
+	}
+
+	require.NotEmptyf(t, debts, "aucune dette lue dans %s : le contrôle est inerte, pas vert",
+		debtsDirectory)
+
+	return debts
+}
+
+// readPlanningDocument rend le document de pilotage, ou fait rougir. Partagé avec
+// `sequence_test.go`, qui y lit l'ordre des steps.
 func readPlanningDocument(t *testing.T) string {
 	t.Helper()
 
@@ -154,95 +110,59 @@ func readPlanningDocument(t *testing.T) string {
 	return string(content)
 }
 
-// registerRows rend la première et la dernière colonne de chaque ligne du registre.
-//
-// La section se délimite par son titre et le titre suivant, jamais par un numéro de ligne : celui-ci
-// se périme au premier paragraphe ajouté au-dessus.
-func registerRows(t *testing.T, document string) []registerRow {
-	t.Helper()
+// Une dette nomme qui la paiera, ou dit pourquoi personne ne le fera.
+func TestChaqueDetteNommeSonPorteurOuLaRaisonDeNePasEnAvoir(t *testing.T) {
+	t.Parallel()
 
-	start := strings.Index(document, registerHeading)
-	require.GreaterOrEqualf(t, start, 0,
-		"%q introuvable dans %s : le registre a disparu ou changé de nom", registerHeading,
-		planningDocument)
+	abandoned := 0
 
-	section := document[start+len(registerHeading):]
-	if end := strings.Index(section, "\n## "); end >= 0 {
-		section = section[:end]
-	}
+	for _, held := range readDebts(t) {
+		if strings.HasPrefix(held.carrier, unattributed) {
+			assert.Greaterf(t, len(held.carrier), len(unattributed)+3,
+				"%s n'est portée par personne **et** ne dit pas pourquoi : une non-attribution sans "+
+					"motif se relit comme un oubli", held.file)
 
-	var rows []registerRow
-
-	for _, line := range strings.Split(section, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if !tableRow.MatchString(trimmed) {
-			continue
-		}
-
-		cells := strings.Split(strings.Trim(trimmed, "|"), "|")
-		for index, cell := range cells {
-			cells[index] = strings.TrimSpace(cell)
-		}
-
-		// La ligne de séparation désigne l'en-tête : c'est celle qui la précède. Retirer l'en-tête
-		// **par cette règle** et non par sa position tient quel que soit le nombre de tables de la
-		// section.
-		if isSeparator(cells) {
-			if len(rows) > 0 {
-				rows = rows[:len(rows)-1]
-			}
+			abandoned++
 
 			continue
 		}
 
-		rows = append(rows, registerRow{debt: cells[0], carrier: cells[len(cells)-1]})
+		assert.Regexpf(t, stepReference, held.carrier,
+			"%s désigne un porteur qui n'est pas une step : %q", held.file, held.carrier)
 	}
 
-	return rows
+	assert.LessOrEqualf(t, abandoned, maxUnattributed,
+		"%d dette(s) sans porteur pour %d tolérées : chacune demande une raison mesurée, et une "+
+			"démission de masse passerait sans cela pour un registre en règle", abandoned, maxUnattributed)
 }
 
-// isSeparator dit si toutes les cellules d'une ligne ne portent que des tirets — la seule forme d'une
-// ligne de séparation Markdown, et rien d'autre.
-func isSeparator(cells []string) bool {
-	for _, cell := range cells {
-		if !separatorCell.MatchString(cell) {
-			return false
-		}
+// Une dette dont la step est **déjà cochée** a survécu à ce qui devait la payer, pendant que le
+// registre affirme encore que quelqu'un s'en occupe. Ou bien elle a été payée et son fichier devait
+// disparaître, ou bien son porteur n'est pas celui qu'on croyait.
+func TestAucuneDetteNeSurvitALaStepQuiDevaitLaPayer(t *testing.T) {
+	t.Parallel()
+
+	done := map[string]bool{}
+	for _, match := range checkedStep.FindAllStringSubmatch(readPlanningDocument(t), -1) {
+		done[match[1]] = true
 	}
 
-	return true
-}
+	require.NotEmptyf(t, done, "aucune step cochée dans %s : le contrôle est inerte, pas vert",
+		planningDocument)
 
-// plannedSteps rend les steps de `todo.md`, séparées selon qu'elles restent à faire ou sont cochées.
-//
-// C'est la **même source** que le registre, et c'est voulu : ce que la porte vérifie n'est pas qu'une
-// step existe dans l'absolu, mais que le document est cohérent avec lui-même. Un renvoi vers une step
-// qui n'est listée nulle part est le défaut le plus probable, et il ne se voit d'aucune autre façon.
-func plannedSteps(t *testing.T, document string) (pending, done map[string]bool) {
-	t.Helper()
-
-	pending, done = map[string]bool{}, map[string]bool{}
-
-	for _, line := range strings.Split(document, "\n") {
-		trimmed := strings.TrimSpace(line)
-
-		step := stepReference.FindString(trimmed)
-		if step == "" {
+	for _, held := range readDebts(t) {
+		// L'absence de porteur se teste **avant** d'y chercher une step, et ce n'est pas un détail
+		// d'ordre : la raison d'une non-attribution en cite souvent une — « step-021 n'en nomme
+		// aucun » —, et la lire comme un porteur ferait rougir la porte sur une dette parfaitement en
+		// règle. Mesuré sur le registre du jour : deux des six y tombaient.
+		if strings.HasPrefix(held.carrier, unattributed) {
 			continue
 		}
 
-		switch {
-		case strings.HasPrefix(trimmed, "- [ ] "):
-			pending[step] = true
-		case strings.HasPrefix(trimmed, "- [x] "):
-			done[step] = true
-		}
+		step := stepReference.FindString(held.carrier)
+
+		assert.Falsef(t, done[step],
+			"%s renvoie à %s, qui est **déjà cochée** : la dette a survécu à la step censée la payer. "+
+				"Si elle a bien été payée, le fichier se **supprime**", held.file, step)
 	}
-
-	require.NotEmpty(t, pending, "aucune step à faire dans %s : la porte est inerte, pas verte",
-		planningDocument)
-	require.NotEmpty(t, done, "aucune step cochée dans %s : la moitié « déjà payée » ne peut pas "+
-		"rougir", planningDocument)
-
-	return pending, done
 }
