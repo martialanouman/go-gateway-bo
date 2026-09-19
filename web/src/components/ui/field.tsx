@@ -57,9 +57,7 @@ export function Field({ label, hint, error, children, className }: FieldProps) {
   return (
     <BaseField.Root className={['ui-field', className].filter(Boolean).join(' ')} invalid={invalid}>
       {label === undefined ? null : (
-        <BaseField.Label className="ui-field__label">
-          {label}
-        </BaseField.Label>
+        <BaseField.Label className="ui-field__label">{label}</BaseField.Label>
       )}
 
       {children}

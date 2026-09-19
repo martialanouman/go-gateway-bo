@@ -137,12 +137,7 @@ export type IconProps = {
   readonly title?: string
 }
 
-export function Icon({
-  name,
-  size = 14,
-  className,
-  title,
-}: IconProps): ReactElement | null {
+export function Icon({ name, size = 14, className, title }: IconProps): ReactElement | null {
   // Le type dit `ReactElement`, jamais `undefined` : le repli n'existe que pour ce que le typage ne
   // couvre pas — un appelant qui aurait casté une valeur venue d'une charge utile. L'annoter est ce
   // qui rend cette branche atteignable, et donc honnête.

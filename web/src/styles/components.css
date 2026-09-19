@@ -143,7 +143,6 @@
   font-size: var(--fs-12);
 }
 
-
 .ui-button--primary {
   border-color: var(--action-primary-border);
   background: var(--action-primary-bg);
