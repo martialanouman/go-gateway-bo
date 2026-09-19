@@ -269,22 +269,16 @@ func TestLeVerrouDeSecondFacteurTombeAuSeuilEtPasAvant(t *testing.T) {
 	mfa, dsn := mfaOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	for essai := 1; essai < testMaxFailures; essai++ {
-		lock, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+	for essai := 1; essai <= testMaxFailures; essai++ {
+		lock, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 		require.NoError(t, err)
-		require.False(t, lock.Locked(), "le verrou mord au %d° échec, avant le seuil", essai)
+		require.False(t, lock.Locked(), "le verrou mord au %d° essai, avant le seuil", essai)
 	}
 
-	lock, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+	lock, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 	require.NoError(t, err)
 	require.True(t, lock.Locked(), "le seuil est franchi et rien ne verrouille")
 	assert.Positive(t, lock.Remaining)
-
-	// Et il se relit, plutôt que d'être seulement rendu par l'écriture qui l'a posé : c'est cette
-	// lecture que le handler fait avant toute dépense.
-	lock, err = mfa.LockFor(t.Context(), operator, testWindow, testMaxFailures)
-	require.NoError(t, err)
-	assert.True(t, lock.Locked())
 }
 
 // Le verrou porte sur **l'opérateur** : celui d'un compte ne ferme pas la porte d'un autre.
@@ -295,12 +289,12 @@ func TestLeVerrouDeSecondFacteurEstProprementParOperateur(t *testing.T) {
 	camille := insertOperator(t, dsn, "camille@exemple.test", "hash")
 	martin := insertOperator(t, dsn, "martin@exemple.test", "hash")
 
-	for range testMaxFailures {
-		_, err := mfa.RecordFailure(t.Context(), camille, testWindow, testMaxFailures)
+	for range testMaxFailures + 1 {
+		_, err := mfa.Reserve(t.Context(), camille, testWindow, testMaxFailures)
 		require.NoError(t, err)
 	}
 
-	lock, err := mfa.LockFor(t.Context(), martin, testWindow, testMaxFailures)
+	lock, err := mfa.Reserve(t.Context(), martin, testWindow, testMaxFailures)
 	require.NoError(t, err)
 	assert.False(t, lock.Locked())
 }
@@ -315,18 +309,21 @@ func TestLeVerrouDeSecondFacteurNeSeConfondPasAvecCeluiDeLaConnexion(t *testing.
 	mfa, logins := store.NewMFA(pool), store.NewLogins(pool)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	for range testMaxFailures {
-		_, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+	for range testMaxFailures + 1 {
+		_, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 		require.NoError(t, err)
 	}
 
-	lock, err := logins.LockFor(t.Context(), "camille@exemple.test", "une-source", testWindow,
-		testMaxFailures)
+	lock, err := logins.Reserve(t.Context(), "camille@exemple.test", testWindow, testMaxFailures)
 	require.NoError(t, err)
 	assert.False(t, lock.Locked(), "verrouiller le second facteur a fermé la connexion")
 
+	source, err := logins.SourceLock(t.Context(), "une-source", testWindow, testMaxFailures)
+	require.NoError(t, err)
+	assert.False(t, source.Locked(), "verrouiller le second facteur a compté sur la dimension de la source")
+
 	// Le témoin, dans l'autre sens : le verrou du second facteur, lui, mord bien.
-	second, err := mfa.LockFor(t.Context(), operator, testWindow, testMaxFailures)
+	second, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 	require.NoError(t, err)
 	assert.True(t, second.Locked())
 }
@@ -339,8 +336,8 @@ func TestUnVerrouDeSecondFacteurEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
 	mfa, dsn := mfaOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	for range testMaxFailures {
-		_, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+	for range testMaxFailures + 1 {
+		_, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 		require.NoError(t, err)
 	}
 
@@ -348,7 +345,7 @@ func TestUnVerrouDeSecondFacteurEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
 		UPDATE login_attempt_counters SET last_failure_at = now() - make_interval(secs => $1)
 		WHERE scope = 'mfa'`, (testWindow + time.Minute).Seconds())
 
-	lock, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+	lock, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 	require.NoError(t, err)
 	assert.False(t, lock.Locked(), "le compteur n'est pas reparti de un après l'oubli")
 }
@@ -362,14 +359,18 @@ func TestFranchirLeSecondFacteurEffaceSonCompteur(t *testing.T) {
 	mfa, dsn := mfaOn(t)
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 
-	for range testMaxFailures {
-		_, err := mfa.RecordFailure(t.Context(), operator, testWindow, testMaxFailures)
+	for range testMaxFailures + 1 {
+		_, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 		require.NoError(t, err)
 	}
 
+	refused, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	require.True(t, refused.Locked(), "ce test ne prouve rien si le compteur n'était pas verrouillé avant l'effacement")
+
 	require.NoError(t, mfa.ClearFailures(t.Context(), operator))
 
-	lock, err := mfa.LockFor(t.Context(), operator, testWindow, testMaxFailures)
+	lock, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 	require.NoError(t, err)
 	assert.False(t, lock.Locked())
 }
