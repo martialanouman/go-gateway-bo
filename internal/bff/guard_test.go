@@ -98,6 +98,13 @@ func withResolvedSession(elevated, alive bool) context.Context {
 	})
 }
 
+// withFailedResolution pose ce que `withSession` pose quand la base n'a pas répondu : une résolution
+// qui porte son erreur. Ce n'est pas une couture inventée pour le test — `resolution.err` est
+// renseigné en production par `(*session.Manager).Resolve`, et `sessionFrom` le rend tel quel.
+func withFailedResolution(err error) context.Context {
+	return context.WithValue(context.Background(), sessionKey{}, resolution{err: err})
+}
+
 func noGrants(_ context.Context, _ string) ([]string, error) {
 	return nil, errors.New("les permissions ne devaient pas être lues sur ce chemin")
 }
@@ -141,6 +148,28 @@ func TestUneSessionFermeeEstRefuseeCommeTelle(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, response.status)
 	assert.Equal(t, "unauthenticated", response.body.Code)
+}
+
+// Une **panne de résolution** de la session n'est pas un refus non plus, et c'est le pendant amont du
+// cas de lecture des permissions ci-dessous.
+//
+// Le mode d'échec que ça ferme : la base est injoignable, la garde lit « pas de session vivante » et
+// rend 401, l'opérateur se reconnecte — ce qui exige la même base — et boucle, pendant que la page de
+// statut du produit affirme que sa session a expiré. Le 500 est le seul statut qui dise où chercher.
+//
+// La branche était **atteignable mais inexercée** jusqu'ici : `withResolvedSession` ne pose jamais
+// d'erreur, et en production aucune opération n'exige encore de clé — la mutation qui la faisait
+// répondre 401 laissait donc toutes les suites vertes. Mesuré le 16/09/2026.
+func TestUnePanneDeResolutionDeSessionNestPasUnRefus(t *testing.T) {
+	t.Parallel()
+
+	ctx := withFailedResolution(errors.New("la base ne répond pas"))
+	response := servedByGuard(t, guardedTable(), noGrants, ctx)
+
+	require.Equal(t, http.StatusInternalServerError, response.status,
+		"une base injoignable est rendue comme un refus de session : l'opérateur se reconnecterait "+
+			"en boucle contre la même base")
+	assert.Equal(t, "internal_error", response.body.Code)
 }
 
 // Une session vivante mais non élevée est refusée **avant** que les permissions soient lues.
