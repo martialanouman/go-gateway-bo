@@ -75,9 +75,25 @@ func TestUnCookieScelleAvecUneAutreCleEstRefuse(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// Le dernier caractère d'un base64 de 32 octets ne porte que deux bits significatifs sur six. Sans
-// décodage strict, quatre valeurs de cookie distinctes sont acceptées pour un même sceau — et c'est
-// exactement ce qui a fait passer un pas de scénario contre un serveur correct pendant cette step.
+// base64URLAlphabet, dans l'ordre des valeurs de six bits que les caractères encodent. Il sert à
+// fabriquer une variante non canonique par arithmétique plutôt qu'en essayant des lettres.
+const base64URLAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+// Un sceau HMAC-SHA256 fait trente-deux octets, donc quarante-trois caractères base64url dont le
+// dernier ne porte que **quatre** bits significatifs sur six : les deux de poids faible sont du
+// remplissage. Sans décodage strict, les quatre valeurs qui ne diffèrent que par eux décodent vers
+// les mêmes octets, donc quatre cookies distincts sont acceptés pour un même sceau.
+//
+// **La variante est construite, pas cherchée.** La rédaction précédente balayait `A…P` et n'en
+// produisait une que si les quatre bits significatifs du dernier caractère valaient 0, 1, 2 ou 3 —
+// **une fois sur quatre**, mesuré sur cent mille tirages contre un `Unseal` privé de `Strict()` :
+// 24 827 rouges. Les trois autres fois, toutes les candidates décodent vers d'autres octets et
+// tombent sur la comparaison du HMAC, qui les refuse quoi qu'il arrive.
+//
+// La fiche d'audit annonçait « une fois sur douze » ; le chiffre a été refait ici plutôt que recopié.
+//
+// Poser les bits de remplissage à `1`, `2` puis `3` rend les trois autres écritures du même sceau, à
+// coup sûr et à chaque exécution.
 func TestUnSceauNonCanoniqueEstRefuse(t *testing.T) {
 	t.Parallel()
 
@@ -86,22 +102,36 @@ func TestUnSceauNonCanoniqueEstRefuse(t *testing.T) {
 
 	text, seal, _ := strings.Cut(value, separator)
 
-	variants := 0
+	last := strings.IndexByte(base64URLAlphabet, seal[len(seal)-1])
+	require.GreaterOrEqual(t, last, 0, "le sceau porte un caractère hors de l'alphabet base64url")
+	require.Zero(t, last%4,
+		"les bits de remplissage du dernier caractère ne sont pas nuls : `newSealedToken` n'encode "+
+			"donc pas canoniquement, et ce cas n'observerait plus ce qu'il croit")
 
-	for _, replacement := range []byte("ABCDEFGHIJKLMNOP") {
-		candidate := text + separator + seal[:len(seal)-1] + string(replacement)
-		if candidate == value {
-			continue
-		}
+	for padding := 1; padding <= 3; padding++ {
+		candidate := seal[:len(seal)-1] + string(base64URLAlphabet[last+padding])
 
-		if _, ok := Unseal(testSecret, candidate); ok {
-			variants++
-		}
+		t.Run(candidate[len(candidate)-1:], func(t *testing.T) {
+			t.Parallel()
+
+			// Le témoin : sans `Strict()`, cette variante décode vers les **mêmes** octets que le sceau
+			// canonique. C'est ce qui prouve que le refus vient bien du décodage strict et non de la
+			// comparaison du HMAC, qui refuserait n'importe quelle autre valeur.
+			relaxed, err := base64.RawURLEncoding.DecodeString(candidate)
+			require.NoError(t, err, "la variante n'est même pas du base64 : le cas ne prouverait rien")
+
+			canonical, err := base64.RawURLEncoding.DecodeString(seal)
+			require.NoError(t, err)
+			require.Equal(t, canonical, relaxed,
+				"la variante ne décode pas vers les mêmes octets : le HMAC la refuserait de toute "+
+					"façon, et `Strict()` pourrait disparaître sans que ce cas le voie")
+
+			_, ok := Unseal(testSecret, text+separator+candidate)
+			assert.False(t, ok,
+				"un encodage non canonique du même sceau est accepté : le cookie n'a pas une seule "+
+					"forme valide")
+		})
 	}
-
-	assert.Zero(t, variants,
-		"%d encodage(s) non canonique(s) du même sceau sont acceptés : le cookie n'a pas une seule "+
-			"forme valide", variants)
 }
 
 func TestDeuxSessionsNePartagentPasLeurJeton(t *testing.T) {

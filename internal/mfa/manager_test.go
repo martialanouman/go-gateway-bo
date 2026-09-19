@@ -47,13 +47,6 @@ func TestUnChallengeMalFormeNAtteintPasLaBase(t *testing.T) {
 	require.Error(t, err, "témoin : un challenge bien formé doit, lui, atteindre la base")
 }
 
-// La passphrase est dérivée à la construction : une clé qui ne mènerait nulle part doit se voir au
-// démarrage, pas à la première authentification.
-func TestUnManagerSeConstruitAvecSaClef(t *testing.T) {
-	t.Parallel()
-
-	manager, err := mfa.NewManager(store.NewMFA(closedPool(t)),
-		store.NewCounter(closedPool(t), store.ScopeTOTPEnroll), []byte(testPassphrase), testIssuer)
-	require.NoError(t, err)
-	assert.NotNil(t, manager)
-}
+// `TestUnManagerSeConstruitAvecSaClef` a été retiré : il affirmait que `NewManager` échoue sur une
+// mauvaise clé, et `hkdf.Key` avec SHA-256 n'échoue pour aucune phrase secrète. Ce qui garde la clé
+// est la borne de longueur d'`internal/config` et `cipher_test.go`.

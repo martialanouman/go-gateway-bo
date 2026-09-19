@@ -167,10 +167,16 @@ func TestUnNomDeProduitOrdinairePasse(t *testing.T) {
 	assert.Equal(t, "Passerelle SMS — Préproduction", cfg.ProductName)
 }
 
-// Les trois secrets sont distincts et le restent. Réutiliser l'un pour l'autre ferait qu'une fuite de
-// la table des compteurs — qui ne porte que des HMAC — livrerait de quoi signer des sessions, ou
-// qu'un secret de signature volé livrerait avec lui tous les seconds facteurs.
-func TestLesTroisSecretsNeSeConfondentPas(t *testing.T) {
+// Chaque secret vient de **sa** variable, et c'est tout ce que ce cas garde : `Load` ne refuse pas
+// trois valeurs identiques, et la rédaction précédente promettait cette garde-là sous le nom
+// « les trois secrets ne se confondent pas ». Ce qu'elle voit vraiment est une affectation croisée —
+// `SessionSecret` recopié dans `BruteForceSalt`, par exemple — que `minimalEnv` rend visible en
+// donnant trois valeurs distinctes.
+//
+// L'enjeu reste celui-là : réutiliser un secret pour l'autre ferait qu'une fuite de la table des
+// compteurs — qui ne porte que des HMAC — livrerait de quoi signer des sessions. Ce qui l'empêche est
+// l'exploitant qui pose trois valeurs différentes, pas ce code.
+func TestChaqueSecretVientDeSaPropreVariable(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := config.Load(lookupFrom(minimalEnv()))

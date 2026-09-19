@@ -116,7 +116,7 @@ func (a API) FinishWebauthnRegistration(ctx context.Context,
 		}))
 	if err != nil {
 		if mfa.IsRefusedCeremony(err) {
-			return FinishWebauthnRegistration401JSONResponse(refusedCeremony()), nil
+			return FinishWebauthnRegistration400JSONResponse(refusedCeremony()), nil
 		}
 
 		return nil, err
@@ -125,7 +125,7 @@ func (a API) FinishWebauthnRegistration(ctx context.Context,
 	if id == "" {
 		// Aucun défi vivant, ou un autre l'a fermé d'abord. Le même refus que pour une signature
 		// fausse : les distinguer dirait à une machine où elle en est.
-		return FinishWebauthnRegistration401JSONResponse(refusedCeremony()), nil
+		return FinishWebauthnRegistration400JSONResponse(refusedCeremony()), nil
 	}
 
 	return FinishWebauthnRegistration200JSONResponse{Id: id}, nil
@@ -228,8 +228,9 @@ func (a API) DeleteWebauthnPasskey(ctx context.Context,
 		return DeleteWebauthnPasskey409JSONResponse(lastSecondFactor()), nil
 	case store.PasskeyUnknown:
 		// « Elle n'existe pas » et « elle n'est pas à vous » rendent le même corps : distinguer dirait
-		// ce que possède quelqu'un d'autre.
-		return DeleteWebauthnPasskey401JSONResponse(notAuthenticated()), nil
+		// ce que possède quelqu'un d'autre. **Ce qui manque est la clé, pas la session** — les deux
+		// gardes de session sont franchies plus haut, et celle-ci est vivante et élevée.
+		return DeleteWebauthnPasskey404JSONResponse(unknownPasskey()), nil
 	case store.PasskeyRemoved:
 		return DeleteWebauthnPasskey204Response{}, nil
 	}
@@ -284,6 +285,23 @@ func lastSecondFactor() Error {
 	}
 }
 
+// unknownPasskey refuse un retrait qui ne désigne aucune clé de l'opérateur.
+//
+// **Il ne parle pas de la session** : les deux gardes qui l'exigent sont franchies plus haut, donc
+// elle est vivante et élevée. « Elle n'existe pas », « elle n'est pas à vous » et « cet identifiant
+// n'en est pas un » rendent le même refus — la comparaison `c.id::text = $2` du store les traite
+// ensemble, et les distinguer dirait ce que possède quelqu'un d'autre.
+//
+// L'inventaire qu'il annonce n'existe pas encore : aucune route ne liste les clés. Le futur est donc
+// écrit au futur, comme dans `secondFactorAlreadyEnrolled`.
+func unknownPasskey() Error {
+	return Error{
+		Code: "passkey_unknown",
+		Message: "Cette clé d'accès n'est pas sur ce compte : rien n'a été retiré. L'inventaire qui " +
+			"nomme les clés du compte arrivera avec l'écran de gestion du second facteur.",
+	}
+}
+
 func noPasskeyToAssert() Error {
 	return Error{
 		Code: "no_passkey_enrolled",
@@ -299,6 +317,11 @@ func noPasskeyToAssert() Error {
 // copie s'adresse donc à quelqu'un qui **pose** un facteur, pas à quelqu'un qui en franchit un : lui
 // conseiller « franchir le second facteur autrement », comme une rédaction précédente le faisait, le
 // renvoyait vers un geste sans rapport avec ce qu'il essayait de faire.
+//
+// **Il part en 400 depuis step-035**, et ce n'est pas un détail de rangement : en 401, un client qui
+// lit le statut sans lire le `code` renvoyait au login un opérateur dont la session est vivante — et
+// `web/src/lib/api.ts` en porte déjà un, `isUnauthenticated`. Ce que le serveur refuse ici est ce qui
+// lui a été présenté, pas la session qui le présente.
 func refusedCeremony() Error {
 	return Error{
 		Code: "webauthn_ceremony_refused",

@@ -1136,6 +1136,20 @@ func (response DeleteWebauthnPasskey401JSONResponse) VisitDeleteWebauthnPasskeyR
 	return err
 }
 
+type DeleteWebauthnPasskey404JSONResponse Error
+
+func (response DeleteWebauthnPasskey404JSONResponse) VisitDeleteWebauthnPasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteWebauthnPasskey409JSONResponse Error
 
 func (response DeleteWebauthnPasskey409JSONResponse) VisitDeleteWebauthnPasskeyResponse(w http.ResponseWriter) error {

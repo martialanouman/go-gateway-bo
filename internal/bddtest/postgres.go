@@ -2,6 +2,7 @@ package bddtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -205,6 +206,10 @@ func Discardable(database, prefix string) bool {
 // processAlive dit si un processus de ce PID tourne encore. Le signal 0 ne fait que poser la
 // question. Un PID recyclé rend un faux positif : la base survit une exécution de plus, ce qui ne
 // coûte rien — l'inverse casserait un run en cours.
+//
+// **EPERM est un « oui ».** Le noyau refuse le signal parce que le processus existe et appartient à
+// quelqu'un d'autre ; seul `ESRCH` — qu'`os` rend en `os.ErrProcessDone` — dit qu'il n'existe plus.
+// Le lire comme une mort fait jeter la base d'un run vivant lancé sous un autre utilisateur.
 func processAlive(pid int) bool {
 	if pid <= 0 {
 		return false
@@ -215,5 +220,7 @@ func processAlive(pid int) bool {
 		return false
 	}
 
-	return process.Signal(syscall.Signal(0)) == nil
+	err = process.Signal(syscall.Signal(0))
+
+	return err == nil || errors.Is(err, syscall.EPERM)
 }

@@ -2,6 +2,9 @@ package bff
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
+	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -22,7 +26,7 @@ import (
 // « arrivée jusqu'à la base ». Une borne retirée bascule de l'un à l'autre.
 //
 // Aucun conteneur, aucun réseau : le pool est paresseux (DN-5) et fermé avant tout usage.
-func loginRouter(t *testing.T) http.Handler {
+func apiRouter(t *testing.T) http.Handler {
 	t.Helper()
 
 	pool, err := store.NewPool(context.Background(), "postgres://operateur:secret@127.0.0.1:1/tableau")
@@ -36,16 +40,16 @@ func loginRouter(t *testing.T) http.Handler {
 	})
 }
 
-// postLogin rend le statut et le corps servis. Le corps est passé en clair pour que sa taille en
-// octets soit celle que la borne du corps mesure.
-func postLogin(t *testing.T, body string) (int, string) {
+// post rend le statut et le corps servis. Le corps part en clair pour que sa taille en octets soit
+// celle que la borne du corps mesure.
+func post(t *testing.T, path, body string) (int, string) {
 	t.Helper()
 
 	rec := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 
-	loginRouter(t).ServeHTTP(rec, request)
+	apiRouter(t).ServeHTTP(rec, request)
 
 	response := rec.Result()
 
@@ -71,7 +75,7 @@ func credentials(t *testing.T, email, password string) string {
 func TestUnMotDePasseDemesureNAtteintPasLeHachage(t *testing.T) {
 	t.Parallel()
 
-	status, _ := postLogin(t,
+	status, _ := post(t, "/api/auth/login",
 		credentials(t, "camille@exemple.test", strings.Repeat("a", maximumPasswordLength+1)))
 
 	assert.Equal(t, http.StatusBadRequest, status,
@@ -83,7 +87,7 @@ func TestUnMotDePasseDemesureNAtteintPasLeHachage(t *testing.T) {
 func TestUneAdresseDemesureeNeDevientPasUneCleDeCompteur(t *testing.T) {
 	t.Parallel()
 
-	status, _ := postLogin(t,
+	status, _ := post(t, "/api/auth/login",
 		credentials(t, strings.Repeat("a", maximumEmailLength+1)+"@exemple.test", "un mot de passe"))
 
 	assert.Equal(t, http.StatusBadRequest, status,
@@ -100,7 +104,7 @@ func TestUneAdresseDAccentsSousLaBorneNEstPasRefusee(t *testing.T) {
 	require.Len(t, []rune(accented), maximumEmailLength)
 	require.Greater(t, len(accented), maximumEmailLength, "ces runes tiennent sur un octet")
 
-	status, _ := postLogin(t, credentials(t, accented, "un mot de passe"))
+	status, _ := post(t, "/api/auth/login", credentials(t, accented, "un mot de passe"))
 
 	assert.Equal(t, http.StatusInternalServerError, status,
 		"une adresse que le contrat autorise a été refusée : la borne compte des octets là où le "+
@@ -119,7 +123,7 @@ func TestUnCorpsPlusGrandQueLaBorneNEstPasDecode(t *testing.T) {
 	require.Greater(t, len(oversized), maximumLoginBodyBytes,
 		"ce corps tient sous la borne : la mutation qui retire RequestSize resterait verte")
 
-	status, _ := postLogin(t, oversized)
+	status, _ := post(t, "/api/auth/login", oversized)
 
 	assert.Equal(t, http.StatusBadRequest, status,
 		"un corps de %d octets a été décodé : la borne du corps ne s'applique plus, et les bornes de "+
@@ -134,7 +138,7 @@ func TestUnCorpsPlusGrandQueLaBorneNEstPasDecode(t *testing.T) {
 func TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants(t *testing.T) {
 	t.Parallel()
 
-	status, served := postLogin(t, credentials(t, "camille@exemple.test", "un mot de passe"))
+	status, served := post(t, "/api/auth/login", credentials(t, "camille@exemple.test", "un mot de passe"))
 
 	require.Equal(t, http.StatusInternalServerError, status,
 		"une base injoignable a été servie comme un refus : l'opérateur retape un mot de passe qui est bon")
@@ -145,4 +149,208 @@ func TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants(t *testing.T) {
 	assert.Equal(t, "internal_error", served500.Code)
 	assert.NotContains(t, served, "closed pool", "le message de la bibliothèque part au navigateur")
 	assert.NotContains(t, served, "127.0.0.1", "le corps porte l'adresse de la base")
+}
+
+// postJSON encode et poste, sans cookie. Les routes de second facteur contrôlent la forme **puis**
+// exigent une session : un corps bien formé rend donc 401 et un corps mal formé 400, et c'est ce
+// contraste qui rend chaque clause observable.
+func postJSON(t *testing.T, path string, body any) int {
+	t.Helper()
+
+	encoded, err := json.Marshal(body)
+	require.NoError(t, err, "composer le corps de la requête")
+
+	status, _ := post(t, path, string(encoded))
+
+	return status
+}
+
+// **Les contrôles de forme de la vérification, un par un.** Les scénarios n'en exerçaient que deux —
+// un code démesuré et une méthode inconnue ; les quatre autres clauses de
+// `presentedSecondFactorIsWellFormed` et de `presentedFactorIsWellFormed` pouvaient disparaître sans
+// qu'aucune suite rougisse, mesuré le 16/09/2026.
+//
+// Le contrat ne sait pas exprimer deux champs qui s'excluent : `code` et `assertion` y sont tous deux
+// facultatifs, et c'est en Go que la règle vit. Sans exclusion, le champ de trop est ignoré en
+// silence et la faute de forme se lit comme un refus de facteur.
+func TestChaqueControleDeFormeDuSecondFacteurRefuseAvantToutEtat(t *testing.T) {
+	t.Parallel()
+
+	code := "123456"
+	assertion := map[string]any{"id": "abc"}
+	challenge := strings.Repeat("a", 43)
+
+	cases := map[string]struct {
+		body map[string]any
+		want int
+	}{
+		// Le témoin, et il n'est pas décoratif : sans lui, une route qui refuserait **tout** en 400
+		// ferait passer les cinq cas ci-dessous sans rien prouver.
+		"un corps bien formé va jusqu'à l'exigence de session": {
+			body: map[string]any{"challenge": challenge, "method": "totp", "code": code},
+			want: http.StatusUnauthorized,
+		},
+		"un challenge plus long que la borne": {
+			body: map[string]any{
+				"challenge": strings.Repeat("a", maximumChallengeLength+1),
+				"method":    "totp",
+				"code":      code,
+			},
+			want: http.StatusBadRequest,
+		},
+		"une assertion accompagnée d'un code": {
+			body: map[string]any{
+				"challenge": challenge, "method": "webauthn", "assertion": assertion, "code": code,
+			},
+			want: http.StatusBadRequest,
+		},
+		"un code accompagné d'une assertion": {
+			body: map[string]any{
+				"challenge": challenge, "method": "totp", "code": code, "assertion": assertion,
+			},
+			want: http.StatusBadRequest,
+		},
+		"une assertion vide sur la méthode qui en exige une": {
+			body: map[string]any{
+				"challenge": challenge, "method": "webauthn", "assertion": map[string]any{},
+			},
+			want: http.StatusBadRequest,
+		},
+		"un code vide sur une méthode qui en exige un": {
+			body: map[string]any{"challenge": challenge, "method": "totp", "code": ""},
+			want: http.StatusBadRequest,
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, testCase.want, postJSON(t, "/api/auth/mfa/verify", testCase.body),
+				"la forme du corps n'est pas jugée comme elle devrait : une faute de forme se lit "+
+					"comme un refus de facteur, ou l'inverse")
+		})
+	}
+}
+
+// **Les deux moitiés de la preuve d'enrôlement.** `presentedFactorIsWellFormed` exige les deux champs
+// ensemble ou aucun des deux ; rien ne l'exerçait.
+//
+// Un `method` sans `code` traité comme « aucune preuve » rendrait 409 « un facteur est déjà en
+// place » à un opérateur qui vient d'en présenter un. Un `code` sans `method` partirait sur le chemin
+// TOTP par le repli de `verifyPresentedFactor`, alors que l'opérateur a peut-être tapé un code de
+// récupération — et se verrait refuser un code juste.
+func TestLaPreuveDEnrolementExigeSesDeuxChampsOuAucun(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		body map[string]any
+		want int
+	}{
+		// Les deux témoins : aucune preuve, et une preuve complète. Les deux formes que la route
+		// accepte, et sans elles un refus universel passerait les deux cas suivants.
+		"aucun des deux champs, qui est l'amorçage": {
+			body: map[string]any{},
+			want: http.StatusUnauthorized,
+		},
+		"les deux champs ensemble": {
+			body: map[string]any{"method": "totp", "code": "123456"},
+			want: http.StatusUnauthorized,
+		},
+		"une méthode sans code": {
+			body: map[string]any{"method": "totp"},
+			want: http.StatusBadRequest,
+		},
+		"un code sans méthode": {
+			body: map[string]any{"code": "123456"},
+			want: http.StatusBadRequest,
+		},
+		// **L'enum de l'enrôlement, pas celui de la vérification.** `webauthn` est une méthode valide
+		// pour `POST /auth/mfa/verify` depuis step-024, et ne l'a jamais été ici : le corps de cette
+		// route ne déclare que `totp` et `recovery_code`. Sans cette clause, le repli de
+		// `verifyPresentedFactor` enverrait une assertion WebAuthn sur le chemin TOTP, par un champ
+		// `code`. C'est le défaut que le commentaire de `presentedFactorIsWellFormed` décrit, et que
+		// la mutation de la fonction entière ne distinguait pas de ses clauses.
+		"une méthode que seule la vérification déclare": {
+			body: map[string]any{"method": "webauthn", "code": "123456"},
+			want: http.StatusBadRequest,
+		},
+		// La borne du code, redite en Go faute de validation du YAML à l'exécution. Sans elle, un code
+		// démesuré part jusqu'à argon2id.
+		"un code plus long que la borne": {
+			body: map[string]any{
+				"method": "totp",
+				"code":   strings.Repeat("1", maximumCodeLength+1),
+			},
+			want: http.StatusBadRequest,
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, testCase.want, postJSON(t, "/api/auth/mfa/totp/enroll", testCase.body),
+				"la preuve d'enrôlement n'est pas jugée sur sa forme : une faute de forme se lit "+
+					"comme « aucune preuve », donc comme un conflit d'état")
+		})
+	}
+}
+
+// sealedLikeProduction fabrique un cookie que `session.Unseal` acceptera. Le jeton est constant —
+// quarante-trois `A`, l'encodage canonique de trente-deux octets nuls : son contenu n'est jamais lu,
+// le pool étant mort avant la requête.
+//
+// **Le risque de la recopie est fermé par le sens de l'échec** : un format qui divergerait ferait
+// refuser `Unseal`, donc rendre 401 là où le cas exige 500.
+func sealedLikeProduction(secret []byte) string {
+	text := strings.Repeat("A", 43)
+
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(text))
+
+	return text + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// **Une base injoignable ne ferme pas la session de l'opérateur**, et ce cas tient la moitié que
+// `TestUnePanneDeResolutionDeSessionNestPasUnRefus` ne tient pas.
+//
+// Celui-là pose lui-même l'erreur dans le contexte et prouve que la garde la propage. Il ne prouve
+// pas que quiconque la pose : `withSession` est le seul à le faire en production, en trois lignes que
+// rien n'exerçait. Poser `err: nil` là-bas laissait les deux suites vertes — c'est exactement le
+// harnais qui masque, et il fallait les deux moitiés.
+//
+// Ce cas-ci traverse le routeur réel, le vrai `withSession` et un vrai `session.Manager` ; seule la
+// base est morte. Le 500 est ce qui distingue « le serveur est en panne » de « reconnectez-vous »,
+// dont le remède boucle puisque se reconnecter exige la même base.
+func TestUneBaseInjoignableNeFermePasLaSessionDeLOperateur(t *testing.T) {
+	t.Parallel()
+
+	pool, err := store.NewPool(context.Background(), "postgres://operateur:secret@127.0.0.1:1/tableau")
+	require.NoError(t, err)
+
+	pool.Close()
+
+	secret := []byte("une-cle-de-session-assez-longue-pour-la-borne")
+	handler := NewRouter(Dependencies{
+		Assets:   fstest.MapFS{},
+		Sessions: session.NewManager(store.NewSessions(pool), secret),
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	request.AddCookie(&http.Cookie{
+		Name:  session.CookieName,
+		Value: sealedLikeProduction(secret),
+	})
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, request)
+
+	response := rec.Result()
+
+	defer func() { _ = response.Body.Close() }()
+
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode,
+		"une base injoignable est servie comme une session close : l'opérateur se reconnecterait en "+
+			"boucle contre la base qui est justement tombée")
 }

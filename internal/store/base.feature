@@ -7,7 +7,7 @@ Fonctionnalité: Le schéma propre au BFF s'applique sur une base vierge
   Scénario: une base vierge reçoit le schéma du tableau de bord
     Étant donné une base PostgreSQL vierge
     Quand les migrations sont jouées
-    Alors les huit migrations du schéma sont rapportées appliquées
+    Alors les neuf migrations du schéma sont rapportées appliquées
     Et les quinze tables du schéma existent
     Et le journal d'audit accepte un événement daté du mois courant
     Et le journal d'audit accepte un événement daté du mois suivant

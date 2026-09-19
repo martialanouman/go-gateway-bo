@@ -68,6 +68,8 @@ func (w *webauthnWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur présente sa clé d'accès signée pour une autre origine$`,
 		w.assertFromAnotherOrigin)
 	ctx.When(`^l'opérateur retire sa première clé d'accès$`, w.removeFirstPasskey)
+	ctx.When(`^l'opérateur retire une clé d'accès qui n'est pas la sienne$`,
+		w.removeUnknownPasskey)
 	ctx.When(`^l'opérateur retire une clé d'accès dont l'identifiant est mal formé$`,
 		w.removeMalformedPasskey)
 	ctx.When(`^le compteur de la clé d'accès est avancé en base$`, w.advanceStoredSignCount)
@@ -86,6 +88,7 @@ func (w *webauthnWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^le second facteur est verrouillé$`, w.secondFactorIsLocked)
 	ctx.Then(`^la réponse conduit vers l'enrôlement$`, w.responseLeadsToEnrolment)
 	ctx.Then(`^la cérémonie est refusée$`, w.ceremonyIsRefused)
+	ctx.Then(`^la clé d'accès est inconnue de ce compte$`, w.passkeyIsUnknown)
 	ctx.Then(`^le refus dit qu'il faut d'abord un autre facteur$`, w.refusalNamesTheMissingFactor)
 	ctx.Then(`^le refus dit comment ajouter un facteur$`, w.refusalNamesTheElevation)
 	ctx.Then(`^le refus dit comment franchir le second facteur$`, w.refusalNamesTheElevation)
@@ -408,6 +411,15 @@ func (w *webauthnWorld) removeMalformedPasskey() error {
 	return w.login.process.remove("/api/auth/mfa/webauthn/passkeys/pas-un-identifiant")
 }
 
+// removeUnknownPasskey retire un identifiant bien formé que ce compte ne porte pas. Rien ne garde la
+// forme en amont — c'est la comparaison `c.id::text = $2` du store qui répond, et un identifiant mal
+// formé converge sur le même refus. Ce cas-ci est celui qui en affirme le statut, le code et la
+// phrase ; le scénario de l'identifiant mal formé, lui, n'affirme aucun statut.
+func (w *webauthnWorld) removeUnknownPasskey() error {
+	return w.login.process.remove(
+		"/api/auth/mfa/webauthn/passkeys/00000000-0000-4000-8000-000000000000")
+}
+
 func (w *webauthnWorld) removeFirstPasskey() error {
 	if len(w.passkeys) == 0 {
 		return errors.New("aucune clé d'accès enregistrée : le scénario n'a rien à retirer")
@@ -450,12 +462,41 @@ func (w *webauthnWorld) passkeysRemaining(expected int) error {
 	return nil
 }
 
+// **Le refus ne nomme aucune méthode**, et c'est vérifié ici parce que c'est ici que ça se voit :
+// l'opérateur vient de présenter une clé d'accès. La rédaction d'avant lui disait « vérifier l'heure
+// de l'application d'authentification », c'est-à-dire de régler une horloge que son geste n'emploie
+// pas. Le constructeur est partagé par les trois méthodes, donc sans ce pas la rédaction fautive
+// revient sans qu'aucune suite le dise.
 func (w *webauthnWorld) secondFactorIsRefused() error {
-	return w.refusalIs(401, "invalid_second_factor")
+	if err := w.refusalIs(401, "invalid_second_factor"); err != nil {
+		return err
+	}
+
+	for _, misleading := range []string{"application d'authentification", "horloge", "heure"} {
+		if strings.Contains(strings.ToLower(w.login.process.received.body), misleading) {
+			return fmt.Errorf("le refus d'une clé d'accès nomme %q : il envoie l'opérateur corriger "+
+				"ce que son geste n'emploie pas\n%s", misleading, w.login.process.received.body)
+		}
+	}
+
+	return nil
 }
 
+// **400 et non 401 depuis step-035.** Le statut est vérifié ici et non seulement le code : c'est lui
+// qu'un intercepteur client lit, et lui seul décide si l'opérateur est renvoyé au login.
 func (w *webauthnWorld) ceremonyIsRefused() error {
-	return w.refusalIs(401, "webauthn_ceremony_refused")
+	return w.refusalIs(400, "webauthn_ceremony_refused")
+}
+
+// La clé nommée par l'URL n'est pas celle de l'opérateur. La session, elle, est vivante **et
+// élevée** : les deux gardes qui l'exigent sont franchies avant ce refus, et c'est pourquoi il ne
+// peut pas parler de la session.
+func (w *webauthnWorld) passkeyIsUnknown() error {
+	if err := w.refusalIs(404, "passkey_unknown"); err != nil {
+		return err
+	}
+
+	return w.messageMentions("n'est pas sur ce compte")
 }
 
 func (w *webauthnWorld) responseLeadsToEnrolment() error {
@@ -483,7 +524,12 @@ func (w *webauthnWorld) secondFactorIsLocked() error {
 }
 
 func (w *webauthnWorld) refusalIs(status int, code string) error {
-	received := w.login.process.received
+	return refusalIs(w.login.process.received, status, code)
+}
+
+// refusalIs est libre plutôt que méthode : `mfaWorld` pose la même question, et deux rédactions
+// divergeraient sur ce qu'elles acceptent de lire.
+func refusalIs(received *response, status int, code string) error {
 	if received == nil {
 		return errors.New("aucune réponse à lire")
 	}
@@ -510,11 +556,22 @@ func (w *webauthnWorld) refusalIs(status int, code string) error {
 // messageMentions lit la **copie**, pas le code : c'est elle que l'opérateur voit, et un refus qui
 // n'expliquerait pas par où passer serait un contrôle interdit sans explication.
 func (w *webauthnWorld) messageMentions(fragment string) error {
+	return messageMentions(w.login.process.received, fragment)
+}
+
+// messageMentions est libre pour la même raison que `refusalIs` : `mfaWorld` pose la même question, et
+// deux rédactions divergeraient sur ce qu'elles acceptent de lire. Elle lit **le champ `message`** et
+// non le corps entier — un fragment trouvé dans `code` ferait passer une phrase qui ne le dit pas.
+func messageMentions(received *response, fragment string) error {
+	if received == nil {
+		return errors.New("aucune réponse à lire")
+	}
+
 	var refusal struct {
 		Message string `json:"message"`
 	}
 
-	if err := json.Unmarshal([]byte(w.login.process.received.body), &refusal); err != nil {
+	if err := json.Unmarshal([]byte(received.body), &refusal); err != nil {
 		return fmt.Errorf("relire le message du refus : %w", err)
 	}
 

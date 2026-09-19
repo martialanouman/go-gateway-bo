@@ -714,6 +714,17 @@ export interface operations {
              *     l'un des codes de récupération. Si les deux sont perdus, la sortie est la réinitialisation
              *     par un administrateur, que la gestion des opérateurs apportera : elle n'existe pas encore,
              *     et le message ne prétend pas le contraire.
+             *
+             *     **Trois causes, trois codes**, et ici le `code` est le **seul** discriminant — contrairement
+             *     au retrait d'une clé d'accès, où le statut sépare déjà les causes. Un client qui ne lirait
+             *     que le statut ne pourrait pas placer l'erreur au bon endroit.
+             *
+             *     `mfa_elevation_required` : le compte ne porte qu'une clé d'accès, et la session n'est pas
+             *     élevée — rien n'a été présenté, et c'est l'élévation qui tient lieu de preuve.
+             *     `mfa_already_enrolled` : un facteur est en place et **aucune preuve** n'accompagne la
+             *     demande. `mfa_replacement_refused` : une preuve a été présentée, et c'est **elle** qui a
+             *     été refusée — le distinguer du précédent est ce qui évite de répondre « présentez votre
+             *     code » à quelqu'un qui vient de le faire.
              */
             409: {
                 headers: {
@@ -921,7 +932,22 @@ export interface operations {
                     "application/json": components["schemas"]["WebauthnCredential"];
                 };
             };
-            /** @description La requête n'a pas la forme que la route attend. */
+            /**
+             * @description Deux causes, deux codes. `bad_request` : la requête n'a pas la forme que la route attend.
+             *     `webauthn_ceremony_refused` : la cérémonie n'a pas abouti — le même corps qu'aucun défi ne
+             *     soit ouvert, qu'il soit échu ou déjà servi, que l'origine ne soit pas celle qu'on
+             *     attendait, que la signature soit fausse, ou que **cette clé soit déjà enregistrée** — ici
+             *     ou ailleurs : les distinguer dirait à qui détient l'authentificateur s'il est enrôlé
+             *     quelque part.
+             *
+             *     **400 et non 401 depuis step-035.** La cérémonie est refusée sur une session bien vivante,
+             *     et rien de ce qui l'authentifie n'a manqué : c'est ce qui a été présenté que le serveur
+             *     n'accepte pas. Un client qui traite tout 401 comme « la session est close » — ce que fait
+             *     `isUnauthenticated` dans `web/src/lib/api.ts` — renverrait l'opérateur au login pour une
+             *     passkey qui a mal signé, en lui faisant perdre son élévation au passage. Le `code` seul ne
+             *     suffisait pas à l'en empêcher : il faut le lire, et un intercepteur câblé sur le statut ne
+             *     le lit pas.
+             */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -930,13 +956,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /**
-             * @description Aucune session vivante, ou la cérémonie n'a pas abouti. Le corps du second cas est le même
-             *     qu'aucun défi ne soit ouvert, qu'il soit échu ou déjà servi, que l'origine ne soit pas
-             *     celle qu'on attendait, que la signature soit fausse, ou que **cette clé soit déjà
-             *     enregistrée** — ici ou ailleurs : les distinguer dirait à qui détient l'authentificateur
-             *     s'il est enrôlé quelque part.
-             */
+            /** @description Aucune session vivante. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1036,16 +1056,30 @@ export interface operations {
                 };
                 content?: never;
             };
-            /**
-             * @description Aucune session vivante, ou cette passkey n'appartient pas à l'opérateur — le même corps
-             *     pour les deux, parce que distinguer « elle existe mais pas chez vous » de « elle n'existe
-             *     pas » dirait ce que possède quelqu'un d'autre.
-             *
-             *     La session **vivante mais non élevée**, elle, rend un 409 : la confondre avec les deux
-             *     précédentes ferait lire « reconnectez-vous » à un opérateur dont le remède est l'inverse —
-             *     se reconnecter rend une session de premier facteur, donc le même refus.
-             */
+            /** @description Aucune session vivante. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Cette passkey n'est pas celle de l'opérateur — **le même corps** qu'elle n'existe nulle
+             *     part ou qu'elle appartienne à un autre, parce que distinguer les deux dirait ce que
+             *     possède quelqu'un d'autre.
+             *
+             *     **404 et non 401 depuis step-035.** Le 401 disait « cette session n'est plus ouverte,
+             *     reconnectez-vous » d'une session bien vivante et bien élevée ; l'opérateur qui obéissait
+             *     perdait son élévation pour rien, et un intercepteur câblé sur le statut la lui faisait
+             *     perdre sans même qu'il lise la phrase. Ce qui manque ici n'est pas une session mais la
+             *     ressource que l'URL nomme.
+             *
+             *     La session **vivante mais non élevée**, elle, rend un 409 : la confondre avec celle-ci
+             *     ferait chercher une clé d'accès à un opérateur dont la clé est la bonne.
+             */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

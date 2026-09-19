@@ -231,6 +231,23 @@ Fonctionnalité: Le second facteur par passkey
     Et la cérémonie est refusée
     Et il lui reste 0 clé d'accès
 
+  Scénario: retirer une clé d'accès qui n'est pas la sienne ne parle pas de la session
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et une clé d'accès enregistrée
+    Et l'opérateur a présenté sa clé d'accès
+    # La session est vivante **et élevée** : les deux gardes qui l'exigent sont franchies avant ce
+    # refus. Il a pourtant longtemps rendu « cette session n'est plus ouverte, reconnectez-vous » —
+    # l'opérateur obéissait, perdait son élévation, et revenait au même endroit.
+    #
+    # Le statut compte autant que la phrase : `isUnauthenticated` côté client traite tout 401 comme
+    # une session close, sans lire le corps.
+    Quand l'opérateur retire une clé d'accès qui n'est pas la sienne
+    Alors la réponse est conforme au contrat du BFF
+    Et la clé d'accès est inconnue de ce compte
+    Et il lui reste 1 clé d'accès
+
   Scénario: un identifiant de clé d'accès mal formé est refusé sur sa forme
     Étant donné une installation avec un opérateur
     Et un serveur démarré

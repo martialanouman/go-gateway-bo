@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -84,6 +85,33 @@ func TestCeQueLeHarnaisSAutoriseAJeter(t *testing.T) {
 			assert.Equal(t, testCase.want, bddtest.Discardable(testCase.database, testCase.prefix))
 		})
 	}
+}
+
+// initPID est le processus 1. Il existe toujours, et il n'appartient pas à l'utilisateur qui lance
+// les tests — sauf si celui-ci est root, cas que le test écarte lui-même.
+const initPID = 1
+
+// **Un processus vivant que le test ne peut pas signaler est vivant**, et le noyau le dit par `EPERM`
+// et non par la mort. Confondre les deux fait jeter la base d'un run qui tourne sous un autre
+// utilisateur : un collègue sur le même poste, un conteneur qui partage l'espace de PID.
+//
+// Le cas vit à part de la table ci-dessus parce qu'il a une condition : sous root, le signal aboutit,
+// `EPERM` n'est pas observable, et un cas qui passerait quand même ne prouverait rien. Il s'écarte
+// alors plutôt que de se déclarer vert.
+func TestUneBaseDUnProcessusVivantMaisNonSignalableEstGardee(t *testing.T) {
+	t.Parallel()
+
+	process, err := os.FindProcess(initPID)
+	require.NoError(t, err)
+
+	if process.Signal(syscall.Signal(0)) == nil {
+		t.Skip("le processus 1 est signalable ici — ces tests tournent en root, et `EPERM` ne peut " +
+			"pas être observé : ce cas ne prouverait rien")
+	}
+
+	assert.False(t, bddtest.Discardable(fmt.Sprintf("store_test_%d_1", initPID), "store"),
+		"le harnais jette la base d'un processus vivant qu'il n'a pas le droit de signaler : un run "+
+			"lancé par un autre utilisateur perdrait sa base en cours de route")
 }
 
 // Les deux fonctions ne se parlent que par la **forme du nom**, et rien d'autre ne les relie : changer

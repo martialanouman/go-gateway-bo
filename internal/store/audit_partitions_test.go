@@ -107,3 +107,66 @@ func TestLeRenouvellementDesPartitionsRepasseEtSArreteAvecSonContexte(t *testing
 		t.Fatal("la boucle ne s'arrête pas avec son contexte : elle survivrait à l'arrêt du serveur")
 	}
 }
+
+// **Un échec ne termine pas la boucle**, et c'est la moitié qui comptait le moins jusqu'ici : le test
+// d'au-dessus n'observe qu'un passage, donc un `return` posé après le rapport le laissait vert.
+//
+// Ce qu'un abandon coûterait : la base est momentanément injoignable — bascule du primaire, pool
+// saturé, redémarrage de PostgreSQL —, la boucle rend la main, et plus rien ne recrée les partitions.
+// La panne ne se voit alors qu'au premier du mois suivant, sur une écriture d'audit refusée, donc sur
+// l'action métier qui partage sa transaction.
+//
+// **La panne est fabriquée en renommant la fonction SQL** plutôt qu'en coupant le serveur : elle est
+// locale à la base de ce cas, réversible à la milliseconde, et elle échoue là où
+// `EnsureAuditPartitions` appelle — pas dans le pool, qui pourrait avoir ses propres reprises.
+func TestUnEchecNArretePasLeRenouvellementDesPartitions(t *testing.T) {
+	t.Parallel()
+
+	pool, _ := migratedPool(t)
+	removeAuditPartitions(t, pool)
+
+	_, err := pool.Exec(t.Context(),
+		"ALTER FUNCTION ensure_audit_log_partitions(timestamptz) RENAME TO hidden_partitions")
+	require.NoError(t, err, "cacher la fonction SQL : sans panne à traverser, ce cas n'observe rien")
+
+	ctx, stop := context.WithCancel(t.Context())
+
+	// Tamponné, et `default:` plus bas : seul le premier rapport est lu, et la boucle ne doit pas se
+	// bloquer sur les suivants.
+	reports := make(chan error, 1)
+	done := make(chan struct{})
+
+	// Rejointe avant que `t.Cleanup` ne ferme le pool, comme sa jumelle ci-dessus : sans cela la
+	// boucle peut être dans `pool.Exec` pendant la fermeture.
+	go func() {
+		defer close(done)
+
+		store.KeepAuditPartitions(ctx, pool, 10*time.Millisecond, func(err error) {
+			select {
+			case reports <- err:
+			default:
+			}
+		})
+	}()
+
+	t.Cleanup(func() {
+		stop()
+		<-done
+	})
+
+	select {
+	case reported := <-reports:
+		require.Error(t, reported, "la boucle rapporte une réussite alors que la fonction n'existe pas")
+	case <-time.After(5 * time.Second):
+		t.Fatal("la boucle n'a rien rapporté : l'échec est avalé, et une panne durable serait muette")
+	}
+
+	_, err = pool.Exec(t.Context(),
+		"ALTER FUNCTION hidden_partitions(timestamptz) RENAME TO ensure_audit_log_partitions")
+	require.NoError(t, err)
+
+	assert.Eventually(t, func() bool { return auditPartitionCount(t, pool) == 2 },
+		5*time.Second, 20*time.Millisecond,
+		"la boucle n'a pas repassé après l'échec : une base momentanément injoignable la termine, "+
+			"et plus rien ne crée les partitions du mois suivant")
+}

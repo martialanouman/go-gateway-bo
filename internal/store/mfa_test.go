@@ -411,7 +411,7 @@ func TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas(t *testing.T) {
 
 			// Le témoin, avant d'abîmer quoi que ce soit : sans lui, un décor qui n'ouvrirait jamais
 			// rien rendrait ce cas vert sans exercer la condition qu'il nomme.
-			_, alive, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"))
+			challenge, alive, err := mfa.LiveChallenge(t.Context(), tokenHash("jeton"))
 			require.NoError(t, err)
 			require.True(t, alive, "le challenge du décor n'était pas vivant")
 
@@ -420,6 +420,19 @@ func TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas(t *testing.T) {
 			_, alive, err = mfa.LiveChallenge(t.Context(), tokenHash("jeton"))
 			require.NoError(t, err)
 			assert.False(t, alive)
+
+			// **La consommation porte les mêmes conditions, et pas par redondance.** `VerifyMfa` lit le
+			// challenge vivant au pas 3 et ne le consomme qu'au pas 5 ; entre les deux, la vérification
+			// du facteur — un déchiffrement AES-GCM pour un TOTP, un argon2id pour un code de
+			// récupération, jamais les deux. Un challenge qui échoit dans cet intervalle serait consommé
+			// et élèverait la session si le `WHERE` ne le refusait pas.
+			// C'est ce que son jumeau `ConsumeCeremony` vérifie déjà (`TestUnDefiEchuNeSeRelitPas`),
+			// et que rien ne tenait ici.
+			consumed, err := mfa.ConsumeChallenge(t.Context(), challenge.ID)
+			require.NoError(t, err)
+			assert.False(t, consumed, "un challenge dont on vient de constater qu'il n'est plus "+
+				"utilisable se consomme quand même : la fenêtre entre la lecture et la consommation "+
+				"suffit à élever une session sur un challenge mort")
 		})
 	}
 }

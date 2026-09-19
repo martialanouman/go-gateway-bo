@@ -356,12 +356,31 @@ func secondFactorLocked(seconds int) Error {
 // refuseReplacement refuse le remplacement. Même forme que `refuseSecondFactor` : l'essai est déjà
 // compté par la réservation prise plus haut dans `EnrollTotp`, et c'est elle qui annonce le verrou
 // quand elle vient d'atteindre le seuil.
+//
+// **Le corps n'est pas celui de « rien n'a été présenté ».** Le contrat décrit deux causes sous ce
+// 409, et les confondre fait lire « présentez votre code » à qui vient de le faire : il retape le
+// même.
 func refuseReplacement(lock store.Lock) EnrollTotpResponseObject {
 	if lock.Failures >= mfa.MaxFailures {
 		return enrollmentLockedBySecondFactor(mfa.LockWindow)
 	}
 
-	return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled())
+	return EnrollTotp409JSONResponse(refusedReplacementProof())
+}
+
+// refusedReplacementProof dit ce qui s'est passé : un facteur a été présenté, et il a été refusé.
+//
+// Le code lui est propre pour que le client **puisse** les séparer : ici le statut ne discrimine rien,
+// les trois causes du 409 de cette route le partageant. Aucun écran ne le lit encore — step-028 le
+// fera, et sa fiche porte l'obligation.
+func refusedReplacementProof() Error {
+	return Error{
+		Code: "mfa_replacement_refused",
+		Message: "Ce second facteur n'a pas été accepté : celui qui est en place n'a pas été " +
+			"remplacé. Le présenter à nouveau — un code de récupération convient aussi. Si les deux " +
+			"sont perdus, leur réinitialisation par un administrateur arrivera avec la gestion des " +
+			"opérateurs.",
+	}
 }
 
 // tooManyEnrollments annonce le verrou d'enrôlement et sa durée. Même construction que les deux
@@ -461,11 +480,19 @@ func presentedFactorIsWellFormed(request TotpEnrollmentRequest) bool {
 //
 // La copie dit la conséquence d'abord et les deux gestes qui peuvent débloquer, sans nommer laquelle
 // des cinq causes s'applique — un challenge épuisé et un chiffre de travers lisent la même phrase.
+//
+// **Elle ne nomme plus aucune méthode.** Ce refus sert les trois — `totp`, `recovery_code` et, depuis
+// step-024, `webauthn` : « vérifier l'heure de l'application d'authentification » envoyait régler une
+// horloge qui n'existe pas dans le geste de qui vient de présenter une clé d'accès.
+//
+// Une copie qui vaut pour trois chemins ne peut nommer que ce qui leur est commun. L'indice de dérive
+// d'horloge n'a donc plus de porteur aujourd'hui : il appartient à l'écran qui présente un code TOTP,
+// et sa fiche — step-027 — porte l'obligation de le rendre.
 func refusedSecondFactor() Error {
 	return Error{
 		Code: "invalid_second_factor",
-		Message: "Ce code n'a pas été accepté. Vérifier l'heure de l'application d'authentification, " +
-			"ou reprendre la connexion depuis le début.",
+		Message: "Ce second facteur n'a pas été accepté. Le présenter à nouveau, ou reprendre la " +
+			"connexion depuis le début.",
 	}
 }
 
