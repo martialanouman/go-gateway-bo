@@ -127,8 +127,28 @@ Fonctionnalité: Le second facteur TOTP
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 409
     Et le refus dit par où passer
+    Et le refus dit qu'aucune preuve n'a été présentée
     # L'enrôlement en place n'a pas bougé : un refus qui écraserait quand même le secret enfermerait
     # l'opérateur dehors, ce que le statut seul ne dirait pas.
+    Et il lui reste 10 codes de récupération
+
+  # **Le même 409, l'autre cause.** L'opérateur a bien présenté un code, et c'est ce code qui a été
+  # refusé. Jusqu'à step-035 les deux rendaient la même phrase — « le remplacer demande de franchir
+  # d'abord celui qui est en place » —, que celui-ci venait précisément de faire : rien ne lui disait
+  # que son code était en cause, et il retapait le même.
+  #
+  # Ce scénario existe pour que les deux corps restent séparés : sans lui, les reconfondre laisse
+  # tout vert.
+  Scénario: remplacer son authentificateur avec un code faux dit que c'est le code qui a été refusé
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    Quand l'opérateur tente un remplacement avec un code faux
+    Alors la réponse est conforme au contrat du BFF
+    Et le refus dit que le facteur présenté a été refusé
+    # Le facteur en place n'a pas bougé : le refus n'a rien détruit.
     Et il lui reste 10 codes de récupération
 
   # Le témoin de la garde ci-dessus. Sans lui, un enrôlement qui refuserait **toujours** passerait le

@@ -244,8 +244,12 @@ expectTypeOf<
 >().toEqualTypeOf<{ id: string }>()
 
 // Le 409 dit qu'un second facteur est apparu **entre** l'ouverture de la cérémonie et sa finition, sur
-// une session non élevée. Le client doit le distinguer du 401 : le premier se rattrape en franchissant
+// une session non élevée. Le client doit le distinguer du 400 : le premier se rattrape en franchissant
 // le facteur, le second en reprenant la cérémonie.
+//
+// **La cérémonie refusée est un 400 depuis step-035**, et non plus un 401. Le 401 ne reste que pour
+// une session réellement close — ce qui compte ici : `isUnauthenticated` traite tout 401 comme telle
+// sans lire le corps, et renvoyait donc au login un opérateur dont la clé avait mal signé.
 expectTypeOf<keyof FinishRegistrationOperation['responses']>().toEqualTypeOf<
   200 | 400 | 401 | 409
 >()
@@ -276,4 +280,8 @@ expectTypeOf<DeletePasskeyOperation['parameters']['path']>().toEqualTypeOf<{ pas
 // Le 409 est ce qui permet au client de ne pas proposer un retrait qui échouera : croisé avec
 // `secondFactors`, il sait d'avance que la dernière passkey d'un compte sans TOTP est verrouillée, et
 // peut désactiver le contrôle **en l'expliquant** plutôt que de laisser l'opérateur le découvrir.
-expectTypeOf<keyof DeletePasskeyOperation['responses']>().toEqualTypeOf<204 | 401 | 409>()
+//
+// **Le 404 est arrivé en step-035** : une clé que le compte ne porte pas rendait 401, donc « cette
+// session n'est plus ouverte » d'une session vivante et élevée. Le 401 ne reste que pour une session
+// réellement close.
+expectTypeOf<keyof DeletePasskeyOperation['responses']>().toEqualTypeOf<204 | 401 | 404 | 409>()

@@ -87,6 +87,9 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^il lui reste (\d+) codes de récupération$`, w.recoveryCodesRemaining)
 	ctx.Then(`^le refus ne dit pas ce qui a été refusé$`, w.refusalNamesNothing)
 	ctx.Then(`^le refus dit par où passer$`, w.refusalNamesTheWayOut)
+	ctx.Then(`^le refus dit qu'aucune preuve n'a été présentée$`, w.refusalSaysNoProofWasGiven)
+	ctx.Then(`^le refus dit que le facteur présenté a été refusé$`,
+		w.refusalSaysTheProofWasRejected)
 	ctx.Then(`^la réponse ne porte ni le secret ni aucun code de récupération$`, w.responseHidesTheSecret)
 	ctx.Then(`^la réponse annonce un second facteur enrôlé$`, w.announcesAnEnrolledFactor)
 }
@@ -580,6 +583,34 @@ func (w *mfaWorld) refusalNamesNothing() error {
 			return fmt.Errorf("le refus nomme %q : il dit à une machine où elle en est\n%s", forbidden,
 				body)
 		}
+	}
+
+	return nil
+}
+
+// **Les deux causes du 409 d'enrôlement, chacune nommée par son code.** Le contrat les décrit depuis
+// toujours — aucune preuve présentée, ou une preuve refusée — et le handler leur servait la même
+// phrase : « le remplacer demande de franchir d'abord celui qui est en place », lue par un opérateur
+// qui venait de le franchir. Sans ces deux pas, les reconfondre laisse les scénarios verts.
+func (w *mfaWorld) refusalSaysNoProofWasGiven() error {
+	return w.refusalIs(409, "mfa_already_enrolled")
+}
+
+func (w *mfaWorld) refusalSaysTheProofWasRejected() error {
+	if err := w.refusalIs(409, "mfa_replacement_refused"); err != nil {
+		return err
+	}
+
+	return w.messageMentions("n'a pas été accepté")
+}
+
+func (w *mfaWorld) refusalIs(status int, code string) error {
+	return refusalIs(w.login.process.received, status, code)
+}
+
+func (w *mfaWorld) messageMentions(fragment string) error {
+	if !strings.Contains(w.login.process.received.body, fragment) {
+		return fmt.Errorf("le refus ne dit pas %q :\n%s", fragment, w.login.process.received.body)
 	}
 
 	return nil
