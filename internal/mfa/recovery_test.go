@@ -96,10 +96,9 @@ func TestLesConfusionsDeCrockfordSontResolues(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			// **La correspondance, et pas seulement l'absence.** Une version précédente n'exigeait que
-			// « ni I, ni L, ni O » et une longueur de dix : mesuré le 12/08/2026, `I,L → 7` et `O → 9` la
-			// laissaient verte. Or ce que ces lettres deviennent est tout l'objet — un opérateur qui lit
-			// `1` et tape `I` doit entrer.
+			// **La correspondance, et pas seulement l'absence.** N'exiger que « ni I, ni L, ni O » et une
+			// longueur de dix reste vert sur `I,L → 7` et `O → 9`, alors que ce que ces lettres
+			// deviennent est tout l'objet — un opérateur qui lit `1` et tape `I` doit entrer.
 			assert.Equal(t, expected, mfa.NormalizeRecoveryCode(presented))
 		})
 	}
@@ -145,11 +144,11 @@ func TestUnCodeInconnuNeMatcheAucunHachage(t *testing.T) {
 // millisecondes par code restant, soit jusqu'à un quart de seconde d'écart entre le premier rang et
 // le dixième, ce qui dit *lequel* a servi.
 //
-// **Une porte structurelle a été écrite d'abord, puis retirée** : elle cherchait l'absence de
-// `return`, `break` et `goto` dans le corps de la première boucle, et trois réécritures mesurées le
-// 01/09/2026 la laissaient verte — une boucle de pré-traitement placée avant elle, un `continue`
-// gardé par `matched`, un `matched < 0` dans la condition du `for`. La propriété n'est pas une forme :
-// c'est que `auth.Verify` soit payé autant de fois quel que soit le rang.
+// **Une porte structurelle ne conviendrait pas** : chercher l'absence de `return`, `break` et `goto`
+// dans le corps de la boucle reste vert sur trois réécritures mesurées — une boucle de pré-traitement
+// placée avant elle, un `continue` gardé par `matched`, un `matched < 0` dans la condition du `for`.
+// La propriété n'est pas une forme : c'est que `auth.Verify` soit payé autant de fois quel que soit
+// le rang.
 //
 // Ce que ce test ne distingue pas, et c'est assumé : une réécriture qui garderait le coût entier mais
 // rendrait le premier rang — `if matched < 0 { matched = index }`. Elle rougirait à tort. Aucune des

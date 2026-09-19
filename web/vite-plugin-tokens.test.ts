@@ -1,15 +1,10 @@
 // @vitest-environment node
 
 /**
- * Le défaut que ce plugin ferme est daté : en v1.0, step-026 a livré un bandeau de refus **sans
- * bordure ni fond**, parce qu'elle consommait `--danger-border`, `--danger-surface` et
- * `--danger-text`, trois tokens qui n'existaient pas. `pnpm check` était vert — un `var()` inconnu
- * ne casse rien, le navigateur applique la valeur héritée et l'écran s'affiche *presque* juste.
- *
  * Trois preuves, parce qu'aucune ne suffit seule : la fonction pure décide correctement ; une
  * construction réelle échoue vraiment ; et le plugin est bien câblé dans `vite.config.ts`, chargée
- * comme Vite la charge. La troisième est la leçon écrite dans la recette `check-routes` — un
- * générateur retiré de la configuration passait la porte.
+ * comme Vite la charge. La troisième porte la leçon de la recette `check-routes` — un générateur
+ * retiré de la configuration passait la porte.
  */
 
 import { mkdtemp, realpath, writeFile } from 'node:fs/promises'
@@ -22,7 +17,6 @@ import { declaredTokens, undeclaredTokens } from './vite-plugin-tokens'
 
 describe('les tokens qu’une source consomme sans les déclarer', () => {
   it('nomme ceux qu’aucune source ne déclare', () => {
-    // Les trois noms réels de step-026, pour que ce cas soit l'incident et pas une illustration.
     const css =
       '.refus { border: 1px solid var(--danger-border); background: var(--danger-surface); }'
 

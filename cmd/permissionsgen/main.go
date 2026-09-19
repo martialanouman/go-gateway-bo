@@ -3,17 +3,13 @@
 // conditionnel du client n'est qu'un confort — donc la source vit du côté qui décide, et le client
 // en dérive.
 //
-// **Le chemin de sortie est un argument, pas une constante.** Trois raisons, la première étant la
-// seule qui compte : le Makefile tient déjà chaque sortie engendrée dans une variable, et c'est
-// cette même variable qui alimente `$(GENERATED)`, la liste que `check-generated` supprime puis
-// régénère. Écrit ici, le chemin existerait à deux endroits qui se croient d'accord. Ensuite, un
-// chemin relatif codé en dur lie silencieusement la commande à un répertoire courant qu'elle ne
-// peut pas vérifier. Enfin, le test écrit dans un `t.TempDir()` sans toucher à l'arbre.
+// **Le chemin de sortie est un argument, pas une constante** : le Makefile tient déjà chaque sortie
+// engendrée dans une variable, celle-là même qui alimente `$(GENERATED)`. Écrit ici, le chemin
+// existerait à deux endroits qui se croient d'accord.
 //
 // La sortie n'est **pas** l'entrée standard, contrairement à ce que `cmd/migrate` fait de la sienne :
 // un `go run … > fichier` tronque la cible avant que la commande démarre, donc un générateur qui
-// échoue laisse derrière lui un fichier engendré vide — que `check-generated` verrait bien, mais
-// après avoir détruit l'état précédent.
+// échoue laisse derrière lui un fichier engendré vide, l'état précédent détruit.
 //
 // L'environnement n'est pas une voie ici non plus : `internal/config` est le seul package du dépôt
 // qui le lit (§1.8), et `forbidigo` tient la règle.
@@ -51,9 +47,8 @@ func start(args []string) error {
 	}
 
 	// La sortie est un fichier source commité, que la CI relit et que le build consomme — pas un
-	// secret. Les quatre autres fichiers engendrés du dépôt sont commités en 100644 (vérifié,
-	// `git ls-files -s`) ; écrire 0600 laisserait celui-ci seul illisible pour tout autre compte du
-	// poste, sans rien protéger.
+	// secret. Les autres fichiers engendrés du dépôt sont commités en 100644 ; écrire 0600 laisserait
+	// celui-ci seul illisible pour tout autre compte du poste, sans rien protéger.
 	//nolint:gosec // G306 : voir juste au-dessus.
 	if err := os.WriteFile(args[0], rendered, 0o644); err != nil {
 		return fmt.Errorf("écrire %s : %w", args[0], err)
@@ -63,22 +58,19 @@ func start(args []string) error {
 }
 
 // La largeur de `web/biome.json`, et les deux indentations que Biome pose autour d'une propriété
-// d'objet à cette largeur. Mesuré le 02/08/2026 avec Biome 2.5.5 : une ligne de propriété de 100
-// colonnes reste en place, une de 101 est reportée sur la ligne suivante avec six espaces.
+// d'objet à cette largeur : une ligne de propriété de 100 colonnes reste en place, une de 101 est
+// reportée sur la ligne suivante avec six espaces.
 //
 // **Ce que ces trois constantes doivent à `lint-web`.** `web/src/lib/permissions.gen.ts` est
 // **inclus** dans le périmètre de Biome, là où `api.gen.ts` et `routeTree.gen.ts` en sont exclus —
 // c'est ce qui fait de `lint-web` la porte qui relie `lineWidth` ici à `formatter.lineWidth` là-bas.
-// L'inclusion tient à une mesure : reformaté par Biome, ce que ce générateur émet est
-// **byte-identique** au fichier commité (zéro ligne d'écart sur 310, mesuré le 02/08/2026), quand
-// `api.gen.ts` en diffère de 112 lignes de `diff` — 56 retirées et 56 ajoutées, sur un fichier qui
-// en compte 67. La mesure ne se refait pas par la commande évidente : Biome **honore l'exclusion en
-// silence** jusque sur `--stdin-file-path`, si bien qu'un `--stdin-file-path=src/lib/api.gen.ts`
-// rend l'entrée inchangée et laisse croire à zéro écart. Il faut lui donner un chemin sonde
-// non exclu — `--stdin-file-path=src/lib/sonde.ts` — pour qu'il formate pour de bon.
-// Émettre l'une de ces deux formes là où Biome émettrait
-// l'autre rendrait `lint-web` et `check-generated` contradictoires, chacune exigeant l'inverse de
-// l'autre.
+// Émettre l'une de ces deux formes là où Biome émettrait l'autre rendrait `lint-web` et
+// `check-generated` contradictoires, chacune exigeant l'inverse de l'autre.
+//
+// Refaire la mesure demande un détour : Biome **honore l'exclusion en silence** jusque sur
+// `--stdin-file-path`, si bien qu'un `--stdin-file-path=src/lib/api.gen.ts` rend l'entrée inchangée
+// et laisse croire à zéro écart. Il faut un chemin sonde non exclu — `src/lib/sonde.ts` — pour qu'il
+// formate pour de bon.
 const (
 	lineWidth       = 100
 	propertyIndent  = "    "
@@ -155,11 +147,9 @@ func render(entries []permissions.Entry, categories []permissions.Category) ([]b
 // dans le diff de la PR (DN-7), et c'est aussi ce que Biome émet aux tailles réelles du catalogue.
 //
 // **Aux tailles réelles seulement.** Biome replie sur une seule ligne toute union qui tient dans les
-// 100 colonnes. Mesuré le 02/08/2026 sur les vrais noms de catégories : cinq membres sont repliés,
-// six ne le sont plus — c'est la largeur qui décide, pas un nombre de membres. Le catalogue porte
-// onze catégories et quarante-quatre clés, donc les deux unions sont loin au-delà du seuil. Le
-// générateur n'implémente pas le repli : ce serait une branche que rien n'atteint et que personne
-// ne relit.
+// 100 colonnes — c'est la largeur qui décide, pas un nombre de membres, et les deux unions du
+// catalogue sont loin au-delà du seuil. Le générateur n'implémente pas le repli : ce serait une
+// branche que rien n'atteint et que personne ne relit.
 func writeUnion(out *strings.Builder, name string, members []string) {
 	fmt.Fprintf(out, "export type %s =\n", name)
 
@@ -185,11 +175,8 @@ func writeEntry(out *strings.Builder, entry permissions.Entry) error {
 			offending, _ := utf8.DecodeRuneInString(field.value[index:])
 
 			// Le message ne nomme pas une cause unique : les quatre runes cassent des choses
-			// différentes, et en conseiller une seule envoie chercher le mauvais coupable. Mesuré :
-			// le guillemet droit, échappé, fait réécrire le littéral en guillemets doubles par
-			// Biome ; `\n` et `\r` rendent le fichier inanalysable (« unterminated string
-			// literal ») ; et l'antislash **change la valeur en silence** — `'C:\nouveau'` vaut 19
-			// caractères côté JS dont un vrai saut de ligne, là où le catalogue Go en porte 20.
+			// différentes — voir `forbiddenInLiteral` — et en conseiller une seule envoie chercher
+			// le mauvais coupable.
 			return fmt.Errorf("la clé %q porte dans sa %s le caractère %q, qu'un littéral TypeScript "+
 				"entre guillemets simples ne peut pas porter tel quel. Selon le caractère, la sortie "+
 				"cesse d'être stable, devient inanalysable, ou porte une valeur différente de celle "+

@@ -1,6 +1,6 @@
 # step-038 — Commentaires : corriger les faux, ramener les blocs
 
-> **Jalon :** M1 · **Statut :** À FAIRE
+> **Jalon :** M1 · **Statut :** FAIT
 > **Dépend de :** step-033, step-034, step-035, step-036, step-037, step-048 · **Bloque :** — (aucune
 > step ne l'attend)
 >
@@ -50,7 +50,42 @@ auront corrigé ou déplacé certains.
   git et dans les fiches.
 - Les numéros de ligne de fichiers engendrés disparaissent.
 - **Objectif chiffré** : environ −2 450 lignes, soit un ratio global d'environ 24 %. L'arithmétique est
-  refaite sur le livré, pas reprise de cette fiche.
+  refaite sur le livré, pas reprise de cette fiche — **et elle l'a été : la cible était fausse.**
+
+## Mesure (refaite sur le livré, le 19/09/2026)
+
+    ./scripts/mesure-commentaires.sh          # HEAD
+    git worktree add /tmp/wt main && cp scripts/mesure-commentaires.sh /tmp/wt/scripts/
+    (cd /tmp/wt && ./scripts/mesure-commentaires.sh)   # main
+
+|                       | avant (`main`)        | après                 |
+|---|---|---|
+| lignes de commentaire | 10 586                | 9 960                 |
+| lignes non vides      | 36 848                | 36 223                |
+| **ratio**             | **28,7 %**            | **27,5 %**            |
+| blocs de plus de 8 l. | 320 blocs / 4 566 l.  | 283 blocs / 3 885 l.  |
+
+**−626 lignes de commentaire, et non −2 450.** Les chiffres de l'audit portaient sur un dépôt de
+32 143 lignes non vides ; il en fait 36 823 depuis step-036, step-040 et step-048.
+
+**Pourquoi la cible de 24 % ne tenait pas.** Elle a été posée sans déduire le noyau que la Definition
+of Done protège. Sur les 150 fichiers qui portent encore un bloc de plus de huit lignes, **74
+contiennent un constat « aucun test ne rougit si ceci disparaît » ou une mesure datée** — c'est
+précisément ce que le critère 4 exige d'écrire là où ça vit. Atteindre 24 % demanderait −1 666 lignes
+de plus, soit 43 % de ce qui reste dans ces blocs : impossible sans retirer la troisième issue que la
+DoD accorde. Quatre relectures indépendantes, chacune menée contre le code sous les blocs, ont
+convergé sur ce diagnostic.
+
+**Ce qui a été trouvé en plus des onze commentaires de l'audit** : douze autres affirmations fausses,
+dont un compte périmé d'un ordre de grandeur (55 occurrences de `var()` annoncées, 397 mesurées),
+deux mesures de taille qui se contredisaient dans le même fichier, une version de bibliothèque
+périmée par un bump (`x/crypto v0.54.0` contre v0.57.0), un job de CI décrit à l'envers, et **quatre
+commentaires qui ne surplombaient pas ce qu'ils décrivaient** — le défaut le plus discret, puisqu'ils
+se relisent justes.
+
+**Une dette inscrite plutôt que corrigée** (la fiche interdit tout changement de code) : le plancher
+de `registerRowCount` est à 60 pour un registre qui en porte 80 — un quart peut disparaître sans un
+rougissement. Porteur : step-187.
 
 ## Points d'implémentation clés
 - **Ne rien réécrire au jugé.** Chaque commentaire conservé est relu contre le code qu'il surplombe

@@ -126,9 +126,9 @@ func (w *schemaWorld) messageNamesTheSchemaNotTheAddress() error {
 // d'erreur qui le porte : c'est ce texte qui atterrit dans les journaux de déploiement, et c'est de
 // lui seul qu'un exploitant tire quoi faire.
 //
-// Il cherche les **phrases** que le message compose, jamais les nombres nus. La version précédente
-// faisait l'inverse et ne prouvait rien : la sortie du process est du JSON `slog` horodaté, où « 0 »
-// et « 2 » figurent tous deux dans « 2026 » — un message vidé de ses deux versions restait vert.
+// Il cherche les **phrases** que le message compose, jamais les nombres nus : la sortie du process
+// est du JSON `slog` horodaté, où « 0 » et « 2 » figurent tous deux dans « 2026 », si bien qu'un
+// message vidé de ses deux versions resterait vert.
 func (w *schemaWorld) messageNamesBothVersions() error {
 	output := w.process.output.String()
 

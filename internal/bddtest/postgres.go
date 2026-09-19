@@ -22,26 +22,25 @@ import (
 const EnvAdminDSN = "DASHBOARD_TEST_DATABASE_URL"
 
 // discardTimeout borne le nettoyage d'ouverture. Deux minutes plutôt que trente secondes, mesuré
-// plutôt que choisi — le 10/09/2026, sur ce poste : jeter cent quatre-vingt-quinze bases en prend
-// douze quand la suite est seule, et davantage quand les trois paquets à base démarrent ensemble sous
-// `go test ./...`, où trente secondes ne suffisaient plus. Rien ne pend ici : les bases visées
-// n'appartiennent qu'à des processus finis.
+// plutôt que choisi : jeter cent quatre-vingt-quinze bases en prend douze quand la suite est seule, et
+// davantage quand les trois paquets à base démarrent ensemble sous `go test ./...`, où trente
+// secondes ne suffisent plus. Rien ne pend ici : les bases visées n'appartiennent qu'à des processus
+// finis.
 const discardTimeout = 2 * time.Minute
 
 // SharedAdminDSN rend le PostgreSQL que l'environnement désigne, et `false` quand il n'en désigne
 // aucun — à l'appelant, alors, de monter le sien.
 //
-// **Un serveur pour tout le module quand la variable est posée.** C'est l'amortissement que step-007
-// laissait ouvert avec son déclencheur écrit — « le jour où un second paquet a besoin de
-// PostgreSQL » —, franchi depuis longtemps : trois paquets montaient chacun leur conteneur, et la CI
-// les faisait démarrer de front sur quatre cœurs. Ce n'est **pas** `WithReuse`, écarté nommément par
-// DN-3 : rien ne survit entre deux exécutions, puisque personne ne réutilise un conteneur.
+// **Un serveur pour tout le module quand la variable est posée** : sans elle, trois paquets montent
+// chacun leur conteneur, que la CI fait démarrer de front sur quatre cœurs. Ce n'est **pas**
+// `WithReuse`, écarté nommément par DN-3 : rien ne survit entre deux exécutions, puisque personne ne
+// réutilise un conteneur.
 //
 // L'isolation ne bouge pas : chaque test taille sa base par `CREATE DATABASE`.
 //
-// **Le repli reste chez l'appelant, dans son `_test.go`, et ce n'est pas une commodité** : mesuré le
-// 09/09/2026, monter le conteneur ici a fait rougir `make vuln-go` sur deux avis de
-// `golang.org/x/crypto/ssh`, atteint par `postgres.Run`. `govulncheck` analyse le produit et ignore
+// **Le repli reste chez l'appelant, dans son `_test.go`, et ce n'est pas une commodité** : mesuré,
+// monter le conteneur ici fait rougir `make vuln-go` sur des avis de `golang.org/x/crypto/ssh`,
+// atteint par `postgres.Run`. `govulncheck` analyse le produit et ignore
 // les fichiers de test : y faire entrer le harnais Docker, c'est faire dépendre les portes du
 // produit des dépendances de testcontainers. La garde d'imports de ce paquet dit déjà que le harnais
 // ne doit pas franchir cette frontière.
@@ -63,10 +62,10 @@ const reachTimeout = 30 * time.Second
 // RequireReachable rend une erreur quand le serveur désigné ne répond pas, **avant** que la suite ne
 // s'en serve.
 //
-// Elle existe pour un mode d'échec que step-032 a créé et qu'elle a rencontré : le serveur du
-// `docker compose` a disparu sous une suite en cours, et les trois paquets ont **attendu plus de deux
-// heures** au lieu de rougir. Un conteneur absent, lui, faisait rouge en quelques secondes — la
-// variable avait donc troqué un refus lisible contre une suspension muette.
+// Elle existe pour le mode d'échec qu'un serveur partagé crée : celui du `docker compose` disparu
+// sous une suite en cours fait **attendre des heures** les trois paquets au lieu de les faire rougir.
+// Un conteneur jetable absent, lui, rougit en quelques secondes : sans cette porte, la variable
+// troquerait un refus lisible contre une suspension muette.
 //
 // Ce que `go test` arme ne suffit pas ici : sa borne interne ne l'est qu'à partir de `m.Run()`, et
 // tout ceci se passe avant, dans `TestMain`.
@@ -131,9 +130,8 @@ func DiscardStaleDatabases(ctx context.Context, adminDSN, prefix string) {
 	defer func() { _ = admin.Close(ctx) }()
 
 	// Toutes les bases, et le tri se fait en Go. Un `LIKE` aurait été plus court et plus faux : le
-	// caractère `_` y est un **joker**, si bien que `store_test_%` retenait aussi `storeXtestY_1`.
-	// Mesuré en revue le 11/09/2026, sur une base étrangère créée pour l'occasion : elle a été
-	// supprimée.
+	// caractère `_` y est un **joker**, si bien que `store_test_%` retiendrait aussi `storeXtestY_1` —
+	// mesuré sur une base étrangère créée pour l'occasion, qui a bien été supprimée.
 	rows, err := admin.Query(ctx, "SELECT datname FROM pg_database")
 	if err != nil {
 		return
@@ -180,10 +178,8 @@ func DiscardStaleDatabases(ctx context.Context, adminDSN, prefix string) {
 // processus qui l'a taillée est fini.
 //
 // C'est elle qui décide de ce qu'on détruit, donc elle est **fermée par défaut** : tout ce qu'elle ne
-// reconnaît pas est gardé. La version qu'une revue a corrigée le 11/09/2026 faisait l'inverse sans le
-// dire — son commentaire promettait qu'un nom d'une autre forme n'était « jamais jeté », quand un PID
-// illisible rendait zéro, que nul processus ne porte, donc « fini », donc jetable. Une base étrangère
-// créée pour la mesure a bien été supprimée.
+// reconnaît pas est gardé. Le piège est un PID illisible rendu comme zéro : nul processus ne le
+// porte, donc il se lirait « fini », donc jetable — et une base étrangère serait supprimée.
 func Discardable(database, prefix string) bool {
 	suffix, ours := strings.CutPrefix(database, prefix+"_test_")
 	if !ours {

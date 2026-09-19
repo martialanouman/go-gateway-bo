@@ -26,8 +26,8 @@ func NewSessions(pool *pgxpool.Pool) *Sessions {
 // Session est ce qu'une session vivante apprend à l'appelant. Ni le jeton, ni son empreinte : les
 // rendre ferait traverser à un secret une frontière qu'il n'a aucune raison de franchir.
 type Session struct {
-	// ID est stable pour toute la vie de la session, y compris à travers l'élévation. C'est ce à quoi
-	// step-024 y a lié ses défis WebAuthn, dans `webauthn_challenges`.
+	// ID est stable pour toute la vie de la session, y compris à travers l'élévation : c'est ce à quoi
+	// `webauthn_challenges` lie ses défis.
 	ID         string
 	OperatorID string
 	// ExpiresAt est l'échéance **absolue**. La glissante n'est pas rendue : elle se déplace à chaque
@@ -43,8 +43,8 @@ type Session struct {
 type Grants struct {
 	Email       string
 	DisplayName string
-	// Permissions est l'union, sans doublon et triée. Vide est un état atteignable : un opérateur
-	// sans rôle existe dès step-029.
+	// Permissions est l'union, sans doublon et triée. Vide est un état atteignable : un opérateur peut
+	// n'avoir aucun rôle.
 	Permissions []string
 }
 
@@ -88,7 +88,7 @@ func (s *Sessions) Create(ctx context.Context, operatorID string, tokenHash []by
 //
 // Le statut de l'opérateur est vérifié ici plutôt qu'après coup : hors du `WHERE`, la session d'un
 // compte désactivé verrait sa fenêtre glissante repoussée par chacune de ses tentatives. La
-// révocation **active** au moment de la désactivation appartient à step-029.
+// révocation **active** au moment de la désactivation appartient à l'écran de gestion des opérateurs.
 //
 // Zéro ligne rendue ne distingue pas « jamais existé », « échue », « oisive » et « compte
 // désactivé » — ce qui est exactement ce qu'on rend au navigateur.
@@ -133,8 +133,8 @@ func (s *Sessions) Resolve(ctx context.Context, tokenHash []byte, idle time.Dura
 // Les trois gardes de `Resolve` sont **redites** ici plutôt qu'empruntées : entre la résolution et
 // l'élévation, la session peut être fermée par un logout concurrent ou son opérateur désactivé.
 //
-// La ligne, elle, est conservée — les défis de cérémonie de step-024 sont liés à `id`, qui ne doit
-// pas disparaître sous eux.
+// La ligne, elle, est conservée — les défis de cérémonie sont liés à `id`, qui ne doit pas
+// disparaître sous eux.
 //
 // `expires_at` n'est pas repoussée : l'élévation n'achète pas du temps, elle change ce que la session
 // autorise.
@@ -195,8 +195,6 @@ func (s *Sessions) Delete(ctx context.Context, id string) error {
 //
 // L'ordre est explicite. Le tri qu'`array_agg(DISTINCT …)` produit en pratique est un détail
 // d'implémentation, et c'est un ordre stable qui rend le corps comparable d'une réponse à l'autre.
-//
-// step-025 lira la même union, au même endroit, pour garder chaque route.
 func (s *Sessions) GrantsOf(ctx context.Context, operatorID string) (Grants, error) {
 	const query = `
 		SELECT o.email, o.display_name,

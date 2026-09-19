@@ -74,27 +74,16 @@ const (
 // `credentials:write`, `scripts:publish` n'est pas dans `scripts:write`. C'est ce qui permet à un
 // rôle de corriger une configuration sans pouvoir déclencher l'acte visible en production.
 //
-// **Aucun test n'affirme le nombre de clés**, et c'est délibéré : un `len(catalog) == 44` exigerait
-// une seconde déclaration tenue à la main, dont l'incrément 44 → 45 ne porte aucune information
-// relisible — on le met à jour sans le lire. Le golden existe déjà ailleurs : une clé disparue ici
-// devient une **ligne supprimée nommée** dans le diff de `permissions.gen.ts`, que
-// `check-generated` force à régénérer.
+// **Aucun test n'affirme le nombre de clés**, et c'est délibéré : un `len(catalog) == N` exigerait
+// une seconde déclaration tenue à la main, dont l'incrément ne porte aucune information relisible.
+// Le golden existe déjà ailleurs : une clé disparue ici devient une **ligne supprimée nommée** dans
+// le diff de `permissions.gen.ts`, que `check-generated` force à régénérer. Ce qu'aucune porte ne
+// voit : une clé retirée **et** régénérée dans le même geste ne laisse qu'un diff à relire.
 //
-// Une version antérieure de ce commentaire disait « la perte accidentelle d'une clé n'est gardée
-// par aucun test ». C'était **faux-pessimiste**, et un relecteur l'a mesuré : retirer `audit:read`,
-// seule clé de sa famille, fait tomber `TestEveryCategoryAcceptedBySQLCarriesAtLeastOneKey` ; et
-// **toute** clé retirée sans régénération fait tomber `TestTheCommittedFileIsWhatTheGeneratorProduces`,
-// qui est précisément le golden que la phrase suivante invoquait. Ce qui n'est gardé par rien est
-// plus étroit : une clé retirée **et** régénérée dans le même geste ne laisse qu'un diff à relire.
-//
-// **Le sens inverse est tenu depuis step-031** par `TestAucuneConstanteNeManqueAuCatalogue`, qui
-// part de la portée du paquet et non de `All()` — une constante déclarée ci-dessous mais qu'aucune
-// entrée ne référence. Jusque-là il n'était gardé par rien, mesuré le 02/08/2026 : un
-// `const FooBar Key = "foo:bar"` ajouté ici **compilait**, laissait les deux suites vertes et
-// n'apparaissait pas dans le TypeScript engendré — Go ne signale pas une constante exportée
-// inutilisée. C'est la faille de DN-3 prise par l'autre bout : `requires(permissions.FooBar)`
-// refusait alors tout le monde en silence, sans qu'aucune porte n'ait rien dit. La rédaction d'alors
-// jugeait le remède plus lourd que ce qu'il protège ; il tient en une quarantaine de lignes.
+// Le sens inverse est tenu par `TestAucuneConstanteNeManqueAuCatalogue`, qui part de la portée du
+// paquet et non de `All()` — une constante déclarée plus haut qu'aucune entrée ne référence. Go ne
+// signale pas une constante exportée inutilisée, et `requires(permissions.FooBar)` refuserait alors
+// tout le monde en silence.
 var catalog = []Entry{
 	// ─── routing ───
 	{

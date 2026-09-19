@@ -22,12 +22,12 @@ import (
 // l'attendu se construit avec `AppliedVersionPhrase` / `ExpectedVersionPhrase`, c'est-à-dire avec la
 // fonction sous test : les faire rendre la chaîne vide laisserait toutes ces assertions vertes sur
 // un message qui ne nomme plus rien — `Contains(s, "")` est toujours vrai. C'est ici que le juge est
-// branché, et il lui a fallu trois rédactions pour l'être vraiment.
+// branché.
 //
 // Deux couples de valeurs plutôt qu'un, parce que des helpers rendant les constantes du test —
-// `return "en version 2"` — passaient la première version. Et des nombres à deux chiffres, parce
-// qu'un `applied % 10` passait la deuxième : la chaîne vide n'est pas la seule façon de ne rien
-// nommer, une constante en est une autre, et une troncature aussi.
+// `return "en version 2"` — passeraient sur un seul. Et des nombres à deux chiffres, parce qu'un
+// `applied % 10` passerait sur des nombres à un chiffre : la chaîne vide n'est pas la seule façon de
+// ne rien nommer, une constante en est une autre, et une troncature aussi.
 func TestLeRefusNommeLesDeuxVersionsEnToutesLettres(t *testing.T) {
 	t.Parallel()
 
@@ -151,8 +151,8 @@ func TestUnSchemaEnAvanceLaisseDemarrer(t *testing.T) {
 // Le DSN porte le mot de passe de la base, et cette erreur remonte jusqu'aux journaux de démarrage.
 //
 // La forme `password = '…'` avec espaces est choisie exprès : c'est celle que la rédaction de pgconn
-// **laisse passer** (mesurée en step-005, ses deux expressions rationnelles sont ancrées sur
-// `password='…'` et `password=…`). Écrit en URL, ce test resterait vert même si l'erreur de la
+// **laisse passer**, ses deux expressions rationnelles étant ancrées sur `password='…'` et
+// `password=…`. Écrit en URL, ce test resterait vert même si l'erreur de la
 // bibliothèque était propagée telle quelle — il aurait alors prouvé le travail de pgx, pas le nôtre.
 func TestUnDSNIllisibleNeRecopieJamaisLeMotDePasse(t *testing.T) {
 	t.Parallel()
@@ -165,8 +165,7 @@ func TestUnDSNIllisibleNeRecopieJamaisLeMotDePasse(t *testing.T) {
 	assert.NotContains(t, err.Error(), password)
 }
 
-// Le cas que step-005 (DN-7) léguait à la première step qui lirait la base : **DSN bien formé, base
-// injoignable**. Il n'était couvert par rien, alors que `configuration.feature` renvoyait déjà ici.
+// **DSN bien formé, base injoignable** — le cas vers lequel `configuration.feature` renvoie.
 //
 // Ce qu'il tient : le refus n'est pas confondu avec « schéma en retard ». Annoncer « version 0 »
 // pour une base qu'on n'a pas jointe enverrait l'exploitant jouer des migrations qui sont peut-être

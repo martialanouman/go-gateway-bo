@@ -36,9 +36,9 @@ func (t replayReadsOnce) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // worthReplaying tient les quatre refus de DN-6 en un endroit. Le seul état de la requête qu'il
 // consulte est sa méthode, et le corps n'entre pas dans la décision : un corps déjà consommé serait
-// rejoué vide, mais aucune lecture n'en porte. Compté sur le client engendré le 01/08/2026 : ses 47
-// constructeurs de GET passent tous `nil` en corps, et le contrat ne déclare **aucune** opération
-// HEAD — les corps ne servent que POST, PATCH et DELETE, que ce filtre écarte de toute façon.
+// rejoué vide, mais aucune lecture n'en porte : les constructeurs de GET du client engendré passent
+// tous `nil` en corps, et le contrat ne déclare **aucune** opération HEAD — les corps ne servent que
+// POST, PATCH et DELETE, que ce filtre écarte de toute façon.
 //
 // Le cas HEAD n'est donc atteignable par aucun appel du client engendré : il est écrit parce que la
 // règle porte sur les lectures et non sur une liste d'opérations, et aucun test ne rougirait s'il
@@ -72,8 +72,8 @@ func worthReplaying(method string, response *http.Response, err error) bool {
 // discard rend la connexion au pool plutôt que de la laisser tomber : c'est la réponse dont on ne
 // veut plus, pas la connexion.
 //
-// Rien ne rougit si cette fonction disparaît — vérifié en la supprimant le 01/08/2026 : la suite
-// reste verte et `bodyclose` ne voit pas la réponse d'un RoundTripper. Ce qu'elle empêche ne
+// Rien ne rougit si cette fonction disparaît — vérifié en la supprimant : la suite reste verte et
+// `bodyclose` ne voit pas la réponse d'un RoundTripper. Ce qu'elle empêche ne
 // s'observe pas dans un test mais sous charge, où une connexion abandonnée par rejeu est une
 // connexion de moins vers la passerelle à chaque 502. La tester demanderait de compter les
 // connexions ouvertes du côté serveur, ce qui mesurerait le pool de net/http plus que ce code.

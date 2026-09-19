@@ -18,9 +18,9 @@ import (
 // `sessions.go` à côté.
 type MFA struct {
 	pool *pgxpool.Pool
-	// attempts compte les essais de second facteur. C'est un `Counter` et non une quatrième rédaction
-	// du compteur glissant : la dimension `mfa` en partage le mécanisme entier — dérivation du verrou,
-	// incrément atomique, fenêtre d'oubli — et n'en diffère que par ce qu'elle compte.
+	// attempts compte les essais de second facteur. C'est un `Counter` : la dimension `mfa` partage le
+	// mécanisme entier — dérivation du verrou, incrément atomique, fenêtre d'oubli — et n'en diffère
+	// que par ce qu'elle compte.
 	attempts *Counter
 }
 
@@ -77,9 +77,9 @@ func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds 
 type SecondFactors struct {
 	TOTPEnrolled           bool
 	RecoveryCodesRemaining int
-	// Passkeys est le nombre de passkeys enregistrées (step-024). Un compte et non une liste : ce que
-	// l'écran doit savoir pour se rendre est s'il conduit à l'enrôlement ou au challenge, et
-	// l'inventaire détaillé appartient à l'écran de gestion de step-028.
+	// Passkeys est le nombre de passkeys enregistrées. Un compte et non une liste : ce que l'écran
+	// doit savoir pour se rendre est s'il conduit à l'enrôlement ou au challenge, et l'inventaire
+	// détaillé appartient à l'écran de gestion.
 	Passkeys int
 }
 
@@ -301,7 +301,7 @@ func (m *MFA) LiveChallenge(ctx context.Context, tokenHash []byte) (PendingChall
 // `WHERE` fait que deux requêtes concurrentes n'en élèvent qu'une.
 //
 // `UPDATE` et non `DELETE` — la raison est dans la migration 00004 : « déjà consommé » doit rester
-// discernable de « n'a jamais existé » pour l'audit de step-025.
+// discernable de « n'a jamais existé » pour l'audit.
 func (m *MFA) ConsumeChallenge(ctx context.Context, id string) (bool, error) {
 	const query = `
 		UPDATE mfa_challenges SET consumed_at = now()

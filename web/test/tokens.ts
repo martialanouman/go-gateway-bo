@@ -12,15 +12,11 @@
  * Il ne comprend en revanche **ni la cascade, ni les media queries, ni aucune autre fonction de
  * couleur** : toute autre syntaxe rend `undefined` plutôt qu'une approximation silencieuse.
  *
- * *(Porté de la v1.0, `909eb8d:src/test/tokens.ts`. Son en-tête d'origine affirmait « il ne comprend
- * ni color-mix() » trois lignes au-dessus de la fonction qui l'évalue — un commentaire qui mentait
- * sur le code qu'il surplombait.)*
- *
  * **Emplacement.** Dans `web/test/` et non sous `src/` : il lit le système de fichiers, ce que la
- * règle de lint de l'invariant (d) refuse à `src/**` hors tests. `web/test/` est ajouté à
- * `tsconfig.include` dans la même step — sans quoi ce fichier serait importé par Vitest sans jamais
- * être typechecké, une porte qui se tait. Il reste hors de `coverage.include`, qui ne vise que
- * `src/**` : un utilitaire de test n'a pas de seuil de couverture à tenir.
+ * règle de lint de l'invariant (d) refuse à `src/**` hors tests. `web/test/` est dans
+ * `tsconfig.include` — sans quoi ce fichier serait importé par Vitest sans jamais être typechecké,
+ * une porte qui se tait. Il reste hors de `coverage.include`, qui ne vise que `src/**` : un
+ * utilitaire de test n'a pas de seuil de couverture à tenir.
  */
 
 import { readFileSync } from 'node:fs'
@@ -42,9 +38,8 @@ const TOKENS_DIRECTORY = join(
  *
  * Elle vit ici, à côté de `TOKEN_FILES` qui joue le même rôle, parce qu'elle a **deux lecteurs** :
  * `charte.test.ts` y tient le contraste et les tokens consommés, `classes-peintes.test.ts` la
- * bijection classe émise ↔ classe peinte. Ce second lecteur ne lisait que `components.css` : une
- * feuille inscrite ici sortait donc de la bijection sans que rien ne le dise. Une constante, deux
- * lecteurs — c'est ce qui fait qu'inscrire une feuille suffit désormais à la soumettre aux deux.
+ * bijection classe émise ↔ classe peinte. Une constante, deux lecteurs — inscrire une feuille suffit
+ * à la soumettre aux deux.
  */
 export const STYLED_FILES = [
   'app.css',

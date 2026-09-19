@@ -10,18 +10,17 @@ import { Icon } from './icon'
  * Un toast dit **quoi**, et **qui l'a détecté**. Les deux étages ne se réparent pas pareil :
  * Alertmanager évalue les alertes d'infrastructure *indépendamment de la disponibilité du tableau de
  * bord*, le BFF évalue les alertes métier sur une source durable. Un opérateur réveillé à 3 h doit
- * savoir lequel des deux parle avant de savoir quoi faire — d'où le bleu et le violet, que la charte
- * fixe et que `--source-alertmanager` / `--source-bff` portaient sans qu'aucune règle ne les
- * consomme.
+ * savoir lequel des deux parle avant de savoir quoi faire — d'où le bleu et le violet de
+ * `--source-alertmanager` et `--source-bff`.
  *
  * ## Les rôles viennent de Base UI, et c'est un écart assumé avec le kit
  *
  * Le `Toast.jsx` de la charte pose `role="status"` sur le toast. Base UI suit le motif APG : le
- * **viewport** porte `role="region"` + `aria-live="polite"`, et chaque toast `role="dialog"`. C'est
- * ce motif qui rend le bouton Fermer atteignable au clavier — reposer `role="status"` par-dessus le
- * casserait, et « toujours fermable » cesserait d'être vrai pour qui n'a pas de souris. Le kit
- * `.jsx` n'est pas du code de production : il montre une apparence, et n'a jamais eu ni piège de
- * focus ni parcours clavier.
+ * **viewport** porte `role="region"` + `aria-live="polite"`, et chaque toast `role="dialog"` — ou
+ * `alertdialog` en priorité haute, donc pour `critical`. C'est ce motif qui rend le bouton Fermer
+ * atteignable au clavier — reposer `role="status"` par-dessus le casserait, et « toujours fermable »
+ * cesserait d'être vrai pour qui n'a pas de souris. Le kit `.jsx` n'est pas du code de production : il
+ * montre une apparence, et n'a jamais eu ni piège de focus ni parcours clavier.
  *
  * Le viewport tient son nom, « Notifications », du défaut de Base UI — déjà du français. Le test de
  * la région le fixe, et rougira si une montée de version le change.
@@ -47,12 +46,7 @@ export type ToastData = {
 /** Neuf secondes pour une alerte critique, six pour le reste. La charte : « éphémères ». */
 export const TOAST_TIMEOUT = { critical: 9000, default: 6000 } as const
 
-/**
- * Pousse un toast, avec la durée que sa sévérité commande.
- *
- * Six lignes plutôt qu'une abstraction : c'est l'API que step-045 appellera quand la WebSocket
- * alimentera la pile, et elle n'a rien à porter de plus aujourd'hui.
- */
+/** Pousse un toast, avec la durée que sa sévérité commande. */
 export function useToast() {
   const manager = BaseToast.useToastManager()
 
@@ -77,9 +71,9 @@ export function useToast() {
 
 export type ToastStackProps = {
   /**
-   * Ce que la pile surplombe. `useToast` n'est appelable que **sous** ce composant — c'est la
-   * contrainte du fournisseur de Base UI, et la raison pour laquelle step-040 le monte au niveau de
-   * la coquille et non dans un coin de l'écran.
+   * Ce que la pile surplombe. `useToast` n'est appelable que **sous** ce composant — contrainte du
+   * fournisseur de Base UI, et la raison pour laquelle la coquille le monte à son niveau plutôt que
+   * dans un coin de l'écran.
    */
   readonly children?: ReactNode
 }

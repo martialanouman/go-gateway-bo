@@ -35,11 +35,10 @@ describe('Icon', () => {
   })
 
   it('dessine chacun des glyphes du jeu', () => {
-    // **Pas de nombre écrit ici.** La première rédaction annonçait « vingt-et-un » alors que la
-    // charte en dessine vingt-deux : le compte du test et celui du composant venaient de la même
-    // main, au même moment, et se confirmaient l'un l'autre. C'est
-    // `test/glyphes-de-la-charte.test.ts` qui confronte le jeu à sa source ; ce test-ci vérifie
-    // seulement que chaque nom déclaré rend bien quelque chose.
+    // **Pas de nombre écrit ici** : un compte recopié dans le test et dans le composant vient de la
+    // même main et ne fait que se confirmer lui-même. C'est `test/glyphes-de-la-charte.test.ts` qui
+    // confronte le jeu à sa source ; ce test-ci vérifie seulement que chaque nom déclaré rend bien
+    // quelque chose.
     expect(GLYPH_NAMES.length).toBeGreaterThan(0)
 
     for (const name of GLYPH_NAMES) {

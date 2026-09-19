@@ -28,7 +28,7 @@ const (
 		`<script src="/assets/app-abc123.js"></script></body></html>`
 	appJS = "console.log('spa')"
 	// Vite recopie `web/public/` à la racine du site sans hacher les noms, et **récursivement** :
-	// step-008 y versera `fonts/`, d'où le fichier imbriqué ci-dessous.
+	// d'où le fichier imbriqué ci-dessous, qui exerce la profondeur.
 	faviconSVG = `<svg xmlns="http://www.w3.org/2000/svg"></svg>`
 	// `wOF2` est la signature d'un WOFF2 : le `Content-Type` de ce fichier vaut `font/woff2` que
 	// la table MIME du système connaisse l'extension ou non — sinon `DetectContentType` la retrouve
@@ -56,8 +56,8 @@ func call(t *testing.T, method, target string) *http.Response {
 	t.Helper()
 
 	request := httptest.NewRequest(method, target, nil)
-	// Ce qu'un navigateur annonce de lui-même sur une méthode non sûre, et que le contrôle d'origine
-	// de step-036 exige avant tout routage. Sans lui, un `POST /api/health` recevrait 403 — le refus
+	// Ce qu'un navigateur annonce de lui-même sur une méthode non sûre, et que `requireSameOrigin`
+	// exige avant tout routage. Sans lui, un `POST /api/health` recevrait 403 — le refus
 	// du **contrôle d'origine** — au lieu du 405 que ce fichier décrit ; le décor mentirait sur la
 	// route qu'il croit exercer.
 	request.Header.Set("Sec-Fetch-Site", "same-origin")
@@ -200,10 +200,8 @@ func declaringFile(t *testing.T, pkg *packages.Package, handler http.Handler) st
 // **appelé**.
 //
 // `chi.Walk` ne rapporte pas le `NotFound` d'un sous-routeur : `handleUnknownAPIRoute` n'a donc pas à
-// être exempté ici. Ce qu'il rapporte, **remesuré en step-025** : les dix opérations du contrat sous
-// `/api`, plus `/assets/*`, `/ws` et `/*` une fois par méthode — vingt-quatre entrées. La rédaction
-// précédente en nommait quatre, ce qui était vrai quand le contrat n'avait qu'une opération et a
-// cessé de l'être sans que rien ne le voie.
+// être exempté ici. Ce qu'il rapporte : les dix opérations du contrat sous `/api`, plus `/assets/*`,
+// `/ws` et `/*` une fois par méthode — vingt-quatre entrées.
 func TestOnlyGeneratedCodeServesTheAPIRoutes(t *testing.T) {
 	t.Parallel()
 
@@ -289,9 +287,10 @@ func setsOption(call *ast.CallExpr, option string) bool {
 // Ce qu'il couvre, et pourquoi une porte structurelle plutôt qu'une requête. Le gestionnaire visé est
 // celui du **wrapper** engendré (`bff.gen.go`, `ServerInterfaceWrapper.ErrorHandlerFunc`) : c'est lui
 // qui reçoit les erreurs de liaison des paramètres de requête, de chemin, des en-têtes et des cookies
-// (`chi-middleware.tmpl`, 14 sites d'appel). `GET /health` n'a aucun des quatre, donc **aucune requête
-// que le contrat autorise ne peut l'atteindre aujourd'hui** — c'est ce qui rend le défaut invisible et
-// c'est pourquoi la preuve est ici structurelle.
+// (`chi-middleware.tmpl`, 14 sites d'appel). Le contrat ne lie aujourd'hui qu'un seul paramètre de la
+// sorte — le `passkeyId` du retrait d'une clé d'accès, une chaîne requise qu'une requête assez bien
+// formée pour atteindre la route ne peut pas faire échouer — donc **aucune requête ne l'atteint** :
+// c'est ce qui rend le défaut invisible, et c'est pourquoi la preuve est ici structurelle.
 //
 // Mesuré le 02/08/2026, contrat muté avec un `depuis` requis de type entier, régénéré, requête réelle
 // à travers `NewRouter` : avec `HandlerFromMux`, `GET /api/health` rend

@@ -1,13 +1,12 @@
-// Package fuite est le **témoin permanent** des portes de step-026 : un paquet qui porte, exprès,
-// les deux défauts qu'elles existent pour refuser.
+// Package fuite est le **témoin permanent** des portes de sérialisation : un paquet qui porte,
+// exprès, les deux défauts qu'elles existent pour refuser.
 //
 // Il vit sous `testdata/`, donc `go list ./...` ne l'énumère pas et `go vet ./...` n'en signale rien
-// — c'est le patron de `testdata/divergent`, mesuré en step-004. La suite normale ne le voit pas ; il
-// n'est chargé que par `TestLesPortesMordentSurLeTemoin`, qui **exige** que chacune le rapporte.
+// — c'est le patron de `testdata/divergent`. La suite normale ne le voit pas ; il n'est chargé que
+// par `TestLesPortesMordentSurLeTemoin`, qui **exige** que chacune le rapporte.
 //
 // Sans lui, la mordance des portes ne serait établie que par des mutations jouées à la main puis
-// retirées, dont rien ne reste dans le dépôt. C'est ce que la première rédaction de step-026 livrait,
-// et sa fiche annonçait pourtant des tests qui n'existaient pas.
+// retirées, dont rien ne resterait dans le dépôt.
 package fuite
 
 import (

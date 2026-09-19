@@ -1,10 +1,10 @@
 /**
  * Les tables que `/_design` rend, et que le contrôle de contraste vérifie.
  *
- * **Une seule liste, deux lecteurs.** La fiche de step-008 exige que chaque paire texte/fond
- * *utilisée par la page* atteigne AA. Énumérer les paires à la main dans le test les ferait diverger
- * de la page dès la première section ajoutée, et l'exigence deviendrait fausse sans que rien ne le
- * signale. Ici, « les paires que la page rend » est littéralement ce que le test lit.
+ * **Une seule liste, deux lecteurs.** Chaque paire texte/fond *utilisée par la page* doit atteindre
+ * AA. Énumérer les paires à la main dans le test les ferait diverger de la page dès la première
+ * section ajoutée, et l'exigence deviendrait fausse sans que rien ne le signale. Ici, « les paires que
+ * la page rend » est littéralement ce que le test lit.
  *
  * Ce module ne contient que des **données** : pas de JSX, pas de React. C'est ce qui permet à
  * `test/charte.test.ts` de tourner en `@vitest-environment node` sans charger le routeur.
@@ -116,9 +116,7 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     over: '--surface-page',
     usage: 'Ligne sélectionnée dans une table',
   },
-  // Les deux combinaisons que les primitives de step-041 ont introduites sans les inscrire ici. La
-  // porteuse est `--surface-card` et non la page : c'est la plus sévère des deux, et DN-5 a été
-  // trompée une fois par le contraire.
+  // La porteuse est `--surface-card` et non la page : c'est la plus sévère des deux.
   {
     text: '--text-danger-on-tint',
     background: '--action-danger-bg-hover',
@@ -131,8 +129,8 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     over: '--surface-card',
     usage: 'Bouton principal · option sélectionnée',
   },
-  // Les cinq combinaisons que step-042 introduit. Le panneau d'erreur pose trois niveaux de texte
-  // sur sa propre teinte, et les deux sources leur couleur sur la carte.
+  // Le panneau d'erreur pose trois niveaux de texte sur sa propre teinte, et les deux sources leur
+  // couleur sur la carte.
   {
     text: '--text-primary',
     background: '--tint-red',
@@ -161,8 +159,8 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     background: '--surface-card',
     usage: 'Source d’un toast · bff',
   },
-  // Le rail de step-040. Le gris de groupe de la charte (`--n-400`) n'atteint pas 4,5:1 sur
-  // `--n-950` : le titre de groupe prend `--text-faint`.
+  // Le gris de groupe de la charte (`--n-400`) n'atteint pas 4,5:1 sur `--n-950` : le titre de groupe
+  // du rail prend `--text-faint`.
   { text: '--text-muted', background: '--surface-chrome', usage: 'Entrée du rail · opérateur' },
   { text: '--text-faint', background: '--surface-chrome', usage: 'Titre de groupe du rail' },
   {

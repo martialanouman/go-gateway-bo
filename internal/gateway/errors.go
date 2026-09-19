@@ -9,10 +9,8 @@ import (
 
 // CodeUpstreamUnreadable est le seul code que le BFF frappe lui-même : celui d'une réponse d'erreur
 // dont le corps n'est pas l'enveloppe du contrat. Le préfixe `bff_` nomme l'émetteur, et l'émetteur
-// n'est pas la passerelle — c'est ce qui interdit la confusion dans un log. Mesuré sur le contrat
-// **4.0.2**, celui que la branche installe, le 08/08/2026 : `code` n'y porte aucun `pattern`
-// (openapi-admin.yaml:1687-1690), ses exemples sont tous en snake_case (`forbidden_scope`,
-// `validation_error`…), et `grep -c bff_` rend 0 sur les deux YAML du paquet.
+// n'est pas la passerelle — c'est ce qui interdit la confusion dans un log, et ce que garde
+// `TestUnreadableCodeIsNotAGatewayCode`.
 const CodeUpstreamUnreadable = "bff_upstream_unreadable"
 
 // FieldError est un élément de `errors[]` : le champ fautif et son explication. Le type engendré ne
@@ -33,11 +31,10 @@ type FieldError struct {
 // qui affichera l'erreur en a besoin — c'est la sérialisation et le log qui les excluent, pas la
 // structure.
 //
-// Un appelant reconnaît ce qui l'intéresse par `errors.As` puis par Status et Code — le seul code
-// constant est CodeUpstreamUnreadable, parce qu'il est le seul que nous frappons. Aucune taxonomie
+// Un appelant reconnaît ce qui l'intéresse par `errors.As` puis par Status et Code. Aucune taxonomie
 // (sentinelles, prédicats par famille) n'est écrite ici : aucune route du BFF n'appelle encore la
-// passerelle — la première arrive en step-060 — et une taxonomie sans appelant est une liste de
-// suppositions qu'aucun test ne peut exercer.
+// passerelle, et une taxonomie sans appelant est une liste de suppositions qu'aucun test ne peut
+// exercer.
 type APIError struct {
 	// Status vient de la ligne de statut : le contrat ne le duplique pas dans le corps.
 	Status  int
@@ -49,17 +46,14 @@ type APIError struct {
 // Les trois méthodes qui suivent sont à **récepteur valeur**, et c'est l'essentiel de la garantie :
 // `errors.As` rend un `*APIError`, que déréférencer pour « logger la struct » ne coûte qu'un
 // caractère. Sur un récepteur pointeur, la valeur n'implémente ni `error`, ni `json.Marshaler`, ni
-// `fmt.GoStringer`, et chaque rendu retombe sur la réflexion : mesuré le 02/08/2026, neuf des seize
-// formes de TestErrorRendersNoUpstreamFreeText écrivaient alors le texte amont — dont
-// `slog.Error("…", "err", *apiErr)`, qui dumpait `Message` dans le journal JSON.
+// `fmt.GoStringer`, et chaque rendu retombe sur la réflexion, qui écrit le texte amont — dont
+// `slog.Error("…", "err", *apiErr)`, qui dumpe `Message` dans le journal JSON.
 //
-// Chacune ferme un chemin distinct : `Error()` les verbes de fmt et slog en mode texte, qui formate
-// par `%+v` ($GOROOT/src/log/slog/text_handler.go:117) ; `MarshalJSON()` un `json.Marshal` de
-// l'erreur ; `GoString()` le verbe `%#v`, que fmt résout par le seul GoStringer sans jamais
-// consulter `error` ($GOROOT/src/fmt/print.go, handleMethods). slog en mode JSON, lui, est couvert
-// deux fois : son handler prend le Marshaler quand il y en a un et `Error()` sinon
-// ($GOROOT/src/log/slog/json_handler.go:126-133) — retirer MarshalJSON ne le fait donc pas rougir,
-// mesuré.
+// Chacune ferme un chemin distinct : `Error()` les verbes de fmt et slog en mode texte ;
+// `MarshalJSON()` un `json.Marshal` de l'erreur ; `GoString()` le verbe `%#v`, que fmt résout par le
+// seul GoStringer sans jamais consulter `error`. slog en mode JSON, lui, est couvert deux fois : son
+// handler prend le Marshaler quand il y en a un et `Error()` sinon — retirer MarshalJSON ne le fait
+// donc pas rougir, mesuré.
 
 // Error ne rend que ce que nous contrôlons : le statut, le code stable, et les **noms** des champs
 // fautifs. Un nom désigne un champ, jamais sa valeur — le contrat décrit `errors[]` comme le détail
@@ -147,24 +141,12 @@ func (e APIError) fieldNames() []string {
 }
 
 // ErrorFrom décode le couple (statut, corps) que rend le client engendré, et rien d'autre — DN-7.
-// Mesuré sur le code engendré : une opération ne matérialise un champ `JSON4xx` que pour les statuts
-// qu'elle **déclare**, et un statut non déclaré ne laisse que `Body` et `HTTPResponse`. S'appuyer
-// sur les champs typés demanderait 133 mappings et ne traiterait aucun statut non déclaré. Mesuré
-// sur le contrat **4.0.2** le 08/08/2026 : 4 de ses 133 opérations déclarent un 503
-// (`erase-customer-content`, `rotate-content-key`, `gdpr-erase` — openapi-admin.yaml:1429, 1442,
-// 1455 — et `create-message-export`, ligne 1531, arrivée avec la 4.0.0), et le client engendré ne
-// matérialise `JSON503` que pour ces quatre-là (client.gen.go:18259, 18323, 19205, 19824) ; les 129
-// autres opérations n'ont aucun champ où le ranger. Comme toutes les réponses d'erreur du contrat
-// sont des alias du même schéma `Error` — `ServiceUnavailable = Error`, client.gen.go:3791 —, un
-// décodeur unique les couvre toutes.
-//
-// La quatrième renforce l'argument au lieu de l'entamer : elle déclare son 503 **en ligne** plutôt
-// que par `$ref`, et le champ engendré est directement `*Error`. Deux formes de déclaration, un seul
-// type à décoder — ce qu'un mapping par opération aurait dû suivre à la main.
-//
-// *(Le chiffre disait 3 jusqu'au 08/08 : mesuré sur 2.5.0 le 02/08, il est resté juste jusqu'à ce que
-// le bump l'invalide. La conclusion, elle, n'a jamais bougé — ce qui est précisément ce qui rend ce
-// genre d'erreur durable : rien ne la fait tomber.)*
+// Une opération n'y matérialise un champ `JSONnnn` que pour les statuts qu'elle **déclare**, et un
+// statut non déclaré ne laisse que `Body` et `HTTPResponse` : s'appuyer sur les champs typés
+// demanderait un mapping par opération et ne traiterait aucun statut non déclaré. Seule une poignée
+// d'opérations déclarent un 503, sous deux formes — par `$ref` et en ligne. Comme toutes les
+// réponses d'erreur du contrat sont des alias du même schéma `Error`, un décodeur unique les couvre
+// toutes.
 //
 // Le succès est le 2xx, et tout le reste est une erreur : un statut inattendu — 3xx non suivi, ou le
 // 0 que rend `StatusCode()` quand `HTTPResponse` est nil — tombe ainsi du côté strict plutôt que de

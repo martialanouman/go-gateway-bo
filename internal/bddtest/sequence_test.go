@@ -26,14 +26,10 @@ var dependencyClause = regexp.MustCompile(`(?s)\*\*Dépend de :\*\*(.*?)\*\*Bloq
 // listedStep reconnaît une ligne de la liste de `todo.md`, cochée ou non.
 var listedStep = regexp.MustCompile(`^- \[[ x]\] (step-[0-9]{3})`)
 
-// Planchers mesurés le 01/09/2026 : **22 fiches** et **41 couples** (step, dépendance) — pour 78 steps
-// au découpage, dont 56 n'avaient pas de fiche. Ce sont des planchers et non des égalités, le
-// découpage grossissant ; mais sans eux, une porte qui ne lirait plus aucune fiche serait verte, et
-// c'est le seul état qu'elle ne doit jamais atteindre.
-//
-// Remesuré le 08/09/2026, les fiches de `040`, `041` et `042` ajoutées : **25 fiches**, **46 couples**,
-// 78 steps, **53** sans fiche. Les constantes ne bougent pas — la marge est voulue —, mais le chiffre
-// qui les justifie se remesure plutôt que de vieillir en silence.
+// Ce sont des **planchers** et non des égalités, le découpage grossissant ; sans eux, une porte qui ne
+// lirait plus aucune fiche serait verte, et c'est le seul état qu'elle ne doit jamais atteindre. La
+// marge sous le compte réel est voulue, mais le chiffre qui la justifie se remesure plutôt que de
+// vieillir en silence.
 const (
 	minimumFiches       = 20
 	minimumDependencies = 35
@@ -45,15 +41,12 @@ const (
 // d'une fiche prime quand elle le contredit. Les deux règles se lisent bien ; **rien ne les
 // confrontait**.
 //
-// Le 01/09/2026 elles se contredisaient. Une note de bas de section déplaçait `027`, `028` et `029`
-// après `041`, `042` et `040`, que la liste plaçait pourtant après elles : lire la liste dans l'ordre
-// — ce que le document demande en toutes lettres — rendait **cinq positions fausses sur huit**, à
-// partir de la deuxième step à faire.
+// Elles se sont déjà contredites : une note de bas de section déplaçait trois steps après trois
+// autres que la liste plaçait pourtant après elles, si bien que lire la liste dans l'ordre — ce que
+// le document demande en toutes lettres — rendait cinq positions fausses sur huit.
 //
-// La ligne « Dépend de » de `step-027.md` rattrapait ce cas-là. Elle ne rattrapait pas `041`, `042` et
-// `040`, qui n'avaient alors pas de fiche — et pour une step qui n'en a pas, l'ordre de la liste est
-// la seule source. *(Les trois en ont une depuis le 08/09/2026, et cette porte les lit : inverser une
-// dépendance dans chacun des trois en-têtes la fait rougir.)*
+// La ligne « Dépend de » rattrape ce cas-là, mais seulement pour une step qui a une fiche : pour une
+// step qui n'en a pas, l'ordre de la liste est la seule source.
 func TestAucuneStepNEstListeeAvantUneDontElleDepend(t *testing.T) {
 	t.Parallel()
 

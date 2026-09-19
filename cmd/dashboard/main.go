@@ -54,10 +54,8 @@ func start(logger *slog.Logger) error {
 
 func run(ctx context.Context, logger *slog.Logger) error {
 	//nolint:forbidigo // La seule lecture d'environnement **du serveur**, et elle ne fait que la
-	// passer au chargeur. Elle n'est plus la seule du dépôt depuis step-021 : `cmd/bootstrap` en porte
-	// une, pour ses propres variables, avec la même exemption sur la ligne. Une par programme, aucune
-	// ailleurs. L'exemption reste posée sur la ligne et non sur le fichier : sinon toute lecture
-	// ajoutée plus tard dans main passerait avec elle.
+	// passer au chargeur — une par programme, aucune ailleurs. L'exemption est posée sur la ligne et
+	// non sur le fichier : sinon toute lecture ajoutée plus tard dans main passerait avec elle.
 	cfg, err := config.Load(os.LookupEnv)
 	if err != nil {
 		return err
@@ -66,12 +64,8 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// Avant `net.Listen`, et non après : une instance qui lie son port puis refuse est déjà dans le
 	// pool du load balancer, le temps d'un aller-retour de sonde. Le récit du démarrage se lit alors
 	// dans l'ordre — la configuration est-elle complète, le schéma est-il celui que j'attends, les
-	// assets, j'écoute.
-	//
-	// Ce que cette ligne change pour l'exploitation : le binaire exige désormais une base
-	// **joignable**. Jusqu'ici le DSN n'était validé qu'en forme (step-005, DN-5), et le cas « DSN
-	// bien formé, base injoignable » n'était observable nulle part — c'est la dette que DN-6 laissait
-	// à la première step qui lirait la base.
+	// assets, j'écoute. Ce qu'elle change pour l'exploitation : le binaire exige une base
+	// **joignable**, et non plus seulement un DSN bien formé.
 	if err = store.VerifySchema(ctx, cfg.DatabaseURL); err != nil {
 		return err
 	}

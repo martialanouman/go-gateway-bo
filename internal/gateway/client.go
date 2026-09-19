@@ -16,10 +16,10 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/config"
 )
 
-// mockAccessToken n'est pas un secret et doit se lire comme tel. Mesuré sur Prism le 01/08/2026 : il
-// applique le `security` global du contrat et répond 401 sans en-tête `Authorization`, mais accepte
-// n'importe quel `Bearer`. Il n'y a pas de `tokenUrl` en face — le mode `mock` n'en appelle aucun.
-// C'est l'inverse d'un identifiant en dur : une valeur qui n'ouvre rien, et qui se lit comme telle.
+// mockAccessToken n'est pas un secret et doit se lire comme tel. Prism applique le `security` global
+// du contrat et répond 401 sans en-tête `Authorization`, mais accepte n'importe quel `Bearer`, et il
+// n'y a pas de `tokenUrl` en face — le mode `mock` n'en appelle aucun. C'est l'inverse d'un
+// identifiant en dur : une valeur qui n'ouvre rien, et qui se lit comme telle.
 //
 //nolint:gosec // G101 : voir juste au-dessus.
 const mockAccessToken = "jeton-factice-du-mock-prism"
@@ -46,23 +46,21 @@ func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
 
 	// Le contexte porte le client sortant : `clientcredentials` obtient le jeton par lui, et
 	// oauth2.NewClient en reprend le transport pour joindre l'API. Un seul client mTLS couvre donc
-	// les deux appels — lu dans oauth2@v0.36.0/oauth2.go:353-367 et internal/transport.go:21-28.
-	// Deux clients configurés séparément laisseraient le jeton s'obtenir hors mTLS, c'est-à-dire une
-	// authentification sortante à moitié protégée que rien ne signalerait.
+	// les deux appels — lu dans oauth2@v0.36.0. Deux clients configurés séparément laisseraient le
+	// jeton s'obtenir hors mTLS, c'est-à-dire une authentification sortante à moitié protégée que rien
+	// ne signalerait.
 	//
 	// Le Timeout est posé ici et nulle part ailleurs, et c'est ce qui le fait borner **aussi**
 	// l'obtention du jeton : oauth2.NewClient recopie le Timeout du client du contexte dans celui
-	// qu'il rend (oauth2.go:365).
+	// qu'il rend.
 	//
-	// Ce qu'il ne fait pas — et les deux se lisent ensemble sans se contredire : l'attente est
-	// bornée, elle n'est pas **annulable**. Le contexte de l'appelant n'atteint pas l'obtention du
-	// jeton, parce que `oauth2.Transport.RoundTrip` appelle `Source.Token()` sans lui en passer aucun
-	// (transport.go:45) et que la source porte celui construit ici, sur context.Background
-	// (clientcredentials.go:79-84). Comme `reuseTokenSource.Token()` garde son mutex pendant l'appel
-	// réseau (oauth2.go:308-320), un tokenUrl parti en trou noir sérialise les appels concurrents,
-	// chacun pour la durée du Timeout, et un appelant qui a renoncé n'en libère aucun. Rien n'est
-	// fait de ce constat tant qu'aucune route n'appelle la passerelle : la première arrive en
-	// step-060, et c'est elle qui dira si ce plafond se voit.
+	// Ce qu'il ne fait pas : l'attente est bornée, elle n'est pas **annulable**. Le contexte de
+	// l'appelant n'atteint pas l'obtention du jeton, parce que `oauth2.Transport.RoundTrip` appelle
+	// `Source.Token()` sans lui en passer aucun et que la source porte celui construit ici, sur
+	// context.Background. Comme `reuseTokenSource.Token()` garde son mutex pendant l'appel réseau, un
+	// tokenUrl parti en trou noir sérialise les appels concurrents, chacun pour la durée du Timeout,
+	// et un appelant qui a renoncé n'en libère aucun. La première route qui appellera la passerelle
+	// dira si ce plafond se voit.
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, &http.Client{
 		Transport: transport,
 		Timeout:   cfg.Timeout,
@@ -107,12 +105,12 @@ func knownMode(mode config.GatewayMode) error {
 //
 // Un `http://` qui traverse ne casse rien de visible : http.Transport ne consulte pas son tls.Config
 // quand l'URL est en clair, si bien que le matériel mTLS est chargé, posé et jamais présenté.
-// Mesuré le 02/08/2026 avec un matériel valide et les deux bouts en clair : l'API reçoit
-// `Bearer …` et zéro certificat pair, le tokenUrl reçoit le secret client en `Basic` — et les cinq
-// scopes, `gdpr:erase` compris, partent avec.
+// Mesuré avec un matériel valide et les deux bouts en clair : l'API reçoit `Bearer …` et zéro
+// certificat pair, le tokenUrl reçoit le secret client en `Basic` — et les cinq scopes,
+// `gdpr:erase` compris, partent avec.
 //
-// La comparaison ignore la casse, comme net/url qui minuscule le schéma à l'analyse
-// ($GOROOT/src/net/url/url.go:454) : `HTTPS://` désigne une passerelle parfaitement joignable, et
+// La comparaison ignore la casse, comme net/url qui minuscule le schéma à l'analyse :
+// `HTTPS://` désigne une passerelle parfaitement joignable, et
 // une garde qui refuse du légitime finit par être retirée.
 func encryptedEndpoints(cfg config.GatewayConfig) error {
 	if cfg.Mode != config.GatewayModeReal {
@@ -159,20 +157,19 @@ func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSou
 		// c'est l'origine de l'invariant (c).
 		//
 		// **Ce qui manque est un choix, et aucune porte ne le voit** — oapi-codegen n'engendre rien du
-		// `security`, donc le symptôme sera un **403 à l'exécution** sur du code qui compile. Mesuré
-		// sur le contrat 4.0.2 le 08/08/2026 :
+		// `security`, donc le symptôme sera un **403 à l'exécution** sur du code qui compile :
 		//
-		//   - `msisdn:reveal` est catalogué (depuis la 3.0.0) et absent de cette liste. Voir les
-		//     numéros d'abonnés en clair là où le contrat les masque par défaut est une frontière
-		//     qu'il a posée ; la déplacer pour du code qui n'existe pas ne se justifie pas.
+		//   - `msisdn:reveal` est catalogué et absent de cette liste. Voir les numéros d'abonnés en
+		//     clair là où le contrat les masque par défaut est une frontière qu'il a posée ; la
+		//     déplacer pour du code qui n'existe pas ne se justifie pas.
 		//   - `cdr:export_bulk` est exigé par `security:` sur `create-message-export` et
-		//     `get-message-export` (4.0.0) mais **n'est catalogué nulle part** — le bloc `scopes` du
-		//     `securitySchemes` n'en compte que six et ne le contient pas. C'est un manque du contrat
-		//     amont, à corriger par une PR dans `go-gateway/api/` plutôt qu'en le devinant ici.
+		//     `get-message-export` mais **n'est catalogué nulle part** — le bloc `scopes` du
+		//     `securitySchemes` ne le contient pas. C'est un manque du contrat amont, à corriger par
+		//     une PR dans `go-gateway/api/` plutôt qu'en le devinant ici.
 		//
 		// Aucune des deux opérations n'est appelée par ce dépôt : les ajouter élargirait le jeton
 		// machine pour personne. C'est à la step qui livrera l'export de décider, sachant ce qu'elle
-		// sert — step-104, prévenue dans `tasks/todo.md`. step-009, 08/08/2026.
+		// sert — step-104, prévenue dans `tasks/todo.md`.
 		Scopes: []string{"admin:read", "admin:write", "content:read", "content:erase", "gdpr:erase"},
 	}
 

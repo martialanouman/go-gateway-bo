@@ -15,17 +15,17 @@ import (
 
 // Ce que ces deux suites tiennent est le **contenu** du schéma, que ni l'inventaire des onze tables
 // ni l'empreinte de `base_test.go` n'observent : l'empreinte se compare à elle-même avant et après
-// rejeu, donc elle prouve l'idempotence et jamais qu'une contrainte existe. Mesuré le 02/08/2026,
-// on pouvait retirer n'importe quel `CHECK`, n'importe quel `ON DELETE` et l'index unique sur
-// `lower(email)` sans qu'une seule porte rougisse.
+// rejeu, donc elle prouve l'idempotence et jamais qu'une contrainte existe : sans ces suites, on
+// retirerait n'importe quel `CHECK`, n'importe quel `ON DELETE` et l'index unique sur `lower(email)`
+// sans qu'une seule porte rougisse.
 //
 // La forme retenue est le **refus observé**, pas l'inventaire de `pg_constraint` : un `CHECK` est un
 // refus (critère 3), et ce qu'on veut savoir est qu'une ligne fautive n'entre pas — pas qu'une ligne
 // de catalogue porte le bon nom.
 
-// `restrict_violation` et non `foreign_key_violation` : mesuré le 02/08/2026 sur `postgres:18`, un
-// `ON DELETE RESTRICT` rend **23001**, là où une clé étrangère non satisfaite rend 23503. Les deux
-// codes sont distingués ici parce qu'ils disent deux choses différentes à l'exploitation.
+// `restrict_violation` et non `foreign_key_violation` : sur `postgres:18`, un `ON DELETE RESTRICT`
+// rend **23001**, là où une clé étrangère non satisfaite rend 23503. Les deux codes sont distingués
+// ici parce qu'ils disent deux choses différentes à l'exploitation.
 const (
 	checkViolation      = "23514"
 	uniqueViolation     = "23505"
@@ -112,12 +112,12 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			sqlstate: uniqueViolation,
 		},
 		{
-			// Les dimensions comptées sont fermées par le schéma. Elles sont **cinq** depuis 00009 et
-			// non trois, comme ce cas l'a dit jusqu'au 29/08/2026 : la contrainte a été élargie deux
-			// fois — 00007 pour `mfa`, 00009 pour `totp_enroll` et `webauthn_ceremony` — sans que
-			// l'intitulé bouge, et le cas restait vert parce que `empreinte` reste refusé quel que soit
-			// le nombre de valeurs admises. Une sixième valeur écrite par erreur ne serait comptée par
-			// rien et ne verrouillerait rien : le refus est le seul symptôme possible.
+			// Les dimensions comptées sont fermées par le schéma, et elles sont **cinq** depuis 00009 :
+			// la contrainte a été élargie deux fois — 00007 pour `mfa`, 00009 pour `totp_enroll` et
+			// `webauthn_ceremony`. Un intitulé qui resterait à trois ne ferait pas rougir ce cas, car
+			// `empreinte` reste refusé quel que soit le nombre de valeurs admises. Une sixième valeur
+			// écrite par erreur ne serait comptée par rien et ne verrouillerait rien : le refus est le
+			// seul symptôme possible.
 			name: "un compteur d'échecs ne connaît que ses cinq dimensions",
 			act: `INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
 				VALUES ('empreinte', 'x', 1, now())`,
@@ -252,15 +252,11 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 	}
 }
 
-// Ce qu'un `ON DELETE` décide n'est pas un refus mais une **conséquence**, et une conséquence
-// silencieuse : un `CASCADE` posé là où le §3.1 veut un `SET NULL` effacerait des notifications
-// déjà signalées sans qu'aucune erreur ne remonte.
 // Les cinq dimensions comptées sont **acceptées** par le schéma.
 //
-// **Le cas « ne connaît que ses cinq dimensions » ne prouve que la moitié**, et le renommage du
-// 29/08/2026 promettait plus qu'il ne tenait : `empreinte` reste refusé quel que soit le nombre de
-// valeurs admises, donc une migration qui resserrerait la contrainte à trois dimensions le laisserait
-// **vert**. Ce test tient l'autre moitié.
+// **Le cas « ne connaît que ses cinq dimensions » ne prouve que la moitié** : `empreinte` reste
+// refusé quel que soit le nombre de valeurs admises, donc une migration qui resserrerait la
+// contrainte à trois dimensions le laisserait **vert**. Ce test tient l'autre moitié.
 //
 // Il n'est pas dans la table voisine parce que celle-ci exige un refus de chaque cas. Et le symptôme
 // qu'il garde serait muet : `internal/bff` ne reçoit aucun journal, donc `POST /auth/mfa/totp/enroll`
@@ -287,6 +283,9 @@ func TestLesCinqDimensionsComptéesSontAcceptées(t *testing.T) {
 		"toutes les dimensions ne sont pas entrées : le contrôle ne prouve pas ce qu'il annonce")
 }
 
+// Ce qu'un `ON DELETE` décide n'est pas un refus mais une **conséquence**, et une conséquence
+// silencieuse : un `CASCADE` posé là où le §3.1 veut un `SET NULL` effacerait des notifications
+// déjà signalées sans qu'aucune erreur ne remonte.
 func TestWhatADeletionCarriesAway(t *testing.T) {
 	t.Parallel()
 

@@ -5,8 +5,8 @@ import { EmptyState } from '~/components/ui'
  * L'état de contenu d'une adresse qui ne correspond à aucun écran.
  *
  * Sans lui, TanStack rend `<p>Not Found</p>` — en anglais, hors des cinq états, et sans dire quoi
- * faire. Le cas n'est pas marginal : step-002 renvoie **toute** URL inconnue vers ce document, donc
- * c'est ici qu'atterrit une adresse mal recopiée.
+ * faire. Le cas n'est pas marginal : le fallback SPA du binaire renvoie **toute** URL inconnue vers ce
+ * document, donc c'est ici qu'atterrit une adresse mal recopiée.
  *
  * Il rend la coquille lui-même parce qu'une adresse inconnue ne matche aucun enfant de `_shell` : la
  * mise en page ne s'applique pas, et l'opérateur se retrouverait sur une page nue. Il doit pouvoir

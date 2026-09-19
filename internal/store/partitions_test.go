@@ -17,10 +17,9 @@ import (
 // et un `ALTER DATABASE … SET timezone` côté serveur fait le reste. Ce test pose donc le fuseau
 // lui-même plutôt que d'espérer celui du runner.
 //
-// **Le mois est ancré**, et c'est ce qui rend le défaut falsifiable à toute date : mesuré le
-// 02/08/2026, l'arithmétique fautive tombe juste 6 mois sur 12 sous `America/New_York` — dont août.
-// Une suite qui s'en remettrait à `now()` dirait donc quelque chose de différent selon le jour où
-// elle tourne.
+// **Le mois est ancré**, et c'est ce qui rend le défaut falsifiable à toute date : l'arithmétique
+// fautive tombe juste 6 mois sur 12 sous `America/New_York`, si bien qu'une suite qui s'en remettrait
+// à `now()` dirait quelque chose de différent selon le jour où elle tourne.
 func TestPartitionBoundsHoldWhateverTheSessionTimezone(t *testing.T) {
 	t.Parallel()
 

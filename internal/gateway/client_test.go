@@ -97,10 +97,9 @@ func TestAdminClientAuthenticatesWithoutTokenEndpointInMockMode(t *testing.T) {
 //
 // `config.Load` replie l'absence sur `real` et refuse tout autre littéral, mais cette polarité ne
 // traverse pas la frontière du package — NewAdminClient prend une struct nue, que rien n'oblige à
-// venir de `config.Load`. Mesuré le 02/08/2026 : seuls les tests de ce package la construisent, et
-// `internal/gateway` n'a toujours aucun importeur hors de lui-même. Un `Mode` vide
-// qui prendrait le chemin `mock` joindrait une passerelle de production sans certificat client et
-// avec le jeton factice en en-tête.
+// venir de `config.Load` : seuls les tests de ce package la construisent, et `internal/gateway` n'a
+// aucun importeur hors de lui-même. Un `Mode` vide qui prendrait le chemin `mock` joindrait une
+// passerelle de production sans certificat client et avec le jeton factice en en-tête.
 func TestAdminClientRefusesAnUnknownGatewayMode(t *testing.T) {
 	t.Parallel()
 
@@ -128,10 +127,9 @@ func TestAdminClientRefusesAnUnknownGatewayMode(t *testing.T) {
 // NewAdminClient prend une struct nue, et un `http://` qui la traverse ne casse rien de visible —
 // http.Transport ne consulte pas son tls.Config, le matériel mTLS est chargé, posé, jamais présenté.
 //
-// Mesuré le 02/08/2026 avant cette garde, en mode `real` avec un matériel mTLS valide et les deux
-// bouts en clair : `NewAdminClient` rend nil, l'API reçoit `Bearer jeton-machine-1` et
-// `clientCerts:0`, et le tokenUrl reçoit `Basic ZGFzaGJvYXJkOnNlY3JldA==` — le secret client en
-// Base64 sur le fil, avec les cinq scopes dont `gdpr:erase`.
+// Mesuré sans cette garde, en mode `real` avec un matériel mTLS valide et les deux bouts en clair :
+// `NewAdminClient` rend nil, l'API reçoit `Bearer jeton-machine-1` et `clientCerts:0`, et le tokenUrl
+// reçoit le secret client en Base64 sur le fil, avec les cinq scopes dont `gdpr:erase`.
 func TestAdminClientRefusesAPlaintextGatewayInRealMode(t *testing.T) {
 	t.Parallel()
 
@@ -197,18 +195,16 @@ func TestAdminClientRefusesAPlaintextGatewayInRealMode(t *testing.T) {
 // ne porte le secret client, qui n'entre pas ici.
 //
 // **Ce que ce test ne prouve pas, et que la §1.8 demande pourtant** : que ce refus arrive au
-// démarrage. Mesuré le 02/08/2026 — `internal/gateway` n'a aucun importeur hors de lui-même,
-// `NewAdminClient` n'est appelé par aucun code de production, et `run()` de `cmd/dashboard/main.go`
-// enchaîne `config.Load` → `webassets.FS` → `net.Listen` → `serve` sans jamais construire de client
-// sortant. Du côté configuration, `requireRealGatewayMaterial` (internal/config/config.go) ne
-// contrôle que la **présence** des six variables du mode `real`, jamais que les fichiers qu'elles
-// nomment se chargent.
+// démarrage. `internal/gateway` n'a aucun importeur hors de lui-même, `NewAdminClient` n'est appelé
+// par aucun code de production, et `run()` de `cmd/dashboard/main.go` ne construit aucun client
+// sortant. Du côté configuration, `requireRealGatewayMaterial` ne contrôle que la **présence** des six
+// variables du mode `real`, jamais que les fichiers qu'elles nomment se chargent.
 //
 // Conséquence à ce jour : un déploiement en `real` dont `DASHBOARD_GATEWAY_CLIENT_CERT` pointe sur
-// un chemin inexistant démarre sans un mot. Le manque est un **appelant**, pas une garde — la
-// première route qui joint la passerelle arrive en step-060, et c'est son câblage qui donnera à ce
-// refus un moment de démarrage où s'exercer. Construire le client dans `main` avant qu'une route ne
-// l'utilise serait du code mort.
+// un chemin inexistant démarre sans un mot. Le manque est un **appelant**, pas une garde : c'est le
+// câblage de la première route qui joindra la passerelle qui donnera à ce refus un moment de
+// démarrage où s'exercer. Construire le client dans `main` avant qu'une route ne l'utilise serait du
+// code mort.
 func TestAdminClientRefusesIncompleteMutualTLSMaterial(t *testing.T) {
 	t.Parallel()
 

@@ -177,9 +177,8 @@ func (w *webauthnWorld) registerSignedFor(origin string) error {
 }
 
 // Le nom de partie de confiance traverse depuis la variable d'environnement jusqu'au corps servi.
-// Sans ce pas, le recoder en dur dans `NewPasskeys` laissait les quatre-vingt-sept scénarios verts —
-// mesuré le 01/09/2026 : il ne fait pas partie des données signées d'une cérémonie, donc aucun
-// authentificateur ne le vérifie.
+// Sans ce pas, le recoder en dur dans `NewPasskeys` laisse toute la suite verte — mesuré : il ne fait
+// pas partie des données signées d'une cérémonie, donc aucun authentificateur ne le vérifie.
 func (w *webauthnWorld) optionsCarryConfiguredProductName() error {
 	expected := completeConfiguration()["DASHBOARD_PRODUCT_NAME"]
 	if w.relyingPartyName != expected {
@@ -317,8 +316,8 @@ func (w *webauthnWorld) presentAssertion(assertion string) error {
 //
 // Sur l'enregistrement et non sur l'assertion, et c'est ce qui donne sa valeur au pas : le chemin
 // d'assertion porte un challenge de premier facteur, consommé au succès, qui refuserait le rejeu
-// avant que le défi de cérémonie n'ait son mot à dire. Mesuré, en retirant la consommation du défi :
-// la première rédaction de ce scénario restait verte.
+// avant que le défi de cérémonie n'ait son mot à dire : mesuré, la consommation du défi retirée, un
+// rejeu posé sur l'assertion reste vert.
 func (w *webauthnWorld) replayTheSameAttestation() error {
 	if w.presented == "" {
 		return errors.New("aucune attestation déjà présentée : le scénario n'a rien à rejouer")
@@ -447,8 +446,7 @@ func (w *webauthnWorld) passkeysRemaining(expected int) error {
 	}
 
 	// L'exigence de 200 n'est pas décorative : sans elle, un corps d'erreur se démarshalerait en zéros
-	// et « il lui reste 0 clés » serait vrai sur toute réponse cassée. C'est le défaut que la revue de
-	// step-023 a trouvé sur `elevation()`.
+	// et « il lui reste 0 clés » serait vrai sur toute réponse cassée.
 	if status != 200 {
 		return fmt.Errorf("/auth/me a répondu %d : ce pas ne peut rien affirmer du compte\n%s",
 			status, body)
@@ -463,10 +461,10 @@ func (w *webauthnWorld) passkeysRemaining(expected int) error {
 }
 
 // **Le refus ne nomme aucune méthode**, et c'est vérifié ici parce que c'est ici que ça se voit :
-// l'opérateur vient de présenter une clé d'accès. La rédaction d'avant lui disait « vérifier l'heure
-// de l'application d'authentification », c'est-à-dire de régler une horloge que son geste n'emploie
-// pas. Le constructeur est partagé par les trois méthodes, donc sans ce pas la rédaction fautive
-// revient sans qu'aucune suite le dise.
+// l'opérateur vient de présenter une clé d'accès, et lui conseiller de « vérifier l'heure de
+// l'application d'authentification » serait lui faire régler une horloge que son geste n'emploie pas.
+// Le constructeur est partagé par les trois méthodes, donc sans ce pas une copie propre à l'une
+// d'elles passerait sans qu'aucune suite le dise.
 func (w *webauthnWorld) secondFactorIsRefused() error {
 	if err := w.refusalIs(401, "invalid_second_factor"); err != nil {
 		return err
@@ -482,7 +480,7 @@ func (w *webauthnWorld) secondFactorIsRefused() error {
 	return nil
 }
 
-// **400 et non 401 depuis step-035.** Le statut est vérifié ici et non seulement le code : c'est lui
+// **400 et non 401.** Le statut est vérifié ici et non seulement le code : c'est lui
 // qu'un intercepteur client lit, et lui seul décide si l'opérateur est renvoyé au login.
 func (w *webauthnWorld) ceremonyIsRefused() error {
 	return w.refusalIs(400, "webauthn_ceremony_refused")

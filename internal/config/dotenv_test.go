@@ -28,9 +28,9 @@ func TestDotenvExampleListsExactlyWhatLoadReads(t *testing.T) {
 // comme une commande, la variable reste vide, et le binaire refuse de démarrer en la nommant absente
 // alors qu'elle est bien dans le fichier. Le message pointe la mauvaise cause.
 //
-// Livré une fois, le 01/09/2026, avec la première valeur du fichier à contenir un espace :
-// `DASHBOARD_PRODUCT_NAME=Passerelle SMS Admin` rendait `dotenv: SMS: command not found`. La porte
-// voisine ne pouvait pas le voir — elle ne compare que des **noms**.
+// C'est arrivé à la première valeur du fichier à contenir un espace :
+// `DASHBOARD_PRODUCT_NAME=Passerelle SMS Admin` rend `dotenv: SMS: command not found`. La porte
+// voisine ne peut pas le voir — elle ne compare que des **noms**.
 func TestAucuneValeurDuDotenvNEstDecoupeeParLeShell(t *testing.T) {
 	t.Parallel()
 

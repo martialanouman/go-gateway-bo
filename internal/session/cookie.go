@@ -15,12 +15,12 @@ import (
 // nommé qui n'aurait pas les trois. Ce que ça achète : un sous-domaine compromis ne peut plus
 // écraser le cookie de session, ce que `Domain` seul n'empêche pas.
 //
-// Le risque était le développement, où le serveur répond en clair : un cookie `Secure` y serait-il
-// refusé ? **Mesuré le 10/08/2026** dans Chromium plutôt que supposé — un serveur d'essai posant ce
-// cookie sur `http://localhost` le voit accepté, avec ses cinq attributs, aux côtés d'un témoin sans
-// préfixe qui écarte l'hypothèse d'une sonde cassée. Les navigateurs traitent `localhost` comme une
-// origine sûre. Rien dans ce dépôt ne garde cette propriété : le harnais godog porte ses cookies à la
-// main et accepterait n'importe quel nom.
+// Le risque est le développement, où le serveur répond en clair : un cookie `Secure` y serait-il
+// refusé ? **Mesuré dans Chromium** plutôt que supposé — un serveur d'essai posant ce cookie sur
+// `http://localhost` le voit accepté, avec ses cinq attributs, aux côtés d'un témoin sans préfixe qui
+// écarte l'hypothèse d'une sonde cassée : les navigateurs traitent `localhost` comme une origine
+// sûre. Rien dans ce dépôt ne garde cette propriété — le harnais godog porte ses cookies à la main et
+// accepterait n'importe quel nom.
 const CookieName = "__Host-dashboard_session"
 
 // tokenBytes : 256 bits tirés d'un CSPRNG. C'est ce qui dispense d'argon2 côté base — il n'y a aucun
@@ -62,18 +62,17 @@ func Unseal(secret []byte, value string) (tokenHash []byte, ok bool) {
 	// `Strict()` refuse les bits de remplissage non nuls du dernier caractère. Sans lui, quatre
 	// caractères de fin différents décodent vers les mêmes octets, donc quatre cookies distincts sont
 	// acceptés pour un même sceau. Aucune conséquence de sécurité — le jeton est intégralement couvert
-	// par le HMAC — mais c'est le piège que cette step a déjà payé une fois : un pas de scénario
-	// altérait ce caractère et restait vert contre un serveur correct.
+	// par le HMAC — mais sans lui, un pas de scénario qui altère ce caractère reste vert contre un
+	// serveur correct.
 	provided, err := base64.RawURLEncoding.Strict().DecodeString(signature)
 	if err != nil {
 		return nil, false
 	}
 
-	// `hmac.Equal` plutôt qu'une comparaison ordinaire. Ce qui le garde depuis step-031 est
+	// `hmac.Equal` plutôt qu'une comparaison ordinaire. Ce qui le garde est
 	// `TestLeSceauNeSeCompareQuEnTempsConstant`, qui exige cet appel **et** refuse toute comparaison
 	// d'octets dans ce corps — la seconde moitié parce qu'un raccourci naïf posé devant l'appel rendrait
-	// le refus en temps variable sans le faire disparaître. Jusqu'à step-031 rien ne le tenait : le
-	// remplacer par `string(a) != string(b)` laissait la suite entière verte, mesuré le 10/08/2026.
+	// le refus en temps variable sans le faire disparaître.
 	if !hmac.Equal(sign(secret, text), provided) {
 		return nil, false
 	}
@@ -114,8 +113,8 @@ func Issued(value string) *http.Cookie {
 		//
 		// **Ce n'est pas la défense contre le CSRF, et ça ne l'a jamais été** : `Lax` raisonne par
 		// *site*, donc il laisse passer le `POST` d'un sous-domaine voisin — le même site — avec ce
-		// cookie. C'est le contrôle d'origine de `internal/bff/durcissement.go` qui refuse celui-là,
-		// depuis step-036 ; cet attribut n'est que la première des deux barrières.
+		// cookie. C'est le contrôle d'origine de `internal/bff/durcissement.go` qui refuse celui-là ;
+		// cet attribut n'est que la première des deux barrières.
 		SameSite: http.SameSiteLaxMode,
 	}
 }

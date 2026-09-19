@@ -29,8 +29,8 @@ const derivationInfo = "dashboard-totp-secret-v1"
 //
 // **Sans sel**, et c'est un choix plutôt qu'un oubli : HKDF sans sel est défini par la RFC 5869 §2.2,
 // qui emploie alors une chaîne de zéros. Le sel sert à décorréler des entrées de faible entropie ;
-// celle-ci est **minorée** à trente-deux caractères dont douze distincts, une borne que step-031 a
-// posée parce que la seule longueur laissait passer trente-deux `a`. Douze symboles distincts ne
+// celle-ci est **minorée** à trente-deux caractères dont douze distincts — la seule longueur
+// laisserait passer trente-deux `a`. Douze symboles distincts ne
 // sont pas une preuve d'entropie, seulement un minorant grossier qui écarte une valeur posée à la
 // main — c'est cette hypothèse-là que HKDF suppose. Un sel obligerait par ailleurs à le stocker
 // quelque part, donc à ajouter un état que perdre rendrait la base illisible — précisément ce que
@@ -81,8 +81,7 @@ func (a *Authenticator) open(sealed, operatorID string) (string, error) {
 
 	// `Strict()` refuse les bits de remplissage non nuls du dernier caractère : sans lui, plusieurs
 	// encodages distincts se relisent vers les mêmes octets, ce qui n'ouvre rien mais rend un test qui
-	// altère un caractère de fin vert contre un serveur correct. Le dépôt a déjà payé ce piège en
-	// step-022.
+	// altère un caractère de fin vert contre un serveur correct.
 	raw, err := base64.RawURLEncoding.Strict().DecodeString(encoded)
 	if err != nil {
 		return "", UnreadableSecretError{Reason: "la valeur stockée n'est pas du base64"}

@@ -103,8 +103,7 @@ func makeRecipe(t *testing.T, target string) string {
 	// `--no-print-directory` n'est pas un confort : sans lui, GNU Make **4.x** préfixe la recette
 	// d'un `make[1]: Entering directory …` dès qu'un `make` parent l'appelle — et `make test-go` en
 	// est un. `sh` essaie alors de l'exécuter et rend `exit status 127`. Invisible ici : macOS livre
-	// GNU Make 3.81, qui ne l'imprime pas. Mesuré le 02/08/2026 sur `golang:1.25` (Make 4.4.1),
-	// après que la CI l'a trouvé et pas `make check`.
+	// GNU Make 3.81, qui ne l'imprime pas — la CI l'a trouvé, `make check` ne le peut pas.
 	command := exec.Command("make", "--dry-run", "--no-print-directory", target)
 	command.Dir = bddtest.RepositoryRoot(t)
 

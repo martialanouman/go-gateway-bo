@@ -110,7 +110,7 @@ func TestUnEncodageIllisibleEstUneErreurEtNonUnRefus(t *testing.T) {
 }
 
 // `argon2.IDKey` ne rend jamais d'erreur sur des coûts aberrants, et il ne réagit pas de la même
-// façon aux trois. `t=0` et `p=0` le font **paniquer** (x/crypto v0.54.0, `deriveKey` — « number of
+// façon aux trois. `t=0` et `p=0` le font **paniquer** (`deriveKey` — « number of
 // rounds too small », « parallelism degree too low ») : une ligne de base abîmée arriverait jusqu'au
 // handler sous forme de panic, sur une route que n'importe qui peut appeler sans être authentifié.
 // `m=0`, lui, est **écrêté** en silence, donc le hachage serait vérifié avec des paramètres qui ne
@@ -154,25 +154,27 @@ func TestHacherAvecDesCoutsNulsEstRefuse(t *testing.T) {
 	require.Error(t, err)
 }
 
-// Le plancher, et non la mesure. La durée mesurée est **écrite** au-dessus de `currentParams`
-// (critère 4) : un test qui l'affirmerait serait rouge un jour sur dix sur un runner partagé.
+// Le plancher, et non la mesure. Les durées mesurées sont **écrites** au-dessus de
+// `BenchmarkVerification` (critère 4) : un test qui les affirmerait serait rouge un jour sur dix sur
+// un runner partagé.
 //
 // Ce que ce test garde est le défaut qui arrive vraiment : quelqu'un abaisse les coûts pour faire
 // passer une suite qu'il trouve lente, et personne ne le voit — un hachage moins cher n'a aucun
 // symptôme, il est juste moins cher pour tout le monde, l'attaquant compris.
 //
-// **Le plancher est le profil retenu depuis step-031**, là où il était celui d'OWASP. Le second
-// laissait descendre de 64 MiB / t=3 à 19 MiB / t=2 — de 26,3 ms à 16,8 ms au tableau qui surplombe
-// `currentParams` — sans faire rougir quoi que ce soit : il bornait ce qu'argon2id doit rester, pas
-// ce que ce déploiement a décidé. Ce qu'il garde désormais est la décision, et la changer demande une
-// mesure neuve plutôt qu'un chiffre plus commode. Le minimum d'OWASP n'est plus asséré à part : il
-// est subsumé, et le redire ferait deux rédactions dont une périmerait.
+// **Le plancher est le profil retenu, et non le minimum d'OWASP.** Ce dernier laisse descendre de
+// 64 MiB / t=3 à 19 MiB / t=2 — de 26,3 ms à 16,8 ms au tableau de `mesure_test.go` — sans faire
+// rougir quoi que ce soit : il borne ce qu'argon2id doit rester, pas ce que ce déploiement a décidé.
+// Ce qui est gardé ici est la décision, et la changer demande une mesure neuve plutôt qu'un chiffre
+// plus commode. Le minimum d'OWASP n'est pas asséré à part : il est subsumé, et le redire ferait deux
+// rédactions dont une périmerait.
 //
-// **`Parallelism` reste à un, et c'est une correction de revue.** La première rédaction l'avait monté
-// à quatre comme les deux autres. Ce n'est pas un paramètre de même nature : la RFC 9106 le règle sur
-// les cœurs disponibles, et un nœud à deux vCPU a une raison légitime de descendre. Une garde qui
-// refuse du légitime finit retirée — et celui qui l'aurait retirée aurait édité les trois lignes du
-// même geste, emportant la borne mémoire, qui elle méritait d'être tenue.
+// **Le plancher de `Parallelism` est à un et non au profil retenu**, contrairement aux deux autres :
+// ce n'est pas un paramètre de même nature, la RFC 9106 le règle sur les cœurs disponibles, et un
+// nœud à deux vCPU a une raison légitime de descendre. Il ne borne donc que ce qui ferait paniquer
+// `argon2.IDKey`. Une garde qui refuse du légitime finit retirée — et celui qui l'aurait
+// retirée aurait édité les trois lignes du même geste, emportant la borne mémoire, qui elle méritait
+// d'être tenue.
 func TestLesParametresNeDescendentPasSousLePlancher(t *testing.T) {
 	t.Parallel()
 

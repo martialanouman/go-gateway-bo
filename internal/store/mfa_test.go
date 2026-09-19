@@ -26,9 +26,8 @@ func mfaOn(t *testing.T) (*store.MFA, string) {
 }
 
 // enroll pose un second facteur pour le décor, et exige que l'écriture ait bien eu lieu. Sans cette
-// exigence, un `Enroll` qui rendrait `false` — c'est désormais possible, la garde du remplacement
-// vivant dans son `WHERE` — laisserait chaque cas suivant observer une base vide en croyant observer
-// un enrôlement.
+// exigence, un `Enroll` qui rendrait `false` — la garde du remplacement vit dans son `WHERE` —
+// laisserait chaque cas suivant observer une base vide en croyant observer un enrôlement.
 //
 // `replace` vaut toujours `true` ici : ces cas observent l'écriture, et la garde a son propre cas.
 func enroll(t *testing.T, m *store.MFA, operatorID, sealed string, hashes []string) {
@@ -85,7 +84,6 @@ func TestLePasCourantEstCeluiDeLHorlogeDeLaBase(t *testing.T) {
 }
 
 // Un compte désactivé ne rend aucun second facteur : le refus est passif, comme pour la session.
-// step-029 révoquera activement.
 //
 // L'absence est **distincte** de « pas encore enrôlé », et pas par coquetterie : une session résolue
 // puis un compte désactivé dans l'intervalle se lirait sinon comme « il lui reste à enrôler un
@@ -349,8 +347,8 @@ func TestUnVerrouDeSecondFacteurEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
 	// premier facteur : sur `reserve`, un compteur resté collé au seuil rend lui aussi un verrou nul,
 	// parce que l'essai vient d'être admis et que `Remaining` retombe à zéro. Ce que le nom de ce test
 	// annonce — « reparti de un » — ne se lit que sur `Failures`. Sans cette assertion, retirer la
-	// branche d'oubli de `reserve` laisse la suite entière verte (mesuré le 19/09/2026), et un
-	// opérateur qui a brûlé ses cinq essais n'en retrouverait jamais que **un** par fenêtre.
+	// branche d'oubli de `reserve` laisse la suite entière verte (mesuré), et un opérateur qui a brûlé
+	// ses cinq essais n'en retrouverait jamais que **un** par fenêtre.
 	admitted, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 	require.NoError(t, err)
 	require.False(t, admitted.Locked(), "l'essai suivant l'oubli est encore refusé")
@@ -485,7 +483,7 @@ func TestUnChallengeNeSeConsommeQuUneFois(t *testing.T) {
 }
 
 // Consommé et non détruit : « déjà servi » doit rester discernable de « n'a jamais existé » pour
-// l'audit de step-025.
+// l'audit.
 func TestUnChallengeConsommeResteEnBase(t *testing.T) {
 	t.Parallel()
 

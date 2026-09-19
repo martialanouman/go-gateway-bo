@@ -96,8 +96,7 @@ func NewAudit(pool *pgxpool.Pool) *Audit {
 //
 // **Un seul appelant en production aujourd'hui** : `bff.API.Logout`, dont l'audit reste dehors par
 // arbitrage — la raison est écrite sur le handler. Les actions **proxyfiées** vers la passerelle
-// n'auront pas d'autre forme, faute de transaction commune avec leur audit ; aucune n'existe encore
-// au contrat, et le trou est inscrit au registre (step-060).
+// n'auront pas d'autre forme, faute de transaction commune avec leur audit.
 func (a *Audit) Record(ctx context.Context, event Event) error {
 	return record(ctx, a.pool, event)
 }
@@ -114,8 +113,8 @@ func (a *Audit) RecordTx(ctx context.Context, tx pgx.Tx, event Event) error {
 	return record(ctx, tx, event)
 }
 
-// writer couvre ce qu'un pool et une transaction ont en commun. Le nommer évite d'écrire la requête
-// deux fois — et deux rédactions du même `INSERT` divergeraient sur la colonne qu'on ajouterait.
+// writer couvre ce qu'un pool et une transaction ont en commun : le nommer évite deux rédactions du
+// même `INSERT`, qui divergeraient sur la colonne qu'on ajouterait.
 type writer interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }

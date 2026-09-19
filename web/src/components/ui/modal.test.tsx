@@ -11,9 +11,8 @@ import { Modal } from './modal'
  * **Le piège du focus lui-même se vérifie ailleurs** — dans le parcours Playwright. jsdom n'a ni
  * ordre de tabulation réel, ni `inert`, ni visibilité calculée : y « vérifier » un piège de focus
  * donnerait un test vert qui ne prouve rien. Ce qui est observable ici, c'est que l'extérieur **sort
- * de l'arbre d'accessibilité** — mesuré plutôt que supposé : une première rédaction cherchait un
- * `aria-hidden` sur un ancêtre, et le bouton de démonstration n'avait tout simplement plus de rôle
- * à interroger.
+ * de l'arbre d'accessibilité** : chercher un `aria-hidden` sur un ancêtre ne marcherait pas, le
+ * bouton extérieur n'ayant plus de rôle à interroger.
  */
 describe('Modal', () => {
   it('prend son nom accessible de son titre', () => {

@@ -31,12 +31,9 @@ const PeriodSeconds = 30
 // driftSteps est la tolérance de dérive, de chaque côté du pas courant : une fenêtre d'acceptation de
 // 90 secondes en tout.
 //
-// C'est exactement ce que `totp.Validate` de la bibliothèque emploie — `Skew: 1`, lu dans
-// `totp/totp.go:34-49` de la v1.5.0 — et donc ce que les applications compatibles Google
-// Authenticator supposent. **Une rédaction précédente affirmait le contraire**, « le défaut de la
-// bibliothèque est zéro » : ce zéro-là est la valeur zéro du **champ** `ValidateOpts.Skew`, que la
-// documentation décrit, et non ce que la fonction fait. Le chiffre était juste, l'objet mesuré ne
-// l'était pas.
+// C'est exactement ce que `totp.Validate` de la bibliothèque emploie — `Skew: 1`, lu dans sa source
+// et non dans sa documentation, qui décrit la valeur zéro du **champ** `ValidateOpts.Skew` — et donc
+// ce que les applications compatibles Google Authenticator supposent.
 //
 // Zéro refuserait un téléphone en avance d'une seconde ; deux doubleraient la durée pendant laquelle
 // un code intercepté vaut encore, pour couvrir des horloges qu'aucun téléphone moderne n'a.
@@ -74,9 +71,9 @@ func (e UnreadableSecretError) Error() string {
 // Authenticator porte le second facteur TOTP. Il tient la clé de chiffrement dérivée et le nom que
 // l'application d'authentification affiche à côté du compte, et rien d'autre : ni pool, ni HTTP.
 //
-// L'`issuer` vient de la configuration depuis step-031. Codé en dur, deux déploiements du même
-// produit — une préproduction et une production — apparaissaient sous le même nom dans le téléphone
-// d'un opérateur qui enrôle les deux.
+// L'`issuer` vient de la configuration : codé en dur, deux déploiements du même produit — une
+// préproduction et une production — apparaîtraient sous le même nom dans le téléphone d'un opérateur
+// qui enrôle les deux.
 type Authenticator struct {
 	key    []byte
 	issuer string

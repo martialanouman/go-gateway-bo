@@ -27,9 +27,9 @@ const (
 	// porté par la mémoire et les passes — et plus court réduirait la marge sans rien gagner.
 	keyLength = 32
 	// La RFC 9106 §3.1 pose huit octets comme minimum. **`x/crypto` ne le vérifie pas** — relu dans
-	// `argon2.go` v0.54.0, `initHash` écrit `uint32(len(salt))` puis le sel dans BLAKE2b sans jamais
+	// `argon2.go` v0.57.0, `initHash` écrit `uint32(len(salt))` puis le sel dans BLAKE2b sans jamais
 	// inspecter la longueur, et un sel de quatre octets dérive une clé en silence. Le refus est donc
-	// ici, ou nulle part. (Une rédaction précédente disait qu'`argon2.IDKey` paniquerait : faux.)
+	// ici, ou nulle part.
 	minimumSaltLength = 8
 	// La borne haute du hachage relu. Elle n'a aucune vertu cryptographique : elle existe pour que la
 	// longueur lue en base tienne dans le `uint32` qu'attend `argon2.IDKey` **par construction**, sans
@@ -55,38 +55,13 @@ type Params struct {
 }
 
 // currentParams est le profil « seconde option » de la RFC 9106 §4 à la lettre — m=64 MiB, t=3, p=4.
-//
-// **Mesuré le 10/08/2026**, Apple M4 Pro (14 cœurs), Go 1.26.5, par `BenchmarkVerification` de
-// `mesure_test.go`, qui porte la commande exacte. Les **dix** profils qu'il mesure, tous, parce qu'un
-// tableau qui choisit ses lignes n'étaye plus le choix qu'il justifie :
-//
-//	 64 MiB · t=1  · p=4     8,5 ms
-//	 19 MiB · t=2  · p=1    16,8 ms
-//	 64 MiB · t=2  · p=4    17,7 ms
-//	 64 MiB · t=3  · p=4    26,3 ms   ← retenu
-//	 64 MiB · t=4  · p=4    35,4 ms
-//	128 MiB · t=3  · p=4    57,9 ms
-//	 64 MiB · t=12 · p=4   108,3 ms
-//	256 MiB · t=3  · p=4   123,8 ms
-//	256 MiB · t=6  · p=4   252,1 ms
-//	512 MiB · t=3  · p=4   258,7 ms
-//
-// La step visait « ≈250 ms à 64 MiB ». **Les deux ne coexistent pas**, et la colonne des passes le
-// montre : à 64 MiB le temps est linéaire en `t` — 8,5 ms la passe, 108,3 ms à t=12 — donc 250 ms
-// demanderait une trentaine de passes, un profil que la RFC ne décrit nulle part. Il fallait choisir,
-// et c'est la mémoire qui a été gardée — parce que c'est elle qui défend, pas le temps. Une carte
-// graphique aligne des milliers de cœurs mais pas des milliers de fois 64 MiB de mémoire rapide ;
-// ajouter des passes n'achète que ce facteur linéaire, que le même matériel rattrape.
+// Ce qui l'a retenu contre les neuf autres profils mesurés vit avec le benchmark qui les produit,
+// au-dessus de `BenchmarkVerification` dans `mesure_test.go`.
 //
 // Le prix assumé, écrit plutôt que tu : une base volée s'attaque à 26 ms le candidat. C'est
 // exactement ce que le relèvement existe pour corriger, et il ne coûte que ces trois nombres — les
 // hachages déjà produits portent les leurs et restent vérifiables, ce que garde
 // `TestUnHachageProduitAvecDAnciensParametresResteVerifiableApresRelevement`.
-//
-// L'autre borne, celle qui a fermé les profils à 256 et 512 MiB : argon2 alloue cette mémoire **par
-// vérification en vol**. Le verrouillage ne protège pas du premier essai sur chaque adresse, donc
-// dix tentatives simultanées à 512 MiB réserveraient 5 GiB et l'anti-brute-force deviendrait un
-// déni de service contre le BFF. À 64 MiB elles en réservent 640 MiB, qu'un conteneur encaisse.
 var currentParams = Params{
 	Memory:      64 * 1024,
 	Time:        3,
@@ -118,8 +93,9 @@ func (e MalformedHashError) Error() string {
 
 // Hash produit le hachage d'un secret avec les paramètres courants, sous forme PHC.
 //
-// Il prend une chaîne quelconque et non un type dédié : step-023 hachera les codes de récupération
-// « comme un mot de passe », et un type `Password` l'obligerait à mentir sur ce qu'il manipule.
+// Il prend une chaîne quelconque et non un type dédié : `internal/mfa` hache les codes de
+// récupération « comme un mot de passe », et un type `Password` l'obligerait à mentir sur ce qu'il
+// manipule.
 func Hash(secret string) (string, error) {
 	return HashWith(currentParams, secret)
 }
@@ -191,11 +167,10 @@ func Verify(ctx context.Context, encoded, secret string) (bool, error) {
 // La comparaison passe par `crypto/subtle` : comparer deux hachages avec `==` rend un verdict en un
 // temps qui dépend du nombre d'octets de tête qui coïncident, ce qui se remonte octet par octet.
 //
-// Ce qui la garde depuis step-031 est `TestUnHachageNeSeCompareQuEnTempsConstant`, qui exige cet
-// appel **et** refuse toute comparaison d'octets dans ce corps — la seconde moitié parce que jeter le
-// résultat de l'appel, ou poser un raccourci naïf devant lui, le laisse en place sans qu'il décide.
-// Jusque-là rien ne le tenait : le remplacer par `string(key) == string(expected)` laissait toute la
-// suite du paquet **verte**, mesuré le 09/08/2026.
+// Ce qui la garde est `TestUnHachageNeSeCompareQuEnTempsConstant`, qui exige cet appel **et** refuse
+// toute comparaison d'octets dans ce corps — la seconde moitié parce que jeter le résultat de
+// l'appel, ou poser un raccourci naïf devant lui, le laisse en place sans qu'il décide. Le reste de
+// la suite ne le tient pas : `string(key) == string(expected)` la laisse verte.
 func VerifyHeld(encoded, secret string) (bool, error) {
 	params, salt, expected, err := decode(encoded)
 	if err != nil {
@@ -238,7 +213,7 @@ var dummySalt = []byte("adresse-inconnue")
 // Les deux distributions se recouvrent : l'écart entre les deux chemins est noyé dans le bruit de la
 // requête. Sans cet appel, la seconde ligne tomberait sous la milliseconde et l'écart deviendrait le
 // signal. Ce que ce constat garde est la **durée**, qu'aucun test n'affirme ; le site d'appel, lui,
-// est tenu par `oracle_test.go` depuis step-021, et les coûts par le plancher de `argon2_test.go`.
+// est tenu par `oracle_test.go`, et les coûts par le plancher de `argon2_test.go`.
 func VerifyDummy(ctx context.Context, secret string) error {
 	return Hold(ctx, func() error {
 		runtime.KeepAlive(argon2.IDKey([]byte(secret), dummySalt, currentParams.Time,
@@ -248,10 +223,9 @@ func VerifyDummy(ctx context.Context, secret string) error {
 	})
 }
 
-// validate refuse trois coûts nuls et deux coûts démesurés — mais pas tous pour la même raison, et
-// la nuance a été payée en revue.
+// validate refuse trois coûts nuls et deux coûts démesurés — mais pas tous pour la même raison.
 //
-// `t == 0` et `p == 0` font **paniquer** `deriveKey` (x/crypto v0.54.0 : « number of rounds too
+// `t == 0` et `p == 0` font **paniquer** `deriveKey` (x/crypto v0.57.0 : « number of rounds too
 // small », « parallelism degree too low »), et un panic dans un handler que personne n'a besoin
 // d'authentifier pour appeler est le mode d'échec à fermer.
 //

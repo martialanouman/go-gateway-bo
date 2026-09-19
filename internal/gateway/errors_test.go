@@ -178,12 +178,10 @@ func TestGoStringStaysGoSyntax(t *testing.T) {
 // `*APIError` dans la chaîne, donc une cible `var apiErr APIError` — la valeur — ne lui est pas
 // assignable et rend `false` avec une struct nulle.
 //
-// Ce n'est pas une faute théorique : c'est la forme qu'invite le passage des trois rendus au
-// récepteur valeur. Avant lui, la valeur n'implémentait pas `error`, et `go vet` — que `go test`
-// lance par défaut — refusait de compiler l'appel : *« second argument to errors.As must be a
-// non-nil pointer to either a type that implements error »*. Depuis, l'appel compile, vet se tait,
-// et le refus 422 tombe dans la branche générique : les messages ne se placent plus sous les champs.
-// Mesuré le 02/08/2026 dans les deux états.
+// Ce n'est pas une faute théorique : c'est la forme qu'invite le récepteur valeur des trois rendus.
+// Sur un récepteur pointeur, la valeur n'implémente pas `error` et `go vet` — que `go test` lance par
+// défaut — refuse de compiler l'appel ; ici il compile, vet se tait, et le refus 422 tomberait dans
+// la branche générique, où les messages ne se placent plus sous les champs.
 //
 // La réponse est un `As` explicite plutôt qu'une phrase de doc : la phrase suppose qu'on la lise
 // avant d'écrire l'appel, et l'appel se lit correct.
@@ -305,16 +303,14 @@ func TestErrorFromDropsAnUnreadableBody(t *testing.T) {
 
 // DN-8 : 503 est une erreur, avec Réessayer — jamais un module désactivé.
 //
-// Mesuré sur le contrat **4.0.2**, celui que la branche installe
-// (`web/node_modules/@martialanouman/gateway-api-contracts`), le 08/08/2026 : il déclare un 503 sur
-// 4 de ses 133 opérations (openapi-admin.yaml:1429, 1442, 1455 et 1531) et un composant
-// `ServiceUnavailable` (ligne 1672), dont la description est *« A dependency (e.g. billing-svc) is
-// unreachable or timed out; retry once it recovers »* — un réessai, pas une extinction.
+// Le contrat déclare un 503 sur une poignée d'opérations et un composant `ServiceUnavailable` dont la
+// description est *« A dependency (e.g. billing-svc) is unreachable or timed out; retry once it
+// recovers »* — un réessai, pas une extinction.
 //
-// La quatrième est arrivée avec la 4.0.0 et mérite d'être nommée, parce qu'elle touche ce DN de plus
-// près que les trois autres : *« Export storage is not configured in this deployment »*. C'est ce que
-// le contrat porte de plus proche d'un module désactivé — une capacité absente de ce déploiement-ci —
-// et il l'exprime quand même par un **503**, donc par une erreur avec Réessayer. Le contrat ne
+// Une de ces opérations touche ce DN de plus près que les autres : *« Export storage is not
+// configured in this deployment »*. C'est ce que le contrat porte de plus proche d'un module
+// désactivé — une capacité absente de ce déploiement-ci — et il l'exprime quand même par un **503**,
+// donc par une erreur avec Réessayer. Le contrat ne
 // déclare toujours ni 501, ni en-tête, ni code d'erreur pour un module désactivé : les seuls signaux
 // voisins sont des booléens par ressource, qui voyagent dans des réponses 200. Interpréter 503 comme
 // « ce module est éteint » fabriquerait donc un signal que la passerelle n'émet pas, et remplacerait

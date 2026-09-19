@@ -103,8 +103,8 @@ func TestHeadIsServedLikeGet(t *testing.T) {
 }
 
 // Caractérisation d'un comportement de `net/http`, pas un défaut d'ici : `serveFile` redirige toute
-// URL finissant par `/index.html` vers `./` **avant** d'ouvrir quoi que ce soit
-// (`net/http/fs.go:685-688`). La coquille se demande donc par `/`, et la section « Tests » de la
+// URL finissant par `/index.html` vers `./` **avant** d'ouvrir quoi que ce soit,
+// dans `serveFile`. La coquille se demande donc par `/`, et la section « Tests » de la
 // fiche — « *Quand* `index.html` est demandé, *Alors* il porte `no-cache` » — décrit un cas qui rend
 // 301. L'en-tête, lui, survit : `localRedirect` ne purge rien.
 func TestIndexHTMLRedirectsToTheSiteRoot(t *testing.T) {
@@ -170,10 +170,10 @@ func TestMissingAssetIsNotFound(t *testing.T) {
 // Ces trois verdicts sont bien ceux de la production, mesurés sur sa forme exacte — `fs.Sub` d'un FS
 // n'exposant que `Open`, soit un `*fs.subFS` : 404/404/404 comme ici, et 404/301/404 comme ici une
 // fois `IsDir` retiré. La divergence entre les deux FS est réelle mais n'appartient pas à `IsDir` :
-// les deux cas barrés rendent `ErrNotExist` sur `fstest.MapFS` et `ErrInvalid` sur `subFS`
-// (`io/fs/sub.go:61-63`), et c'est la branche `err != nil` — pas `IsDir` — qui empêche `toHTTPError`
+// les deux cas barrés rendent `ErrNotExist` sur `fstest.MapFS` et `ErrInvalid` sur le `fullName` de
+// `subFS`, et c'est la branche `err != nil` — pas `IsDir` — qui empêche `toHTTPError`
 // de jamais la voir. Retirer cette branche-là, et elle seule, rend 404 ici mais **500** en
-// production (`net/http/fs.go:769-781`).
+// production, par le `toHTTPError` de `net/http`.
 //
 // L'assertion de contenu, elle, tient si le handler repassait un jour par un serveur de fichiers qui,
 // lui, énumérerait le répertoire.

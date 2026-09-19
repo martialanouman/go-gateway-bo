@@ -12,15 +12,12 @@ import (
 )
 
 // `hmac.Equal` est ce qui empêche de forger un sceau octet par octet : une comparaison ordinaire rend
-// son verdict d'autant plus tard que les octets de tête coïncident, et cet écart se remonte. Rien ne
-// l'imposait — le remplacer par `string(a) != string(b)` laissait la suite entière verte, mesuré le
-// 10/08/2026.
+// son verdict d'autant plus tard que les octets de tête coïncident, et cet écart se remonte.
 //
-// **La porte a deux moitiés, et il a fallu les deux.** La première rédaction n'exigeait que la
-// *présence* de l'appel ; une revue l'a mise en défaut le 01/09/2026 en posant un raccourci naïf
-// **devant** lui — `if string(expected) != string(provided) { return }` —, ce qui rend le refus en
-// temps variable tout en laissant `hmac.Equal` dans le corps. La seconde moitié refuse donc toute
-// comparaison d'octets, quelle qu'en soit la place.
+// **La porte a deux moitiés, et il faut les deux.** Exiger la seule *présence* de l'appel laisse
+// poser un raccourci naïf **devant** lui — `if string(expected) != string(provided) { return }` —,
+// qui rend le refus en temps variable tout en laissant `hmac.Equal` dans le corps. La seconde moitié
+// refuse donc toute comparaison d'octets, quelle qu'en soit la place.
 //
 // **Ce que la porte ne voit pas, et c'est écrit plutôt que supposé** : son périmètre est le corps
 // d'`Unseal` seul, sans suivi d'appel. Extraire la vérification dans une fonction voisine la ferait
@@ -67,11 +64,10 @@ func loadSession(t *testing.T) *packages.Package {
 // functionBody rend le corps de la déclaration nommée, et échoue si le nom est absent **ou porté par
 // deux déclarations**.
 //
-// Le nom absent était la seule borne de la première rédaction. Une revue a montré le 01/09/2026 que
-// l'homonymie en était une autre, et muette : un `func (k APIKey) Verify(…)` dans un fichier trié
-// avant `argon2.go` détournait la porte des comparaisons vers cette méthode — qui appelait bien
-// `subtle.ConstantTimeCompare` — pendant que le vrai `Verify` comparait naïvement. `pkg.Syntax` suit
-// l'ordre des fichiers : « la première trouvée » n'est pas une propriété du code.
+// L'homonymie est une borne muette : un `func (k APIKey) Verify(…)` dans un fichier trié avant
+// `argon2.go` détournerait la porte des comparaisons vers cette méthode — qui appelle bien
+// `subtle.ConstantTimeCompare` — pendant que le vrai `Verify` comparerait naïvement. `pkg.Syntax`
+// suit l'ordre des fichiers : « la première trouvée » n'est pas une propriété du code.
 func functionBody(t *testing.T, pkg *packages.Package, name string) *ast.BlockStmt {
 	t.Helper()
 

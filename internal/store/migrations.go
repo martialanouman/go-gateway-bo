@@ -85,8 +85,8 @@ func openSQL(dsn string) (*sql.DB, error) {
 		// L'erreur de pgx n'est **pas** propagée : elle recopie le DSN, et sa rédaction n'est pas
 		// hermétique. Mesuré sur v5.10.0 — ses deux expressions rationnelles (`pgconn/errors.go`)
 		// masquent `postgres://u:xxxxx@…` et `password=xxxxx`, mais laissent passer
-		// `password = 'secret'` avec espaces, une forme que PostgreSQL accepte. Cette erreur
-		// remonte jusqu'à `cmd/migrate`, qui l'imprime sur stderr — donc dans les journaux de CI.
+		// `password = 'secret'` avec espaces, une forme que PostgreSQL accepte. Cette erreur remonte
+		// jusqu'à `cmd/migrate`, qui l'imprime sur stderr — donc dans les journaux de CI.
 		//
 		// Ce qu'on perd — la raison exacte du refus — se retrouve au démarrage du serveur, où
 		// `internal/config` valide le même DSN et fait le même choix.

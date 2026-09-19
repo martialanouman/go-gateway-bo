@@ -10,11 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Ce que ce test garde, et que **rien ne gardait à aucune valeur du délai** : qu'une route de lecture
-// ne devienne pas dix fois plus lente. step-023 l'écrit en le portant de 2 s à 15 s — « une régression
-// qui rendrait une route dix fois plus lente ne rougirait plus ici. Rien ne la garderait par ailleurs,
-// et c'était déjà vrai à deux secondes ». Le délai du client est une borne anti-suspension ; le voici,
-// le filet qui manquait.
+// Ce que ce test garde, et que le délai du client ne gardait à aucune de ses valeurs : qu'une route
+// de lecture ne devienne pas dix fois plus lente. Ce délai-là est une borne anti-suspension.
 //
 // **Un budget relatif, pas un seuil en millisecondes.** Un seuil absolu sur un runner partagé rougit
 // au hasard, et une suite qui rougit au hasard cesse d'être lue — ce qui est pire que l'absence de
@@ -24,17 +21,14 @@ import (
 // dire ce que la route fait en plus du socle : lire la ligne de session, résoudre les rôles, réunir
 // leurs permissions.
 //
-// **Deux rédactions de ce test n'ont rien gardé, et chacune ne s'est vue que par la mutation :**
+// **Deux façons d'étalonner ne gardent rien, et la mutation seule les distingue d'une bonne :**
 //
-//   - l'étalon a d'abord été `/api/auth/me` **sans cookie** ; le refus traverse le *même* handler,
-//     donc un délai posé dans la route gonflait les deux branches ensemble et la mutation restait
-//     verte à 1,2. Un étalon pris à l'intérieur de ce qu'il mesure annule ce qu'il devait voir ;
-//   - la sonde a ensuite été appelée par un `browser.Get` qui fermait son corps **sans le lire**.
-//     `net/http` ne rend alors pas la connexion au pool : la sonde repayait une poignée de main à
-//     chaque tour quand la session réutilisait la sienne, et le rapport des temps **totaux** semblait
-//     tenir à 15–19 pour un budget de 60. Les deux branches passant par le même chemin, il est tombé
-//     à 1,2–1,6, et la mutation a cessé d'être monotone — +3 ms rouge, +5 ms vert. C'est ce qui a fait
-//     passer la mesure du temps total au surcoût.
+//   - un étalon pris à l'intérieur de ce qu'il mesure — `/api/auth/me` **sans cookie** — annule ce
+//     qu'il devait voir : le refus traverse le *même* handler, donc un délai posé dans la route
+//     gonfle les deux branches ensemble et la mutation reste verte ;
+//   - une sonde appelée par un `browser.Get` qui ferme son corps **sans le lire** ne rend pas sa
+//     connexion au pool : elle repaie une poignée de main à chaque tour quand la session réutilise
+//     la sienne, et le rapport des temps **totaux** semble tenir pour cette raison-là.
 //
 // Ce qu'il attrape : un `N+1` sur les permissions, un index perdu, un appel synchrone ajouté au
 // chemin. Ce qu'il n'attrape pas : un serveur uniformément ralenti, où les deux branches enflent
@@ -61,12 +55,11 @@ func TestUneLectureDeSessionResteDansSonBudget(t *testing.T) {
 
 	require.NotZero(t, probe, "l'étalon est nul : le rapport ci-dessous ne voudrait rien dire")
 
-	// Le **surcoût** de la route, rapporté au socle — et non son temps total. Les deux branches
-	// passant désormais par le même chemin de harnais, le total est dominé par ce que ce chemin coûte
-	// (lecture du corps, cookies, allocation) : mesuré, la session tient dans 1,2 à 1,6 fois la sonde,
-	// et un délai de cinq millisecondes posé dans le handler n'y déplaçait pas le rapport de façon
-	// monotone. Retrancher la sonde isole ce que la route fait **en plus**, et diviser par elle annule
-	// la vitesse de la machine.
+	// Le **surcoût** de la route, rapporté au socle — et non son temps total, que le chemin de
+	// harnais domine (lecture du corps, cookies, allocation) au point qu'un délai de cinq
+	// millisecondes posé dans le handler n'y déplace pas le rapport de façon monotone. Retrancher la
+	// sonde isole ce que la route fait **en plus**, et diviser par elle annule la vitesse de la
+	// machine.
 	overhead := float64(resolved-probe) / float64(probe)
 
 	t.Logf("session résolue %v, sonde %v, surcoût %.2f fois le socle (budget %.2f)",
@@ -80,15 +73,14 @@ func TestUneLectureDeSessionResteDansSonBudget(t *testing.T) {
 // sessionBudget est ce que la lecture d'une session peut coûter **en plus du socle**, en multiples de
 // celui-ci.
 //
-// **Mesuré, pas choisi, et la dispersion fait partie de la mesure.** Cinq passages sur ce poste le
-// 11/09/2026 : 0,25 · 0,26 · 0,33 · 0,38 · 0,46, pour une session de 1,6 à 3,3 ms et une sonde de 1,2
-// à 2,0 ms. Les deux enflent ensemble quand la machine charge, et diviser par la sonde l'annule.
+// **Mesuré, pas choisi, et la dispersion fait partie de la mesure.** Cinq passages sur ce poste :
+// 0,25 · 0,26 · 0,33 · 0,38 · 0,46, pour une session de 1,6 à 3,3 ms et une sonde de 1,2 à 2,0 ms.
 //
 // Un et demi laisse trois fois le pire relevé, et ce qu'il attrape a été **mesuré par mutation**
 // plutôt que déduit : un délai posé dans le handler donne 0,88 à +1 ms (vert), 1,57 à +2 ms (rouge),
 // 2,62 à +5 ms, 4,83 à +10 ms. Le travail propre de la route valant quelque quatre dixièmes de
-// milliseconde, le filet mord donc quand elle quadruple — bien avant le facteur dix que step-023
-// nomme. Plus serré, il accuserait la machine ; plus large, il ne garderait rien.
+// milliseconde, le filet mord donc quand elle quadruple — bien avant le facteur dix. Plus serré, il
+// accuserait la machine ; plus large, il ne garderait rien.
 const sessionBudget = 1.5
 
 // measureSessionRoute rend les durées médianes de la lecture de session et de la sonde de vivacité.
@@ -110,11 +102,10 @@ func measureSessionRoute(t *testing.T, p *process) (resolved, probe time.Duratio
 	probeSamples := make([]time.Duration, 0, performanceSamples)
 
 	for range performanceSamples {
-		// Les deux branches passent par le **même** chemin, et ce n'est pas une commodité : une revue a
-		// montré qu'un `browser.Get` qui ferme son corps sans le lire ne rend pas sa connexion au
-		// pool, si bien que la sonde repayait une poignée de main à chaque tour quand la lecture de
-		// session réutilisait la sienne. L'étalon gonflait donc, et le budget devenait plus facile à
-		// tenir que le commentaire ne le prétendait.
+		// Les deux branches passent par le **même** chemin, et ce n'est pas une commodité : un
+		// `browser.Get` qui ferme son corps sans le lire ne rend pas sa connexion au pool, si bien
+		// que la sonde repaierait une poignée de main à chaque tour quand la lecture de session
+		// réutilise la sienne. L'étalon gonflerait, et le budget serait plus facile à tenir qu'annoncé.
 		resolvedSamples = append(resolvedSamples, timeRequest(t, func() error {
 			return p.fetch(sessionPath)
 		}))

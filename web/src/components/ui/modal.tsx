@@ -5,25 +5,19 @@ import { Icon } from './icon'
 /**
  * La modale du produit : confirmations conséquentes et secrets montrés une seule fois.
  *
- * ## Base UI porte ce qu'une réécriture maison casse en silence
+ * **Base UI porte ce qu'une réécriture maison casse en silence** : piège du focus, restauration du
+ * focus à la fermeture, verrou du défilement, inertie de ce qu'il y a derrière, fermeture par `Échap`
+ * et par le voile. Le `Modal.jsx` du kit n'a aucun des quatre premiers — il montre une apparence,
+ * qu'on reprend ici en laissant le comportement à `@base-ui/react/dialog`.
  *
- * Piège du focus, restauration du focus à la fermeture, verrou du défilement, inertie de ce qu'il y
- * a derrière, fermeture par `Échap` et par le voile. Le `Modal.jsx` du kit de la charte n'a **aucun
- * des quatre premiers** — il n'est pas du code de production, il montre une apparence. Ce fichier
- * reprend son apparence et laisse le comportement à `@base-ui/react/dialog`.
+ * **Le contenu est démonté, pas masqué.** `Dialog.Portal` est monté **sans `keepMounted`**, et c'est
+ * l'invariant (b) : M3 exigera qu'« après fermeture de la modale le secret soit introuvable dans le
+ * DOM, l'état, le cache Query et les logs ». Un `keepMounted` le laisserait dans le document, masqué,
+ * et le test qui cherche la chaîne la trouverait.
  *
- * ## Le contenu est démonté, pas masqué
- *
- * `Dialog.Portal` est monté **sans `keepMounted`** : à la fermeture, le contenu quitte le DOM. Ce
- * n'est pas une optimisation, c'est l'invariant (b) — M3 exigera qu'« après fermeture de la modale
- * le secret soit introuvable dans le DOM, l'état, le cache Query et les logs ». Un `keepMounted` le
- * laisserait dans le document, masqué, et le test qui cherche la chaîne la trouverait.
- *
- * ## Le voile ne floute pas
- *
- * `--scrim-blur` existe dans les tokens et reste délibérément non consommé : « blurring live metrics
- * behind a dialog costs more than it gives ». Un cockpit dont les compteurs continuent de défiler
- * derrière une confirmation vaut mieux qu'un effet de profondeur.
+ * **Le voile ne floute pas.** `--scrim-blur` existe dans les tokens et reste délibérément non
+ * consommé : « blurring live metrics behind a dialog costs more than it gives ». Un cockpit dont les
+ * compteurs continuent de défiler derrière une confirmation vaut mieux qu'un effet de profondeur.
  */
 
 export type ModalProps = {

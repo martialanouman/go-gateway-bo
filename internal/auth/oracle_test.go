@@ -66,11 +66,11 @@ func loadAuth(t *testing.T) *packages.Package {
 // functionBody rend le corps de la déclaration nommée, et échoue si le nom est absent **ou porté par
 // deux déclarations**.
 //
-// Le nom absent était la seule borne de la première rédaction. Une revue a montré le 01/09/2026 que
-// l'homonymie en était une autre, et muette : un `func (k APIKey) Verify(…)` dans un fichier trié
-// avant `argon2.go` détournait la porte des comparaisons vers cette méthode — qui appelait bien
-// `subtle.ConstantTimeCompare` — pendant que le vrai `Verify` comparait naïvement. `pkg.Syntax` suit
-// l'ordre des fichiers : « la première trouvée » n'est pas une propriété du code.
+// L'homonymie détourne la porte **en silence**, et c'est pourquoi elle échoue dessus : un
+// `func (k APIKey) Verify(…)` dans un fichier trié avant `argon2.go` enverrait la porte des
+// comparaisons sur cette méthode — qui appellerait bien `subtle.ConstantTimeCompare` — pendant que le
+// vrai `Verify` comparerait naïvement. `pkg.Syntax` suit l'ordre des fichiers : « la première
+// trouvée » n'est pas une propriété du code.
 func functionBody(t *testing.T, pkg *packages.Package, name string) *ast.BlockStmt {
 	t.Helper()
 

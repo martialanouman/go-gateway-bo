@@ -9,10 +9,10 @@ import (
 
 // **Ce fichier est en `package mfa` et non `mfa_test`, et c'est la raison même de son existence.**
 //
-// `TestDeuxChiffrementsDuMemeSecretDifferent`, dans la suite externe, appelait `Enroll` deux fois : il
-// comparait donc les chiffrés de **deux secrets différents**, ce qui est vrai quel que soit le nonce.
-// Mesuré le 12/08/2026 : un nonce de douze zéros constants le laissait vert. La dérive venait de ce
-// que `seal` n'est pas exporté — la suite externe ne pouvait pas fixer le secret.
+// Un cas de la suite externe qui appelle `Enroll` deux fois compare les chiffrés de **deux secrets
+// différents**, ce qui est vrai quel que soit le nonce : mesuré, un nonce de douze zéros constants le
+// laisse vert. La cause est que `seal` n'est pas exporté — la suite externe ne peut pas fixer le
+// secret.
 //
 // Ce qu'un nonce constant coûterait sous GCM n'est pas une faiblesse théorique : deux secrets chiffrés
 // sous la même clé et le même nonce se déchiffrent l'un par l'autre, et la clé d'authentification se

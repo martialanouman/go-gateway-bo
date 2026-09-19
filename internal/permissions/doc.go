@@ -12,7 +12,7 @@
 // pas de la base. Le seed n'en est que la projection.
 //
 // Le package ne porte **aucune garde et aucun middleware** : la garde vit dans `internal/bff`
-// (`guard.go`, montée en `router.go`) depuis step-025, et c'est là qu'on l'exerce. Le TypeScript que
+// (`guard.go`, montée en `router.go`), et c'est là qu'on l'exerce. Le TypeScript que
 // consomme le client est **engendré** depuis ici : la garde serveur est ce qui protège réellement, le
 // rendu conditionnel du client n'est qu'un confort (invariant c), donc la source vit du côté qui
 // décide.

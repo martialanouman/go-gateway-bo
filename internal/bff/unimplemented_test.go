@@ -81,8 +81,8 @@ func embeddedPath(carrier, forbidden reflect.Type, path string, visited map[refl
 // silence. Cette valeur-là est construite dans `mountContract` et n'est atteignable par aucune
 // réflexion depuis ici.
 //
-// **Aucune porte structurelle ne garde ce montage-là**, et il faut le dire parce que ce commentaire a
-// affirmé le contraire. Mesuré le 02/08/2026, `Unimplemented{}` substitué à `API{}` sous la forme de
+// **Aucune porte structurelle ne garde ce montage-là.** Mesuré le 02/08/2026, `Unimplemented{}`
+// substitué à `API{}` sous la forme de
 // montage du produit : les quatre portes structurelles du paquet passent — celle-ci,
 // `TestOnlyGeneratedCodeServesTheAPIRoutes`, `TestResponseTypesDeclareTheirFields` et
 // `TestTheContractMountInstallsTheProductErrorHandler`. Ce qui tombe est le test de corps exact,

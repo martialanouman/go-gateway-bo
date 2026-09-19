@@ -28,15 +28,13 @@ func TestUnChallengeCanoniqueRendLEmpreinteQueLaBasePorte(t *testing.T) {
 	assert.Equal(t, expected[:], digest)
 }
 
-// **La garde de `Strict()`, qui n'était tenue par rien.** Le jeton fait trente-deux octets, donc
-// quarante-trois caractères base64url dont le **dernier ne porte que quatre bits significatifs sur
-// six**, les deux de poids faible étant du remplissage : sans
+// **Ce test est seul à tenir `Strict()`** : mesuré le 12/08/2026, le retirer laissait toutes les
+// autres suites et tous les scénarios verts.
+//
+// Le jeton fait trente-deux octets, donc quarante-trois caractères base64url dont le **dernier ne
+// porte que quatre bits significatifs sur six**, les deux de poids faible étant du remplissage : sans
 // ce contrôle, quatre valeurs distinctes décodent vers les mêmes octets, donc quatre challenges
 // différents seraient acceptés pour une seule ligne.
-//
-// C'est le piège que ce dépôt a déjà payé en step-022, sur le sceau du cookie. Là-bas la garde a son
-// test ; ici elle n'en avait aucun — mesuré le 12/08/2026, retirer `Strict()` laissait toutes les
-// suites et les quarante-deux scénarios verts.
 func TestUnChallengeNonCanoniqueNEstPasLeMemeChallenge(t *testing.T) {
 	t.Parallel()
 

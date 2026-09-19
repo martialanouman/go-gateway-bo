@@ -305,8 +305,8 @@ func (w *mfaWorld) presentOversizedCode() error {
 }
 
 func (w *mfaWorld) presentUnknownMethod() error {
-	// `"webauthn"` jusqu'à step-024, qui l'a rendue valide. Toute chaîne que l'enum ne porte pas fait
-	// l'affaire — ce que ce scénario observe est le refus **sur la forme**, pas la valeur choisie.
+	// Toute chaîne que l'enum du contrat ne porte pas fait l'affaire — ce que ce scénario observe est
+	// le refus **sur la forme**, pas la valeur choisie.
 	return w.verify("carte-a-puce", "123456")
 }
 
@@ -474,7 +474,7 @@ func (w *mfaWorld) secretChanged() error {
 }
 
 // secondFactorIsVerified et son contraire lisent `/auth/me`, donc l'état **servi** et non celui de la
-// ligne. C'est ce que la garde de permission lit pour décider (step-025).
+// ligne. C'est ce que la garde de permission lit pour décider.
 func (w *mfaWorld) secondFactorIsVerified() error {
 	elevated, err := w.elevation()
 	if err != nil {
@@ -517,7 +517,7 @@ func (w *mfaWorld) elevation() (bool, error) {
 //
 // Sans cette exigence, un corps d'erreur se démarshalait en zéros : « le second facteur n'est pas
 // encore vérifié » était donc vert sur *toute* réponse qui n'était pas un 200 disant `elevated:true` —
-// y compris « il n'y a plus de session » et « le serveur a cassé ». Mesuré en revue le 12/08/2026 :
+// y compris « il n'y a plus de session » et « le serveur a cassé ». Mesuré :
 // c'est ce qui rendait invisible la garde « le challenge n'est pas consommé sur échec ».
 func (w *mfaWorld) currentOperator() (me, error) {
 	restored := w.login.process.received

@@ -398,7 +398,7 @@ func TestUnDefiEchuNeSeRelitPas(t *testing.T) {
 	require.NoError(t, err)
 
 	// La naissance recule avec l'échéance : le `CHECK` de la migration refuse une échéance antérieure
-	// à la création, et il a mordu la première rédaction de ce cas.
+	// à la création.
 	execOn(t, dsn, `UPDATE webauthn_challenges
 		SET created_at = now() - interval '10 minutes', expires_at = now() - interval '1 second'
 		WHERE id = $1`, id)

@@ -43,8 +43,8 @@ type declaration struct{ key, value string }
 // chemins à lui. Le couple chemin + operationId, lui, n'appartient qu'à la passerelle.
 //
 // La moitié chemin de la signature ne discrimine que du côté Admin : aucun document légitime ne
-// déclare un chemin `/admin/…`, et aucun test ne rougit si on la retire — re-vérifié le 02/08/2026
-// en la retirant, suite du package entièrement verte. Elle reste parce qu'elle ne coûte rien et que
+// déclare un chemin `/admin/…`, et aucun test ne rougit si on la retire — vérifié en la retirant,
+// suite du package entièrement verte. Elle reste parce qu'elle ne coûte rien et que
 // le jour où elle servira — un contrat du BFF qui reprendrait les chemins de la passerelle —
 // personne ne pensera à la rajouter.
 //
@@ -57,27 +57,24 @@ func operation(path, operationID string) signature {
 	return signature{{key: path}, {key: "operationId", value: operationID}}
 }
 
-// Signatures relevées dans le paquet npm (`web/node_modules/@martialanouman/gateway-api-contracts`,
-// contrat **2.5.0**), le 02/08/2026, en extrayant les couples chemin + operationId des deux YAML.
-// **Re-vérifiées sur le contrat 4.0.2 le 08/08/2026** (step-009, deux majeures) : les 28 signatures
-// Admin et les 7 du contrat public sont intactes — les deux majeures n'ont ajouté, retiré ni renommé
-// aucune opération. Elles n'ont plus à l'être à la main, voir
-// TestTheSampleStillMatchesTheContractItWasTakenFrom.
+// Signatures relevées dans le paquet npm (`web/node_modules/@martialanouman/gateway-api-contracts`)
+// en extrayant les couples chemin + operationId des deux YAML. Elles n'ont pas à être re-vérifiées à
+// la main, voir TestTheSampleStillMatchesTheContractItWasTakenFrom.
 //
 // L'échantillon est large parce que c'est **lui** qui sépare les deux populations, et non le seuil.
-// Mesuré : à sept opérations, une fiche de step qui en citait quatre dans un bloc clôturé était
-// refusée par la porte (4 sur 8, soit la moitié). À vingt-sept, il faut en citer quatorze, avec leur
-// chemin exact, pour être accusé de copier — ce qu'aucun document de conception ne fait, et ce
-// qu'une copie fait par construction. Elles couvrent les dix domaines du plan de contrôle : un
-// contrat amputé d'un domaine reste très au-dessus du seuil.
+// Mesuré : à sept opérations, une fiche de step qui en cite quatre dans un bloc clôturé est refusée
+// par la porte (4 sur 8, soit la moitié). À vingt-sept, il faut en citer quatorze, avec leur chemin
+// exact, pour être accusé de copier — ce qu'aucun document de conception ne fait, et ce qu'une copie
+// fait par construction. Elles couvrent les dix domaines du plan de contrôle : un contrat amputé d'un
+// domaine reste très au-dessus du seuil.
 //
 // Ce raisonnement tient pour le contrat Admin et **pas** pour le contrat public, parce qu'il repose
 // sur la moitié chemin de la signature : aucun document que nous écrivons ne déclare un chemin
 // `/admin/…`. Le contrat public, lui, n'a que cinq opérations, et leurs chemins sont ceux que prend
 // n'importe quel document OpenAPI dont les clés sont relatives à son `servers.url` — `/health`,
-// `/messages`, `/messages/{id}`, `/account`. Mesuré le 02/08/2026 : un `api/openapi-bff.yaml`
-// plausible, servi sous `servers: [{url: /api}]`, rendait 5 signatures sur 7 et le verdict « copie ».
-// La porte accusait donc le contrat du BFF de copier celui de la passerelle.
+// `/messages`, `/messages/{id}`, `/account`. Mesuré : un `api/openapi-bff.yaml` plausible, servi sous
+// `servers: [{url: /api}]`, rend 5 signatures sur 7 et le verdict « copie » — la porte accuserait
+// donc le contrat du BFF de copier celui de la passerelle.
 //
 // D'où `identity` sur le contrat public : ses opérations ne le désignent pas, son titre et l'URL de
 // son serveur si. Une copie les porte par construction — on copie un fichier, pas une liste
@@ -246,15 +243,14 @@ func TestNoGatewayContractIsCopiedIntoTheRepository(t *testing.T) {
 // a dérivé ne compte plus, ce qui rapproche le décompte du seuil sans que rien ne le dise. À
 // l'extrême, un échantillon entièrement périmé rend la porte verte sur une vraie copie.
 //
-// Rien ne le voyait : les cas de TestACopyIsRecognizedByWhatItDeclares fabriquent leur YAML **depuis**
-// l'échantillon (`yamlDeclaring(admin.signatures...)`), donc ils restent vrais quelle que soit sa
-// dérive. Mesuré le 08/08/2026 pendant le bump vers 4.0.2, en remplaçant `reorder-routes` par un
-// operationId inexistant : suite du package entièrement verte.
+// Les cas de TestACopyIsRecognizedByWhatItDeclares ne le voient pas : ils fabriquent leur YAML
+// **depuis** l'échantillon (`yamlDeclaring(admin.signatures...)`), donc ils restent vrais quelle que
+// soit sa dérive — mesuré en remplaçant `reorder-routes` par un operationId inexistant, suite du
+// package entièrement verte.
 //
-// Ce test est la moitié manquante. Il confronte l'échantillon au YAML que le paquet npm installe —
-// la seule source qui bouge — et transforme en porte ce qui était une re-mesure à la main, « à
-// refaire quand le contrat change de version majeure ». Il lit `web/node_modules/`, ce que ce package
-// fait déjà pour lancer Prism.
+// Ce test est la moitié manquante : il confronte l'échantillon au YAML que le paquet npm installe —
+// la seule source qui bouge — plutôt que de laisser cette confrontation à une re-mesure à la main. Il
+// lit `web/node_modules/`, ce que ce package fait déjà pour lancer Prism.
 //
 // **Il vérifie les couples, pas les lignes.** `declaredIn` teste l'appartenance de chaque déclaration
 // à un ensemble plat, donc rien n'y exige que le chemin et l'operationId appartiennent à la *même*
@@ -372,14 +368,11 @@ func trackedFiles(t *testing.T, root string) []string {
 }
 
 // Ces cas prouvent le discriminant, pas la fidélité des signatures au contrat publié : celle-là ne se
-// vérifie que contre les vrais YAML du paquet npm. Faite à la main le 02/08/2026 sur le contrat
-// 2.5.0 — `openapi-admin.yaml` rendait 28 signatures sur 28, `openapi-public.yaml` 5 sur 5 et son
-// identité, les deux verdicts à « copie ».
-//
-// Elle n'est plus à refaire à la main : TestTheSampleStillMatchesTheContractItWasTakenFrom l'exige à
-// chaque suite, et signature par signature — donc plus strictement que le verdict, qui se contente de
-// la moitié. Le rendre automatique était la seule façon de le rendre vrai : « à refaire quand le
-// contrat change de version majeure » est un rituel, et un rituel ne rougit pas quand on l'oublie.
+// vérifie que contre les vrais YAML du paquet npm, et c'est
+// TestTheSampleStillMatchesTheContractItWasTakenFrom qui l'exige à chaque suite, signature par
+// signature — donc plus strictement que le verdict, qui se contente de la moitié. L'automatiser était
+// la seule façon de le rendre vrai : « à refaire quand le contrat change de version majeure » est un
+// rituel, et un rituel ne rougit pas quand on l'oublie.
 //
 // Les documents sont rendus à partir du même tableau plutôt qu'écrits en clair : un YAML de contrat
 // recopié dans un littéral de ce fichier ferait tomber la porte ci-dessus sur ce fichier-ci, et
@@ -445,14 +438,13 @@ func TestACopyIsRecognizedByWhatItDeclares(t *testing.T) {
 
 	// Le contrat du BFF n'a aucune raison de préfixer ses chemins : `servers.url` porte le préfixe, et
 	// les clés de chemin sont **relatives** à lui. C'est la forme normale d'un document OpenAPI, et
-	// c'est celle que prendra `api/openapi-bff.yaml` — un `/health` que step-004 prévoit, un
-	// explorateur de messages, une page « mon compte ». Les cinq opérations du contrat public portent
-	// exactement ces chemins-là.
+	// c'est celle que prend `api/openapi-bff.yaml` — un `/health`, un explorateur de messages, une page
+	// « mon compte ». Les cinq opérations du contrat public portent exactement ces chemins-là.
 	//
-	// Mesuré le 02/08/2026, sur l'échantillon d'alors — sept signatures, titre et URL comptés avec les
-	// opérations : 5 sur 7, verdict « copie », et 4 sur 7 en retirant `/account`, verdict « copie »
-	// encore. La porte accusait donc le contrat du BFF de copier celui de la passerelle, et la sortie
-	// qu'on prend sous pression est l'exemption par chemin.
+	// Mesuré sur un échantillon de sept signatures, titre et URL comptés avec les opérations : 5 sur 7,
+	// verdict « copie », et 4 sur 7 en retirant `/account`, verdict « copie » encore. Sans ce cas, la
+	// porte accuserait le contrat du BFF de copier celui de la passerelle, et la sortie qu'on prend
+	// sous pression est l'exemption par chemin.
 	t.Run("laisse passer un contrat du BFF à chemins relatifs", func(t *testing.T) {
 		t.Parallel()
 

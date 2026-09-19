@@ -168,10 +168,8 @@ func TestUnNomDeProduitOrdinairePasse(t *testing.T) {
 }
 
 // Chaque secret vient de **sa** variable, et c'est tout ce que ce cas garde : `Load` ne refuse pas
-// trois valeurs identiques, et la rédaction précédente promettait cette garde-là sous le nom
-// « les trois secrets ne se confondent pas ». Ce qu'elle voit vraiment est une affectation croisée —
-// `SessionSecret` recopié dans `BruteForceSalt`, par exemple — que `minimalEnv` rend visible en
-// donnant trois valeurs distinctes.
+// trois valeurs identiques. Ce qu'il voit est une affectation croisée — `SessionSecret` recopié dans
+// `BruteForceSalt`, par exemple — que `minimalEnv` rend visible en donnant trois valeurs distinctes.
 //
 // L'enjeu reste celui-là : réutiliser un secret pour l'autre ferait qu'une fuite de la table des
 // compteurs — qui ne porte que des HMAC — livrerait de quoi signer des sessions. Ce qui l'empêche est

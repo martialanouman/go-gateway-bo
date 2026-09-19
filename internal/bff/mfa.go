@@ -47,8 +47,8 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 	}
 
 	// **Avant toute dépense**, et avant même de lire l'état du facteur : cette route hache dix
-	// argon2id par appel, et jusqu'ici une session de premier facteur suffisait à la répéter sans
-	// qu'aucun compteur la voie — elle réussit, et les compteurs d'échecs ne comptent que les refus.
+	// argon2id par appel, et sans ce compteur une session de premier facteur suffirait à la répéter
+	// sans qu'aucun autre la voie — elle réussit, et les compteurs d'échecs ne comptent que les refus.
 	// Compté ici et non au succès : le travail est fait dès qu'on entre, et un client qui coupe la
 	// connexion pendant les dix hachages les a fait payer quand même. Un refus en aval — 401 sur une
 	// session survivante, 409 sur un remplacement sans preuve — a lui aussi coûté, jusqu'aux argon2id
@@ -89,10 +89,10 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 	// WebAuthn par un champ `code`. C'est donc l'élévation qui tient lieu de preuve — la même garde
 	// que `POST /auth/mfa/webauthn/register/begin`, pour la même raison.
 	//
-	// Sans elle, un opérateur qui ne détient qu'une passkey se faisait enrôler une application
-	// d'authentification par quiconque détenait son mot de passe : l'enrôlement rendait le secret et
-	// dix codes de récupération, et la vérification élevait la session sans que la clé ait jamais été
-	// présentée. Trouvé en revue, et le scénario qui le garde a d'abord rendu 200.
+	// Sans elle, un opérateur qui ne détient qu'une passkey se ferait enrôler une application
+	// d'authentification par quiconque détient son mot de passe : l'enrôlement rendrait le secret et
+	// dix codes de récupération, et la vérification élèverait la session sans que la clé ait jamais
+	// été présentée.
 	held, err := a.SecondFactor.Factors(ctx, resolved.OperatorID)
 	if err != nil {
 		return nil, err
@@ -110,10 +110,10 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		}
 
 		// **La réservation d'essai de second facteur, prise ici comme elle l'est par la vérification.**
-		// Sans elle, ce chemin ouvrait un second seau de cinq essais, indépendant du premier : qui
-		// détient le mot de passe disposait de dix devinettes par quart d'heure au lieu de cinq, la
-		// moitié par une route que la migration 00007 n'avait pas vue. Le compteur d'appels de 00009
-		// bornait le nombre de requêtes, pas le budget de recherche.
+		// Sans elle, ce chemin ouvrirait un second seau de cinq essais, indépendant du premier : qui
+		// détient le mot de passe disposerait de dix devinettes par quart d'heure au lieu de cinq. Le
+		// compteur d'appels de la migration 00009 borne le nombre de requêtes, pas le budget de
+		// recherche.
 		//
 		// **Réserver et compter sont deux gardes distinctes, et l'une masque l'autre sur un code
 		// faux** — les deux rendent alors le même 429, et la mutation qui retire cette réservation
@@ -203,17 +203,16 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 // entre les deux.
 //
 // Aucune n'est atteignable par un test non plus — `a.SecondFactor` et `a.Sessions` sont des types
-// concrets, et poser une couture remanierait le câblage. Ce qui est couvert, et que « aucun test ne
-// les exerce » disait trop largement : les trois `false` le sont **au niveau du store**
-// (`TestUnChallengeNeSeConsommeQuUneFois`, les trois `…NEleveJamais…` de `sessions_test.go`) ; ce qui
-// ne l'est pas est leur traduction en 401 ici.
+// concrets, et poser une couture remanierait le câblage. Ce qui est couvert l'est **au niveau du
+// store** (`TestUnChallengeNeSeConsommeQuUneFois`, les trois refus d'élévation de `sessions_test.go`) ;
+// ce qui ne l'est pas est leur traduction en 401 ici.
 //
 // La couverture ne peut pas trancher à leur place : les scénarios lancent le binaire en
 // sous-processus, donc `-coverprofile` ne voit que 0,1 % de ce paquet. Seule la mutation répond.
 //
 // **La famille est plus large.** Les cérémonies WebAuthn de `internal/bff/webauthn.go` et
-// `internal/mfa/webauthn.go` en portent la forme, livrées par step-024 que step-023 ne pouvait pas
-// voir. Elles ne sont pas auditées ici, et un décompte au grep se tromperait : le `!found` de
+// `internal/mfa/webauthn.go` en portent la forme. Elles ne sont pas auditées ici, et un décompte au
+// grep se tromperait : le `!found` de
 // `mfa.open` a la même forme sans être une course, et celui de `Passkeys.BeginAssertion` est atteint
 // par un scénario, mais par son second membre.
 func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (VerifyMfaResponseObject,
@@ -469,9 +468,9 @@ func presentedFactorIsWellFormed(request TotpEnrollmentRequest) bool {
 		return false
 	}
 
-	// L'enum de **l'enrôlement** et non celui de la vérification, qui porte `webauthn` depuis
-	// step-024 : les convertir l'un en l'autre ferait accepter ici une méthode que cette route ne sait
-	// pas exercer, et le repli de `verifyPresentedFactor` l'enverrait alors sur le chemin TOTP.
+	// L'enum de **l'enrôlement** et non celui de la vérification, qui porte `webauthn` : les convertir
+	// l'un en l'autre ferait accepter ici une méthode que cette route ne sait pas exercer, et le repli
+	// de `verifyPresentedFactor` l'enverrait alors sur le chemin TOTP.
 	return request.Method.Valid() && len([]rune(*request.Code)) <= maximumCodeLength
 }
 
@@ -481,9 +480,9 @@ func presentedFactorIsWellFormed(request TotpEnrollmentRequest) bool {
 // La copie dit la conséquence d'abord et les deux gestes qui peuvent débloquer, sans nommer laquelle
 // des cinq causes s'applique — un challenge épuisé et un chiffre de travers lisent la même phrase.
 //
-// **Elle ne nomme plus aucune méthode.** Ce refus sert les trois — `totp`, `recovery_code` et, depuis
-// step-024, `webauthn` : « vérifier l'heure de l'application d'authentification » envoyait régler une
-// horloge qui n'existe pas dans le geste de qui vient de présenter une clé d'accès.
+// **Elle ne nomme aucune méthode.** Ce refus sert les trois — `totp`, `recovery_code` et `webauthn` :
+// « vérifier l'heure de l'application d'authentification » enverrait régler une horloge qui n'existe
+// pas dans le geste de qui vient de présenter une clé d'accès.
 //
 // Une copie qui vaut pour trois chemins ne peut nommer que ce qui leur est commun. L'indice de dérive
 // d'horloge n'a donc plus de porteur aujourd'hui : il appartient à l'écran qui présente un code TOTP,

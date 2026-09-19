@@ -98,8 +98,8 @@
  * squelette dans `index.html` — mais elles disent qu'on attend, jamais ce qui est vrai. Ce pouls-ci
  * ne marque que les valeurs alimentées par la WebSocket.
  *
- * La classe est portée par le point lui-même. Le kit de la charte la posait là aussi mais ciblait un
- * descendant, si bien qu'un point isolé ne battait jamais.
+ * La classe est portée par le point lui-même, et non par un descendant : un point isolé ne battrait
+ * jamais.
  */
 .ui-dot--live {
   animation: ui-pulse var(--dur-pulse) var(--ease-expressive) infinite;
@@ -179,7 +179,7 @@
  * **Le texte change de token avec le fond.** `--action-danger-fg` est `--red-500`, qui tient sur une
  * surface nue (4,90 sur la page, 4,64 en carte) et **tombe à 4,05 sur sa propre teinte** — la
  * combinaison que `colors.css` décrit et pour laquelle il déclare `--text-danger-on-tint` (4,70 en
- * carte). Le survol était la seule règle du fichier à poser la teinte sans reprendre la couleur.
+ * carte).
  */
 .ui-button--danger:hover:not([aria-disabled], [data-disabled]) {
   border-color: var(--red-500);
@@ -253,8 +253,8 @@
  *
  * `content: '*' / ''` donne au pseudo-élément un texte de remplacement **vide** : la marque est
  * peinte sans être annoncée. Le ` / ''` est la moitié qui compte, et le parcours l'assertit
- * littéralement — une assertion qui cherchait seulement l'astérisque laissait passer sa disparition. `required` sur le contrôle porte déjà l'information pour les
- * technologies d'assistance, et entendre « étoile » n'aide personne.
+ * littéralement — chercher seulement l'astérisque laisserait passer sa disparition. `required` sur le
+ * contrôle porte déjà l'information pour les technologies d'assistance.
  */
 .ui-field:has(.ui-input:required) .ui-field__label::after {
   content: "*" / "";
@@ -304,7 +304,7 @@
 }
 
 /*
- * Après `.ui-input`, dont elle l'emporte de toute façon en spécificité : l'écrire avant se lisait
+ * Après `.ui-input`, dont elle l'emporte de toute façon en spécificité : l'écrire avant se lirait
  * comme une règle écrasée par le raccourci `padding` qui suit, ce qu'elle n'est pas.
  *
  * Un seul sélecteur : le composant n'émet l'enveloppe **que** s'il y a une icône. Un
@@ -572,9 +572,9 @@
  * rafraîchissement — dans un cockpit où les compteurs défilent, c'est le défaut qu'on remarque sans
  * savoir le nommer.
  *
- * Reposé ici et **nulle part ailleurs** : les autres surfaces de chiffres de cette step —
- * `.ui-status__meta`, `.ui-tab__count`, les cellules mono — portent des rôles en IBM Plex Mono, dont
- * la chasse est déjà fixe. Les en décorer ferait croire à une protection qui n'agit sur rien.
+ * Reposé ici et **nulle part ailleurs** : les autres surfaces de chiffres — `.ui-status__meta`,
+ * `.ui-tab__count`, les cellules mono — portent des rôles en IBM Plex Mono, dont la chasse est déjà
+ * fixe. Les en décorer ferait croire à une protection qui n'agit sur rien.
  */
 .ui-table {
   width: 100%;
@@ -646,10 +646,9 @@
 }
 
 /*
- * Le glyphe n'est rendu que sur la colonne triée — voir `data-table.tsx`. Sa couleur renforce donc
- * un signal que sa présence porte déjà, au lieu d'en être le seul support : posé sur chaque colonne
- * triable, il ne se distinguait de ses voisins que par ce teal, ce que WCAG 1.4.1 refuse. Le glyphe
- * vient du jeu fermé, il n'est pas dessiné ici.
+ * Le glyphe n'est rendu que sur la colonne triée — voir `data-table.tsx`. Sa couleur renforce donc un
+ * signal que sa présence porte déjà, au lieu d'en être le seul support : posé sur chaque colonne
+ * triable, il ne se distinguerait de ses voisins que par ce teal, ce que WCAG 1.4.1 refuse.
  */
 .ui-table__sort-glyph {
   color: var(--teal-500);

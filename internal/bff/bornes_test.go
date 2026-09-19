@@ -273,8 +273,8 @@ func TestLaPreuveDEnrolementExigeSesDeuxChampsOuAucun(t *testing.T) {
 			want: http.StatusBadRequest,
 		},
 		// **L'enum de l'enrôlement, pas celui de la vérification.** `webauthn` est une méthode valide
-		// pour `POST /auth/mfa/verify` depuis step-024, et ne l'a jamais été ici : le corps de cette
-		// route ne déclare que `totp` et `recovery_code`. Sans cette clause, le repli de
+		// pour `POST /auth/mfa/verify`, et ne l'est pas ici : le corps de cette route ne déclare que
+		// `totp` et `recovery_code`. Sans cette clause, le repli de
 		// `verifyPresentedFactor` enverrait une assertion WebAuthn sur le chemin TOTP, par un champ
 		// `code`. C'est le défaut que le commentaire de `presentedFactorIsWellFormed` décrit, et que
 		// la mutation de la fonction entière ne distinguait pas de ses clauses.

@@ -13,7 +13,7 @@ import (
 
 // Le cas qu'aucun scénario ne met en scène parce qu'il ne se produit qu'entre deux releases : un
 // rôle marqué `is_default` en base que le code ne décrit plus — une release qui retire un rôle par
-// défaut, ou une base semée par une version antérieure.
+// défaut, ou une base semée par une version plus ancienne.
 //
 // Le seed le **signale et le laisse en l'état**, comme il fait d'une clé disparue du catalogue. Sans
 // la garde `EXISTS (… wanted …)` de la révocation, il le dépouillerait de toutes ses attributions en

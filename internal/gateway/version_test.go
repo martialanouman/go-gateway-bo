@@ -16,21 +16,19 @@ import (
 
 const contractPackage = "@martialanouman/gateway-api-contracts"
 
-// Un bump périme en silence tout texte qui affirme la version, et rien ne le voit. step-003 l'a payé :
-// sa propre fiche raconte que le bump est arrivé au huitième commit « et n'a fait relire aucun texte
-// qui parlait du contrat — cinq DN, quatre commentaires de code et six passages de documentation
-// affirmaient du faux ». Le correctif d'alors fut de tout remesurer à la main. Rien n'avait été posé
-// pour que ça ne recommence pas ; c'est cette porte.
+// Un bump périme en silence tout texte qui affirme la version, et rien d'autre que cette porte ne le
+// voit : le dépôt l'a déjà payé d'un bump qui a laissé derrière lui des DN, des commentaires et des
+// passages de documentation affirmant du faux, tous remesurés à la main.
 //
 // Elle ne couvre qu'une classe de textes sur trois, et le tri est délibéré :
 //
 //   - **l'état présent** — « le dépôt installe X » — que le bump rend faux sans le toucher. Les deux
 //     tableaux de versions ci-dessous en sont la forme pure : leur raison d'être *est* d'affirmer ce
 //     qui est installé. C'est ce que ce test garde.
-//   - **la mesure datée** — « mesuré le 02/08/2026 sur le contrat 2.5.0 ». Elle reste vraie comme
-//     mesure, mais on la lit comme un fait actuel et ses chiffres bougent : `errors.go` annonçait
-//     « 3 de ses 133 opérations déclarent un 503 », elles sont 4 en 4.0.2. Ce test ne peut rien pour
-//     elle — juger si une affirmation de fond est encore vraie, c'est de la lecture, pas une porte.
+//   - **la mesure datée** — « mesuré sur le contrat 2.5.0 ». Elle reste vraie comme mesure, mais on
+//     la lit comme un fait actuel et ses chiffres bougent : le nombre d'opérations qui déclarent un
+//     503 a changé d'une majeure à l'autre. Ce test ne peut rien pour elle — juger si une affirmation
+//     de fond est encore vraie, c'est de la lecture, pas une porte.
 //   - **l'historique** — `tasks/steps/done/`, où une fiche livrée raconte une décision datée. La
 //     réécrire falsifierait un compte rendu. Ces fichiers ne sont pas lus, et c'est le sens de la
 //     classe, pas une commodité.

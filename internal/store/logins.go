@@ -14,8 +14,7 @@ import (
 // compteurs d'échecs que les instances partagent, et le challenge qu'un login réussi émet.
 //
 // Il prend un **pool** et non un DSN, et c'est le premier de ce paquet à le faire : une route HTTP
-// sert des milliers de requêtes là où `Migrate` et `Seed` s'exécutent une fois par déploiement. C'est
-// le site d'appel que `NewPool` annonce depuis step-005.
+// sert des milliers de requêtes là où `Migrate` et `Seed` s'exécutent une fois par déploiement.
 type Logins struct {
 	pool *pgxpool.Pool
 	// emails porte la réservation de l'adresse (`Reserve`) et son effacement (`ClearFailures`).
@@ -55,9 +54,8 @@ const StatusActive = "active"
 // littéral dans les requêtes est ce qui fait qu'une faute de frappe est refusée par le compilateur et
 // non par la base.
 //
-// `ScopeSecondFactor` est comptée par `mfa.go`, sur l'identifiant de l'opérateur. Elle partage cette
-// table et son mécanisme d'incrément atomique plutôt que d'en avoir une jumelle, qui en serait une
-// seconde rédaction.
+// `ScopeSecondFactor` est comptée par `mfa.go`, sur l'identifiant de l'opérateur : elle partage cette
+// table et son mécanisme d'incrément atomique plutôt que d'en avoir une jumelle.
 const (
 	ScopeEmail        = "email"
 	ScopeSource       = "source"

@@ -22,9 +22,9 @@ func buildFixture(t *testing.T, name string) (string, error) {
 }
 
 // Un handler dont la signature diverge de l'interface engendrée ne compile pas. La porte asserte le
-// **message** et non le seul code de sortie : mesuré pendant la conception, une première version du
-// fixture échouait bel et bien — mais sur un `undefined: context`, un import oublié. Un test qui
-// n'aurait regardé que l'échec l'aurait accepté et n'aurait plus rien gardé.
+// **message** et non le seul code de sortie : un fixture échoue aussi bien sur un import oublié —
+// `undefined: context` — que sur la divergence visée, et un test qui ne regarderait que l'échec
+// accepterait le premier et ne garderait plus rien.
 //
 // Le témoin positif n'est pas décoratif : sans lui, un harnais cassé — mauvais chemin, `go`
 // introuvable, `testdata/` déplacé — ferait échouer les deux fixtures et laisserait la porte verte.

@@ -12,28 +12,25 @@ import (
 )
 
 // Le front Go↔SQL — les onze catégories d'ici contre le `CHECK` sur `permissions.category` — est
-// tenu par `internal/store/permissions_catalog_test.go`, et non ici. Il y a d'abord vécu sous la
-// forme d'un `os.ReadFile` de la migration et d'une expression rationnelle sur son texte ; mesuré le
-// 02/08/2026, la contrainte mise en commentaire d'historique laissait les deux cas **verts**. Un
-// détecteur textuel n'a aucune notion de commentaire SQL, et ne voit pas non plus un `ALTER` posé
-// par une migration ultérieure. Le remplaçant observe la contrainte que PostgreSQL applique, où ces
-// deux angles n'existent plus — au prix du conteneur que `internal/store` monte déjà.
+// tenu par `internal/store/permissions_catalog_test.go`, et non ici : un détecteur textuel sur le
+// fichier de migration n'a aucune notion de commentaire SQL, et ne voit pas non plus un `ALTER` posé
+// par une migration ultérieure. Là-bas, la contrainte observée est celle que PostgreSQL applique —
+// au prix du conteneur que `internal/store` monte déjà.
 
 // `catalog` est un `var` de package : sans la copie de `All()`, chaque appelant recevrait la tranche
 // elle-même, et écrire dedans réécrirait le catalogue **pour tout le process**. Le scénario n'est pas
-// théorique : l'écran d'édition de rôle (step-027) trie et filtre ce qu'on lui donne, et les deux
+// théorique : l'écran d'édition de rôle trie et filtre ce qu'on lui donne, et les deux
 // lecteurs de `All()` — le semis (`internal/store/seed.go`) et `cmd/permissionsgen` — travailleraient
 // ensuite sur un catalogue réordonné. La garde, elle, ne le lit pas : elle compare la clé de sa table
 // aux droits venus de la base.
 //
-// Ce cas existe parce que la propriété n'était tenue par rien : mesuré le 02/08/2026, remplacer
-// `slices.Clone(catalog)` par `return catalog` laissait `internal/permissions` et
-// `cmd/permissionsgen` verts et `golangci-lint` à 0 issue — la couverture était pourtant à 100 %,
-// mais c'est une couverture d'instructions, et aucun cas n'écrivait dans la tranche rendue.
-// L'entrée témoin est copiée **par valeur** (`Entry` n'a que des champs valeur), et non gardée sous
-// la forme d'une tranche : une première version de ce cas comparait `permissions.All()` d'avant à
-// celui d'après et restait verte défaut posé, les deux « tranches » étant la même quand `All()` rend
-// le catalogue lui-même.
+// Ce cas existe parce que rien d'autre ne tient la propriété : remplacer `slices.Clone(catalog)` par
+// `return catalog` laisse `internal/permissions` et `cmd/permissionsgen` verts et `golangci-lint` à 0
+// issue, couverture à 100 % comprise — c'est une couverture d'instructions, et aucun autre cas n'écrit
+// dans la tranche rendue. L'entrée témoin est copiée **par valeur** (`Entry` n'a que des champs
+// valeur), et non gardée sous la forme d'une tranche : comparer `permissions.All()` d'avant à celui
+// d'après resterait vert défaut posé, les deux « tranches » étant la même quand `All()` rend le
+// catalogue lui-même.
 func TestAllHandsOutACopyAndNotTheCatalogItself(t *testing.T) {
 	handed := permissions.All()
 	require.NotEmpty(t, handed)
@@ -135,7 +132,7 @@ func TestTheShapeRejectsWhatNoKeyCarries(t *testing.T) {
 	}
 }
 
-// La description est ce que l'écran d'édition de rôle affiche tel quel (step-027). Une entrée sans
+// La description est ce que l'écran d'édition de rôle affiche tel quel. Une entrée sans
 // description y produirait une case à cocher muette, dont personne ne peut dire ce qu'elle accorde.
 func TestEveryEntryCarriesADescription(t *testing.T) {
 	for _, entry := range permissions.All() {

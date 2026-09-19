@@ -33,8 +33,8 @@ export default defineConfig({
     alias: { '~': fileURLToPath(new URL('./src', import.meta.url)) },
   },
 
-  // Déclaré plutôt que laissé au défaut : step-002 embarque ce répertoire dans le binaire, et une
-  // seule ligne change alors de place.
+  // Déclaré plutôt que laissé au défaut : le binaire embarque ce répertoire, et une seule ligne
+  // change alors de place.
   build: { outDir: 'dist' },
 
   server: {

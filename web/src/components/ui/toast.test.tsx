@@ -153,8 +153,8 @@ describe('ToastStack', () => {
    *
    * Il prouve que le quatrième toast est *marqué* : Base UI le rend avec `data-limited` plutôt que
    * de le retirer. Il ne prouve **pas** qu'il disparaît de l'écran — c'est la règle `display: none`
-   * de la feuille qui le fait, et jsdom n'applique aucun CSS. Mesuré en remplaçant cette règle par
-   * une opacité : les 254 tests restaient verts.
+   * de la feuille qui le fait, et jsdom n'applique aucun CSS — mesuré en remplaçant cette règle par
+   * une opacité, la suite reste verte.
    *
    * La preuve manquante est donc dans le parcours Playwright, seul endroit où l'on lit ce qui est
    * peint. Les deux ensemble tiennent le plafond ; ni l'une ni l'autre ne suffit.

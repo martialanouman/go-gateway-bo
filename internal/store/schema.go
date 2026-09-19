@@ -39,11 +39,9 @@ func (e OutdatedSchemaError) Error() string {
 
 // AppliedVersionPhrase et ExpectedVersionPhrase nomment une version dans le message de refus.
 //
-// Elles sont exportées **pour être exigées par les tests**, et cette exportation est le correctif
-// d'un défaut mesuré : la version précédente des scénarios cherchait le nombre nu dans la sortie du
-// process, or celle-ci est du JSON `slog` horodaté — « 0 » et « 2 » sont tous deux dans « 2026 », si
-// bien qu'un message vidé de ses deux versions restait vert. Une phrase entière ne se trouve pas par
-// accident.
+// Elles sont exportées **pour être exigées par les tests** : la sortie du process est du JSON `slog`
+// horodaté, où chercher le nombre nu laisse vert un message vidé de ses deux versions — « 0 » et
+// « 2 » sont tous deux dans « 2026 ». Une phrase entière ne se trouve pas par accident.
 func AppliedVersionPhrase(applied int64) string {
 	return fmt.Sprintf("en version %d", applied)
 }

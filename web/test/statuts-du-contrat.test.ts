@@ -3,11 +3,10 @@
 /**
  * Les statuts que le produit peint sont-ils encore ceux que le contrat déclare ?
  *
- * **Le mode d'échec est daté et coûteux.** `StatusPill` recopie quatre énumérations du contrat pour
- * leur donner une tonalité. Une valeur qui manque à la table ne casse rien : elle retombe sur le
+ * **Le mode d'échec est silencieux et coûteux.** `StatusPill` recopie quatre énumérations du contrat
+ * pour leur donner une tonalité. Une valeur qui manque à la table ne casse rien : elle retombe sur le
  * repli au repos, se peint en gris, et **disparaît de l'œil de l'opérateur** qui balaie la colonne à
- * la recherche des rouges. La v1.0 portait six des huit valeurs de `CdrStatus` — `accepted` et
- * `cancelled` absentes — et toutes ses portes étaient vertes.
+ * la recherche des rouges — toutes portes vertes.
  *
  * Un contrat qui bouge périme donc en silence une table qu'aucune porte ne regarde. Ce fichier la
  * regarde : il lit le **YAML installé**, pas une liste écrite à la main, et rougit dès qu'une valeur
@@ -68,7 +67,6 @@ describe('les statuts peints suivent le contrat', () => {
   })
 
   it('CdrStatus : les mêmes valeurs, ni plus ni moins', () => {
-    // Les huit, dont les deux que la v1.0 avait laissées tomber au gris.
     expect(Object.keys(DELIVERY_TONES).sort()).toEqual(enumOf('CdrStatus').sort())
   })
 
@@ -76,12 +74,10 @@ describe('les statuts peints suivent le contrat', () => {
     // `Customer.status` et `SmppAccount.status` n'ont pas de schéma nommé : ils déclarent leur
     // énumération sur place. On les ancre donc par **nom de schéma**, et le cardinal est fixé.
     //
-    // **La première rédaction filtrait les occurrences sur `includes('suspended')`** — c'est-à-dire
-    // sur le contenu de ce qu'elle jugeait. Mesuré : renommer une seule des quatre en
-    // `[active, paused, closed]` la faisait sortir de l'échantillon au lieu de rougir, et les cinq
-    // tests restaient verts. `<StatusPill kind="entity" state="paused" />` aurait alors peint un
-    // client au gris, exactement le mode d'échec que ce fichier existe pour fermer. Une porte dont
-    // les cas viennent de la donnée qu'elle garde ne voit pas sa dérive.
+    // **Jamais un filtre sur le contenu de ce qui est jugé** — `includes('suspended')` par exemple :
+    // mesuré, renommer une seule des quatre en `[active, paused, closed]` la fait sortir de
+    // l'échantillon au lieu de rougir, et la suite reste verte. Une porte dont les cas viennent de la
+    // donnée qu'elle garde ne voit pas sa dérive.
     const PORTEURS = ['Customer', 'CustomerUpdate', 'SmppAccount', 'SmppAccountUpdate'] as const
 
     const attendu = Object.keys(ENTITY_TONES).sort()

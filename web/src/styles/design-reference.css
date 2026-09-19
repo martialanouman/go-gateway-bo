@@ -1,6 +1,6 @@
 /*
- * Mise en page de `/_design`. Elle n'habille aucune primitive du produit — les composants arrivent
- * en step-041 et step-042 — et ne sert qu'à disposer les échantillons de tokens.
+ * Mise en page de `/_design`. Elle n'habille aucune primitive du produit — `components.css` et
+ * `feedback.css` s'en chargent — et ne sert qu'à disposer les échantillons de tokens.
  *
  * Elle ne pose **aucune couleur, graisse, rayon ni espacement** en littéral : ce serait contradictoire
  * de la part de la page qui montre la charte. Deux valeurs y échappent, et elles ne sont pas des

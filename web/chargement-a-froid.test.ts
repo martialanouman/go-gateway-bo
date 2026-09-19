@@ -16,8 +16,8 @@ import { readTokens, resolveToken } from './test/tokens'
  * asserter après le montage de React ne prouverait rien, puisque React remplace ce squelette.
  *
  * Le serveur de développement n'est volontairement pas le sujet : il n'est pas le chemin de
- * production, et le fallback SPA qui associe une URL profonde à ce document appartient au Go — c'est
- * step-002 qui l'exercera, sur le binaire.
+ * production, et le fallback SPA qui associe une URL profonde à ce document appartient au Go, où les
+ * scénarios godog l'exercent sur le binaire.
  */
 // `import.meta.url` n'est pas un chemin de fichier sous jsdom : la racine du projet est celle où
 // Vitest s'exécute.
@@ -35,10 +35,9 @@ describe('chargement à froid', () => {
   beforeAll(async () => {
     outDir = await mkdtemp(join(tmpdir(), 'dashboard-build-'))
 
-    // Le build passe par la **même commande que la production**, dans son propre process. Appeler
-    // l'API de Vite depuis Vitest héritait de `NODE_ENV=test` : React s'y résolvait en développement
-    // et l'artefact pesait 490 kB d'avertissements au lieu des 291 kB livrés — le test décrivait
-    // alors quelque chose que personne ne sert. Par cette voie, l'octet produit est le même.
+    // Le build passe par la **même commande que la production**, dans son propre process : appeler
+    // l'API de Vite depuis Vitest hérite de `NODE_ENV=test`, où React se résout en développement et
+    // l'artefact grossit d'avertissements que personne ne sert.
     await promisify(execFile)(
       'node_modules/.bin/vite',
       ['build', '--outDir', outDir, '--emptyOutDir'],
@@ -59,8 +58,7 @@ describe('chargement à froid', () => {
     ).join('\n')
 
     // Le document est **attaché** au DOM de test, et non simplement analysé : un arbre détaché n'a
-    // aucune feuille de style associée, et `getComputedStyle` y rend les valeurs par défaut. Une
-    // première version de ce test lisait ainsi `display: block` sur tout et ne pouvait rien prouver.
+    // aucune feuille de style associée, et `getComputedStyle` y rend `display: block` sur tout.
     const parsed = new DOMParser().parseFromString(html, 'text/html')
     document.documentElement.replaceWith(document.importNode(parsed.documentElement, true))
     painted = document.body
@@ -136,17 +134,12 @@ describe('chargement à froid', () => {
   })
 
   it('recopie fidèlement, dans le document, les tokens que la coquille consomme', () => {
-    // **Ce test a changé de sens en step-008, et son remplaçant est plus fort.** Il exigeait avant
-    // que *tout* `var()` de la feuille soit déclaré dans `index.html` — écrit pour quatre variables
-    // de géométrie, il tombait au premier `var(--text-primary)` parmi 236 tokens. Ce contrôle
-    // d'existence vit désormais dans le build (`vite-plugin-tokens`), où il juge l'**union** du
-    // document et du CSS émis : il couvre les 236 tokens au lieu de quatre, et il fait échouer
-    // `vite build` plutôt qu'un test.
-    //
-    // Ce qui reste ici est ce que le build ne peut pas voir : le `<style>` inline **duplique** des
-    // tokens de la charte, parce que la première peinture n'a aucune feuille à sa disposition. La
-    // duplication est imposée ; ce qui se teste, c'est qu'elle soit fidèle. Non alignées, ces valeurs
-    // font sauter le rail de 4 px et changent la luminance du canvas au montage de React.
+    // Le contrôle d'existence d'un token vit dans le build (`vite-plugin-tokens`), qui juge l'union du
+    // document et du CSS émis. Ce qui reste ici est ce qu'il ne peut pas voir : le `<style>` inline
+    // **duplique** des tokens de la charte, parce que la première peinture n'a aucune feuille à sa
+    // disposition. La duplication est imposée ; ce qui se teste, c'est qu'elle soit fidèle. Non
+    // alignées, ces valeurs font sauter le rail et changent la luminance du canvas au montage de
+    // React.
     const tokens = readTokens()
 
     const copies = [
@@ -154,14 +147,11 @@ describe('chargement à froid', () => {
       ['--shell-topbar-height', '--topbar-height'],
       ['--skeleton-surface', '--surface-page'],
       ['--skeleton-shape', '--border-subtle'],
-      // Cinquième paire, step-042. Le document battait à `1.6s` en dur quand la charte dit 1,4 s et
-      // que `--dur-skeleton` porte cette valeur depuis step-008 sans consommateur. Rien ne
-      // justifiait l'écart : le commentaire qui surplombait la règle ne parlait que de
-      // `prefers-reduced-motion`. Les deux squelettes du produit — celui du document et celui des
-      // écrans — battent désormais au même rythme, depuis la même source.
+      // Les deux squelettes du produit — celui du document et celui des écrans — battent au même
+      // rythme, depuis la même source.
       ['--skeleton-duration', '--dur-skeleton'],
-      // Le rail et la barre de step-040 peignent le chrome, plus sombre que le canvas : sans ces
-      // deux copies, leur luminance sauterait au montage.
+      // Le rail et la barre peignent le chrome, plus sombre que le canvas : sans ces deux copies,
+      // leur luminance sauterait au montage.
       ['--skeleton-chrome', '--surface-chrome'],
       ['--skeleton-chrome-border', '--border-chrome'],
     ] as const
@@ -186,36 +176,23 @@ describe('chargement à froid', () => {
   })
 
   it("garde la feuille d'entrée assez petite pour que l'aller-retour reste le seul coût", async () => {
-    // step-001 mesurait 680 octets et concluait « négligeable tant que la feuille est petite ».
-    // C'était une hypothèse ; ce plafond en fait une condition.
-    //
-    // **Deux bornes, parce qu'il y a deux coûts distincts** — la version précédente n'en mesurait
-    // qu'un, le brut, pour protéger l'autre, le transfert. Elle avait prévu sa propre fin : « la
-    // marge sous le plafond n'est pas celle de `components.css`, qui arrive en step-041 ». Elle y
-    // est, et le bon geste n'était pas de relever le chiffre d'un cran arbitraire.
+    // **Deux bornes, parce qu'il y a deux coûts distincts :**
     //
     // - **Ce qui voyage** est l'octet *compressé* : c'est lui qui décide si la feuille tient dans la
     //   fenêtre de congestion initiale (~14 Ko), donc si elle arrive en un aller-retour.
     // - **Ce qui s'analyse** est l'octet brut, un coût réel mais d'un autre ordre, qu'un plafond
     //   large suffit à tenir.
     //
-    // Ordre de grandeur sur la sortie livrée, `components.css` versé : **~21 Ko bruts, ~5 Ko
-    // compressés** — soit le tiers de la borne de transfert. Volontairement pas au chiffre près : la
-    // première rédaction écrivait « 21 202 / 4 967 », exact le jour même et **périmé par les deux
-    // commits suivants**, qui ont ajouté des règles à la feuille. Un chiffre figé dans un
-    // commentaire se démode au prochain diff, et c'est la borne qui garde, pas le récit.
-    //
-    // *(Et l'instrument compte : `gzipSync` par défaut, celui de ce test. `gzip -9` et le rapport de
-    // Vite rendent trois valeurs différentes pour la même feuille.)*
+    // Volontairement aucun chiffre du jour ici : il se démode au prochain diff, et c'est la borne qui
+    // garde, pas le récit. L'instrument, lui, compte — `gzipSync` par défaut, celui de ce test ;
+    // `gzip -9` et le rapport de Vite rendent trois valeurs différentes pour la même feuille.
     //
     // La feuille des primitives est sur le chemin critique **à sa place** — tout écran la consomme
-    // au premier rendu, et la scinder ajouterait un aller-retour au lieu d'en retirer un.
-    //
-    // Reste `design-reference.css`, qui n'y a rien à faire : ~1,9 Ko servis à tous pour une page que
-    // seul un développeur visite. La cause est mesurée depuis step-008 — l'import de la route est
-    // statique dans `routeTree.gen.ts`, donc `autoCodeSplitting` scinde le composant et pas sa
-    // feuille. Non corrigé ici : le geste touche la génération de l'arbre de routes, pas les
-    // primitives, et il vaut sa propre mesure.
+    // au premier rendu, et la scinder ajouterait un aller-retour au lieu d'en retirer un. Reste
+    // `design-reference.css`, qui n'y a rien à faire : servie à tous pour une page que seul un
+    // développeur visite. La cause est mesurée — l'import de la route est statique dans
+    // `routeTree.gen.ts`, donc `autoCodeSplitting` scinde le composant et pas sa feuille. La corriger
+    // touche la génération de l'arbre de routes, pas les primitives, et vaut sa propre mesure.
     const entry = /<link rel="stylesheet"[^>]*href="([^"]+)"/.exec(html)?.[1]
     expect(entry, "le document ne lie plus de feuille d'entrée").toBeDefined()
 
@@ -228,26 +205,19 @@ describe('chargement à froid', () => {
   })
 
   it("garde le script d'entrée exempt de ce qu'une seule route consomme", async () => {
-    // Le script d'entrée n'avait aucune borne, et il a coûté 163 Ko sans que rien ne le dise :
-    // `package.json` ne déclarait pas `sideEffects`, donc Rollup tenait chaque module de `src/` pour
-    // susceptible d'en avoir, et un import depuis la façade `components/ui` tirait **tous** ses
-    // modules — dont `@base-ui/react`, que seule `/_design` consomme. Mesuré sur la sortie livrée :
-    // 453,78 Ko bruts / 147,44 gzip sans la déclaration, 290,60 / 93,03 avec, pour un total inchangé
-    // à l'octet près. Ce n'était donc pas le prix de la façade, mais celui d'une autorisation de
-    // secouer qui manquait.
+    // Ce que la borne tient : sans `sideEffects` dans `package.json`, Rollup tient chaque module de
+    // `src/` pour susceptible d'en avoir, et un import depuis la façade `components/ui` tire **tous**
+    // ses modules — mesuré, 453,78 Ko bruts / 147,44 gzip sans la déclaration contre 290,60 / 93,03
+    // avec, pour un total inchangé à l'octet près. C'est le prix d'une autorisation de secouer qui
+    // manque, pas celui de la façade.
     //
     // Deux bornes pour les deux coûts, comme pour la feuille — sauf qu'ici c'est le **brut** qui
     // domine : le moteur l'analyse et le compile avant le premier rendu.
     //
-    // Le motif retenu est `["**/*.css"]` et non `false`, alors que les deux rendent ici **la même
-    // feuille à l'empreinte près** : Vite ne laisse pas secouer ses propres modules CSS, mesuré en
-    // jouant `false`. Le motif ne protège donc rien aujourd'hui ; il dit ce qui est vrai du graphe,
-    // pour que la déclaration reste juste si cette protection cesse d'être implicite.
-    //
-    // La marge n'était pas là pour absorber la croissance ordinaire : elle était là pour que la
-    // bascule de Base UI dans l'entrée, que step-040 a faite en montant la pile de toasts dans la
-    // coquille, se présente comme une question plutôt que comme un rouge à faire taire. Elle l'a
-    // absorbée : des 15 % d'origine il reste environ 8 % sous la borne brute.
+    // Le motif retenu est `["**/*.css"]` et non `false`, alors que les deux rendent **la même feuille
+    // à l'empreinte près** : Vite ne laisse pas secouer ses propres modules CSS, mesuré en jouant
+    // `false`. Le motif ne protège donc rien aujourd'hui ; il dit ce qui est vrai du graphe, pour que
+    // la déclaration reste juste si cette protection cesse d'être implicite.
     const entry = /<script\b[^>]*\bsrc="([^"]+)"/.exec(html)?.[1]
     expect(entry, "le document ne charge plus de script d'entrée").toBeDefined()
 
@@ -283,15 +253,14 @@ describe('chargement à froid', () => {
 
   it("n'emporte dans le bundle aucune adresse que le navigateur ne doit pas connaître", async () => {
     // **Invariant (d).** `internal/` met le jeton machine, le mTLS et la base hors de portée du
-    // bundle par construction ; le risque résiduel est une adresse écrite en dur dans le client.
-    // `web/CLAUDE.md` présente ce test comme le dernier rempart — il n'existait pas, et cette step
-    // produit le premier bundle.
+    // bundle par construction ; le risque résiduel est une adresse écrite en dur dans le client, et
+    // `web/CLAUDE.md` présente ce test comme le dernier rempart.
+    //
     // Tout ce qui est servi, et pas seulement `assets/` : Vite recopie `public/` tel quel, et un
     // fichier de configuration déposé là échapperait à une lecture du seul répertoire des bundles.
-    // Les binaires sont exclus **par extension** plutôt que lus en `utf8` : depuis que step-008
-    // auto-héberge les polices, sept `.woff2` (144 Ko) transiteraient sinon par cette regex, décodés
-    // en UTF-8 avec des `U+FFFD` partout. Un octet mal placé y produirait une fausse origine, sur du
-    // contenu qui ne peut de toute façon pas porter d'URL.
+    // Les binaires sont exclus **par extension** plutôt que lus en `utf8` : les polices
+    // auto-hébergées transiteraient sinon par cette regex, décodées avec des `U+FFFD` partout, où un
+    // octet mal placé produirait une fausse origine sur du contenu qui ne peut porter d'URL.
     const TEXTUAL = /\.(js|mjs|cjs|css|html|json|svg|txt|map|webmanifest)$/
     const emitted = await readdir(outDir, { recursive: true, withFileTypes: true })
     const sources = await Promise.all(
@@ -311,17 +280,15 @@ describe('chargement à froid', () => {
     // Les préfixes couvrent des familles d'URL documentaires ; `http://localhost` est autorisé **à
     // l'identique** et non en préfixe, sinon `http://localhost:3001` — le BFF en dur, exactement ce
     // que cette garde cherche — passerait par la porte qu'elle tient. Vérifié : il passait.
-    // Seuls les préfixes qui correspondent à quelque chose de réellement livré : une entrée morte
-    // élargit la surface sans que personne ne s'en aperçoive. Vérifié — le bundle n'émet que ces
-    // deux familles, plus le `http://localhost` nu ci-dessous.
+    // Seuls des préfixes qui correspondent à quelque chose de réellement livré : une entrée morte
+    // élargit la surface sans que personne ne s'en aperçoive.
     const allowedPrefixes = [
       'http://www.w3.org/', // espaces de noms SVG et XML, émis par React
       'https://react.dev/errors/', // messages d'erreur de React en production
-      // Même mécanisme, côté Base UI, entré avec les primitives de step-041. Vérifié sur le bundle
-      // livré plutôt que supposé : l'adresse est **interpolée dans une chaîne** — « … error #n;
-      // visit <url> for the full message. » — et n'est la cible d'aucun `fetch` ni d'aucun `src`.
-      // Le navigateur ne la demande donc jamais, ce que le parcours Playwright observe pour de bon
-      // en refusant toute requête hors origine.
+      // Même mécanisme, côté Base UI. Vérifié sur le bundle livré : l'adresse est **interpolée dans
+      // une chaîne** — « … error #n; visit <url> for the full message. » — et n'est la cible d'aucun
+      // `fetch` ni d'aucun `src`. Le navigateur ne la demande jamais, ce que le parcours Playwright
+      // observe en refusant toute requête hors origine.
       'https://base-ui.com/production-error',
     ]
     const allowedExactly = ['http://localhost'] // repli d'origine de TanStack Router hors navigateur
@@ -341,12 +308,10 @@ describe('chargement à froid', () => {
     // Ce que cela achète : la silhouette garde sa forme si la feuille échoue, et elle est peinte sans
     // attendre le CSS en développement, où Vite l'injecte par JavaScript.
     //
-    // Ce que cela **n'**achète **pas**, contrairement à ce qui était écrit ici : Vite émet en
-    // production un `<link rel="stylesheet">` dans le `<head>`, et une feuille liée bloque le rendu
-    // du document entier — squelette compris. Mesuré sur le livré : 680 octets, 379 compressés, 0,6 à
-    // 0,8 ms sur une boucle locale. Le remède (inliner au build) rendrait la feuille non cacheable
-    // entre deux déploiements, ce qui coûte plus qu'il ne rapporte tant qu'elle est petite.
-    // **À rouvrir en step-008**, qui y versera les tokens et les polices.
+    // Ce que cela **n'**achète **pas** : Vite émet en production un `<link rel="stylesheet">` dans le
+    // `<head>`, et une feuille liée bloque le rendu du document entier — squelette compris. Le remède
+    // (inliner au build) rendrait la feuille non cacheable entre deux déploiements, ce qui coûte plus
+    // qu'il ne rapporte tant qu'elle tient dans un aller-retour — la borne du test ci-dessus.
     const inlineStyle = html.slice(html.indexOf('<style>'), html.indexOf('</style>'))
 
     expect(inlineStyle).toContain('.skeleton')

@@ -3,35 +3,21 @@ import { Dot } from './icon'
 /**
  * Les statuts de la charte, et l'interdiction de confondre leurs dimensions.
  *
- * ## Pourquoi `kind` est obligatoire
+ * **`kind` est obligatoire** parce que `closed` appartient à deux vocabulaires du contrat —
+ * `BreakerState: [closed, open, half_open]` et `status: [active, suspended, closed]` de `Customer` et
+ * `SmppAccount`. Déduire la dimension de la valeur peindrait donc un `<StatusPill
+ * state={customer.status} />` — le geste le plus naturel du monde — en **pilule verte « circuit
+ * sain » pour un client résilié**. Seule la déclaration de la dimension l'empêche, et l'union
+ * discriminée en fait une propriété du compilateur.
  *
- * Une première version prenait `state: string` et **devinait** la dimension : si la valeur était
- * `closed`, `open` ou `half_open`, c'était un disjoncteur. Le contrat rend cette devinette fausse —
- * `closed` appartient à deux vocabulaires :
+ * **Deux rendus, jamais mélangés.** `breaker_state` est une pilule teintée, tout le reste un point
+ * coloré + libellé mono. La raison est opérationnelle : un disjoncteur ouvert sur un lien vivant
+ * (attendre la reprise) et un bind mort (rebind manuel) demandent des actions opposées.
  *
- * ```yaml
- * BreakerState: { enum: [closed, open, half_open] }     # le disjoncteur
- * status:       { enum: [active, suspended, closed] }   # Customer, SmppAccount
- * ```
+ * **Le libellé reste en `snake_case`** : ce sont les valeurs du contrat, qu'un opérateur grep dans
+ * les logs. Les traduire couperait le lien entre l'écran et la trace.
  *
- * `<StatusPill state={customer.status} />` — le geste le plus naturel du monde — aurait donc peint
- * un **client résilié en pilule verte « circuit sain »**. Une devinette ne peut pas prévenir cela :
- * seule la déclaration de la dimension le peut. D'où l'union discriminée, qui fait de la règle de la
- * charte une propriété du compilateur au lieu d'un commentaire.
- *
- * ## Deux rendus, jamais mélangés
- *
- * `breaker_state` est une **pilule teintée**. Tout le reste est un **point coloré + libellé mono**.
- * La raison est opérationnelle : un disjoncteur ouvert sur un lien vivant (attendre la reprise) et
- * un bind mort (rebind manuel) demandent des actions opposées.
- *
- * ## Le libellé reste en `snake_case`
- *
- * `half_open`, `reconnecting`, `suspended` : ce sont les valeurs du contrat, et un opérateur les
- * grep dans les logs. Les traduire couperait le lien entre l'écran et la trace.
- *
- * **Les quatre énumérations sont tenues égales au contrat par `test/statuts-du-contrat.test.ts`.**
- * Les recopier à la main est ce qui a fait perdre deux valeurs de `CdrStatus` à la v1.0.
+ * Les quatre énumérations sont tenues égales au contrat par `test/statuts-du-contrat.test.ts`.
  */
 
 import type { DotTone } from './icon'
@@ -56,10 +42,7 @@ export type DeliveryStatus =
   | 'rerouted'
   | 'cancelled'
 
-/**
- * Les tonalités, **par dimension**. Séparées et non fusionnées en une table unique : c'est la fusion
- * qui avait produit la collision sur `closed`.
- */
+/** Les tonalités, **par dimension** : une table unique se heurterait à la collision sur `closed`. */
 export const LINK_TONES: Readonly<Record<LinkStatus, DotTone>> = {
   up: 'up',
   reconnecting: 'degraded',
@@ -83,7 +66,7 @@ export const DELIVERY_TONES: Readonly<Record<DeliveryStatus, DotTone>> = {
   expired: 'degraded',
   failed: 'down',
   // `rejected` est un échec, pas une attente : il doit se voir dans la colonne au même titre qu'un
-  // `failed`. C'est exactement la valeur qu'un oubli antérieur peignait en gris.
+  // `failed`.
   rejected: 'down',
   // Annulé avant remise : une fin administrative, comme un client résilié. Rien à réparer.
   cancelled: 'idle',

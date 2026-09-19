@@ -162,9 +162,9 @@ func TestDeuxEnrolementsNeProduisentPasLeMemeSecret(t *testing.T) {
 	assert.NotEqual(t, first.RecoveryCodes, second.RecoveryCodes)
 }
 
-// Ce que step-028 dessinera. Les quatre paramètres sont **écrits** dans l'URI plutôt que laissés au
-// défaut : beaucoup d'applications les ignorent et supposent les mêmes valeurs, mais celles qui les
-// lisent doivent lire ce que le serveur vérifie.
+// Les quatre paramètres sont **écrits** dans l'URI plutôt que laissés au défaut : beaucoup
+// d'applications les ignorent et supposent les mêmes valeurs, mais celles qui les lisent doivent lire
+// ce que le serveur vérifie.
 func TestLUriOtpauthPorteCeQueLApplicationAttend(t *testing.T) {
 	t.Parallel()
 
