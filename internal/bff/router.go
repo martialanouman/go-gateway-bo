@@ -32,9 +32,15 @@ type Dependencies struct {
 	// sous `assets/`. Le prendre en `fs.FS` plutôt qu'en `embed.FS` est ce qui permet de tester le
 	// repli sans build client.
 	Assets fs.FS
-	// TrustedProxies alimente la dérivation de l'adresse cliente. Vide est une valeur sûre : voir
-	// `withClientAddress` et `internal/auth.ClientAddress`.
+	// TrustedProxies alimente la dérivation de l'adresse cliente. Vide veut dire « aucun proxy », et
+	// c'est désormais une valeur **écrite** — voir `config.NoTrustedProxy`, `withClientAddress` et
+	// `internal/auth.ClientAddress`.
 	TrustedProxies []netip.Prefix
+	// Origin est l'origine depuis laquelle une mutation est acceptée, telle que la configuration la
+	// déclare. C'est la **même valeur** que l'origine des cérémonies WebAuthn, et non une seconde :
+	// deux origines pour un seul déploiement divergeraient, et celle qui ne sert qu'à refuser
+	// divergerait en silence.
+	Origin string
 }
 
 // NewRouter assemble les routes du BFF et le service des assets de la SPA.
@@ -46,10 +52,18 @@ func NewRouter(deps Dependencies) http.Handler {
 
 	r := chi.NewRouter()
 
+	// À la racine, donc sur les trois surfaces : la coquille, les fichiers hachés et `/api`. Un seul
+	// montage, et aucune route future à ne pas oublier.
+	r.Use(withHardeningHeaders)
+
 	r.Route("/api", func(api chi.Router) {
 		// Borne la lecture du corps **avant** le décodage : la `maxLength` du contrat s'applique après,
 		// donc sur une valeur déjà entièrement chargée en mémoire.
 		api.Use(withoutCaching)
+		// Avant tout le reste de la chaîne : une mutation qui ne vient pas du tableau de bord ne doit
+		// atteindre ni la base, ni le décodeur, ni le compteur d'échecs.
+		api.Use(requireSameOrigin(deps.Origin))
+		api.Use(withAPIDeadlines)
 		api.Use(middleware.RequestSize(maximumLoginBodyBytes))
 		api.Use(withClientAddress(deps.TrustedProxies))
 		// Après les deux précédents : celui-ci est le seul qui puisse interroger la base, et il ne le

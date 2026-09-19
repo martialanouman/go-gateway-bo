@@ -226,7 +226,7 @@ func Load(lookup Lookup) (Config, error) {
 			SessionSecret:  r.requiredSecret(EnvSessionSecret, minimumSessionSecretLength),
 			TOTPEncryptionKey: r.requiredSecret(EnvTOTPEncryptionKey,
 				minimumTOTPEncryptionKeyLength),
-			TrustedProxies: r.prefixList(EnvTrustedProxies),
+			TrustedProxies: r.requiredPrefixList(EnvTrustedProxies),
 			WebauthnRPID:   r.requiredValue(EnvWebauthnRPID),
 			WebauthnOrigin: r.requiredAbsoluteURL(EnvWebauthnOrigin, "http", "https"),
 		},
@@ -234,6 +234,8 @@ func Load(lookup Lookup) (Config, error) {
 
 	r.requireRealGatewayMaterial(cfg.Gateway.Mode)
 	r.requireEncryptedGatewayBaseURL(cfg.Gateway.Mode, cfg.Gateway.BaseURL)
+	r.requireLocalMockGateway(cfg.Gateway.Mode, cfg.Gateway.BaseURL)
+	r.requireLoopbackForClearOrigin(cfg.Auth.WebauthnOrigin)
 
 	if err := errors.Join(r.problems...); err != nil {
 		return Config{}, fmt.Errorf("configuration invalide :\n%w", err)
@@ -345,8 +347,92 @@ func (r *reader) requireEncryptedGatewayBaseURL(mode GatewayMode, baseURL string
 	// ($GOROOT/src/net/url/url.go:454) : `HTTPS://` a passé la garde ci-dessus, refuser ici serait
 	// refuser une URL que le programme joint parfaitement.
 	if scheme, _, _ := strings.Cut(baseURL, ":"); !strings.EqualFold(scheme, "https") {
-		r.reject(EnvGatewayBaseURL, "URL absolue en https attendue en mode %s, reçu %q", GatewayModeReal, baseURL)
+		r.reject(EnvGatewayBaseURL, "URL absolue en https attendue en mode %s, reçu %q",
+			GatewayModeReal, RedactURL(baseURL))
 	}
+}
+
+// requireLocalMockGateway est **ce qui empêche `mock` d'atteindre la production**, et c'est la seule
+// chose qui puisse le faire sans variable supplémentaire : un mock n'est pas un mode d'exploitation,
+// c'est un processus lancé à côté. Une passerelle désignée hors du bouclage est donc une vraie
+// passerelle, quoi que le mode annonce — et le contraire est un tableau de bord qui sert des données
+// inventées à des opérateurs qui les croient.
+//
+// Ce qu'elle laisse passer, délibérément : les quatre décors du dépôt — `.env.example`, la CI, les
+// parcours Playwright et les scénarios — désignent tous `127.0.0.1:4010`, l'adresse de Prism.
+func (r *reader) requireLocalMockGateway(mode GatewayMode, baseURL string) {
+	if mode != GatewayModeMock || baseURL == "" {
+		return
+	}
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil || isLoopbackHost(parsed.Hostname()) {
+		return
+	}
+
+	r.reject(EnvGatewayMode, "mode %s réservé à un mock lancé sur le poste : %s désigne %q, "+
+		"qui n'est pas une adresse de bouclage. Une passerelle jointe pour de vrai se déclare en %s",
+		GatewayModeMock, EnvGatewayBaseURL, RedactURL(baseURL), GatewayModeReal)
+}
+
+// requireLoopbackForClearOrigin n'accepte `http://` que là où il n'y a pas de réseau à écouter. Cette
+// origine est celle que le navigateur présente à chaque cérémonie WebAuthn **et**, depuis step-036,
+// celle qu'une mutation doit annoncer : en clair sur un vrai domaine, les deux se lisent et se
+// rejouent sur le fil.
+func (r *reader) requireLoopbackForClearOrigin(origin string) {
+	// Vide, ou déjà refusée plus haut : la redire ferait deux lignes pour un seul problème.
+	if origin == "" {
+		return
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme != "http" || isLoopbackHost(parsed.Hostname()) {
+		return
+	}
+
+	r.reject(EnvWebauthnOrigin, "https attendu hors du poste de développement, reçu %q : "+
+		"en clair, la cérémonie de clé d'accès et le cookie de session se lisent sur le fil",
+		RedactURL(origin))
+}
+
+// isLoopbackHost reconnaît le poste local sous ses trois écritures. `localhost` est traité par son
+// nom et non résolu : la résolution dépend de `/etc/hosts`, donc du conteneur, et une configuration
+// se juge au démarrage sans dépendre de ce qui l'entoure.
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+
+	address, err := netip.ParseAddr(host)
+
+	return err == nil && address.IsLoopback()
+}
+
+// RedactURL masque les identifiants qu'une URL porte avant qu'un refus ne la cite — le refus doit
+// nommer la variable pour être actionnable, et ne peut pas citer sa valeur pour l'être sans danger.
+//
+// Le découpage est **textuel et non `net/url`** : une URL qu'on refuse est précisément celle que
+// l'analyse peut refuser d'abord, et un `url.Parse` en échec rendrait alors la valeur intacte, mot
+// de passe compris.
+func RedactURL(value string) string {
+	scheme, rest, found := strings.Cut(value, "//")
+	if !found {
+		return value
+	}
+
+	// L'autorité s'arrête au premier `/`, `?` ou `#` : au-delà, un `@` appartient au chemin et ne
+	// sépare aucun identifiant.
+	authority, tail := rest, ""
+	if end := strings.IndexAny(rest, "/?#"); end >= 0 {
+		authority, tail = rest[:end], rest[end:]
+	}
+
+	at := strings.LastIndexByte(authority, '@')
+	if at < 0 {
+		return value
+	}
+
+	return scheme + "//…@" + authority[at+1:] + tail
 }
 
 // requiredDatabaseURL valide le DSN sans ouvrir de connexion : `pgxpool.ParseConfig` analyse et rend
@@ -461,14 +547,27 @@ func distinctSymbols(value string) int {
 	return len(seen)
 }
 
-// prefixList lit une liste de réseaux CIDR séparés par des virgules.
+// NoTrustedProxy est la façon d'écrire « aucun proxy ne s'interpose ». Elle existe parce que vide ne
+// se distinguait pas d'un oubli : les deux se lisaient « ignore l'en-tête », et derrière un load
+// balancer l'oubli fait compter toutes les tentatives sur l'adresse de celui-ci — cinq mots de passe
+// faux verrouillent alors tous les opérateurs à la fois, indéfiniment renouvelable.
+const NoTrustedProxy = "none"
+
+// requiredPrefixList lit une liste de réseaux CIDR séparés par des virgules, et l'exige.
 //
 // Une adresse nue est **refusée** plutôt que promue en /32 : `10.0.0.1` et `10.0.0.1/32` se lisent
 // pareil pour un humain, et accepter les deux ferait passer `10.0.0.0` pour un hôte là où l'auteur
 // pensait à un réseau. Exiger le préfixe force à écrire ce qu'on veut dire.
-func (r *reader) prefixList(name string) []netip.Prefix {
-	value := r.optional(name)
-	if value == "" {
+func (r *reader) requiredPrefixList(name string) []netip.Prefix {
+	value, found := r.lookup(name)
+	if value = strings.TrimSpace(value); !found || value == "" {
+		r.reject(name, "variable obligatoire absente : les réseaux CIDR dont l'en-tête "+
+			"X-Forwarded-For est cru, ou %q sur un poste où rien ne s'interpose", NoTrustedProxy)
+
+		return nil
+	}
+
+	if value == NoTrustedProxy {
 		return nil
 	}
 
@@ -517,7 +616,8 @@ func (r *reader) optionalAbsoluteURL(name string, schemes ...string) string {
 func (r *reader) absoluteURL(name, value string, schemes []string) string {
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Host == "" || !slices.Contains(schemes, parsed.Scheme) {
-		r.reject(name, "URL absolue en %s attendue, reçu %q", strings.Join(schemes, " ou "), value)
+		r.reject(name, "URL absolue en %s attendue, reçu %q",
+			strings.Join(schemes, " ou "), RedactURL(value))
 
 		return ""
 	}

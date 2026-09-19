@@ -507,7 +507,26 @@ export interface components {
             message: string;
         };
     };
-    responses: never;
+    responses: {
+        /** @description La requête ne vient pas de l'origine du tableau de bord. */
+        OrigineRefusee: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Le corps n'est pas annoncé en `application/json`. */
+        TypeDeContenuRefuse: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -578,6 +597,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            403: components["responses"]["OrigineRefusee"];
+            415: components["responses"]["TypeDeContenuRefuse"];
             /**
              * @description Trop d'échecs sur ce compte ou depuis cette adresse. Le message porte la durée restante :
              *     un refus muet ferait retenter l'opérateur, puis ouvrir un ticket.
@@ -659,6 +680,8 @@ export interface operations {
                 };
                 content?: never;
             };
+            403: components["responses"]["OrigineRefusee"];
+            415: components["responses"]["TypeDeContenuRefuse"];
         };
     };
     enrollTotp: {
@@ -704,6 +727,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            403: components["responses"]["OrigineRefusee"];
             /**
              * @description Un second facteur est déjà en place, et rien n'a été présenté qui le prouve — ou ce qui a
              *     été présenté n'a pas été accepté. Le remplacer sans cette preuve reviendrait à le
@@ -734,6 +758,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            415: components["responses"]["TypeDeContenuRefuse"];
             /**
              * @description Trop d'enrôlements depuis ce compte sur le dernier quart d'heure. Le compteur porte ici sur
              *     les **appels** et non sur les échecs : cette route réussit, et une session de premier
@@ -812,6 +837,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            403: components["responses"]["OrigineRefusee"];
+            415: components["responses"]["TypeDeContenuRefuse"];
             /**
              * @description Trop d'essais de second facteur sur ce compte. Le message porte la durée restante, comme
              *     celui de la connexion : un refus muet ferait retenter l'opérateur, puis ouvrir un ticket.
@@ -873,6 +900,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            403: components["responses"]["OrigineRefusee"];
             /**
              * @description Un second facteur est déjà en place et la session n'est pas élevée. En ajouter un sans
              *     l'élévation permettrait à quiconque détient le mot de passe de se donner un second facteur,
@@ -889,6 +917,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            415: components["responses"]["TypeDeContenuRefuse"];
             /**
              * @description Trop de cérémonies ouvertes depuis ce compte sur le dernier quart d'heure. Le compteur
              *     porte ici sur les **appels** et non sur les échecs : cette route réussit, et une session de
@@ -965,6 +994,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            403: components["responses"]["OrigineRefusee"];
             /**
              * @description Un second facteur a été mis en place **entre l'ouverture de la cérémonie et sa finition**,
              *     et la session n'est pas élevée. Le défi vit cinq minutes : sans ce contrôle, une cérémonie
@@ -978,6 +1008,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            415: components["responses"]["TypeDeContenuRefuse"];
         };
     };
     beginWebauthnAssertion: {
@@ -1016,6 +1047,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            403: components["responses"]["OrigineRefusee"];
+            415: components["responses"]["TypeDeContenuRefuse"];
             /**
              * @description Trop de cérémonies ouvertes depuis ce compte sur le dernier quart d'heure. Le compteur
              *     porte ici sur les **appels** et non sur les échecs : cette route réussit, et une session de
@@ -1065,6 +1098,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            403: components["responses"]["OrigineRefusee"];
             /**
              * @description Cette passkey n'est pas celle de l'opérateur — **le même corps** qu'elle n'existe nulle
              *     part ou qu'elle appartienne à un autre, parce que distinguer les deux dirait ce que
@@ -1103,6 +1137,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            415: components["responses"]["TypeDeContenuRefuse"];
         };
     };
 }

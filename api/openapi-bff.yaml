@@ -84,6 +84,10 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/LoginRequest' }
       responses:
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
         '200':
           description: Le premier facteur est franchi ; le second reste à fournir.
           content:
@@ -171,6 +175,10 @@ paths:
         Aucun corps : rien à dire que le statut ne dise. Le cookie d'expiration n'est pas déclaré
         ici, pour la même raison qu'à la connexion — il est `HttpOnly`, le client ne le lit pas.
       responses:
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
         '204':
           description: La session est fermée, qu'elle ait existé ou non.
 
@@ -206,6 +214,10 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/TotpEnrollmentRequest' }
       responses:
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
         '200':
           description: L'authentificateur est enrôlé ; voici ce qui ne sera plus jamais montré.
           content:
@@ -308,6 +320,10 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/MfaVerification' }
       responses:
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
         '204':
           description: Le second facteur est vérifié ; la session est élevée.
         '400':
@@ -368,6 +384,10 @@ paths:
         Les passkeys déjà détenues sont exclues des options : sans cela, l'appareil en enregistrerait
         une seconde que l'opérateur ne saurait pas distinguer de la première.
       responses:
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
         '200':
           description: Les options de création, à passer telles quelles au navigateur.
           content:
@@ -423,6 +443,10 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/WebauthnRegistration' }
       responses:
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
         '200':
           description: La passkey est enregistrée.
           content:
@@ -474,6 +498,10 @@ paths:
         Elle n'exige pas de challenge de connexion : c'est la finition qui l'exige, comme pour un code
         TOTP. Ouvrir une cérémonie ne prouve rien et n'élève rien.
       responses:
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
         '200':
           description: Les options d'assertion, à passer telles quelles au navigateur.
           content:
@@ -535,6 +563,10 @@ paths:
           description: L'identifiant rendu à l'enregistrement.
           schema: { type: string }
       responses:
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
         '204':
           description: La passkey est retirée.
         '401':
@@ -572,6 +604,25 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
 
 components:
+  responses:
+    # Les deux refus que pose le contrôle d'origine de `internal/bff/origine.go`, **avant** que la
+    # requête n'atteigne l'opération. Ils sont donc possibles sur toute méthode non sûre, et déclarés
+    # sur chacune : un statut qu'une opération peut rendre sans que ce fichier le dise ferait échouer
+    # la validation de la réponse contre le contrat.
+    OrigineRefusee:
+      description: |
+        La requête ne vient pas de l'origine du tableau de bord.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+    TypeDeContenuRefuse:
+      description: |
+        Le corps n'est pas annoncé en `application/json`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
   schemas:
     Health:
       type: object

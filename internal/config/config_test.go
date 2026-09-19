@@ -33,6 +33,7 @@ func minimalEnv() map[string]string {
 		config.EnvTOTPEncryptionKey: testTOTPEncryptionKey,
 		config.EnvWebauthnRPID:      testWebauthnRPID,
 		config.EnvWebauthnOrigin:    testWebauthnOrigin,
+		config.EnvTrustedProxies:    config.NoTrustedProxy,
 	}
 }
 
@@ -80,6 +81,7 @@ func realGatewayEnv() map[string]string {
 		config.EnvTOTPEncryptionKey:   testTOTPEncryptionKey,
 		config.EnvWebauthnRPID:        testWebauthnRPID,
 		config.EnvWebauthnOrigin:      testWebauthnOrigin,
+		config.EnvTrustedProxies:      config.NoTrustedProxy,
 	}
 }
 

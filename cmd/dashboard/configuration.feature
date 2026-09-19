@@ -28,6 +28,30 @@ Fonctionnalité: Configuration validée au démarrage
     Et le message d'erreur nomme "DASHBOARD_GATEWAY_CLIENT_ID"
     Et le message d'erreur nomme "DASHBOARD_GATEWAY_CA_CERT"
 
+  # Vide était accepté, et vide se lit comme « pas de proxy » aussi bien que comme « je n'y ai pas
+  # pensé ». Derrière le load balancer, le second cas fait compter toutes les tentatives sur son
+  # adresse : cinq mots de passe faux verrouillent alors **tous** les opérateurs.
+  Scénario: un réseau de confiance non déclaré empêche le démarrage
+    Étant donné une configuration complète dont on retire "DASHBOARD_TRUSTED_PROXIES"
+    Quand le serveur démarre
+    Alors le serveur refuse de démarrer
+    Et le message d'erreur nomme "DASHBOARD_TRUSTED_PROXIES"
+
+  Scénario: un poste sans proxy le déclare et le serveur démarre
+    Étant donné une configuration complète dont on passe "DASHBOARD_TRUSTED_PROXIES" à "none"
+    Et un serveur démarré
+    Quand le navigateur demande "/api/health"
+    Alors le serveur répond 200
+
+  # Le refus doit nommer la variable pour être actionnable, et ne peut pas citer la valeur pour
+  # l'être sans danger : les URL de la passerelle portent des identifiants.
+  Scénario: une URL rejetée ne divulgue pas les identifiants qu'elle porte
+    Étant donné une configuration complète dont on passe "DASHBOARD_GATEWAY_BASE_URL" à "ftp://dashboard:tres-secret@passerelle.exemple.test/v1"
+    Quand le serveur démarre
+    Alors le serveur refuse de démarrer
+    Et le message d'erreur nomme "DASHBOARD_GATEWAY_BASE_URL"
+    Et aucune sortie ne porte "tres-secret"
+
   # Une passkey est liée à un **domaine**, et une adresse IP n'en est pas un : le navigateur refuserait
   # la cérémonie, et la bibliothèque refuse la configuration. Ce refus-là est le seul de ce fichier qui
   # ne vienne pas d'`internal/config` — il vient de `webauthn.New`.

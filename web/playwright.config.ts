@@ -91,6 +91,10 @@ export default defineConfig({
       // parcours d'aujourd'hui n'exerce.
       DASHBOARD_WEBAUTHN_RP_ID: host,
       DASHBOARD_WEBAUTHN_ORIGIN: `http://${host}:${port}`,
+      // Obligatoire depuis step-036 : vide ne se distinguait pas d'un oubli, et l'oubli fait
+      // compter toutes les tentatives sur l'adresse du load balancer. Aucun proxy ne s'interpose
+      // ici, et c'est désormais une valeur qu'on écrit.
+      DASHBOARD_TRUSTED_PROXIES: 'none',
     },
   },
 })

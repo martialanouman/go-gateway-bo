@@ -442,7 +442,7 @@ func postAlone(ctx context.Context, url, body string, cookies map[string]string)
 		return response{}, fmt.Errorf("composer la requête vers %s : %w", url, err)
 	}
 
-	request.Header.Set("Content-Type", "application/json")
+	browserHeaders(request, configuredOrigin, "application/json")
 
 	for name, value := range cookies {
 		request.AddCookie(&http.Cookie{Name: name, Value: value})

@@ -38,6 +38,8 @@ var admittedSinks = map[string]string{
 		"de middlewares et c'est le maillon suivant qui répondra",
 	"net/http.NotFound": "la surface des assets, qui écrit une chaîne fixe de la bibliothèque " +
 		"standard et ne reçoit rien du produit",
+	"net/http.NewResponseController": "une échéance n'est pas un corps : le contrôleur rendu ne sait " +
+		"poser que des délais sur la connexion, et aucun objet de domaine ne peut y entrer",
 	"net/http.ServeFileFS": "la surface des assets : le contenu vient d'un `//go:embed` résolu à la " +
 		"compilation, donc du bundle SPA et de rien d'autre. Aucun objet de domaine ne peut y entrer",
 	modulePath + "internal/bff.StrictHandlerFunc": "la chaîne des middlewares stricts. `next(ctx, w, " +
