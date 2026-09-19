@@ -35,8 +35,10 @@ func apiRouter(t *testing.T) http.Handler {
 	pool.Close()
 
 	return NewRouter(Dependencies{
-		Assets:        fstest.MapFS{},
-		Authenticator: auth.NewAuthenticator(store.NewLogins(pool), []byte("un sel de test assez long")),
+		Assets: fstest.MapFS{},
+		API: API{
+			Authenticator: auth.NewAuthenticator(store.NewLogins(pool), []byte("un sel de test assez long")),
+		},
 	})
 }
 
@@ -333,8 +335,8 @@ func TestUneBaseInjoignableNeFermePasLaSessionDeLOperateur(t *testing.T) {
 
 	secret := []byte("une-cle-de-session-assez-longue-pour-la-borne")
 	handler := NewRouter(Dependencies{
-		Assets:   fstest.MapFS{},
-		Sessions: session.NewManager(store.NewSessions(pool), secret),
+		Assets: fstest.MapFS{},
+		API:    API{Sessions: session.NewManager(store.NewSessions(pool), secret)},
 	})
 
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
