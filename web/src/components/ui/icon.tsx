@@ -12,9 +12,8 @@ import type { ReactElement } from 'react'
  * absent, la réponse est son libellé texte. Substituer une forme voisine ferait passer une icône
  * décorative pour un glyphe fonctionnel.
  *
- * Les **vingt-deux** de la charte, tenus égaux au kit par `test/glyphes-de-la-charte.test.ts` — le
- * premier portage en avait perdu un, `ellipsis-vertical`, sous cette phrase même qui promettait le
- * jeu complet, et le test qui devait l'attraper recopiait le compte faux.
+ * Les **vingt-deux** de la charte, tenus égaux au kit par `test/glyphes-de-la-charte.test.ts`, qui
+ * les confronte à leur source plutôt que de recopier un compte.
  *
  * Ce qui n'est **pas** porté : la trentaine d'alias du kit (`x`, `close`, `lock`, `trash-2`…), qui
  * absorbent des noms hérités de bibliothèques tierces. Aucun consommateur ici, et ils adouciraient
@@ -120,14 +119,11 @@ export const GLYPH_NAMES = Object.keys(GLYPHS) as readonly GlyphName[]
 export type IconProps = {
   /**
    * Typé sur le jeu, **et rien d'autre** : un nom absent se voit au typecheck, bien avant de ne rien
-   * rendre à l'écran. Une première rédaction écrivait `GlyphName | (string & {})` pour garder
-   * l'autocomplétion tout en acceptant n'importe quelle chaîne — c'est-à-dire en désarmant la
-   * promesse que la phrase précédente fait, sous cette phrase même. `InputProps.icon` était déjà
-   * strict et citait la même promesse : les deux ne pouvaient pas être vraies ensemble.
+   * rendre à l'écran. Un `GlyphName | (string & {})`, qui garderait l'autocomplétion tout en
+   * acceptant n'importe quelle chaîne, désarmerait cette promesse.
    *
-   * Le repli `null` du rendu reste. Il ne couvre plus le typecheck mais ce qui lui échappe pour de
-   * bon : une valeur venue d'une charge utile, qui n'atteint ce composant qu'au prix d'un `as`
-   * visible en revue.
+   * Le repli `null` du rendu couvre ce qui échappe au typecheck : une valeur venue d'une charge
+   * utile, qui n'atteint ce composant qu'au prix d'un `as` visible en revue.
    */
   readonly name: GlyphName
   /** 14 px dans les contrôles et les lignes, 16 px dans les en-têtes. Jamais sous 12. */

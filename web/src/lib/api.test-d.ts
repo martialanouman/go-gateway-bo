@@ -2,20 +2,16 @@ import { expectTypeOf } from 'vitest'
 import type { paths } from './api.gen'
 
 /**
- * Ce que le client tiendra pour vrai de `GET /api/health`, écrit à la main et confronté aux types
+ * Ce que le client tiendra pour vrai du contrat, écrit à la main et confronté aux types
  * qu'`openapi-typescript` dérive d'`api/openapi-bff.yaml`.
  *
- * **Aucun runner n'exécute ce fichier.** `expectTypeOf` ne produit rien à l'exécution : ses
- * assertions sont des contraintes de type, et c'est `tsc --noEmit` — la cible `typecheck-web`, le job
- * « Typecheck client » — qui les juge. Le nom en `.test-d.ts` le dit et le rend vrai : le `include`
- * de `vitest.config.ts` vaut `**\/*.test.{ts,tsx}` et ne l'attrape pas, là où le `include: ["src"]`
- * de `tsconfig.json` l'attrape. Mesuré dans les deux sens — `pnpm test` ne le liste pas, `pnpm
- * typecheck` rougit quand une assertion est fausse.
+ * **Aucun runner n'exécute ce fichier.** `expectTypeOf` ne produit rien à l'exécution : c'est
+ * `tsc --noEmit` — la cible `typecheck-web` — qui juge ses assertions. Le nom en `.test-d.ts` le rend
+ * vrai : le `include` de `vitest.config.ts` vaut `**\/*.test.{ts,tsx}` et ne l'attrape pas, là où le
+ * `include: ["src"]` de `tsconfig.json` l'attrape.
  *
- * Ce que ça prouve : qu'une évolution du contrat qui change la forme de cette opération est **lue**
- * par quelqu'un plutôt que traversée en silence. Ce que ça ne prouve pas : que le BFF sert bien cette
- * forme — c'est le scénario godog qui valide la réponse HTTP réelle contre le YAML (DN-9), et rien
- * ici ne touche au réseau.
+ * Ce que ça ne prouve pas : que le BFF sert bien cette forme — c'est le scénario godog qui valide la
+ * réponse HTTP réelle contre le YAML (DN-9), et rien ici ne touche au réseau.
  *
  * Les clés de `paths` sont **relatives à `servers.url`** : `/health`, jamais `/api/health`. Le
  * préfixe appartient à l'adresse de base que le client posera le jour où il en instanciera un.
@@ -24,12 +20,10 @@ import type { paths } from './api.gen'
 type HealthOperation = paths['/health']['get']
 type HealthBody = HealthOperation['responses'][200]['content']['application/json']
 
-// Le corps que le client recevra. `toEqualTypeOf` et non `toExtend` : un champ ajouté au schéma doit
-// rougir ici, sans quoi la porte ne dit plus rien de ce que la réponse contient. L'égalité stricte
-// couvre aussi l'enum et l'obligation — mesuré, chacune des trois mutations la fait tomber sur cette
-// ligne : champ ajouté (`TS2741: Property 'uptime_seconds' is missing`), `enum: [ok]` retiré
-// (`Actual: string`), `required: [status]` retiré (`Actual: undefined`). Une assertion séparée sur
-// `status` a donc été écrite puis **retirée** : aucune mutation ne la faisait tomber seule.
+// `toEqualTypeOf` et non `toExtend` : un champ ajouté au schéma doit rougir ici, sans quoi la porte
+// ne dit plus rien de ce que la réponse contient. L'égalité stricte couvre aussi l'enum et
+// l'obligation — mesuré, chacune des trois mutations tombe sur cette ligne : champ ajouté, `enum:
+// [ok]` retiré, `required: [status]` retiré.
 expectTypeOf<HealthBody>().toEqualTypeOf<{ status: 'ok' }>()
 
 // 200 est la **seule** réponse déclarée. Le jour où la sonde de disponibilité de step-186 ajoutera un
@@ -43,25 +37,19 @@ expectTypeOf<HealthOperation['requestBody']>().toEqualTypeOf<undefined>()
 expectTypeOf<HealthOperation['parameters']['query']>().toEqualTypeOf<undefined>()
 
 /**
- * `POST /api/auth/login` — step-021. Ce que l'écran de connexion (step-027) tiendra pour vrai.
+ * `POST /api/auth/login`. Ce que l'écran de connexion (step-027) tiendra pour vrai.
  *
- * La raison d'écrire ces quatre assertions plutôt qu'une : le client doit traiter **cinq**
- * réponses depuis step-034, et quatre sont des refus qui ne se ressemblent pas — l'un se réessaie
- * tout de suite, l'autre après un délai connu, le troisième jamais, le quatrième bientôt mais sans
- * délai que le serveur puisse promettre. Un client qui n'en connaîtrait qu'une partie découvrirait
- * le reste en production, sur l'écran de connexion, c'est-à-dire au pire endroit.
- */
-
-/**
- * **403 et 415 accompagnent désormais les huit opérations mutantes du contrat** — step-036. Ils ne
- * viennent d'aucun handler : le contrôle d'origine du BFF les rend *avant* que la requête n'atteigne
- * l'opération, sur toute méthode non sûre.
+ * La raison d'écrire ces quatre assertions plutôt qu'une : quatre des cinq réponses sont des refus
+ * qui ne se ressemblent pas — l'un se réessaie tout de suite, l'autre après un délai connu, le
+ * troisième jamais, le quatrième bientôt mais sans délai que le serveur puisse promettre. Un client
+ * qui n'en connaîtrait qu'une partie découvrirait le reste sur l'écran de connexion en production.
  *
- * Ce qu'ils veulent dire pour le client, et pourquoi ils ne se traitent pas comme les autres refus :
- * ni l'un ni l'autre n'est réessayable, et aucun ne dépend de ce que l'opérateur a saisi. Les deux
- * disent que la requête n'a pas été composée depuis l'application — un onglet resté ouvert pendant
- * un changement d'origine, un client écrit à la main. La sortie est de recharger, jamais de
- * réessayer ni de reformuler.
+ * **403 et 415 accompagnent les huit opérations mutantes du contrat.** Ils ne viennent d'aucun
+ * handler : le contrôle d'origine du BFF les rend *avant* que la requête n'atteigne l'opération, sur
+ * toute méthode non sûre. Ni l'un ni l'autre n'est réessayable, et aucun ne dépend de ce que
+ * l'opérateur a saisi : les deux disent que la requête n'a pas été composée depuis l'application —
+ * un onglet resté ouvert pendant un changement d'origine, un client écrit à la main. La sortie est
+ * de recharger, jamais de réessayer ni de reformuler.
  */
 
 type LoginOperation = paths['/auth/login']['post']
@@ -87,23 +75,21 @@ expectTypeOf<LoginOperation['responses'][401]['content']['application/json']>().
   message: string
 }>()
 
-// Les cinq statuts, et le 400 en fait partie : login est la première opération à porter un corps,
-// donc la première dont le décodage peut échouer avant d'atteindre le handler.
-//
-// Le 503 est le cinquième depuis step-034 : les dix places de hachage argon2id manquaient. Le client
-// doit le distinguer du 401 et du 429 — ni un refus d'identifiants, ni un compte à faire patienter,
-// mais une machine saturée à retenter sans attendre une durée précise.
+// Le 400 en fait partie : login est la première opération à porter un corps, donc la première dont le
+// décodage peut échouer avant d'atteindre le handler. Le 503 dit que les dix places de hachage
+// argon2id manquaient ; le client doit le distinguer du 401 et du 429 — ni un refus d'identifiants,
+// ni un compte à faire patienter, mais une machine saturée à retenter sans attendre une durée.
 expectTypeOf<keyof LoginOperation['responses']>().toEqualTypeOf<
   200 | 400 | 401 | 403 | 415 | 429 | 503
 >()
 
 /**
- * `GET /api/auth/me` — step-022. Le **seul** endroit d'où le client apprend ses droits.
+ * `GET /api/auth/me` — le **seul** endroit d'où le client apprend ses droits.
  *
  * Deux assertions portent tout le poids : la première dit que les permissions sont une liste plate
- * de chaînes, la seconde qu'aucun rôle n'accompagne le corps. C'est cette absence qui empêche
- * step-040 de réintroduire un contrôle de rôle côté client — un champ `roles` ici, et le `if` qui
- * s'en sert s'écrit tout seul le mois suivant.
+ * de chaînes, la seconde qu'aucun rôle n'accompagne le corps. C'est cette absence qui interdit un
+ * contrôle de rôle côté client — un champ `roles` ici, et le `if` qui s'en sert s'écrit tout seul le
+ * mois suivant.
  */
 
 type MeOperation = paths['/auth/me']['get']
@@ -124,8 +110,8 @@ expectTypeOf<MeOperation['responses'][200]['content']['application/json']>().toE
 expectTypeOf<keyof MeOperation['responses']>().toEqualTypeOf<200 | 401>()
 
 /**
- * `POST /api/auth/logout` — step-022. Un seul statut, et c'est ce que le client doit savoir : il n'y
- * a pas de branche « la déconnexion a échoué » à écrire, pas même quand la session n'existait plus.
+ * `POST /api/auth/logout`. Aucun statut d'échec fonctionnel : il n'y a pas de branche « la
+ * déconnexion a échoué » à écrire, pas même quand la session n'existait plus.
  */
 
 type LogoutOperation = paths['/auth/logout']['post']
@@ -136,7 +122,7 @@ expectTypeOf<keyof LogoutOperation['responses']>().toEqualTypeOf<204 | 403 | 415
 expectTypeOf<LogoutOperation['requestBody']>().toEqualTypeOf<undefined>()
 
 /**
- * `POST /api/auth/mfa/totp/enroll` — step-023. Ce que l'écran d'enrôlement (step-028) dessinera.
+ * `POST /api/auth/mfa/totp/enroll`. Ce que l'écran d'enrôlement (step-028) dessinera.
  *
  * Les trois champs du 200 sont ce qui n'est **montré qu'une fois** : l'URI que le QR encodera, le
  * secret pour la saisie manuelle, et les dix codes de récupération. Aucune autre opération ne les
@@ -153,15 +139,11 @@ expectTypeOf<EnrollOperation['responses'][200]['content']['application/json']>()
   recoveryCodes: string[]
 }>()
 
-// Six statuts, et le 409 en fait partie : le client doit traiter « un second facteur est déjà en
-// place » comme un cas normal — c'est celui d'un opérateur qui change de téléphone — et non comme une
-// panne. Le découvrir à l'exécution ferait un toast d'erreur là où il faut une explication.
-//
-// Le 429 aussi est un cas normal, et il ne dit pas la même chose ici qu'ailleurs : le compteur porte
-// sur les **appels** et non sur les échecs. L'opérateur n'a rien raté ; il a demandé trop souvent.
-//
-// Le 503, depuis step-034, ne se rend que sur un remplacement : c'est la preuve présentée qui hache,
-// et les dix places de `auth.Hold` peuvent manquer là où le premier enrôlement n'en demande aucune.
+// Le 409 est un cas normal — un opérateur qui change de téléphone — et non une panne : le découvrir à
+// l'exécution ferait un toast d'erreur là où il faut une explication. Le 429 aussi, et il ne dit pas
+// la même chose ici qu'ailleurs : le compteur porte sur les **appels** et non sur les échecs.
+// Le 503 ne se rend que sur un remplacement : c'est la preuve présentée qui hache, et les dix places
+// de `auth.Hold` peuvent manquer là où le premier enrôlement n'en demande aucune.
 expectTypeOf<keyof EnrollOperation['responses']>().toEqualTypeOf<
   200 | 400 | 401 | 403 | 409 | 415 | 429 | 503
 >()
@@ -174,9 +156,7 @@ expectTypeOf<EnrollOperation['requestBody']['content']['application/json']>().to
   code?: string
 }>()
 
-/**
- * `POST /api/auth/mfa/verify` — step-023. Le second facteur, TOTP ou code de récupération.
- */
+/** `POST /api/auth/mfa/verify` — le second facteur, TOTP ou code de récupération. */
 
 type VerifyOperation = paths['/auth/mfa/verify']['post']
 
@@ -189,7 +169,7 @@ type VerifyOperation = paths['/auth/mfa/verify']['post']
 //
 // `assertion` est `{ [key: string]: unknown }` et non `Record<string, never>` : la seconde forme est
 // ce qu'`openapi-typescript` produit pour un `type: object` sans `additionalProperties`, et **aucune
-// clé ne peut y être écrite**. Mesuré à l'écriture de step-024, avant qu'un écran n'en dépende.
+// clé ne peut y être écrite**.
 expectTypeOf<VerifyOperation['requestBody']['content']['application/json']>().toEqualTypeOf<{
   challenge: string
   method: 'totp' | 'recovery_code' | 'webauthn'
@@ -197,21 +177,19 @@ expectTypeOf<VerifyOperation['requestBody']['content']['application/json']>().to
   assertion?: { [key: string]: unknown }
 }>()
 
-// Aucun corps en retour sur le succès : ce que la session ouvre désormais se relit sur `/auth/me`,
-// qui reste le seul endroit d'où le client apprend ses droits.
+// Aucun corps en retour sur le succès : ce que la session ouvre se relit sur `/auth/me`, qui reste le
+// seul endroit d'où le client apprend ses droits.
 //
-// Le 429 est le quatrième, et le client doit le distinguer du 401 : l'un dit « ce code ne convient
-// pas », l'autre « arrêtez d'essayer pendant un quart d'heure ». Les confondre ferait boucler l'écran
-// sur un formulaire qui ne peut plus rien accepter.
-//
-// Le 503, cinquième depuis step-034, ne se rend que sur un code TOTP ou de récupération : l'assertion
+// Le client doit distinguer le 429 du 401 : l'un dit « ce code ne convient pas », l'autre « arrêtez
+// d'essayer pendant un quart d'heure ». Les confondre ferait boucler l'écran sur un formulaire qui ne
+// peut plus rien accepter. Le 503 ne se rend que sur un code TOTP ou de récupération : l'assertion
 // WebAuthn ne hache rien et ne peut jamais y mener.
 expectTypeOf<keyof VerifyOperation['responses']>().toEqualTypeOf<
   204 | 400 | 401 | 403 | 415 | 429 | 503
 >()
 
 /**
- * `POST /api/auth/mfa/webauthn/*` — step-024. Les deux cérémonies de passkey.
+ * `POST /api/auth/mfa/webauthn/*` — les deux cérémonies de passkey.
  *
  * Ce que ces assertions tiennent que les autres ne tiennent pas : les options rendues sont **des DTO
  * déclarés champ par champ**, non le type de la bibliothèque serveur. Un bump qui ajouterait un champ
@@ -265,9 +243,8 @@ expectTypeOf<
 // une session non élevée. Le client doit le distinguer du 400 : le premier se rattrape en franchissant
 // le facteur, le second en reprenant la cérémonie.
 //
-// **La cérémonie refusée est un 400 depuis step-035**, et non plus un 401. Le 401 ne reste que pour
-// une session réellement close — ce qui compte ici : `isUnauthenticated` traite tout 401 comme telle
-// sans lire le corps, et renvoyait donc au login un opérateur dont la clé avait mal signé.
+// **Une cérémonie refusée est un 400**, jamais un 401 : `isUnauthenticated` traite tout 401 comme une
+// session close sans lire le corps, et renverrait donc au login un opérateur dont la clé a mal signé.
 expectTypeOf<keyof FinishRegistrationOperation['responses']>().toEqualTypeOf<
   200 | 400 | 401 | 403 | 409 | 415
 >()
@@ -301,9 +278,8 @@ expectTypeOf<DeletePasskeyOperation['parameters']['path']>().toEqualTypeOf<{ pas
 // `secondFactors`, il sait d'avance que la dernière passkey d'un compte sans TOTP est verrouillée, et
 // peut désactiver le contrôle **en l'expliquant** plutôt que de laisser l'opérateur le découvrir.
 //
-// **Le 404 est arrivé en step-035** : une clé que le compte ne porte pas rendait 401, donc « cette
-// session n'est plus ouverte » d'une session vivante et élevée. Le 401 ne reste que pour une session
-// réellement close.
+// **Une clé que le compte ne porte pas est un 404**, jamais un 401 : le second dirait « cette session
+// n'est plus ouverte » d'une session vivante et élevée.
 expectTypeOf<keyof DeletePasskeyOperation['responses']>().toEqualTypeOf<
   204 | 401 | 403 | 404 | 409 | 415
 >()

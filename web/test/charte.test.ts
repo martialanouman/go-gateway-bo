@@ -1,31 +1,18 @@
 // @vitest-environment node
 
 /**
- * La charte, tenue par des tests.
+ * La charte, tenue par des tests. Deux garanties distinctes :
  *
- * Deux garanties distinctes :
- *
- * 1. **Les tokens que les écrans consomment existent.** Un `var(--surface-card)` qui ne résout rien
- *    ne casse pas : le navigateur applique la valeur héritée, et l'écran s'affiche presque juste.
- *    Un token renommé se remarquerait donc des semaines plus tard, sur une capture d'écran. La v1.0
- *    en a fait les frais — step-026 avait inventé `--danger-border`, `--danger-surface` et
- *    `--danger-text`, et le bandeau de refus s'affichait sans bordure ni fond, `pnpm check` vert.
- *
- *    Le sens qui manquait est testé ici : on part de ce que le CSS **consomme réellement**, jamais
- *    d'une liste écrite à la main — une liste ne voit jamais le token qu'on vient d'inventer. Depuis
- *    step-008, cette garantie est **doublée par le build** : `vite-plugin-tokens` fait échouer
- *    `vite build` sur un `var()` non déclaré. Le test garde ce que le plugin ne voit pas — les
- *    `var()` composés à l'exécution, que le CSS émis ne contient pas.
+ * 1. **Les tokens que les écrans consomment existent.** Un `var()` qui ne résout rien ne casse pas :
+ *    le navigateur applique la valeur héritée, et l'écran s'affiche presque juste — un token renommé
+ *    ne se remarquerait que des semaines plus tard, sur une capture d'écran. La garde part donc de ce
+ *    que le CSS **consomme réellement**, jamais d'une liste écrite à la main, qui ne verrait jamais le
+ *    token qu'on vient d'inventer. `vite-plugin-tokens` tient le même front sur le CSS émis ; ce
+ *    fichier garde ce que le plugin ne voit pas — les `var()` composés à l'exécution.
  * 2. **Le contraste est conforme dès les tokens**, pas rattrapé écran par écran — sur les surfaces
- *    plates *et* sur les surfaces composées. Ces dernières sont le vrai point bas : une pilule pose
- *    son texte sur sa propre teinte, une ligne se survole et se sélectionne. Un test qui ne
- *    regarderait que les fonds littéraux de la palette laisserait passer les combinaisons que le
- *    produit rend réellement — c'est ce qui est arrivé à la première version de ce fichier, et deux
- *    paires étaient sous le seuil.
- *
- * *(Porté de la v1.0, `909eb8d:src/test/charte.test.ts`. Les deux tests qui visaient
- * `src/styles/components.css` sont reciblés : les primitives habillées sont hors périmètre de
- * step-008, elles arrivent en step-041/042.)*
+ *    plates *et* composées. Ces dernières sont le vrai point bas : une pilule pose son texte sur sa
+ *    propre teinte, une ligne se survole et se sélectionne. Un test qui ne regarderait que les fonds
+ *    littéraux de la palette laisserait passer les combinaisons que le produit rend réellement.
  */
 
 import { readdirSync, readFileSync } from 'node:fs'
@@ -116,14 +103,10 @@ describe('tokens de la charte', () => {
   })
 
   it('assemble tout ce que la charte a besoin de servir', () => {
-    // **Ce que ce test ferme, mesuré le 08/08/2026** : retirer `@import "./tokens/base.css"` d'app.css
-    // laissait les 137 tests verts et `vite build` à rc=0 — alors que `base.css` porte à lui seul le
-    // reset, `color-scheme: dark`, la couleur du corps, et surtout la règle `:focus-visible` qui pose
-    // l'anneau de focus sur tous les contrôles. Le produit perdait son indicateur de focus (WCAG
-    // 2.4.7) sans qu'aucune porte ne bouge.
-    //
-    // L'assemblage se teste ici plutôt que par le rendu, parce qu'aucun test de composant ne visite
-    // un `:focus-visible` et qu'aucune règle de `base.css` n'a de porteur dans le DOM de test.
+    // Retirer `@import "./tokens/base.css"` d'app.css laisse la suite verte et `vite build` à rc=0 —
+    // mesuré — alors que `base.css` porte seul le reset, `color-scheme: dark` et la règle
+    // `:focus-visible` qui pose l'anneau sur tous les contrôles (WCAG 2.4.7). L'assemblage se teste
+    // ici plutôt que par le rendu : aucune règle de `base.css` n'a de porteur dans le DOM de test.
     const here = dirname(fileURLToPath(import.meta.url))
     const app = readFileSync(join(resolve(here, '..'), 'src', 'styles', 'app.css'), 'utf8')
 
@@ -135,15 +118,10 @@ describe('tokens de la charte', () => {
   })
 
   it('inscrit dans STYLED_FILES chaque feuille qui existe', () => {
-    // **Ce que ce test ferme, et qui manquait.** Les gardes ci-dessous **parcourent** `STYLED_FILES`.
-    // En retirer une entrée n'en fait donc échouer aucune : elles vérifient simplement une feuille
-    // de moins, en silence. Mesuré en retirant `components.css` de la liste : les 125 tests restaient
-    // verts, alors que la feuille des primitives — la plus grosse du produit — n'était plus gardée
-    // par rien.
-    //
-    // La liste reste **nommée plutôt que globbée**, parce qu'on veut la relire. Ce test dit
-    // seulement qu'elle est *complète* : une feuille posée dans `src/styles/` sans y être inscrite
-    // fait rougir ici, et son auteur choisit alors où elle va.
+    // Les gardes ci-dessous **parcourent** `STYLED_FILES` : en retirer une entrée n'en fait échouer
+    // aucune, elles vérifient une feuille de moins en silence — mesuré en retirant `components.css`,
+    // la plus grosse du produit, sans qu'un seul test bouge. La liste reste nommée plutôt que
+    // globbée, parce qu'on veut la relire ; ce test dit seulement qu'elle est *complète*.
     const here = dirname(fileURLToPath(import.meta.url))
     const styles = resolve(here, '..', 'src', 'styles')
 
@@ -169,12 +147,11 @@ describe('tokens de la charte', () => {
 
   it('sert chaque feuille que STYLED_FILES prétend garder', async () => {
     // Une feuille qu'aucun module n'importe n'est pas servie, et la garantie ci-dessus se met alors à
-    // juger un fichier mort. Mesuré le 08/08/2026 : retirer `import '~/styles/design-reference.css'`
-    // de la route laissait les 137 tests verts et `vite build` à rc=0 — la page rendait nue, et ce
-    // fichier continuait de lire la feuille **sur disque** comme si de rien n'était.
+    // juger un fichier mort : retirer l'import de `design-reference.css` de la route laisse la suite
+    // verte et `vite build` à rc=0 — mesuré — pendant que la page rend nue.
     //
     // Les imports sont lus par l'analyseur et les `@import` résolus par Vite : un import commenté
-    // contient encore le nom de la feuille, et une recherche dans le texte le comptait.
+    // contient encore le nom de la feuille, et une recherche dans le texte le compterait.
     const web = resolve(dirname(fileURLToPath(import.meta.url)), '..')
     const config = await resolveConfig({ root: web, logLevel: 'silent' }, 'build')
 
@@ -205,17 +182,15 @@ describe('tokens de la charte', () => {
    * une fois la mesure faite. La garde ci-dessous exige que tout `var()` vienne de `tokens/` ; ces
    * trois-là n'en viendront jamais.
    *
-   * Elles sont **nommées** plutôt que tolérées par un motif : trois lignes qu'on relit, et tout le
-   * reste demeure fermé. Le test suivant vérifie qu'aucune ne vit sans repli — sans quoi cette
-   * liste les rendrait simplement invisibles, ce qui est le contraire de ce qu'on veut.
+   * Nommées plutôt que tolérées par un motif : trois lignes qu'on relit, et tout le reste demeure
+   * fermé. Le test suivant vérifie qu'aucune ne vit sans repli — sans quoi cette liste les rendrait
+   * simplement invisibles.
    */
   const RUNTIME_VARIABLES = ['--active-tab-left', '--active-tab-width', '--anchor-width'] as const
 
   it('n’en consomme aucun qui n’existe pas', () => {
-    // On part de ce que le CSS **consomme réellement**, jamais d'une liste écrite à la main : une
-    // liste ne voit jamais le token qu'on vient d'inventer. `vite-plugin-tokens` tient déjà ce front
-    // sur le CSS émis ; ce test le tient sur les sources, et il rougit plus tôt — à `make test-web`
-    // plutôt qu'à `make build`.
+    // Le plugin tient déjà ce front sur le CSS émis ; ce test le tient sur les sources, et il rougit
+    // plus tôt — à `make test-web` plutôt qu'à `make build`.
     const used = new Set(
       [...readStyledCss().matchAll(/var\(\s*(--[\w-]+)/g)].map(([, name]) => name as string),
     )
@@ -228,26 +203,19 @@ describe('tokens de la charte', () => {
   })
 
   it('donne une valeur de repli à chaque variable que le JavaScript écrira', () => {
-    // **Ce que ce test ferme.** `vite-plugin-tokens` fait échouer la construction sur un `var()` que
-    // rien ne déclare, et il nomme lui-même ces trois variables comme le cas qui l'avait mis en
-    // défaut. Le repli est la sortie qu'il préfère à une liste d'exemptions, pour une raison de plus
-    // que le build : il donne une valeur **au premier rendu**, avant que le composant n'ait mesuré
-    // quoi que ce soit — sans lui, l'indicateur d'onglet apparaîtrait à largeur nulle le temps d'une
-    // image.
-    //
-    // Sans ce test, `RUNTIME_VARIABLES` ci-dessus suffirait à faire taire la garde précédente, et le
-    // repli pourrait disparaître sans que rien ne bouge.
+    // Le repli ne sert pas qu'à satisfaire le plugin : il donne une valeur **au premier rendu**,
+    // avant que le composant n'ait mesuré quoi que ce soit — sans lui, l'indicateur d'onglet
+    // apparaîtrait à largeur nulle le temps d'une image. Sans ce test, `RUNTIME_VARIABLES` ci-dessus
+    // suffirait à faire taire la garde précédente et le repli pourrait disparaître en silence.
     const here = dirname(fileURLToPath(import.meta.url))
     const components = readFileSync(
       join(resolve(here, '..'), 'src', 'styles', 'components.css'),
       'utf8',
     ).replace(/\/\*[\s\S]*?\*\//g, '')
 
-    // **Dans `:root`, et pas seulement « quelque part ».** La première rédaction cherchait le nom
-    // dans tout le fichier : mesuré en déplaçant les trois déclarations de `:root` vers
-    // `.ui-select__popup`, les 126 tests et `vite build` restaient verts — alors que l'indicateur
-    // d'onglets n'a plus aucun ancêtre qui les déclare. C'est le trou de portée que le plugin
-    // documente lui-même, reproduit dans le test censé le compenser.
+    // **Dans `:root`, et pas seulement « quelque part ».** Chercher le nom dans tout le fichier
+    // laisse passer les trois déclarations déplacées vers `.ui-select__popup` — mesuré, suite et
+    // `vite build` verts — alors que l'indicateur d'onglets n'a plus aucun ancêtre qui les déclare.
     const root = /:root\s*\{([^}]*)\}/.exec(components)?.[1]
     expect(root, 'components.css ne déclare plus de bloc :root').toBeDefined()
 
@@ -265,8 +233,7 @@ describe('tokens de la charte', () => {
 
   it('en consomme assez pour que ce test garde quelque chose', () => {
     // Sans ce plancher, une expression régulière qui cesserait de reconnaître `var(--…)` rendrait le
-    // test précédent vert et vide — la panne la plus discrète qu'un test puisse avoir. Mesuré le
-    // 08/08/2026 : 55 occurrences, 13 dans `app.css` et 42 dans `design-reference.css`.
+    // test précédent vert et vide — la panne la plus discrète qu'un test puisse avoir.
     expect([...readStyledCss().matchAll(/var\(\s*(--[\w-]+)/g)].length).toBeGreaterThan(40)
   })
 
@@ -365,10 +332,9 @@ describe('contraste WCAG 2.1 AA', () => {
      *
      * **Les deux porteuses, pas une.** `--surface-selected` est une teinte translucide : son rendu
      * dépend de la surface qui la porte, et les tables du produit vivent dans des cartes autant que
-     * sur le canvas. Ne composer que sur le canvas retenait le cas le plus clément — mesuré le
-     * 08/08/2026, `--text-faint` y donne 4,56, et 4,21 en carte. `--surface-hover` et
-     * `--surface-active`, elles, sont opaques (`color-mix(…, var(--n-800))`) : la porteuse ne change
-     * rien pour elles, et les tester deux fois ne coûte que deux assertions.
+     * sur le canvas. Ne composer que sur le canvas retiendrait le cas le plus clément.
+     * `--surface-hover` et `--surface-active`, elles, sont opaques (`color-mix(…, var(--n-800))`) :
+     * la porteuse ne change rien pour elles, et les tester deux fois ne coûte que deux assertions.
      */
     const carriers = ['--surface-page', '--surface-card'] as const
     const interactive = ['--surface-hover', '--surface-active', '--surface-selected'] as const
@@ -376,12 +342,10 @@ describe('contraste WCAG 2.1 AA', () => {
     /**
      * `--text-faint` n'est **pas** de la partie, et c'est une règle de la charte plutôt qu'une
      * exemption de confort : sur une surface interactive, le texte le plus discret remonte d'un cran.
-     * Mesuré — `--text-faint` sur une ligne sélectionnée rend 4,56 sur le canvas mais **4,21** en
-     * carte, sous AA. L'éclaircir davantage était l'autre issue : elle est fermée, `--n-300` (#848f9e)
-     * touche déjà `--n-200` (#8b95a3), et les confondre supprimerait un échelon de l'échelle.
-     *
-     * Ce que cela engage pour step-041, qui livrera les tables : une ligne sélectionnée porte son
-     * texte discret en `--text-muted` (4,55 en carte), jamais en `--text-faint`.
+     * Mesuré — sur une ligne sélectionnée il rend 4,56 sur le canvas mais **4,21** en carte, sous AA,
+     * et une ligne sélectionnée porte donc son texte discret en `--text-muted` (4,55 en carte).
+     * L'éclaircir davantage est l'autre issue, fermée : `--n-300` (#848f9e) touche déjà `--n-200`
+     * (#8b95a3), et les confondre supprimerait un échelon de l'échelle.
      */
     const readable = ['--text-primary', '--text-muted'] as const
 
@@ -406,12 +370,11 @@ describe('contraste WCAG 2.1 AA', () => {
   /**
    * **Les paires que `/_design` rend réellement.** Les listes croisées ci-dessus couvrent la palette
    * systématiquement ; celle-ci couvre ce que la page affiche, sous un libellé qui promet à son
-   * lecteur « chaque ligne est vérifiée à 4,5:1 par ce fichier ». Sans ce bloc, la promesse était
-   * fausse : mesuré le 08/08/2026, une paire à 2,53:1 ajoutée à la table laissait la suite verte, et
-   * la page l'affichait comme vérifiée.
+   * lecteur « chaque ligne est vérifiée à 4,5:1 par ce fichier ». Sans ce bloc, une paire à 2,53:1
+   * ajoutée à la table laisse la suite verte et la page l'affiche comme vérifiée — mesuré.
    *
-   * Les deux jeux se recouvrent aujourd'hui, et c'est voulu : les croisements attrapent une couleur
-   * qui se dégrade partout, celui-ci attrape une **combinaison** que quelqu'un décide de montrer.
+   * Les deux jeux se recouvrent, et c'est voulu : les croisements attrapent une couleur qui se
+   * dégrade partout, celui-ci attrape une **combinaison** que quelqu'un décide de montrer.
    */
   it.each(CONTRAST_PAIRS)(
     '$text sur $background atteint 4,5:1 — $usage',
@@ -453,12 +416,10 @@ describe('contraste WCAG 2.1 AA', () => {
   it('l’anneau de focus tranche sur le canvas', () => {
     // Un focus invisible rend la navigation au clavier impraticable (WCAG 2.4.7).
     //
-    // **Ce test lit `--focus-ring`, et c'est tout son intérêt.** Il résolvait auparavant `--teal-500`
-    // en dur, sous un titre qui parlait de l'anneau : il mesurait donc un token *voisin*, pas celui
-    // que le produit peint. Mesuré en repeignant l'anneau en `--n-700` — un gris à 1,64:1 sur la
-    // page, invisible — **les 214 tests, `vite build` et le parcours Playwright restaient verts**.
-    // L'assertion de bout en bout ne le voyait pas non plus : elle comptait les deux *couches* de
-    // l'ombre, jamais leur couleur.
+    // **Ce test lit `--focus-ring` lui-même, et c'est tout son intérêt** : mesuré en repeignant
+    // l'anneau en `--n-700` — un gris à 1,64:1 sur la page, invisible —, la suite, `vite build` et le
+    // parcours Playwright restent verts. Le parcours compte les deux *couches* de l'ombre, jamais
+    // leur couleur.
     //
     // La dernière couleur de l'ombre est celle qu'on voit : la première est un repli de la couleur
     // de la page, qui sépare l'anneau du contrôle.
@@ -487,13 +448,6 @@ describe('contraste WCAG 2.1 AA', () => {
    * donc les `tabular-nums` que `tokens/base.css` pose sur `body`. Une colonne de nombres en police
    * proportionnelle perd sa chasse commune et **danse** à chaque rafraîchissement — dans un cockpit
    * où les compteurs défilent, c'est le défaut qu'on remarque sans savoir le nommer.
-   *
-   * step-041 l'avait rebouché **là où il mordait**, sur `.ui-table`, et l'avait écrit : « le
-   * mécanisme, lui, reste ouvert — six autres règles posent un rôle proportionnel et le
-   * réinitialisent tout autant. Aucune ne porte de chiffre aujourd'hui ; un compteur dans un libellé,
-   * une plage dans un message d'aide, et la dette revient sans qu'aucune porte ne bouge. » C'est
-   * exactement ce qui est arrivé : les cinq états de contenu rendent « (504) » dans un corps de
-   * texte.
    *
    * La garde ne juge donc pas une liste de règles mais la **propriété** : toute règle qui pose un
    * rôle en police proportionnelle doit reprendre `tabular-nums`. Les rôles concernés sont dérivés de

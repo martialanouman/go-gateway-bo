@@ -150,8 +150,8 @@ describe('Table', () => {
   })
 
   it('ne rend aucune ligne quand il n’y en a pas — sans inventer de message', () => {
-    // L'état vide est un composant à part (step-042) : le tableau ne doit pas improviser sa copie,
-    // sinon chaque écran finit avec sa propre version du vide.
+    // L'état vide est un composant à part : le tableau ne doit pas improviser sa copie, sinon chaque
+    // écran finit avec sa propre version du vide.
     render(<DataTable caption="Connecteurs" columns={COLUMNS} rows={[]} rowKey={(row) => row.id} />)
 
     expect(screen.queryAllByRole('row')).toHaveLength(1)

@@ -1,21 +1,15 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * Le seul parcours du dépôt — né en M0, étendu à la coquille de M2 par step-040 — et il tourne contre
- * le **binaire**. Ce qu'il prouve que rien d'autre ne prouve : le bundle **embarqué dans le
- * déployable** démarre dans un vrai navigateur. Les scénarios
- * `godog` exercent déjà le binaire, mais ils lisent ce qu'il sert sans jamais exécuter le JavaScript ;
- * le job « Build client et déployable » compare des octets. Aucun des deux ne verrait une application
- * servie intacte et incapable de se monter.
- *
- * Mesuré le 03/08/2026, et c'est ce qui fixe le partage : l'asset embarqué remplacé par un `throw`,
- * puis le binaire recompilé — la première assertion passe (le document servi est correct) et les
- * suivantes tombent, « element(s) not found ». C'est exactement le défaut qu'aucune autre porte ne
- * voit.
+ * Le seul parcours du dépôt, et il tourne contre le **binaire**. Ce qu'il prouve que rien d'autre ne
+ * prouve : le bundle **embarqué dans le déployable** démarre dans un vrai navigateur. Les scénarios
+ * `godog` exercent déjà le binaire, mais lisent ce qu'il sert sans jamais exécuter le JavaScript ; le
+ * job « Build client et déployable » compare des octets. Aucun des deux ne verrait une application
+ * servie intacte et incapable de se monter — mesuré en remplaçant l'asset embarqué par un `throw` :
+ * la première assertion passe, les suivantes tombent sur « element(s) not found ».
  *
  * `plan.md` §17.4 pose « cinq parcours seulement » — un plafond, jamais une liste : ni lui ni la
- * spécification n'en énumèrent un seul. Les suivants arriveront donc avec la step qui livre leur
- * écran, et c'est elle qui les nommera ; les quatre restants ne sont pour l'instant qu'un budget.
+ * spécification n'en énumèrent un seul. Les suivants arriveront avec la step qui livre leur écran.
  *
  * Ce que ce parcours n'observe pas : le contenu servi par `/api` ni l'ordonnancement du fallback SPA,
  * tenus par les scénarios `godog` ; ni l'égalité octet à octet entre ce que le binaire rend et la
@@ -103,10 +97,10 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   await page.goto('/billing')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Soldes & crédits')
 
-  // Et le navigateur n'est sorti nulle part. C'est la moitié « vérifiée sur le binaire » de la DoD de
-  // step-008 : la charte est servie par le déployable, jamais par un tiers. Le test de bundle attrape
-  // déjà une adresse écrite en dur dans les sources ; lui seul ne dit rien de ce qu'un navigateur
-  // demande réellement — un `@import` résolu à l'exécution ne laisse aucune trace dans le bundle.
+  // Et le navigateur n'est sorti nulle part : la charte est servie par le déployable, jamais par un
+  // tiers. Le test de bundle attrape une adresse écrite en dur dans les sources ; lui seul ne dit
+  // rien de ce qu'un navigateur demande réellement — un `@import` résolu à l'exécution ne laisse
+  // aucune trace dans le bundle.
   const origin = new URL(page.url()).origin
   expect(requested.filter((url) => !url.startsWith(origin))).toEqual([])
 
@@ -118,9 +112,8 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   ).not.toHaveLength(0)
 
   // Et la référence visuelle est atteignable **sur le binaire**, pas seulement dans un routeur monté
-  // en mémoire par un test de composant. C'est ce que la DoD appelle traverser le chemin pour de
-  // bon : rien de simulé, le vrai déployable, le vrai fallback SPA sur une URL profonde. La v1.0
-  // avait trois défauts que seul ce genre de traversée avait trouvés.
+  // en mémoire par un test de composant : rien de simulé, le vrai déployable, le vrai fallback SPA
+  // sur une URL profonde.
   await page.goto('/_design')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Référence visuelle')
   // Hors de la coquille : elle ne s'adresse pas à un opérateur.
@@ -130,17 +123,17 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // endroit de la suite où l'on lit ce qui est **réellement peint**.
   await expect(page.locator('h1')).toHaveCSS('font-family', /IBM Plex Sans/)
 
-  // ── Les primitives, peintes pour de bon (step-041) ──────────────────────────────────────────
+  // ── Les primitives, peintes pour de bon ─────────────────────────────────────────────────────
   //
   // Ce bloc prolonge le parcours plutôt que d'ouvrir un fichier : les primitives n'ont pas d'écran
-  // à elles, et ce qu'il faut vérifier — ce qui est **réellement peint** — n'existe qu'ici. Trois
+  // à elles, et ce qu'il faut vérifier — ce qui est **réellement peint** — n'existe qu'ici. Ces
   // propriétés tiennent à des `var()` et des `color-mix()` que jsdom ne résout pas, donc qu'aucun
   // test de composant ne peut observer, quoi qu'il affirme.
 
   // **L'anneau de focus, WCAG 2.4.7.** Les tests de composant vérifient qu'un contrôle *reçoit* le
-  // focus ; aucun ne peut dire qu'il se **voit**. Mesuré deux fois plutôt que supposé : step-008 en
-  // retirant l'import qui porte `:focus-visible` — 137 tests verts, build rc=0 — et step-041 en
-  // retirant la déclaration elle-même — 214 tests verts, build rc=0. Seule cette ligne-ci rougit.
+  // focus ; aucun ne peut dire qu'il se **voit**. Mesuré deux fois : en retirant l'import qui porte
+  // `:focus-visible`, puis la déclaration elle-même — suite verte et build rc=0 les deux fois, seule
+  // cette ligne-ci rougit.
   const button = page.getByRole('button', { name: 'Nouveau client' })
   await button.focus()
   await expect(button).toBeFocused()
@@ -193,18 +186,16 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
     .first()
     .evaluate((element) => getComputedStyle(element, '::after').content)
   // `'"*" / ""'` et non `toContain('*')` : c'est le ` / ""` — le texte de remplacement **vide** —
-  // qui empêche le lecteur d'écran d'annoncer « étoile » sur chaque libellé de champ requis. Mesuré
-  // en le retirant : `toContain('*')` passait, et le commentaire du CSS affirmait le contraire de ce
-  // que le parcours mesurait.
+  // qui empêche le lecteur d'écran d'annoncer « étoile » sur chaque libellé de champ requis, et
+  // `toContain('*')` passe quand on le retire.
   expect(required, "le champ requis ne porte pas sa marque, ou l'annonce").toBe('"*" / ""')
 
   // **Les deux formes de statut ne se confondent pas**, et c'est la règle la plus stricte du
   // système : un disjoncteur ouvert sur un lien vivant et un bind mort demandent des actions
   // opposées. Sur la page, les deux sont côte à côte ; la pilule n'emprunte jamais le point.
   //
-  // Compter les pilules serait compter la page, pas la règle : la première rédaction attendait une
-  // `half_open` et en a trouvé deux — la rangée de spécimens et la ligne MTN de la table. Ce qui se
-  // vérifie ici est la **séparation**, dans les deux sens, sur toutes les occurrences.
+  // Compter les pilules serait compter la page, pas la règle : ce qui se vérifie ici est la
+  // **séparation**, dans les deux sens, sur toutes les occurrences.
   const breakers = await page.locator('.ui-breaker').count()
   const dots = await page.locator('.ui-status .ui-dot').count()
   expect(
@@ -221,7 +212,7 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
     'un point de lien a emprunté le rendu du disjoncteur',
   ).toBe(0)
 
-  // ── Les surfaces flottantes et les états, peints pour de bon (step-042) ─────────────────────
+  // ── Les surfaces flottantes et les états, peints pour de bon ────────────────────────────────
   //
   // Même raison que le bloc précédent, et quatre propriétés de plus qu'aucun test de composant ne
   // peut observer : jsdom n'applique aucun CSS, n'a pas d'ordre de tabulation réel, et ne connaît
@@ -260,7 +251,7 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
 
   // **La source du toast, résolue par le navigateur.** Le token est lu à l'exécution plutôt que
   // recopié en `rgb(…)` : deux recopies de la même main se confirment l'une l'autre sans rien
-  // mesurer, et c'est le piège qu'une revue de step-041 avait trouvé sur l'anneau de focus.
+  // mesurer.
   await page.getByRole('button', { name: 'Toast · alertmanager' }).click()
   await page.getByRole('button', { name: 'Toast · bff' }).click()
 

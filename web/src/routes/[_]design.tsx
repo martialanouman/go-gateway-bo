@@ -40,11 +40,9 @@ import '~/styles/design-reference.css'
  *
  * **Le nom du fichier est `[_]design.tsx` et non `_design.tsx`.** Dans TanStack Router, un segment
  * préfixé d'un souligné est une mise en page *sans chemin* : la page n'aurait aucune URL à elle. Les
- * crochets échappent le caractère et rendent le segment littéral.
- *
- * Mesuré le 08/08/2026 en renommant le fichier : le chemin de la mise en page vaut `/`, qui est déjà
- * celui de `_shell`, et `vite build` **échoue** — `Conflicting configuration paths were found for the
- * following routes: "/", "/"`, rc=1. Le symptôme est donc plus franc qu'une page injoignable, mais il
+ * crochets échappent le caractère et rendent le segment littéral. Mesuré en renommant le fichier :
+ * le chemin de la mise en page vaut `/`, déjà celui de `_shell`, et `vite build` échoue sur
+ * `Conflicting configuration paths`. Le symptôme est plus franc qu'une page injoignable, mais il
  * tient à la coexistence des deux : seul dans un arbre, `_design.tsx` produirait une route muette.
  *
  * Elle est un **frère** de `_shell`, donc hors de la coquille, et sans garde de session — elle
@@ -54,11 +52,9 @@ import '~/styles/design-reference.css'
  *
  * **Elle est servie en production comme ailleurs.** Aucune donnée réelle, aucune API jointe : rien à
  * fuiter. En contrepartie elle permet de vérifier qu'un déploiement rend bien la charte, polices
- * comprises — ce qu'aucune capture d'écran locale ne prouve.
- *
- * Elle rend aussi les **primitives** depuis step-041 : un écran y lit l'état exact d'un contrôle
- * refusé, d'un champ en erreur ou d'une pilule de disjoncteur, plutôt que de le déduire d'une
- * capture. step-042 y ajoute les surfaces flottantes et les cinq états de contenu.
+ * comprises — ce qu'aucune capture d'écran locale ne prouve. Elle rend aussi les **primitives**, les
+ * surfaces flottantes et les cinq états de contenu : un écran y lit l'état exact d'un contrôle
+ * refusé, d'un champ en erreur ou d'une pilule de disjoncteur.
  *
  * **La modale et les toasts démarrent fermés**, et c'est structurel plutôt que cosmétique :
  * `Dialog.Title` et `Toast.Title` rendent un `<h2>`, que le test de cette page compte. Un spécimen
@@ -67,10 +63,7 @@ import '~/styles/design-reference.css'
  */
 export const Route = createFileRoute('/_design')({ component: DesignReference })
 
-/**
- * Des lignes **inventées**, et elles doivent le rester : cette page ne parle à personne. step-040 a
- * monté `QueryClientProvider` dans `createAppRouter`, mais aucun tableau n'est encore branché au BFF.
- */
+/** Des lignes **inventées**, et elles doivent le rester : cette page ne parle à personne. */
 const SPECIMEN_ROWS = [
   {
     id: 'orange-ci',

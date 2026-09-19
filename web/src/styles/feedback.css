@@ -1,9 +1,8 @@
 /*
  * Les surfaces flottantes et les cinq états de contenu.
  *
- * Feuille annoncée par `test/charte.test.ts` depuis step-041 — « il reste une feuille à venir, celle
- * des surfaces flottantes et des cinq états de contenu ». Son nom vient de la taxonomie de la charte,
- * dont le groupe `feedback/` réunit exactement Modal, Toast, EmptyState, ErrorState et Skeleton.
+ * Son nom vient de la taxonomie de la charte, dont le groupe `feedback/` réunit exactement Modal,
+ * Toast, EmptyState, ErrorState et Skeleton.
  *
  * Comme `components.css`, elle n'invente **aucune valeur** : elle assemble les tokens de
  * `tokens/`. Si une surface a besoin d'une valeur qui n'y est pas, c'est une question à poser à la
@@ -87,9 +86,8 @@
 }
 
 /*
- * `--text-danger-on-tint` et non `--red-500` : sur sa propre teinte, le rouge de la charte rend
- * 4,05 et tombe sous AA. C'est le défaut exact qu'une revue de step-041 a trouvé sur le bouton
- * destructif survolé, et la teinte est ici sur toute la surface.
+ * `--text-danger-on-tint` et non `--red-500` : sur sa propre teinte, le rouge de la charte rend 4,05
+ * et tombe sous AA. Ici la teinte couvre toute la surface.
  */
 .ui-error__icon {
   display: flex;
@@ -144,8 +142,7 @@
 }
 
 /*
- * Le scintillement de la charte : un dégradé qui balaie, 1,4 s, linéaire. `--dur-skeleton` porte
- * cette valeur depuis step-008 sans qu'aucune règle ne la consomme ; c'est la première.
+ * Le scintillement de la charte : un dégradé qui balaie, 1,4 s, linéaire, depuis `--dur-skeleton`.
  *
  * Aucun `@media (prefers-reduced-motion)` ici : `tokens/base.css` le pose déjà sur `*`, avec le seul
  * `!important` du dépôt. En rajouter un se lirait comme la protection alors qu'il ne protégerait
@@ -415,9 +412,8 @@
 /*
  * L'étage qui a détecté, en mono et coloré : bleu pour Alertmanager, violet pour le BFF.
  *
- * Les deux tokens existaient depuis step-008 sans qu'aucune règle ne les consomme. La couleur n'est
- * pas le seul porteur — le mot est écrit à côté, en toutes lettres (WCAG 1.4.1) ; elle sert à
- * reconnaître l'étage d'un coup d'œil sur une pile de trois.
+ * La couleur n'est pas le seul porteur — le mot est écrit à côté, en toutes lettres (WCAG 1.4.1) ;
+ * elle sert à reconnaître l'étage d'un coup d'œil sur une pile de trois.
  */
 .ui-toast__source {
   font: var(--text-data-sm);

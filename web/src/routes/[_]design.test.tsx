@@ -52,10 +52,9 @@ describe('la référence visuelle', () => {
       'Espacements',
       'Rayons',
       'Contraste',
-      // step-041. La page ne montrait que des tokens ; elle montre maintenant ce qu'ils habillent.
       'Primitives',
-      // step-042. La modale et les toasts y sont **fermés** : leurs titres sont des `h2`, et cette
-      // liste les compterait comme des sections.
+      // La modale et les toasts y sont **fermés** : leurs titres sont des `h2`, et cette liste les
+      // compterait comme des sections.
       'Retour et états',
     ]
 
@@ -104,10 +103,9 @@ describe('la référence visuelle', () => {
 
     const { CONTRAST_PAIRS } = await import('~/lib/design-tokens')
 
-    // **La table de contraste, pas toutes les lignes de la page.** La version précédente comptait
-    // `getAllByRole('row')` sur le document entier : elle a cessé d'être vraie à la minute où la
-    // section « Primitives » a rendu un spécimen de `DataTable`, et elle aurait aussi bien pu
-    // devenir fausse **en restant verte** si deux changements s'étaient compensés.
+    // **La table de contraste, pas toutes les lignes de la page.** Compter `getAllByRole('row')` sur
+    // le document entier cesse d'être vrai dès qu'une autre section rend un tableau, et peut devenir
+    // faux **en restant vert** si deux changements se compensent.
     const contrast = screen
       .getAllByRole('table')
       .find((table) => table.className.includes('design__table'))
@@ -200,8 +198,8 @@ describe('la référence visuelle', () => {
   it('rend les cinq états de contenu, chacun avec sa copie', async () => {
     await visitDesign()
 
-    // Les cinq, et surtout **cinq copies distinctes** : c'est la page où un relecteur vérifie qu'un
-    // module désactivé ne se lit pas comme une panne.
+    // Les cinq, et surtout **cinq copies distinctes** : c'est la page où l'on vérifie qu'un module
+    // désactivé ne se lit pas comme une panne.
     expect(screen.getByText('Aucune règle d’alerte')).toBeInTheDocument()
     expect(screen.getByText('Aucun message trouvé')).toBeInTheDocument()
     expect(screen.getByText('Facturation indisponible')).toBeInTheDocument()

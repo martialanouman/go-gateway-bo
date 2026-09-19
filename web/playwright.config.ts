@@ -4,26 +4,23 @@ import { defineConfig, devices } from '@playwright/test'
 // du mock Prism (4010) : `make e2e` doit pouvoir tourner pendant que `make dev` occupe les siens.
 const port = 3101
 
-// `localhost` et non `127.0.0.1` depuis step-024 : le second facteur WebAuthn lie les passkeys à un
-// domaine, et une adresse IP n'en est pas un — le navigateur refuse la cérémonie, et la bibliothèque
-// refuse désormais de démarrer. Aucun parcours n'exerce encore de passkey, mais déclarer une origine
-// en `localhost` pendant qu'on visite une IP ferait de la configuration ci-dessous un mensonge, et
-// c'est step-027 qui le paierait.
+// `localhost` et non `127.0.0.1` : le second facteur WebAuthn lie les passkeys à un domaine, et une
+// adresse IP n'en est pas un — le navigateur refuse la cérémonie, et la bibliothèque refuse de
+// démarrer. Aucun parcours n'exerce encore de passkey, mais déclarer une origine en `localhost`
+// pendant qu'on visite une IP ferait de la configuration ci-dessous un mensonge, et c'est step-027
+// qui le paierait.
 const host = 'localhost'
 
 export default defineConfig({
-  // Explicite, et pas seulement par rangement : sans lui, Playwright ramasse les fichiers de Vitest —
-  // mesuré le 03/08/2026, il a chargé `chargement-a-froid.test.ts` et échoué dans `describe`, faute du
-  // runner qui va avec.
+  // Explicite, et pas seulement par rangement : sans lui, Playwright ramasse les fichiers de Vitest et
+  // échoue dans `describe`, faute du runner qui va avec.
   testDir: './e2e',
 
   // Un `test.only` oublié ne rougit pas, il rend **vert** sur un seul parcours : `filterOnly()`
-  // — `playwright/lib/common/index.js` en 1.62.0 — ne garde du plan que les entrées portant `_only`.
-  // Le défaut de Playwright étant `false`, rien ne le dirait. Un seul parcours existe aujourd'hui, la
-  // porte doit donc précéder ceux qui rendront le silence coûteux. Mesuré le 03/08/2026 sur un
-  // `.only` temporaire : `playwright test --list` rend 0 sans `CI`, et 1 avec `CI=1`, sur « item
-  // focused with '.only' is not allowed ». Conditionné à `CI` : `.only` reste l'outil d'itération
-  // normal en local.
+  // — `playwright/lib/common/index.js` en 1.62.0 — ne garde du plan que les entrées portant `_only`,
+  // et le défaut de Playwright est `false`. Mesuré sur un `.only` temporaire : `playwright test
+  // --list` rend 0 sans `CI`, et 1 avec `CI=1`, sur « item focused with '.only' is not allowed ».
+  // Conditionné à `CI` : `.only` reste l'outil d'itération normal en local.
   forbidOnly: !!process.env.CI,
 
   // La CI ne réessaie pas : un parcours instable doit se voir tout de suite. Le jour où l'un d'eux
@@ -57,43 +54,39 @@ export default defineConfig({
     reuseExistingServer: false,
     stdout: 'pipe',
     stderr: 'pipe',
+    // Toutes les variables ci-dessous sont **obligatoires et sans repli** : le binaire refuse de
+    // démarrer sans elles, et ce refus arrive avant qu'il ne lie son port — un parcours démarrerait
+    // donc sur un serveur qui n'écoute pas.
     env: {
       DASHBOARD_ADDR: `${host}:${port}`,
-      // Obligatoire depuis step-031, sans repli : le nom sous lequel ce déploiement se présente
-      // à l'opérateur, dans son application d'authentification et dans la cérémonie WebAuthn. La
-      // valeur diffère du nom de production, comme les décors de test et de scénario — un nom recodé
-      // en dur passerait sinon tout parcours qui le lirait.
+      // Le nom sous lequel ce déploiement se présente à l'opérateur, dans son application
+      // d'authentification et dans la cérémonie WebAuthn. La valeur diffère du nom de production,
+      // comme les décors de test — un nom recodé en dur passerait tout parcours qui le lirait.
       DASHBOARD_PRODUCT_NAME: 'Cockpit de parcours',
       // Aucun mock n'est lancé : le client sortant n'est appelé par aucun écran, et la configuration
       // ne fait qu'exiger son adresse au démarrage.
       //
-      // La base, elle, **doit répondre et porter les migrations** depuis step-020 : le binaire
-      // contrôle la version du schéma avant de lier son port. Celle-ci n'appartient qu'aux parcours,
-      // et `make e2e` la recrée, la migre et y sème le compte avant d'arriver ici — un poste sans
-      // `docker compose up -d` échoue donc plus tôt, sur une erreur de connexion, plutôt qu'ici sur
-      // un écran blanc. `?sslmode=disable` parce que ni le conteneur local ni le service de la CI ne
-      // présentent de certificat.
+      // La base, elle, **doit répondre et porter les migrations** : le binaire contrôle la version du
+      // schéma avant de lier son port. Celle-ci n'appartient qu'aux parcours, et `make e2e` la
+      // recrée, la migre et y sème le compte avant d'arriver ici — un poste sans `docker compose up
+      // -d` échoue donc plus tôt, sur une erreur de connexion, plutôt qu'ici sur un écran blanc.
+      // `?sslmode=disable` parce que ni le conteneur local ni le service de la CI ne présentent de
+      // certificat.
       DASHBOARD_GATEWAY_MODE: 'mock',
       DASHBOARD_GATEWAY_BASE_URL: 'http://127.0.0.1:4010',
       DASHBOARD_DATABASE_URL:
         'postgres://dashboard:dashboard@127.0.0.1:5432/dashboard_e2e?sslmode=disable',
-      // Obligatoire depuis step-021, sans repli : le binaire refuse de démarrer sans elle, et ce
-      // refus arrive avant qu'il ne lie son port — un parcours démarrerait donc sur un serveur qui
-      // n'écoute pas. Rien d'un secret : aucun parcours ne relit un HMAC.
+      // Rien d'un secret : aucun parcours ne relit un HMAC.
       DASHBOARD_BRUTEFORCE_SALT: 'un-sel-de-parcours-assez-long-pour-passer-la-borne',
-      // Obligatoire depuis step-022, sans repli de même, et refusée avant la liaison du port.
       DASHBOARD_SESSION_SECRET: 'une-cle-de-parcours-assez-longue-pour-passer-la-borne',
-      // Obligatoire depuis step-023, aux mêmes conditions.
       DASHBOARD_TOTP_ENCRYPTION_KEY: 'une-cle-de-chiffrement-de-parcours-assez-longue',
-      // Obligatoires depuis step-024, aux mêmes conditions. Ce ne sont pas des secrets : le
-      // navigateur les voit à chaque cérémonie. Elles doivent s'accorder au `baseURL` ci-dessus,
-      // sans quoi la première cérémonie de step-027 échouerait sur une configuration qu'aucun
-      // parcours d'aujourd'hui n'exerce.
+      // Pas des secrets non plus : le navigateur les voit à chaque cérémonie. Elles doivent s'accorder
+      // au `baseURL` ci-dessus, sans quoi la première cérémonie de step-027 échouerait sur une
+      // configuration qu'aucun parcours d'aujourd'hui n'exerce.
       DASHBOARD_WEBAUTHN_RP_ID: host,
       DASHBOARD_WEBAUTHN_ORIGIN: `http://${host}:${port}`,
-      // Obligatoire depuis step-036 : vide ne se distinguait pas d'un oubli, et l'oubli fait
-      // compter toutes les tentatives sur l'adresse du load balancer. Aucun proxy ne s'interpose
-      // ici, et c'est désormais une valeur qu'on écrit.
+      // Vide ne se distingue pas d'un oubli, et l'oubli fait compter toutes les tentatives sur
+      // l'adresse du load balancer. Aucun proxy ne s'interpose ici.
       DASHBOARD_TRUSTED_PROXIES: 'none',
     },
   },

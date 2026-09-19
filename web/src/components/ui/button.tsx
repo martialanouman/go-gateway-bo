@@ -4,23 +4,18 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 /**
  * Le bouton du produit.
  *
- * ## Contour et teinte, jamais un aplat
+ * **Contour et teinte, jamais un aplat.** La charte l'écrit pour le cas destructif — « toujours en
+ * contour, jamais plein » — et ses spécimens montrent la même chose pour le primaire. Sur des
+ * surfaces quasi-noires, un aplat teal capte le regard plus fort qu'une alerte rouge, et l'accent
+ * unique du système perdrait son sens.
  *
- * La charte l'écrit pour le cas destructif — « toujours en contour, jamais plein » — et ses
- * spécimens montrent la même chose pour le primaire. Ce n'est pas une préférence : sur des surfaces
- * quasi-noires, un aplat teal capte le regard plus fort qu'une alerte rouge, et l'accent unique du
- * système perdrait son sens.
- *
- * ## Base UI pour le comportement
- *
- * `Button` de Base UI porte la sémantique et laisse la forme libre. On ne réimplémente ni le focus
- * ni le clavier — deux endroits où une réécriture maison casse l'accessibilité en silence.
+ * `Button` de Base UI porte la sémantique et laisse la forme libre : ni le focus ni le clavier ne
+ * sont réimplémentés, deux endroits où une réécriture maison casse l'accessibilité en silence.
  */
 
 /**
- * Quatre variantes. Le kit de la charte en dessine deux de plus, `ghost` et `dangerGhost`, pour les
- * actions de ligne d'un tableau : elles arriveront avec le premier écran qui en a, plutôt qu'en
- * bibliothèque devinée d'avance.
+ * Quatre variantes. Le kit en dessine deux de plus, `ghost` et `dangerGhost`, pour les actions de
+ * ligne d'un tableau : elles arriveront avec le premier écran qui en a.
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'link'
 

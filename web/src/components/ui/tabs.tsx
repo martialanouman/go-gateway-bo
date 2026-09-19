@@ -44,10 +44,9 @@ export type TabsProps = Omit<
    *
    * Base UI démonte le panneau caché par défaut, ce qui est le bon choix pour des onglets qui ne font
    * qu'afficher : cela évite de payer le rendu de ce que personne ne regarde. Il devient un piège dès
-   * qu'un panneau **porte un état** — une saisie en cours, une cérémonie préparée. La v1.0 l'a payé
-   * sur l'enrôlement du second facteur : un aller-retour d'onglet détruisait un secret déjà scanné,
-   * puis les codes de récupération, que rien ne peut réafficher. L'écran qui héritera du cas est
-   * `step-028`, qui n'est pas encore livrée ici.
+   * qu'un panneau **porte un état** — une saisie en cours, une cérémonie préparée. Sur l'enrôlement du
+   * second facteur (step-028, non livrée), un aller-retour d'onglet détruirait un secret déjà scanné,
+   * puis les codes de récupération, que rien ne peut réafficher.
    *
    * À demander explicitement, jamais par défaut : la plupart des onglets n'ont rien à conserver.
    */

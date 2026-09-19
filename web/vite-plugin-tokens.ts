@@ -1,11 +1,9 @@
 /**
  * Fait échouer la construction quand une source consomme un token que rien ne déclare.
  *
- * **Le défaut qu'il ferme est daté.** En v1.0, step-026 a livré un bandeau de refus sans bordure ni
- * fond : elle consommait `--danger-border`, `--danger-surface` et `--danger-text`, trois tokens
- * inventés. Toutes les portes étaient vertes, parce qu'un `var()` inconnu ne casse rien — le
- * navigateur applique la valeur héritée, et l'écran s'affiche *presque* juste. Rien dans cette pile
- * ne le voyait : le CSS est du CSS pur, sans PostCSS, sans typage, et Vite ne valide aucun `var()`.
+ * Rien d'autre dans cette pile ne le voit : le CSS est du CSS pur, sans PostCSS, sans typage, et Vite
+ * ne valide aucun `var()`. Or un `var()` inconnu ne casse rien — le navigateur applique la valeur
+ * héritée et l'écran s'affiche *presque* juste, toutes portes vertes.
  *
  * Le jugement porte sur l'**union** des sources, jamais fichier par fichier : le document déclare la
  * géométrie que le squelette peint, la feuille la consomme. Les juger séparément rejetterait la
@@ -20,12 +18,10 @@
  *   qui le garde, pas ce plugin.
  * - Il lit le CSS **émis**, donc après `@import` et minification. Un token qu'aucune règle atteinte
  *   ne consomme n'existe pas pour lui, ce qui est le bon comportement : on garde ce qui est servi.
- * - **Il refuse les variables qu'un composant pose depuis JavaScript.** Trouvé en jouant une mutation
- *   qui versait `components.css` de la v1.0 dans la feuille : la construction a échoué sur
- *   `--active-tab-left`, `--active-tab-width` et `--anchor-width` — trois variables qu'aucun CSS ne
- *   déclare parce qu'un `style.setProperty()` les écrit à l'exécution. Elles sont désormais déclarées
- *   avec une valeur de repli dans `components.css`, ce qui satisfait le plugin sans exemption : une
- *   largeur d'onglet a une valeur au premier rendu, avant que le JavaScript ne mesure.
+ * - **Il refuse les variables qu'un composant pose depuis JavaScript** — `--active-tab-left`,
+ *   `--active-tab-width`, `--anchor-width`, qu'un `style.setProperty()` écrit à l'exécution. Elles
+ *   sont déclarées avec une valeur de repli dans `components.css`, ce qui le satisfait sans
+ *   exemption : une largeur d'onglet a une valeur au premier rendu, avant que le JavaScript ne mesure.
  */
 
 import type { Plugin } from 'vite'
@@ -46,8 +42,8 @@ const STYLE_BLOCK = /<style[^>]*>([\s\S]*?)<\/style>/g
  * Les tokens que `sources` — du **CSS** — consomme sans qu'aucune d'elles ne les déclare, triés et
  * dédoublonnés.
  *
- * Les commentaires sortent d'abord : sans ça, le fichier de test de ce plugin — qui cite les trois
- * noms de l'incident de step-026 — se ferait rejeter par le plugin qu'il teste.
+ * Les commentaires sortent d'abord : un commentaire qui cite un nom de token le ferait compter comme
+ * consommé.
  */
 export function undeclaredTokens(sources: readonly string[]): string[] {
   const text = sources.join('\n').replace(COMMENTS, '')
@@ -61,12 +57,11 @@ export function undeclaredTokens(sources: readonly string[]): string[] {
 /**
  * Le CSS d'un asset émis : son contenu s'il est déjà du CSS, sinon les blocs `<style>` qu'il porte.
  *
- * **On n'assainit pas le HTML, on en extrait le CSS.** La première version retirait les commentaires
- * HTML du document pour le traiter comme du CSS ; CodeQL l'a signalé en `js/incomplete-multi-character-sanitization`,
- * et l'alerte était juste sur la forme même si le résultat n'est jamais rendu — un remplacement
- * unique de `<!--…-->` laisse passer une imbrication. Extraire les `<style>` est plus précis : les
- * commentaires HTML, qui citent des noms de tokens dans `index.html`, cessent d'être lus du tout, au
- * lieu d'être nettoyés.
+ * **On n'assainit pas le HTML, on en extrait le CSS.** Retirer les commentaires HTML pour traiter le
+ * document comme du CSS est ce que CodeQL signale en `js/incomplete-multi-character-sanitization` —
+ * un remplacement unique de `<!--…-->` laisse passer une imbrication. Extraire les `<style>` est plus
+ * précis : les commentaires HTML, qui citent des noms de tokens dans `index.html`, cessent d'être lus
+ * du tout au lieu d'être nettoyés.
  */
 function styleSheetsIn(fileName: string, source: string): string[] {
   if (fileName.endsWith('.css')) return [source]

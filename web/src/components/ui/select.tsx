@@ -29,8 +29,8 @@ export type SelectProps = Omit<
    *
    * Sans lui, le nom accessible du `combobox` se réduit au texte de la valeur : un lecteur d'écran
    * annonce « Pool partagé, zone de liste » sans jamais dire de quoi on choisit la portée. C'est le
-   * point le plus fragile de l'abandon du `<select>` natif — celui-là s'associait à un `<label>`
-   * gratuitement, et la v1.0 avait livré ce champ sans libellé obligatoire.
+   * point le plus fragile de l'abandon du `<select>` natif, qui s'associait à un `<label>`
+   * gratuitement.
    */
   readonly label: ReactNode
   readonly options: readonly SelectOption[]

@@ -10,9 +10,9 @@ import { BREAKER_STATES, DELIVERY_TONES, ENTITY_TONES, LINK_TONES, StatusPill } 
  * ouvert sur un lien vivant (attendre la reprise) et un bind mort (rebind manuel) demandent des
  * actions opposées ».
  *
- * Le test central est le dernier bloc : **`closed` appartient à deux vocabulaires du contrat**. Une
- * version antérieure devinait la dimension à partir de la valeur, et peignait donc un client
- * résilié en pilule verte « circuit sain ». C'est cette devinette qu'on vérifie absente.
+ * Le test central est le dernier bloc : **`closed` appartient à deux vocabulaires du contrat**.
+ * Déduire la dimension de la valeur peindrait un client résilié en pilule verte « circuit sain » ;
+ * c'est cette devinette qu'on vérifie absente.
  */
 describe('StatusPill — link_status', () => {
   it('rend un point et le libellé de l’API, en snake_case', () => {
@@ -122,14 +122,9 @@ describe('StatusPill — la dimension est déclarée, jamais devinée', () => {
   })
 
   it('ne laisse aucune valeur vivre dans deux dimensions à la fois', () => {
-    // **Ce qui remplace un test qui ne prouvait rien.** La version précédente rendait un compte
-    // suspendu puis un lien tombé et assertait *deux fois la même classe* sous le titre « distingue
-    // l'un de l'autre » : elle prouvait qu'ils sont identiques.
-    //
-    // Ce qui compte vraiment est en amont — `closed` appartient à deux vocabulaires, et c'est la
-    // seule collision que le contrat porte aujourd'hui. Ce test rougit le jour où une valeur en
-    // rejoint une autre dimension : la fusion des tables, que la docstring déclare avoir rejetée,
-    // redeviendrait alors silencieusement possible.
+    // `closed` appartient à deux vocabulaires, et c'est la seule collision que le contrat porte
+    // aujourd'hui. Ce test rougit le jour où une valeur en rejoint une autre dimension : la fusion
+    // des tables, que la docstring déclare avoir rejetée, redeviendrait alors possible en silence.
     const dimensions = [
       { nom: 'link', valeurs: Object.keys(LINK_TONES) },
       { nom: 'entity', valeurs: Object.keys(ENTITY_TONES) },
@@ -150,10 +145,9 @@ describe('StatusPill — la dimension est déclarée, jamais devinée', () => {
   })
 
   it('couvre les huit valeurs de `CdrStatus`, sans en laisser tomber au gris', () => {
-    // **Le mode d'échec est daté.** La v1.0 en portait six sur huit : une valeur omise retombe sur
-    // le repli au repos et disparaît de l'œil de l'opérateur qui balaie la colonne à la recherche
-    // des rouges. `web/test/statuts-du-contrat.test.ts` garde l'exhaustivité contre le YAML ; ce
-    // test-ci garde la tonalité de chacune.
+    // Une valeur omise retombe sur le repli au repos et disparaît de l'œil de l'opérateur qui balaie
+    // la colonne à la recherche des rouges. `web/test/statuts-du-contrat.test.ts` garde
+    // l'exhaustivité contre le YAML ; ce test-ci garde la tonalité de chacune.
     const cases = [
       { state: 'delivered', tone: 'up' },
       { state: 'accepted', tone: 'degraded' },

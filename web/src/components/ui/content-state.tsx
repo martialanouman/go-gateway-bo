@@ -11,11 +11,10 @@ import { type GlyphName, Icon } from './icon'
  * action séparent. La charte les dessine ainsi ; les scinder en trois composants aurait fabriqué
  * trois fois la même chose.
  *
- * `ErrorState`, lui, a son propre balisage — panneau teinté, `role="alert"`, ligne de trace. Ce
- * n'est pas une variante de plus : c'est **la** distinction que le produit doit tenir. Un module
- * éteint est une absence de fonctionnalité, une erreur est une panne réessayable, et les confondre
- * afficherait « réessayez » sur ce qui ne reviendra pas. Le serveur a déjà tranché exactement cela
- * (`internal/gateway/errors_test.go`, DN-8) ; ce fichier dit la même chose côté écran.
+ * `ErrorState`, lui, a son propre balisage — panneau teinté, `role="alert"`, ligne de trace. C'est
+ * **la** distinction que le produit doit tenir : un module éteint est une absence de fonctionnalité,
+ * une erreur est une panne réessayable, et les confondre afficherait « réessayez » sur ce qui ne
+ * reviendra pas. Le serveur tranche déjà cela (`internal/gateway/errors_test.go`, DN-8).
  */
 
 /**
@@ -127,10 +126,9 @@ export type ModuleDisabledProps = {
  *
  * **Livré sans producteur**, délibérément : le contrat ne déclare ni 501, ni en-tête, ni code
  * d'erreur pour un module désactivé — les seuls signaux voisins sont des booléens par ressource, qui
- * voyagent dans des réponses 200 (DN-8, mesuré sur le contrat 4.0.2). Un 503 reste donc une erreur
- * avec Réessayer, jusque sur « Export storage is not configured in this deployment ». Le premier
- * écran qui lira un de ces booléens branchera ce composant ; inventer un déclencheur maintenant
- * fabriquerait un signal que la passerelle n'émet pas.
+ * voyagent dans des réponses 200 (DN-8). Un 503 reste donc une erreur avec Réessayer, jusque sur
+ * « Export storage is not configured in this deployment ». Le premier écran qui lira un de ces
+ * booléens branchera ce composant.
  */
 export function ModuleDisabled({ module, titleAs, className }: ModuleDisabledProps) {
   return (
@@ -161,10 +159,10 @@ export type ErrorStateProps = {
 /**
  * Une panne, et ce qu'elle laisse debout.
  *
- * Le composant promet lui-même que « vos données locales restent affichées », et cette promesse
- * est une contrainte de rendu avant d'être une phrase : **l'appelant ne doit pas effacer l'écran pour poser
- * cet état**. Vider la vue pour annoncer une panne est le contraire de ce que demande l'invariant
- * (e) — la chute d'un flux amont dégrade l'affichage, elle ne le supprime pas.
+ * Le composant promet lui-même que « vos données locales restent affichées », et cette promesse est
+ * une contrainte de rendu avant d'être une phrase : **l'appelant ne doit pas effacer l'écran pour
+ * poser cet état**. Vider la vue pour annoncer une panne est le contraire de l'invariant (e) — la
+ * chute d'un flux amont dégrade l'affichage, elle ne le supprime pas.
  *
  * `role="alert"` parce qu'une panne survenue pendant la lecture doit s'annoncer sans qu'on la
  * cherche. C'est la seule des quatre surfaces de ce fichier à le porter.

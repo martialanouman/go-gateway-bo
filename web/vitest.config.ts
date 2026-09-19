@@ -21,28 +21,21 @@ export default mergeConfig(
         enabled: true,
 
         // Le point de la porte. Sans `include`, `getUntestedFiles` rend `[]` — vérifié dans
-        // vitest@4.1.10 — et le fournisseur v8 ne rapporte que ce qu'un test a chargé : un module
-        // que personne n'importe serait absent du rapport, pas à zéro. Mesuré le 03/08/2026 sur un
-        // module orphelin temporaire : absent sans cette ligne, à 0 % avec elle.
+        // vitest@4.1.10 — et le fournisseur v8 ne rapporte que ce qu'un test a chargé : un module que
+        // personne n'importe serait absent du rapport, pas à zéro. Mesuré sur un module orphelin :
+        // absent sans cette ligne, à 0 % avec elle.
         include: ['src/**/*.{ts,tsx}'],
 
         // `test-setup.ts`, les fichiers de `test.include` et les fichiers de configuration sont
-        // ajoutés par Vitest à cette liste, qui est purement additive. Ne restent donc à écrire que
-        // ce qu'aucun test ne doit couvrir : le code **engendré**, et les assertions de type,
-        // qu'aucun runner n'exécute — c'est `tsc --noEmit` qui les juge. Le motif `*.gen.ts` couvre
-        // deux origines et deux portes, ce qui est voulu : `api.gen.ts` et `permissions.gen.ts`
-        // viennent de `make generate` et sont tenus par `check-generated` ; `routeTree.gen.ts` vient
-        // du plugin TanStack pendant `build-web` et est tenu par `check-routes`.
-        // `__root.tsx` est exempté depuis step-008, et c'est une exemption **de mesure**, pas de
-        // test : le fichier est exercé à 100 % en lignes, en fonctions et en branches. Il ne contient
-        // plus qu'un `createRootRoute({ notFoundComponent })` depuis que la coquille est passée dans
-        // `_shell` et le message d'adresse inconnue dans `components/` — et sur cette unique ligne, v8
-        // compte deux statements dont il n'en couvre qu'un, soit **50 %** quoi qu'on fasse. Mesuré :
-        // 50 % avec ou sans commentaire de tête, 66,66 % en y remettant le composant, jamais 75.
+        // ajoutés par Vitest à cette liste, purement additive. Ne restent à écrire que le code
+        // **engendré** et les assertions de type, qu'aucun runner n'exécute.
         //
-        // Abaisser le seuil pour tout le monde était l'autre issue, et la DoD l'interdit nommément.
-        // **À retirer dès que ce fichier reportera du code** — un `errorComponent`, un
-        // `beforeLoad` : il redeviendrait mesurable, et l'exemption le couvrirait alors en silence.
+        // `__root.tsx` est une exemption **de mesure**, pas de test : le fichier est exercé à 100 %
+        // en lignes, en fonctions et en branches, mais son unique `createRootRoute({…})` compte deux
+        // statements pour v8, dont un seul couvert — **50 %** quoi qu'on fasse. Abaisser le seuil pour
+        // tout le monde était l'autre issue, que la DoD interdit nommément. **À retirer dès que ce
+        // fichier reportera du code** — un `errorComponent`, un `beforeLoad` : il redeviendrait
+        // mesurable, et l'exemption le couvrirait alors en silence.
         exclude: ['src/**/*.gen.ts', 'src/**/*.test-d.ts', 'src/routes/__root.tsx'],
 
         // Le **tableau** doit lister les mêmes fichiers quel que soit le lecteur. Vitest 4.1.10 force
@@ -51,25 +44,15 @@ export default mergeConfig(
         // de `std-env`, qui le déduit de `AI_AGENT` puis d'une table où figurent `CLAUDECODE` et
         // `CLAUDE_CODE`. L'option écrite ici est spreadée **après** le défaut, donc elle gagne.
         //
-        // Ce que ça évite, mesuré le 03/08/2026 en retirant cette ligne : lu par un agent, le tableau
-        // perd `main.tsx` et `router.tsx`, tous deux à 100 %, et n'en montre plus que deux. Un
-        // relecteur en a conclu que `perFile` ne contraignait que deux fichiers ; il en contraint
-        // quatre — même date, `src/main.test.tsx` écarté du run, les `ERROR` tombent aussi sur
-        // `src/main.tsx` et `src/router.tsx`.
-        //
-        // Rien ne **survit** au run, ce qui n'est pas dire que rien n'est écrit : le fournisseur v8
-        // dépose `coverage/.tmp/coverage-N.json` pendant l'exécution — observés, `coverage-0` à
-        // `coverage-3` — et les supprime en sortant.
+        // Sans elle, un lecteur agent voit un tableau amputé des fichiers à 100 %, et conclut que
+        // `perFile` contraint moins de fichiers qu'il n'en contraint.
         reporter: [['text', { skipFull: false }]],
 
-        // Des planchers anti-régression, jamais une cible : chaque valeur est la mesure du jour, et
-        // aucune n'a de marge — vérifié le 03/08/2026, un point de plus rougit partout où il reste un
-        // point à prendre (`lines=76` et `statements=76` sur `__root.tsx` et `index.tsx`,
-        // `branches=81` sur `index.tsx`), et `functions` est déjà au plafond de 100. Les 25 % manquants
-        // de `__root.tsx` et `index.tsx` ne sont pas du code non exercé mais ce que la cartographie
-        // de v8 y rattache : l'accolade fermante du composant pour l'un, l'ouverture d'un bloc de
-        // commentaire pour l'autre. `perFile` parce qu'un seuil global se laisse tenir par la
-        // moyenne : mesuré sur un module orphelin d'une ligne, les quatre seuils globaux passaient.
+        // Des planchers anti-régression, jamais une cible : aucun n'a de marge, un point de plus
+        // rougit. Ce qui manque n'est pas du code non exercé mais ce que la cartographie de v8
+        // rattache à une accolade fermante ou à l'ouverture d'un bloc de commentaire. `perFile` parce
+        // qu'un seuil global se laisse tenir par la moyenne : mesuré sur un module orphelin d'une
+        // ligne, les quatre seuils globaux passaient.
         thresholds: {
           perFile: true,
           lines: 75,

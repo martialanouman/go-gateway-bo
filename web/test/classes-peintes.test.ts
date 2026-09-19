@@ -5,15 +5,11 @@
  * classes que personne n'émet ?
  *
  * **Le trou que ce fichier ferme est large.** Une quarantaine d'assertions de test visent une classe
- * — `toHaveClass('ui-button--danger')`, `querySelector('.ui-dot--down')`. Aucune ne traverse une
- * feuille : elles relisent la chaîne que le composant vient de construire. Mesuré le 12/09/2026 en
- * renommant `.ui-table__cell--mono` en `.ui-table__cell--machine` **dans le CSS seulement** : les
- * 214 tests, `vite build` et le parcours Playwright restaient verts, et toutes les valeurs machine
- * du produit perdaient leur police mono.
- *
- * Le défaut symétrique — un sélecteur que rien n'émet — est celui que Biome avait signalé sur
- * `.ui-input-wrap--icon`, mais seulement parce qu'il créait une spécificité descendante. Le linter
- * ne voit ni l'un ni l'autre en général.
+ * — `toHaveClass('ui-button--danger')`, `querySelector('.ui-dot--down')` — sans qu'aucune ne traverse
+ * une feuille : elles relisent la chaîne que le composant vient de construire. Mesuré en renommant
+ * `.ui-table__cell--mono` **dans le CSS seulement** : suite, `vite build` et parcours Playwright
+ * verts, et toutes les valeurs machine du produit perdaient leur police mono. Biome ne voit le défaut
+ * symétrique — un sélecteur que rien n'émet — que lorsqu'il crée une spécificité descendante.
  *
  * Ce qu'il ne garde pas : qu'une règle **fasse** ce qu'elle prétend. Une classe peut être ciblée par
  * une règle vide. C'est le rôle du parcours Playwright, seul endroit où l'on lit ce qui est peint.
@@ -52,10 +48,10 @@ function emitted(): Set<string> {
 /**
  * Les valeurs de chaque classe calculée.
  *
- * Comparer une règle au seul préfixe tenait une famille pour peinte dès qu'une de ses valeurs
- * l'était : retirer `.ui-dot--degraded` laissait le test vert, et une règle morte `.ui-dot--x`
- * aussi. `Record<Union, true>` rend la liste exhaustive par le typecheck : une valeur ajoutée à
- * l'union sans l'être ici, ou l'inverse, casse `tsc`.
+ * Comparer une règle au seul préfixe tiendrait une famille pour peinte dès qu'une de ses valeurs
+ * l'est : retirer `.ui-dot--degraded` laisserait le test vert, et une règle morte `.ui-dot--x` aussi.
+ * `Record<Union, true>` rend la liste exhaustive par le typecheck — une valeur ajoutée à l'union sans
+ * l'être ici, ou l'inverse, casse `tsc`.
  */
 function values<T extends string>(record: Record<T, true>): readonly string[] {
   return Object.keys(record)
@@ -96,12 +92,10 @@ function expanded(): Set<string> {
 /**
  * Les classes que les feuilles servies ciblent.
  *
- * **Toutes les feuilles, jamais une seule.** La première rédaction ne lisait que `components.css`,
- * la seule qui portait des `ui-*` à l'époque. Une primitive peinte ailleurs — ce que step-042 fait
- * avec `feedback.css` — serait sortie de la bijection sans qu'aucun test ne le dise : les deux
- * assertions ci-dessous auraient simplement jugé une feuille de moins, en silence. C'est exactement
- * le défaut que `STYLED_FILES` avait déjà eu, et il se referme de la même façon — une liste, deux
- * lecteurs.
+ * **Toutes les feuilles, jamais une seule.** Ne lire que `components.css` ferait sortir de la
+ * bijection toute primitive peinte ailleurs — `feedback.css` en peint — sans qu'aucun test ne le
+ * dise : les deux assertions ci-dessous jugeraient une feuille de moins, en silence. D'où
+ * `STYLED_FILES` : une liste, deux lecteurs.
  */
 function painted(): Set<string> {
   const css = STYLED_FILES.map((file) =>
