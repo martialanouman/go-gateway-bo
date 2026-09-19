@@ -411,9 +411,13 @@ func (w *webauthnWorld) removeMalformedPasskey() error {
 	return w.login.process.remove("/api/auth/mfa/webauthn/passkeys/pas-un-identifiant")
 }
 
-// removeUnknownPasskey retire un identifiant **bien formé** que ce compte ne porte pas : la garde de
-// forme le laisse donc passer, et c'est le store qui rend `PasskeyUnknown`. Un identifiant mal formé
-// serait refusé plus tôt, par l'autre garde, et n'observerait pas ce refus-ci.
+// removeUnknownPasskey retire un identifiant **bien formé** que ce compte ne porte pas.
+//
+// Il n'existe aucune garde de forme en amont — le contrat déclare `type: string`, le code engendré
+// se contente de le lier, et le handler ne l'inspecte pas. C'est la comparaison `c.id::text = $2` du
+// store qui répond, et elle rend `PasskeyUnknown` aussi bien pour un identifiant mal formé que pour
+// un UUID étranger. Les deux convergent donc sur **ce** refus ; ce cas-ci est celui qui en affirme le
+// statut, le code et la phrase, là où le scénario de l'identifiant mal formé n'affirme aucun statut.
 func (w *webauthnWorld) removeUnknownPasskey() error {
 	return w.login.process.remove(
 		"/api/auth/mfa/webauthn/passkeys/00000000-0000-4000-8000-000000000000")
@@ -555,11 +559,22 @@ func refusalIs(received *response, status int, code string) error {
 // messageMentions lit la **copie**, pas le code : c'est elle que l'opérateur voit, et un refus qui
 // n'expliquerait pas par où passer serait un contrôle interdit sans explication.
 func (w *webauthnWorld) messageMentions(fragment string) error {
+	return messageMentions(w.login.process.received, fragment)
+}
+
+// messageMentions est libre pour la même raison que `refusalIs` : `mfaWorld` pose la même question, et
+// deux rédactions divergeraient sur ce qu'elles acceptent de lire. Elle lit **le champ `message`** et
+// non le corps entier — un fragment trouvé dans `code` ferait passer une phrase qui ne le dit pas.
+func messageMentions(received *response, fragment string) error {
+	if received == nil {
+		return errors.New("aucune réponse à lire")
+	}
+
 	var refusal struct {
 		Message string `json:"message"`
 	}
 
-	if err := json.Unmarshal([]byte(w.login.process.received.body), &refusal); err != nil {
+	if err := json.Unmarshal([]byte(received.body), &refusal); err != nil {
 		return fmt.Errorf("relire le message du refus : %w", err)
 	}
 

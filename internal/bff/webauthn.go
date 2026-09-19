@@ -293,12 +293,17 @@ func lastSecondFactor() Error {
 // obéissait perdait son élévation et revenait au même endroit.
 //
 // « Elle n'existe pas » et « elle n'est pas à vous » restent indiscernables : c'est l'autre moitié du
-// refus, et elle ne bouge pas.
+// refus, et elle ne bouge pas. **Un identifiant mal formé rend le même refus** — la comparaison
+// `c.id::text = $2` du store le traite comme les autres, et aucune garde de forme ne le précède.
+//
+// La copie ne renvoie vers **aucun** inventaire existant : `GET /auth/me` ne rend qu'un compte de
+// clés, jamais leurs identifiants, et aucune route ne les liste. Le futur est donc annoncé comme
+// tel, à la manière de `secondFactorAlreadyEnrolled`.
 func unknownPasskey() Error {
 	return Error{
 		Code: "passkey_unknown",
-		Message: "Cette clé d'accès n'est pas sur ce compte : rien n'a été retiré. La liste des clés " +
-			"du compte dit lesquelles peuvent l'être.",
+		Message: "Cette clé d'accès n'est pas sur ce compte : rien n'a été retiré. L'inventaire qui " +
+			"nomme les clés du compte arrivera avec l'écran de gestion du second facteur.",
 	}
 }
 

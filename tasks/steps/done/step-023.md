@@ -182,7 +182,7 @@ a trouvées nues. Les cinq qui comptent :
 - **l'appel du handler à `ConsumeChallenge`.** Le store savait refuser un challenge déjà servi, mais
   rien n'exigeait qu'on l'appelle — un challenge de cinq minutes aurait valu douze heures.
 - **le `.Strict()` de `ChallengeDigest`.** Le jeton fait quarante-trois caractères base64url dont le
-  dernier ne porte que deux bits significatifs : sans lui, quatre valeurs distinctes ouvraient la même
+  dernier ne porte que quatre bits significatifs sur six : sans lui, quatre valeurs distinctes ouvraient la même
   ligne. C'est le piège déjà payé en step-022, sur le sceau du cookie.
 - **le nonce de GCM.** Le test qui prétendait le garder comparait les chiffrés de deux secrets
   **différents** — vrai quel que soit le nonce. Douze zéros constants le laissaient vert. Le vrai test

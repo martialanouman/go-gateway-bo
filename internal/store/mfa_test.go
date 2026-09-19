@@ -422,9 +422,10 @@ func TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas(t *testing.T) {
 			assert.False(t, alive)
 
 			// **La consommation porte les mêmes conditions, et pas par redondance.** `VerifyMfa` lit le
-			// challenge vivant au pas 3 et ne le consomme qu'au pas 5 : entre les deux passent un
-			// déchiffrement et un argon2id, soit un bon quart de seconde. Un challenge qui échoit dans
-			// cet intervalle serait consommé et élèverait la session si le `WHERE` ne le refusait pas.
+			// challenge vivant au pas 3 et ne le consomme qu'au pas 5 ; entre les deux, la vérification
+			// du facteur — un déchiffrement AES-GCM pour un TOTP, un argon2id pour un code de
+			// récupération, jamais les deux. Un challenge qui échoit dans cet intervalle serait consommé
+			// et élèverait la session si le `WHERE` ne le refusait pas.
 			// C'est ce que son jumeau `ConsumeCeremony` vérifie déjà (`TestUnDefiEchuNeSeRelitPas`),
 			// et que rien ne tenait ici.
 			consumed, err := mfa.ConsumeChallenge(t.Context(), challenge.ID)

@@ -211,8 +211,10 @@ func Discardable(database, prefix string) bool {
 // quelqu'un d'autre ; seul `ESRCH` — qu'`os` rend en `os.ErrProcessDone` — dit qu'il n'existe plus.
 // Lire le refus comme une mort fait jeter la base d'un run en cours dès qu'il tourne sous un autre
 // utilisateur : un collègue sur le même poste, un conteneur qui partage l'espace de PID, un run lancé
-// par CI à côté d'un run local. C'est le sens contraire de celui que cette fonction assume : elle est
-// fermée par défaut, et « je ne sais pas » doit s'y lire « vivant ».
+// par CI à côté d'un run local.
+//
+// Le défaut de cette fonction reste « mort », `EPERM` étant l'exception nommée — c'est `Discardable`,
+// au-dessus, qui est fermée par défaut, et elle l'est sur la **forme du nom**.
 func processAlive(pid int) bool {
 	if pid <= 0 {
 		return false

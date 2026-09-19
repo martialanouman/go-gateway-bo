@@ -609,11 +609,7 @@ func (w *mfaWorld) refusalIs(status int, code string) error {
 }
 
 func (w *mfaWorld) messageMentions(fragment string) error {
-	if !strings.Contains(w.login.process.received.body, fragment) {
-		return fmt.Errorf("le refus ne dit pas %q :\n%s", fragment, w.login.process.received.body)
-	}
-
-	return nil
+	return messageMentions(w.login.process.received, fragment)
 }
 
 // refusalNamesTheWayOut est l'inverse, et c'est la charte : un contrôle qui refuse dit où s'arrête

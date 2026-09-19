@@ -47,11 +47,6 @@ func TestUnChallengeMalFormeNAtteintPasLaBase(t *testing.T) {
 	require.Error(t, err, "témoin : un challenge bien formé doit, lui, atteindre la base")
 }
 
-// `TestUnManagerSeConstruitAvecSaClef` vivait ici. Il affirmait que `NewManager` échoue sur une clé
-// qui ne mènerait nulle part — et il était **toujours vrai** : `hkdf.Key` avec SHA-256 et trente-deux
-// octets demandés n'échoue pour aucune phrase secrète, quelle qu'elle soit. Aucune mutation ne le
-// faisait rougir, parce qu'il n'y avait rien à casser. Retiré plutôt que réparé : ce qu'il prétendait
-// garder n'existe pas.
-//
-// Ce qui garde vraiment la clé est ailleurs : la borne d'entropie de `internal/config` refuse une
-// phrase posée à la main, et `cipher_test.go` éprouve le chiffrement de bout en bout.
+// `TestUnManagerSeConstruitAvecSaClef` a été retiré : il affirmait que `NewManager` échoue sur une
+// mauvaise clé, et `hkdf.Key` avec SHA-256 n'échoue pour aucune phrase secrète. Ce qui garde la clé
+// est la borne de longueur d'`internal/config` et `cipher_test.go`.

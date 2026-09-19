@@ -18,6 +18,11 @@ bon au BFF.
 - Les cinq états de contenu là où ils s'appliquent, et les erreurs **champ par champ** depuis
   `errors[]` (§1.4).
 - L'extension d'un **parcours Playwright existant** contre le binaire, jusqu'à la console.
+- **L'indice de dérive d'horloge, que step-035 a retiré du serveur.** `invalid_second_factor` sert les
+  trois méthodes — TOTP, code de récupération, clé d'accès — et disait « vérifier l'heure de
+  l'application d'authentification » à qui venait de présenter une clé. Le serveur ne le dit donc
+  plus ; **l'écran du challenge TOTP doit le dire**, puisque lui seul sait quelle méthode il présente.
+  Sans cette reprise, un opérateur dont le téléphone a dérivé n'a plus aucune piste.
 
 ### Deux dettes que cette step hérite
 

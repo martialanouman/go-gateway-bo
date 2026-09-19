@@ -253,7 +253,7 @@ naissance sans toucher la dernière vue.
 |---|---|
 | `age()` reculait les trois horodatages, donc aucun test ne pouvait rougir pour l'échéance absolue | la mutation « borne absolue retirée » restée verte |
 | l'échéance absolue comparée sur une session ouverte à la milliseconde près | la mutation « repousser aussi `expires_at` » restée verte |
-| le pas altérait le **dernier** caractère du sceau, dont seuls deux bits sur six sont significatifs — le décodeur rendait les mêmes octets, et le scénario passait sur un serveur correct | le scénario rouge alors que le produit était juste |
+| le pas altérait le **dernier** caractère du sceau, dont seuls quatre bits sur six sont significatifs — le décodeur rendait les mêmes octets, et le scénario passait sur un serveur correct | le scénario rouge alors que le produit était juste |
 
 ### Ce qui n'est gardé par rien, vérifié plutôt que supposé
 

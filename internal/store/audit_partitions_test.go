@@ -130,17 +130,28 @@ func TestUnEchecNArretePasLeRenouvellementDesPartitions(t *testing.T) {
 	require.NoError(t, err, "cacher la fonction SQL : sans panne à traverser, ce cas n'observe rien")
 
 	ctx, stop := context.WithCancel(t.Context())
-	defer stop()
 
 	// Tamponné : la boucle ne doit pas se bloquer sur un rapport que personne ne lit, et un canal
 	// synchrone ferait dépendre ce cas de l'ordre d'exécution plutôt que du comportement.
 	reports := make(chan error, 64)
+	done := make(chan struct{})
 
-	go store.KeepAuditPartitions(ctx, pool, 10*time.Millisecond, func(err error) {
-		select {
-		case reports <- err:
-		default:
-		}
+	// Rejointe avant que `t.Cleanup` ne ferme le pool, comme sa jumelle ci-dessus : sans cela la
+	// boucle peut être dans `pool.Exec` pendant la fermeture.
+	go func() {
+		defer close(done)
+
+		store.KeepAuditPartitions(ctx, pool, 10*time.Millisecond, func(err error) {
+			select {
+			case reports <- err:
+			default:
+			}
+		})
+	}()
+
+	t.Cleanup(func() {
+		stop()
+		<-done
 	})
 
 	select {

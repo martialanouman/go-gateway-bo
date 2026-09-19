@@ -372,8 +372,9 @@ func refuseReplacement(lock store.Lock) EnrollTotpResponseObject {
 
 // refusedReplacementProof dit ce qui s'est passé : un facteur a été présenté, et il a été refusé.
 //
-// Le code lui est propre pour que le client puisse les séparer — l'écran d'enrôlement de step-028
-// place l'erreur sur le champ du code dans ce cas-ci, et sur l'écran entier dans l'autre.
+// Le code lui est propre pour que le client **puisse** les séparer : ici le statut ne discrimine rien,
+// les trois causes du 409 de cette route le partageant. Aucun écran ne le lit encore — step-028 le
+// fera, et sa fiche porte l'obligation.
 func refusedReplacementProof() Error {
 	return Error{
 		Code: "mfa_replacement_refused",
@@ -486,9 +487,9 @@ func presentedFactorIsWellFormed(request TotpEnrollmentRequest) bool {
 // step-024, `webauthn` : « vérifier l'heure de l'application d'authentification » envoyait régler une
 // horloge qui n'existe pas dans le geste de qui vient de présenter une clé d'accès.
 //
-// La dérive d'horloge n'est pas perdue pour autant, elle change d'endroit : l'écran qui présente un
-// code TOTP sait quelle méthode il sert, ce refus ne le sait pas. Une copie qui vaut pour trois
-// chemins ne peut nommer que ce qui leur est commun.
+// Une copie qui vaut pour trois chemins ne peut nommer que ce qui leur est commun. L'indice de dérive
+// d'horloge n'a donc plus de porteur aujourd'hui : il appartient à l'écran qui présente un code TOTP,
+// et sa fiche — step-027 — porte l'obligation de le rendre.
 func refusedSecondFactor() Error {
 	return Error{
 		Code: "invalid_second_factor",

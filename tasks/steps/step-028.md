@@ -17,6 +17,11 @@ permette de l'enrôler.
   **avant** que l'opérateur quitte l'écran.
 - Le chemin de sortie : l'écran conduit à la console, et il est atteignable depuis le login d'un
   opérateur sans facteur (step-027).
+- **Les trois causes du 409 de `POST /auth/mfa/totp/enroll` se distinguent au `code`, pas au statut**
+  (step-035). `mfa_replacement_refused` dit que la preuve présentée a été refusée : l'erreur se pose
+  **sur le champ du code**. `mfa_already_enrolled` dit qu'aucune preuve n'accompagnait la demande, et
+  `mfa_elevation_required` qu'il faut d'abord franchir la clé en place : ces deux-là valent pour
+  l'écran entier. Les confondre répondrait « présentez votre code » à quelqu'un qui vient de le faire.
 
 ### Deux dettes que cette step hérite
 

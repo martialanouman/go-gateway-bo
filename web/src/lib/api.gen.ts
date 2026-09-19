@@ -714,6 +714,17 @@ export interface operations {
              *     l'un des codes de récupération. Si les deux sont perdus, la sortie est la réinitialisation
              *     par un administrateur, que la gestion des opérateurs apportera : elle n'existe pas encore,
              *     et le message ne prétend pas le contraire.
+             *
+             *     **Trois causes, trois codes**, et ici le `code` est le **seul** discriminant — contrairement
+             *     au retrait d'une clé d'accès, où le statut sépare déjà les causes. Un client qui ne lirait
+             *     que le statut ne pourrait pas placer l'erreur au bon endroit.
+             *
+             *     `mfa_elevation_required` : le compte ne porte qu'une clé d'accès, et la session n'est pas
+             *     élevée — rien n'a été présenté, et c'est l'élévation qui tient lieu de preuve.
+             *     `mfa_already_enrolled` : un facteur est en place et **aucune preuve** n'accompagne la
+             *     demande. `mfa_replacement_refused` : une preuve a été présentée, et c'est **elle** qui a
+             *     été refusée — le distinguer du précédent est ce qui évite de répondre « présentez votre
+             *     code » à quelqu'un qui vient de le faire.
              */
             409: {
                 headers: {

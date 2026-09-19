@@ -27,7 +27,7 @@ import (
 // « arrivée jusqu'à la base ». Une borne retirée bascule de l'un à l'autre.
 //
 // Aucun conteneur, aucun réseau : le pool est paresseux (DN-5) et fermé avant tout usage.
-func loginRouter(t *testing.T) http.Handler {
+func apiRouter(t *testing.T) http.Handler {
 	t.Helper()
 
 	pool, err := store.NewPool(context.Background(), "postgres://operateur:secret@127.0.0.1:1/tableau")
@@ -50,7 +50,7 @@ func postLogin(t *testing.T, body string) (int, string) {
 	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 
-	loginRouter(t).ServeHTTP(rec, request)
+	apiRouter(t).ServeHTTP(rec, request)
 
 	response := rec.Result()
 
@@ -167,7 +167,7 @@ func postJSON(t *testing.T, path string, body any) int {
 	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(string(encoded)))
 	request.Header.Set("Content-Type", "application/json")
 
-	loginRouter(t).ServeHTTP(rec, request)
+	apiRouter(t).ServeHTTP(rec, request)
 
 	response := rec.Result()
 
@@ -186,9 +186,12 @@ func postJSON(t *testing.T, path string, body any) int {
 // Ce qu'elles achètent n'est pas cosmétique : le contrat ne sait pas exprimer deux champs qui
 // s'excluent, donc `code` et `assertion` y sont tous deux facultatifs. Sans exclusion, un
 // `method: webauthn` accompagné d'un `code` est traité comme une assertion et le code est ignoré en
-// silence ; un `method: totp` accompagné d'une `assertion` déréférence `*body.Code` sur un pointeur
-// que rien n'a rempli. La faute de forme se lirait alors comme un refus de facteur, ou comme une
-// panne du serveur.
+// silence ; un `method: totp` accompagné d'une `assertion` fait l'inverse — l'assertion est ignorée et
+// c'est le code qui est vérifié. Dans les deux sens, la faute de forme se lirait comme un refus de
+// facteur au lieu d'être nommée.
+//
+// **Aucun des deux ne provoque de panne**, et une rédaction précédente l'affirmait : `body.Code != nil`
+// est une clause **distincte** de l'exclusion (`mfa.go`), donc la retirer ne déréférence rien.
 func TestChaqueControleDeFormeDuSecondFacteurRefuseAvantToutEtat(t *testing.T) {
 	t.Parallel()
 
@@ -279,6 +282,25 @@ func TestLaPreuveDEnrolementExigeSesDeuxChampsOuAucun(t *testing.T) {
 		},
 		"un code sans méthode": {
 			body: map[string]any{"code": "123456"},
+			want: http.StatusBadRequest,
+		},
+		// **L'enum de l'enrôlement, pas celui de la vérification.** `webauthn` est une méthode valide
+		// pour `POST /auth/mfa/verify` depuis step-024, et ne l'a jamais été ici : le corps de cette
+		// route ne déclare que `totp` et `recovery_code`. Sans cette clause, le repli de
+		// `verifyPresentedFactor` enverrait une assertion WebAuthn sur le chemin TOTP, par un champ
+		// `code`. C'est le défaut que le commentaire de `presentedFactorIsWellFormed` décrit, et que
+		// la mutation de la fonction entière ne distinguait pas de ses clauses.
+		"une méthode que seule la vérification déclare": {
+			body: map[string]any{"method": "webauthn", "code": "123456"},
+			want: http.StatusBadRequest,
+		},
+		// La borne du code, redite en Go faute de validation du YAML à l'exécution. Sans elle, un code
+		// démesuré part jusqu'à argon2id.
+		"un code plus long que la borne": {
+			body: map[string]any{
+				"method": "totp",
+				"code":   strings.Repeat("1", maximumCodeLength+1),
+			},
 			want: http.StatusBadRequest,
 		},
 	}
