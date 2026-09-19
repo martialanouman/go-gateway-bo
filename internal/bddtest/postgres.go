@@ -209,12 +209,7 @@ func Discardable(database, prefix string) bool {
 //
 // **EPERM est un « oui ».** Le noyau refuse le signal parce que le processus existe et appartient à
 // quelqu'un d'autre ; seul `ESRCH` — qu'`os` rend en `os.ErrProcessDone` — dit qu'il n'existe plus.
-// Lire le refus comme une mort fait jeter la base d'un run en cours dès qu'il tourne sous un autre
-// utilisateur : un collègue sur le même poste, un conteneur qui partage l'espace de PID, un run lancé
-// par CI à côté d'un run local.
-//
-// Le défaut de cette fonction reste « mort », `EPERM` étant l'exception nommée — c'est `Discardable`,
-// au-dessus, qui est fermée par défaut, et elle l'est sur la **forme du nom**.
+// Le lire comme une mort fait jeter la base d'un run vivant lancé sous un autre utilisateur.
 func processAlive(pid int) bool {
 	if pid <= 0 {
 		return false

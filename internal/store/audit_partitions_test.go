@@ -131,9 +131,9 @@ func TestUnEchecNArretePasLeRenouvellementDesPartitions(t *testing.T) {
 
 	ctx, stop := context.WithCancel(t.Context())
 
-	// Tamponné : la boucle ne doit pas se bloquer sur un rapport que personne ne lit, et un canal
-	// synchrone ferait dépendre ce cas de l'ordre d'exécution plutôt que du comportement.
-	reports := make(chan error, 64)
+	// Tamponné, et `default:` plus bas : seul le premier rapport est lu, et la boucle ne doit pas se
+	// bloquer sur les suivants.
+	reports := make(chan error, 1)
 	done := make(chan struct{})
 
 	// Rejointe avant que `t.Cleanup` ne ferme le pool, comme sa jumelle ci-dessus : sans cela la

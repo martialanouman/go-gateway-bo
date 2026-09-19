@@ -357,11 +357,9 @@ func secondFactorLocked(seconds int) Error {
 // compté par la réservation prise plus haut dans `EnrollTotp`, et c'est elle qui annonce le verrou
 // quand elle vient d'atteindre le seuil.
 //
-// **Le corps n'est plus celui de « rien n'a été présenté ».** Le contrat décrit depuis toujours deux
-// causes sous ce 409 — aucune preuve, ou une preuve refusée — et le handler les servait avec la même
-// phrase : « le remplacer demande de franchir d'abord celui qui est en place », lue par un opérateur
-// qui venait précisément de le franchir, et à qui rien ne disait que c'était son code qui avait été
-// refusé. Il retapait le même.
+// **Le corps n'est pas celui de « rien n'a été présenté ».** Le contrat décrit deux causes sous ce
+// 409, et les confondre fait lire « présentez votre code » à qui vient de le faire : il retape le
+// même.
 func refuseReplacement(lock store.Lock) EnrollTotpResponseObject {
 	if lock.Failures >= mfa.MaxFailures {
 		return enrollmentLockedBySecondFactor(mfa.LockWindow)

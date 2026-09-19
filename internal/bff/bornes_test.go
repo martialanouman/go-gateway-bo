@@ -3,7 +3,6 @@ package bff
 import (
 	"context"
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -41,13 +40,13 @@ func apiRouter(t *testing.T) http.Handler {
 	})
 }
 
-// postLogin rend le statut et le corps servis. Le corps est passé en clair pour que sa taille en
-// octets soit celle que la borne du corps mesure.
-func postLogin(t *testing.T, body string) (int, string) {
+// post rend le statut et le corps servis. Le corps part en clair pour que sa taille en octets soit
+// celle que la borne du corps mesure.
+func post(t *testing.T, path, body string) (int, string) {
 	t.Helper()
 
 	rec := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 
 	apiRouter(t).ServeHTTP(rec, request)
@@ -76,7 +75,7 @@ func credentials(t *testing.T, email, password string) string {
 func TestUnMotDePasseDemesureNAtteintPasLeHachage(t *testing.T) {
 	t.Parallel()
 
-	status, _ := postLogin(t,
+	status, _ := post(t, "/api/auth/login",
 		credentials(t, "camille@exemple.test", strings.Repeat("a", maximumPasswordLength+1)))
 
 	assert.Equal(t, http.StatusBadRequest, status,
@@ -88,7 +87,7 @@ func TestUnMotDePasseDemesureNAtteintPasLeHachage(t *testing.T) {
 func TestUneAdresseDemesureeNeDevientPasUneCleDeCompteur(t *testing.T) {
 	t.Parallel()
 
-	status, _ := postLogin(t,
+	status, _ := post(t, "/api/auth/login",
 		credentials(t, strings.Repeat("a", maximumEmailLength+1)+"@exemple.test", "un mot de passe"))
 
 	assert.Equal(t, http.StatusBadRequest, status,
@@ -105,7 +104,7 @@ func TestUneAdresseDAccentsSousLaBorneNEstPasRefusee(t *testing.T) {
 	require.Len(t, []rune(accented), maximumEmailLength)
 	require.Greater(t, len(accented), maximumEmailLength, "ces runes tiennent sur un octet")
 
-	status, _ := postLogin(t, credentials(t, accented, "un mot de passe"))
+	status, _ := post(t, "/api/auth/login", credentials(t, accented, "un mot de passe"))
 
 	assert.Equal(t, http.StatusInternalServerError, status,
 		"une adresse que le contrat autorise a été refusée : la borne compte des octets là où le "+
@@ -124,7 +123,7 @@ func TestUnCorpsPlusGrandQueLaBorneNEstPasDecode(t *testing.T) {
 	require.Greater(t, len(oversized), maximumLoginBodyBytes,
 		"ce corps tient sous la borne : la mutation qui retire RequestSize resterait verte")
 
-	status, _ := postLogin(t, oversized)
+	status, _ := post(t, "/api/auth/login", oversized)
 
 	assert.Equal(t, http.StatusBadRequest, status,
 		"un corps de %d octets a été décodé : la borne du corps ne s'applique plus, et les bornes de "+
@@ -139,7 +138,7 @@ func TestUnCorpsPlusGrandQueLaBorneNEstPasDecode(t *testing.T) {
 func TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants(t *testing.T) {
 	t.Parallel()
 
-	status, served := postLogin(t, credentials(t, "camille@exemple.test", "un mot de passe"))
+	status, served := post(t, "/api/auth/login", credentials(t, "camille@exemple.test", "un mot de passe"))
 
 	require.Equal(t, http.StatusInternalServerError, status,
 		"une base injoignable a été servie comme un refus : l'opérateur retape un mot de passe qui est bon")
@@ -152,30 +151,18 @@ func TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants(t *testing.T) {
 	assert.NotContains(t, served, "127.0.0.1", "le corps porte l'adresse de la base")
 }
 
-// postJSON poste un corps quelconque sur une route de `/api`, sans cookie. Le même harnais que
-// `postLogin` — routeur entier, base morte — mais les routes de second facteur s'arrêtent plus tôt :
-// elles contrôlent la forme, **puis** exigent une session. Sans cookie, un corps bien formé rend donc
-// **401** et un corps mal formé **400**, et c'est ce contraste qui rend chaque clause observable. Un
-// contrôle retiré fait basculer 400 en 401.
+// postJSON encode et poste, sans cookie. Les routes de second facteur contrôlent la forme **puis**
+// exigent une session : un corps bien formé rend donc 401 et un corps mal formé 400, et c'est ce
+// contraste qui rend chaque clause observable.
 func postJSON(t *testing.T, path string, body any) int {
 	t.Helper()
 
 	encoded, err := json.Marshal(body)
 	require.NoError(t, err, "composer le corps de la requête")
 
-	rec := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(string(encoded)))
-	request.Header.Set("Content-Type", "application/json")
+	status, _ := post(t, path, string(encoded))
 
-	apiRouter(t).ServeHTTP(rec, request)
-
-	response := rec.Result()
-
-	defer func() { _ = response.Body.Close() }()
-
-	_, _ = io.Copy(io.Discard, response.Body)
-
-	return response.StatusCode
+	return status
 }
 
 // **Les contrôles de forme de la vérification, un par un.** Les scénarios n'en exerçaient que deux —
@@ -183,15 +170,9 @@ func postJSON(t *testing.T, path string, body any) int {
 // `presentedSecondFactorIsWellFormed` et de `presentedFactorIsWellFormed` pouvaient disparaître sans
 // qu'aucune suite rougisse, mesuré le 16/09/2026.
 //
-// Ce qu'elles achètent n'est pas cosmétique : le contrat ne sait pas exprimer deux champs qui
-// s'excluent, donc `code` et `assertion` y sont tous deux facultatifs. Sans exclusion, un
-// `method: webauthn` accompagné d'un `code` est traité comme une assertion et le code est ignoré en
-// silence ; un `method: totp` accompagné d'une `assertion` fait l'inverse — l'assertion est ignorée et
-// c'est le code qui est vérifié. Dans les deux sens, la faute de forme se lirait comme un refus de
-// facteur au lieu d'être nommée.
-//
-// **Aucun des deux ne provoque de panne**, et une rédaction précédente l'affirmait : `body.Code != nil`
-// est une clause **distincte** de l'exclusion (`mfa.go`), donc la retirer ne déréférence rien.
+// Le contrat ne sait pas exprimer deux champs qui s'excluent : `code` et `assertion` y sont tous deux
+// facultatifs, et c'est en Go que la règle vit. Sans exclusion, le champ de trop est ignoré en
+// silence et la faute de forme se lit comme un refus de facteur.
 func TestChaqueControleDeFormeDuSecondFacteurRefuseAvantToutEtat(t *testing.T) {
 	t.Parallel()
 
@@ -316,22 +297,14 @@ func TestLaPreuveDEnrolementExigeSesDeuxChampsOuAucun(t *testing.T) {
 	}
 }
 
-// sealedLikeProduction fabrique un cookie que `session.Unseal` acceptera, en reproduisant les quatre
-// lignes de `newSealedToken` — qui ne sort pas de son paquet, et c'est bien ainsi : le jeton nu ne
-// doit se fabriquer nulle part ailleurs dans le produit.
+// sealedLikeProduction fabrique un cookie que `session.Unseal` acceptera. Le jeton est constant —
+// quarante-trois `A`, l'encodage canonique de trente-deux octets nuls : son contenu n'est jamais lu,
+// le pool étant mort avant la requête.
 //
-// **Le risque de la recopie est fermé par le sens de l'échec.** Si le format du sceau diverge,
-// `Unseal` refuse, la base n'est jamais atteinte, et le cas ci-dessous rend 401 là où il exige 500 :
-// il rougit au lieu de passer. Une recopie qui se démoderait ne peut donc pas rendre ce test
-// complaisant.
-func sealedLikeProduction(t *testing.T, secret []byte) string {
-	t.Helper()
-
-	token := make([]byte, 32)
-	_, err := rand.Read(token)
-	require.NoError(t, err)
-
-	text := base64.RawURLEncoding.EncodeToString(token)
+// **Le risque de la recopie est fermé par le sens de l'échec** : un format qui divergerait ferait
+// refuser `Unseal`, donc rendre 401 là où le cas exige 500.
+func sealedLikeProduction(secret []byte) string {
+	text := strings.Repeat("A", 43)
 
 	mac := hmac.New(sha256.New, secret)
 	mac.Write([]byte(text))
@@ -367,7 +340,7 @@ func TestUneBaseInjoignableNeFermePasLaSessionDeLOperateur(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
 	request.AddCookie(&http.Cookie{
 		Name:  session.CookieName,
-		Value: sealedLikeProduction(t, secret),
+		Value: sealedLikeProduction(secret),
 	})
 
 	rec := httptest.NewRecorder()

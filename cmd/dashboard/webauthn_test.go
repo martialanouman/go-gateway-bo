@@ -411,13 +411,10 @@ func (w *webauthnWorld) removeMalformedPasskey() error {
 	return w.login.process.remove("/api/auth/mfa/webauthn/passkeys/pas-un-identifiant")
 }
 
-// removeUnknownPasskey retire un identifiant **bien formé** que ce compte ne porte pas.
-//
-// Il n'existe aucune garde de forme en amont — le contrat déclare `type: string`, le code engendré
-// se contente de le lier, et le handler ne l'inspecte pas. C'est la comparaison `c.id::text = $2` du
-// store qui répond, et elle rend `PasskeyUnknown` aussi bien pour un identifiant mal formé que pour
-// un UUID étranger. Les deux convergent donc sur **ce** refus ; ce cas-ci est celui qui en affirme le
-// statut, le code et la phrase, là où le scénario de l'identifiant mal formé n'affirme aucun statut.
+// removeUnknownPasskey retire un identifiant bien formé que ce compte ne porte pas. Rien ne garde la
+// forme en amont — c'est la comparaison `c.id::text = $2` du store qui répond, et un identifiant mal
+// formé converge sur le même refus. Ce cas-ci est celui qui en affirme le statut, le code et la
+// phrase ; le scénario de l'identifiant mal formé, lui, n'affirme aucun statut.
 func (w *webauthnWorld) removeUnknownPasskey() error {
 	return w.login.process.remove(
 		"/api/auth/mfa/webauthn/passkeys/00000000-0000-4000-8000-000000000000")

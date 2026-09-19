@@ -287,18 +287,13 @@ func lastSecondFactor() Error {
 
 // unknownPasskey refuse un retrait qui ne désigne aucune clé de l'opérateur.
 //
-// **Il ne parle pas de la session**, et c'est tout le correctif : la rédaction d'avant réutilisait
-// `notAuthenticated()` — « cette session n'est plus ouverte, reconnectez-vous » — sur une session
-// vivante et élevée, puisque les deux gardes qui l'exigent sont franchies plus haut. L'opérateur qui
-// obéissait perdait son élévation et revenait au même endroit.
+// **Il ne parle pas de la session** : les deux gardes qui l'exigent sont franchies plus haut, donc
+// elle est vivante et élevée. « Elle n'existe pas », « elle n'est pas à vous » et « cet identifiant
+// n'en est pas un » rendent le même refus — la comparaison `c.id::text = $2` du store les traite
+// ensemble, et les distinguer dirait ce que possède quelqu'un d'autre.
 //
-// « Elle n'existe pas » et « elle n'est pas à vous » restent indiscernables : c'est l'autre moitié du
-// refus, et elle ne bouge pas. **Un identifiant mal formé rend le même refus** — la comparaison
-// `c.id::text = $2` du store le traite comme les autres, et aucune garde de forme ne le précède.
-//
-// La copie ne renvoie vers **aucun** inventaire existant : `GET /auth/me` ne rend qu'un compte de
-// clés, jamais leurs identifiants, et aucune route ne les liste. Le futur est donc annoncé comme
-// tel, à la manière de `secondFactorAlreadyEnrolled`.
+// L'inventaire qu'il annonce n'existe pas encore : aucune route ne liste les clés. Le futur est donc
+// écrit au futur, comme dans `secondFactorAlreadyEnrolled`.
 func unknownPasskey() Error {
 	return Error{
 		Code: "passkey_unknown",
