@@ -146,3 +146,145 @@ func TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants(t *testing.T) {
 	assert.NotContains(t, served, "closed pool", "le message de la bibliothèque part au navigateur")
 	assert.NotContains(t, served, "127.0.0.1", "le corps porte l'adresse de la base")
 }
+
+// postJSON poste un corps quelconque sur une route de `/api`, sans cookie. Le même harnais que
+// `postLogin` — routeur entier, base morte — mais les routes de second facteur s'arrêtent plus tôt :
+// elles contrôlent la forme, **puis** exigent une session. Sans cookie, un corps bien formé rend donc
+// **401** et un corps mal formé **400**, et c'est ce contraste qui rend chaque clause observable. Un
+// contrôle retiré fait basculer 400 en 401.
+func postJSON(t *testing.T, path string, body any) int {
+	t.Helper()
+
+	encoded, err := json.Marshal(body)
+	require.NoError(t, err, "composer le corps de la requête")
+
+	rec := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(string(encoded)))
+	request.Header.Set("Content-Type", "application/json")
+
+	loginRouter(t).ServeHTTP(rec, request)
+
+	response := rec.Result()
+
+	defer func() { _ = response.Body.Close() }()
+
+	_, _ = io.Copy(io.Discard, response.Body)
+
+	return response.StatusCode
+}
+
+// **Les contrôles de forme de la vérification, un par un.** Les scénarios n'en exerçaient que deux —
+// un code démesuré et une méthode inconnue ; les quatre autres clauses de
+// `presentedSecondFactorIsWellFormed` et de `presentedFactorIsWellFormed` pouvaient disparaître sans
+// qu'aucune suite rougisse, mesuré le 16/09/2026.
+//
+// Ce qu'elles achètent n'est pas cosmétique : le contrat ne sait pas exprimer deux champs qui
+// s'excluent, donc `code` et `assertion` y sont tous deux facultatifs. Sans exclusion, un
+// `method: webauthn` accompagné d'un `code` est traité comme une assertion et le code est ignoré en
+// silence ; un `method: totp` accompagné d'une `assertion` déréférence `*body.Code` sur un pointeur
+// que rien n'a rempli. La faute de forme se lirait alors comme un refus de facteur, ou comme une
+// panne du serveur.
+func TestChaqueControleDeFormeDuSecondFacteurRefuseAvantToutEtat(t *testing.T) {
+	t.Parallel()
+
+	code := "123456"
+	assertion := map[string]any{"id": "abc"}
+	challenge := strings.Repeat("a", 43)
+
+	cases := map[string]struct {
+		body map[string]any
+		want int
+	}{
+		// Le témoin, et il n'est pas décoratif : sans lui, une route qui refuserait **tout** en 400
+		// ferait passer les cinq cas ci-dessous sans rien prouver.
+		"un corps bien formé va jusqu'à l'exigence de session": {
+			body: map[string]any{"challenge": challenge, "method": "totp", "code": code},
+			want: http.StatusUnauthorized,
+		},
+		"un challenge plus long que la borne": {
+			body: map[string]any{
+				"challenge": strings.Repeat("a", maximumChallengeLength+1),
+				"method":    "totp",
+				"code":      code,
+			},
+			want: http.StatusBadRequest,
+		},
+		"une assertion accompagnée d'un code": {
+			body: map[string]any{
+				"challenge": challenge, "method": "webauthn", "assertion": assertion, "code": code,
+			},
+			want: http.StatusBadRequest,
+		},
+		"un code accompagné d'une assertion": {
+			body: map[string]any{
+				"challenge": challenge, "method": "totp", "code": code, "assertion": assertion,
+			},
+			want: http.StatusBadRequest,
+		},
+		"une assertion vide sur la méthode qui en exige une": {
+			body: map[string]any{
+				"challenge": challenge, "method": "webauthn", "assertion": map[string]any{},
+			},
+			want: http.StatusBadRequest,
+		},
+		"un code vide sur une méthode qui en exige un": {
+			body: map[string]any{"challenge": challenge, "method": "totp", "code": ""},
+			want: http.StatusBadRequest,
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, testCase.want, postJSON(t, "/api/auth/mfa/verify", testCase.body),
+				"la forme du corps n'est pas jugée comme elle devrait : une faute de forme se lit "+
+					"comme un refus de facteur, ou l'inverse")
+		})
+	}
+}
+
+// **Les deux moitiés de la preuve d'enrôlement.** `presentedFactorIsWellFormed` exige les deux champs
+// ensemble ou aucun des deux ; rien ne l'exerçait.
+//
+// Un `method` sans `code` traité comme « aucune preuve » rendrait 409 « un facteur est déjà en
+// place » à un opérateur qui vient d'en présenter un. Un `code` sans `method` partirait sur le chemin
+// TOTP par le repli de `verifyPresentedFactor`, alors que l'opérateur a peut-être tapé un code de
+// récupération — et se verrait refuser un code juste.
+func TestLaPreuveDEnrolementExigeSesDeuxChampsOuAucun(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		body map[string]any
+		want int
+	}{
+		// Les deux témoins : aucune preuve, et une preuve complète. Les deux formes que la route
+		// accepte, et sans elles un refus universel passerait les deux cas suivants.
+		"aucun des deux champs, qui est l'amorçage": {
+			body: map[string]any{},
+			want: http.StatusUnauthorized,
+		},
+		"les deux champs ensemble": {
+			body: map[string]any{"method": "totp", "code": "123456"},
+			want: http.StatusUnauthorized,
+		},
+		"une méthode sans code": {
+			body: map[string]any{"method": "totp"},
+			want: http.StatusBadRequest,
+		},
+		"un code sans méthode": {
+			body: map[string]any{"code": "123456"},
+			want: http.StatusBadRequest,
+		},
+	}
+
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, testCase.want, postJSON(t, "/api/auth/mfa/totp/enroll", testCase.body),
+				"la preuve d'enrôlement n'est pas jugée sur sa forme : une faute de forme se lit "+
+					"comme « aucune preuve », donc comme un conflit d'état")
+		})
+	}
+}
