@@ -11,9 +11,10 @@ import (
 // MaxFailures et LockWindow bornent les essais de second facteur d'un opérateur, **toutes connexions
 // confondues**. C'est la seule chose qui rende la recherche exhaustive d'un code à six chiffres
 // infaisable, et elle a manqué : le compteur du premier facteur ne borne rien ici, puisque
-// `RecordFailure` n'est appelé que sur le chemin d'échec de `auth.Login` et que le chemin de succès
-// appelle `ClearFailures`. Une connexion réussie n'incrémente donc aucun compteur, et qui détient le
-// mot de passe émet autant de challenges qu'il veut. L'arithmétique est dans la migration 00007.
+// `RecordSourceFailure` n'est appelé que sur le chemin d'échec de `auth.Login` et que le chemin de
+// succès appelle `ClearFailures`. Une connexion réussie n'incrémente donc aucun compteur d'adresse,
+// et qui détient le mot de passe émet autant de challenges qu'il veut. L'arithmétique est dans la
+// migration 00007.
 //
 // Les mêmes valeurs qu'au premier facteur, et pour les mêmes raisons : cinq parce qu'un opérateur qui
 // hésite entre deux téléphones ou tape à côté en consomme trois sans être un attaquant ; un quart
