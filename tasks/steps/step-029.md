@@ -21,7 +21,7 @@ surface serveur **et** son écran dans la même PR.
 ### Huit dettes que cette step hérite
 
 *Écrites ici et non seulement dans `steps/done/`, parce qu'une fiche archivée n'est ouverte par
-personne. Les huit figurent au registre de `todo.md`.*
+personne. Les huit ont leur fiche dans `debts/`.*
 
 - **Un refus de permission ne laisse aucune trace côté serveur, et c'est cette step qui le rend
   visible.** `internal/bff` ne reçoit aucun `*slog.Logger` (`router.go:151-156`), et le journal
@@ -68,7 +68,7 @@ personne. Les huit figurent au registre de `todo.md`.*
   `internal/config/bootstrap.go` le dit en toutes lettres : « c'est la seule politique de mot de passe
   du produit à ce jour […] l'écran de gestion des opérateurs (step-029) tranchera pour les comptes
   suivants ». Le renvoi existait donc depuis step-020 ; ce qui manquait est qu'il soit lu ici. Sans
-  cette ligne, la step passerait sans la payer pendant que le registre affirmerait le contraire.
+  ce fichier, la step passerait sans la payer pendant que `debts/` affirmerait le contraire.
 
 - **Les deux moitiés de la question que DN-8 de step-020 a léguée, et qu'aucune autre step ne touche.**
   D'abord : un rôle personnalisé qui porterait le nom d'un rôle par défaut — celui d'aujourd'hui ou

@@ -27,7 +27,7 @@ bon au BFF.
 ### Deux dettes que cette step hérite
 
 *Écrites ici et non seulement dans `steps/done/`, parce qu'une fiche archivée n'est ouverte par
-personne. Les deux figurent au registre de `todo.md`.*
+personne. Les deux ont leur fiche dans `debts/`.*
 
 - **Le préfixe `__Host-` du cookie de session n'est vu par aucun scénario, et c'est cette step qui
   peut enfin le voir.** step-022 a mesuré le comportement dans Chromium et l'a écrit, mais son propre

@@ -192,6 +192,8 @@ jamais un seuil abaissé pour tout le monde.
 - Quoi/pourquoi : `docs/specification-technique-tableau-de-bord.md`
 - Comment/dans quel ordre : `tasks/plan.md`
 - Découpage en PRs : `tasks/todo.md` + `tasks/steps/step-NNN.md`
+- Dettes connues, une par fichier : `debts/` — sa convention est dans `debts/README.md`, et
+  `internal/bddtest/porteurs_test.go` la tient
 - Règles du client : `web/CLAUDE.md`
 - Charte graphique & kit UI : `.claude/skills/sms-gateway-design/README.md`
 - Contrat API : `@martialanouman/gateway-api-contracts` (jamais copié ici)
