@@ -576,17 +576,15 @@ const NoTrustedProxy = "none"
 // La normalisation vit **ici**, à l'entrée de la valeur, et non dans la garde qui la consomme : une
 // garde qui normalise son paramètre à chaque requête laisse deux formes circuler dans le produit.
 func (r *reader) webauthnOrigin(name string) string {
-	value, ok := r.required(name)
-	if !ok {
+	value := r.requiredAbsoluteURL(name, "http", "https")
+	if value == "" {
 		return ""
 	}
 
-	parsed, err := url.Parse(value)
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		r.reject(name, "URL absolue en http ou https attendue, reçu %q", RedactURL(value))
-
-		return ""
-	}
+	// L'erreur est écartée parce qu'elle ne peut plus survenir : `absoluteURL` vient d'analyser cette
+	// même valeur, et rend `""` quand elle échoue. En réécrire le refus ici ferait deux rédactions
+	// d'un seul verdict, qui divergeraient.
+	parsed, _ := url.Parse(value)
 
 	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
 		(parsed.Path != "" && parsed.Path != "/") {

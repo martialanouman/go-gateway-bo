@@ -141,15 +141,13 @@ func announcesJSON(r *http.Request) bool {
 // octet par minute, qui retient sinon une goroutine et un descripteur aussi longtemps que le client
 // le décide.
 //
-// Elle est indépendante du temps de traitement, et c'est ce qui permet de la garder aussi courte :
-// `startBackgroundRead` (`$GOROOT/src/net/http/server.go`) **efface** l'échéance de lecture dès que
-// le corps atteint son EOF, si bien que les 3,16 s d'argon2id relevées le 09/09/2026 sur le runner de
-// la CI ne courent jamais contre elle.
+// Aussi courte parce qu'elle ne couvre pas le traitement : `startBackgroundRead`
+// (`$GOROOT/src/net/http/server.go`) **efface** l'échéance dès l'EOF du corps, donc les 3,16 s
+// d'argon2id ne courent jamais contre elle.
 //
-// Ce que le chiffre couvre exactement : le temps entre l'entrée de ce middleware et l'EOF du corps —
-// pas « cinq secondes de corps ». `withSession` s'exécute entre les deux et fait un aller-retour en
-// base, qui rogne donc le budget. Sur une base saine c'est un millième de la marge ; sur une base
-// très lente, une requête légitime se verrait refuser en 400.
+// Ce qu'elle couvre est l'entrée de ce middleware jusqu'à cet EOF, et non « cinq secondes de corps » :
+// l'aller-retour en base de `withSession` s'y trouve et rogne le budget. Sur une base très lente, une
+// requête légitime se verrait donc refuser en 400.
 const apiBodyDeadline = 5 * time.Second
 
 // apiRequestDeadline borne la requête entière. Ce qu'elle couvre que l'échéance de lecture ne couvre
@@ -157,29 +155,22 @@ const apiBodyDeadline = 5 * time.Second
 // n'a ni `AcquireTimeout` ni paramètre équivalent (`internal/store/pool.go`), si bien qu'un pool
 // saturé suspend la requête indéfiniment.
 //
-// Trente secondes : très au-dessus de la requête la plus lente du produit, parce que ce qu'elle
-// attrape est une suspension et non une lenteur.
+// Trente secondes, parce que ce qu'elle attrape est une suspension et non une lenteur.
 //
-// **Aucun test ne rougit si cette échéance disparaît, et c'est mesuré plutôt que supposé** : le
-// 19/09/2026, `context.WithTimeout` remplacé par `context.WithCancel`, les 95 scénarios restent
-// verts. Ce qu'il faudrait pour l'observer est un pool saturé sous un scénario — soit tenir dix
-// connexions occupées pendant qu'une onzième attend, ce qui fait durer le test plus longtemps que la
-// porte qu'il garde. Elle reste parce que la suspension qu'elle ferme est réelle, pas parce qu'elle
-// est prouvée.
+// **Aucun test ne rougit si elle disparaît, et c'est mesuré** : le 19/09/2026, `context.WithTimeout`
+// remplacé par `context.WithCancel`, les 95 scénarios restent verts. L'observer demanderait un pool
+// saturé sous scénario, dont la durée dépasserait la porte qu'il garde. Elle reste parce que la
+// suspension qu'elle ferme est réelle, pas parce qu'elle est prouvée.
 const apiRequestDeadline = 30 * time.Second
 
 // withAPIDeadlines borne une requête `/api`, et elle seule : montée dans le groupe `/api`, elle
 // n'atteint pas `/ws`, dont c'est le métier de rester ouverte.
 //
-// **Ce montage-là n'est gardé par rien, et la raison est plus bête que mesurée** : posée à la racine
-// — donc sur `/ws` — le 19/09/2026, les 95 scénarios restent verts. Ce n'est pas que le handler s'en
-// moque : c'est qu'**aucun scénario ne demande `/ws`**. Le seul exercice de cette route dans le dépôt
-// est un GET de `router_test.go`. C'est step-043, qui ouvrira une vraie WebSocket, qui rendra la
-// différence observable, et c'est elle qui doit porter le test.
-//
-// **`/ws` n'est pas non plus couverte par le contrôle d'origine**, pour la même raison de montage.
-// Sans conséquence aujourd'hui — elle refuse tout en 501 — mais step-043 ouvrira une route qui porte
-// le cookie de session : la garde devra monter avec elle.
+// **Ce montage n'est gardé par rien** : posée à la racine — donc sur `/ws` — le 19/09/2026, les 95
+// scénarios restent verts, et la raison n'est pas le handler mais qu'**aucun scénario ne demande
+// `/ws`**. Le contrôle d'origine ci-dessus manque à `/ws` pour la même raison de montage, sans
+// conséquence tant qu'elle refuse tout en 501. step-043 ouvrira une route qui porte le cookie de
+// session : elle doit y monter les deux, et porter le test.
 //
 // **Ni `ReadTimeout` ni `http.TimeoutHandler`** : le premier vaut pour toute connexion du serveur,
 // WebSocket comprise ; le second met la réponse entière en mémoire tampon avant de l'écrire.
