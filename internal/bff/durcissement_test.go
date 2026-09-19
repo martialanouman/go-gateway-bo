@@ -31,8 +31,10 @@ func throughGuard(t *testing.T, request *http.Request) (int, bool) {
 	return recorder.Code, reached
 }
 
-func mutation(method, contentType string, headers map[string]string) *http.Request {
-	request := httptest.NewRequest(method, "/api/auth/login", strings.NewReader(`{}`))
+// mutation compose un POST : la seule forme que les cas ci-dessous font varier est ce que le
+// navigateur annonce, jamais la méthode — celle du `DELETE` sans corps a son test à elle.
+func mutation(contentType string, headers map[string]string) *http.Request {
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{}`))
 	if contentType != "" {
 		request.Header.Set("Content-Type", contentType)
 	}
@@ -93,7 +95,7 @@ func TestUneMutationNEstServieQueDepuisLeTableauDeBord(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			status, reached := throughGuard(t, mutation(http.MethodPost, "application/json", testCase.headers))
+			status, reached := throughGuard(t, mutation("application/json", testCase.headers))
 
 			assert.Equal(t, testCase.expected, status)
 			assert.Equal(t, testCase.expected == http.StatusOK, reached,
@@ -158,7 +160,7 @@ func TestUnCorpsDeMutationEstAnnonceEnJSON(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			request := mutation(http.MethodPost, testCase.contentType,
+			request := mutation(testCase.contentType,
 				map[string]string{"Sec-Fetch-Site": "same-origin"})
 
 			status, _ := throughGuard(t, request)
@@ -193,7 +195,7 @@ func TestUneBarreObliqueDansLaConfigurationNeRefuseRien(t *testing.T) {
 		func(_ http.ResponseWriter, _ *http.Request) { reached = true }))
 
 	recorder := httptest.NewRecorder()
-	guard.ServeHTTP(recorder, mutation(http.MethodPost, "application/json",
+	guard.ServeHTTP(recorder, mutation("application/json",
 		map[string]string{"Origin": dashboardOrigin}))
 
 	assert.True(t, reached, "l'origine du navigateur devait correspondre malgré la barre oblique")
@@ -207,7 +209,7 @@ func TestUnRefusDOrigineEstUnDTODeclare(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	requireSameOrigin(dashboardOrigin)(http.HandlerFunc(
 		func(_ http.ResponseWriter, _ *http.Request) {}),
-	).ServeHTTP(recorder, mutation(http.MethodPost, "application/json", nil))
+	).ServeHTTP(recorder, mutation("application/json", nil))
 
 	require.Equal(t, http.StatusForbidden, recorder.Code)
 	assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
