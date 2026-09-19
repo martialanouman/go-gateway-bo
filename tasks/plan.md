@@ -430,7 +430,7 @@ contrat resté en 2.5.0. Cette ligne a annoncé « 000 → 008 » pendant vingt-
 - `api/openapi-bff.yaml` : le contrat du BFF, engendrant les types serveur Go **et** les types client
   TypeScript. Un seul contrat, deux bouts typés.
 - PostgreSQL 18 + `pgx`, les tables du §3.1, migrations commitées, `audit_log` partitionné par
-  mois, `docker-compose.yml` (PostgreSQL + Redis).
+  mois, `docker-compose.yml` (PostgreSQL ; Redis revient avec step-044).
 - `internal/permissions/` : le catalogue Go, la génération du TypeScript, et le test de divergence.
 - Tokens de la charte portés + page `/_design`, polices auto-hébergées.
 - Harnais **BDD** : `godog` + `testify` + testcontainers côté Go, Vitest + Testing Library et

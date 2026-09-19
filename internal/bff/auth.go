@@ -213,8 +213,9 @@ func lockedResponse(remaining time.Duration) Login429JSONResponse {
 		Headers: Login429ResponseHeaders{RetryAfter: seconds},
 		Body: Error{
 			Code: "too_many_attempts",
-			// La copie ne promet pas les deux dimensions à la fois. `LockFor` n'en rend **qu'une** — celle
-			// qui a franchi son seuil — et les deux le franchissent indépendamment : cinq adresses
+			// La copie ne promet pas les deux dimensions à la fois. Le refus n'en porte **qu'une** — celle
+			// que `SourceLock` ou `Reserve` a vue franchir son seuil — et les deux le franchissent
+			// indépendamment : cinq adresses
 			// essayées depuis une même source ne verrouillent que la source, et un opérateur légitime
 			// derrière elle lirait « ce compte est bloqué » alors qu'il pourrait entrer d'ailleurs. Elle
 			// ne dit pas « ce compte » non plus : les compteurs portent sur l'adresse **soumise**, et il

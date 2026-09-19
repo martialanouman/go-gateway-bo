@@ -35,9 +35,10 @@ const writeJSONCallSites = 8
 // résolu par le type-checker et non par la lecture de l'expression, ce qui laisse passer aussi bien
 // `Error{…}` littéral qu'un constructeur qui le rend.
 //
-// L'alias compte comme le type : `Error` **est** `Error`, engendré depuis le contrat, et
-// `types.Unalias` est ce qui le dit. Sans lui la porte refuserait les huit sites légitimes le jour de
-// sa livraison, ce qui est la façon la plus sûre de la faire retirer.
+// `Error` est engendré depuis le contrat, et les sites légitimes le nomment directement. Le
+// `types.Unalias` de `declarationFile` ne porte donc **rien** ici depuis que step-037 a retiré
+// l'alias `errorResponse` qui le motivait : il reste par précaution, pour le jour où un alias
+// reparaîtrait, et le retirer ne ferait aujourd'hui rougir aucun test.
 func TestLeSecondCheminVersLeFilNeSerialiseQueDesDTODeclares(t *testing.T) {
 	t.Parallel()
 

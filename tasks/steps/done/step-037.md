@@ -101,6 +101,19 @@ Le filet bascule donc sur l'API vivante avant que les méthodes partent.
 Aucun test neuf pour le reste de l'élagage : il ne change aucun comportement. `make check` vert, et
 `pnpm install --frozen-lockfile` passe sur le lockfile régénéré.
 
+## Revue (19/09/2026)
+Six constats, **tous conséquences de cet élagage**, tous corrigés dans la même PR. Chacun revérifié
+ici plutôt que repris du rapport.
+
+| # | Constat | Mesure refaite |
+|---|---|---|
+| 1 | `TestUnVerrouDeSecondFacteurEchuLaisseLeCompteurRepartirDeUn`, repointé de `count` vers `reserve`, ne prouvait plus son nom | Mutation confirmée : retirer la branche d'oubli de `reserve` laissait le test **vert**. `Locked()` seul ne distingue pas « reparti de 1 » de « collé au seuil », l'essai venant d'être admis. Corrigé par un second essai témoin — vert propre, **rouge sous la même mutation** |
+| 2 | `internal/mfa/manager.go:14` affirmait qu'une connexion réussie n'incrémente aucun compteur d'adresse | Faux : `auth.Login` appelle `Reserve(emailKey)` à **chaque** essai (`authenticator.go:115`), succès compris. La conclusion tient, mais parce que `ClearFailures` efface ensuite |
+| 3 | `internal/bff/auth.go:216` citait encore `LockFor`, supprimé par cette PR | Dernière référence pendante de l'arbre |
+| 4 | `serialization_test.go` affirmait que `types.Unalias` empêche la porte de refuser huit sites | Mutation faite : `types.Unalias` retiré de `declarationFile` → **vert**. Il ne porte plus rien depuis le retrait de l'alias ; le commentaire le dit désormais |
+| 5 | `README.md:39` et `plan.md:433` annonçaient Redis dans `docker compose up -d` | Vérifié absent du fichier depuis cette PR |
+| 6 | `.toolbar` et `.toolbar__end` n'ont plus d'émetteur depuis la suppression de `page.tsx` | `classes-peintes.test.ts` ne juge que les sélecteurs `ui-*` : le défaut symétrique qu'il documente lui échappait |
+
 ## Hors périmètre
 Les commentaires → step-038.
 

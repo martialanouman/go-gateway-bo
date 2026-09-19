@@ -345,9 +345,21 @@ func TestUnVerrouDeSecondFacteurEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
 		UPDATE login_attempt_counters SET last_failure_at = now() - make_interval(secs => $1)
 		WHERE scope = 'mfa'`, (testWindow + time.Minute).Seconds())
 
-	lock, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
+	// **`Locked()` seul ne prouve rien ici**, et c'est ce qui distingue cette dimension de celle du
+	// premier facteur : sur `reserve`, un compteur resté collé au seuil rend lui aussi un verrou nul,
+	// parce que l'essai vient d'être admis et que `Remaining` retombe à zéro. Ce que le nom de ce test
+	// annonce — « reparti de un » — ne se lit que sur `Failures`. Sans cette assertion, retirer la
+	// branche d'oubli de `reserve` laisse la suite entière verte (mesuré le 19/09/2026), et un
+	// opérateur qui a brûlé ses cinq essais n'en retrouverait jamais que **un** par fenêtre.
+	admitted, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
 	require.NoError(t, err)
-	assert.False(t, lock.Locked(), "le compteur n'est pas reparti de un après l'oubli")
+	require.False(t, admitted.Locked(), "l'essai suivant l'oubli est encore refusé")
+
+	remaining, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	assert.False(t, remaining.Locked(),
+		"le compteur n'est pas reparti de un : le second essai après l'oubli est déjà refusé, "+
+			"donc l'opérateur ne retrouve qu'un essai par fenêtre au lieu de %d", testMaxFailures)
 }
 
 // Franchir le second facteur efface le compteur — contrairement au premier, où seule la dimension de
