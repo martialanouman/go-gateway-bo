@@ -85,10 +85,15 @@ const base64URLAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0
 // les mêmes octets, donc quatre cookies distincts sont acceptés pour un même sceau.
 //
 // **La variante est construite, pas cherchée.** La rédaction précédente balayait `A…P` et n'en
-// produisait une que si le dernier caractère du sceau valait `A`, `E`, `I` ou `M` — une fois sur
-// seize, et verte les quinze autres fois puisque toutes les autres candidates décodent vers d'autres
-// octets et tombent alors sur la comparaison du HMAC. Poser les bits de remplissage à `1`, `2` puis
-// `3` rend les trois autres écritures du même sceau, à coup sûr et à chaque exécution.
+// produisait une que si les quatre bits significatifs du dernier caractère valaient 0, 1, 2 ou 3 —
+// **une fois sur quatre**, mesuré sur cent mille tirages contre un `Unseal` privé de `Strict()` :
+// 24 827 rouges. Les trois autres fois, toutes les candidates décodent vers d'autres octets et
+// tombent sur la comparaison du HMAC, qui les refuse quoi qu'il arrive.
+//
+// La fiche d'audit annonçait « une fois sur douze » ; le chiffre a été refait ici plutôt que recopié.
+//
+// Poser les bits de remplissage à `1`, `2` puis `3` rend les trois autres écritures du même sceau, à
+// coup sûr et à chaque exécution.
 func TestUnSceauNonCanoniqueEstRefuse(t *testing.T) {
 	t.Parallel()
 

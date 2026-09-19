@@ -2,6 +2,10 @@ package bff
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
+	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -287,4 +292,70 @@ func TestLaPreuveDEnrolementExigeSesDeuxChampsOuAucun(t *testing.T) {
 					"comme « aucune preuve », donc comme un conflit d'état")
 		})
 	}
+}
+
+// sealedLikeProduction fabrique un cookie que `session.Unseal` acceptera, en reproduisant les quatre
+// lignes de `newSealedToken` — qui ne sort pas de son paquet, et c'est bien ainsi : le jeton nu ne
+// doit se fabriquer nulle part ailleurs dans le produit.
+//
+// **Le risque de la recopie est fermé par le sens de l'échec.** Si le format du sceau diverge,
+// `Unseal` refuse, la base n'est jamais atteinte, et le cas ci-dessous rend 401 là où il exige 500 :
+// il rougit au lieu de passer. Une recopie qui se démoderait ne peut donc pas rendre ce test
+// complaisant.
+func sealedLikeProduction(t *testing.T, secret []byte) string {
+	t.Helper()
+
+	token := make([]byte, 32)
+	_, err := rand.Read(token)
+	require.NoError(t, err)
+
+	text := base64.RawURLEncoding.EncodeToString(token)
+
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(text))
+
+	return text + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// **Une base injoignable ne ferme pas la session de l'opérateur**, et ce cas tient la moitié que
+// `TestUnePanneDeResolutionDeSessionNestPasUnRefus` ne tient pas.
+//
+// Celui-là pose lui-même l'erreur dans le contexte et prouve que la garde la propage. Il ne prouve
+// pas que quiconque la pose : `withSession` est le seul à le faire en production, en trois lignes que
+// rien n'exerçait. Poser `err: nil` là-bas laissait les deux suites vertes — c'est exactement le
+// harnais qui masque, et il fallait les deux moitiés.
+//
+// Ce cas-ci traverse le routeur réel, le vrai `withSession` et un vrai `session.Manager` ; seule la
+// base est morte. Le 500 est ce qui distingue « le serveur est en panne » de « reconnectez-vous »,
+// dont le remède boucle puisque se reconnecter exige la même base.
+func TestUneBaseInjoignableNeFermePasLaSessionDeLOperateur(t *testing.T) {
+	t.Parallel()
+
+	pool, err := store.NewPool(context.Background(), "postgres://operateur:secret@127.0.0.1:1/tableau")
+	require.NoError(t, err)
+
+	pool.Close()
+
+	secret := []byte("une-cle-de-session-assez-longue-pour-la-borne")
+	handler := NewRouter(Dependencies{
+		Assets:   fstest.MapFS{},
+		Sessions: session.NewManager(store.NewSessions(pool), secret),
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	request.AddCookie(&http.Cookie{
+		Name:  session.CookieName,
+		Value: sealedLikeProduction(t, secret),
+	})
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, request)
+
+	response := rec.Result()
+
+	defer func() { _ = response.Body.Close() }()
+
+	assert.Equal(t, http.StatusInternalServerError, response.StatusCode,
+		"une base injoignable est servie comme une session close : l'opérateur se reconnecterait en "+
+			"boucle contre la base qui est justement tombée")
 }
