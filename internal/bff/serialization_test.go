@@ -30,15 +30,15 @@ const writeJSONCallSites = 8
 // hors de tout `Visit…Response` engendré et hors de la conformité au contrat que les scénarios
 // exercent. `enumeration_test.go` le nomme déjà par l'autre bout.
 //
-// La porte de step-004 ne pouvait rien en dire : elle énumère des **types**, et ce chemin-ci n'en
-// déclare aucun. Ce qui est gardé ici est donc le **site d'appel** — le type statique de l'argument,
-// résolu par le type-checker et non par la lecture de l'expression, ce qui laisse passer aussi bien
-// `Error{…}` littéral qu'un constructeur qui le rend.
+// `TestResponseTypesDeclareTheirFields` ne peut rien en dire : elle énumère des **types**, et ce
+// chemin-ci n'en déclare aucun. Ce qui est gardé ici est donc le **site d'appel** — le type statique
+// de l'argument, résolu par le type-checker et non par la lecture de l'expression, ce qui laisse
+// passer aussi bien `Error{…}` littéral qu'un constructeur qui le rend.
 //
 // `Error` est engendré depuis le contrat, et les sites légitimes le nomment directement. Le
-// `types.Unalias` de `declarationFile` ne porte donc **rien** ici depuis que step-037 a retiré
-// l'alias `errorResponse` qui le motivait : il reste par précaution, pour le jour où un alias
-// reparaîtrait, et le retirer ne ferait aujourd'hui rougir aucun test.
+// `types.Unalias` de `declarationFile` ne porte donc **rien** ici, aucun alias ne le motivant : il
+// reste par précaution, pour le jour où un alias reparaîtrait, et le retirer ne ferait aujourd'hui
+// rougir aucun test.
 func TestLeSecondCheminVersLeFilNeSerialiseQueDesDTODeclares(t *testing.T) {
 	t.Parallel()
 

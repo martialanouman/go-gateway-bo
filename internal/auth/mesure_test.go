@@ -23,10 +23,32 @@ import (
 // choisit entre 60 ms et 400 ms, pas entre 250 et 252.
 //
 // **Relevé du 10/08/2026**, machine de développement (Apple M4 Pro, Go 1.26.5), report dans **DN-4**
-// de la fiche step-021. Ce qui est retenu est le profil « seconde option » de la RFC 9106 §4 : la
-// cible de 250 ms de la fiche a été **abandonnée**, parce qu'elle ne coexiste pas avec 64 MiB — DN-4
-// dit pourquoi, et les dix profils mesurés sont tous au-dessus de `currentParams`, dans l'ordre des
-// durées plutôt que dans celui de cette liste.
+// de la fiche step-021. Les dix profils, tous, parce qu'un tableau qui choisit ses lignes n'étaye
+// plus le choix qu'il justifie :
+//
+//	 64 MiB · t=1  · p=4     8,5 ms
+//	 19 MiB · t=2  · p=1    16,8 ms
+//	 64 MiB · t=2  · p=4    17,7 ms
+//	 64 MiB · t=3  · p=4    26,3 ms   ← retenu, et c'est `currentParams`
+//	 64 MiB · t=4  · p=4    35,4 ms
+//	128 MiB · t=3  · p=4    57,9 ms
+//	 64 MiB · t=12 · p=4   108,3 ms
+//	256 MiB · t=3  · p=4   123,8 ms
+//	256 MiB · t=6  · p=4   252,1 ms
+//	512 MiB · t=3  · p=4   258,7 ms
+//
+// La cible de 250 ms à 64 MiB que visait la fiche a été **abandonnée** : les deux ne coexistent pas,
+// et la colonne des passes le montre — à 64 MiB le temps est linéaire en `t`, 8,5 ms la passe, donc
+// 250 ms demanderait une trentaine de passes, un profil que la RFC ne décrit nulle part. C'est la
+// mémoire qui a été gardée, parce que c'est elle qui défend : une carte graphique aligne des milliers
+// de cœurs mais pas des milliers de fois 64 MiB de mémoire rapide, là où des passes n'achètent qu'un
+// facteur linéaire que le même matériel rattrape.
+//
+// Ce qui ferme les profils à 256 et 512 MiB n'est pas leur durée mais le serveur : argon2 alloue
+// cette mémoire **par vérification en vol**, et le verrouillage ne protège pas du premier essai sur
+// chaque adresse. Dix tentatives simultanées à 512 MiB réserveraient 5 GiB, et l'anti-brute-force
+// deviendrait un déni de service contre le BFF ; à 64 MiB elles en réservent 640 MiB, qu'un
+// conteneur encaisse.
 func BenchmarkVerification(b *testing.B) {
 	candidates := []auth.Params{
 		{Memory: 19 * 1024, Time: 2, Parallelism: 1},

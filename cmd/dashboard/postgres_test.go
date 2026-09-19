@@ -13,9 +13,9 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// Depuis step-020, le binaire **contrôle la version du schéma avant de lier son port** et refuse de
-// servir sur une base en retard. Ces scénarios lancent le déployable : ils exigent donc un
-// PostgreSQL, comme la production.
+// Le binaire **contrôle la version du schéma avant de lier son port** et refuse de servir sur une
+// base en retard. Ces scénarios lancent le déployable : ils exigent donc un PostgreSQL, comme la
+// production.
 //
 // C'est ce que coûte le critère 1 de la DoD, et c'est le bon prix. Le harnais aurait pu donner au
 // binaire un environnement qui désarme la garde — un drapeau, une variable — mais un binaire dont la
@@ -59,10 +59,10 @@ func startPostgres(ctx context.Context) (func(), error) {
 		return release, err
 	}
 
-	// Relevée **ici et nulle part ailleurs**, sur une base déjà migrée. La version précédente
-	// l'écrivait depuis `migratedDatabase`, donc aussi depuis un pas de scénario — sans course
-	// aujourd'hui, godog exécutant en séquence, mais une écriture non synchronisée qui aurait viré au
-	// rouge sous `-race` le jour où quelqu'un pose `Concurrency`.
+	// Relevée **ici et nulle part ailleurs**, sur une base déjà migrée : l'écrire depuis
+	// `migratedDatabase` l'écrirait aussi depuis un pas de scénario — sans course aujourd'hui, godog
+	// exécutant en séquence, mais une écriture non synchronisée qui virerait au rouge sous `-race` le
+	// jour où quelqu'un pose `Concurrency`.
 	if suiteSchemaVersion, err = appliedSchemaVersion(ctx, migratedSuiteDSN); err != nil {
 		return release, err
 	}

@@ -27,8 +27,8 @@ type pendingCookie struct {
 // **Un middleware strict et non un middleware chi**, et ce n'est pas un détail de style : le statut
 // et les en-têtes partent dans `Visit…Response(w)`, à l'intérieur du handler engendré (`bff.gen.go`,
 // `strictHandler.Login`). Un middleware chi ne reprendrait la main qu'après, sur une réponse déjà
-// écrite ; celui-ci est appelé **autour** du handler. C'est le mécanisme que step-025 emploiera pour
-// ses gardes de permission. Pourquoi le cookie n'est pas déclaré au contrat : voir la description de
+// écrite ; celui-ci est appelé **autour** du handler. C'est le mécanisme qu'emploie aussi
+// `requirePermission`. Pourquoi le cookie n'est pas déclaré au contrat : voir la description de
 // `/auth/login` dans `api/openapi-bff.yaml`.
 //
 // Rien n'est posé sur une erreur : un 500 accompagné d'un `Set-Cookie` ouvrirait une session que le
@@ -66,8 +66,9 @@ func postCookie(ctx context.Context, cookie *http.Cookie) {
 // tiers. `Vary: Cookie` l'accompagne pour les caches qui négocient : deux sessions ne sont jamais la
 // même réponse.
 //
-// Posé sur **tout** le groupe `/api` plutôt que sur cette route : les routes que step-025 ajoutera
-// rendront des données d'exploitation, et hériter d'une garde vaut mieux que devoir y penser.
+// Posé sur **tout** le groupe `/api` plutôt que sur cette route : les routes d'exploitation à venir
+// rendront elles aussi des données à ne pas mettre en cache, et hériter d'une garde vaut mieux que
+// devoir y penser.
 const apiCacheControl = "no-store"
 
 // withoutCaching pose ces deux en-têtes sur les réponses de l'API.
@@ -85,8 +86,8 @@ func withoutCaching(next http.Handler) http.Handler {
 
 // resolution est ce que le middleware apprend, y compris quand il n'apprend rien. L'échec est porté
 // plutôt qu'avalé : une base injoignable ne doit pas se lire comme une session expirée, sans quoi
-// l'opérateur se reconnecte en boucle pendant que la panne est ailleurs. Même arbitrage qu'en
-// step-021, où une base tombée pendant un login rend 500 et non 401.
+// l'opérateur se reconnecte en boucle pendant que la panne est ailleurs. Même arbitrage qu'au
+// premier facteur, où une base tombée pendant un login rend 500 et non 401.
 type resolution struct {
 	session store.Session
 	alive   bool
@@ -104,8 +105,7 @@ type resolution struct {
 // `/health` exige — ne pas dépendre d'une autre brique pour répondre — tient parce que rien n'y
 // refuse, et parce que l'orchestrateur qui la sonde n'envoie pas de cookie.
 //
-// Le refus appartient aux routes qui exigent une session : `GET /auth/me` aujourd'hui, la garde de
-// permission de step-025 demain.
+// Le refus appartient aux routes qui exigent une session, et à `requirePermission`.
 func withSession(manager *session.Manager) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -82,21 +82,17 @@ func runTests(m *testing.M) (code int) {
 }
 
 // Ce qui précède `m.Run` n'échappe pas à toute limite — `cmd/go` en arme une **externe**, qui couvre
-// le process entier : `testKillTimeout = testTimeout + 1*time.Minute`, posée autour du lancement du
-// binaire (`cmd/go/internal/test/test.go:841` et `:1641`, « add a last-ditch deadline to detect and
-// stop wedged binaires »). Avec le `-timeout` de 10 minutes par défaut, une compilation partie en
-// vrille est donc tuée vers 11 minutes.
-//
-// Ce qui lui échappe est la borne **interne** au binaire, celle que `m.Run` arme : pas de panique
-// horodatée, pas de dump de goroutines, pas de test à qui attribuer l'attente. Le dernier recours de
-// `cmd/go` affiche « *** Test killed: ran too long » et ne dit pas ce qui pendait. C'est ce que cette
-// borne-ci achète : deux minutes et un message qui nomme la compilation, plutôt que onze minutes et
-// un message muet. Elle est large parce qu'elle vise la compilation en vrille, pas la machine lente.
+// le process entier (`testKillTimeout = testTimeout + 1*time.Minute`), donc une compilation partie en
+// vrille est tuée vers onze minutes avec le `-timeout` de dix minutes par défaut. Ce qui lui échappe
+// est la borne **interne** au binaire, celle que `m.Run` arme : le dernier recours de `cmd/go`
+// affiche « *** Test killed: ran too long » et ne dit pas ce qui pendait. Cette borne-ci achète deux
+// minutes et un message qui nomme la compilation. Elle est large parce qu'elle vise la compilation en
+// vrille, pas la machine lente.
 const buildTimeout = 2 * time.Minute
 
 // buildBinary fabrique lui-même son contexte : la borne n'a ainsi qu'un site, celui que le test
-// exerce. Portée par le contexte de l'appelant, elle se retirait d'un `context.Background()` posé au
-// site d'appel, sans qu'aucun test ne rougisse.
+// exerce. Portée par le contexte de l'appelant, elle se retirerait d'un `context.Background()` posé
+// au site d'appel sans qu'aucun test ne rougisse.
 func buildBinary(path string, within time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), within)
 	defer cancel()
@@ -111,10 +107,6 @@ func buildBinary(path string, within time.Duration) error {
 	return nil
 }
 
-// La borne est prouvée là où elle est posée. La version d'avant fabriquait son propre contexte et le
-// passait à `buildBinary` : elle prouvait la propagation dans `exec.CommandContext`, pas que le seul
-// appel réel soit borné — remplacer ce contexte par un `context.Background()` au site d'appel laissait
-// la suite verte. Il n'y a plus de contexte à remplacer : `buildBinary` porte le sien.
 func TestTheBuildStopsWhenItsDeadlinePasses(t *testing.T) {
 	t.Parallel()
 
@@ -163,9 +155,9 @@ func TestScenarios(t *testing.T) {
 // minimumScenarios est un plancher, pas un compte : en ajouter un n'oblige à rien ici, en retirer un
 // demande de le dire — c'est exactement la relecture qu'on veut provoquer.
 //
-// Il vaut donc le corpus, sans jeu. Laissé à 5 quand le corpus est passé à 7, il n'exigeait plus rien :
-// mesuré, `contrat.feature` renommé en `.feature.disabled` laissait la suite verte, et deux fichiers
-// entiers retirés aussi. Un plancher qui survit à ce qu'il doit interdire est une phrase, pas une porte.
+// Il vaut donc le corpus, sans jeu : laissé en retard, il n'exige plus rien, et un fichier de
+// scénarios entier renommé en `.feature.disabled` laisse la suite verte. Un plancher qui survit à ce
+// qu'il doit interdire est une phrase, pas une porte.
 const minimumScenarios = 77
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
@@ -288,49 +280,41 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 // lui aussi sa borne : au-delà, il rend la main sans avoir constaté la mort de l'enfant, ce qui vaut
 // mieux qu'un scénario suspendu, mais reste un abandon.
 //
-// **C'est une borne anti-suspension, pas une assertion de performance.** Ce que la performance garde
-// est ailleurs depuis step-032, dans `performance_test.go`, et c'est un budget relatif — cette
-// valeur-ci n'a jamais rien gardé de tel, à quinze secondes comme à deux.
+// **C'est une borne anti-suspension, pas une assertion de performance** : ce que la performance garde
+// est dans `performance_test.go`, et c'est un budget relatif.
 //
 // Huit secondes, et le chiffre vient d'une mesure et non d'un arbitrage : la requête la plus lente de
-// toute la suite est `POST /auth/mfa/totp/enroll`, qui hache dix codes de récupération en argon2id.
-// Relevée le 09/09/2026 par une sonde temporaire du job « Tests Go », une fois le PostgreSQL fourni
-// par celui-ci : **3,16 s** — et 311 ms le même jour sur un M4 Pro, suite entière en parallèle. La
-// borne laisse donc deux fois et demie le pire relevé.
-//
-// **Les deux secondes d'origine ne peuvent pas revenir, et c'est mesuré plutôt que supposé** : elles
-// tomberaient sous les 3,16 s de l'enrôlement, sur une suite verte. Ce que la borne doit attraper est
-// un serveur qui ne répond **plus**, et huit secondes l'attrapent deux fois plus vite que quinze.
+// toute la suite est `POST /auth/mfa/totp/enroll`, qui hache dix codes de récupération en argon2id —
+// **3,16 s** sur le runner de la CI, 311 ms sur un M4 Pro, suite entière en parallèle. La borne
+// laisse donc deux fois et demie le pire relevé, et rien sous trois secondes ne tiendrait sans couper
+// une suite verte.
 var browser = &http.Client{Timeout: 8 * time.Second}
 
 // completeConfiguration est le plus petit environnement avec lequel le binaire démarre. Le port 0
 // laisse le système en choisir un libre, et le mode `mock` n'exige de la passerelle que son adresse —
 // aucun scénario d'ici ne la joint, mais la configuration se valide au démarrage, avant tout appel.
 //
-// Le DSN, lui, désigne une **vraie base à jour** depuis step-020 : le binaire contrôle la version du
-// schéma avant de lier son port, et une adresse qui ne répond pas le ferait refuser de démarrer.
-// C'était l'inverse jusqu'ici — le DSN était exigé, validé en forme, et jamais composé.
+// Le DSN, lui, désigne une **vraie base à jour** : le binaire contrôle la version du schéma avant de
+// lier son port, et une adresse qui ne répond pas le ferait refuser de démarrer.
 func completeConfiguration() map[string]string {
 	return map[string]string{
 		"DASHBOARD_ADDR":             "127.0.0.1:0",
 		"DASHBOARD_GATEWAY_MODE":     "mock",
 		"DASHBOARD_GATEWAY_BASE_URL": "http://127.0.0.1:4010",
 		"DASHBOARD_DATABASE_URL":     migratedSuiteDSN,
-		// Obligatoire depuis step-031, et sans repli. La valeur diffère délibérément du nom de
-		// production : un `issuer` recodé en dur dans `internal/mfa` passerait sinon le scénario qui
-		// le lit dans l'URI `otpauth://`.
+		// La valeur diffère délibérément du nom de production : un `issuer` recodé en dur dans
+		// `internal/mfa` passerait sinon le scénario qui le lit dans l'URI `otpauth://`.
 		"DASHBOARD_PRODUCT_NAME": "Cockpit de scénario",
-		// Obligatoire depuis step-021, et sans repli : le binaire refuse de démarrer sans elle. Sa
-		// valeur ici n'a rien d'un secret — aucun scénario ne relit un HMAC, ils observent le verrou.
+		// Sa valeur ici n'a rien d'un secret — aucun scénario ne relit un HMAC, ils observent le
+		// verrou.
 		"DASHBOARD_BRUTEFORCE_SALT": "un-sel-de-scenario-assez-long-pour-la-borne",
-		// Obligatoire depuis step-022, et sans repli de même. Les scénarios de session, eux, relisent
-		// bien ce que cette clé scelle : c'est le serveur qui signe et vérifie, jamais le harnais.
+		// Les scénarios de session, eux, relisent bien ce que cette clé scelle : c'est le serveur qui
+		// signe et vérifie, jamais le harnais.
 		"DASHBOARD_SESSION_SECRET": "une-cle-de-scenario-assez-longue-pour-la-borne",
-		// Obligatoire depuis step-023, et sans repli de même. Le harnais ne la relit jamais : le secret
-		// TOTP lui arrive **en clair par la réponse d'enrôlement**, qui existe pour ça, donc aucun
-		// scénario n'a besoin de déchiffrer une colonne.
+		// Le harnais ne la relit jamais : le secret TOTP lui arrive **en clair par la réponse
+		// d'enrôlement**, qui existe pour ça, donc aucun scénario n'a besoin de déchiffrer une colonne.
 		"DASHBOARD_TOTP_ENCRYPTION_KEY": "une-cle-de-chiffrement-de-scenario-assez-longue",
-		// Obligatoires depuis step-024, et sans repli de même. Ce ne sont pas des secrets.
+		// Ce ne sont pas des secrets.
 		//
 		// **Le domaine ne ressemble délibérément pas à l'adresse d'écoute**, qui est
 		// `127.0.0.1:<port éphémère>`. C'est ce qui donne sa preuve aux scénarios de passkey :
@@ -339,9 +323,8 @@ func completeConfiguration() map[string]string {
 		// la lirait dans la requête verrait `http://127.0.0.1:…` et refuserait tout.
 		"DASHBOARD_WEBAUTHN_RP_ID":  "dashboard.exemple.test",
 		"DASHBOARD_WEBAUTHN_ORIGIN": configuredOrigin,
-		// Obligatoire depuis step-036, et `none` est la façon d'écrire « aucun proxy » : vide se
-		// lisait aussi bien comme ça que comme un oubli, et l'oubli verrouille tous les opérateurs
-		// d'un coup derrière un load balancer.
+		// `none` est la façon d'écrire « aucun proxy » : vide se lirait aussi bien comme ça que comme
+		// un oubli, et l'oubli verrouille tous les opérateurs d'un coup derrière un load balancer.
 		"DASHBOARD_TRUSTED_PROXIES": "none",
 	}
 }
@@ -467,32 +450,23 @@ func (p *process) startAndServe() error {
 
 // startupTimeout vise un démarrage parti en vrille, pas une machine chargée.
 //
-// **Elle revient aux 5 s qu'elle valait avant step-007**, et la mesure qui l'avait fait passer à 30
-// n'est plus vraie du monde d'aujourd'hui : le 03/08/2026, sous un `go test -race ./...`, le binaire
-// n'avait rien écrit au bout de cinq secondes pendant que dix paquets compilaient — et que trois
-// conteneurs PostgreSQL démarraient de front, ce que step-032 a supprimé. Relevé le 09/09/2026 sur
-// le même arbre, par la même sonde : le démarrage le plus lent de toute la suite est de **295 ms** sur
-// le runner de la CI, et de 504 ms sur un M4 Pro — le poste est ici le plus lent des deux, ses
-// quatorze cœurs compilant et exécutant les quatorze paquets de front quand le runner en fait moins
-// à la fois. C'est donc sur les 504 ms que la borne laisse dix fois le pire relevé.
+// Cinq secondes, et le chiffre vient d'une mesure : le démarrage le plus lent de toute la suite est
+// de **295 ms** sur le runner de la CI, et de **504 ms** sur un M4 Pro — le poste est ici le plus
+// lent des deux, ses quatorze cœurs compilant et exécutant les quatorze paquets de front quand le
+// runner en fait moins à la fois. C'est donc sur les 504 ms que la borne laisse dix fois le pire
+// relevé.
 //
-// *(Le 504 ms d'un texte antérieur désignait tout autre chose — l'enrôlement TOTP sur deux cœurs, le
-// 19/08/2026. La coïncidence des deux nombres est fortuite, et elle est notée ici pour qu'on ne
-// relise pas l'un pour l'autre.)*
+// **Les deux modes sont couverts**, et pas seulement celui de la CI : le repli — sans
+// `DASHBOARD_TEST_DATABASE_URL`, chaque suite montant son conteneur — est la charge la plus lourde
+// que la suite sache produire, et `go test -race -count=1 ./...` sans la variable, donc à trois
+// conteneurs, rend les quatorze paquets verts avec les 5 s.
 //
-// Ce que trente secondes coûtaient n'était pas l'attente mais le diagnostic : sur le job en échec de
-// la PR 52, où le PostgreSQL de la suite refusait les connexions, **chaque scénario a attendu ses
-// trente secondes pour rien** avant de rendre le même message.
+// Ce qu'une borne large coûte n'est pas l'attente mais le diagnostic : sur un PostgreSQL qui refuse
+// les connexions, chaque scénario attend sa borne pour rien avant de rendre le même message.
 //
-// **Les deux modes ont été mesurés**, et pas seulement celui de la CI : une revue a fait remarquer
-// que le repli — sans `DASHBOARD_TEST_DATABASE_URL`, chaque suite montant son conteneur — reproduit
-// exactement la charge du 03/08/2026 qui avait fait élargir cette borne. Vérifié le 11/09/2026 plutôt
-// qu'argumenté : `go test -race -count=1 ./...` sans la variable, donc à trois conteneurs, rend les
-// quatorze paquets verts avec les 5 s.
-//
-// Aucun test ne rougit si cette valeur remonte à 30 s, ce qui reste vrai et vérifié : une borne
-// haute ne se distingue d'une borne juste que sous une charge qu'aucune porte ne fabrique. Ce qui la
-// garde est la mesure ci-dessus, refaite quand le harnais change.
+// Aucun test ne rougit si cette valeur remonte à 30 s, ce qui a été vérifié : une borne haute ne se
+// distingue d'une borne juste que sous une charge qu'aucune porte ne fabrique. Ce qui la garde est la
+// mesure ci-dessus, refaite quand le harnais change.
 const startupTimeout = 5 * time.Second
 
 // awaitListenAddr lit l'adresse effectivement obtenue dans le journal de démarrage. C'est ce qui
@@ -559,9 +533,8 @@ func (p *process) send(method, path, contentType, body string) error {
 }
 
 // browserHeaders pose ce qu'un navigateur pose de lui-même. **Un seul endroit pour les deux
-// composeurs du harnais** — `sendFrom` et le `postAlone` des rafales : deux copies auraient divergé,
-// et la divergence se serait lue comme un refus du produit plutôt que comme un décor incomplet.
-// C'est exactement ce qui est arrivé le jour où l'origine est devenue obligatoire.
+// composeurs du harnais** — `sendFrom` et le `postAlone` des rafales : deux copies divergeraient, et
+// la divergence se lirait comme un refus du produit plutôt que comme un décor incomplet.
 //
 // Une valeur vide ne pose **pas** l'en-tête, et n'en pose pas un vide : ce que le scénario « sans
 // annoncer d'origine » décrit est une absence.
@@ -632,15 +605,13 @@ func (p *process) remember(cookies []*http.Cookie) {
 	}
 }
 
-// post envoie un corps JSON. Le harnais n'avait que `fetch`, en GET : `POST /auth/login` est la
-// première opération du contrat à porter un corps, et `responseMatchesTheContract` a besoin de la
-// **méthode** pour retrouver la route dans le YAML.
+// post envoie un corps JSON. La méthode est retenue avec la réponse parce que
+// `responseMatchesTheContract` en a besoin pour retrouver la route dans le YAML.
 func (p *process) post(path, body string) error {
 	return p.send(http.MethodPost, path, "application/json", body)
 }
 
-// remove est le troisième verbe du harnais, et il arrive avec la première opération du contrat qui
-// en emploie un — le retrait d'une passkey (step-024). Aucun corps : ce qu'elle désigne est dans son
+// remove est le troisième verbe du harnais. Aucun corps : ce qu'une suppression désigne est dans son
 // chemin.
 func (p *process) remove(path string) error {
 	return p.send(http.MethodDelete, path, "", "")
@@ -753,15 +724,12 @@ func (p *process) responseIsNeverCached() error {
 const contractPath = "../../api/openapi-bff.yaml"
 
 // contractRouter lie une requête HTTP à l'opération que le contrat lui destine. Le routeur `legacy`
-// plutôt que `gorillamux`, et ce que ce choix évite est plus étroit que « ajouter `gorilla/mux` au
-// graphe de dépendances » : mesuré le 02/08/2026, `gorilla/mux v1.8.0` est **déjà** dans le `go.sum`
-// de cette branche, tiré par le graphe de modules de `kin-openapi`
-// (`go mod why -m` : `cmd/dashboard.test → openapi3filter.test → routers/gorillamux → gorilla/mux`).
-// Ce que `legacy` évite est de le faire entrer dans les `require` de `go.mod` et dans le graphe de
+// plutôt que `gorillamux`, et ce que ce choix évite est plus étroit qu'une dépendance de plus :
+// `gorilla/mux` est **déjà** dans le `go.sum`, tiré par le graphe de modules de `kin-openapi`. Ce que
+// `legacy` évite est de le faire entrer dans les `require` de `go.mod` et dans le graphe de
 // **compilation** — mesuré, `go list -deps ./cmd/... ./internal/...` n'en rapporte aucune occurrence.
-// Le premier rapproche par ailleurs la requête du contrat par son seul chemin
-// (`routers/legacy/router.go:121` → `openapi3.Servers.MatchURL`), ce qu'un `servers.url` relatif
-// comme `/api` demande. Il valide au passage le document lui-même (`routers/legacy/router.go:62`).
+// Il rapproche par ailleurs la requête du contrat par son seul chemin, ce qu'un `servers.url` relatif
+// comme `/api` demande, et valide au passage le document lui-même.
 func contractRouter(ctx context.Context) (routers.Router, error) {
 	doc, err := (&openapi3.Loader{Context: ctx}).LoadFromFile(contractPath)
 	if err != nil {

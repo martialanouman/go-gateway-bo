@@ -34,13 +34,13 @@ func serveAsset(assets fs.FS) http.HandlerFunc {
 		// G703 suit la teinture de l'URL jusqu'ici. Ce qui la rend inoffensive n'est pas le `fs.Stat`
 		// ci-dessus — `io/fs.Stat` ne valide rien, il délègue à `Open` — mais le contrat de `fs.FS`,
 		// dont l'`Open` doit rejeter tout nom que `fs.ValidPath` refuse, et l'implémentation
-		// réellement injectée : `fs.Sub` rend un `subFS`, qui les rejette dans `fullName`
-		// (`io/fs/sub.go:60-65`). Un `..` n'a donc aucun parent où remonter.
+		// réellement injectée : `fs.Sub` rend un `subFS`, qui les rejette dans `fullName`. Un `..` n'a
+		// donc aucun parent où remonter.
 		//
 		// Aucun test ne descend jusqu'à `fullName`, et ce n'est pas un manque :
 		// `TestAssetPathCannotEscapeItsDirectory` mesure le résultat — un `..` ne sort pas — et
-		// s'arrête au `fs.Stat` ci-dessus. Même sans lui, `ServeFileFS` refuse `..` sur
-		// `r.URL.Path` par 400 (`net/http/fs.go:849-857`) sans jamais atteindre `fullName`.
+		// s'arrête au `fs.Stat` ci-dessus. Même sans lui, `ServeFileFS` refuse `..` sur `r.URL.Path`
+		// par 400, dans son `containsDotDot`, sans jamais atteindre `fullName`.
 		http.ServeFileFS(w, r, assets, name) //nolint:gosec // G703 : voir juste au-dessus
 	}
 }

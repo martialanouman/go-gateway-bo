@@ -15,10 +15,10 @@ import (
 //
 // `ReadTimeout` et `WriteTimeout` restent délibérément à zéro : ils couperaient la WebSocket que le
 // hub ouvrira en M2, dont c'est le métier de rester ouverte. Le corps d'une requête `/api` est en
-// revanche borné depuis step-036, et par requête plutôt que par serveur —
-// `internal/bff.withAPIDeadlines`, monté dans le seul groupe `/api`, qu'un scénario à connexion
-// brute exerce. Aucun test ne rougit si la constante ci-dessus disparaît : le vérifier demanderait de
-// tenir une connexion muette assez longtemps pour que le test dure plus que la porte qu'il garde.
+// revanche borné par requête plutôt que par serveur — `internal/bff.withAPIDeadlines`, monté dans le
+// seul groupe `/api`, qu'un scénario à connexion brute exerce. Aucun test ne rougit si la constante
+// ci-dessus disparaît : le vérifier demanderait de tenir une connexion muette assez longtemps pour
+// que le test dure plus que la porte qu'il garde.
 const readHeaderTimeout = 10 * time.Second
 
 // serve sert jusqu'à l'annulation de ctx, puis laisse aux requêtes en vol le délai de grâce pour se

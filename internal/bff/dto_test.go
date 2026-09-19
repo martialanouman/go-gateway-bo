@@ -22,7 +22,7 @@ import (
 const responseObjectSuffix = "ResponseObject"
 
 // contractInterfaceName désigne l'interface que le gabarit strict d'oapi-codegen écrit toujours en
-// pied de fichier (`strict-interface.tmpl:234`). Sa position **est** la définition de « fichier
+// pied de fichier (`strict-interface.tmpl`). Sa position **est** la définition de « fichier
 // engendré » utilisée partout ici — un renommage du fichier de sortie déplace la porte avec lui, là
 // où un `bff.gen.go` codé en dur laisserait la porte pointer sur un fichier disparu.
 const contractInterfaceName = "StrictServerInterface"
@@ -51,7 +51,7 @@ const rawJSONType = "encoding/json.RawMessage"
 // large laissait donc entrer exactement ce que cette porte existe pour interdire.
 //
 // `io.Reader` reste admis parce que c'est la forme qu'oapi-codegen donne au corps d'une réponse
-// binaire (`strict-interface.tmpl:63`) : un flux, pas une surface de sérialisation. L'interdire
+// binaire (`strict-interface.tmpl`) : un flux, pas une surface de sérialisation. L'interdire
 // fermerait la porte à l'export que le contrat déclarera, et une garde qui refuse du légitime finit
 // retirée.
 var streamedBodies = map[string]bool{
@@ -138,11 +138,11 @@ func implementsAny(candidate types.Type, ifaces []*types.Interface) bool {
 // forbidden nomme la première chose qu'un type de réponse ne doit pas porter, et rend "" quand il n'en
 // porte aucune. C'est **un seul parcours** et non deux, et la raison est une divergence constatée.
 //
-// Ce fichier a d'abord porté deux marcheurs jumeaux — l'un pour la forme, l'autre pour le domaine —
-// présentés comme suivant « la même règle de descente ». La revue du 30/08/2026 a montré qu'ils
-// avaient **déjà divergé** en une seule rédaction : l'un traitait une map comme fatale et l'autre y
-// descendait, l'un connaissait les interfaces et l'autre les ignorait en silence. C'est le mode
-// d'échec que le reste du dépôt se donne du mal à éviter, reproduit dans la porte qui l'interdit.
+// Deux marcheurs jumeaux — l'un pour la forme, l'autre pour le domaine — annoncés comme suivant « la
+// même règle de descente » avaient **déjà divergé** en une seule rédaction : l'un traitait une map
+// comme fatale et l'autre y descendait, l'un connaissait les interfaces et l'autre les ignorait en
+// silence. C'est le mode d'échec que le reste du dépôt se donne du mal à éviter, reproduit dans la
+// porte qui l'interdit.
 //
 // Les formes refusées, et la frontière de chacune :
 //
@@ -290,9 +290,9 @@ func forbiddenField(
 // part sur le fil. Un champ `PasswordHash` étiqueté `json:"id"` fuirait sous le second contrôle seul,
 // et un champ `Identifiant` étiqueté `json:"password_hash"` sous le premier.
 //
-// Un tag qui ne nomme rien — absent, `json:"-"`, ou `json:",omitempty"` — n'ajoute aucun nom. La
-// première rédaction y laissait entrer la chaîne vide, qu'aucune clé ne porte : sans conséquence
-// alors, mais une entrée accidentellement vide y aurait fait rougir tout champ non sérialisé.
+// Un tag qui ne nomme rien — absent, `json:"-"`, ou `json:",omitempty"` — n'ajoute aucun nom, et la
+// chaîne vide n'entre pas dans la liste : une entrée accidentellement vide dans le vocabulaire
+// interdit ferait sinon rougir tout champ non sérialisé.
 func serializedNames(field *types.Var, tag string) []string {
 	names := []string{normalize(field.Name())}
 
@@ -336,22 +336,22 @@ func declarationFile(pkg *packages.Package, carrier types.Type) string {
 // profondeur — c'est l'invariant (a) tenu par le compilateur plutôt que par la discipline. Rien
 // n'oblige en revanche le type lui-même à être un struct : oapi-codegen rend `type XxxResponse []Foo`
 // pour une réponse tableau et `type XxxTextResponse string` pour du `text/plain`
-// (`strict-interface.tmpl:50`), deux formes parfaitement bornées qu'une exigence de struct refuserait.
+// (`strict-interface.tmpl`), deux formes parfaitement bornées qu'une exigence de struct refuserait.
 //
 // L'**embarquement** ensuite, et la règle y est plus fine pour une raison mesurée : dès qu'une
 // réponse est un `$ref` vers `components/responses/*`, le gabarit rend
-// `type Xxx400JSONResponse struct{ ErrorJSONResponse }` (`strict-interface.tmpl:47`) — la forme
+// `type Xxx400JSONResponse struct{ ErrorJSONResponse }` (`strict-interface.tmpl`) — la forme
 // normale d'un DTO d'erreur factorisé, que refuser obligerait à dé-factoriser le contrat.
 //
-// La **provenance** enfin (step-026), et c'est ce qui ferme le trou que `api.go` nommait depuis
-// step-004 : un type de réponse écrit à la main compile et son `Visit…` sérialise ce qu'il veut. La
-// règle est une **localisation** — le type vient du fichier engendré — et non une inspection du corps
-// de la méthode, ce qui est mesuré : cinq `…429JSONResponse` engendrés encodent `response.Body` et non
-// `response`, et trois `…204Response` n'encodent rien.
+// La **provenance** enfin, et c'est ce qui ferme le trou que `api.go` nomme : un type de réponse
+// écrit à la main compile et son `Visit…` sérialise ce qu'il veut. La règle est une **localisation** —
+// le type vient du fichier engendré — et non une inspection du corps de la méthode, ce qui est
+// mesuré : cinq `…429JSONResponse` engendrés encodent `response.Body` et non `response`, et trois
+// `…204Response` n'encodent rien.
 //
 // **Ce test ne voit que `internal/bff`.** Le module entier est couvert par
-// `TestAucuneMethodeDeSerialisationNEstEcriteAilleurs`, et les deux ensemble sont la porte : la
-// première rédaction n'avait que celui-ci, et se laissait contourner par un type déclaré ailleurs.
+// `TestAucuneMethodeDeSerialisationNEstEcriteAilleurs`, et les deux ensemble sont la porte : celui-ci
+// seul se laisse contourner par un type déclaré ailleurs.
 //
 // La population n'est pas « les types dont le nom contient Response » mais « les types qui
 // implémentent une interface engendrée ». Le témoin anti-vide de toutes ces règles est le **même** —

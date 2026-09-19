@@ -190,8 +190,8 @@ func tooManyCeremonies(remaining time.Duration) Error {
 //
 // L'élévation est exigée, mais **pas** de présenter la passkey qu'on retire : on la retire
 // précisément quand on ne l'a plus. Ce que l'élévation seule ne couvre pas est écrit dans le §6.9 —
-// elle vaut douze heures — et ce qui reste est tenu par le refus du dernier facteur, plus l'audit de
-// step-025.
+// elle vaut douze heures — et ce qui reste est tenu par le refus du dernier facteur, plus l'audit du
+// retrait.
 func (a API) DeleteWebauthnPasskey(ctx context.Context,
 	request DeleteWebauthnPasskeyRequestObject,
 ) (DeleteWebauthnPasskeyResponseObject, error) {
@@ -314,14 +314,14 @@ func noPasskeyToAssert() Error {
 // vérification : un seul constructeur, donc pas deux messages entre lesquels choisir.
 //
 // Il ne sert **que** ce chemin — l'assertion se termine dans `VerifyMfa` et emprunte l'autre. La
-// copie s'adresse donc à quelqu'un qui **pose** un facteur, pas à quelqu'un qui en franchit un : lui
-// conseiller « franchir le second facteur autrement », comme une rédaction précédente le faisait, le
-// renvoyait vers un geste sans rapport avec ce qu'il essayait de faire.
+// copie s'adresse donc à quelqu'un qui **pose** un facteur, pas à quelqu'un qui en franchit un :
+// lui conseiller « franchir le second facteur autrement » le renverrait vers un geste sans rapport
+// avec ce qu'il essaie de faire.
 //
-// **Il part en 400 depuis step-035**, et ce n'est pas un détail de rangement : en 401, un client qui
-// lit le statut sans lire le `code` renvoyait au login un opérateur dont la session est vivante — et
-// `web/src/lib/api.ts` en porte déjà un, `isUnauthenticated`. Ce que le serveur refuse ici est ce qui
-// lui a été présenté, pas la session qui le présente.
+// **Il part en 400 et non en 401** : un client qui lit le statut sans lire le `code` renverrait au
+// login un opérateur dont la session est vivante — et `web/src/lib/api.ts` en porte un,
+// `isUnauthenticated`. Ce que le serveur refuse ici est ce qui lui a été présenté, pas la session qui
+// le présente.
 func refusedCeremony() Error {
 	return Error{
 		Code: "webauthn_ceremony_refused",

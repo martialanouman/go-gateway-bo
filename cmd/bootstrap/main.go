@@ -18,10 +18,9 @@
 // chaque livraison, et une commande qui échouerait au second passage finirait retirée du déploiement,
 // donc le catalogue ne serait plus jamais reprojeté.
 //
-// Les valeurs du compte se lisent dans l'**environnement** et non en argument, pour la raison qui fait
-// déjà lire le DSN sur l'entrée standard : `ps aux` affiche la ligne de commande de tout processus de
-// la machine. Elles ne sont exigées que lorsque la base ne porte aucun opérateur, c'est-à-dire au seul
-// moment où elles servent.
+// Les valeurs du compte se lisent dans l'**environnement** et non en argument, pour la raison qui
+// fait déjà lire le DSN sur l'entrée standard. Elles ne sont exigées que lorsque la base ne porte
+// aucun opérateur, c'est-à-dire au seul moment où elles servent.
 package main
 
 import (
@@ -43,10 +42,9 @@ const usage = "usage : printf '%s' \"$DASHBOARD_DATABASE_URL\" | bootstrap"
 
 func main() {
 	// os.Exit reste seul dans main : appelé depuis start, il court-circuiterait son `defer`.
-	//nolint:forbidigo // La seconde et dernière lecture d'environnement du dépôt — une par
-	// programme — et elle ne fait que la passer au chargeur de `internal/config`. L'exemption est
-	// posée sur la ligne, pas sur le fichier : sinon toute lecture ajoutée plus tard passerait avec
-	// elle.
+	//nolint:forbidigo // Une lecture d'environnement par programme, et elle ne fait que la passer au
+	// chargeur de `internal/config`. L'exemption est posée sur la ligne, pas sur le fichier : sinon
+	// toute lecture ajoutée plus tard passerait avec elle.
 	if err := start(os.Stdin, os.Stdout, os.Stderr, os.Args[1:], os.LookupEnv); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -180,12 +178,10 @@ func warnAboutDivergence(errOut io.Writer, outcome store.SeedOutcome) {
 	// Ce message est lu dans **cinq** situations, selon qui détient encore la clé : personne, un rôle
 	// par défaut que le code décrit, un rôle composé à l'écran, un rôle marqué `is_default` que le
 	// code ne décrit plus, ou plusieurs à la fois. Il ne dit donc que ce qui est vrai des cinq.
-	//
-	// Deux rédactions précédentes ne l'étaient pas : la première affirmait qu'un rôle détenait la clé
-	// — faux dès que personne ne la détient — et la seconde que « aucun rôle par défaut ne l'accorde
-	// plus », que le message voisin sur un rôle inconnu dément six lignes plus bas, puisque celui-là
-	// conserve ses attributions. D'où « que ce code décrit », qui est la formulation exacte de la
-	// garde de la révocation.
+	// « Aucun rôle par défaut **que ce code décrit** » est la formulation exacte de la garde de la
+	// révocation : « un rôle détient la clé » serait faux dès que personne ne la détient, et « aucun
+	// rôle par défaut ne l'accorde plus » serait démenti par le message voisin sur un rôle inconnu,
+	// qui conserve ses attributions.
 	for _, key := range outcome.UnknownPermissions {
 		printLine(errOut, "ATTENTION — la base porte la permission %q, que le catalogue ne déclare "+
 			"plus.\n  La ligne est conservée : aucun rôle par défaut que ce code décrit ne l'accorde "+

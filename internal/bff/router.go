@@ -57,9 +57,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Use(withHardeningHeaders)
 
 	// L'ordre des lignes **est** l'ordre d'exécution : `chain` de chi enveloppe depuis la queue, donc
-	// le premier enregistré est le plus extérieur. Chaque commentaire ci-dessous surplombe donc bien
-	// la ligne qu'il décrit — ce qui n'était pas le cas jusqu'à step-036, où le commentaire de la
-	// borne de corps coiffait celle du cache.
+	// le premier enregistré est le plus extérieur.
 	r.Route("/api", func(api chi.Router) {
 		api.Use(withoutCaching)
 		// Avant la base, le décodeur et le compteur d'échecs : une mutation qui ne vient pas du
@@ -80,9 +78,9 @@ func NewRouter(deps Dependencies) http.Handler {
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
 		// est un filet : chi propage le `NotFound` de la racine à tout sous-routeur qui n'en
-		// déclare pas (`mux.go:212-216` à la déclaration, `308-309` au montage). Le jour où le
-		// repli ci-dessous passerait de `r.Get("/*")` à `r.NotFound()`, cette ligne serait la seule
-		// chose empêchant `/api/inconnu` de rendre 200 + HTML. Vérifié sur chi v5.3.1.
+		// déclare pas — vérifié dans `mux.go` sur chi v5.3.1. Le jour où le repli ci-dessous
+		// passerait de `r.Get("/*")` à `r.NotFound()`, cette ligne serait la seule chose empêchant
+		// `/api/inconnu` de rendre 200 + HTML.
 		api.NotFound(handleUnknownAPIRoute)
 	})
 
@@ -116,13 +114,12 @@ func NewRouter(deps Dependencies) http.Handler {
 // (`chi-middleware.tmpl` d'oapi-codegen v2.8.0, 14 sites d'appel). `HandlerFromMux` ne permet pas de
 // le poser : il délègue à `HandlerWithOptions` sans l'option, donc avec le défaut.
 //
-// Mesuré le 02/08/2026, contrat muté avec un paramètre de requête `depuis` requis, régénéré, requête
-// réelle à travers `NewRouter` : `HandlerFromMux` rend `400 text/plain; charset=utf-8` et le corps
-// `Query argument depuis is required, but not found` ; la forme ci-dessous rend `400
-// application/json` et le DTO d'erreur du produit. Le contrat a ensuite été restauré et régénéré.
-// `GET /health` n'ayant ni paramètre ni en-tête requis, aucune requête que le contrat autorise
-// n'atteint ce gestionnaire aujourd'hui : c'est `TestTheContractMountInstallsTheProductErrorHandler`
-// qui garde le montage, faute de pouvoir l'exercer.
+// Le contrat n'a aujourd'hui qu'un seul paramètre lié de la sorte — le `passkeyId` du retrait d'une
+// clé d'accès, une chaîne requise qu'une requête assez bien formée pour atteindre la route ne peut
+// pas faire échouer. Aucune requête n'exerce donc ce gestionnaire, et c'est
+// `TestTheContractMountInstallsTheProductErrorHandler` qui garde le montage. Sans l'option,
+// `HandlerFromMux` rendrait le message Go en `text/plain` — mesuré le 02/08/2026 sur un contrat muté
+// avec un paramètre de requête requis, puis restauré.
 func mountContract(api chi.Router, impl StrictServerInterface, sessions *session.Manager) {
 	HandlerWithOptions(newContractHandler(impl, sessions), ChiServerOptions{
 		BaseRouter:       api,
@@ -137,26 +134,26 @@ func mountContract(api chi.Router, impl StrictServerInterface, sessions *session
 // Ce que ces deux-là couvrent exactement, lu dans le gabarit plutôt que supposé
 // (`strict-http.tmpl` d'oapi-codegen v2.8.0) : `RequestErrorHandlerFunc` n'a que huit sites d'appel,
 // **tous** dans le décodage du **corps** de la requête — JSON, formdata, multipart, texte brut. Il ne
-// voit ni paramètre, ni en-tête, ni cookie. Il était sans site d'appel jusqu'à step-021 : `POST
-// /auth/login` est la **première** opération du contrat à porter un corps de requête, donc la
-// première à l'atteindre — un JSON illisible envoyé sur cette route rend son 400. C'est pourquoi le
-// contrat déclare ce statut : sans lui, le scénario qui valide la réponse échouerait sur un statut
-// que le YAML ne connaît pas. `ResponseErrorHandlerFunc`, lui, est atteint dès
+// voit ni paramètre, ni en-tête, ni cookie. Une opération qui porte un corps de requête l'atteint
+// donc, et `POST /auth/login` est la première du contrat dans ce cas — un JSON illisible envoyé sur
+// cette route rend son 400. C'est pourquoi le contrat déclare ce statut : sans lui, le scénario qui
+// valide la réponse échouerait sur un statut que le YAML ne connaît pas.
+// `ResponseErrorHandlerFunc`, lui, est atteint dès
 // qu'une implémentation rend une erreur — le seul des trois qu'une requête exerce pour de bon ici,
 // par `TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser`. Une route future qui enveloppe son
 // erreur — `fmt.Errorf("appel de %s: %w", cfg.Gateway.BaseURL, err)` — servirait sans lui l'adresse
 // interne de l'API Admin au navigateur.
 //
 // L'erreur n'est ni journalisée ni propagée, et c'est un manque assumé plutôt qu'un oubli : aucun
-// journal n'atteint ce paquet aujourd'hui. `NewRouter` prend depuis step-021 une struct de
-// dépendances — mais elle ne porte pas de `*slog.Logger`, qui s'arrête toujours à `cmd/dashboard`. Un
-// 500 servi ici ne laisse donc **aucune trace côté serveur**, et c'est désormais vrai d'une route qui
-// travaille : un `password_hash` corrompu en base fait refuser la connexion sans que rien ne le dise.
-// Le premier appel réel à la passerelle (step-060) devra apporter les deux à la fois.
+// journal n'atteint ce paquet, la `Dependencies` de `NewRouter` ne portant pas de `*slog.Logger`, qui
+// s'arrête à `cmd/dashboard`. Un 500 servi ici ne laisse donc **aucune trace côté serveur**, y
+// compris sur une route qui travaille : un `password_hash` corrompu en base fait refuser la connexion
+// sans que rien ne le dise. Le premier appel réel à la passerelle (step-060) devra apporter les deux
+// à la fois.
 //
-// **L'ordre du slice compte.** La boucle du wrapper engendré (`bff.gen.go:1354`) enveloppe
-// successivement, donc le **dernier** élément est le plus extérieur : la garde s'exécute avant tout
-// le reste, et son refus court-circuite la machinerie de cookie — qui ne pose rien, ne posant que sur
+// **L'ordre du slice compte.** La boucle du wrapper engendré enveloppe successivement, donc le
+// **dernier** élément est le plus extérieur : la garde s'exécute avant tout le reste, et son refus
+// court-circuite la machinerie de cookie — qui ne pose rien, ne posant que sur
 // `err == nil && pending.cookie != nil`.
 func newContractHandler(impl StrictServerInterface, sessions *session.Manager) ServerInterface {
 	return NewStrictHandlerWithOptions(impl,

@@ -23,17 +23,13 @@ var visitMethod = regexp.MustCompile(`^Visit[A-Za-z0-9_]*Response$`)
 // le jour où ce contrôle est écrit — quatre sous `cmd/`, dix sous `internal/`. Il est là parce qu'un
 // chargement qui ne rapporte rien passe en n'ayant rien cherché, et c'est le mode d'échec que ce dépôt
 // a déjà payé.
-//
-// Le premier chiffre écrit ici était vingt, deviné et non mesuré. Il a fait rougir la porte à sa
-// première exécution, ce qui est la bonne direction pour un plancher.
 const modulePackageCount = 14
 
 // Aucune méthode de sérialisation d'une réponse n'est écrite hors du fichier engendré, **dans tout le
 // module**.
 //
-// C'est le contournement que la revue du 30/08/2026 a trouvé, et il rendait la première rédaction de
-// step-026 largement décorative. `HealthResponseObject` (`bff.gen.go`) ne mentionne que
-// `http.ResponseWriter` : **n'importe quel paquet peut l'implémenter**, et le dispatch du wrapper
+// Le contournement que ce contrôle ferme : `HealthResponseObject` (`bff.gen.go`) ne mentionne que
+// `http.ResponseWriter`, donc **n'importe quel paquet peut l'implémenter**, et le dispatch du wrapper
 // engendré est une assertion de type à l'exécution, pas une contrainte de paquet. Sondé le
 // 30/08/2026 : un `internal/leak` rendant un `store.Operator` complet compile, `Health` le sert, et
 // `password_hash` part sur le fil pendant que les cinq règles de `dto_test.go` rendent **rc=0** —
@@ -134,16 +130,13 @@ func loadModule(t *testing.T) []*packages.Package {
 	return loaded
 }
 
-// Les portes de step-026 **mordent**, et la preuve en reste dans le dépôt.
+// Les portes **mordent**, et la preuve en reste dans le dépôt : une sonde jouée puis retirée ne
+// distingue plus une porte mordante d'une porte débranchée.
 //
-// C'est ce qui manquait à la première rédaction. Sa fiche annonçait « les portes restent mordantes :
-// chacune est vue tomber sur une sonde jetable », et le dépôt ne contenait rien de tel : les sondes
-// avaient été jouées puis retirées. Rien ne distinguait une porte mordante d'une porte débranchée.
-//
-// **Chaque règle a son propre témoin, et c'est une correction de la revue.** La première version n'en
-// avait qu'un — le paquet `testdata/fuite` — et il restait vert quand on débranchait la règle de
-// domaine : le type y est catché par la règle des méthodes, et l'assertion ne regardait que « quelque
-// chose a parlé ». Un témoin qui ne dit pas **laquelle** des portes a parlé prouve la mauvaise borne.
+// **Chaque règle a son propre témoin.** Un témoin unique — le seul paquet `testdata/fuite` — reste
+// vert quand on débranche la règle de domaine : le type y est attrapé par la règle des méthodes, et
+// l'assertion ne regarderait que « quelque chose a parlé ». Un témoin qui ne dit pas **laquelle** des
+// portes a parlé prouve la mauvaise borne.
 //
 // Le paquet témoin ne sert donc qu'à la porte du module. Les deux autres règles sont exercées sur des
 // types réels et sur un type fabriqué, parce qu'un paquet de `testdata/` est lui-même « du domaine »
@@ -182,11 +175,10 @@ func TestLesPortesMordentSurLeTemoin(t *testing.T) {
 		// fichiers n'est exempté — il n'abrite ni `writeJSON` ni l'interface engendrée —, donc les deux
 		// doivent être rapportés.
 		//
-		// **Les deux nommément, et c'est une correction.** La première version demandait seulement que
-		// « quelque chose » soit rapporté, et restait verte quand on retirait la moitié « argument » du
-		// détecteur : le `WriteHeader`, qui est un récepteur, suffisait à la satisfaire. Or c'est la
-		// moitié « argument » qui attrape le défaut le plus naturel à écrire. Deux gardes dont une
-		// seule est observée ne prouvent que celle qu'on observe.
+		// **Les deux nommément.** Exiger que « quelque chose » soit rapporté reste vert quand on retire
+		// la moitié « argument » du détecteur : le `WriteHeader`, qui est un récepteur, suffit à
+		// satisfaire l'assertion. Or c'est la moitié « argument » qui attrape le défaut le plus naturel
+		// à écrire. Deux gardes dont une seule est observée ne prouvent que celle qu'on observe.
 		found, seen := directWrites(loadWitness(t), map[string]bool{})
 
 		require.Positive(t, seen, "le témoin n'atteint plus de writer : il ne prouve rien")

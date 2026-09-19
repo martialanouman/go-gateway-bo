@@ -221,8 +221,8 @@ func TestUneSessionQuiDetientLaCleAtteintSonHandler(t *testing.T) {
 
 // Une panne de lecture des permissions n'est pas un refus.
 //
-// La distinction est celle que step-021 a payée au premier facteur : une base injoignable lue comme
-// « vous n'avez pas le droit » ferait chercher un problème de rôle pendant que la panne est ailleurs.
+// Même distinction qu'au premier facteur : une base injoignable lue comme « vous n'avez pas le
+// droit » ferait chercher un problème de rôle pendant que la panne est ailleurs.
 func TestUnePanneDeLectureDesPermissionsNestPasUnRefus(t *testing.T) {
 	t.Parallel()
 
@@ -239,10 +239,9 @@ func TestUnePanneDeLectureDesPermissionsNestPasUnRefus(t *testing.T) {
 // garde retirée du slice, aucun scénario ne rougit — mesuré. Ce qui reste à tenir, c'est donc que le
 // montage la pose, et sur la vraie source.
 //
-// **Les appels sont rattachés à la fonction qui les porte**, et pas cherchés dans le paquet entier.
-// La première rédaction ne l'était pas et se lisait comme un succès : `me.go` appelle déjà
-// `Grants` pour rendre les permissions à l'écran, donc l'assertion « le paquet atteint `Grants` »
-// était vraie avec ou sans garde câblée. Mesuré, puis resserré.
+// **Les appels sont rattachés à la fonction qui les porte**, et pas cherchés dans le paquet entier :
+// `me.go` appelle déjà `Grants` pour rendre les permissions à l'écran, donc une assertion « le paquet
+// atteint `Grants` » serait vraie avec ou sans garde câblée, et se lirait comme un succès.
 //
 // L'appel est résolu par le **type-checker** et non cherché dans le texte : un détecteur qui grep un
 // nom est rendu vrai par le moindre commentaire qui le cite. Même patron que

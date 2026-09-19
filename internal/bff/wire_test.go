@@ -50,20 +50,20 @@ var admittedSinks = map[string]string{
 
 // Un corps de réponse ne s'écrit qu'à deux endroits, et le compilateur ne l'impose pas.
 //
-// `writeJSON` **est** la seule surface de sérialisation non typée du paquet, mais rien ne l'obligeait
-// à le rester : `json.NewEncoder(w).Encode(resolved)` écrit dans un middleware compile, ne passe par
-// aucun `Visit…` engendré, échappe à la conformité au contrat que les scénarios exercent, et aucune
-// des portes de step-026 ne le voit. La revue du 30/08/2026 a montré que l'affirmation de `respond.go`
-// — « la seule surface » — était un constat et non une propriété.
+// `writeJSON` **est** la seule surface de sérialisation non typée du paquet, mais rien d'autre ne
+// l'oblige à le rester : `json.NewEncoder(w).Encode(resolved)` écrit dans un middleware compile, ne
+// passe par aucun `Visit…` engendré, échappe à la conformité au contrat que les scénarios exercent,
+// et aucune des portes de forme ou de provenance ne le voit — elles portent sur les types de réponse,
+// pas sur ce qui atteint le writer.
 //
 // Ce contrôle en fait une propriété. Il suit le **type statique** de chaque expression et refuse qu'un
 // `http.ResponseWriter` atteigne autre chose que les puits nommés ci-dessus : ni `w.Write`, ni
 // `w.WriteHeader`, ni `json.NewEncoder(w)`, ni `fmt.Fprintf(w, …)`, ni `http.Error`.
 //
-// **Il ne porte pas sur `json`, et c'est mesuré.** La première rédaction envisagée refusait
-// `json.Marshal` hors de `respond.go` : elle aurait eu deux faux positifs le jour de sa livraison —
-// `webauthn.go` marshale l'attestation et l'assertion d'une **requête** vers le store, sans jamais
-// toucher au writer. Une garde qui refuse du légitime finit retirée.
+// **Il ne porte pas sur `json`, et c'est mesuré.** Une règle qui refuserait `json.Marshal` hors de
+// `respond.go` aurait deux faux positifs : `webauthn.go` marshale l'attestation et l'assertion d'une
+// **requête** vers le store, sans jamais toucher au writer. Une garde qui refuse du légitime finit
+// retirée.
 //
 // Le paquet est chargé sans ses tests : un `httptest.ResponseRecorder` nourri à la main dans un
 // `_test.go` est le harnais, pas le produit.

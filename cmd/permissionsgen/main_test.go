@@ -115,9 +115,8 @@ func TestTheUnionsAdmitExactlyWhatTheCatalogCarries(t *testing.T) {
 // une propriété observée.
 //
 // C'est précisément pourquoi la sortie est aussi exigée **non vide**. L'égalité seule est tout aussi
-// vraie sur `("", nil)` que sur les dix kilo-octets réels : mesuré le 02/08/2026, un `render`
-// court-circuité à `return nil, nil` repassait ce cas tel quel. Le stub qui a servi pendant
-// l'écriture le repasserait encore.
+// vraie sur `("", nil)` que sur les dix kilo-octets réels : mesuré, un `render` court-circuité à
+// `return nil, nil` repasse ce cas tel quel.
 func TestTwoRunsProduceTheSameBytes(t *testing.T) {
 	t.Parallel()
 
@@ -132,7 +131,7 @@ func TestTwoRunsProduceTheSameBytes(t *testing.T) {
 }
 
 // Les quatre runes que `forbiddenInLiteral` refuse, chacune pour une raison **différente**, et
-// chacune mesurée le 02/08/2026 (Biome 2.5.5, Node 24) plutôt que supposée :
+// chacune mesurée plutôt que supposée :
 //
 //   - Le **guillemet droit** : échappé, Biome réécrit le littéral entier en guillemets doubles —
 //     `'Voir l\'écran'` devient `"Voir l'écran"`. `check-generated` et `lint-web` exigeraient alors
@@ -180,16 +179,14 @@ func TestEveryRuneASingleQuotedLiteralCannotCarryIsRefused(t *testing.T) {
 	}
 }
 
-// Mesuré le 02/08/2026, `web/node_modules/.bin/biome format` sur `web/biome.json` (largeur 100) :
-// une ligne de propriété de 100 colonnes reste en place, une de 101 est reportée sur la ligne
-// suivante avec six espaces d'indentation. Et la colonne se compte en **points de code**, pas en
-// octets — une ligne de 100 points de code pour 180 octets (80 « é ») reste en place, tout comme
-// avec « — » et « ’ ».
+// Mesuré sur `web/biome.json` (largeur 100) : une ligne de propriété de 100 colonnes reste en place,
+// une de 101 est reportée sur la ligne suivante avec six espaces d'indentation. Et la colonne se
+// compte en **points de code**, pas en octets — une ligne de 100 points de code pour 180 octets
+// (80 « é ») reste en place, tout comme avec « — » et « ’ ».
 //
-// Les deux formes existent dans le vrai catalogue — comptées le 02/08/2026 sur le fichier commité,
-// 29 descriptions en ligne et 15 reportées, pour 44 entrées. Émettre l'une là où Biome émettrait
-// l'autre rendrait `lint-web` et `check-generated` contradictoires : `permissions.gen.ts` est inclus
-// dans le périmètre de Biome, donc `lint-web` le formate vraiment.
+// Les deux formes existent dans le vrai catalogue, et émettre l'une là où Biome émettrait l'autre
+// rendrait `lint-web` et `check-generated` contradictoires : `permissions.gen.ts` est inclus dans le
+// périmètre de Biome, donc `lint-web` le formate vraiment.
 func TestADescriptionIsWrappedExactlyWhereBiomeWouldWrapIt(t *testing.T) {
 	t.Parallel()
 
@@ -233,9 +230,9 @@ func TestTheOutputPathIsTheArgument(t *testing.T) {
 	assert.Equal(t, renderCatalog(t), string(written))
 }
 
-// Les deux chemins sont pris dans un `t.TempDir()` et non relatifs au package. Mesuré le
-// 02/08/2026 en relâchant la garde à `len(args) < 1` : avec les chemins relatifs d'origine, ce cas
-// écrivait `cmd/permissionsgen/premier.ts` dans l'arbre source. Un cas dont toute la raison d'être
+// Les deux chemins sont pris dans un `t.TempDir()` et non relatifs au package. Mesuré, en relâchant
+// la garde à `len(args) < 1` : avec des chemins relatifs, ce cas écrirait
+// `cmd/permissionsgen/premier.ts` dans l'arbre source. Un cas dont toute la raison d'être
 // est que rien ne s'écrive ne doit pas pouvoir écrire là où ça compte — et le répertoire est relu à
 // la fin, pour que « rien ne s'écrit » soit observé plutôt que déduit du refus.
 func TestTheCommandRefusesToGuessItsOutputPath(t *testing.T) {

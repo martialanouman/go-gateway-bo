@@ -236,12 +236,12 @@ func (w *loginWorld) challengeIsIssued(ctx context.Context) error {
 
 // challengeMatchesWhatTheDatabaseKeeps confronte le jeton **rendu** à l'empreinte **stockée**.
 //
-// Sans ce pas, rendre l'empreinte à la place du jeton passait toutes les portes : les deux font 32
-// octets, donc 43 caractères, donc le `minLength` du contrat aussi. La panne n'apparaîtrait qu'en
-// step-023, au moment de vérifier un second facteur que personne ne peut plus fournir.
+// Sans ce pas, rendre l'empreinte à la place du jeton passe toutes les portes : les deux font 32
+// octets, donc 43 caractères, donc le `minLength` du contrat aussi. La panne n'apparaîtrait qu'à la
+// vérification du second facteur, que personne ne pourrait plus fournir.
 //
-// C'est aussi ce qui exerce enfin l'usage unique que DN-9 dit « porté par le schéma » : l'empreinte
-// est cherchée par l'index unique, et une ligne non consommée est ce que step-023 consommera.
+// C'est aussi ce qui exerce l'usage unique que DN-9 dit « porté par le schéma » : l'empreinte est
+// cherchée par l'index unique, et c'est une ligne non consommée que la vérification consomme.
 func (w *loginWorld) challengeMatchesWhatTheDatabaseKeeps(ctx context.Context, token string) error {
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {

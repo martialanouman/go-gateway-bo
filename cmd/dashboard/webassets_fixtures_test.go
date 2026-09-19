@@ -1,8 +1,8 @@
 package main
 
 // Le binaire embarque `internal/webassets/dist/` au moment de la compilation, et ce répertoire ne
-// contient qu'un `.gitkeep` sur un clone neuf — comme dans le job de CI « Tests Go », qui n'a ni pnpm
-// ni pnpm. Ce fichier y met donc en scène une sortie de client minimale avant que le harnais ne
+// contient qu'un `.gitkeep` partout où `make build` n'a pas tourné — un clone neuf, le job de CI
+// « Tests Go ». Ce fichier y met donc en scène une sortie de client minimale avant que le harnais ne
 // compile, puis remet en place ce qu'il y a trouvé.
 //
 // Sans cette mise en scène, les scénarios se tairaient partout où le client n'a jamais été construit :
@@ -133,7 +133,7 @@ func claimStash(dist, stash string) error {
 // lu. Le compte de la mise à l'écart ne décide pas de l'état du répertoire embarqué : sur un clone
 // neuf — et dans le job de CI « Tests Go » — la mise à l'écart ne reçoit que `.gitkeep`, donc elle
 // paraît vide alors que les fixtures, elles, sont restées dans `dist`. C'est l'état le plus courant
-// qu'un run interrompu laisse, et le message l'a affirmé « intact » deux versions durant.
+// qu'un run interrompu laisse, et celui qu'un message affirmant « intact » décrirait de travers.
 //
 // Rien d'autre ne signale l'état où le refus laisse le poste — le répertoire embarqué est ignoré par
 // git, donc l'arbre reste propre — et ce message est la seule documentation du chemin : ni le

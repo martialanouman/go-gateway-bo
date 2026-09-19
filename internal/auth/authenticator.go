@@ -55,9 +55,9 @@ type Verdict struct {
 	Outcome Outcome
 	// OperatorID n'est renseigné que sur OutcomeChallenged, et n'a de sens que là : c'est le seul cas
 	// où quelqu'un a été identifié. Il sert à ouvrir la session de premier facteur — que ce paquet
-	// n'ouvre pas lui-même, pour ne pas faire dépendre le premier facteur de la session. step-023 n'a
-	// pas inversé cette dépendance non plus : `internal/mfa` emprunte à ce paquet-ci, et c'est
-	// `internal/bff` qui compose les trois.
+	// n'ouvre pas lui-même, pour ne pas faire dépendre le premier facteur de la session. Le sens de la
+	// dépendance tient dans les deux autres paquets : `internal/mfa` emprunte à celui-ci, et
+	// `internal/bff` compose les trois.
 	OperatorID string
 	// Challenge est le jeton opaque, rendu **une seule fois** : la base n'en garde que l'empreinte.
 	Challenge string
@@ -141,8 +141,8 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 // passwordMatches est le **seul** endroit où un mot de passe est confronté à quoi que ce soit.
 //
 // **L'appel à `VerifyDummy` ci-dessous est gardé par `oracle_test.go`**, qui exige l'appel dans cette
-// branche-ci. Sans lui rien ne le tenait : `TestLeHachageFacticeSExecuteSurNImporteQuelSecret` appelle
-// la fonction directement, donc garde la fonction et jamais son site d'appel, et sa suppression laisse
+// branche-ci. Lui seul le tient : `TestLeHachageFacticeSExecuteSurNImporteQuelSecret` appelle la
+// fonction directement, donc garde la fonction et jamais son site d'appel, et retirer l'appel laisse
 // un `if` idiomatique que la revue ne voit pas. La **durée**, elle, reste hors de portée d'un test —
 // la mesure est écrite au-dessus de `VerifyDummy`.
 //

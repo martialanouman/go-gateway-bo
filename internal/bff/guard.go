@@ -49,9 +49,9 @@ func (r rule) exempted() bool { return r.exemption != "" }
 // laisser passer aurait ouvert la garde en silence. La porte d'énumération tient le même invariant
 // par le type-checker, et les deux ensemble sont ce qui ferme le piège.
 //
-// **Aucune entrée n'exige de clé aujourd'hui, et c'est le sujet de la step.** Les **huit** mutations
-// vivent sous `/auth/`, où l'autorisation est l'affaire de chaque route ; les deux autres opérations
-// sont des lectures. Le premier `requires` arrive avec `POST /operators`, en step-029.
+// **Aucune entrée n'exige de clé aujourd'hui.** Les **huit** mutations vivent sous `/auth/`, où
+// l'autorisation est l'affaire de chaque route ; les deux autres opérations sont des lectures. Le
+// premier `requires` arrive avec `POST /operators`, en step-029.
 var authorization = map[string]rule{
 	"Health": exempt("la sonde de l'orchestrateur, qui n'a pas de session et ne doit jamais " +
 		"dépendre d'une autre brique pour répondre"),
@@ -84,23 +84,22 @@ var authorization = map[string]rule{
 // cette couture la branche « la clé manque » n'aurait aucun test avant step-029 — donc la mutation
 // qui retire la comparaison resterait verte, ce que la DoD de la step refuse.
 //
-// Le prix de toute couture est qu'un test peut vérifier un mécanisme que la production ne câble pas :
-// c'est le défaut que step-021 a payé. Il est fermé ici par `TestLaGardeEstCablee`, qui exige que
-// `newContractHandler` atteigne `(*session.Manager).Grants` — la vraie source, pas n'importe quelle
-// fonction du bon type.
+// Le prix de toute couture est qu'un test peut vérifier un mécanisme que la production ne câble pas.
+// Ce qui le ferme ici est `TestLaGardeEstCablee`, qui exige que `newContractHandler` atteigne
+// `(*session.Manager).Grants` — la vraie source, pas n'importe quelle fonction du bon type.
 type grantsOf func(ctx context.Context, operatorID string) ([]string, error)
 
 // requirePermission garde chaque opération selon la table.
 //
-// **Un middleware strict et non chi**, pour la raison mesurée en step-021 : le statut part dans
-// `Visit…Response(w)`, à l'intérieur du handler engendré, et un middleware chi ne reprendrait la main
-// qu'après, sur une réponse déjà écrite.
+// **Un middleware strict et non chi** : le statut part dans `Visit…Response(w)`, à l'intérieur du
+// handler engendré, et un middleware chi ne reprendrait la main qu'après, sur une réponse déjà
+// écrite.
 //
 // **Le refus s'écrit ici, sur `w`, et le middleware rend ensuite `(nil, nil)`.** Lu dans le code
-// engendré (`bff.gen.go:1360-1368`), les trois branches du wrapper sont alors fausses — l'erreur est
-// nulle, l'assertion de type échoue sur `nil`, et `response != nil` est faux — donc rien n'est
-// réécrit par-dessus. Rendre `(nil, nil)` **sans** écrire laisserait `net/http` servir un 200 vide :
-// c'est l'écriture qui est le refus, pas le retour.
+// engendré, les trois branches du wrapper sont alors fausses — l'erreur est nulle, l'assertion de
+// type échoue sur `nil`, et `response != nil` est faux — donc rien n'est réécrit par-dessus. Rendre
+// `(nil, nil)` **sans** écrire laisserait `net/http` servir un 200 vide : c'est l'écriture qui est le
+// refus, pas le retour.
 //
 // L'alternative — rendre l'objet de réponse typé de l'opération — exigerait une seconde table
 // `operationID → constructeur du 403 de cette opération-là`, et son défaut retomberait sur

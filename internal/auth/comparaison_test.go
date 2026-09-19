@@ -15,10 +15,10 @@ import (
 // — le remplacer par `string(key) == string(expected)` laissait tout le paquet vert, mesuré le
 // 09/08/2026.
 //
-// **La porte a deux moitiés, et il a fallu les deux.** La première rédaction n'exigeait que la
-// *présence* de l'appel, et une revue l'a mise en défaut le 01/09/2026 par deux formes : jeter le
-// résultat (`_ = subtle.ConstantTimeCompare(…)` puis comparer naïvement), et poser un raccourci naïf
-// **devant** l'appel. Les deux gardent l'appel dans le corps et rendent le refus en temps variable.
+// **La porte a deux moitiés, et il faut les deux.** Exiger la seule *présence* de l'appel se
+// contourne par deux formes : jeter le résultat (`_ = subtle.ConstantTimeCompare(…)` puis comparer
+// naïvement), et poser un raccourci naïf **devant** l'appel. Les deux gardent l'appel dans le corps
+// et rendent le refus en temps variable.
 //
 // **Le périmètre est nominatif et non topologique, et c'est mesuré** : une règle « toute comparaison
 // atteignable depuis un chemin de vérification » compte onze faux positifs, dont sept dans ce paquet
@@ -26,10 +26,9 @@ import (
 // `VerifyHeld` l'appelle en première instruction. La contrepartie est écrite : extraire la
 // comparaison dans une fonction voisine ferait rougir cette porte à tort.
 //
-// **La cible est `VerifyHeld` et non `Verify` depuis la borne de concurrence (step-034)** : `Verify`
-// ne fait plus que prendre une place de `Hold` autour de `VerifyHeld`, qui seul porte le calcul et la
-// comparaison — pointer la porte sur `Verify` la laisserait chercher dans un corps qui ne contient
-// plus l'appel.
+// **La cible est `VerifyHeld` et non `Verify`** : `Verify` ne fait que prendre une place de `Hold`
+// autour de `VerifyHeld`, qui seul porte le calcul et la comparaison — pointer la porte sur `Verify`
+// la laisserait chercher dans un corps qui ne contient pas l'appel.
 //
 // `loadAuth` et `functionBody` viennent d'`oracle_test.go`, même paquet de test.
 const (

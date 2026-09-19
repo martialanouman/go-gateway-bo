@@ -111,10 +111,9 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 	switch verdict.Outcome {
 	case auth.OutcomeChallenged:
 		// La session naît ici, au franchissement du premier facteur, et **non élevée** :
-		// `POST /auth/mfa/verify` l'élève — code TOTP, code de récupération ou assertion de passkey
-		// depuis step-024. L'ouvrir plus tard laisserait
-		// l'enrôlement d'un authentificateur sans rien pour dire de qui il s'agit, donc permettrait
-		// d'attacher une clé à un compte qu'on ne détient pas.
+		// `POST /auth/mfa/verify` l'élève — code TOTP, code de récupération ou assertion de passkey.
+		// L'ouvrir plus tard laisserait l'enrôlement d'un authentificateur sans rien pour dire de qui
+		// il s'agit, donc permettrait d'attacher une clé à un compte qu'on ne détient pas.
 		if sessionErr := a.closePresentedSession(ctx); sessionErr != nil {
 			return nil, sessionErr
 		}
@@ -191,7 +190,7 @@ func badRequest() Error {
 // second facteur pour `VerifyMfa` et `EnrollTotp` — est posée **avant** le hachage, pour la raison
 // inverse de la saturation : fermer la fenêtre où une rafale lirait toutes « pas de verrou » avant
 // qu'aucune n'ait compté (voir `auth.Authenticator.Login`). La retirer sur ce chemin referait cette
-// course. La phrase dit donc l'inverse de la rédaction du brief.
+// course.
 func overloaded() Error {
 	return Error{
 		Code: "overloaded",
