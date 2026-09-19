@@ -137,7 +137,11 @@ func (m *Manager) VerifyRecoveryCode(ctx context.Context, operatorID, presented 
 		hashes[index] = code.Hash
 	}
 
-	matched := MatchRecoveryCode(hashes, presented)
+	matched, err := MatchRecoveryCode(ctx, hashes, presented)
+	if err != nil {
+		return false, err
+	}
+
 	if matched < 0 {
 		return false, nil
 	}

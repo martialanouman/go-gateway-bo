@@ -126,7 +126,12 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 		return Verdict{}, err
 	}
 
-	if !a.passwordMatches(operator, password) {
+	matches, err := a.passwordMatches(ctx, operator, password)
+	if err != nil {
+		return Verdict{}, err
+	}
+
+	if !matches {
 		return a.refuse(ctx, sourceKey, lock)
 	}
 
@@ -145,16 +150,23 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 // abîmée, mais le dire au navigateur distinguerait ce compte des autres. L'erreur est écartée ici et
 // c'est un manque assumé — aucun journal n'atteint encore ce paquet (voir `internal/bff/router.go`),
 // donc une ligne corrompue est silencieuse. Le premier journal du BFF devra la remonter.
-func (a *Authenticator) passwordMatches(operator *store.Operator, password string) bool {
+//
+// **`ErrOverloaded` seul remonte.** Il ne dit rien d'un compte : les dix places de `Hold` manquaient,
+// et `internal/bff` le sert en 503, jamais en 401 — le confondre avec un hachage illisible ferait
+// annoncer un refus d'identifiants à une machine qui n'a encore rien vérifié.
+func (a *Authenticator) passwordMatches(ctx context.Context, operator *store.Operator, password string) (
+	bool, error,
+) {
 	if operator == nil {
-		VerifyDummy(password)
-
-		return false
+		return false, VerifyDummy(ctx, password)
 	}
 
-	ok, err := Verify(operator.PasswordHash, password)
+	ok, err := Verify(ctx, operator.PasswordHash, password)
+	if errors.Is(err, ErrOverloaded) {
+		return false, err
+	}
 
-	return err == nil && ok && operator.Status == store.StatusActive
+	return ok && operator.Status == store.StatusActive, nil
 }
 
 // refuse compte l'échec sur la source, et refuse. `reserved` est le verrou rendu par la réservation

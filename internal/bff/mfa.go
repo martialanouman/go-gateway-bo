@@ -2,8 +2,10 @@ package bff
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
@@ -130,6 +132,10 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		replace, err = a.verifyPresentedFactor(ctx, resolved.OperatorID, string(*request.Body.Method),
 			*request.Body.Code)
 		if err != nil {
+			if errors.Is(err, auth.ErrOverloaded) {
+				return EnrollTotp503JSONResponse(overloaded()), nil
+			}
+
 			return nil, err
 		}
 
@@ -246,6 +252,10 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 
 	verified, err := a.verifySecondFactor(ctx, resolved, *request.Body)
 	if err != nil {
+		if errors.Is(err, auth.ErrOverloaded) {
+			return VerifyMfa503JSONResponse(overloaded()), nil
+		}
+
 		return nil, err
 	}
 

@@ -791,6 +791,20 @@ func (response Login429JSONResponse) VisitLoginResponse(w http.ResponseWriter) e
 	return err
 }
 
+type Login503JSONResponse Error
+
+func (response Login503JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type LogoutRequestObject struct {
 }
 
@@ -927,6 +941,20 @@ func (response EnrollTotp429JSONResponse) VisitEnrollTotpResponse(w http.Respons
 	return err
 }
 
+type EnrollTotp503JSONResponse Error
+
+func (response EnrollTotp503JSONResponse) VisitEnrollTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type VerifyMfaRequestObject struct {
 	Body *VerifyMfaJSONRequestBody
 }
@@ -989,6 +1017,20 @@ func (response VerifyMfa429JSONResponse) VisitVerifyMfaResponse(w http.ResponseW
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
 	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyMfa503JSONResponse Error
+
+func (response VerifyMfa503JSONResponse) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }

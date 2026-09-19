@@ -1,6 +1,7 @@
 package mfa_test
 
 import (
+	"context"
 	"regexp"
 	"strings"
 	"testing"
@@ -33,7 +34,8 @@ func TestDixCodesDeRecuperationSontRemisAlEnrolement(t *testing.T) {
 
 		// Le hachage porte la valeur **normalisée**, pas la forme affichée : c'est ce qui permet à un
 		// opérateur de recopier avec ou sans le tiret.
-		ok, err := auth.Verify(enrollment.RecoveryCodeHashes[index], mfa.NormalizeRecoveryCode(code))
+		ok, err := auth.Verify(context.Background(), enrollment.RecoveryCodeHashes[index],
+			mfa.NormalizeRecoveryCode(code))
 		require.NoError(t, err)
 		assert.True(t, ok, "le hachage rangé ne correspond pas au code remis, au même index")
 	}
@@ -72,7 +74,9 @@ func TestUnCodeEstAccepteQuelleQueSoitSaMiseEnForme(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, 3, mfa.MatchRecoveryCode(enrollment.RecoveryCodeHashes, presented))
+			matched, err := mfa.MatchRecoveryCode(context.Background(), enrollment.RecoveryCodeHashes, presented)
+			require.NoError(t, err)
+			assert.Equal(t, 3, matched)
 		})
 	}
 }
@@ -128,7 +132,9 @@ func TestUnCodeInconnuNeMatcheAucunHachage(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, -1, mfa.MatchRecoveryCode(enrollment.RecoveryCodeHashes, presented))
+			matched, err := mfa.MatchRecoveryCode(context.Background(), enrollment.RecoveryCodeHashes, presented)
+			require.NoError(t, err)
+			assert.Equal(t, -1, matched)
 		})
 	}
 }
@@ -160,7 +166,9 @@ func TestLaBoucleDesCodesDeRecuperationNeCourtCircuitePas(t *testing.T) {
 
 	hashes := append(append([]string{}, enrollment.RecoveryCodeHashes...), duplicate)
 
-	assert.Equal(t, len(hashes)-1, mfa.MatchRecoveryCode(hashes, enrollment.RecoveryCodes[0]),
+	matched, err := mfa.MatchRecoveryCode(context.Background(), hashes, enrollment.RecoveryCodes[0])
+	require.NoError(t, err)
+	assert.Equal(t, len(hashes)-1, matched,
 		"la boucle rend le premier rang qui colle et non le dernier : elle s'arrête donc dès qu'elle "+
 			"a trouvé, et la durée du verdict dit à quel rang le code présenté se trouvait")
 }
@@ -174,5 +182,7 @@ func TestUnHachageIllisibleNEmpechePasLesAutresDeMatcher(t *testing.T) {
 
 	hashes := append([]string{"ceci n'est pas du PHC"}, enrollment.RecoveryCodeHashes...)
 
-	assert.Equal(t, 1, mfa.MatchRecoveryCode(hashes, enrollment.RecoveryCodes[0]))
+	matched, err := mfa.MatchRecoveryCode(context.Background(), hashes, enrollment.RecoveryCodes[0])
+	require.NoError(t, err)
+	assert.Equal(t, 1, matched)
 }

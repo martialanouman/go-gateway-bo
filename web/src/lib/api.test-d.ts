@@ -45,10 +45,11 @@ expectTypeOf<HealthOperation['parameters']['query']>().toEqualTypeOf<undefined>(
 /**
  * `POST /api/auth/login` — step-021. Ce que l'écran de connexion (step-027) tiendra pour vrai.
  *
- * La raison d'écrire ces quatre assertions plutôt qu'une : le client doit traiter **quatre**
- * réponses, et trois sont des refus qui ne se ressemblent pas — l'un se réessaie tout de suite,
- * l'autre après un délai, le troisième jamais. Un client qui n'en connaîtrait que deux découvrirait
- * la troisième en production, sur l'écran de connexion, c'est-à-dire au pire endroit.
+ * La raison d'écrire ces quatre assertions plutôt qu'une : le client doit traiter **cinq**
+ * réponses depuis step-034, et quatre sont des refus qui ne se ressemblent pas — l'un se réessaie
+ * tout de suite, l'autre après un délai connu, le troisième jamais, le quatrième bientôt mais sans
+ * délai que le serveur puisse promettre. Un client qui n'en connaîtrait qu'une partie découvrirait
+ * le reste en production, sur l'écran de connexion, c'est-à-dire au pire endroit.
  */
 
 type LoginOperation = paths['/auth/login']['post']
@@ -74,9 +75,13 @@ expectTypeOf<LoginOperation['responses'][401]['content']['application/json']>().
   message: string
 }>()
 
-// Les quatre statuts, et le 400 en fait partie : login est la première opération à porter un corps,
+// Les cinq statuts, et le 400 en fait partie : login est la première opération à porter un corps,
 // donc la première dont le décodage peut échouer avant d'atteindre le handler.
-expectTypeOf<keyof LoginOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 429>()
+//
+// Le 503 est le cinquième depuis step-034 : les dix places de hachage argon2id manquaient. Le client
+// doit le distinguer du 401 et du 429 — ni un refus d'identifiants, ni un compte à faire patienter,
+// mais une machine saturée à retenter sans attendre une durée précise.
+expectTypeOf<keyof LoginOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 429 | 503>()
 
 /**
  * `GET /api/auth/me` — step-022. Le **seul** endroit d'où le client apprend ses droits.
@@ -134,13 +139,18 @@ expectTypeOf<EnrollOperation['responses'][200]['content']['application/json']>()
   recoveryCodes: string[]
 }>()
 
-// Cinq statuts, et le 409 en fait partie : le client doit traiter « un second facteur est déjà en
+// Six statuts, et le 409 en fait partie : le client doit traiter « un second facteur est déjà en
 // place » comme un cas normal — c'est celui d'un opérateur qui change de téléphone — et non comme une
 // panne. Le découvrir à l'exécution ferait un toast d'erreur là où il faut une explication.
 //
 // Le 429 aussi est un cas normal, et il ne dit pas la même chose ici qu'ailleurs : le compteur porte
 // sur les **appels** et non sur les échecs. L'opérateur n'a rien raté ; il a demandé trop souvent.
-expectTypeOf<keyof EnrollOperation['responses']>().toEqualTypeOf<200 | 400 | 401 | 409 | 429>()
+//
+// Le 503, depuis step-034, ne se rend que sur un remplacement : c'est la preuve présentée qui hache,
+// et les dix places de `auth.Hold` peuvent manquer là où le premier enrôlement n'en demande aucune.
+expectTypeOf<keyof EnrollOperation['responses']>().toEqualTypeOf<
+  200 | 400 | 401 | 409 | 429 | 503
+>()
 
 // Les deux champs sont **facultatifs**, et c'est ce que le type doit dire : un premier enrôlement n'a
 // rien à prouver, un remplacement présente le facteur qu'il détruit. Le serveur exige qu'ils soient
@@ -179,7 +189,10 @@ expectTypeOf<VerifyOperation['requestBody']['content']['application/json']>().to
 // Le 429 est le quatrième, et le client doit le distinguer du 401 : l'un dit « ce code ne convient
 // pas », l'autre « arrêtez d'essayer pendant un quart d'heure ». Les confondre ferait boucler l'écran
 // sur un formulaire qui ne peut plus rien accepter.
-expectTypeOf<keyof VerifyOperation['responses']>().toEqualTypeOf<204 | 400 | 401 | 429>()
+//
+// Le 503, cinquième depuis step-034, ne se rend que sur un code TOTP ou de récupération : l'assertion
+// WebAuthn ne hache rien et ne peut jamais y mener.
+expectTypeOf<keyof VerifyOperation['responses']>().toEqualTypeOf<204 | 400 | 401 | 429 | 503>()
 
 /**
  * `POST /api/auth/mfa/webauthn/*` — step-024. Les deux cérémonies de passkey.

@@ -1,8 +1,10 @@
 package auth_test
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +18,7 @@ func TestUnHachageSeVerifieAvecLeSecretQuiLAProduit(t *testing.T) {
 	encoded, err := auth.Hash("un mot de passe d'opérateur")
 	require.NoError(t, err)
 
-	ok, err := auth.Verify(encoded, "un mot de passe d'opérateur")
+	ok, err := auth.Verify(context.Background(), encoded, "un mot de passe d'opérateur")
 	require.NoError(t, err)
 	assert.True(t, ok, "le mot de passe qui a produit ce hachage ne le vérifie pas : personne ne peut plus entrer")
 }
@@ -27,7 +29,7 @@ func TestUnSecretFauxNeVerifiePas(t *testing.T) {
 	encoded, err := auth.Hash("le bon")
 	require.NoError(t, err)
 
-	ok, err := auth.Verify(encoded, "le mauvais")
+	ok, err := auth.Verify(context.Background(), encoded, "le mauvais")
 	require.NoError(t, err)
 	assert.False(t, ok, "un mot de passe faux vérifie : le premier facteur n'en est plus un")
 }
@@ -58,7 +60,7 @@ func TestUnHachageProduitAvecDAnciensParametresResteVerifiableApresRelevement(t 
 	ancien, err := auth.HashWith(faibles, "un mot de passe d'avant le relèvement")
 	require.NoError(t, err)
 
-	ok, err := auth.Verify(ancien, "un mot de passe d'avant le relèvement")
+	ok, err := auth.Verify(context.Background(), ancien, "un mot de passe d'avant le relèvement")
 	require.NoError(t, err)
 	assert.True(t, ok, "Verify a utilisé les paramètres courants au lieu de ceux de l'encodage : "+
 		"tout relèvement fermerait la porte aux opérateurs déjà inscrits")
@@ -100,7 +102,7 @@ func TestUnEncodageIllisibleEstUneErreurEtNonUnRefus(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			ok, err := auth.Verify(encoded, "peu importe")
+			ok, err := auth.Verify(context.Background(), encoded, "peu importe")
 			require.Error(t, err, "cet encodage est accepté comme lisible")
 			assert.False(t, ok, "un encodage illisible ne doit jamais vérifier")
 		})
@@ -135,7 +137,7 @@ func TestDesCoutsNulsSontRefusesPlutotQueDeFairePaniquer(t *testing.T) {
 
 			require.NotEqual(t, sain, encoded, "la substitution n'a rien remplacé : ce cas ne teste rien")
 
-			ok, err := auth.Verify(encoded, "peu importe")
+			ok, err := auth.Verify(context.Background(), encoded, "peu importe")
 			require.Error(t, err, "ces coûts sont acceptés : t=0 et p=0 feraient paniquer argon2.IDKey, et m=0 "+
 				"ferait vérifier avec des paramètres écrêtés qui ne sont pas ceux du hachage")
 			assert.False(t, ok)
@@ -192,6 +194,66 @@ func TestLesParametresNeDescendentPasSousLePlancher(t *testing.T) {
 func TestLeHachageFacticeSExecuteSurNImporteQuelSecret(t *testing.T) {
 	t.Parallel()
 
-	assert.NotPanics(t, func() { auth.VerifyDummy("") })
-	assert.NotPanics(t, func() { auth.VerifyDummy("un mot de passe quelconque") })
+	assert.NotPanics(t, func() { _ = auth.VerifyDummy(context.Background(), "") })
+	assert.NotPanics(t, func() { _ = auth.VerifyDummy(context.Background(), "un mot de passe quelconque") })
+}
+
+// TestLaOnziemeVerificationAttendSaPlace — la borne se mesure par l'échéance, jamais par une durée
+// observée : un test qui chronomètre passerait sur une machine lente et rougirait sur une rapide.
+func TestLaOnziemeVerificationAttendSaPlace(t *testing.T) {
+	t.Parallel()
+
+	release := make(chan struct{})
+	occupied := make(chan struct{}, auth.HashSlots)
+
+	for range auth.HashSlots {
+		go func() {
+			_ = auth.Hold(context.Background(), func() error {
+				occupied <- struct{}{}
+				<-release
+
+				return nil
+			})
+		}()
+	}
+
+	for range auth.HashSlots {
+		<-occupied
+	}
+
+	expired, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	_, err := auth.Verify(expired, hashForTest, "peu importe")
+
+	close(release)
+
+	assert.ErrorIs(t, err, auth.ErrOverloaded,
+		"la onzième vérification a haché sans place : la borne ne borne rien")
+}
+
+// hashForTest est un encodage PHC quelconque : la onzième vérification échoue faute de **place**,
+// avant même de lire ce champ — `decode` ne s'exécute jamais tant que `Hold` n'a rien acquis.
+var hashForTest = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHRzYWx0c2E$aGFjaGVoYWNoZWhhY2hlaGFjaGU"
+
+// TestLaDixiemeVerificationTientDansLesDixPlaces s'assure que la borne ne bloque pas la charge
+// nominale : dix vérifications concurrentes, sans échéance qui expire, aboutissent toutes.
+func TestLaDixiemeVerificationTientDansLesDixPlaces(t *testing.T) {
+	t.Parallel()
+
+	encoded, err := auth.Hash("un mot de passe d'opérateur")
+	require.NoError(t, err)
+
+	results := make(chan error, auth.HashSlots)
+
+	for range auth.HashSlots {
+		go func() {
+			_, verifyErr := auth.Verify(context.Background(), encoded, "un mot de passe d'opérateur")
+			results <- verifyErr
+		}()
+	}
+
+	for range auth.HashSlots {
+		assert.NoError(t, <-results)
+	}
 }
