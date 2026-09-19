@@ -20,8 +20,7 @@ import (
 // pas entrer en collision avec celle de goose, qui verrouille les migrations sur la même base et
 // dans le **même espace** — `pg_advisory_xact_lock` et le `pg_try_advisory_lock` de goose partagent
 // leurs identifiants. Celle de goose est `lock.DefaultLockID`, et `seed_lock_test.go` compare les
-// deux plutôt que de recopier sa valeur : une première rédaction de ce commentaire citait un nombre
-// qui n'existe nulle part dans le module.
+// deux plutôt que de recopier sa valeur, qu'un commentaire citerait de travers.
 const SeedLockKey int64 = 7_020_020_020_020_020
 
 // Grant est une attribution : le rôle par défaut, et la clé qu'il accorde.
@@ -79,9 +78,9 @@ func (o SeedOutcome) Diverges() bool {
 func Seed(ctx context.Context, dsn string) (SeedOutcome, error) {
 	conn, err := pgx.Connect(ctx, dsn)
 	if err != nil {
-		// Comme ailleurs dans ce package, l'erreur de la bibliothèque n'est pas propagée : elle
-		// recopie le DSN, dont la rédaction n'est pas hermétique, et celle-ci remonte jusqu'à la
-		// sortie de `bootstrap`, donc dans les journaux de déploiement.
+		// Comme ailleurs dans ce package, l'erreur de la bibliothèque n'est pas propagée : sa rédaction
+		// du DSN n'est pas hermétique, et celle-ci remonte jusqu'à la sortie de `bootstrap`, donc dans
+		// les journaux de déploiement.
 		return SeedOutcome{}, errors.New(
 			"connexion à la base impossible ; la valeur du DSN n'est pas citée, elle porte le mot de " +
 				"passe de la base")
@@ -157,20 +156,19 @@ func seedWithin(ctx context.Context, tx pgx.Tx) (SeedOutcome, error) {
 
 // upsertPermissions classe ce qu'elle fait au lieu de le taire.
 //
-// **`ON CONFLICT DO NOTHING` ne convient pas**, et c'est le cœur de cette step : il laisserait une
-// description modifiée à la main telle quelle, et ne dirait rien d'une clé disparue du catalogue —
-// la base garderait indéfiniment un vocabulaire que plus personne ne lit, et le premier symptôme
-// serait un écran de rôle affichant une permission que le serveur ignore.
+// **`ON CONFLICT DO NOTHING` ne convient pas** : il laisserait une description modifiée à la main
+// telle quelle, et ne dirait rien d'une clé disparue du catalogue — la base garderait indéfiniment un
+// vocabulaire que plus personne ne lit, et le premier symptôme serait un écran de rôle affichant une
+// permission que le serveur ignore.
 //
-// Le `IS DISTINCT FROM` n'est pas une optimisation : sans lui, la seconde exécution réécrirait les
-// 44 lignes à l'identique et se rapporterait comme ayant changé quelque chose. C'est lui qui rend
+// Le `IS DISTINCT FROM` n'est pas une optimisation : sans lui, la seconde exécution réécrirait toutes
+// les lignes à l'identique et se rapporterait comme ayant changé quelque chose. C'est lui qui rend
 // « rejouer ne change rien » observable plutôt que supposé.
 //
 // La troisième branche du `SELECT` final — celle qui classe `unknown` — ne peut pas croiser les deux
 // autres : son prédicat est `NOT EXISTS (… wanted …)`, et tout ce qu'`inserted` et `updated`
-// touchent vient de `wanted`. C'est **ce prédicat** qui fait qu'une base vierge ne se signale pas 44
-// clés inconnues à elle-même, et non la sémantique de snapshot — une première rédaction de ce
-// commentaire l'attribuait à celle-ci, ce qui expliquait un code correct par une raison qu'il n'a pas.
+// touchent vient de `wanted`. C'est **ce prédicat**, et non la sémantique de snapshot, qui fait
+// qu'une base vierge ne se signale pas à elle-même toutes ses clés comme inconnues.
 const upsertPermissions = `
 WITH wanted (key, category, description) AS (
 	SELECT * FROM unnest($1::text[], $2::text[], $3::text[])
@@ -226,7 +224,7 @@ func seedPermissions(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error
 
 // `created_by` reste NULL, et la colonne est nullable pour cette raison autant que pour le départ
 // d'un auteur : ces neuf rôles sont posés par le déploiement, pas par un humain, et c'est ce qui les
-// distingue d'un rôle créé depuis l'écran de step-029. Il n'y a donc **personne à nommer**, et cela
+// distingue d'un rôle créé depuis l'écran de gestion. Il n'y a donc **personne à nommer**, et cela
 // reste vrai quand la base porte des opérateurs : aucun d'eux n'est l'auteur de ces rôles.
 //
 // `is_default = true` est écrit explicitement : le défaut de la colonne est `false`, et un rôle par
@@ -255,13 +253,11 @@ UNION ALL SELECT 'unknown', r.name FROM roles r
 	WHERE r.is_default AND NOT EXISTS (SELECT 1 FROM wanted w WHERE w.name = r.name)`
 
 // seedRoles projette les neuf rôles par défaut. Ce que la requête ci-dessus ne distingue pas, et
-// qu'il faut savoir : **l'identité d'un rôle est son nom**.
-// Un rôle composé depuis l'écran qui porterait le nom d'un rôle par défaut — celui d'aujourd'hui, ou
-// celui qu'une release future ajoutera — serait basculé en `is_default`, verrait sa description
+// qu'il faut savoir : **l'identité d'un rôle est son nom**. Un rôle composé depuis l'écran qui
+// porterait le nom d'un rôle par défaut serait basculé en `is_default`, verrait sa description
 // écrasée et ses attributions ramenées à la liste du code. Le rapport le compte, donc ce n'est pas
-// silencieux, mais c'est destructeur par défaut. C'est la seconde moitié de la question léguée à
-// step-029, qui décidera si l'écran interdit ces neuf noms ou ce qu'il fait d'une collision.
-
+// silencieux, mais c'est destructeur par défaut : l'écran de gestion des rôles devra interdire ces
+// neuf noms, ou trancher ce qu'il fait d'une collision.
 func seedRoles(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error {
 	defaults := permissions.DefaultRoles()
 
@@ -308,11 +304,9 @@ func seedRoles(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error {
 // quelque chose — mais c'est le SQL qui ne se défend pas seul, et deux des neuf rôles n'ont qu'une
 // clé.
 //
-// Un `AND r.is_default` a d'abord été écrit à côté, et **mesuré inatteignable** : le retirer seul
-// laissait les huit scénarios et les tests unitaires verts. La raison est deux instructions plus
-// haut — `upsertRoles` force `is_default = true` sur exactement les rôles de `wanted`, dans la même
-// transaction. Une garde qu'aucune mutation ne peut faire tomber ne garde rien ; elle a été retirée
-// plutôt que dotée d'un test de complaisance.
+// Un `AND r.is_default` à côté serait **inatteignable**, et c'est mesuré : `upsertRoles`, deux
+// instructions plus haut, force `is_default = true` sur exactement les rôles de `wanted`, dans la
+// même transaction. Une garde qu'aucune mutation ne peut faire tomber ne garde rien.
 const reconcileGrants = `
 WITH wanted (role_name, permission_key) AS (
 	SELECT * FROM unnest($1::text[], $2::text[])

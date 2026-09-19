@@ -26,18 +26,18 @@ import (
 // message de refus vivent dans l'`adminDSN` du bas de ce fichier ; `bddtest` ne porte que la variable
 // qui désigne un serveur partagé, et le contrôle de sa joignabilité.
 //
-// Mesuré le 02/08/2026, et contraire à ce qu'on suppose spontanément : **`DOCKER_HOST` ne suffit pas
-// à détourner testcontainers**. Posé sur une socket inexistante, il a été ignoré et la suite a
-// tourné contre le démon du contexte Docker courant (`orbstack`). C'est ce contexte qui décide du
-// repli, pas la variable — `DASHBOARD_TEST_DATABASE_URL`, elle, décide du serveur.
+// Mesuré, et contraire à ce qu'on suppose spontanément : **`DOCKER_HOST` ne suffit pas à détourner
+// testcontainers**. Posé sur une socket inexistante, il est ignoré et la suite tourne contre le démon
+// du contexte Docker courant. C'est ce contexte qui décide du repli, pas la variable —
+// `DASHBOARD_TEST_DATABASE_URL`, elle, décide du serveur.
 
 // suiteDSN désigne la base d'administration de la suite — celle depuis laquelle chaque test taille
 // la sienne. Elle est posée par TestMain avant tout test, et lue seulement ensuite.
 var suiteDSN string
 
 // **Un serveur par suite** (DN-8), pas un par test : la création d'une base coûte quelques
-// millisecondes, et depuis step-032 le serveur lui-même est partagé par tout le module quand
-// l'environnement en fournit un.
+// millisecondes, et le serveur lui-même est partagé par tout le module quand l'environnement en
+// fournit un.
 func TestMain(m *testing.M) {
 	code, err := runSuite(m)
 	if err != nil {

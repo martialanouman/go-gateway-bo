@@ -13,13 +13,12 @@ import (
 // OperationLedger note les opérations du contrat qu'un scénario a **validées**, et refuse qu'une
 // opération déclarée n'ait été validée par aucun.
 //
-// Ce qu'il ferme est un trou nommé par step-004 et laissé ouvert faute d'être falsifiable sur une
-// seule route : le mode strict d'`oapi-codegen` retire le `ResponseWriter` de la signature du
-// *handler*, mais pas de celle du *type de réponse*. Un type de réponse **sans champ** dont le
-// `Visit…` écrit ce qu'il veut sur le fil compile, satisfait l'interface, et traverse les portes
-// structurelles de `internal/bff` — mesuré le 02/08/2026. Ce qui l'attrape est le scénario qui
-// confronte la réponse servie au YAML, et lui seul. La convention « DTO de sortie déclaré » n'est
-// donc pas auto-portante, et l'oubli d'un scénario était silencieux.
+// Ce qu'il ferme n'est pas falsifiable sur une seule route : le mode strict d'`oapi-codegen` retire le
+// `ResponseWriter` de la signature du *handler*, mais pas de celle du *type de réponse*. Un type de
+// réponse **sans champ** dont le `Visit…` écrit ce qu'il veut sur le fil compile, satisfait
+// l'interface, et traverse les portes structurelles de `internal/bff`. Ce qui l'attrape est le
+// scénario qui confronte la réponse servie au YAML, et lui seul : la convention « DTO de sortie
+// déclaré » n'est donc pas auto-portante, et l'oubli d'un scénario serait silencieux.
 //
 // D'où le choix de ce qui compte comme visite : une opération est visitée quand un scénario a
 // **validé** sa réponse contre le contrat, jamais quand il en a seulement demandé le chemin. Compter

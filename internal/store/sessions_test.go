@@ -16,7 +16,7 @@ import (
 const (
 	// Les deux échéances des tests sont larges : ce qu'ils observent est le verdict de vivacité, pas
 	// l'écoulement du temps. Les cas qui font mourir une session reculent son horodatage en base
-	// plutôt que d'attendre — précédent des verrous de step-021.
+	// plutôt que d'attendre.
 	testLifetime = 12 * time.Hour
 	testIdle     = 2 * time.Hour
 )
@@ -84,9 +84,9 @@ func grantRole(t *testing.T, dsn, operatorID, role string, keys ...string) {
 }
 
 // **Les deux vieillissements sont séparés, et c'est le cœur de ces tests.** Reculer les deux
-// horodatages ensemble faisait refuser la fenêtre glissante dans tous les cas : la mutation « borne
-// absolue retirée du `WHERE` » laissait alors la suite entièrement verte, mesuré le 10/08/2026. Un
-// test qui ne peut pas rougir pour la borne qu'il nomme est un test vert pour la mauvaise borne.
+// horodatages ensemble ferait refuser la fenêtre glissante dans tous les cas, et la mutation « borne
+// absolue retirée du `WHERE` » laisserait la suite entièrement verte : un test qui ne peut pas rougir
+// pour la borne qu'il nomme est un test vert pour la mauvaise borne.
 //
 // Le compte de lignes touchées est asserté : un cas qui n'a rien vieilli passerait en silence.
 
@@ -104,8 +104,8 @@ func idleFor(t *testing.T, dsn string, hash []byte, elapsed time.Duration) {
 // openedAgo recule la naissance et l'échéance absolue, **et laisse la dernière vue** : la session est
 // celle d'un opérateur connecté il y a un moment et qui vient de faire une requête. C'est ce qui rend
 // l'échéance absolue observable — sans recul, la session ouverte et la session résolue le sont à la
-// même milliseconde, et « ne pas repousser » ne se distingue pas de « repousser » (mesuré le
-// 10/08/2026 : la mutation « Resolve repousse aussi l'échéance absolue » laissait la suite verte).
+// même milliseconde, et « ne pas repousser » ne se distingue pas de « repousser » — mesuré : la
+// mutation « Resolve repousse aussi l'échéance absolue » laisse alors la suite verte.
 func openedAgo(t *testing.T, dsn string, hash []byte, elapsed time.Duration) {
 	t.Helper()
 
@@ -259,10 +259,10 @@ func TestLEcheanceAbsolueNEstJamaisRepoussee(t *testing.T) {
 	assert.WithinDuration(t, first.ExpiresAt, second.ExpiresAt, time.Second)
 }
 
-// **`Elevate` porte les mêmes trois gardes que `Resolve`, et chacune se teste séparément.** Mesuré le
-// 11/08/2026 en revue : les retirer une par une d'`Elevate` laissait la suite entièrement verte, parce
-// que les tests de `Resolve` ne disent rien de la seconde requête. C'est le motif « deux gardes,
-// chacune invisible seule », transposé à deux méthodes qui se ressemblent.
+// **`Elevate` porte les mêmes trois gardes que `Resolve`, et chacune se teste séparément.** Mesuré :
+// les retirer une par une d'`Elevate` laisse la suite entièrement verte, parce que les tests de
+// `Resolve` ne disent rien de la seconde requête. C'est le motif « deux gardes, chacune invisible
+// seule », transposé à deux méthodes qui se ressemblent.
 
 // Sans cette garde, une session oisive depuis des jours s'élève encore — et l'élévation repousse
 // `last_seen_at`, donc la **ressuscite** au passage.
@@ -286,8 +286,8 @@ func TestUneSessionOisiveNeSEleveJamais(t *testing.T) {
 	assert.False(t, alive, "l'élévation refusée a quand même repoussé la fenêtre")
 }
 
-// Le second facteur d'un compte désactivé ne doit rien ouvrir : step-029 révoquera activement, mais
-// la porte passive vaut pour les deux méthodes, pas seulement pour `Resolve`.
+// Le second facteur d'un compte désactivé ne doit rien ouvrir : la porte passive vaut pour les deux
+// méthodes, pas seulement pour `Resolve`.
 func TestUnOperateurDesactiveNEleveJamaisSaSession(t *testing.T) {
 	t.Parallel()
 
@@ -413,8 +413,8 @@ func TestLesPermissionsSontLUnionDesRolesDetenusSansDoublon(t *testing.T) {
 	assert.Equal(t, "Opérateur d'essai", grants.DisplayName)
 }
 
-// Un opérateur sans rôle existe dès step-029. Rendre une absence plutôt qu'un ensemble vide ferait
-// dire « pas de session » là où le fait est « aucune permission ».
+// Un opérateur sans aucun rôle est un état atteignable. Rendre une absence plutôt qu'un ensemble vide
+// ferait dire « pas de session » là où le fait est « aucune permission ».
 func TestUnOperateurSansAucunRoleRendUnEnsembleVide(t *testing.T) {
 	t.Parallel()
 
@@ -426,8 +426,9 @@ func TestUnOperateurSansAucunRoleRendUnEnsembleVide(t *testing.T) {
 	assert.Empty(t, grants.Permissions)
 }
 
-// La révocation au moment de la désactivation appartient à step-029 ; ce que garde cette ligne-ci
-// est la porte passive : un compte désactivé ne résout plus, même avec un cookie encore valide.
+// La révocation active au moment de la désactivation appartient à l'écran de gestion des opérateurs ;
+// ce que garde ce cas-ci est la porte passive : un compte désactivé ne résout plus, même avec un
+// cookie encore valide.
 func TestUnOperateurDesactiveNeResoutPlusSaSession(t *testing.T) {
 	t.Parallel()
 

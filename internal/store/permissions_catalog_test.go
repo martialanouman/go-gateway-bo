@@ -15,23 +15,17 @@ import (
 // Les onze catégories vivent à trois endroits : `internal/permissions`, le TypeScript qu'il
 // engendre, et le `CHECK` sur `permissions.category`. `check-generated` tient le front Go↔TS ; ces
 // deux cas sont tout ce qui tient le front Go↔SQL. Sans eux, une catégorie mal orthographiée en Go
-// passe toutes les portes et n'échoue qu'à l'`INSERT` du seed — c'est-à-dire, depuis step-020, au
-// `make bootstrap` d'un déploiement.
+// passe toutes les portes et n'échoue qu'à l'`INSERT` du seed, c'est-à-dire au `make bootstrap` d'un
+// déploiement.
 //
 // # Pourquoi ces cas vivent ici et non dans `internal/permissions`
 //
-// Ils y ont d'abord vécu, sous la forme d'un `os.ReadFile` de la migration `00001` et d'une
-// expression rationnelle sur son texte. Mesuré le 02/08/2026 : la contrainte mise en commentaire
-// d'historique — `-- CHECK (category IN (` — laissait les **deux** cas verts, parce que ni
-// `os.ReadFile` ni `regexp` n'ont de notion de commentaire SQL. Ils affirmaient tenir un front qui
-// n'existait plus en base. Le même angle mort couvrait un `ALTER … DROP CONSTRAINT` posé par une
-// migration ultérieure, que la lecture de `00001` seule ne peut pas voir.
-//
-// Ici, la contrainte est **celle que PostgreSQL applique** après toutes les migrations : un
-// commentaire n'en fait plus partie, et un `ALTER` d'une future `00004` s'y voit — vérifié en posant
-// une `00004` qui `DROP` la contrainte, que la lecture de `00001` seule laissait verte. Le prix est
-// un conteneur, que ce package paie déjà pour toutes ses suites : mesuré le 02/08/2026, la suite
-// passe de 13,3 s à 14,3 s, soit deux bases neuves et leurs migrations.
+// Lire la migration `00001` par `os.ReadFile` et une expression rationnelle ne tient rien : ni l'un
+// ni l'autre n'a de notion de commentaire SQL, donc la contrainte mise en commentaire — `-- CHECK
+// (category IN (` — laisse les **deux** cas verts, et un `ALTER … DROP CONSTRAINT` posé par une
+// migration ultérieure reste invisible. Ici, la contrainte est **celle que PostgreSQL applique**
+// après toutes les migrations. Le prix est un conteneur, que ce package paie déjà pour toutes ses
+// suites : une seconde de plus, soit deux bases neuves et leurs migrations.
 //
 // # Ce qui est observé et ce qui est lu
 //
@@ -41,8 +35,8 @@ import (
 // Le sens inverse ne peut pas l'être : « la contrainte accepte-t-elle une valeur qu'aucune clé ne
 // porte ? » porte sur un ensemble infini de chaînes candidates, et aucune sonde ne l'épuise. Il faut
 // donc énumérer ce que la contrainte accepte, et `pg_get_constraintdef` est la seule façon de le
-// demander. C'est du texte, mais du texte **rendu par l'analyseur** : mesuré le 02/08/2026 sur
-// `postgres:18-alpine`, le `IN (…)` de la migration y ressort normalisé en
+// demander. C'est du texte, mais du texte **rendu par l'analyseur** : sur `postgres:18-alpine`, le
+// `IN (…)` de la migration ressort normalisé en
 // `CHECK ((category = ANY (ARRAY['routing'::text, …])))`.
 var checkedLiteral = regexp.MustCompile(`'([^']*)'::text`)
 
@@ -102,9 +96,9 @@ func TestEveryCatalogCategoryIsAcceptedBySQL(t *testing.T) {
 	for _, category := range permissions.Categories() {
 		// Un point de reprise par sonde, et non un seul `INSERT` après l'autre : un `INSERT` refusé
 		// **avorte la transaction**, et les sondes suivantes échoueraient toutes sur
-		// `current transaction is aborted`. Mesuré le 02/08/2026 en retirant `'compliance'` de la
-		// liste : sans le point de reprise, le test nommait aussi `alerts` et `audit` comme refusées
-		// alors que la contrainte les accepte.
+		// `current transaction is aborted`. Mesuré en retirant `'compliance'` de la liste : sans le
+		// point de reprise, le test nomme aussi `alerts` et `audit` comme refusées alors que la
+		// contrainte les accepte.
 		probe, err := tx.Begin(ctx)
 		require.NoError(t, err, "ouvrir le point de reprise de la sonde")
 
@@ -119,8 +113,8 @@ func TestEveryCatalogCategoryIsAcceptedBySQL(t *testing.T) {
 	}
 }
 
-// Le sens inverse n'est pas décoratif : en v1.0, `connectors` a existé côté PostgreSQL sans qu'aucune
-// clé ne s'y rattache, et l'écran d'édition de rôle présentait une famille vide.
+// Le sens inverse n'est pas décoratif : une catégorie acceptée par PostgreSQL sans clé qui s'y
+// rattache fait présenter une famille vide par l'écran d'édition de rôle.
 func TestEveryCategoryAcceptedBySQLCarriesAtLeastOneKey(t *testing.T) {
 	t.Parallel()
 

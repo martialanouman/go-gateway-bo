@@ -1,8 +1,8 @@
 // Package config charge la configuration du tableau de bord depuis l'environnement et la valide une
 // fois pour toutes, au lancement.
 //
-// « Au lancement » et non « au démarrage du serveur » : il y a deux programmes et deux chargeurs
-// depuis step-021 — `Load` pour le serveur, `LoadBootstrap` pour la commande d'installation.
+// « Au lancement » et non « au démarrage du serveur » : il y a deux programmes et deux chargeurs —
+// `Load` pour le serveur, `LoadBootstrap` pour la commande d'installation.
 //
 // Aucun autre package ne lit l'environnement : une variable lue ailleurs se découvrirait manquante à
 // la première requête qui l'emprunte, c'est-à-dire en production, sur un serveur qu'on croyait en
@@ -83,11 +83,11 @@ const minimumTOTPEncryptionKeyLength = 32
 // trente-deux `a` de suite passaient les bornes ci-dessus, et rien n'imposait le tirage aléatoire
 // que la documentation se contentait alors de recommander.
 //
-// Douze, choisi sur ce que la borne doit refuser et non sur les valeurs déjà posées. Mesuré le
-// 01/09/2026 sur un million de tirages base64 de trente-deux caractères — la longueur minimale — :
-// 25,4 symboles distincts en moyenne, et **jamais moins de seize**. Douze laisse donc quatre symboles
-// de marge sous le pire tirage observé. Ce n'est pas une mesure d'entropie mais un minorant grossier ;
-// il ferme le seul mode d'échec observé — une valeur posée à la main pour faire démarrer.
+// Douze, choisi sur ce que la borne doit refuser et non sur les valeurs déjà posées : mesuré sur un
+// million de tirages base64 de trente-deux caractères — la longueur minimale —, 25,4 symboles
+// distincts en moyenne et **jamais moins de seize**, donc quatre symboles de marge sous le pire
+// tirage. Ce n'est pas une mesure d'entropie mais un minorant grossier ; il ferme le seul mode
+// d'échec observé — une valeur posée à la main pour faire démarrer.
 const minimumDistinctSymbols = 12
 
 // maximumProductNameLength borne le nom du produit. Soixante-quatre caractères : le label de l'URI
@@ -155,9 +155,9 @@ type AuthConfig struct {
 	//
 	// **Vide veut dire « aucun proxy », et se déclare** : la valeur littérale `NoTrustedProxy`. Sans
 	// liste, l'en-tête est ignoré et le compteur porte sur l'adresse de pair, ce qui est exact en
-	// développement où rien ne s'interpose. Ce que l'obligation a fermé depuis step-036 est l'oubli,
-	// qui se lisait pareil : en production, il ferait compter toutes les tentatives sur l'adresse du
-	// load balancer, et le verrou se refermerait sur tout le monde d'un coup.
+	// développement où rien ne s'interpose. Ce que l'obligation ferme est l'oubli, qui se lisait
+	// pareil : en production, il ferait compter toutes les tentatives sur l'adresse du load balancer,
+	// et le verrou se refermerait sur tout le monde d'un coup.
 	TrustedProxies []netip.Prefix
 	// WebauthnRPID est le domaine auquel les passkeys sont liées, et WebauthnOrigin l'origine exacte
 	// depuis laquelle une cérémonie est acceptée.
@@ -248,12 +248,10 @@ func Load(lookup Lookup) (Config, error) {
 // environnement vide plutôt qu'en tenant une seconde liste — laquelle finirait par diverger d'eux, et
 // c'est d'elle que dépend le test de `.env.example`.
 //
-// « Le dépôt » et non « Load » depuis step-021 : il y a désormais **deux** chargeurs, parce qu'il y a
-// deux programmes. `Load` est la configuration du serveur ; `LoadBootstrap` celle de la commande
-// d'installation, dont les trois variables ne servent qu'une fois et qu'un serveur n'a aucune raison
-// d'exiger. Les sonder tous les deux ici est ce qui garde la porte de `.env.example` **exacte** : la
-// version qui n'en sondait qu'un aurait reproché au fichier trois variables qu'il documente à raison.
-// L'alternative — une seconde fonction que le test concatène — déplaçait la porte dans le test, où
+// « Le dépôt » et non « Load » : il y a **deux** chargeurs, parce qu'il y a deux programmes. Les
+// sonder tous les deux ici est ce qui garde la porte de `.env.example` **exacte** — n'en sonder qu'un
+// reprocherait au fichier les trois variables de `LoadBootstrap`, qu'il documente à raison.
+// L'alternative — une seconde fonction que le test concatène — déplacerait la porte dans le test, où
 // une step future oublierait d'ajouter la sienne.
 //
 // La contrainte que cela impose au chargeur : **toute lecture est inconditionnelle**, faite dans le
@@ -266,11 +264,10 @@ func Variables() []string {
 		seen  = map[string]bool{}
 	)
 
-	// Le dédoublonnage porte désormais quelque chose : les six variables qu'exige le mode `real` sont
-	// lues deux fois — une fois dans le littéral, une fois par requireRealGatewayMaterial qui constate
-	// leur absence sur l'environnement. Sans lui, `.env.example` se verrait reprocher une divergence
-	// qui n'existe pas. Vérifié en le retirant : `TestDotenvExampleListsExactlyWhatLoadReads` tombe,
-	// en réclamant neuf noms de passerelle déjà documentés.
+	// Le dédoublonnage porte quelque chose : les six variables qu'exige le mode `real` sont lues deux
+	// fois — une fois dans le littéral, une fois par requireRealGatewayMaterial qui constate leur
+	// absence sur l'environnement. Vérifié en le retirant :
+	// `TestDotenvExampleListsExactlyWhatLoadReads` tombe, en réclamant neuf noms déjà documentés.
 	probe := func(name string) (string, bool) {
 		if !seen[name] {
 			seen[name] = true
@@ -376,9 +373,9 @@ func (r *reader) requireLocalMockGateway(mode GatewayMode, baseURL string) {
 }
 
 // requireLoopbackForClearOrigin n'accepte `http://` que là où il n'y a pas de réseau à écouter. Cette
-// origine est celle que le navigateur présente à chaque cérémonie WebAuthn **et**, depuis step-036,
-// celle qu'une mutation doit annoncer : en clair sur un vrai domaine, les deux se lisent et se
-// rejouent sur le fil.
+// origine est celle que le navigateur présente à chaque cérémonie WebAuthn **et** celle qu'une
+// mutation doit annoncer : en clair sur un vrai domaine, les deux se lisent et se rejouent sur le
+// fil.
 func (r *reader) requireLoopbackForClearOrigin(origin string) {
 	// Vide, ou déjà refusée plus haut : la redire ferait deux lignes pour un seul problème.
 	if origin == "" {
@@ -486,13 +483,10 @@ func (r *reader) requiredValue(name string) string {
 	return value
 }
 
-// requiredSecret exige une valeur d'au moins `minimum` caractères **et** d'une variété minimale, sans
-// jamais citer ce qu'elle a trouvé — ni sa longueur ni son décompte de symboles, qui sont déjà des
-// informations sur le secret.
 // productName lit le nom du produit et refuse ce que l'URI `otpauth://` ne sait pas porter.
 //
 // `totp.Generate` compose son label en `"/" + issuer + ":" + accountName` et Go n'échappe **ni `:` ni
-// `/`** dans un chemin d'URL. Mesuré le 01/09/2026 : `Preprod:Passerelle` rend
+// `/`** dans un chemin d'URL : `Preprod:Passerelle` rend
 // `otpauth://totp/Preprod:Passerelle:op@exemple.test`, que l'application découpe sur le **premier**
 // `:` — elle lit alors `Preprod` comme émetteur, en contradiction avec le paramètre `issuer=` de la
 // même URI. `Pass/erelle` rend un label à deux segments. Ce sont exactement les deux séparateurs
@@ -524,6 +518,9 @@ func (r *reader) productName(name string) string {
 	return value
 }
 
+// requiredSecret exige une valeur d'au moins `minimum` caractères **et** d'une variété minimale, sans
+// jamais citer ce qu'elle a trouvé — ni sa longueur ni son décompte de symboles, qui sont déjà des
+// informations sur le secret.
 func (r *reader) requiredSecret(name string, minimum int) []byte {
 	value, ok := r.required(name)
 	if !ok {

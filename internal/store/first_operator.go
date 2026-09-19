@@ -22,30 +22,28 @@ type FirstOperatorOutcome struct {
 // CreateFirstOperator crée le compte propriétaire **s'il n'existe aucun opérateur**, et ne touche à
 // rien sinon.
 //
-// Elle prend `SeedLockKey`, le verrou du seed, et c'est délibéré. Un `WHERE NOT EXISTS` se garde sur
-// le snapshot de sa transaction : deux exécutions simultanées sur une base vierge y verraient toutes
-// deux zéro opérateur et en créeraient deux — précisément le mode d'échec que le « refuse » de la
-// rédaction d'origine visait, et que la rejouabilité ne doit pas rouvrir. Partager la clé du seed
-// sérialise en plus les deux moitiés de la commande, qui n'ont aucune raison de se croiser.
+// Elle prend `SeedLockKey`, le verrou du seed, et c'est délibéré : un `WHERE NOT EXISTS` se garde sur
+// le snapshot de sa transaction, donc deux exécutions simultanées sur une base vierge y verraient
+// toutes deux zéro opérateur et en créeraient deux. Partager la clé du seed sérialise en plus les
+// deux moitiés de la commande, qui n'ont aucune raison de se croiser.
 //
-// **Ce que le `WHERE NOT EXISTS` couvre seul, aucun test ne le voit — mesuré le 09/08/2026.** Le
-// retirer laisse `TestUnSecondPassageNeCreeAucunSecondOperateur` **vert**, parce que le retour
-// anticipé de `createOwner` arrête la commande avant d'arriver ici. Retirer ce retour anticipé seul
-// est vert aussi, pour la raison symétrique. Il faut retirer **les deux** pour faire rougir.
+// **Ce que le `WHERE NOT EXISTS` couvre seul, aucun test ne le voit — mesuré.** Le retirer laisse
+// `TestUnSecondPassageNeCreeAucunSecondOperateur` **vert**, parce que le retour anticipé de
+// `createOwner` arrête la commande avant d'arriver ici ; retirer ce retour anticipé seul est vert
+// aussi, pour la raison symétrique. Il faut retirer **les deux** pour faire rougir.
 //
 // Les deux méritent d'exister quand même, et ce n'est pas la même garde : le retour anticipé décide
 // du **message** — il faut savoir s'il y a un opérateur avant d'exiger les variables — tandis que
 // celle-ci est la seule qui tienne quand deux exécutions se croisent. Ce cas-là n'est exercé par rien,
-// exactement comme le verrou du seed (step-020, DN-9) : deux exécutions concurrentes se croisent trop
-// rarement pour qu'un test qui les lance prouve quoi que ce soit.
+// comme le verrou du seed : deux exécutions concurrentes se croisent trop rarement pour qu'un test
+// qui les lance prouve quoi que ce soit.
 func CreateFirstOperator(ctx context.Context, dsn, email, displayName, passwordHash string) (
 	FirstOperatorOutcome, error,
 ) {
 	conn, err := pgx.Connect(ctx, dsn)
 	if err != nil {
-		// Comme ailleurs dans ce paquet, l'erreur de la bibliothèque n'est pas propagée : elle recopie
-		// le DSN, dont la rédaction n'est pas hermétique, et celle-ci remonte jusqu'aux journaux de
-		// déploiement.
+		// Comme ailleurs dans ce paquet, l'erreur de la bibliothèque n'est pas propagée : sa rédaction
+		// du DSN n'est pas hermétique, et celle-ci remonte jusqu'aux journaux de déploiement.
 		return FirstOperatorOutcome{}, errors.New(
 			"connexion à la base impossible ; la valeur du DSN n'est pas citée, elle porte le mot de " +
 				"passe de la base")

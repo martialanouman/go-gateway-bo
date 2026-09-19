@@ -25,9 +25,7 @@ const (
 //
 // **Ce que les cinq dimensions comptent diffère ; comment elles le comptent, non.** Trois comptent des
 // échecs et deux des appels, mais toutes dérivent leur verrou de `(failures, last_failure_at)`,
-// incrémentent en une seule instruction et oublient au bout de la fenêtre. Ces trois mécanismes
-// vivaient en trois exemplaires — `Logins`, `MFA` et ce fichier — jusqu'à ce que la dette nommée par
-// `tasks/steps/done/step-025.md` soit payée.
+// incrémentent en une seule instruction et oublient au bout de la fenêtre.
 type Counter struct {
 	pool  *pgxpool.Pool
 	scope string
@@ -132,8 +130,7 @@ func (c *Counter) reset(ctx context.Context, subject string) error {
 //
 // **Un essai reçu pendant le verrou ne repousse pas l'échéance** : `last_failure_at` n'avance que
 // lorsque l'essai est admis. Sans cette dissymétrie, qui s'acharne garderait le compte de sa victime
-// fermé indéfiniment — c'est ce que l'ordre inverse protégeait, et qu'il fallait reprendre en
-// passant au compte-d'abord.
+// fermé indéfiniment.
 //
 // **Le plafond se lit `>=`, et c'est `admitted` qui tranche, pas `failures` seul.** Sous trente
 // essais entrés ensemble, geler `failures` à `threshold` rend le cinquième essai — celui qui atteint
@@ -187,13 +184,13 @@ func (c *Counter) reserve(ctx context.Context, subject string, window time.Durat
 	return Lock{Scope: lock.Scope, Failures: lock.Failures}, nil
 }
 
-// Admit réserve l'appel — voir `reserve`, dont c'est la seule rédaction — et rend le verrou qui pèse :
-// non nul veut dire « refusé », et l'appel n'a alors rien ajouté au compteur.
+// Admit réserve l'appel — voir `reserve` — et rend le verrou qui pèse : non nul veut dire « refusé »,
+// et l'appel n'a alors rien ajouté au compteur.
 //
 // **`Admit` est la seule des quatre méthodes qui soit exportée, et c'est une garde et non un style.**
 // Les trois autres sont privées parce que `internal/mfa` détient un `*Counter` : exportées, un appelant
-// pourrait compter sans passer par `reserve`, ce que le compilateur interdit désormais. `MFA` et
-// `Logins` les atteignent parce qu'ils vivent dans ce paquet, et c'est exactement la portée voulue.
+// pourrait compter sans passer par `reserve`, ce que le compilateur interdit. `MFA` et `Logins` les
+// atteignent parce qu'ils vivent dans ce paquet, et c'est exactement la portée voulue.
 func (c *Counter) Admit(ctx context.Context, subject string, window time.Duration, threshold int,
 ) (Lock, error) {
 	return c.reserve(ctx, subject, window, threshold)

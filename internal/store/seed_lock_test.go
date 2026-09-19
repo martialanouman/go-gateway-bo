@@ -17,7 +17,7 @@ import (
 // pendant que le premier tourne suffit. Sans verrou, les deux transactions voient la même clé
 // absente, l'insèrent, et la seconde échoue sur `permissions_pkey` une fois la première validée —
 // une livraison arrêtée par le cas le plus fréquent, la première installation. C'est exactement la
-// raison pour laquelle `Migrate` prend déjà un verrou de session (step-005, DN-1).
+// raison pour laquelle `Migrate` prend déjà un verrou de session.
 //
 // **Le verrou s'observe dans `pg_locks`, jamais en lançant deux goroutines** : deux `Seed`
 // concurrents passent la plupart du temps sans se croiser, et le test vert dirait alors « ils ne se
@@ -26,7 +26,7 @@ import (
 // `pg_advisory_xact_lock` et le `pg_try_advisory_lock` que goose prend pour les migrations partagent
 // le même espace d'identifiants : la même valeur ferait attendre un seed derrière une migration
 // concurrente, ou l'inverse. Les deux constantes sont comparées plutôt que recopiées — un nombre
-// recopié dans un commentaire n'est vérifié par personne, et celui qui l'était était faux.
+// recopié dans un commentaire n'est vérifié par personne.
 func TestLeVerrouDuSeedNEntrePasEnCollisionAvecCeluiDeGoose(t *testing.T) {
 	t.Parallel()
 

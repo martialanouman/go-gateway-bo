@@ -29,14 +29,19 @@ func DefaultRoles() []DefaultRole {
 	return copied
 }
 
-// defaultRoles est la politique elle-même.
-//
-// Elle est **écrite à la main d'après le §6.10**, et sa fidélité est tenue par
-// `roles_test.go`, dont la table de vérité est transcrite depuis la spécification et non dérivée
-// d'ici. Les exclusions portent le sens autant que les inclusions — `ops` sans `suppressions:delete`,
-// `script_author` sans `scripts:publish`, `support_readonly` sans `content:read`, `account_manager`
-// sans `billing:topup`, `auditor` sans `cdr:read_pii` — et une exclusion oubliée n'a aucun symptôme
-// visible : elle accorde, en silence, exactement ce que le rôle existe pour interdire.
+// SuperAdminRole est le nom du rôle propriétaire. Il est exporté parce que
+// `store.CreateFirstOperator` doit l'attacher au premier compte : le citer en littéral des deux côtés
+// ferait qu'un renommage ici laisserait la commande d'installation chercher un rôle qui n'existe
+// plus, et livrer un compte qui n'accorde rien.
+const SuperAdminRole = "super_admin"
+
+// defaultRoles est la politique elle-même, **écrite à la main d'après le §6.10**, et sa fidélité est
+// tenue par `roles_test.go`, dont la table de vérité est transcrite depuis la spécification et non
+// dérivée d'ici. Les exclusions portent le sens autant que les inclusions — `ops` sans
+// `suppressions:delete`, `script_author` sans `scripts:publish`, `support_readonly` sans
+// `content:read`, `account_manager` sans `billing:topup`, `auditor` sans `cdr:read_pii` — et une
+// exclusion oubliée n'a aucun symptôme visible : elle accorde, en silence, exactement ce que le rôle
+// existe pour interdire.
 //
 // Trois clés n'appartiennent à aucun rôle sauf `super_admin`, délibérément : `content:read`,
 // `operators:manage` et `roles:manage`. Toute autre clé orpheline est un oubli, et le test le dit.
@@ -44,12 +49,6 @@ func DefaultRoles() []DefaultRole {
 // Les arbitrages que la prose du §6.10 ne tranche pas mécaniquement — `sessions:disconnect` pour
 // `ops`, `credentials:read` refusé à `support_readonly` — sont écrits dans DN-3 de
 // `tasks/steps/step-020.md`, chacun avec la phrase de la spécification qui le décide.
-// SuperAdminRole est le nom du rôle propriétaire. Il est exporté depuis step-021, où
-// `store.CreateFirstOperator` doit l'attacher au premier compte : le citer en littéral des deux côtés
-// ferait qu'un renommage ici laisserait la commande d'installation chercher un rôle qui n'existe
-// plus, et livrer un compte qui n'accorde rien.
-const SuperAdminRole = "super_admin"
-
 var defaultRoles = []DefaultRole{
 	{
 		Name: SuperAdminRole,

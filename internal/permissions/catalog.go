@@ -74,14 +74,11 @@ const (
 // `credentials:write`, `scripts:publish` n'est pas dans `scripts:write`. C'est ce qui permet à un
 // rôle de corriger une configuration sans pouvoir déclencher l'acte visible en production.
 //
-// **Aucun test n'affirme le nombre de clés**, et c'est délibéré : un `len(catalog) == 44` exigerait
-// une seconde déclaration tenue à la main, dont l'incrément 44 → 45 ne porte aucune information
-// relisible — on le met à jour sans le lire. Le golden existe déjà ailleurs : une clé disparue ici
-// devient une **ligne supprimée nommée** dans le diff de `permissions.gen.ts`, que
-// `check-generated` force à régénérer.
-//
-// Ce qu'aucune porte ne voit : une clé retirée **et** régénérée dans le même geste ne laisse qu'un
-// diff à relire.
+// **Aucun test n'affirme le nombre de clés**, et c'est délibéré : un `len(catalog) == N` exigerait
+// une seconde déclaration tenue à la main, dont l'incrément ne porte aucune information relisible.
+// Le golden existe déjà ailleurs : une clé disparue ici devient une **ligne supprimée nommée** dans
+// le diff de `permissions.gen.ts`, que `check-generated` force à régénérer. Ce qu'aucune porte ne
+// voit : une clé retirée **et** régénérée dans le même geste ne laisse qu'un diff à relire.
 //
 // Le sens inverse est tenu par `TestAucuneConstanteNeManqueAuCatalogue`, qui part de la portée du
 // paquet et non de `All()` — une constante déclarée plus haut qu'aucune entrée ne référence. Go ne

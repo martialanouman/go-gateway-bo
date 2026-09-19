@@ -79,9 +79,9 @@ func (p testPKI) serveTLS(t *testing.T, handler http.HandlerFunc) *httptest.Serv
 //     présente. C'est ce qui rend **falsifiable** l'assertion « le client a présenté le sien » :
 //     sous la première, une requête qui atteint le handler porte nécessairement un certificat pair,
 //     la branche fausse de l'assertion est inatteignable, et le test tombe sur la poignée de main —
-//     à un endroit qui n'accuse pas ce que l'assertion nomme. Mesuré le 02/08/2026 en retirant
-//     `Certificates` du client : `tls: certificate required` sur le require.NoError de l'appel, et
-//     pas une ligne sur le certificat manquant.
+//     à un endroit qui n'accuse pas ce que l'assertion nomme. Mesuré en retirant `Certificates` du
+//     client : `tls: certificate required` sur le require.NoError de l'appel, et pas une ligne sur le
+//     certificat manquant.
 func (p testPKI) serveTLSWithClientAuth(
 	t *testing.T,
 	clientAuth tls.ClientAuthType,

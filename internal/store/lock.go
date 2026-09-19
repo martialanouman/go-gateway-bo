@@ -10,8 +10,7 @@ import (
 // courant : c'est ce qui permet à l'appelant d'écrire `if lock.Locked()` sans distinguer l'absence.
 type Lock struct {
 	// Scope dit quelle dimension a verrouillé. Elles sont **cinq** depuis 00009 — l'adresse soumise,
-	// l'adresse source, le second facteur, l'enrôlement TOTP et les cérémonies WebAuthn — et ce
-	// commentaire en annonçait deux jusqu'à ce que le repli des rédactions le relise.
+	// l'adresse source, le second facteur, l'enrôlement TOTP et les cérémonies WebAuthn.
 	Scope string
 	// Failures est le compte de cette dimension. Des échecs pour les trois premières, des **appels**
 	// pour les deux qu'ajoute 00009, qui bornent des routes réussissant à chaque fois.
@@ -34,8 +33,7 @@ func (l Lock) Locked() bool { return l.Remaining > 0 }
 //
 // **La conversion en `time.Duration` est la seule arithmétique de temps qui se fasse en Go**, et elle
 // ne consulte aucune horloge : la base a déjà mesuré la durée restante contre la sienne, et il ne
-// reste qu'à changer d'unité. Elle était écrite **cinq** fois avant ce repli, sur les trois types qui
-// lisaient un verrou ; c'est le genre de ligne dont une correction n'atteint qu'un exemplaire.
+// reste qu'à changer d'unité.
 //
 // L'erreur remonte nue : `pgx.ErrNoRows` doit rester reconnaissable par l'appelant, qui seul sait si
 // l'absence de ligne est un cas normal, et lui seul sait aussi nommer la dimension dans son message.

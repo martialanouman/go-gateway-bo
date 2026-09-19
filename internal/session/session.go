@@ -4,11 +4,8 @@
 // Il est distinct d'`internal/auth`, qui porte le **premier facteur** — argon2id, les compteurs
 // d'échecs, l'adresse source. Les deux sont **frères** : ni l'un ni l'autre ne s'importe, c'est
 // `internal/bff` qui les compose. Ce que la séparation achète est qu'un importeur de la session
-// n'emporte pas le hachage des mots de passe, ce dont step-025 profitera.
-//
-// step-023 a ajouté un troisième frère, `internal/mfa`, sans créer d'arête vers celui-ci non plus.
-// Une rédaction précédente prédisait ici que le second facteur poserait la direction `auth → session` ;
-// il ne l'a pas fait, et c'est toujours `internal/bff` qui compose les trois.
+// n'emporte pas le hachage des mots de passe. `internal/mfa` est un troisième frère, sans arête vers
+// celui-ci non plus : `internal/bff` compose les trois.
 package session
 
 import (

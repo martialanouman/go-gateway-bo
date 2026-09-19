@@ -237,9 +237,9 @@ func (w *Webauthn) ConsumeSignCount(ctx context.Context, credentialID []byte, si
 // passkey, l'opérateur ne pourrait plus élever aucune session.
 //
 // Une transaction, et **deux instructions** : le verrou d'abord, l'inventaire ensuite. Les réunir
-// serait faux, et ça l'a été — mesuré le 27/08/2026 en forçant la séquence, verrou observé dans
-// `pg_locks` : en READ COMMITTED, attendre un verrou de ligne ne rafraîchit pas le snapshot de
-// l'instruction pour les **autres** relations. Deux retraits concurrents de deux passkeys distinctes
+// serait faux, et c'est mesuré en forçant la séquence, verrou observé dans `pg_locks` : en
+// READ COMMITTED, attendre un verrou de ligne ne rafraîchit pas le snapshot de l'instruction pour
+// les **autres** relations. Deux retraits concurrents de deux passkeys distinctes
 // comptaient donc chacun celle que l'autre venait de supprimer, et les deux aboutissaient — laissant
 // l'opérateur sans aucun second facteur.
 //

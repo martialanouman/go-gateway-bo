@@ -28,16 +28,15 @@ type Passkeys struct {
 // un label vide, un label numérique.
 //
 // L'origine, elle, n'est **pas** jugée ici : lu dans `Config.validate()` de la v0.18.0, seule sa
-// présence est contrôlée. Ce qui la garde est `requiredAbsoluteURL` dans `internal/config`. Une
-// rédaction précédente de ce commentaire promettait les deux, et la revue l'a réfutée en sondant la
-// bibliothèque — c'est le genre d'affirmation que personne ne relit contre sa source.
+// présence est contrôlée. Ce qui la garde est `requiredAbsoluteURL` dans `internal/config`.
 //
 // Le domaine, lui, est bien jugé ici plutôt que dans `internal/config` : la spécification WebAuthn
 // §5.1.3 dit ce qu'est un domaine valable, la bibliothèque l'applique, et le redire ailleurs en
 // ferait deux rédactions dont une périmerait. L'appelant doit donc construire ceci **avant de lier
 // son port**, sans quoi le serveur écouterait en refusant chaque cérémonie sans avoir rien dit.
-// Le `displayName` vient de la configuration depuis step-031, comme l'`issuer` du TOTP et par la
-// même valeur : c'est le nom du produit, vu par l'opérateur à deux endroits.
+//
+// Le `displayName` vient de la configuration, comme l'`issuer` du TOTP et par la même valeur : c'est
+// le nom du produit, vu par l'opérateur à deux endroits.
 func NewPasskeys(rpID, origin, displayName string) (*Passkeys, error) {
 	ceremonies, err := webauthn.New(&webauthn.Config{
 		RPID:          rpID,
@@ -149,10 +148,8 @@ func (p *Passkeys) FinishAssertion(subject store.PasskeyOwner, session webauthn.
 // l'appelant en fait est un 401 muet, et distinguer dirait à une machine où elle en est.
 //
 // La cause réelle est enveloppée, et **n'atteint aujourd'hui personne** : il n'y a pas encore de
-// journal dans `internal/bff`, et le chemin d'assertion la jette. Une rédaction précédente disait
-// « enveloppée pour le journal » — elle décrivait une destination qui n'existe pas. Elle deviendra
-// vraie quand le logging arrivera ; d'ici là, l'enveloppe ne sert qu'à distinguer un refus d'une
-// panne, ce qui est déjà sa raison d'être.
+// journal dans `internal/bff`, et le chemin d'assertion la jette. D'ici là, l'enveloppe ne sert qu'à
+// distinguer un refus d'une panne, ce qui est déjà sa raison d'être.
 type RefusedCeremonyError struct {
 	cause error
 }

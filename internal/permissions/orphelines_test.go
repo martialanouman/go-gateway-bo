@@ -19,10 +19,10 @@ import (
 const keyTypeName = "Key"
 
 // Le catalogue est gardé **contre les rôles** par `TestAucuneCleOrphelineHorsDesTroisDeliberees` :
-// toute entrée qu'aucun rôle ne détient y est signalée. Le sens inverse n'était gardé par rien, et
-// c'était mesuré depuis le 02/08/2026 — un `const FooBar Key = "foo:bar"` ajouté au bloc compile,
-// laisse les deux suites vertes et n'apparaît pas dans le TypeScript engendré, Go ne signalant pas
-// une constante exportée inutilisée.
+// toute entrée qu'aucun rôle ne détient y est signalée. Le sens inverse n'est gardé que par cette
+// porte-ci : un `const FooBar Key = "foo:bar"` ajouté au bloc compile, laisse les deux suites vertes
+// et n'apparaît pas dans le TypeScript engendré, Go ne signalant pas une constante exportée
+// inutilisée.
 //
 // Ce que ça coûte n'est pas cosmétique : `requires(permissions.FooBar)` compile alors,
 // n'entre dans aucun rôle, et **refuse tout le monde en silence** sur la route qu'elle garde.
@@ -30,13 +30,11 @@ const keyTypeName = "Key"
 // La porte part de la **portée du paquet** et non de `All()`, qui est justement ce que l'orpheline
 // n'atteint pas.
 //
-// **Le décompte est une égalité et non un plancher, et c'est une correction de revue.** La première
-// rédaction posait un plancher à quarante pour quarante-quatre constantes : il ne voyait qu'une panne
-// *totale* du filtre, laissait passer une panne partielle de quatre constantes, et aurait accusé le
-// filtre le jour où une step supprime des permissions. L'égalité avec le catalogue se met à jour
-// toute seule, et elle attrape un défaut que rien d'autre ne tient — deux constantes de la **même
-// valeur**, dont une seule est référencée : l'orpheline ne se voit pas par valeur, mais le décompte
-// bouge.
+// **Le décompte est une égalité et non un plancher.** Un plancher sous le compte réel ne verrait
+// qu'une panne *totale* du filtre, laisserait passer une panne partielle, et accuserait le filtre le
+// jour où une step supprime des permissions. L'égalité avec le catalogue se met à jour toute seule, et
+// elle attrape un défaut que rien d'autre ne tient — deux constantes de la **même valeur**, dont une
+// seule est référencée : l'orpheline ne se voit pas par valeur, mais le décompte bouge.
 func TestAucuneConstanteNeManqueAuCatalogue(t *testing.T) {
 	t.Parallel()
 
@@ -81,8 +79,7 @@ func TestAucuneConstanteNeManqueAuCatalogue(t *testing.T) {
 // et refuserait tout le monde en silence, exactement le défaut que l'autre porte ferme.
 //
 // Omettre le type sur une ligne d'un bloc `const` est une écriture Go ordinaire, pas une bizarrerie :
-// c'est ce qui rend ce trou probable. Trouvé en revue le 01/09/2026, la porte voisine étant alors
-// verte sur cette mutation.
+// c'est ce qui rend ce trou probable, et la porte voisine reste verte sur cette mutation.
 func TestToutLeBlocDesClesPorteSonType(t *testing.T) {
 	t.Parallel()
 

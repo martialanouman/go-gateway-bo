@@ -123,8 +123,8 @@ func TestUneAutrePassphraseNeRelitRien(t *testing.T) {
 }
 
 // Deux enrôlements ne produisent pas la même valeur stockée. **Ce test ne garde pas le nonce** — il
-// compare les chiffrés de deux secrets **différents**, ce qui est vrai quel que soit le nonce : mesuré
-// le 12/08/2026, douze zéros constants le laissaient vert. Le nonce est gardé par
+// compare les chiffrés de deux secrets **différents**, ce qui est vrai quel que soit le nonce :
+// mesuré, douze zéros constants le laissent vert. Le nonce est gardé par
 // `TestDeuxChiffrementsDuMemeSecretSousLaMemeCleDifferent`, qui vit dans le paquet parce que `seal`
 // n'est pas exporté.
 //

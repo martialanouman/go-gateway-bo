@@ -26,8 +26,8 @@ import (
 
 // Les scénarios de ce package exercent le client sortant contre le **mock Prism**, monté sur le
 // contrat publié : c'est la frontière du système sous test. Le harnais lance Prism lui-même depuis
-// `web/node_modules/.bin/prism` — le binaire installé, prêt en ~1,0 s (mesuré le 02/08/2026) — et
-// jamais par `npx`, qui repaie une résolution de paquet à chaque lancement.
+// `web/node_modules/.bin/prism` — le binaire installé, prêt en ~1,0 s — et jamais par `npx`, qui
+// repaie une résolution de paquet à chaque lancement.
 //
 // Rien ici ne se saute : ni `t.Skip()`, ni tag exclu, ni build tag. Un binaire ou un contrat absent
 // fait rouge et nomme la sortie de secours. C'est ce qui range ce package du côté à deux toolchains —
@@ -48,7 +48,7 @@ const envMockBaseURL = "PRISM_MOCK_BASE_URL"
 const prismStartup = 30 * time.Second
 
 // `godog` ne pose aucun plancher : `Paths` qui ne trouve rien rend une suite **vide et réussie**, et
-// `Strict` ne couvre que les steps non définies d'un scénario lu. Vérifié le 02/08/2026 en renommant
+// `Strict` ne couvre que les steps non définies d'un scénario lu. Vérifié en renommant
 // `passerelle.feature` — la suite rend `ok` sans avoir joint le mock une seule fois. Le registre qui
 // ferme ces deux trous vit dans `internal/bddtest`, avec ses propres tests unitaires.
 func TestScenarios(t *testing.T) {
@@ -137,7 +137,7 @@ func declaredOperations(t *testing.T) int {
 
 // probeToken n'ouvre rien : Prism applique le `security` du contrat **avant** de router — sans en-tête
 // `Authorization`, tout répond 401 et la sonde ne distinguerait plus une route servie d'une route
-// absente. Mesuré le 02/08/2026 : n'importe quel `Bearer` suffit au mock.
+// absente. N'importe quel `Bearer` suffit au mock.
 //
 //nolint:gosec // G101 : voir juste au-dessus.
 const probeToken = "Bearer jeton-de-sonde"
@@ -171,9 +171,9 @@ func unservedRoutes(t *testing.T, routes []announcedRoute) []string {
 
 // probeRoute rend vide quand la route est servie, et le motif du refus sinon. Une route servie répond
 // n'importe quoi d'autre : 200 sur une lecture, 422 quand Prism refuse un corps absent, 101 sur un
-// flux. Les deux refus de **routage**, eux, se nomment dans le corps — mesuré le 02/08/2026 :
-// `NO_PATH_MATCHED_ERROR` en 404 sur un chemin inconnu, `NO_METHOD_MATCHED_ERROR` en 405 sur une
-// méthode que le chemin ne déclare pas.
+// flux. Les deux refus de **routage**, eux, se nomment dans le corps : `NO_PATH_MATCHED_ERROR` en 404
+// sur un chemin inconnu, `NO_METHOD_MATCHED_ERROR` en 405 sur une méthode que le chemin ne déclare
+// pas.
 func probeRoute(t *testing.T, probe *http.Client, route announcedRoute) string {
 	t.Helper()
 
@@ -239,9 +239,9 @@ type adminCalls struct {
 
 func (c *adminCalls) connect(baseURL string) error {
 	// Le mode `mock` est celui du développement local : pas de mTLS, pas d'endpoint de jeton, un
-	// `Bearer` factice. Prism applique le `security` global du contrat — mesuré le 02/08/2026, il
-	// refuse en 401 une requête sans en-tête `Authorization` et accepte n'importe quel `Bearer` — donc
-	// ces scénarios traversent bien l'authentification sortante, sans rien exiger d'une passerelle.
+	// `Bearer` factice. Prism applique le `security` global du contrat — il refuse en 401 une requête
+	// sans en-tête `Authorization` et accepte n'importe quel `Bearer` —, donc ces scénarios traversent
+	// bien l'authentification sortante, sans rien exiger d'une passerelle.
 	client, err := gateway.NewAdminClient(config.GatewayConfig{
 		Mode:    config.GatewayModeMock,
 		BaseURL: baseURL,
@@ -293,9 +293,9 @@ func (c *adminCalls) list(ctx context.Context, editors ...gateway.RequestEditorF
 	return response.StatusCode(), nil
 }
 
-// preferStatus demande à Prism la réponse d'un statut précis. Mesuré le 02/08/2026 sur
-// `/admin/customers` : `Prefer: code=422` rend le corps `forbidden_scope` que le contrat déclare, avec
-// le statut 422. Sans ce levier, un scénario d'erreur devrait remplacer le serveur par un double,
+// preferStatus demande à Prism la réponse d'un statut précis : sur `/admin/customers`,
+// `Prefer: code=422` rend le corps `forbidden_scope` que le contrat déclare, avec le statut 422.
+// Sans ce levier, un scénario d'erreur devrait remplacer le serveur par un double,
 // c'est-à-dire ne plus rien exercer du contrat.
 func preferStatus(status int) gateway.RequestEditorFn {
 	return func(_ context.Context, request *http.Request) error {

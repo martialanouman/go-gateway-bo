@@ -519,8 +519,8 @@ func TestLoadReportsEveryProblemAtOnce(t *testing.T) {
 	assert.Contains(t, err.Error(), config.EnvGatewayBaseURL)
 }
 
-// Les trois dernières ne sont pas lues par le serveur mais par `cmd/bootstrap` : depuis step-021,
-// `Variables` sonde les **deux** chargeurs, parce que `.env.example` documente les deux programmes.
+// Les trois dernières ne sont pas lues par le serveur mais par `cmd/bootstrap` : `Variables` sonde
+// les **deux** chargeurs, parce que `.env.example` documente les deux programmes.
 func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 	t.Parallel()
 
@@ -618,7 +618,7 @@ func TestUneURLCitéeDansUnRefusPerdSesIdentifiants(t *testing.T) {
 		// se coupe sur son `:` sans qu'aucun `@` ne suive.
 		"127.0.0.1:4010": "127.0.0.1:4010",
 		// Un port démesuré, que `url.Parse` **accepte** — `validOptionalPort` n'exige que des
-		// chiffres, vérifié le 19/09/2026. Il est ici pour la forme, pas comme témoin du découpage
+		// chiffres. Il est ici pour la forme, pas comme témoin du découpage
 		// textuel : ce témoin-là est la forme opaque ci-dessous, que `absoluteURL` refuse pour son
 		// hôte vide et que le refus citait alors en entier.
 		"http://u:p@hôte.test:99999999999/x": "http://…@hôte.test:99999999999/x",

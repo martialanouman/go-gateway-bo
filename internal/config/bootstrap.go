@@ -19,8 +19,8 @@ const (
 // se démontre, là où « une majuscule et un chiffre » produit surtout `Motdepasse1`.
 //
 // C'est la **seule** politique de mot de passe du produit à ce jour, et elle ne s'applique qu'ici :
-// la spec n'en énonce aucune, et l'écran de gestion des opérateurs (step-029) tranchera pour les
-// comptes suivants. Le dire plutôt que de laisser croire que le produit en porte une.
+// la spec n'en énonce aucune, et l'écran de gestion des opérateurs tranchera pour les comptes
+// suivants. Le dire plutôt que de laisser croire que le produit en porte une.
 const minimumOperatorPasswordLength = 12
 
 // Bootstrap est la configuration de la **commande** `bootstrap`, pas du serveur.

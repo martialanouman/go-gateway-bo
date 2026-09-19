@@ -18,8 +18,8 @@ const PartitionRefresh = 24 * time.Hour
 // EnsureAuditPartitions crée les partitions d'`audit_log` du mois courant et du suivant.
 //
 // **La migration 00002 ne les crée qu'une fois**, à son application, et goose ne rejoue jamais une
-// migration appliquée. Mesuré en step-005 : une base migrée en août ne porte que les partitions
-// d'août et de septembre, et la première écriture d'octobre est refusée par
+// migration appliquée : une base migrée en août ne porte que les partitions d'août et de septembre,
+// et la première écriture d'octobre est refusée par
 // `no partition of relation "audit_log" found for row`. Comme l'audit partage la transaction de
 // l'action qu'il trace, c'est l'action métier qui tombe — sans que rien n'ait prévenu.
 //

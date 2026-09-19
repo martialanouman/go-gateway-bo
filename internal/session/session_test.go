@@ -84,16 +84,11 @@ const base64URLAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0
 // remplissage. Sans décodage strict, les quatre valeurs qui ne diffèrent que par eux décodent vers
 // les mêmes octets, donc quatre cookies distincts sont acceptés pour un même sceau.
 //
-// **La variante est construite, pas cherchée.** La rédaction précédente balayait `A…P` et n'en
-// produisait une que si les quatre bits significatifs du dernier caractère valaient 0, 1, 2 ou 3 —
-// **une fois sur quatre**, mesuré sur cent mille tirages contre un `Unseal` privé de `Strict()` :
-// 24 827 rouges. Les trois autres fois, toutes les candidates décodent vers d'autres octets et
-// tombent sur la comparaison du HMAC, qui les refuse quoi qu'il arrive.
-//
-// La fiche d'audit annonçait « une fois sur douze » ; le chiffre a été refait ici plutôt que recopié.
-//
-// Poser les bits de remplissage à `1`, `2` puis `3` rend les trois autres écritures du même sceau, à
-// coup sûr et à chaque exécution.
+// **La variante est construite, pas cherchée.** Balayer `A…P` en quête d'une variante n'en produit
+// une qu'une fois sur quatre — quand les quatre bits significatifs du dernier caractère valent 0, 1,
+// 2 ou 3 ; les trois autres fois, toutes les candidates décodent vers d'autres octets et tombent sur
+// la comparaison du HMAC, qui les refuse quoi qu'il arrive. Poser les bits de remplissage à `1`, `2`
+// puis `3` rend les trois autres écritures du même sceau, à coup sûr et à chaque exécution.
 func TestUnSceauNonCanoniqueEstRefuse(t *testing.T) {
 	t.Parallel()
 
@@ -170,11 +165,10 @@ func TestUnCookieMalScelleNAtteintPasLaBase(t *testing.T) {
 	require.Error(t, err, "témoin : un cookie authentique doit, lui, atteindre la base")
 }
 
-// **Il n'y a plus de jumeau de ce test pour l'élévation, et c'est une garde plus forte, pas un trou.**
-// Jusqu'à step-023, `Elevate` prenait le cookie présenté et devait le desceller avant d'interroger la
-// base — un ordre qu'un test devait tenir. Elle prend désormais l'identifiant de la session **déjà
-// résolue**, comme `Close` : il n'y a plus de cookie sur ce chemin, donc plus d'ordre à respecter, et
-// le sceau reste vérifié à l'endroit unique où il l'a toujours été — ci-dessus.
+// **Il n'y a pas de jumeau de ce test pour l'élévation, et c'est une garde plus forte, pas un trou.**
+// `Elevate` prend l'identifiant de la session **déjà résolue**, comme `Close` : il n'y a pas de
+// cookie sur ce chemin, donc pas d'ordre à respecter, et le sceau reste vérifié à l'endroit unique
+// où il l'est — ci-dessus.
 
 // Les cinq attributs sont ce qui remplace, ici, ce que le contrat ne peut pas déclarer : `HttpOnly`
 // tient le cookie hors de portée d'un script, `Secure` hors d'un transport en clair, `SameSite` hors

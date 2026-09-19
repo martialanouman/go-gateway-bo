@@ -14,7 +14,7 @@ import (
 
 // closedPool rend un pool fermé : toute requête qui l'atteint échoue bruyamment. C'est ce qui rend
 // observable un **ordre** — « refusé sur la forme » et « arrivé jusqu'à la base » deviennent deux
-// résultats distincts. Même construction qu'en step-022 pour le sceau du cookie.
+// résultats distincts.
 func closedPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 

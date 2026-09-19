@@ -22,15 +22,11 @@ import (
 // d'heure qui est **à la fois** la durée du verrou et la fenêtre d'oubli, sans quoi un verrou qui
 // vient d'expirer se refermerait au premier essai suivant.
 //
-// Ce qu'elles achètent, **recalculé en step-025 et corrigé** : cinq essais par quart d'heure, sur 10⁶
-// codes dont trois sont valables à la fois, donc 231 000 essais pour une chance sur deux et
-// 175 200 essais par an — de l'ordre de **seize mois**, pour un attaquant qui détient déjà le mot de
-// passe et s'acharne sans interruption.
-//
-// La rédaction précédente disait « quatre-vingts ans ». Le chiffre était faux d'un facteur soixante,
-// et personne ne l'avait refait : il vivait ici et dans `done/step-023.md`, à côté de ses propres
-// prémisses, qui suffisent à le contredire. Seize mois n'est pas « infaisable » — c'est cher, et
-// c'est la raison pour laquelle l'enrôlement a cessé d'ouvrir un second seau (step-025).
+// Ce qu'elles achètent : cinq essais par quart d'heure, sur 10⁶ codes dont trois sont valables à la
+// fois, donc 231 000 essais pour une chance sur deux et 175 200 essais par an — de l'ordre de **seize
+// mois**, pour un attaquant qui détient déjà le mot de passe et s'acharne sans interruption. Seize
+// mois n'est pas « infaisable », c'est cher : c'est la raison pour laquelle l'enrôlement n'ouvre pas
+// un second seau.
 const (
 	MaxFailures = 5
 	LockWindow  = 15 * time.Minute
@@ -40,11 +36,10 @@ const (
 // d'échecs ci-dessus ne voit rien de cette route : elle réussit, et une session de premier facteur
 // suffit à la répéter.
 //
-// Ce qu'elle coûte au serveur est mesuré (step-023) : dix argon2id par appel, soit dix fois le
-// processeur d'une connexion. Cinq par quart d'heure laisse largement l'usage réel — enrôler deux
-// fois de suite est déjà inhabituel — et la même fenêtre que partout ailleurs, pour la raison qui
-// l'a fait choisir : un verrou qui vient d'expirer se refermerait au premier appel suivant si la
-// fenêtre d'oubli était plus courte que lui.
+// Ce qu'elle coûte au serveur est mesuré : dix argon2id par appel — un par code de secours —, soit
+// dix fois le processeur d'une connexion. Cinq par quart d'heure laisse largement l'usage réel, et la
+// même fenêtre que partout ailleurs, pour la raison qui l'a fait choisir : un verrou qui vient
+// d'expirer se refermerait au premier appel suivant si la fenêtre d'oubli était plus courte que lui.
 const MaxEnrollments = 5
 
 // Manager compose l'authentificateur et le stockage, comme `session.Manager` compose le sceau du

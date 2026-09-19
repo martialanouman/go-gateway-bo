@@ -111,10 +111,10 @@ func (w *schemaWorld) migrateThenRecordSchema(ctx context.Context) error {
 // initialMigrations est ce qu'une base vierge doit voir appliquer, dans l'ordre, et la version que
 // le schéma atteint alors.
 //
-// Sans cette assertion, `MigrationOutcome.Applied` n'était tenu qu'**en négatif** — « la seconde
-// exécution n'a rien appliqué » — et la boucle qui remplit la liste pouvait disparaître sans qu'une
-// suite rougisse : `make migrate` aurait alors annoncé « schéma déjà à jour » sur une base qu'il
-// venait d'ériger. Mesuré le 02/08/2026.
+// Sans cette assertion, `MigrationOutcome.Applied` ne serait tenu qu'**en négatif** — « la seconde
+// exécution n'a rien appliqué » — et la boucle qui remplit la liste pourrait disparaître sans qu'une
+// suite rougisse : `make migrate` annoncerait alors « schéma déjà à jour » sur une base qu'il vient
+// d'ériger.
 var initialMigrations = []string{
 	"00001_operators_roles_permissions.sql",
 	"00002_audit_log.sql",
@@ -148,9 +148,8 @@ func (w *schemaWorld) everyMigrationWasReported() error {
 // toutes lettres plutôt que dérivé des fichiers de migration : une liste dérivée du SQL dirait
 // seulement que le SQL fait ce que le SQL dit.
 //
-// Les six dernières ne venaient pas du §3.1, qui n'en déclarait que neuf : step-021, step-022,
-// step-023 et step-024 l'ont **amendé**, chacune dans sa PR. Livrer une table que la spec ignore la rendrait
-// invisible à quiconque la relit.
+// Une table livrée que la spécification ignore serait invisible à quiconque la relit : les six
+// dernières y ont été **amendées**, chacune dans la PR qui l'a livrée.
 var dashboardTables = []string{
 	"operators",
 	"permissions",
@@ -169,9 +168,9 @@ var dashboardTables = []string{
 	"webauthn_challenges",
 }
 
-// dashboardTableCount est le plancher de l'inventaire ci-dessus. Il n'est pas décoratif : mesuré le
-// 02/08/2026, `dashboardTables = []string{}` laissait cette suite **verte** — le scénario « les neuf
-// tables existent » passait en n'ayant cherché aucune table.
+// dashboardTableCount est le plancher de l'inventaire ci-dessus. Il n'est pas décoratif : mesuré,
+// `dashboardTables = []string{}` laisse cette suite **verte** — le scénario « les tables existent »
+// passe en n'ayant cherché aucune table.
 const dashboardTableCount = 15
 
 func (w *schemaWorld) everyTableExists(ctx context.Context) error {
@@ -222,15 +221,14 @@ func (w *schemaWorld) everyTableExists(ctx context.Context) error {
 // décrit une structure sans jamais tenter l'écriture qui compte.
 //
 // La date de la sonde se calcule **en `timestamp`**, comme les bornes de
-// `ensure_audit_log_partitions()`, et ne devient un instant qu'à la sortie : la version précédente
-// ajoutait les mois à un `timestamptz`, donc dans le fuseau de la session, et ce scénario aurait
-// visé lui-même la mauvaise date sur un schéma décalé.
+// `ensure_audit_log_partitions()`, et ne devient un instant qu'à la sortie : ajouter les mois à un
+// `timestamptz` les ajouterait dans le fuseau de la session, et ce scénario viserait lui-même la
+// mauvaise date sur un schéma décalé.
 //
-// **Aucun test ne rougit si cette correction disparaît, et c'est mesuré** (02/08/2026, la sonde
-// remise sur `timestamptz` : suite verte) : la session de ce scénario tourne en UTC, où les deux
-// formes coïncident. Ce qui tient le fuseau est `partitions_test.go`, qui le pose lui-même et ancre
-// son mois ; ici, il s'agit de ne pas rejouer la faute qu'on vient de corriger, pour le jour où un
-// runner tournera sous un autre fuseau.
+// **Aucun test ne rougit si cette précaution disparaît, et c'est mesuré** — la session de ce scénario
+// tourne en UTC, où les deux formes coïncident. Ce qui tient le fuseau est `partitions_test.go`, qui
+// le pose lui-même et ancre son mois ; ici, il s'agit de tenir pour le jour où un runner tournera
+// sous un autre fuseau.
 func (w *schemaWorld) auditLogAcceptsEventDated(ctx context.Context, month string) error {
 	months := map[string]int{"mois courant": 0, "mois suivant": 1}
 
@@ -315,7 +313,7 @@ func (w *schemaWorld) schemaIsUnchanged(ctx context.Context) error {
 // contenu du schéma est tenu ailleurs : `constraints_test.go` observe chaque refus et chaque
 // `ON DELETE` sur leur effet. Restent hors de portée de tout test le type et la nullabilité de
 // chaque colonne — aucune suite ne rougit si `notifications.message` devient nullable, ce qui a été
-// vérifié le 02/08/2026 plutôt que supposé. Les tenir demanderait une empreinte de référence
+// vérifié plutôt que supposé. Les tenir demanderait une empreinte de référence
 // commitée, donc un fichier à mettre à jour à chaque migration ; ce qu'elle attraperait — un type
 // changé sans qu'on le veuille — n'est pas encore arrivé une fois.
 const schemaCatalog = `
