@@ -65,7 +65,6 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   // `md` n'émet aucune classe : c'est la hauteur par défaut.
   'ui-button--': values<ButtonVariant | Exclude<ButtonSize, 'md'>>({
     danger: true,
-    lg: true,
     link: true,
     primary: true,
     secondary: true,

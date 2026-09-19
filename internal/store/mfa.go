@@ -241,32 +241,6 @@ func (m *MFA) ConsumeRecoveryCode(ctx context.Context, id string) (bool, error) 
 	return tag.RowsAffected() > 0, nil
 }
 
-// LockFor rend le verrou d'essais de second facteur qui pèse sur cet opérateur.
-//
-// **C'est ce qui borne la recherche exhaustive d'un code à six chiffres**, et le compteur par
-// challenge ne le fait pas : une connexion réussie n'incrémente rien, donc qui détient le mot de
-// passe émet autant de challenges qu'il veut. La raison longue est dans la migration 00007.
-//
-// Il est consulté **avant** toute dépense — avant le déchiffrement du secret, avant les argon2id du
-// chemin de récupération — pour la même raison qu'au premier facteur : sinon le verrou protégerait le
-// compte sans protéger le serveur.
-func (m *MFA) LockFor(ctx context.Context, operatorID string, window time.Duration,
-	threshold int,
-) (Lock, error) {
-	return m.attempts.lockFor(ctx, operatorID, window, threshold)
-}
-
-// RecordFailure compte un échec de second facteur et rend le verrou qui en résulte.
-//
-// **Un `Lock` nul ne veut pas dire « rien n'a été compté »** : l'échec est enregistré à tous les coups,
-// et le verrou reste nul tant que le seuil n'est pas atteint. C'est écrit ici parce que l'appelant est
-// à deux délégations de `Counter.count`, où la règle vit.
-func (m *MFA) RecordFailure(ctx context.Context, operatorID string, window time.Duration,
-	threshold int,
-) (Lock, error) {
-	return m.attempts.count(ctx, operatorID, window, threshold)
-}
-
 // Reserve réserve un essai de second facteur sur cet opérateur, avant tout déchiffrement et tout
 // hachage.
 func (m *MFA) Reserve(ctx context.Context, operatorID string, window time.Duration, threshold int,

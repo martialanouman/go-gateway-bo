@@ -30,7 +30,7 @@ func TestUnEvenementSeRelitTelQuEcrit(t *testing.T) {
 		Action:     "passkey.remove",
 		TargetType: "webauthn_credential",
 		TargetID:   "0198f2c0-0000-7000-8000-000000000000",
-		Before:     store.NewFields().Text("transports", "internal").Number("signCount", 42),
+		Before:     store.NewFields().Text("transports", "internal").Flag("backedUp", true),
 		IPAddress:  "203.0.113.7",
 	})
 	require.NoError(t, err)
@@ -50,7 +50,7 @@ func TestUnEvenementSeRelitTelQuEcrit(t *testing.T) {
 		"targetType": "webauthn_credential",
 		"targetId": "0198f2c0-0000-7000-8000-000000000000",
 		"address": "203.0.113.7",
-		"before": {"transports": "internal", "signCount": 42},
+		"before": {"transports": "internal", "backedUp": true},
 		"after": null
 	}`, written,
 		"l'adresse va en clair, délibérément ; et un état absent laisse la colonne **nulle** plutôt "+

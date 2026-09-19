@@ -10,11 +10,6 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 )
 
-// OwnerRole est le rôle attaché au compte propriétaire : celui qui détient tout le catalogue (§6.10).
-// Une installation neuve n'a personne pour en accorder d'autres, donc le premier compte doit pouvoir
-// tout faire — y compris `operators:manage`, sans quoi il ne pourrait créer personne.
-const OwnerRole = permissions.SuperAdminRole
-
 // FirstOperatorOutcome dit ce que la commande a fait, **y compris quand elle n'a rien fait** : c'est
 // ce qui permet au compte rendu de distinguer « installation neuve » de « déjà installée » sans
 // interroger la base une seconde fois.
@@ -114,7 +109,7 @@ func insertOwner(ctx context.Context, tx pgx.Tx, email, displayName, passwordHas
 
 	var created, granted int
 
-	err := tx.QueryRow(ctx, query, email, displayName, passwordHash, OwnerRole).Scan(&created, &granted)
+	err := tx.QueryRow(ctx, query, email, displayName, passwordHash, permissions.SuperAdminRole).Scan(&created, &granted)
 	if err != nil {
 		return FirstOperatorOutcome{}, fmt.Errorf("créer le premier opérateur : %w", err)
 	}
@@ -130,10 +125,10 @@ func insertOwner(ctx context.Context, tx pgx.Tx, email, displayName, passwordHas
 	if granted == 0 {
 		return FirstOperatorOutcome{}, fmt.Errorf(
 			"le rôle %q est absent de la base : le compte propriétaire aurait pu se connecter sans "+
-				"pouvoir rien faire. Rien n'a été créé — jouer le seed d'abord", OwnerRole)
+				"pouvoir rien faire. Rien n'a été créé — jouer le seed d'abord", permissions.SuperAdminRole)
 	}
 
-	return FirstOperatorOutcome{Created: true, Email: email, Role: OwnerRole}, nil
+	return FirstOperatorOutcome{Created: true, Email: email, Role: permissions.SuperAdminRole}, nil
 }
 
 // HasAnyOperator dit si la base porte au moins un opérateur.

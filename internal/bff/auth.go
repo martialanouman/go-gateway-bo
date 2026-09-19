@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"net/netip"
+	"strconv"
 	"time"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
@@ -212,8 +213,9 @@ func lockedResponse(remaining time.Duration) Login429JSONResponse {
 		Headers: Login429ResponseHeaders{RetryAfter: seconds},
 		Body: Error{
 			Code: "too_many_attempts",
-			// La copie ne promet pas les deux dimensions à la fois. `LockFor` n'en rend **qu'une** — celle
-			// qui a franchi son seuil — et les deux le franchissent indépendamment : cinq adresses
+			// La copie ne promet pas les deux dimensions à la fois. Le refus n'en porte **qu'une** — celle
+			// que `SourceLock` ou `Reserve` a vue franchir son seuil — et les deux le franchissent
+			// indépendamment : cinq adresses
 			// essayées depuis une même source ne verrouillent que la source, et un opérateur légitime
 			// derrière elle lirait « ce compte est bloqué » alors qu'il pourrait entrer d'ailleurs. Elle
 			// ne dit pas « ce compte » non plus : les compteurs portent sur l'adresse **soumise**, et il
@@ -253,22 +255,5 @@ func plural(count int, unit string) string {
 		rendered += "s"
 	}
 
-	return itoa(count) + " " + rendered
-}
-
-// itoa évite d'importer `strconv` pour un seul appel, et surtout `fmt`, dont les verbes acceptent
-// n'importe quoi : ici on formate un entier, et rien d'autre ne doit pouvoir s'y glisser.
-func itoa(value int) string {
-	if value == 0 {
-		return "0"
-	}
-
-	var digits []byte
-
-	for value > 0 {
-		digits = append([]byte{byte('0' + value%10)}, digits...)
-		value /= 10
-	}
-
-	return string(digits)
+	return strconv.Itoa(count) + " " + rendered
 }

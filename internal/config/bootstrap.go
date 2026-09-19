@@ -36,17 +36,12 @@ type Bootstrap struct {
 	OperatorPassword string
 }
 
-// Complete dit si les trois valeurs sont présentes.
+// MissingNames rend les variables absentes, pour que le refus les nomme sans jamais citer de valeur.
 //
 // **LoadBootstrap n'exige rien**, et c'est ce qui rend la commande rejouable : un déploiement la
 // rappelle à chaque livraison, et six mois après l'installation ces variables n'existent plus dans
 // son environnement. C'est `cmd/bootstrap` qui exige — et seulement quand la base ne porte aucun
 // opérateur, c'est-à-dire au seul moment où elles servent.
-func (b Bootstrap) Complete() bool {
-	return b.OperatorEmail != "" && b.OperatorName != "" && b.OperatorPassword != ""
-}
-
-// MissingNames rend les variables absentes, pour que le refus les nomme sans jamais citer de valeur.
 func (b Bootstrap) MissingNames() []string {
 	var missing []string
 

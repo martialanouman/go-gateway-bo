@@ -124,7 +124,7 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 			sqlstate: checkViolation,
 		},
 		{
-			// Inatteignable depuis le produit aujourd'hui — `RecordFailure` n'écrit que `1` ou
+			// Inatteignable depuis le produit aujourd'hui — `Counter.count` n'écrit que `1` ou
 			// `c.failures + 1`. La contrainte garde contre la step qui décrémentera : un compteur passé
 			// sous zéro rendrait le verrou inatteignable, sans erreur et sans symptôme.
 			name: "un compteur d'échecs ne descend pas sous zéro",

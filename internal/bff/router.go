@@ -15,10 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/martialanouman/go-gateway-bo/internal/auth"
-	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
-	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // Dependencies porte ce que les routes du BFF ne savent pas fabriquer.
@@ -28,25 +25,13 @@ import (
 // production, sans que rien ne l'ait dit au démarrage. La struct force le compilateur à revisiter
 // chaque site d'appel le jour où une dépendance obligatoire apparaît — ce qui est arrivé ici.
 type Dependencies struct {
+	// API porte les cinq collaborateurs que les routes du contrat exercent. Il est **embarqué** et non
+	// recopié champ par champ : deux listes des mêmes cinq dépendances divergeraient à la sixième.
+	API
 	// Assets a pour racine la racine du site : la coquille y est `index.html`, les fichiers hachés
 	// sous `assets/`. Le prendre en `fs.FS` plutôt qu'en `embed.FS` est ce qui permet de tester le
 	// repli sans build client.
 	Assets fs.FS
-	// Authenticator porte le premier facteur. Ce paquet ne connaît ni le pool ni la configuration : il
-	// reçoit un collaborateur déjà construit, ce qui le garde à l'écart de `pgxpool` et de
-	// `internal/config`.
-	Authenticator *auth.Authenticator
-	// Sessions ouvre, résout et ferme les sessions du tableau de bord.
-	Sessions *session.Manager
-	// SecondFactor enrôle et vérifie le second facteur, et porte la clé qui chiffre les secrets au
-	// repos. Comme les deux ci-dessus, il arrive déjà construit.
-	SecondFactor *mfa.Manager
-	// Passkeys mène les cérémonies WebAuthn. Comme les trois ci-dessus, il arrive déjà construit — et
-	// sa construction est ce qui juge `DASHBOARD_WEBAUTHN_RP_ID`, donc elle doit précéder la liaison
-	// du port.
-	Passkeys *mfa.PasskeyManager
-	// Audit écrit le journal des mutations. Comme les autres, il arrive déjà construit.
-	Audit *store.Audit
 	// TrustedProxies alimente la dérivation de l'adresse cliente. Vide est une valeur sûre : voir
 	// `withClientAddress` et `internal/auth.ClientAddress`.
 	TrustedProxies []netip.Prefix
@@ -71,13 +56,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		// fait que sur une requête déjà bornée et porteuse d'un cookie scellé.
 		api.Use(withSession(deps.Sessions))
 
-		mountContract(api, API{
-			Authenticator: deps.Authenticator,
-			Sessions:      deps.Sessions,
-			SecondFactor:  deps.SecondFactor,
-			Passkeys:      deps.Passkeys,
-			Audit:         deps.Audit,
-		}, deps.Sessions)
+		mountContract(api, deps.API, deps.Sessions)
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
@@ -189,28 +168,28 @@ func grantsFrom(sessions *session.Manager) grantsOf {
 // depuis is required, but not found`, `strconv.ParseInt: parsing "pasunentier"` — et il part avec,
 // faute de journal ici (voir `newContractHandler`).
 func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
-	writeJSON(w, http.StatusBadRequest, errorResponse{
+	writeJSON(w, http.StatusBadRequest, Error{
 		Code:    "bad_request",
 		Message: "Cette requête a été refusée : sa forme ne correspond pas à ce que la route attend.",
 	})
 }
 
 func reportFailedResponse(w http.ResponseWriter, _ *http.Request, _ error) {
-	writeJSON(w, http.StatusInternalServerError, errorResponse{
+	writeJSON(w, http.StatusInternalServerError, Error{
 		Code:    "internal_error",
 		Message: "Le serveur n'a pas pu produire cette réponse. Réessayez ; si elle persiste, la panne est côté serveur.",
 	})
 }
 
 func handleUnknownAPIRoute(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusNotFound, errorResponse{
+	writeJSON(w, http.StatusNotFound, Error{
 		Code:    "not_found",
 		Message: "Cette route n'existe pas sur ce serveur.",
 	})
 }
 
 func handleRealtimeNotImplemented(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, errorResponse{
+	writeJSON(w, http.StatusNotImplemented, Error{
 		Code:    "not_implemented",
 		Message: "Le canal temps réel n'est pas encore disponible.",
 	})

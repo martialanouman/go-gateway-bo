@@ -4,6 +4,9 @@
 # chaque requête, et ne sont jamais recopiés ici (§3.2).
 #
 # Un poste neuf : `docker compose up -d`, puis `make migrate`, puis `make bootstrap`.
+#
+# Redis n'est pas ici : step-044 le rétablira avec le Pub/Sub qui coordonne les instances. Déclaré
+# avant, il tournait sur chaque poste sans qu'une ligne de code le joigne.
 
 services:
   postgres:
@@ -28,19 +31,6 @@ services:
       # `pg_isready` répond avant que la base accepte réellement les connexions applicatives ;
       # préciser l'utilisateur et la base évite un `make migrate` lancé une seconde trop tôt.
       test: ['CMD-SHELL', 'pg_isready -U dashboard -d dashboard']
-      interval: 2s
-      timeout: 3s
-      retries: 15
-
-  redis:
-    # Ne sert à rien avant step-044, où il portera le Pub/Sub qui coordonne les instances du BFF.
-    # Il est déclaré ici pour qu'un poste neuf n'ait à lancer qu'une seule commande, aujourd'hui
-    # comme dans trois steps.
-    image: redis:8-alpine
-    ports:
-      - '6379:6379'
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
       interval: 2s
       timeout: 3s
       retries: 15

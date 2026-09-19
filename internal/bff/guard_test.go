@@ -53,7 +53,7 @@ func (passingAPI) Logout(_ context.Context, _ LogoutRequestObject) (LogoutRespon
 // genre de discipline qu'on oublie une fois sur dix.
 type served struct {
 	status int
-	body   errorResponse
+	body   Error
 }
 
 // servedByGuard monte la garde autour du wrapper engendré et rend ce que le client a reçu.

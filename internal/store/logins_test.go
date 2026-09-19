@@ -77,42 +77,25 @@ func TestUnOperateurSeRetrouveQuelleQueSoitLaCasseDeSonAdresse(t *testing.T) {
 	assert.Equal(t, store.StatusActive, operator.Status)
 }
 
-func TestLeVerrouTombeAuSeuilEtPasAvant(t *testing.T) {
+// La dimension source est comptée seule, sur le chemin d'échec, et c'est elle qui rattrape une
+// machine qui balaie des adresses différentes : chaque adresse repart de zéro, donc le verrou par
+// compte ne la ralentirait jamais.
+func TestLeVerrouDeSourceTombeAuSeuilEtPasAvant(t *testing.T) {
 	t.Parallel()
 
 	logins, _ := loginsOn(t)
 
 	for attempt := 1; attempt < testThreshold; attempt++ {
-		lock, err := logins.RecordFailure(t.Context(), "cible@exemple.test", "source-a", testWindow, testThreshold)
+		lock, err := logins.RecordSourceFailure(t.Context(), "source-a", testWindow, testThreshold)
 		require.NoError(t, err)
 		assert.False(t, lock.Locked(), "verrouillé dès le %dᵉ échec, alors que le seuil est %d",
 			attempt, testThreshold)
 	}
 
-	lock, err := logins.RecordFailure(t.Context(), "cible@exemple.test", "source-a", testWindow, testThreshold)
+	lock, err := logins.RecordSourceFailure(t.Context(), "source-a", testWindow, testThreshold)
 	require.NoError(t, err)
 	assert.True(t, lock.Locked(), "le %dᵉ échec ne verrouille pas : la porte ne se ferme jamais", testThreshold)
 	assert.Positive(t, lock.Remaining, "le verrou n'annonce aucune durée restante")
-}
-
-// La seconde dimension. Sans elle, une machine qui balaie des adresses différentes n'est comptée par
-// rien : chaque adresse repart de zéro et le verrou par compte ne la ralentit jamais.
-func TestLeVerrouSAppliqueAussiALAdresseSource(t *testing.T) {
-	t.Parallel()
-
-	logins, _ := loginsOn(t)
-
-	for attempt := range testThreshold {
-		_, err := logins.RecordFailure(t.Context(),
-			// Une adresse différente à chaque fois : seul le compteur de source peut verrouiller.
-			"cible-"+string(rune('a'+attempt))+"@exemple.test", "source-balayeuse", testWindow, testThreshold)
-		require.NoError(t, err)
-	}
-
-	lock, err := logins.LockFor(t.Context(), "encore-une-autre@exemple.test", "source-balayeuse",
-		testWindow, testThreshold)
-	require.NoError(t, err)
-	assert.True(t, lock.Locked(), "une source qui balaie des adresses distinctes n'est comptée par rien")
 	assert.Equal(t, store.ScopeSource, lock.Scope)
 }
 
@@ -142,11 +125,11 @@ func TestDeuxPoolsDistinctsSurLaMemeBaseAdditionnentLeursEchecs(t *testing.T) {
 			instance = seconde
 		}
 
-		_, err = instance.RecordFailure(t.Context(), "cible@exemple.test", "source-a", testWindow, testThreshold)
+		_, err = instance.RecordSourceFailure(t.Context(), "source-a", testWindow, testThreshold)
 		require.NoError(t, err)
 	}
 
-	lock, err := seconde.LockFor(t.Context(), "cible@exemple.test", "source-a", testWindow, testThreshold)
+	lock, err := seconde.SourceLock(t.Context(), "source-a", testWindow, testThreshold)
 	require.NoError(t, err)
 	assert.True(t, lock.Locked(),
 		"les échecs de deux instances ne s'additionnent pas : chacune compte dans son coin et la porte reste ouverte")
@@ -173,7 +156,7 @@ func TestDesEchecsSimultanesNeSePerdentPas(t *testing.T) {
 		go func() {
 			defer groupe.Done()
 
-			_, errs[worker] = logins.RecordFailure(t.Context(), "cible@exemple.test", "source-a",
+			_, errs[worker] = logins.RecordSourceFailure(t.Context(), "source-a",
 				testWindow, simultaneous+1)
 		}()
 	}
@@ -184,7 +167,7 @@ func TestDesEchecsSimultanesNeSePerdentPas(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	lock, err := logins.LockFor(t.Context(), "cible@exemple.test", "source-a", testWindow, 1)
+	lock, err := logins.SourceLock(t.Context(), "source-a", testWindow, 1)
 	require.NoError(t, err)
 	assert.Equal(t, simultaneous, lock.Failures,
 		"%d échecs simultanés en ont laissé %d : des tentatives se perdent, et le verrou tombe plus tard "+
@@ -200,7 +183,7 @@ func TestUnVerrouEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
 	logins, dsn := loginsOn(t)
 
 	for range testThreshold {
-		_, err := logins.RecordFailure(t.Context(), "cible@exemple.test", "source-a", testWindow, testThreshold)
+		_, err := logins.RecordSourceFailure(t.Context(), "source-a", testWindow, testThreshold)
 		require.NoError(t, err)
 	}
 
@@ -208,11 +191,11 @@ func TestUnVerrouEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
 	// déplace, pas le produit — aucun drapeau de test, aucune garde désarmée.
 	ageCounters(t, dsn, testWindow+time.Minute)
 
-	lock, err := logins.LockFor(t.Context(), "cible@exemple.test", "source-a", testWindow, testThreshold)
+	lock, err := logins.SourceLock(t.Context(), "source-a", testWindow, testThreshold)
 	require.NoError(t, err)
 	require.False(t, lock.Locked(), "le verrou n'est jamais tombé")
 
-	after, err := logins.RecordFailure(t.Context(), "cible@exemple.test", "source-a", testWindow, testThreshold)
+	after, err := logins.RecordSourceFailure(t.Context(), "source-a", testWindow, testThreshold)
 	require.NoError(t, err)
 	assert.False(t, after.Locked(),
 		"le premier échec après l'échéance reverrouille aussitôt : la fenêtre d'oubli est plus longue que le verrou")
@@ -223,21 +206,30 @@ func TestUneConnexionReussieEffaceLeCompteurDeLAdresseEtPasCeluiDeLaSource(t *te
 
 	logins, _ := loginsOn(t)
 
+	// Les deux dimensions se remplissent par les deux gestes que le chemin de connexion fait
+	// réellement : l'adresse est **réservée** avant tout hachage, la source n'est comptée qu'au refus.
 	for range testThreshold {
-		_, err := logins.RecordFailure(t.Context(), "cible@exemple.test", "source-a", testWindow, testThreshold)
+		_, err := logins.Reserve(t.Context(), "cible@exemple.test", testWindow, testThreshold)
+		require.NoError(t, err)
+
+		_, err = logins.RecordSourceFailure(t.Context(), "source-a", testWindow, testThreshold)
 		require.NoError(t, err)
 	}
 
+	refused, err := logins.Reserve(t.Context(), "cible@exemple.test", testWindow, testThreshold)
+	require.NoError(t, err)
+	require.True(t, refused.Locked(), "ce test ne prouve rien si l'adresse n'était pas verrouillée avant l'effacement")
+
 	require.NoError(t, logins.ClearFailures(t.Context(), "cible@exemple.test"))
 
-	// L'adresse repart de zéro : LockFor au seuil 1 ne trouve plus rien pour elle seule.
-	lock, err := logins.LockFor(t.Context(), "cible@exemple.test", "source-inconnue", testWindow, 1)
+	// L'adresse repart de zéro : la réservation suivante est admise.
+	admitted, err := logins.Reserve(t.Context(), "cible@exemple.test", testWindow, testThreshold)
 	require.NoError(t, err)
-	assert.False(t, lock.Locked(), "le compteur de l'adresse n'a pas été effacé après une connexion réussie")
+	assert.False(t, admitted.Locked(), "le compteur de l'adresse n'a pas été effacé après une connexion réussie")
 
 	// La source, elle, garde son compte : sinon détenir un compte valide annulerait la seconde
 	// dimension pour tout le monde.
-	stillCounted, err := logins.LockFor(t.Context(), "autre@exemple.test", "source-a", testWindow, testThreshold)
+	stillCounted, err := logins.SourceLock(t.Context(), "source-a", testWindow, testThreshold)
 	require.NoError(t, err)
 	assert.True(t, stillCounted.Locked(),
 		"le compteur de source a été effacé par une connexion réussie : quiconque détient un compte peut le vider")

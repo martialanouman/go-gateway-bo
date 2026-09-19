@@ -28,10 +28,6 @@ const (
 // incrémentent en une seule instruction et oublient au bout de la fenêtre. Ces trois mécanismes
 // vivaient en trois exemplaires — `Logins`, `MFA` et ce fichier — jusqu'à ce que la dette nommée par
 // `tasks/steps/done/step-025.md` soit payée.
-//
-// **Ce qui n'est pas ici, et pourquoi** : `Logins.LockFor` et `Logins.RecordFailure` couvrent
-// l'adresse et la source **en une seule instruction**, ce qui n'est pas la même requête. Les replier
-// aurait remanié le chemin consulté avant tout argon2id pour un gain de forme.
 type Counter struct {
 	pool  *pgxpool.Pool
 	scope string
@@ -82,8 +78,7 @@ func (c *Counter) lockFor(ctx context.Context, subject string, window time.Durat
 // excluded.failures`. Elle **perd des passages** — la CTE lit sur le snapshot, donc `excluded` porte
 // une valeur périmée qui écrase la valeur fraîche, et le `FOR UPDATE` n'y change rien puisqu'il ne
 // verrouille pas une ligne absente. Elle est verte sous test séquentiel. C'est le genre de réécriture
-// qu'une revue « simplifions cette expression dupliquée » réintroduit six mois plus tard, et c'est
-// pourquoi cette mise en garde est écrite **ici seulement** : `Logins.RecordFailure` y renvoie.
+// qu'une revue « simplifions cette expression dupliquée » réintroduit six mois plus tard.
 //
 // La branche `CASE` est la **fenêtre d'oubli**, et sa durée est celle du verrou, délibérément : plus
 // courte, un verrou qui vient d'expirer se refermerait au premier passage suivant, et « verrou

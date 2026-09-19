@@ -25,7 +25,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'link'
 
 /** 28 / 34 / 40 px — les trois hauteurs de contrôle de la charte, et rien entre les deux. */
-export type ButtonSize = 'sm' | 'md' | 'lg'
+export type ButtonSize = 'sm' | 'md'
 
 /**
  * `className` est retiré des props de Base UI : la bibliothèque le type

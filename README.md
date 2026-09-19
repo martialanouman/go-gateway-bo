@@ -36,7 +36,7 @@ pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"
 
 pnpm -C web install
 cp .env.example .env       # puis remplir — le fichier documente chaque variable
-docker compose up -d       # PostgreSQL 18 + Redis
+docker compose up -d       # PostgreSQL 18
 make migrate               # applique les migrations
 make bootstrap             # sème permissions et rôles ; crée le compte propriétaire
 make mock                  # Prism sert le contrat Admin sur :4010, autre terminal

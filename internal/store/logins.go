@@ -21,9 +21,7 @@ type Logins struct {
 	// emails porte la réservation de l'adresse (`Reserve`) et son effacement (`ClearFailures`).
 	// sources porte le seul geste que la source connaisse : compter un échec, jamais réserver — la
 	// réserver verrouillerait tout un bureau derrière une IP partagée dès qu'un seul poste y multiplie
-	// les essais. `LockFor` et `RecordFailure` ci-dessous couvrent encore les **deux** dimensions en
-	// une instruction pour le verrou consulté avant hachage ; `sources` sert le seul cas où compter
-	// l'adresse une seconde fois diviserait son plafond par deux : le refus de `Authenticator.refuse`.
+	// les essais.
 	emails  *Counter
 	sources *Counter
 }
@@ -99,101 +97,6 @@ func (l *Logins) OperatorByEmail(ctx context.Context, lowerEmail string) (*Opera
 	return &operator, nil
 }
 
-// LockFor rend le verrou en cours sur l'une des deux dimensions : le plus **récent**, qui est aussi
-// le plus long — mais seulement parce que les deux lignes partagent la même fenêtre `$3`, ce qui rend
-// la durée restante monotone en `last_failure_at`. Le jour où une dimension aurait sa propre fenêtre,
-// ce tri deviendrait faux en silence et il faudrait trier sur l'expression qui calcule `Remaining`. Il est consulté **avant** tout hachage : c'est ce qui borne à la fois le coût d'une attaque
-// et le nombre de lignes qu'elle peut créer dans la table des compteurs.
-func (l *Logins) LockFor(ctx context.Context, emailKey, sourceKey string, window time.Duration,
-	threshold int,
-) (Lock, error) {
-	const query = `
-		SELECT scope, failures,
-		       EXTRACT(EPOCH FROM (last_failure_at + make_interval(secs => $3) - now()))
-		FROM login_attempt_counters
-		WHERE (scope, subject) IN (($4, $1), ($5, $2))
-		  AND failures >= $6
-		  AND last_failure_at + make_interval(secs => $3) > now()
-		ORDER BY last_failure_at DESC
-		LIMIT 1`
-
-	lock, err := scanLock(l.pool.QueryRow(ctx, query, emailKey, sourceKey, window.Seconds(),
-		ScopeEmail, ScopeSource, threshold))
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Lock{}, nil
-	}
-
-	if err != nil {
-		return Lock{}, fmt.Errorf("lire le verrou de connexion : %w", err)
-	}
-
-	return lock, nil
-}
-
-// RecordFailure incrémente les deux compteurs et rend le verrou qui en résulte.
-//
-// **Une seule instruction, et c'est ce qui rend le compteur partagé.** Dans `ON CONFLICT DO UPDATE`,
-// l'alias `c` désigne la ligne telle que PostgreSQL la relit après avoir pris son verrou de ligne, et
-// non telle que le snapshot de la transaction la voyait : deux instances qui entrent ensemble sur une
-// ligne à trois échecs sortent à quatre puis cinq, jamais à quatre et quatre.
-//
-// **La forme qu'il ne faut pas écrire est décrite une seule fois, sur `Counter.count`**, et elle vaut
-// ici mot pour mot : la CTE `SELECT … FOR UPDATE` perd des échecs quel que soit le nombre de
-// dimensions. L'écrire deux fois serait le défaut même que ce fichier a cessé de porter.
-//
-// Les deux lignes ne peuvent jamais entrer en collision entre elles — leurs `scope` diffèrent — donc
-// « ON CONFLICT DO UPDATE command cannot affect row a second time » est inatteignable ici.
-func (l *Logins) RecordFailure(ctx context.Context, emailKey, sourceKey string, window time.Duration,
-	threshold int,
-) (Lock, error) {
-	const query = `
-		INSERT INTO login_attempt_counters AS c (scope, subject, failures, last_failure_at)
-		SELECT dimension.scope, dimension.subject, 1, now()
-		FROM (VALUES ($4::text, $1::text), ($5::text, $2::text)) AS dimension(scope, subject)
-		ON CONFLICT (scope, subject) DO UPDATE
-		SET failures = CASE
-		        -- Un silence plus long que la fenêtre remet le compteur à un. La fenêtre d'oubli et la
-		        -- durée du verrou sont la **même** valeur, délibérément : plus courte, un verrou qui
-		        -- vient d'expirer se refermerait au premier essai suivant, et « verrou expiré → un
-		        -- nouvel essai est possible » serait faux.
-		        WHEN c.last_failure_at + make_interval(secs => $3) <= now() THEN 1
-		        ELSE c.failures + 1
-		    END,
-		    last_failure_at = now()
-		RETURNING scope, failures,
-		          EXTRACT(EPOCH FROM (last_failure_at + make_interval(secs => $3) - now()))`
-
-	rows, err := l.pool.Query(ctx, query, emailKey, sourceKey, window.Seconds(), ScopeEmail, ScopeSource)
-	if err != nil {
-		return Lock{}, fmt.Errorf("enregistrer l'échec de connexion : %w", err)
-	}
-	defer rows.Close()
-
-	var strongest Lock
-
-	for rows.Next() {
-		lock, scanErr := scanLock(rows)
-		if scanErr != nil {
-			return Lock{}, fmt.Errorf("lire le compteur mis à jour : %w", scanErr)
-		}
-
-		if lock.Failures < threshold {
-			continue
-		}
-
-		if lock.Remaining > strongest.Remaining {
-			strongest = lock
-		}
-	}
-
-	if err = rows.Err(); err != nil {
-		return Lock{}, fmt.Errorf("enregistrer l'échec de connexion : %w", err)
-	}
-
-	return strongest, nil
-}
-
 // Reserve réserve un essai sur l'adresse soumise, avant tout hachage. La dimension **source** n'est
 // pas réservée : elle ne compte que les échecs, sans quoi cinq connexions réussies depuis une même
 // IP verrouilleraient tout un bureau.
@@ -215,9 +118,8 @@ func (l *Logins) SourceLock(ctx context.Context, sourceKey string, window time.D
 }
 
 // RecordSourceFailure compte un échec sur la seule dimension de la source. L'adresse ne s'y ajoute
-// plus depuis que `Login` la réserve avant de hacher (`Reserve`) : l'y recompter au refus doublerait
-// son incrément, et diviserait son plafond par deux — c'est `RecordFailure`, gardé pour son propre
-// test, qui portait encore ce défaut.
+// pas : `Login` la réserve avant de hacher (`Reserve`), et l'y recompter au refus doublerait son
+// incrément, donc diviserait son plafond par deux.
 func (l *Logins) RecordSourceFailure(ctx context.Context, sourceKey string, window time.Duration,
 	threshold int,
 ) (Lock, error) {

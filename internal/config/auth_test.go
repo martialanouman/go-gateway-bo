@@ -241,7 +241,6 @@ func TestLeChargeurDuBootstrapAccepteUnEnvironnementVide(t *testing.T) {
 
 	cfg, err := config.LoadBootstrap(lookupFrom(map[string]string{}))
 	require.NoError(t, err)
-	assert.False(t, cfg.Complete())
 	assert.ElementsMatch(t, []string{
 		config.EnvBootstrapOperatorEmail,
 		config.EnvBootstrapOperatorName,
