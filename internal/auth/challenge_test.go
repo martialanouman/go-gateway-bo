@@ -29,7 +29,8 @@ func TestUnChallengeCanoniqueRendLEmpreinteQueLaBasePorte(t *testing.T) {
 }
 
 // **La garde de `Strict()`, qui n'était tenue par rien.** Le jeton fait trente-deux octets, donc
-// quarante-trois caractères base64url dont le **dernier ne porte que deux bits significatifs** : sans
+// quarante-trois caractères base64url dont le **dernier ne porte que quatre bits significatifs sur
+// six**, les deux de poids faible étant du remplissage : sans
 // ce contrôle, quatre valeurs distinctes décodent vers les mêmes octets, donc quatre challenges
 // différents seraient acceptés pour une seule ligne.
 //

@@ -85,7 +85,7 @@ func (w *sessionWorld) permissionsOfRoles(ctx context.Context, roles ...string) 
 // base : il ne prouverait rien.
 //
 // Le premier caractère et non le dernier, pour que ce scénario éprouve la **comparaison du sceau** et
-// non le décodage : le dernier caractère ne porte que deux bits significatifs sur six, et c'est
+// non le décodage : les deux bits de poids faible du dernier caractère sont du remplissage, et c'est
 // désormais `Strict()` qui refuse les autres formes (`TestUnSceauNonCanoniqueEstRefuse`). Avant lui,
 // le viser laissait ce scénario vert contre un serveur correct — mesuré le 10/08/2026.
 func (w *sessionWorld) alterSessionSeal() error {

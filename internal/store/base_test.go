@@ -54,7 +54,7 @@ func initializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Given(`^les migrations déjà jouées$`, schema.migrateThenRecordSchema)
 	ctx.When(`^les migrations sont jouées$`, schema.migrate)
 	ctx.When(`^les migrations sont rejouées$`, schema.migrate)
-	ctx.Then(`^les huit migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
+	ctx.Then(`^les neuf migrations du schéma sont rapportées appliquées$`, schema.everyMigrationWasReported)
 	ctx.Then(`^les quinze tables du schéma existent$`, schema.everyTableExists)
 	ctx.Then(`^le journal d'audit accepte un événement daté du (mois courant|mois suivant)$`,
 		schema.auditLogAcceptsEventDated)
