@@ -9,14 +9,6 @@ allowBuilds:
   # fonctionnalité n'en dépend. Le laisser à `false` plutôt que de le taire : une entrée absente
   # redevient une question à chaque `pnpm install`, et fait échouer la commande.
   '@scarf/scarf': false
-  # ⚠ Chaîne disparue : `@testcontainers/postgresql` et `dockerode` ont été retirés
-  # en step-001, et aucun des trois paquets n'est plus dans le lockfile. Les refus
-  # sont conservés comme garde-fous — ils ne coûtent rien et redeviendraient
-  # pertinents si un paquet les réintroduisait — mais la justification d'origine
-  # ne s'applique plus à rien.
-  cpu-features: false
-  protobufjs: false
-  ssh2: false
 
 # Corrections de versions transitives. Un avis qu'on peut réellement résoudre ne s'ignore pas : ces
 # entrées suppriment les avis de l'arbre au lieu de les inscrire dans `ignoreGhsas`.
