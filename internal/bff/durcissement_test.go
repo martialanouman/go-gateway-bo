@@ -170,8 +170,10 @@ func TestUnCorpsDeMutationEstAnnonceEnJSON(t *testing.T) {
 	}
 }
 
-// Le retrait d'une clé d'accès n'a pas de corps : ce qu'il désigne est dans son chemin. Sans cette
-// branche, la seule mutation sans corps du contrat serait refusée.
+// **Quatre** des huit opérations mutantes du contrat n'ont aucun corps : la déconnexion, les deux
+// débuts de cérémonie WebAuthn, et le retrait d'une clé d'accès — ce qu'il désigne est dans son
+// chemin. Sans cette branche, les quatre seraient refusées. Le `DELETE` les représente ici ; ce que
+// la branche lit est `ContentLength`, que la méthode ne change pas.
 func TestUneMutationSansCorpsNaRienAAnnoncer(t *testing.T) {
 	t.Parallel()
 
@@ -182,23 +184,6 @@ func TestUneMutationSansCorpsNaRienAAnnoncer(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, status)
 	assert.True(t, reached)
-}
-
-// Une origine n'a pas de chemin, et le navigateur n'en envoie jamais avec. Sans le retrait de la
-// barre oblique, une configuration qui en porte une refuserait **toutes** les mutations, et rien
-// dans le refus ne dirait que la faute est là.
-func TestUneBarreObliqueDansLaConfigurationNeRefuseRien(t *testing.T) {
-	t.Parallel()
-
-	reached := false
-	guard := requireSameOrigin(dashboardOrigin + "/")(http.HandlerFunc(
-		func(_ http.ResponseWriter, _ *http.Request) { reached = true }))
-
-	recorder := httptest.NewRecorder()
-	guard.ServeHTTP(recorder, mutation("application/json",
-		map[string]string{"Origin": dashboardOrigin}))
-
-	assert.True(t, reached, "l'origine du navigateur devait correspondre malgré la barre oblique")
 }
 
 // Le refus nomme ce qui manque et par où passer, et ne fuit rien : c'est un DTO déclaré, pas un
@@ -215,4 +200,20 @@ func TestUnRefusDOrigineEstUnDTODeclare(t *testing.T) {
 	assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
 	assert.Contains(t, recorder.Body.String(), `"code":"forbidden_origin"`)
 	assert.Contains(t, recorder.Body.String(), "recharger l'onglet du tableau de bord")
+}
+
+// La valeur zéro de `Dependencies` ferme au lieu d'ouvrir. Elle est inatteignable depuis le binaire
+// — la configuration exige l'origine avant la liaison du port — mais une garde dont la valeur zéro
+// sert tout le monde est une garde qu'un câblage futur désactive sans un mot.
+func TestUneOrigineNonConfigureeNeSertAucuneMutation(t *testing.T) {
+	t.Parallel()
+
+	reached := false
+	recorder := httptest.NewRecorder()
+	requireSameOrigin("")(http.HandlerFunc(
+		func(_ http.ResponseWriter, _ *http.Request) { reached = true }),
+	).ServeHTTP(recorder, mutation("application/json", map[string]string{"Origin": ""}))
+
+	assert.Equal(t, http.StatusForbidden, recorder.Code)
+	assert.False(t, reached)
 }

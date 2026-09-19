@@ -39,6 +39,10 @@ func apiRouter(t *testing.T) http.Handler {
 		API: API{
 			Authenticator: auth.NewAuthenticator(store.NewLogins(pool), []byte("un sel de test assez long")),
 		},
+		// Ce que la configuration fournit en production. Sans elle, le contrôle d'origine refuserait
+		// en 403 **avant** les bornes que ce fichier mesure, et chaque cas se lirait « refusée à la
+		// porte » pour la mauvaise porte.
+		Origin: dashboardOrigin,
 	})
 }
 
@@ -50,6 +54,7 @@ func post(t *testing.T, path, body string) (int, string) {
 	rec := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Origin", dashboardOrigin)
 
 	apiRouter(t).ServeHTTP(rec, request)
 

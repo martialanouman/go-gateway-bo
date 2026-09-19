@@ -56,14 +56,19 @@ func NewRouter(deps Dependencies) http.Handler {
 	// montage, et aucune route future à ne pas oublier.
 	r.Use(withHardeningHeaders)
 
+	// L'ordre des lignes **est** l'ordre d'exécution : `chain` de chi enveloppe depuis la queue, donc
+	// le premier enregistré est le plus extérieur. Chaque commentaire ci-dessous surplombe donc bien
+	// la ligne qu'il décrit — ce qui n'était pas le cas jusqu'à step-036, où le commentaire de la
+	// borne de corps coiffait celle du cache.
 	r.Route("/api", func(api chi.Router) {
-		// Borne la lecture du corps **avant** le décodage : la `maxLength` du contrat s'applique après,
-		// donc sur une valeur déjà entièrement chargée en mémoire.
 		api.Use(withoutCaching)
-		// Avant tout le reste de la chaîne : une mutation qui ne vient pas du tableau de bord ne doit
-		// atteindre ni la base, ni le décodeur, ni le compteur d'échecs.
+		// Avant la base, le décodeur et le compteur d'échecs : une mutation qui ne vient pas du
+		// tableau de bord ne doit atteindre aucun des trois. Seul `withoutCaching` la précède, et il
+		// ne fait que poser deux en-têtes.
 		api.Use(requireSameOrigin(deps.Origin))
 		api.Use(withAPIDeadlines)
+		// Borne la lecture du corps **avant** le décodage : la `maxLength` du contrat s'applique après,
+		// donc sur une valeur déjà entièrement chargée en mémoire.
 		api.Use(middleware.RequestSize(maximumLoginBodyBytes))
 		api.Use(withClientAddress(deps.TrustedProxies))
 		// Après les deux précédents : celui-ci est le seul qui puisse interroger la base, et il ne le

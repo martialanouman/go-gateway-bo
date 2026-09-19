@@ -605,7 +605,7 @@ paths:
 
 components:
   responses:
-    # Les deux refus que pose le contrôle d'origine de `internal/bff/origine.go`, **avant** que la
+    # Les deux refus que pose le contrôle d'origine de `internal/bff/durcissement.go`, **avant** que la
     # requête n'atteigne l'opération. Ils sont donc possibles sur toute méthode non sûre, et déclarés
     # sur chacune : un statut qu'une opération peut rendre sans que ce fichier le dise ferait échouer
     # la validation de la réponse contre le contrat.

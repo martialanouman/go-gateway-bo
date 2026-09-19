@@ -609,7 +609,18 @@ func TestUneURLCitéeDansUnRefusPerdSesIdentifiants(t *testing.T) {
 		"https://client:secret@api.exemple.test/v1?a=b@c":       "https://…@api.exemple.test/v1?a=b@c",
 		"https://api.exemple.test/v1":                           "https://api.exemple.test/v1",
 		"https://api.exemple.test/chemin@bizarre":               "https://api.exemple.test/chemin@bizarre",
-		// Ce que `url.Parse` refuse — un port illisible — et que le repli textuel masque quand même.
+		// La forme **opaque**, sans les deux barres qui annoncent l'autorité : `net/url` la lit
+		// (`Scheme="dashboard"`, `Host=""`), `absoluteURL` la refuse pour son hôte vide, et le refus
+		// citait alors la valeur entière. C'est le schéma oublié au copier-coller.
+		"dashboard:tres-secret@passerelle.exemple.test/v1": "dashboard:…@passerelle.exemple.test/v1",
+		"u:p@h:443": "u:…@h:443",
+		// Ce qui n'est pas une URL et ne porte aucun identifiant traverse inchangé : `127.0.0.1:4010`
+		// se coupe sur son `:` sans qu'aucun `@` ne suive.
+		"127.0.0.1:4010": "127.0.0.1:4010",
+		// Un port démesuré, que `url.Parse` **accepte** — `validOptionalPort` n'exige que des
+		// chiffres, vérifié le 19/09/2026. Il est ici pour la forme, pas comme témoin du découpage
+		// textuel : ce témoin-là est la forme opaque ci-dessous, que `absoluteURL` refuse pour son
+		// hôte vide et que le refus citait alors en entier.
 		"http://u:p@hôte.test:99999999999/x": "http://…@hôte.test:99999999999/x",
 		"pas-une-url":                        "pas-une-url",
 	} {
@@ -645,4 +656,74 @@ func TestAucunProxyDeConfianceSeDeclareEtNeFaitCroireAAucun(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, cfg.Auth.TrustedProxies)
+}
+
+// Une liste qui ne porte que des séparateurs rendait `nil` sans un mot — c'est-à-dire exactement le
+// silence que l'obligation venait de fermer, atteignable depuis n'importe quel gabarit qui joint sur
+// des virgules.
+func TestUneListeDeProxysSansAucunReseauEstRefusee(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{",", ",,", " , "} {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+				config.EnvTrustedProxies: value,
+			})))
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.EnvTrustedProxies)
+			assert.Contains(t, err.Error(), config.NoTrustedProxy)
+		})
+	}
+}
+
+// Une origine n'a **que** un schéma et un hôte. Un chemin y passait la configuration et ne cassait
+// qu'à moitié : les navigateurs modernes annoncent `Sec-Fetch-Site` et passaient, ceux qui ne
+// l'annoncent pas se faisaient refuser par une comparaison d'origine que le chemin faisait échouer.
+func TestUneOrigineNaNiCheminNiIdentifiants(t *testing.T) {
+	t.Parallel()
+
+	for _, origin := range []string{
+		"https://dashboard.exemple.test/app",
+		"https://dashboard.exemple.test?a=b",
+		"https://dashboard.exemple.test#ancre",
+		"https://operateur:secret@dashboard.exemple.test",
+	} {
+		t.Run(origin, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+				config.EnvWebauthnOrigin: origin,
+			})))
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.EnvWebauthnOrigin)
+		})
+	}
+}
+
+// La barre oblique finale et la casse de l'hôte sont **normalisées**, pas refusées : les deux
+// désignent la même origine, et un refus ferait chercher une faute là où il n'y en a pas. La
+// normalisation vit ici, à l'entrée de la valeur, et non dans la garde qui la consomme.
+func TestUneOrigineEstRendueSousSaFormeCanonique(t *testing.T) {
+	t.Parallel()
+
+	for raw, canonical := range map[string]string{
+		"https://Dashboard.Exemple.TEST/": "https://dashboard.exemple.test",
+		"https://dashboard.exemple.test":  "https://dashboard.exemple.test",
+		"http://LOCALHOST:3000":           "http://localhost:3000",
+	} {
+		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
+
+			cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+				config.EnvWebauthnOrigin: raw,
+			})))
+
+			require.NoError(t, err)
+			assert.Equal(t, canonical, cfg.Auth.WebauthnOrigin)
+		})
+	}
 }

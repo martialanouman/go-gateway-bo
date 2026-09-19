@@ -4,7 +4,6 @@ import (
 	"context"
 	"mime"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -47,12 +46,11 @@ func withHardeningHeaders(next http.Handler) http.Handler {
 //
 // L'origine de référence est celle de la configuration, jamais l'en-tête `Host` : le lire dans la
 // requête reviendrait à laisser l'appelant déclarer d'où il vient.
+//
+// L'origine reçue est **déjà canonique** : `config.webauthnOrigin` la rend en schéma et hôte
+// minuscules, sans chemin. C'est ce qui permet la comparaison exacte ci-dessous plutôt qu'un
+// `EqualFold`, dont le repliement Unicode fait correspondre `daſhboard` à `dashboard`.
 func requireSameOrigin(origin string) func(http.Handler) http.Handler {
-	// Une origine n'a pas de chemin, et le navigateur n'en envoie jamais avec. Sans ce retrait, une
-	// barre oblique finale dans la configuration refuserait **toutes** les mutations, et rien dans le
-	// refus ne dirait que la faute est là.
-	origin = strings.TrimSuffix(origin, "/")
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if isSafeMethod(r.Method) {
@@ -61,7 +59,10 @@ func requireSameOrigin(origin string) func(http.Handler) http.Handler {
 				return
 			}
 
-			if !comesFromDashboard(r, origin) {
+			// L'origine vide ferme au lieu d'ouvrir. Elle est inatteignable depuis le binaire — la
+			// configuration l'exige avant la liaison du port — mais la valeur zéro de `Dependencies`
+			// est une chaîne vide, et `"" == ""` aurait servi toute mutation d'un client muet.
+			if origin == "" || !comesFromDashboard(r, origin) {
 				writeJSON(w, http.StatusForbidden, Error{
 					Code: "forbidden_origin",
 					Message: "Cette requête a été refusée : elle n'a pas été envoyée depuis le " +
@@ -105,7 +106,7 @@ func comesFromDashboard(r *http.Request, origin string) bool {
 	case "same-origin":
 		return true
 	case "":
-		return strings.EqualFold(r.Header.Get("Origin"), origin)
+		return r.Header.Get("Origin") == origin
 	default:
 		// `cross-site` est l'attaque, `same-site` le voisin qui la porte, `none` une navigation
 		// directe — qu'aucune mutation n'emprunte.
@@ -117,9 +118,13 @@ func comesFromDashboard(r *http.Request, origin string) bool {
 // `text/plain`, `application/x-www-form-urlencoded` ou `multipart/form-data`, et aucun de ces trois
 // ne déclenche le pré-vol qui aurait arrêté la requête. Exiger `application/json` les exclut tous.
 //
-// Un corps absent n'annonce rien et n'a rien à annoncer — c'est le `DELETE` d'une clé d'accès, dont
-// ce qu'il désigne est dans son chemin. Un corps annoncé sans type est refusé : un navigateur en pose
-// toujours un, `fetch` mettant `text/plain` de lui-même quand l'appelant n'en donne pas.
+// Un corps absent n'annonce rien et n'a rien à annoncer : **quatre** des huit opérations mutantes du
+// contrat sont dans ce cas — la déconnexion, les deux débuts de cérémonie, et le retrait d'une clé
+// d'accès, dont ce qu'il désigne est dans son chemin.
+//
+// Un corps annoncé **sans** type est refusé. Ce que ça coûte : un appelant qui envoie un
+// `ArrayBuffer` ou un `Blob` sans type, à qui `fetch` n'en pose aucun, est refusé — aucun client du
+// dépôt n'en émet, et le formulaire inter-site qu'on ferme ici en pose toujours un.
 func announcesJSON(r *http.Request) bool {
 	declared := r.Header.Get("Content-Type")
 	if declared == "" {
@@ -136,9 +141,15 @@ func announcesJSON(r *http.Request) bool {
 // octet par minute, qui retient sinon une goroutine et un descripteur aussi longtemps que le client
 // le décide.
 //
-// Elle est indépendante du temps de traitement, et c'est ce qui permet de la garder courte : une
-// échéance de **lecture** ne court pas pendant qu'argon2id hache — relevé le 09/09/2026 à 3,16 s sur
-// le runner de la CI, ce qu'un `ReadTimeout` de cinq secondes aurait coupé.
+// Elle est indépendante du temps de traitement, et c'est ce qui permet de la garder aussi courte :
+// `startBackgroundRead` (`$GOROOT/src/net/http/server.go`) **efface** l'échéance de lecture dès que
+// le corps atteint son EOF, si bien que les 3,16 s d'argon2id relevées le 09/09/2026 sur le runner de
+// la CI ne courent jamais contre elle.
+//
+// Ce que le chiffre couvre exactement : le temps entre l'entrée de ce middleware et l'EOF du corps —
+// pas « cinq secondes de corps ». `withSession` s'exécute entre les deux et fait un aller-retour en
+// base, qui rogne donc le budget. Sur une base saine c'est un millième de la marge ; sur une base
+// très lente, une requête légitime se verrait refuser en 400.
 const apiBodyDeadline = 5 * time.Second
 
 // apiRequestDeadline borne la requête entière. Ce qu'elle couvre que l'échéance de lecture ne couvre
@@ -160,20 +171,25 @@ const apiRequestDeadline = 30 * time.Second
 // withAPIDeadlines borne une requête `/api`, et elle seule : montée dans le groupe `/api`, elle
 // n'atteint pas `/ws`, dont c'est le métier de rester ouverte.
 //
-// **Ce montage-là n'est gardé par rien non plus, et c'est mesuré** : posée à la racine — donc sur
-// `/ws` — le 19/09/2026, les 95 scénarios restent verts. La raison est que le `/ws` d'aujourd'hui
-// refuse sans lire le corps de la requête, si bien qu'une échéance de lecture ne change rien à ce
-// qu'il rend. C'est step-043, qui ouvrira une vraie WebSocket, qui rendra la différence observable —
-// et c'est elle qui doit porter le test.
+// **Ce montage-là n'est gardé par rien, et la raison est plus bête que mesurée** : posée à la racine
+// — donc sur `/ws` — le 19/09/2026, les 95 scénarios restent verts. Ce n'est pas que le handler s'en
+// moque : c'est qu'**aucun scénario ne demande `/ws`**. Le seul exercice de cette route dans le dépôt
+// est un GET de `router_test.go`. C'est step-043, qui ouvrira une vraie WebSocket, qui rendra la
+// différence observable, et c'est elle qui doit porter le test.
+//
+// **`/ws` n'est pas non plus couverte par le contrôle d'origine**, pour la même raison de montage.
+// Sans conséquence aujourd'hui — elle refuse tout en 501 — mais step-043 ouvrira une route qui porte
+// le cookie de session : la garde devra monter avec elle.
 //
 // **Ni `ReadTimeout` ni `http.TimeoutHandler`** : le premier vaut pour toute connexion du serveur,
 // WebSocket comprise ; le second met la réponse entière en mémoire tampon avant de l'écrire.
 func withAPIDeadlines(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// L'erreur ne peut venir que d'un `ResponseWriter` dont la connexion ne sait pas poser
-		// d'échéance — jamais celui du serveur HTTP. Elle est écartée plutôt que propagée parce
-		// qu'aucun journal n'atteint ce paquet (voir `newContractHandler`), et qu'un 500 servi ici
-		// refuserait une requête légitime pour une raison qui n'est pas la sienne.
+		// Deux sources possibles : un `ResponseWriter` qui ne sait pas poser d'échéance, et une
+		// connexion déjà fermée — `(*response).SetReadDeadline` transmet à la `net.Conn` brute, qui
+		// rend alors une erreur. Aucune des deux ne mérite un 500 : la seconde décrit un client
+		// parti. Elle est écartée plutôt que journalisée parce qu'aucun journal n'atteint ce paquet
+		// (voir `newContractHandler`).
 		_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(apiBodyDeadline))
 
 		ctx, cancel := context.WithTimeout(r.Context(), apiRequestDeadline)
