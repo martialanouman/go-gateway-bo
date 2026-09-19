@@ -148,10 +148,23 @@ const apiBodyDeadline = 5 * time.Second
 //
 // Trente secondes : très au-dessus de la requête la plus lente du produit, parce que ce qu'elle
 // attrape est une suspension et non une lenteur.
+//
+// **Aucun test ne rougit si cette échéance disparaît, et c'est mesuré plutôt que supposé** : le
+// 19/09/2026, `context.WithTimeout` remplacé par `context.WithCancel`, les 95 scénarios restent
+// verts. Ce qu'il faudrait pour l'observer est un pool saturé sous un scénario — soit tenir dix
+// connexions occupées pendant qu'une onzième attend, ce qui fait durer le test plus longtemps que la
+// porte qu'il garde. Elle reste parce que la suspension qu'elle ferme est réelle, pas parce qu'elle
+// est prouvée.
 const apiRequestDeadline = 30 * time.Second
 
 // withAPIDeadlines borne une requête `/api`, et elle seule : montée dans le groupe `/api`, elle
-// n'atteint structurellement pas `/ws`, dont c'est le métier de rester ouverte.
+// n'atteint pas `/ws`, dont c'est le métier de rester ouverte.
+//
+// **Ce montage-là n'est gardé par rien non plus, et c'est mesuré** : posée à la racine — donc sur
+// `/ws` — le 19/09/2026, les 95 scénarios restent verts. La raison est que le `/ws` d'aujourd'hui
+// refuse sans lire le corps de la requête, si bien qu'une échéance de lecture ne change rien à ce
+// qu'il rend. C'est step-043, qui ouvrira une vraie WebSocket, qui rendra la différence observable —
+// et c'est elle qui doit porter le test.
 //
 // **Ni `ReadTimeout` ni `http.TimeoutHandler`** : le premier vaut pour toute connexion du serveur,
 // WebSocket comprise ; le second met la réponse entière en mémoire tampon avant de l'écrire.

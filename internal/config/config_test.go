@@ -549,3 +549,100 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvBootstrapOperatorPassword,
 	}, config.Variables())
 }
+
+// Cette origine est celle des cérémonies WebAuthn **et** celle dont le BFF exige que vienne toute
+// mutation. En clair sur un vrai domaine, les deux se lisent et se rejouent sur le fil ; sur le poste
+// de développement, il n'y a pas de réseau à écouter.
+func TestUneOrigineEnClairNEstAcceptéeQueSurLePosteLocal(t *testing.T) {
+	t.Parallel()
+
+	for origin, accepted := range map[string]bool{
+		"http://localhost:3000":          true,
+		"http://127.0.0.1:3000":          true,
+		"http://[::1]:3000":              true,
+		"https://dashboard.exemple.test": true,
+		"http://dashboard.exemple.test":  false,
+		"http://192.168.1.10:3000":       false,
+	} {
+		t.Run(origin, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+				config.EnvWebauthnOrigin: origin,
+			})))
+
+			if accepted {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.EnvWebauthnOrigin)
+			assert.Contains(t, err.Error(), "https attendu")
+		})
+	}
+}
+
+// Ce qui empêche `mock` d'atteindre la production, et la seule chose qui le puisse sans variable
+// supplémentaire : un mock est un processus lancé à côté, jamais un mode d'exploitation.
+func TestLeModeMockExigeUnePasserelleSurLePosteLocal(t *testing.T) {
+	t.Parallel()
+
+	_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+		config.EnvGatewayBaseURL: "https://admin.gateway.internal/v1",
+	})))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvGatewayMode)
+	assert.Contains(t, err.Error(), "adresse de bouclage")
+}
+
+// Le refus doit nommer la variable pour être actionnable, et ne peut pas citer sa valeur pour l'être
+// sans danger. Le découpage est textuel parce qu'une URL qu'on refuse est précisément celle que
+// `net/url` peut refuser d'abord — un repli sur la valeur intacte rendrait le mot de passe.
+func TestUneURLCitéeDansUnRefusPerdSesIdentifiants(t *testing.T) {
+	t.Parallel()
+
+	for raw, expected := range map[string]string{
+		"postgres://dashboard:tres-secret@base.exemple.test/db": "postgres://…@base.exemple.test/db",
+		"https://client:secret@api.exemple.test/v1?a=b@c":       "https://…@api.exemple.test/v1?a=b@c",
+		"https://api.exemple.test/v1":                           "https://api.exemple.test/v1",
+		"https://api.exemple.test/chemin@bizarre":               "https://api.exemple.test/chemin@bizarre",
+		// Ce que `url.Parse` refuse — un port illisible — et que le repli textuel masque quand même.
+		"http://u:p@hôte.test:99999999999/x": "http://…@hôte.test:99999999999/x",
+		"pas-une-url":                        "pas-une-url",
+	} {
+		t.Run(raw, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, expected, config.RedactURL(raw))
+		})
+	}
+}
+
+// Le refus nomme la variable **et** dit comment l'écrire sur un poste sans proxy : un refus qui
+// nommerait seulement la variable ferait chercher une valeur qui n'existe pas.
+func TestUnReseauDeConfianceNonDeclaréEstRefuséEnNommantSaSortie(t *testing.T) {
+	t.Parallel()
+
+	env := minimalEnv()
+	delete(env, config.EnvTrustedProxies)
+
+	_, err := config.Load(lookupFrom(env))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvTrustedProxies)
+	assert.Contains(t, err.Error(), config.NoTrustedProxy)
+}
+
+func TestAucunProxyDeConfianceSeDeclareEtNeFaitCroireAAucun(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+		config.EnvTrustedProxies: config.NoTrustedProxy,
+	})))
+
+	require.NoError(t, err)
+	assert.Empty(t, cfg.Auth.TrustedProxies)
+}
