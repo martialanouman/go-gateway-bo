@@ -189,28 +189,28 @@ func grantsFrom(sessions *session.Manager) grantsOf {
 // depuis is required, but not found`, `strconv.ParseInt: parsing "pasunentier"` — et il part avec,
 // faute de journal ici (voir `newContractHandler`).
 func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
-	writeJSON(w, http.StatusBadRequest, errorResponse{
+	writeJSON(w, http.StatusBadRequest, Error{
 		Code:    "bad_request",
 		Message: "Cette requête a été refusée : sa forme ne correspond pas à ce que la route attend.",
 	})
 }
 
 func reportFailedResponse(w http.ResponseWriter, _ *http.Request, _ error) {
-	writeJSON(w, http.StatusInternalServerError, errorResponse{
+	writeJSON(w, http.StatusInternalServerError, Error{
 		Code:    "internal_error",
 		Message: "Le serveur n'a pas pu produire cette réponse. Réessayez ; si elle persiste, la panne est côté serveur.",
 	})
 }
 
 func handleUnknownAPIRoute(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusNotFound, errorResponse{
+	writeJSON(w, http.StatusNotFound, Error{
 		Code:    "not_found",
 		Message: "Cette route n'existe pas sur ce serveur.",
 	})
 }
 
 func handleRealtimeNotImplemented(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, errorResponse{
+	writeJSON(w, http.StatusNotImplemented, Error{
 		Code:    "not_implemented",
 		Message: "Le canal temps réel n'est pas encore disponible.",
 	})

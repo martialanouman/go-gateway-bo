@@ -160,8 +160,8 @@ func requirePermission(rules map[string]rule, grants grantsOf) StrictMiddlewareF
 // undecidedOperation refuse une opération que la table ne décide pas. Elle ne devrait jamais être
 // servie — la porte d'énumération exige une entrée pour chacune — et c'est justement pourquoi le
 // message dit à l'opérateur que ce n'est pas lui qui a mal fait.
-func undecidedOperation() errorResponse {
-	return errorResponse{
+func undecidedOperation() Error {
+	return Error{
 		Code: "forbidden",
 		Message: "Cette action est refusée : le serveur ne sait pas quelle permission elle demande, " +
 			"et refuse plutôt que de laisser passer. Ce n'est pas un manque de droits mais une " +
@@ -176,8 +176,8 @@ func undecidedOperation() errorResponse {
 // facteur. Et **403 et non 409**, contrairement aux quatre refus de `/auth/mfa/*` : là-bas le 409 dit
 // « un facteur existe déjà, franchissez-le pour en ajouter un autre », un conflit d'état dont le
 // remède est nommé ; ici c'est une interdiction pure.
-func secondFactorRequired() errorResponse {
-	return errorResponse{
+func secondFactorRequired() Error {
+	return Error{
 		Code: "mfa_required",
 		Message: "Cette action demande d'avoir franchi votre second facteur dans cette session. " +
 			"Votre session reste ouverte : validez votre second facteur, puis recommencez.",
@@ -189,8 +189,8 @@ func secondFactorRequired() errorResponse {
 // La charte exige qu'un contrôle interdit soit expliqué et non masqué, et c'est la clé — pas une
 // périphrase — qu'un administrateur cherchera dans l'éditeur de rôle. Elle ne révèle rien : le
 // catalogue entier est rendu au client par `permissions.gen.ts`.
-func permissionMissing(key permissions.Key) errorResponse {
-	return errorResponse{
+func permissionMissing(key permissions.Key) Error {
+	return Error{
 		Code: "permission_denied",
 		Message: "Votre compte ne détient pas la permission « " + string(key) + " », que cette " +
 			"action demande. La consultation reste ouverte ; un administrateur peut vous l'accorder.",

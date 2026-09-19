@@ -119,11 +119,11 @@ func createOwner(ctx context.Context, dsn string, lookup config.Lookup) (store.F
 		return store.FirstOperatorOutcome{}, err
 	}
 
-	if !cfg.Complete() {
+	if missing := cfg.MissingNames(); len(missing) > 0 {
 		return store.FirstOperatorOutcome{}, fmt.Errorf(
 			"cette base ne porte aucun opérateur, et le compte propriétaire ne peut pas être créé : "+
 				"%s manquent dans l'environnement.\n  Sans lui, l'installation a un vocabulaire complet "+
-				"et personne pour l'exercer", strings.Join(cfg.MissingNames(), ", "))
+				"et personne pour l'exercer", strings.Join(missing, ", "))
 	}
 
 	hash, err := auth.Hash(cfg.OperatorPassword)

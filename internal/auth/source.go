@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/netip"
+	"slices"
 	"strings"
 )
 
@@ -174,11 +175,7 @@ func isTrusted(address netip.Addr, trusted []netip.Prefix) bool {
 	// préfixe IPv4 : `netip.Prefix.Contains` compare les familles. On la ramène à sa forme IPv4.
 	address = address.Unmap()
 
-	for _, prefix := range trusted {
-		if prefix.Contains(address) {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc(trusted, func(prefix netip.Prefix) bool {
+		return prefix.Contains(address)
+	})
 }

@@ -33,10 +33,6 @@ func (f *Fields) Text(name, value string) *Fields {
 	return f.with(name, value)
 }
 
-func (f *Fields) Number(name string, value int64) *Fields {
-	return f.with(name, value)
-}
-
 func (f *Fields) Flag(name string, value bool) *Fields {
 	return f.with(name, value)
 }

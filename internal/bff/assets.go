@@ -24,8 +24,7 @@ func serveAsset(assets fs.FS) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(r.URL.Path, "/")
 
-		info, err := fs.Stat(assets, name)
-		if err != nil || info.IsDir() {
+		if !isFile(assets, name) {
 			http.NotFound(w, r)
 
 			return

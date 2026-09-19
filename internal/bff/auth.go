@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"net/netip"
+	"strconv"
 	"time"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
@@ -253,22 +254,5 @@ func plural(count int, unit string) string {
 		rendered += "s"
 	}
 
-	return itoa(count) + " " + rendered
-}
-
-// itoa évite d'importer `strconv` pour un seul appel, et surtout `fmt`, dont les verbes acceptent
-// n'importe quoi : ici on formate un entier, et rien d'autre ne doit pouvoir s'y glisser.
-func itoa(value int) string {
-	if value == 0 {
-		return "0"
-	}
-
-	var digits []byte
-
-	for value > 0 {
-		digits = append([]byte{byte('0' + value%10)}, digits...)
-		value /= 10
-	}
-
-	return string(digits)
+	return strconv.Itoa(count) + " " + rendered
 }
