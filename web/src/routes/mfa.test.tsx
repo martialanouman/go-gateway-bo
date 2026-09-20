@@ -432,7 +432,7 @@ describe('le code manquant', () => {
 
     expect(code()).toHaveAttribute('aria-invalid', 'true')
     expect(within(code().closest('.ui-field') as HTMLElement).getByRole('alert')).toHaveTextContent(
-      'Ce code est requis',
+      'Saisissez le code',
     )
     // `noValidate` en même temps : sans lui, le navigateur rendrait son propre message, dans sa
     // langue et hors charte, et la phrase française ci-dessus n'apparaîtrait jamais.
@@ -533,6 +533,6 @@ describe('le refus serveur et ce qu’il décrit', () => {
     expect(code()).toHaveAttribute('aria-invalid', 'true')
 
     await user.type(code(), '6')
-    expect(screen.queryByText(/Ce code est requis/)).toBeNull()
+    expect(screen.queryByText(/Saisissez le code/)).toBeNull()
   })
 })

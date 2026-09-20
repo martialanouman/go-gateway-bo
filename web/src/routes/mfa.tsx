@@ -138,7 +138,7 @@ function FactorChallenge({
     event.preventDefault()
 
     if (code.trim() === '') {
-      setMissing('Ce code est requis pour franchir le second facteur.')
+      setMissing('Saisissez le code à six chiffres.')
 
       return
     }

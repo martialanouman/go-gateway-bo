@@ -132,9 +132,7 @@ describe('les erreurs champ par champ', () => {
 
     const champ = email().closest('.ui-field')
     expect(email()).toHaveAttribute('aria-invalid', 'true')
-    expect(within(champ as HTMLElement).getByRole('alert')).toHaveTextContent(
-      'Cet e-mail est requis',
-    )
+    expect(within(champ as HTMLElement).getByRole('alert')).toHaveTextContent('Saisissez un e-mail')
     // Le mot de passe manque aussi : les deux refus s'affichent, et non le premier seulement.
     expect(password()).toHaveAttribute('aria-invalid', 'true')
   })
@@ -306,5 +304,38 @@ describe('le refus serveur et ce qu’il décrit', () => {
     // Un refus qui survit à ce qu'il reproche fait douter de tous les autres — la règle déjà
     // appliquée champ par champ vaut pour le refus qui les surplombe.
     expect(screen.queryByText(/La connexion a été refusée/)).toBeNull()
+  })
+})
+
+describe('le format de l’e-mail', () => {
+  it('nomme ce qui manque et montre un exemple, sans partir au serveur', async () => {
+    // Sans ce contrôle, `admin@` part au BFF, y coûte un argon2id, et revient en 401 générique :
+    // l'opérateur croit s'être trompé de mot de passe. Le format ne dit **rien** de l'existence du
+    // compte — il ne rouvre donc pas l'oracle d'énumération que le serveur ferme.
+    const { user } = await visitLogin()
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+
+    await user.type(email(), 'admin@')
+    await user.type(password(), 'un-mot-de-passe')
+    await user.click(submit())
+
+    expect(email()).toHaveAttribute('aria-invalid', 'true')
+    expect(
+      within(email().closest('.ui-field') as HTMLElement).getByRole('alert'),
+    ).toHaveTextContent('ops@exemple.ci')
+    expect(fetch.mock.calls.filter(([r]) => r.method === 'POST')).toEqual([])
+  })
+
+  it('laisse passer une adresse complète', async () => {
+    const { router, user } = await visitLogin()
+
+    await user.type(email(), 'a.kouadio@example.test')
+    await user.type(password(), 'un-mot-de-passe')
+    await user.click(submit())
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Second facteur/ }),
+    ).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/mfa')
   })
 })

@@ -38,6 +38,29 @@ export const Route = createFileRoute('/login')({
 })
 
 /**
+ * Ce que l'e-mail saisi a de refusable, ou `undefined`.
+ *
+ * **Le motif est volontairement lâche** : un `@`, quelque chose de part et d'autre, et un point
+ * dans le domaine. Une expression conforme à la RFC 5322 fait quatre cents caractères et **rejette
+ * des adresses valides** ; le seul juge du format est de toute façon le serveur, qui borne à 320
+ * caractères. Ce contrôle-ci ne cherche donc que la faute de frappe évidente.
+ *
+ * **Il ne rouvre pas l'oracle d'énumération.** Le serveur refuse de distinguer l'adresse inconnue
+ * du mot de passe faux ; le format, lui, ne dit rien de l'existence d'un compte — `absent@nulle.part`
+ * le passe. Ce qu'il évite est un aller-retour qui coûte un argon2id et revient en 401 générique,
+ * où l'opérateur soupçonne son mot de passe.
+ */
+function refusedEmail(value: string) {
+  if (value.trim() === '') return 'Saisissez un e-mail.'
+  // L'exemple enseigne mieux que la règle : il montre la forme au lieu de la décrire.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+    return 'Cet e-mail est incomplet. Exemple : ops@exemple.ci'
+  }
+
+  return undefined
+}
+
+/**
  * Ce qui manque dans le formulaire, champ par champ. Vide, il n'y a rien à dire.
  *
  * **Le refus vient d'ici et non du serveur**, contrairement à ce que la fiche de step-027 annonçait
@@ -91,10 +114,8 @@ function LoginScreen() {
     // Les deux champs sont relus d'un coup : signaler le premier puis le second ferait deux
     // aller-retours là où l'opérateur peut tout corriger en une fois.
     const incomplete: MissingFields = {
-      ...(email.trim() === '' ? { email: 'Cet e-mail est requis pour ouvrir une session.' } : {}),
-      ...(password === ''
-        ? { password: 'Ce mot de passe est requis pour ouvrir une session.' }
-        : {}),
+      ...(refusedEmail(email) === undefined ? {} : { email: refusedEmail(email) }),
+      ...(password === '' ? { password: 'Saisissez un mot de passe.' } : {}),
     }
     setMissing(incomplete)
 
