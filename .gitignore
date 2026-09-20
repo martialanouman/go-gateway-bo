@@ -32,3 +32,7 @@ playwright-report/
 !internal/webassets/dist/
 internal/webassets/dist/*
 !internal/webassets/dist/.gitkeep
+
+# Les worktrees que le harnais crée pour isoler un sous-agent : ce sont des clones de ce dépôt,
+# et `git add -A` les a déjà indexés deux fois comme dépôts imbriqués.
+.claude/worktrees/

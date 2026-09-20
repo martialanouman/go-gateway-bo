@@ -339,3 +339,117 @@ describe('le format de l’e-mail', () => {
     expect(router.state.location.pathname).toBe('/mfa')
   })
 })
+
+describe('les bornes du contrat, à l’écran', () => {
+  it('refuse un mot de passe plus long que ce que le serveur accepte, sans partir au BFF', async () => {
+    // La borne est celle du contrat — `password.maxLength: 4096` — et elle n'est écrite ni dans cet
+    // écran ni dans ce test : elle arrive par `LoginRequest`, qu'engendre `cmd/zodgen`. Sans elle,
+    // ce corps part au BFF, qui le refuse en 400 après l'avoir lu en entier.
+    const { user } = await visitLogin()
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+
+    await user.type(email(), 'a.kouadio@example.test')
+    // `paste` et non `type` : quatre mille frappes simulées prennent des minutes, et personne ne
+    // tape un mot de passe de cette longueur — il est collé d'un gestionnaire.
+    await user.click(password())
+    await user.paste('x'.repeat(4097))
+    await user.click(submit())
+
+    const refusal = within(password().closest('.ui-field') as HTMLElement).getByRole('alert')
+    expect(refusal).toHaveTextContent('4096')
+    // La phrase **française**, et pas seulement le nombre : « Too big: expected string to have
+    // <=4096 characters » porte le même 4096. Sans cette seconde assertion, `formResolver` qui
+    // oublierait de passer sa rédaction laissait la suite verte et l'écran en anglais.
+    expect(refusal).toHaveTextContent(/trop longue/)
+    expect(fetch.mock.calls.filter(([r]) => r.method === 'POST')).toEqual([])
+  })
+
+  it('laisse passer ce qui tient exactement dans la borne', async () => {
+    const { router, user } = await visitLogin()
+
+    await user.type(email(), 'a.kouadio@example.test')
+    await user.click(password())
+    await user.paste('x'.repeat(4096))
+    await user.click(submit())
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Second facteur/ }),
+    ).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/mfa')
+  })
+})
+
+describe('les quatre couches du formulaire', () => {
+  it('ne rend qu’un message par champ refusé, et non celui de chacune', async () => {
+    // React Hook Form tient l'état, Zod la forme, Base UI le rendu. Brancher en plus le moteur de
+    // validité de Base UI — `required` est posé, donc `valueMissing` est vrai — ferait deux messages
+    // dans le même champ, dont un en anglais et hors de la charte.
+    const { user } = await visitLogin()
+
+    await user.click(submit())
+
+    expect(within(email().closest('.ui-field') as HTMLElement).getAllByRole('alert')).toHaveLength(
+      1,
+    )
+    expect(
+      within(password().closest('.ui-field') as HTMLElement).getAllByRole('alert'),
+    ).toHaveLength(1)
+  })
+})
+
+describe('ce que le formulaire envoie vraiment', () => {
+  it('poste l’adresse débarrassée des espaces qui l’entourent', async () => {
+    // Le décor tient l'état du serveur mais n'avait jamais lu un **corps** de requête : le contrôle
+    // de format travaillait sur une adresse rognée quand l'envoi, lui, partait telle quelle. Une
+    // adresse collée depuis un gestionnaire de mots de passe traîne régulièrement une espace.
+    const { user } = await visitLogin()
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+
+    await user.type(email(), '  a.kouadio@example.test  ')
+    await user.type(password(), 'un-mot-de-passe')
+    await user.click(submit())
+
+    const posted = fetch.mock.calls
+      .map(([request]) => request)
+      .find((request) => request.url.endsWith('/api/auth/login'))
+    expect(await posted?.clone().json()).toEqual({
+      email: 'a.kouadio@example.test',
+      password: 'un-mot-de-passe',
+    })
+  })
+})
+
+describe('la borne de l’adresse, que rien ne tenait', () => {
+  it('refuse une adresse plus longue que ce que le serveur accepte, sans partir au BFF', async () => {
+    // `email.maxLength: 320`, la borne symétrique de celle du mot de passe. Elle n'atteignait
+    // l'écran que par un `.pipe` qu'aucune porte ne tenait : retiré, une adresse de 323 caractères
+    // partait au BFF sans un mot. Le but même de la step était donc gardé pour un champ sur deux.
+    const { user } = await visitLogin()
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+
+    await user.click(email())
+    await user.paste(`${'a'.repeat(310)}@exemple.test`)
+    await user.type(password(), 'un-mot-de-passe')
+    await user.click(submit())
+
+    const refusal = within(email().closest('.ui-field') as HTMLElement).getByRole('alert')
+    expect(refusal).toHaveTextContent('320')
+    expect(refusal).toHaveTextContent(/trop longue/)
+    expect(fetch.mock.calls.filter(([r]) => r.method === 'POST')).toEqual([])
+  })
+})
+
+describe('le refus du mot de passe vide, et sa rédaction', () => {
+  it('nomme le champ plutôt que de citer la borne du contrat', async () => {
+    // L'ordre du `.pipe` est ce qui décide : les règles de l'écran **puis** celles du contrat. Le
+    // contrat pose `minLength: 1` sur le mot de passe, et l'ordre inverse ferait lire « Cette saisie
+    // est trop courte : 1 caractère au minimum. » — vrai, générique, et muet sur le champ.
+    const { user } = await visitLogin()
+
+    await user.click(submit())
+
+    expect(
+      within(password().closest('.ui-field') as HTMLElement).getByRole('alert'),
+    ).toHaveTextContent('Saisissez un mot de passe')
+  })
+})

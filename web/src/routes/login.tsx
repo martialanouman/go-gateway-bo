@@ -1,9 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { type FormEvent, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
 import { AuthLayout, AuthPending, AuthRefusal } from '~/components/auth-layout'
 import { Button, Field, Input } from '~/components/ui'
 import { api } from '~/lib/api'
+import { LoginRequest } from '~/lib/contract.gen'
+import { formResolver } from '~/lib/form'
 import { forgetSession, readSession, rememberChallenge, safeDestination } from '~/lib/session'
 
 /**
@@ -38,58 +41,62 @@ export const Route = createFileRoute('/login')({
 })
 
 /**
- * Ce que l'e-mail saisi a de refusable, ou `undefined`.
+ * Ce que le formulaire oppose à la saisie : ses propres règles **puis** celles du contrat.
  *
- * **Le motif est volontairement lâche** : un `@`, quelque chose de part et d'autre, et un point
- * dans le domaine. Une expression conforme à la RFC 5322 fait quatre cents caractères et **rejette
- * des adresses valides** ; le seul juge du format est de toute façon le serveur, qui borne à 320
- * caractères. Ce contrôle-ci ne cherche donc que la faute de frappe évidente.
+ * `.pipe` et non deux contrôles côte à côte, et l'ordre est ce qui compte. Un champ vide échouerait
+ * aussi sur le `minLength: 1` que le contrat pose sur le mot de passe, et c'est alors le message
+ * générique de `refusalInFrench` — « Cette saisie est trop courte : 1 caractère au minimum. » — que
+ * l'opérateur lirait, au lieu de celui qui nomme le champ. Le schéma engendré ne s'exécute donc
+ * qu'une fois les règles de l'écran satisfaites : chacun rédige ce qu'il sait, et aucune borne n'est
+ * retapée ici.
  *
- * **Il ne rouvre pas l'oracle d'énumération.** Le serveur refuse de distinguer l'adresse inconnue
- * du mot de passe faux ; le format, lui, ne dit rien de l'existence d'un compte — `absent@nulle.part`
- * le passe. Ce qu'il évite est un aller-retour qui coûte un argon2id et revient en 401 générique,
- * où l'opérateur soupçonne son mot de passe.
+ * **Le motif d'adresse est volontairement lâche** — un `@`, quelque chose de part et d'autre, un
+ * point dans le domaine — et il **ne rouvre pas l'oracle d'énumération** : le format ne dit rien de
+ * l'existence d'un compte, `absent@nulle.part` le passe. Ce qu'il évite est un aller-retour qui
+ * coûte un argon2id et revient en 401 générique, où l'opérateur soupçonne son mot de passe.
  */
-function refusedEmail(value: string) {
-  if (value.trim() === '') return 'Saisissez un e-mail.'
-  // L'exemple enseigne mieux que la règle : il montre la forme au lieu de la décrire.
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
-    return 'Cet e-mail est incomplet. Exemple : ops@exemple.ci'
-  }
-
-  return undefined
-}
+const credentials = z.object({
+  email: z
+    .string()
+    // Pas de `.trim()` : la « value sanitization » que la spécification HTML impose à
+    // `type="email"` retire déjà les espaces qui entourent la valeur. Mesuré, en jsdom comme au
+    // navigateur — c'est donc le `type` du champ qui tient l'adresse postée, et le passer à `text`
+    // fait rougir.
+    .min(1, 'Saisissez un e-mail.')
+    // L'exemple enseigne mieux que la règle : il montre la forme au lieu de la décrire.
+    .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Cet e-mail est incomplet. Exemple : ops@exemple.ci')
+    .pipe(LoginRequest.shape.email),
+  password: z.string().min(1, 'Saisissez un mot de passe.').pipe(LoginRequest.shape.password),
+})
 
 /**
- * Ce qui manque dans le formulaire, champ par champ. Vide, il n'y a rien à dire.
+ * **Les refus de champ viennent d'ici et non du serveur**, contrairement à ce que la fiche de
+ * step-027 annonçait (« les erreurs champ par champ depuis `errors[]` »). Vérifié dans le contrat
+ * plutôt que supposé : le schéma `Error` d'`api/openapi-bff.yaml` n'a que `code` et `message`, et il
+ * écrit lui-même que « le champ `errors[]` que le §1.4 annonce arrive avec la première route qui
+ * relaie la passerelle (step-060) ».
  *
- * **Le refus vient d'ici et non du serveur**, contrairement à ce que la fiche de step-027 annonçait
- * (« les erreurs champ par champ depuis `errors[]` »). Vérifié dans le contrat plutôt que supposé :
- * le schéma `Error` d'`api/openapi-bff.yaml` n'a que `code` et `message`, et il écrit lui-même que
- * « le champ `errors[]` que le §1.4 annonce arrive avec la première route qui relaie la passerelle
- * (step-060) ».
- *
- * L'écart est sans conséquence ici, et c'est la seconde raison de ne pas l'attendre : les refus
- * que cette route rend à un formulaire **rempli** — 401 et 429 — sont globaux par conception.
- * (Elle en déclare six en tout ; les quatre autres — 400, 403, 415, 503 — ne nomment pas davantage
- * un champ.) Le serveur se tait sur
- * lequel des deux champs a manqué, puisque le dire nommerait les adresses qui existent. Il ne
- * remplira donc jamais `errors[]` sur cette route, et ce qui reste à dire champ par champ est ce
- * que le client sait seul : un champ vide.
+ * L'écart est sans conséquence ici, et c'est la seconde raison de ne pas l'attendre : les refus que
+ * cette route rend à un formulaire **rempli** — 401 et 429 — sont globaux par conception. (Elle en
+ * déclare six en tout ; les quatre autres — 400, 403, 415, 503 — ne nomment pas davantage un champ.)
+ * Le serveur se tait sur lequel des deux champs a manqué, puisque le dire nommerait les adresses qui
+ * existent.
  */
-type MissingFields = { email?: string; password?: string }
-
 function LoginScreen() {
   const { redirect: destination } = Route.useSearch()
   const navigate = Route.useNavigate()
   const queryClient = useQueryClient()
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [missing, setMissing] = useState<MissingFields>({})
+  // Les défauts de React Hook Form sont ceux qu'on veut, et c'est pourquoi aucun n'est écrit :
+  // valider à l'envoi, puis **revalider à la frappe** une fois le refus affiché. Valider dès la
+  // première frappe reprocherait une adresse incomplète à qui est en train de la taper.
+  const form = useForm({
+    resolver: formResolver(credentials),
+    defaultValues: { email: '', password: '' },
+  })
 
   const login = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ email, password }: z.output<typeof credentials>) => {
       const { data, error, response } = await api.POST('/auth/login', {
         body: { email, password },
       })
@@ -108,21 +115,14 @@ function LoginScreen() {
     },
   })
 
-  function onSubmit(event: FormEvent) {
-    event.preventDefault()
-
-    // Les deux champs sont relus d'un coup : signaler le premier puis le second ferait deux
-    // aller-retours là où l'opérateur peut tout corriger en une fois.
-    const incomplete: MissingFields = {
-      ...(refusedEmail(email) === undefined ? {} : { email: refusedEmail(email) }),
-      ...(password === '' ? { password: 'Saisissez un mot de passe.' } : {}),
-    }
-    setMissing(incomplete)
-
-    if (Object.keys(incomplete).length > 0) return
-
-    login.mutate()
-  }
+  // Le refus du serveur s'efface dès la frappe : un message qui survit à ce qu'il reproche fait
+  // douter de tous les autres, et celui-ci refusait des identifiants qui ne sont plus ceux-là. Le
+  // refus de champ, lui, est effacé par React Hook Form, qui revalide.
+  //
+  // **C'est le seul endroit qui l'efface, et il suffit** : un bandeau n'existe qu'après un envoi que
+  // la validation a laissé passer, donc avec deux champs remplis, et le vider demande une frappe.
+  const forgetRefusal = { onChange: () => login.reset() }
+  const { errors } = form.formState
 
   return (
     <AuthLayout title="Connexion">
@@ -131,43 +131,27 @@ function LoginScreen() {
       {/* `noValidate` : la validation native rendrait ses propres messages, dans la langue du
           navigateur et hors de la charte. `required` reste posé — il porte la sémantique pour les
           technologies d'assistance, et la marque visuelle en découle. */}
-      <form className="auth__form" noValidate onSubmit={onSubmit}>
-        <Field error={missing.email} label="E-mail">
+      <form
+        className="auth__form"
+        noValidate
+        onSubmit={form.handleSubmit((values) => login.mutate(values))}
+      >
+        <Field error={errors.email?.message} label="E-mail">
           <Input
             autoComplete="username"
             autoFocus
-            name="email"
-            onChange={(event) => {
-              setEmail(event.target.value)
-              // Le refus s'efface dès la correction : un message qui survit à ce qu'il reproche
-              // fait douter de tous les autres. La règle vaut pour le refus du **serveur** autant
-              // que pour celui du champ — il refusait des identifiants qui ne sont plus ceux-là.
-              //
-              // **C'est le seul endroit qui l'efface, et il suffit.** Un bandeau n'existe qu'après
-              // un envoi que la validation a laissé passer, donc avec deux champs remplis ; le
-              // vider demande une frappe, qui passe ici. Un second effacement dans `onSubmit` a été
-              // écrit, puis retiré : la mutation qui le supprimait laissait tout vert.
-              setMissing((previous) => ({ ...previous, email: undefined }))
-              login.reset()
-            }}
             required
             type="email"
-            value={email}
+            {...form.register('email', forgetRefusal)}
           />
         </Field>
 
-        <Field error={missing.password} label="Mot de passe">
+        <Field error={errors.password?.message} label="Mot de passe">
           <Input
             autoComplete="current-password"
-            name="password"
-            onChange={(event) => {
-              setPassword(event.target.value)
-              setMissing((previous) => ({ ...previous, password: undefined }))
-              login.reset()
-            }}
             required
             type="password"
-            value={password}
+            {...form.register('password', forgetRefusal)}
           />
         </Field>
 
