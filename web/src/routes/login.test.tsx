@@ -224,3 +224,47 @@ describe('une session déjà élevée', () => {
     expect(router.state.location.pathname).toBe('/billing')
   })
 })
+
+describe('la réduction de la destination, à son point d’appel', () => {
+  it('ne suit pas une URL de schéma relatif collée dans le paramètre', async () => {
+    // `session.test.ts` tient `safeDestination` en tant que **fonction**. Ce test-ci tient son
+    // **câblage** : la fonction gardée et la route non câblée passaient les mêmes assertions —
+    // c'est la mesure sur un proxy. Ici la route est visitée pour de bon, avec une session élevée,
+    // donc le renvoi s'exécute.
+    stubSession({ permissions: [] })
+    const router = createAppRouter(
+      createMemoryHistory({ initialEntries: ['/login?redirect=%2F%2Failleurs.example'] }),
+    )
+    render(<RouterProvider router={router} />)
+
+    await screen.findByRole('heading', { level: 1, name: /cockpit d’exploitation|cockpit/i })
+    expect(router.state.location.pathname).toBe('/')
+    expect(router.state.location.href).not.toContain('ailleurs.example')
+  })
+})
+
+describe('l’attente de la garde', () => {
+  it('peint un squelette du formulaire, et non un blanc', async () => {
+    // La garde s'exécute **avant** tout rendu : sans `pendingComponent`, l'écran reste vide le
+    // temps d'un aller-retour, juste après le squelette peint par `index.html`. Les deux helpers
+    // de ce fichier décrivent cet écran en commentaire et le contournaient sans jamais l'affirmer.
+    stubSession('pending')
+    render(
+      <RouterProvider
+        router={createAppRouter(createMemoryHistory({ initialEntries: ['/login'] }))}
+      />,
+    )
+
+    // **Une fenêtre courte, et c'est tout l'objet de ce test.** La fenêtre par défaut de `findBy`
+    // vaut 1000 ms — exactement le délai que TanStack applique quand `defaultPendingMs: 0` n'est
+    // pas posé. Un `findBy` nu rendrait donc vert avec ou sans ce réglage, et ne mesurerait que
+    // lui-même. Mesuré : à 200 ms ce test rougit dès que la ligne disparaît du routeur.
+    expect(
+      await screen.findByText('Vérification de la session en cours', undefined, { timeout: 200 }),
+    ).toBeInTheDocument()
+    expect(document.querySelectorAll('.ui-skeleton').length).toBeGreaterThan(0)
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Connexion au tableau de bord',
+    )
+  })
+})

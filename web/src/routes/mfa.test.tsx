@@ -1,10 +1,10 @@
 import { _browserSupportsWebAuthnInternals } from '@simplewebauthn/browser'
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '~/lib/api.gen'
-import { forgetChallenge, rememberChallenge } from '~/lib/session'
+import { forgetChallenge, peekChallenge, rememberChallenge } from '~/lib/session'
 import { createAppRouter } from '~/router'
 import { type AuthReplies, CHALLENGE, stubSession } from '../../test/session'
 
@@ -402,5 +402,105 @@ describe('la cérémonie de clé d’accès, une à la fois', () => {
       request.url.endsWith('/api/auth/mfa/webauthn/assert/begin'),
     )
     expect(ouvertures).toHaveLength(1)
+  })
+})
+
+describe('la réduction de la destination, à son point d’appel', () => {
+  it('ne suit pas une URL de schéma relatif collée dans le paramètre', async () => {
+    // Même raison que sur `/login` : ici le renvoi part en `href`, donc en URL brute. Sans la
+    // réduction câblée, un opérateur déjà élevé qui ouvre ce lien quitte le site avec la connexion
+    // encore en tête.
+    rememberChallenge(CHALLENGE)
+    stubSession({ permissions: [] })
+    const router = createAppRouter(
+      createMemoryHistory({ initialEntries: ['/mfa?redirect=%2F%2Failleurs.example'] }),
+    )
+    render(<RouterProvider router={router} />)
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(router.state.location.pathname).toBe('/')
+    expect(router.state.location.href).not.toContain('ailleurs.example')
+  })
+})
+
+describe('le code manquant', () => {
+  it('nomme ce qui manque et n’envoie rien au BFF', async () => {
+    const { user } = await visitMfa({ totp: true, passkeys: 0 })
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+
+    expect(code()).toHaveAttribute('aria-invalid', 'true')
+    expect(within(code().closest('.ui-field') as HTMLElement).getByRole('alert')).toHaveTextContent(
+      'Ce code est requis',
+    )
+    // `noValidate` en même temps : sans lui, le navigateur rendrait son propre message, dans sa
+    // langue et hors charte, et la phrase française ci-dessus n'apparaîtrait jamais.
+    expect(fetch.mock.calls.filter(([r]) => r.url.endsWith('/api/auth/mfa/verify'))).toEqual([])
+  })
+
+  it('efface le refus dès que le code est saisi', async () => {
+    const { user } = await visitMfa({ totp: true, passkeys: 0 })
+
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+    expect(code()).toHaveAttribute('aria-invalid', 'true')
+
+    await user.type(code(), '1')
+    expect(code()).not.toHaveAttribute('aria-invalid', 'true')
+  })
+})
+
+describe('le clavier, sur le second facteur', () => {
+  it('pose le focus sur le code et se valide sans souris', async () => {
+    const { router, user } = await visitMfa({ totp: true, passkeys: 0 })
+
+    expect(code()).toHaveFocus()
+    // Six chiffres et pas un de plus : le commentaire du champ l'affirmait sans que rien le tienne.
+    expect(code()).toHaveAttribute('maxLength', '6')
+
+    await user.type(code(), '123456{Enter}')
+
+    await screen.findByRole('heading', { level: 1, name: /cockpit/i })
+    expect(router.state.location.pathname).toBe('/')
+  })
+})
+
+describe('ce que l’élévation et la sortie laissent derrière', () => {
+  it('oublie le challenge consommé', async () => {
+    const { user } = await visitMfa({ totp: true, passkeys: 0 })
+
+    await user.type(code(), '123456')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+    await screen.findByRole('heading', { level: 1, name: /cockpit/i })
+
+    // Gardé, il rouvrirait ce formulaire sur un challenge **mort** si la session retombait non
+    // élevée — le cul-de-sac que la garde existe pour empêcher.
+    expect(peekChallenge()).toBeUndefined()
+  })
+
+  it('oublie challenge et session quand l’opérateur reprend la connexion', async () => {
+    const { user } = await visitMfa({ totp: true, passkeys: 0 })
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+    const lectures = () => fetch.mock.calls.filter(([r]) => r.url.endsWith('/api/auth/me')).length
+    const avant = lectures()
+
+    await user.click(screen.getByRole('button', { name: 'Reprendre la connexion' }))
+    await screen.findByLabelText(/Adresse professionnelle/)
+
+    expect(peekChallenge()).toBeUndefined()
+    expect(lectures()).toBeGreaterThan(avant)
+  })
+
+  it('reste une sortie même quand la déconnexion échoue', async () => {
+    // `onSettled` et non `onSuccess` : rester bloqué ici parce que le serveur a tombé serait
+    // exactement le cul-de-sac qu'on cherche à éviter.
+    const { user } = await visitMfa(
+      { totp: true, passkeys: 0 },
+      { replies: { logout: { status: 500, body: { code: 'oops', message: 'Panne.' } } } },
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Reprendre la connexion' }))
+
+    expect(await screen.findByLabelText(/Adresse professionnelle/)).toBeInTheDocument()
   })
 })

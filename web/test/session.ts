@@ -45,6 +45,12 @@ export type AuthReplies = {
   readonly login?: Reply | 'pending'
   readonly verify?: Reply | 'pending'
   readonly assert?: Reply | 'pending'
+  /**
+   * Le serveur rend 204 même sans session — se déconnecter est une demande d'**état**, et l'état est
+   * atteint. Mais il peut tomber, et c'est le seul cas où l'on peut observer qu'une sortie reste une
+   * sortie : sans cette clé, un écran qui ne repartirait que sur un succès passait vert.
+   */
+  readonly logout?: Reply | 'pending'
 }
 
 export const OPERATOR_NAME = 'Awa Kouadio'
@@ -60,10 +66,13 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
     const route = `${request.method} ${pathname}`
 
     switch (route) {
-      case 'POST /api/auth/logout':
-        current = { status: 401 }
+      case 'POST /api/auth/logout': {
+        const reply = replies.logout ?? { status: 204 }
+        // La session ne tombe que si le serveur a bien fermé : un échec laisse le cookie vivant.
+        if (reply !== 'pending' && reply.status < 400) current = { status: 401 }
 
-        return new Response(null, { status: 204 })
+        return respond(reply)
+      }
 
       case 'POST /api/auth/login': {
         const reply = replies.login ?? {
