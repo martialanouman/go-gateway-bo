@@ -215,8 +215,17 @@ elles, rien ne l'aurait rattrapée. **Elles en ont une depuis le 08/09/2026**, e
 vérifié en inversant une dépendance dans chacun des trois en-têtes.*
 
 - [x] step-027 — Écrans Login & MFA, branchés sur le BFF Go
+- [ ] step-049 — Socle de formulaires : React Hook Form, Zod engendré, `Field` en adaptateur ¤
 - [ ] step-028 — Écran d'enrôlement du second facteur
 - [ ] step-029 — Gestion des opérateurs et des rôles
+
+¤ **`step-049` porte un numéro du bloc M2 et se lit ici** — l'ordre de cette liste fait foi. C'est un
+socle de primitives, pas un écran, et il doit précéder les **deux** écrans de formulaire qui restent
+à M1 : sans lui, `step-028` et `step-029` écrivent une deuxième et une troisième fois le cousu main
+de `step-027`, et la migration coûte trois écrans au lieu de deux. Elle est née du constat que les
+bornes du contrat — `maxLength` en tête — **n'atteignent pas le client** : `openapi-typescript` les
+jette, le serveur les redit à la main, et le contrôle de format livré par `step-027` avait inventé sa
+règle. *(Arbitré le 20/09/2026, en revue de `step-027`.)*
 
 `step-028` avant `step-029` : la v1.0 avait rendu le second facteur obligatoire alors qu'aucun écran ne
 permettait de l'enrôler — le premier administrateur se serait connecté, serait arrivé au challenge, et
