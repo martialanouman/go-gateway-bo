@@ -4,9 +4,9 @@ import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useId } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { AuthLayout, AuthPending, AuthRefusal } from '~/components/auth-layout'
+import { AuthLayout, AuthPending, AuthRefusal, RestartLogin } from '~/components/auth-layout'
 import { Button, Field, Input } from '~/components/ui'
-import { api, HttpError, meQueryOptions } from '~/lib/api'
+import { api, HttpError, meQueryOptions, refusalCode, refusalMessage } from '~/lib/api'
 import { MfaVerification } from '~/lib/contract.gen'
 import { formResolver } from '~/lib/form'
 import {
@@ -35,6 +35,18 @@ export const Route = createFileRoute('/mfa')({
 
     if (session.kind === 'open' && session.me.elevated) {
       throw redirect({ href: search.redirect ?? '/' })
+    }
+
+    // **Aucun facteur enrôlé : l'enrôlement, pas le challenge.** `POST /auth/login` rend un
+    // challenge **sans regarder** ce qui est enrôlé (`internal/auth`, `OutcomeChallenged`) : le cas
+    // se découvre donc ici, et présenter un formulaire dont chaque envoi serait refusé est la
+    // boucle que la v1.0 a livrée.
+    if (
+      session.kind === 'open' &&
+      !session.me.secondFactors.totp &&
+      session.me.secondFactors.passkeys === 0
+    ) {
+      throw redirect({ to: '/enroll', search: { redirect: search.redirect } })
     }
 
     // Sans challenge, `POST /auth/mfa/verify` refuserait chaque envoi : le formulaire serait un
@@ -94,11 +106,10 @@ function SecondFactorScreen() {
   // Les deux causes se séparent donc avant d'être lues, et le produit n'affirme plus rien qu'il ne
   // sache.
   if (me.data === undefined) {
-    return <SessionUnreadable error={me.error} onRetry={() => void me.refetch()} />
+    return <SessionUnreadable error={me.error} />
   }
 
   const { totp, passkeys } = me.data.secondFactors
-  if (!totp && passkeys === 0) return <NoFactorEnrolled />
 
   return <FactorChallenge destination={destination} holdsPasskey={passkeys > 0} holdsTotp={totp} />
 }
@@ -234,13 +245,12 @@ function FactorChallenge({
  * Ce n'est pas un `ErrorState` : celui-là promet « vos données locales restent affichées », et il
  * n'y a ici aucune donnée locale — l'écran n'a jamais rien ouvert.
  */
-function SessionUnreadable({
-  error,
-  onRetry,
-}: {
-  readonly error: unknown
-  readonly onRetry: () => void
-}) {
+function SessionUnreadable({ error }: { readonly error: unknown }) {
+  // `router.invalidate()` et non `me.refetch()` : ce qu'il faut rejouer est la **garde**, pas la
+  // seule requête. Une relecture réussie peut rendre un compte **sans aucun facteur**, et cet
+  // écran se peignait alors sur un challenge que le serveur refuserait — `beforeLoad` ne se rejoue
+  // pas de lui-même. La garde, elle, conduit à l'enrôlement. Même arbitrage que `shell.tsx`.
+  const router = useRouter()
   const status = error instanceof HttpError ? String(error.status) : 'réseau'
 
   return (
@@ -249,65 +259,11 @@ function SessionUnreadable({
       title="Impossible de vérifier la session"
     >
       <AuthRefusal>{`GET /api/auth/me · ${status}`}</AuthRefusal>
-      <Button onClick={onRetry} variant="primary">
+      <Button onClick={() => void router.invalidate()} variant="primary">
         Réessayer
       </Button>
       <RestartLogin />
     </AuthLayout>
-  )
-}
-
-/**
- * Ce que voit un opérateur dont aucun second facteur n'est enrôlé.
- *
- * `POST /auth/login` rend un challenge **sans regarder** ce qui est enrôlé (`internal/auth`,
- * `OutcomeChallenged`) : c'est donc ici que le cas se découvre, et l'envoyer au challenge serait
- * l'envoyer à un refus certain — la boucle que la v1.0 a livrée. L'enrôlement arrive en step-028 ;
- * d'ici là, l'écran nomme son jalon et garde une sortie, jamais un cul-de-sac.
- */
-function NoFactorEnrolled() {
-  return (
-    <AuthLayout
-      intro="Ce compte n’a ni application d’authentification ni clé d’accès, et la session en reste au premier facteur : aucun écran ne s’ouvre tant que le second n’est pas franchi."
-      title="L’enrôlement du second facteur n’est pas encore livré"
-    >
-      <p className="auth__aside">
-        L’écran d’enrôlement arrive avec step-028, au jalon M1. D’ici là, un administrateur peut
-        poser un second facteur sur ce compte.
-      </p>
-      <RestartLogin />
-    </AuthLayout>
-  )
-}
-
-/**
- * La sortie, présente sur **les deux** états de cet écran : un opérateur qui s'est trompé de compte,
- * ou dont le facteur est perdu, doit pouvoir repartir sans fermer l'onglet.
- *
- * Elle ferme la session côté serveur plutôt que de seulement naviguer : rester connecté au premier
- * facteur après avoir demandé à repartir laisserait un cookie vivant que personne ne croit ouvert.
- */
-function RestartLogin() {
-  const queryClient = useQueryClient()
-  const navigate = Route.useNavigate()
-
-  const restart = useMutation({
-    mutationFn: async () => {
-      await api.POST('/auth/logout')
-    },
-    onSettled: () => {
-      // `onSettled` et non `onSuccess` : si la déconnexion échoue, rester bloqué ici serait le
-      // cul-de-sac qu'on cherche justement à éviter. Le serveur rend le même 204 sans session.
-      forgetChallenge()
-      forgetSession(queryClient)
-      void navigate({ to: '/login', search: { redirect: undefined } })
-    },
-  })
-
-  return (
-    <Button loading={restart.isPending} onClick={() => restart.mutate()} variant="link">
-      Reprendre la connexion
-    </Button>
   )
 }
 
@@ -350,33 +306,17 @@ const CEREMONY_ABANDONED =
  * ajouté partout, il redeviendrait ce que step-035 a retiré.
  */
 function refusalOf(error: unknown, status: number, method: 'totp' | 'webauthn') {
-  const fromServer = messageOf(error, status)
+  const fromServer = refusalMessage(
+    error,
+    `La vérification n’a pas abouti : le tableau de bord n’a pas obtenu de réponse (HTTP ${status}).`,
+  )
 
   // La **cause** autant que la méthode. Conditionné au seul chemin TOTP, l'indice se collait aussi
   // au verrouillage et à la panne — « réessayez dans cinq minutes » suivi de « vérifiez l'heure de
   // votre téléphone », qui n'y est pour rien. C'est l'autre moitié de ce que step-035 a retiré du
   // serveur : `invalid_second_factor` y servait des causes qu'il ne décrivait pas autant que des
   // méthodes qu'il ne décrivait pas.
-  if (method !== 'totp' || codeOf(error) !== 'invalid_second_factor') return fromServer
+  if (method !== 'totp' || refusalCode(error) !== 'invalid_second_factor') return fromServer
 
   return `${fromServer} ${CLOCK_HINT}`
-}
-
-/** Le `code` du DTO `Error`, qui se grep dans les journaux et ne se traduit pas. */
-function codeOf(error: unknown) {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const { code } = error as { code: unknown }
-    if (typeof code === 'string') return code
-  }
-
-  return undefined
-}
-
-function messageOf(error: unknown, status: number) {
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const { message } = error as { message: unknown }
-    if (typeof message === 'string' && message !== '') return message
-  }
-
-  return `La vérification n’a pas abouti : le tableau de bord n’a pas obtenu de réponse (HTTP ${status}).`
 }

@@ -1,5 +1,9 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { Icon, LoadingState, Skeleton } from '~/components/ui'
+import { Button, Icon, LoadingState, Skeleton } from '~/components/ui'
+import { api } from '~/lib/api'
+import { forgetChallenge, forgetSession } from '~/lib/session'
 
 /**
  * La mise en page des deux écrans qui précèdent la session : connexion et second facteur.
@@ -70,5 +74,37 @@ export function AuthRefusal({ children }: { readonly children: ReactNode }) {
       <Icon name="bang" size={13} />
       <span>{children}</span>
     </p>
+  )
+}
+
+/**
+ * La sortie, présente sur **tous** les états des écrans qui précèdent la session : un opérateur qui
+ * s'est trompé de compte, dont le facteur est perdu, ou qui renonce à enrôler, doit pouvoir repartir
+ * sans fermer l'onglet.
+ *
+ * Elle ferme la session côté serveur plutôt que de seulement naviguer : rester connecté au premier
+ * facteur après avoir demandé à repartir laisserait un cookie vivant que personne ne croit ouvert.
+ */
+export function RestartLogin() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+
+  const restart = useMutation({
+    mutationFn: async () => {
+      await api.POST('/auth/logout')
+    },
+    onSettled: () => {
+      // `onSettled` et non `onSuccess` : si la déconnexion échoue, rester bloqué ici serait le
+      // cul-de-sac qu'on cherche justement à éviter. Le serveur rend le même 204 sans session.
+      forgetChallenge()
+      forgetSession(queryClient)
+      void navigate({ to: '/login', search: { redirect: undefined } })
+    },
+  })
+
+  return (
+    <Button loading={restart.isPending} onClick={() => restart.mutate()} variant="link">
+      Reprendre la connexion
+    </Button>
   )
 }

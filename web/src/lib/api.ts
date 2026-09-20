@@ -15,6 +15,33 @@ export function isUnauthenticated(error: unknown) {
 }
 
 /**
+ * Le refus rendu à l'opérateur, pris **du serveur** quand il en a rédigé un.
+ *
+ * Le BFF rédige ses refus en français, conséquence d'abord : les recopier écran par écran en ferait
+ * deux rédactions dont une périmerait. Le repli, lui, appartient à l'écran — « la vérification n'a
+ * pas abouti » et « l'enrôlement n'a pas abouti » ne se disent pas de la même façon, et une phrase
+ * générique dirait moins que le statut qu'elle porte.
+ */
+export function refusalMessage(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const { message } = error as { message: unknown }
+    if (typeof message === 'string' && message !== '') return message
+  }
+
+  return fallback
+}
+
+/** Le `code` du DTO `Error`, qui se grep dans les journaux et ne se traduit pas. */
+export function refusalCode(error: unknown) {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const { code } = error as { code: unknown }
+    if (typeof code === 'string') return code
+  }
+
+  return undefined
+}
+
+/**
  * Le seul client HTTP du produit, et il ne parle qu'au BFF.
  *
  * L'origine est **lue à l'exécution** : écrite dans le bundle, elle ferait rougir la garde de

@@ -51,6 +51,9 @@ export type AuthReplies = {
    * sortie : sans cette clé, un écran qui ne repartirait que sur un succès passait vert.
    */
   readonly logout?: Reply | 'pending'
+  readonly enroll?: Reply | 'pending'
+  readonly register?: Reply | 'pending'
+  readonly registered?: Reply | 'pending'
 }
 
 export const OPERATOR_NAME = 'Awa Kouadio'
@@ -58,8 +61,41 @@ export const OPERATOR_NAME = 'Awa Kouadio'
 /** Ce que `POST /auth/login` rend au succès, et que l'écran du second facteur doit reporter. */
 export const CHALLENGE = 'un-challenge-de-test-assez-long-pour-passer-la-borne-de-43'
 
+/**
+ * Ce que `POST /auth/mfa/totp/enroll` rend au succès, et que l'écran d'enrôlement montre **une
+ * seule fois**.
+ *
+ * Le secret est le même dans l'URI et dans le champ `secret`, comme le contrat l'exige : deux
+ * valeurs différentes feraient qu'une des deux voies d'enrôlement marcherait et pas l'autre.
+ */
+export const ENROLLMENT_SECRET = 'JBSWY3DPEHPK3PXP'
+
+export const OTPAUTH_URI = `otpauth://totp/SMS%20Gateway:a.kouadio%40example.test?secret=${ENROLLMENT_SECRET}&issuer=SMS%20Gateway&algorithm=SHA1&digits=6&period=30`
+
+export const RECOVERY_CODES = [
+  'a1b2c-3d4e5',
+  'f6g7h-8i9j0',
+  'k1l2m-3n4o5',
+  'p6q7r-8s9t0',
+  'u1v2w-3x4y5',
+  'z6a7b-8c9d0',
+  'e1f2g-3h4i5',
+  'j6k7l-8m9n0',
+  'o1p2q-3r4s5',
+  't6u7v-8w9x0',
+]
+
 export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) {
   let current = outcome
+  /**
+   * Ce que l'enrôlement vient de poser sur le compte, par-dessus ce que le test a déclaré.
+   *
+   * Le serveur le tient, donc le décor aussi : sans cette couche, l'écran d'enrôlement enrôlerait
+   * un facteur que `GET /auth/me` continuerait d'annoncer absent, et la vérification qui suit
+   * relirait « ce compte n'a rien » — l'enchaînement même que la step livre ne serait jamais
+   * observable.
+   */
+  let granted: Partial<SecondFactors> = {}
 
   const fetch = vi.fn(async (request: Request) => {
     const { pathname } = new URL(request.url)
@@ -106,6 +142,52 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
           },
         )
 
+      case 'POST /api/auth/mfa/totp/enroll': {
+        const reply = replies.enroll ?? {
+          status: 200,
+          body: {
+            secret: ENROLLMENT_SECRET,
+            otpauthUri: OTPAUTH_URI,
+            recoveryCodes: RECOVERY_CODES,
+          },
+        }
+        // L'enrôlement **n'élève pas** la session — c'est `POST /auth/mfa/verify` qui le fait, avec
+        // le premier code. Il pose seulement le facteur.
+        if (reply !== 'pending' && reply.status === 200) {
+          granted = { ...granted, totp: true, recoveryCodesRemaining: RECOVERY_CODES.length }
+        }
+
+        return respond(reply)
+      }
+
+      case 'POST /api/auth/mfa/webauthn/register/begin':
+        return respond(
+          replies.register ?? {
+            status: 200,
+            body: {
+              publicKey: {
+                rp: { id: 'exemple.test', name: 'SMS Gateway' },
+                user: {
+                  id: 'dW4tb3BlcmF0ZXVy',
+                  name: 'a.kouadio@example.test',
+                  displayName: 'Awa',
+                },
+                challenge: 'un-defi-d-enregistrement',
+                pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+              },
+            },
+          },
+        )
+
+      case 'POST /api/auth/mfa/webauthn/register/finish': {
+        const reply = replies.registered ?? { status: 200, body: { id: 'une-passkey' } }
+        if (reply !== 'pending' && reply.status === 200) {
+          granted = { ...granted, passkeys: heldPasskeys(outcome) + 1 }
+        }
+
+        return respond(reply)
+      }
+
       case 'GET /api/auth/me':
         if (current === 'pending') return new Promise<Response>(() => undefined)
         if ('status' in current) {
@@ -115,7 +197,9 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
           )
         }
 
-        return Response.json(me(current))
+        return Response.json(
+          me({ ...current, secondFactors: { ...current.secondFactors, ...granted } }),
+        )
 
       default:
         throw new Error(`appel réseau non déclaré : ${route}`)
@@ -133,6 +217,13 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
  */
 function heldPermissions(outcome: SessionOutcome): readonly PermissionKey[] {
   return typeof outcome === 'string' || 'status' in outcome ? [] : outcome.permissions
+}
+
+/** Les clés d'accès déjà détenues, dont l'enregistrement d'une nouvelle part. */
+function heldPasskeys(outcome: SessionOutcome): number {
+  if (typeof outcome === 'string' || 'status' in outcome) return 0
+
+  return outcome.secondFactors?.passkeys ?? 0
 }
 
 function respond(reply: Reply | 'pending') {
