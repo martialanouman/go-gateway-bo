@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { AuthLayout, AuthPending, AuthRefusal } from '~/components/auth-layout'
 import { Button, Field, Input } from '~/components/ui'
-import { api } from '~/lib/api'
+import { api, refusalMessage } from '~/lib/api'
 import { LoginRequest } from '~/lib/contract.gen'
 import { formResolver } from '~/lib/form'
 import { forgetSession, readSession, rememberChallenge, safeDestination } from '~/lib/session'
@@ -175,10 +175,8 @@ function LoginScreen() {
  * revenu.
  */
 function refusalOf(error: unknown, status: number) {
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const { message } = error as { message: unknown }
-    if (typeof message === 'string' && message !== '') return message
-  }
-
-  return `La connexion n’a pas abouti : le tableau de bord n’a pas obtenu de réponse (HTTP ${status}). Réessayez ; si le refus persiste, la passerelle est peut-être en cours de redémarrage.`
+  return refusalMessage(
+    error,
+    `La connexion n’a pas abouti : le tableau de bord n’a pas obtenu de réponse (HTTP ${status}). Réessayez ; si le refus persiste, la passerelle est peut-être en cours de redémarrage.`,
+  )
 }

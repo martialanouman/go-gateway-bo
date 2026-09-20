@@ -153,7 +153,7 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
     return resolu
   })
   await expect(page.locator('.auth__qr')).toHaveCSS('background-color', papier)
-  // Dessiné à sa taille, et non étiré depuis les 128 px du défaut.
+  // Dessiné à sa taille, et non laissé aux 128 px du défaut.
   await expect(page.locator('.auth__qr svg')).toHaveCSS('width', '200px')
 
   // La clé, lue à l'écran comme sur un poste sans caméra.

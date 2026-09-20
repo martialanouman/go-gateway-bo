@@ -73,8 +73,11 @@ function EnrollmentScreen() {
   const queryClient = useQueryClient()
   const explanationId = useId()
 
-  // `browserSupportsWebAuthn` plutôt qu'une sonde maison : la bibliothèque connaît les cas que
-  // `window.PublicKeyCredential !== undefined` manque, et c'est elle qui conduira la cérémonie.
+  // `browserSupportsWebAuthn` plutôt qu'une sonde maison — non qu'elle voie plus de cas : son corps
+  // est `PublicKeyCredential !== undefined && typeof … === 'function'`, mesuré en 13.3.0. Ce qu'elle
+  // apporte est d'être **la** sonde de la bibliothèque qui conduira la cérémonie, et de passer par
+  // `_browserSupportsWebAuthnInternals.stubThis`, le crochet par lequel un test déclare la
+  // plateforme sans remplacer quoi que ce soit du produit.
   const platformKnowsPasskeys = browserSupportsWebAuthn()
 
   /** Le facteur est posé ; c'est l'écran du second facteur qui l'élèvera. */
@@ -190,19 +193,25 @@ function EnrollmentScreen() {
  * La taille du QR, écrite plutôt que laissée au défaut de la bibliothèque.
  *
  * `qrcode.react` dessine 128 px par défaut, soit une vignette qu'une caméra de téléphone rate à
- * distance de lecture confortable. La valeur est ici et non dans la feuille parce que la
- * bibliothèque la porte dans la géométrie du SVG autant que dans ses attributs : la poser en CSS
- * étirerait 128 px au lieu d'en dessiner 200.
+ * distance de lecture confortable.
+ *
+ * `size` n'écrit que les attributs `width` et `height` : la géométrie des deux chemins est en
+ * **unités de module**, et le `viewBox` — ici `0 0 49 49`, 41 modules plus deux fois la zone calme
+ * — la met à l'échelle. Mesuré : à 128 px et à 200 px, le `d` des modules est identique. La valeur
+ * est donc posée ici et non dans la feuille parce que c'est le bouton de la bibliothèque, et que la
+ * taille intrinsèque du SVG doit dire la vérité plutôt que dépendre d'une règle qui ne la nomme pas.
  */
 const QR_SIZE = 200
 
 /**
  * Ce que l'enrôlement vient de rendre, et que **rien ne rendra plus**.
  *
- * Le secret est chiffré au repos et les codes sont hachés : le serveur lui-même ne saurait plus les
- * recomposer. Aucune action « révéler » n'existe donc — invariant (b) —, et aucune route ne les
- * relit. Ils vivent dans l'état de ce composant, le temps de l'écran ; un rechargement les perd, et
- * c'est la propriété qu'on veut, non un effet de bord qu'on tolère.
+ * Les codes sont hachés (`internal/mfa/recovery.go`, argon2id) : irrécupérables, y compris pour le
+ * serveur. La clé, elle, est **chiffrée au repos et non hachée** — `internal/mfa/cipher.go` la
+ * rouvre à chaque vérification TOTP, sans quoi aucun code ne pourrait être vérifié. Ce qui la rend
+ * irréaffichable n'est donc pas la cryptographie mais l'absence de route qui la rende : aucune
+ * action « révéler » n'existe, invariant (b). Ils vivent dans l'état de ce composant, le temps de
+ * l'écran ; un rechargement les perd, et c'est la propriété qu'on veut, non un effet de bord.
  */
 function TotpEnrollment({
   enrollment,
@@ -223,7 +232,7 @@ function TotpEnrollment({
 
   return (
     <AuthLayout
-      intro="L’application d’authentification est enrôlée. Ce que cet écran montre ne sera plus jamais affiché : le secret est chiffré au repos et les codes sont hachés, donc le serveur ne saurait plus les recomposer."
+      intro="L’application d’authentification est enrôlée. Ce que cet écran montre ne sera plus jamais affiché : les codes de récupération sont hachés, donc irrécupérables, et aucune route ne rend une seconde fois la clé."
       title={TITLE}
     >
       {refusal === undefined ? null : <AuthRefusal>{refusal}</AuthRefusal>}

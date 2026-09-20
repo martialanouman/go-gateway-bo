@@ -6,7 +6,7 @@ import { api } from '~/lib/api'
 import { forgetChallenge, forgetSession } from '~/lib/session'
 
 /**
- * La mise en page des deux écrans qui précèdent la session : connexion et second facteur.
+ * La mise en page des trois écrans qui précèdent la session : connexion, enrôlement, second facteur.
  *
  * **Elle n'est pas la coquille, et c'est tout son objet.** Ni rail ni barre supérieure — leurs
  * entrées mèneraient toutes à un refus —, donc pas non plus de lien d'évitement : il n'y a rien à
@@ -78,9 +78,10 @@ export function AuthRefusal({ children }: { readonly children: ReactNode }) {
 }
 
 /**
- * La sortie, présente sur **tous** les états des écrans qui précèdent la session : un opérateur qui
- * s'est trompé de compte, dont le facteur est perdu, ou qui renonce à enrôler, doit pouvoir repartir
- * sans fermer l'onglet.
+ * La sortie des **deux écrans qui suivent la connexion** — enrôlement et second facteur —, sur
+ * chacun de leurs états résolus : un opérateur qui s'est trompé de compte, dont le facteur est
+ * perdu, ou qui renonce à enrôler, doit pouvoir repartir sans fermer l'onglet. L'écran de connexion
+ * ne la porte pas : il n'y a rien à y reprendre.
  *
  * Elle ferme la session côté serveur plutôt que de seulement naviguer : rester connecté au premier
  * facteur après avoir demandé à repartir laisserait un cookie vivant que personne ne croit ouvert.

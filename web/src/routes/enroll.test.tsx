@@ -211,9 +211,9 @@ describe('l’enrôlement d’une application d’authentification', () => {
     await user.click(authenticator())
 
     const svg = await qrCode()
-    // 128 est le défaut de `qrcode.react`, et la bibliothèque le porte dans la géométrie du SVG
-    // autant que dans ces attributs : une taille posée en CSS étirerait 128 px au lieu d'en
-    // dessiner 200.
+    // 128 est le défaut de `qrcode.react`. Ce que `size` écrit est exactement ces deux attributs —
+    // la géométrie des chemins est en unités de module, identique aux deux tailles —, donc ce sont
+    // eux qu'il faut lire, et la seule chose que la mutation « retirer `size` » puisse changer.
     expect(svg.getAttribute('width')).toBe('200')
     expect(svg.getAttribute('height')).toBe('200')
   })
@@ -269,9 +269,10 @@ describe('l’enrôlement d’une application d’authentification', () => {
     await user.click(authenticator())
     await screen.findByText(ENROLLMENT_SECRET)
 
-    // Le refus est réel : Safari et les contextes non sécurisés rendent la permission `denied`, et
-    // un bouton qui ne répond rien laisse croire que la clé est copiée. Or elle ne se réaffichera
-    // jamais.
+    // Le refus est réel : Safari rend la permission `denied` hors d'un geste qu'il reconnaît, et un
+    // bouton qui ne répond rien laisse croire que la clé est copiée. Or elle ne se réaffichera
+    // jamais. Le contexte non sécurisé, lui, ne passe pas par ce chemin — `navigator.clipboard` y
+    // est absent —, et le cockpit n'y tourne pas : son cookie `__Host-` exige `Secure`.
     vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('refusé'))
     await user.click(screen.getByRole('button', { name: 'Copier la clé' }))
 
@@ -299,8 +300,9 @@ describe('l’enrôlement d’une application d’authentification', () => {
     await user.click(authenticator())
     await screen.findByText(RECOVERY_CODES[0] ?? '')
 
-    // Le rechargement, pour de bon : un document neuf, un routeur neuf, et le serveur qui porte
-    // désormais le facteur — exactement ce que produit un F5 après l'enrôlement.
+    // Le rechargement : un arbre neuf, un routeur neuf, et le serveur qui porte désormais le
+    // facteur. Le **document**, lui, survit — et c'est ce qui permet d'interroger ses deux stockages
+    // plus bas, là où un vrai F5 les aurait retrouvés intacts de la même façon.
     cleanup()
     rememberChallenge(CHALLENGE)
     render(

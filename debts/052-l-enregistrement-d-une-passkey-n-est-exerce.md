@@ -16,9 +16,15 @@ Mesuré le 20/09/2026, sur step-028. jsdom n'expose pas `navigator.credentials`,
 n'atteignent que la rédaction française du refus. Le parcours Playwright, lui, passe par TOTP,
 puisque c'est la voie qu'un poste de CI sans authentificateur peut suivre.
 
-    pnpm -C web vitest run --coverage
-    # enroll.tsx — 116-122, 337 : l'appel à register/finish et le retour de `createPasskey`
-    # mfa.tsx    — 297          : le retour d'`assertPasskey`
+    pnpm -C web exec vitest run --coverage
+
+Ni `enroll.tsx` ni `mfa.tsx` n'atteignent 100 % de lignes, et ce qui manque est **nommé** plutôt que
+numéroté — un numéro périme au premier commentaire ajouté, et v8 projette de toute façon
+l'instruction sur la ligne de doc qui la précède. Ce qui reste non couvert :
+
+- dans `enroll.tsx`, l'appel à `POST /auth/mfa/webauthn/register/finish` avec sa rédaction de refus,
+  et le `return await startRegistration(…)` de `createPasskey` ;
+- dans `mfa.tsx`, le `return await startAuthentication(…)` d'`assertPasskey`.
 
 Ce qui la refermerait : un **authentificateur virtuel** posé par CDP dans le parcours Playwright —
 `WebAuthn.enable` puis `WebAuthn.addVirtualAuthenticator` sur une `CDPSession` —, qui fait répondre

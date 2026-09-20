@@ -1,6 +1,6 @@
 # step-028 — Écran d'enrôlement du second facteur
 
-> **Jalon :** M1 (§6.9) · **Statut :** À FAIRE
+> **Jalon :** M1 (§6.9) · **Statut :** FAIT le 20/09/2026
 > **Dépend de :** step-023, step-024, step-027 · **Bloque :** step-029
 
 ## But

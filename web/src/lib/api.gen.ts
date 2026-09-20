@@ -377,9 +377,11 @@ export interface components {
             code?: string;
         };
         /**
-         * @description Rendu **une seule fois**, à l'enrôlement. Aucune route ne le rend ensuite : le secret est
-         *     chiffré au repos et les codes sont hachés, donc le serveur lui-même ne saurait plus les
-         *     recomposer.
+         * @description Rendu **une seule fois**, à l'enrôlement. Aucune route ne le rend ensuite, et c'est la seule
+         *     chose qui rend la clé irréaffichable : elle est chiffrée au repos, non hachée, et
+         *     `internal/mfa/cipher.go` la rouvre à chaque vérification TOTP — sans quoi aucun code ne
+         *     pourrait être vérifié. Les codes de récupération, eux, sont hachés en argon2id : ceux-là, le
+         *     serveur lui-même ne saurait plus les recomposer.
          */
         TotpEnrollment: {
             secret: string;

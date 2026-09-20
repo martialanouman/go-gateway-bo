@@ -131,8 +131,10 @@ function FactorChallenge({
   const form = useForm({ resolver: formResolver(totpAttempt), defaultValues: { code: '' } })
   const explanationId = useId()
 
-  // `browserSupportsWebAuthn` plutôt qu'une sonde maison : la bibliothèque connaît les cas que
-  // `window.PublicKeyCredential !== undefined` manque, et c'est elle qui conduira la cérémonie.
+  // `browserSupportsWebAuthn` plutôt qu'une sonde maison — non qu'elle voie plus de cas : son corps
+  // est `PublicKeyCredential !== undefined && typeof … === 'function'`, mesuré en 13.3.0. Ce qu'elle
+  // apporte est d'être **la** sonde de la bibliothèque qui conduira la cérémonie. Même arbitrage
+  // qu'en `enroll.tsx`, où il est écrit en entier.
   const platformKnowsPasskeys = browserSupportsWebAuthn()
 
   function elevate() {
