@@ -6,10 +6,10 @@
 
 « Celle enregistrée le 12 août » n'est pas un nom. Migration + champ au contrat.
 
-**Le porteur passe de step-028 à step-029 le 21/09/2026**, et la raison est mesurée plutôt que
+**Le porteur passe de step-028 à step-029 le 20/09/2026**, et la raison est mesurée plutôt que
 supposée : un nom ne sert qu'où on l'affiche et où on s'en sert pour retirer. Or `DELETE
 /auth/mfa/webauthn/passkeys/{passkeyId}` **n'a aucun consommateur et aucune step** — vérifié par un
-grep de `tasks/` le 21/09/2026 —, et le périmètre de step-028 ne porte ni inventaire ni retrait :
+grep de `tasks/` le 20/09/2026 —, et le périmètre de step-028 ne porte ni inventaire ni retrait :
 elle livre l'entrée du premier administrateur, pas la gestion de ses facteurs.
 
 C'est la règle que cette dette cite elle-même, tenue pour de bon : « la colonne s'écrira avec la step

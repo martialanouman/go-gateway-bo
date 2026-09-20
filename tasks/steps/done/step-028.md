@@ -18,24 +18,46 @@ permette de l'enrôler.
 - Le chemin de sortie : l'écran conduit à la console, et il est atteignable depuis le login d'un
   opérateur sans facteur (step-027).
 - **Les trois causes du 409 de `POST /auth/mfa/totp/enroll` se distinguent au `code`, pas au statut**
-  (step-035). `mfa_replacement_refused` dit que la preuve présentée a été refusée : l'erreur se pose
-  **sur le champ du code**. `mfa_already_enrolled` dit qu'aucune preuve n'accompagnait la demande, et
+  (step-035). `mfa_already_enrolled` dit qu'aucune preuve n'accompagnait la demande, et
   `mfa_elevation_required` qu'il faut d'abord franchir la clé en place : ces deux-là valent pour
-  l'écran entier. Les confondre répondrait « présentez votre code » à quelqu'un qui vient de le faire.
+  l'écran entier, et le serveur les rédige lui-même — l'écran rend sa phrase, sans en écrire une
+  seconde qui périmerait. **`mfa_replacement_refused` ne peut pas arriver ici**, et la mesure le
+  dit : `internal/bff/mfa.go` ne l'atteint que sous `state.Enrolled && request.Body.Code != nil`, or
+  cet écran poste `{}` et n'enrôle que le **premier** facteur — sa garde renvoie au second facteur
+  dès qu'un facteur est en place. Le champ où poser cette erreur n'existe donc pas non plus : il
+  naîtra avec le formulaire de remplacement, en step-029. Arbitré le 20/09/2026.
 
-### Deux dettes que cette step hérite
+### Deux dettes héritées, et une contractée
 
 *Écrite ici et non seulement dans `steps/done/step-024.md` : une fiche archivée n'est ouverte par
 personne.*
 
 - **Aucune passkey ne porte de nom** — et ce n'est **pas** cette step qui l'écrira. Arbitré le
-  21/09/2026 : un nom ne sert qu'où on l'affiche et où on s'en sert pour retirer, or `DELETE
+  20/09/2026 : un nom ne sert qu'où on l'affiche et où on s'en sert pour retirer, or `DELETE
   /auth/mfa/webauthn/passkeys/{passkeyId}` n'a aucun consommateur ni aucune step, et le périmètre
   ci-dessus ne porte ni inventaire ni retrait. La dette 042 passe à step-029, qui tranchera dans le
   même mouvement que la dette 045. Poser la colonne ici livrerait une donnée sans consommateur.
 - Le serveur accepte TOTP et passkey **à parité** (step-024) : laquelle proposer en premier est une
   décision d'écran, et **la spec la tranche** — §6.9, « WebAuthn/passkey privilégié quand l'appareil
   le supporte ». Dette 043 payée : elle était réputée « écrite nulle part », elle l'était.
+- **Dette 052 contractée** : le **succès** d'une cérémonie WebAuthn n'est exercé nulle part, ni ici
+  ni sur `/mfa`. jsdom n'expose pas `navigator.credentials`, et le parcours Playwright passe par
+  TOTP. Les refus, eux, sont tenus des deux côtés. Portée par step-029, qui touche les passkeys pour
+  elles-mêmes et paiera la mesure d'un coup — un authentificateur virtuel posé par CDP.
+
+### Trois arbitrages tranchés pendant l'écriture
+
+- **L'écran enrôle, il ne vérifie pas.** Ni `POST /auth/mfa/totp/enroll` ni
+  `POST /auth/mfa/webauthn/register/finish` n'élèvent la session : seule `POST /auth/mfa/verify` le
+  fait (`internal/bff/mfa.go`, `Sessions.Elevate`). `/mfa` sait déjà présenter les deux méthodes et
+  rédiger leurs refus — l'indice de dérive d'horloge compris ; `/enroll` y conduit plutôt que d'en
+  écrire une seconde copie. Le périmètre de la step est tenu : le premier code est bien saisi dans
+  le parcours qu'elle livre.
+- **`/enroll` exige le challenge, comme `/mfa`.** Sans lui la vérification qui suit serait refusée,
+  et l'écran aurait montré dix codes irrécupérables avant un cul-de-sac.
+- **Un pas sépare les codes de la sortie** — « J'ai enregistré ces codes ». La vérification les
+  emporte sans retour ; sans ce pas, le bouton qui conduit à la suite est sous les codes dès qu'ils
+  paraissent, et le réflexe l'atteint avant l'œil.
 
 ## Points d'implémentation clés
 - **Le QR de la v1.0 était un carré noir de 176 pixels**, et le parcours qui l'assertait « visible »
@@ -50,7 +72,7 @@ personne.*
   de plateforme doit pouvoir entrer, et la détection de support ne doit jamais retirer la seule
   option restante.
 - **La bibliothèque de QR est déjà installée** — `qrcode.react` 4.2.0, présente et sans aucun usage
-  dans `web/src`. La fiche la disait absente ; vérifié le 21/09/2026.
+  dans `web/src`. La fiche la disait absente ; vérifié le 20/09/2026.
 
 ## Tests (écrits dans la même PR)
 - **Composants (Vitest)** : les états de l'écran, le clavier, la copie, le rappel avant sortie.
@@ -61,12 +83,14 @@ personne.*
   console, sans impasse.
 
 ## Definition of Done
-- [ ] `make check` vert et `make e2e` vert
-- [ ] le parcours du premier administrateur va jusqu'à la console **contre le binaire**
-- [ ] la mutation « rendre le QR à sa taille par défaut » fait rougir — la mutation qui rejoue le
-      défaut réel de la v1.0
-- [ ] la mutation « réafficher les codes de récupération après rechargement » fait rougir
-- [ ] la sortie de la bibliothèque de QR a été **lue** avant que le style soit écrit, et le constat
+- [x] `make check` vert et `make e2e` vert
+- [x] le parcours du premier administrateur va jusqu'à la console **contre le binaire** — il enrôle
+      par l'écran, et lit la clé à l'écran : le décor d'API de step-027 a disparu
+- [x] la mutation « rendre le QR à sa taille par défaut » fait rougir. Et la mutation qui rejoue le
+      **défaut réel** de la v1.0 — une règle `.auth__qr path { fill: … }` qui prend les deux
+      chemins — fait rougir le parcours Playwright, seul endroit où le CSS est appliqué
+- [x] la mutation « réafficher les codes de récupération après rechargement » fait rougir
+- [x] la sortie de la bibliothèque de QR a été **lue** avant que le style soit écrit, et le constat
       figure dans la PR
 
 ## Hors périmètre

@@ -216,7 +216,7 @@ vérifié en inversant une dépendance dans chacun des trois en-têtes.*
 
 - [x] step-027 — Écrans Login & MFA, branchés sur le BFF Go
 - [x] step-049 — Socle de formulaires : React Hook Form, Zod engendré, `Field` en adaptateur ¤
-- [ ] step-028 — Écran d'enrôlement du second facteur
+- [x] step-028 — Écran d'enrôlement du second facteur
 - [ ] step-029 — Gestion des opérateurs et des rôles
 
 ¤ **`step-049` porte un numéro du bloc M2 et se lit ici** — l'ordre de cette liste fait foi. C'est un

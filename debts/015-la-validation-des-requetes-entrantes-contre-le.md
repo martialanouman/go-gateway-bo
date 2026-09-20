@@ -11,7 +11,7 @@ chacune à travers `openapi3filter.ValidateResponse`, et tient un registre qui r
 répond sans que sa réponse ait été confrontée au contrat. Le validateur symétrique du même paquet —
 `ValidateRequest` — n'est appelé nulle part, ni en test ni en production.
 
-## Ce que personne n'applique — mesuré le 21/09/2026
+## Ce que personne n'applique — mesuré le 20/09/2026
 
 Sonde jetable dans `internal/bff`, décodant trois corps dans les types engendrés :
 

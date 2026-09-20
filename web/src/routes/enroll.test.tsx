@@ -344,6 +344,29 @@ describe('l’enrôlement d’une application d’authentification', () => {
 })
 
 describe('l’enregistrement d’une clé d’accès', () => {
+  it('annonce la durée du verrou plutôt que de laisser rouvrir une cérémonie', async () => {
+    // Le compteur porte sur les **appels** et non sur les échecs : chaque ouverture écrit un défi
+    // que rien ne purge, et le seuil est commun à l'enregistrement et à l'assertion. Le refus part
+    // donc avant toute cérémonie, et c'est le serveur qui le rédige.
+    stubWebAuthnSupport(true)
+    const { user } = await visitEnroll({
+      replies: {
+        register: {
+          status: 429,
+          headers: { 'Retry-After': '300' },
+          body: {
+            code: 'too_many_attempts',
+            message: 'Trop de cérémonies ouvertes depuis ce compte : réessayez dans 5 minutes.',
+          },
+        },
+      },
+    })
+
+    await user.click(passkey())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('réessayez dans 5 minutes')
+  })
+
   it('dit en français que la cérémonie n’a pas abouti, plutôt que le message de la bibliothèque', async () => {
     // Le poste **connaît** les clés d'accès ; jsdom n'a pas `navigator.credentials`, donc la
     // cérémonie de la bibliothèque échoue pour de bon.
