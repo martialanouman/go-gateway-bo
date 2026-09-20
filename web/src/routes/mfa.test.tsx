@@ -504,3 +504,35 @@ describe('ce que l’élévation et la sortie laissent derrière', () => {
     expect(await screen.findByLabelText(/Adresse professionnelle/)).toBeInTheDocument()
   })
 })
+
+describe('le refus serveur et ce qu’il décrit', () => {
+  it('disparaît quand la validation cliente prend la main, puis quand le code est corrigé', async () => {
+    const { user } = await visitMfa(
+      { totp: true, passkeys: 0 },
+      {
+        replies: {
+          verify: {
+            status: 401,
+            body: {
+              code: 'invalid_second_factor',
+              message: 'Ce second facteur n’a pas été accepté.',
+            },
+          },
+        },
+      },
+    )
+
+    await user.type(code(), '123456')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('n’a pas été accepté')
+
+    await user.clear(code())
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+
+    expect(screen.queryByText(/n’a pas été accepté/)).toBeNull()
+    expect(code()).toHaveAttribute('aria-invalid', 'true')
+
+    await user.type(code(), '6')
+    expect(screen.queryByText(/Ce code est requis/)).toBeNull()
+  })
+})

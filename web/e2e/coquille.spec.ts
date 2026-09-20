@@ -59,7 +59,7 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // tests la déclaraient verte, et qu'aucun test de composant ne peut voir.
   await page.goto('/')
   await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Connexion au tableau de bord')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Connexion')
   // Hors de la coquille : le squelette du rail a bien cédé, et rien ne l'a remplacé.
   await expect(page.locator('[data-skeleton="rail"]')).toHaveCount(0)
   await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toHaveCount(0)
@@ -289,17 +289,15 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   await blocked.focus()
   await expect(blocked).toBeFocused()
 
-  // **L'astérisque du champ requis**, qui n'est pas une prop mais une conséquence de l'état du
-  // contrôle — donc invisible à jsdom, qui n'applique pas le CSS. C'est ici qu'on vérifie que le
-  // `:has()` trouve sa cible, et que la marque n'est pas annoncée.
-  const required = await page
+  // **Le marqueur porte l'optionnel, et rien d'autre.** La règle s'est inversée : un cockpit
+  // demande presque tous ses champs, donc semer des astérisques fait du bruit sur la règle et du
+  // silence sur l'exception. Vérifié ici et pas en test de composant parce que la disparition de la
+  // marque tenait à une règle CSS — `::after` sur `:has(:required)` —, que jsdom n'applique pas.
+  const marqueDuRequis = await page
     .locator('.ui-field:has(.ui-input:required) .ui-field__label')
     .first()
     .evaluate((element) => getComputedStyle(element, '::after').content)
-  // `'"*" / ""'` et non `toContain('*')` : c'est le ` / ""` — le texte de remplacement **vide** —
-  // qui empêche le lecteur d'écran d'annoncer « étoile » sur chaque libellé de champ requis, et
-  // `toContain('*')` passe quand on le retire.
-  expect(required, "le champ requis ne porte pas sa marque, ou l'annonce").toBe('"*" / ""')
+  expect(marqueDuRequis, 'un champ requis porte encore une marque').toBe('none')
 
   // **Les deux formes de statut ne se confondent pas**, et c'est la règle la plus stricte du
   // système : un disjoncteur ouvert sur un lien vivant et un bind mort demandent des actions

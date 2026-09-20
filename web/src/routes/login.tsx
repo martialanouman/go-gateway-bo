@@ -32,7 +32,7 @@ export const Route = createFileRoute('/login')({
     }
   },
 
-  pendingComponent: () => <AuthPending title="Connexion au tableau de bord" />,
+  pendingComponent: () => <AuthPending title="Connexion" />,
 
   component: LoginScreen,
 })
@@ -106,10 +106,7 @@ function LoginScreen() {
   }
 
   return (
-    <AuthLayout
-      intro="Le tableau de bord ne montre aucun écran sans session : l’adresse et le mot de passe ouvrent le premier facteur, puis un second est demandé."
-      title="Connexion au tableau de bord"
-    >
+    <AuthLayout title="Connexion">
       {login.error === null ? null : <AuthRefusal>{login.error.message}</AuthRefusal>}
 
       {/* `noValidate` : la validation native rendrait ses propres messages, dans la langue du
@@ -124,8 +121,15 @@ function LoginScreen() {
             onChange={(event) => {
               setEmail(event.target.value)
               // Le refus s'efface dès la correction : un message qui survit à ce qu'il reproche
-              // fait douter de tous les autres.
+              // fait douter de tous les autres. La règle vaut pour le refus du **serveur** autant
+              // que pour celui du champ — il refusait des identifiants qui ne sont plus ceux-là.
+              //
+              // **C'est le seul endroit qui l'efface, et il suffit.** Un bandeau n'existe qu'après
+              // un envoi que la validation a laissé passer, donc avec deux champs remplis ; le
+              // vider demande une frappe, qui passe ici. Un second effacement dans `onSubmit` a été
+              // écrit, puis retiré : la mutation qui le supprimait laissait tout vert.
               setMissing((previous) => ({ ...previous, email: undefined }))
+              login.reset()
             }}
             required
             type="email"
@@ -140,6 +144,7 @@ function LoginScreen() {
             onChange={(event) => {
               setPassword(event.target.value)
               setMissing((previous) => ({ ...previous, password: undefined }))
+              login.reset()
             }}
             required
             type="password"

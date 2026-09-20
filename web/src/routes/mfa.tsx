@@ -170,6 +170,7 @@ function FactorChallenge({
               onChange={(event) => {
                 setCode(event.target.value)
                 setMissing(undefined)
+                verify.reset()
               }}
               required
               value={code}

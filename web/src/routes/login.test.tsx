@@ -39,13 +39,13 @@ describe("l'écran de connexion", () => {
   it('énonce ce qu’il demande, sans rail ni barre supérieure', async () => {
     await visitLogin()
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Connexion au tableau de bord',
-    )
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Connexion')
     // Hors de la coquille : aucune entrée de navigation ne mènerait ailleurs qu'à un refus.
     expect(screen.queryByRole('navigation', { name: 'Navigation principale' })).toBeNull()
     expect(email()).toBeRequired()
     expect(password()).toHaveAttribute('type', 'password')
+    // La marque porte l'optionnel, jamais l'obligatoire : aucun de ces deux libellés ne l'annonce.
+    expect(screen.queryByText('(optionnel)')).toBeNull()
   })
 
   it('mène au second facteur et retient le challenge hors de l’URL', async () => {
@@ -263,8 +263,48 @@ describe('l’attente de la garde', () => {
       await screen.findByText('Vérification de la session en cours', undefined, { timeout: 200 }),
     ).toBeInTheDocument()
     expect(document.querySelectorAll('.ui-skeleton').length).toBeGreaterThan(0)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Connexion au tableau de bord',
-    )
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Connexion')
+  })
+})
+
+describe('le refus serveur et ce qu’il décrit', () => {
+  it('disparaît quand la validation cliente prend la main', async () => {
+    // Le refus porte sur des identifiants **envoyés**. Dès qu'un champ manque, l'envoi n'a pas
+    // lieu : le message décrirait alors une requête qui ne correspond plus à ce qui est à l'écran,
+    // et l'opérateur lirait deux diagnostics contradictoires en même temps. Ce qui l'efface est la
+    // frappe qui vide le champ, pas l'envoi — vérifié en retirant chacun des deux.
+    const { user } = await visitLogin('/login', {
+      login: {
+        status: 401,
+        body: { code: 'invalid_credentials', message: 'La connexion a été refusée : …' },
+      },
+    })
+
+    await fillAndSubmit(user)
+    expect(await screen.findByRole('alert')).toHaveTextContent('La connexion a été refusée')
+
+    await user.clear(email())
+    await user.click(submit())
+
+    expect(screen.queryByText(/La connexion a été refusée/)).toBeNull()
+    expect(email()).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('disparaît dès que les identifiants qu’il refusait sont corrigés', async () => {
+    const { user } = await visitLogin('/login', {
+      login: {
+        status: 401,
+        body: { code: 'invalid_credentials', message: 'La connexion a été refusée : …' },
+      },
+    })
+
+    await fillAndSubmit(user)
+    expect(await screen.findByRole('alert')).toHaveTextContent('La connexion a été refusée')
+
+    await user.type(email(), 'x')
+
+    // Un refus qui survit à ce qu'il reproche fait douter de tous les autres — la règle déjà
+    // appliquée champ par champ vaut pour le refus qui les surplombe.
+    expect(screen.queryByText(/La connexion a été refusée/)).toBeNull()
   })
 })

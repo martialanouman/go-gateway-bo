@@ -247,18 +247,19 @@
 }
 
 /*
- * L'astérisque **découle** de l'état du contrôle, il n'est pas déclaré une seconde fois sur le
- * libellé : deux déclarations se contredisent tôt ou tard, et c'est l'ornement qui gagnerait à
- * l'écran pendant que la sémantique dirait l'inverse.
+ * **Le marqueur porte l'optionnel, jamais l'obligatoire.** Un cockpit d'exploitation demande
+ * presque toujours tous ses champs : semer des astérisques partout fait du bruit sur la règle et
+ * du silence sur l'exception. C'est donc l'exception qu'on nomme, et en toutes lettres.
  *
- * `content: '*' / ''` donne au pseudo-élément un texte de remplacement **vide** : la marque est
- * peinte sans être annoncée. Le ` / ''` est la moitié qui compte, et le parcours l'assertit
- * littéralement — chercher seulement l'astérisque laisserait passer sa disparition. `required` sur le
- * contrôle porte déjà l'information pour les technologies d'assistance.
+ * `required` reste posé sur le contrôle — il porte la sémantique pour le navigateur et pour les
+ * technologies d'assistance, et rien ici ne le remplace.
  */
-.ui-field:has(.ui-input:required) .ui-field__label::after {
-  content: "*" / "";
-  color: var(--text-danger);
+.ui-field__optional {
+  margin-left: var(--sp-3);
+  color: var(--text-faint);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
 }
 
 .ui-field__hint {
