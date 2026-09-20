@@ -28,14 +28,14 @@ permette de l'enrôler.
 *Écrite ici et non seulement dans `steps/done/step-024.md` : une fiche archivée n'est ouverte par
 personne.*
 
-- **Aucune passkey ne porte de nom.** step-024 a livré la table sans colonne `name`, délibérément —
-  « la colonne s'écrira avec la step qui saura ce qu'elle doit contenir », comme step-005 l'a fait
-  pour `sessions`. C'est cette step-ci : un opérateur qui détient deux clés doit pouvoir dire laquelle
-  retirer, et « celle enregistrée le 12 août » n'est pas un nom. Cela demande une migration, un champ
-  au contrat sur `finishWebauthnRegistration`, et une opération de renommage — ou le nom posé à
-  l'enregistrement, ce qui évite la seconde route.
+- **Aucune passkey ne porte de nom** — et ce n'est **pas** cette step qui l'écrira. Arbitré le
+  21/09/2026 : un nom ne sert qu'où on l'affiche et où on s'en sert pour retirer, or `DELETE
+  /auth/mfa/webauthn/passkeys/{passkeyId}` n'a aucun consommateur ni aucune step, et le périmètre
+  ci-dessus ne porte ni inventaire ni retrait. La dette 042 passe à step-029, qui tranchera dans le
+  même mouvement que la dette 045. Poser la colonne ici livrerait une donnée sans consommateur.
 - Le serveur accepte TOTP et passkey **à parité** (step-024) : laquelle proposer en premier est une
-  décision de cet écran, et elle n'est écrite nulle part.
+  décision d'écran, et **la spec la tranche** — §6.9, « WebAuthn/passkey privilégié quand l'appareil
+  le supporte ». Dette 043 payée : elle était réputée « écrite nulle part », elle l'était.
 
 ## Points d'implémentation clés
 - **Le QR de la v1.0 était un carré noir de 176 pixels**, et le parcours qui l'assertait « visible »
@@ -49,8 +49,8 @@ personne.*
 - **Passkey d'abord quand l'appareil suit, TOTP toujours disponible** : un poste sans authentificateur
   de plateforme doit pouvoir entrer, et la détection de support ne doit jamais retirer la seule
   option restante.
-- La bibliothèque de QR n'est pas encore installée : sa version se relève **à l'ajout** via `ctx7`,
-  jamais devinée, et son poids se pèse contre le fait qu'elle ne sert qu'un écran.
+- **La bibliothèque de QR est déjà installée** — `qrcode.react` 4.2.0, présente et sans aucun usage
+  dans `web/src`. La fiche la disait absente ; vérifié le 21/09/2026.
 
 ## Tests (écrits dans la même PR)
 - **Composants (Vitest)** : les états de l'écran, le clavier, la copie, le rappel avant sortie.
