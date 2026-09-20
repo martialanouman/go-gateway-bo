@@ -101,6 +101,31 @@ describe('le choix de la voie', () => {
     expect(boutons.indexOf(passkey())).toBeLessThan(boutons.indexOf(authenticator()))
   })
 
+  it('désigne la voie recommandée, et une seule', async () => {
+    stubWebAuthnSupport(true)
+    await visitEnroll()
+
+    // « Privilégié » se lit dans la **variante** autant que dans l'ordre, et le commentaire de
+    // production l'affirme. Sans cette assertion, les deux voies peuvent devenir secondaires : sur
+    // un poste sans authentificateur, la seule voie ouverte ne dirait plus qu'elle est la voie.
+    expect(passkey()).toHaveClass('ui-button--primary')
+    expect(authenticator()).not.toHaveClass('ui-button--primary')
+  })
+
+  it('fait de l’application d’authentification la voie principale quand elle est la seule', async () => {
+    await visitEnroll()
+
+    expect(authenticator()).toHaveClass('ui-button--primary')
+  })
+
+  it('dit ce que l’écran demande et pourquoi', async () => {
+    await visitEnroll()
+
+    expect(
+      screen.getByText(/aucun écran ne s’ouvre tant qu’un second facteur n’est pas posé/),
+    ).toBeVisible()
+  })
+
   it('garde l’application d’authentification offerte sur un poste sans clé d’accès', async () => {
     // jsdom n'implémente pas WebAuthn : c'est le poste sans authentificateur, rien de simulé.
     await visitEnroll()
@@ -130,26 +155,50 @@ describe('la garde de l’enrôlement', () => {
     expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
+  it('ne suit pas une URL de schéma relatif collée dans le paramètre', async () => {
+    // Ici le renvoi part en `href`, donc en **URL brute** et non en chemin routeur : `//ailleurs`
+    // déposerait l'opérateur ailleurs avec la connexion encore en tête. `/mfa` porte le même test,
+    // et chaque copie de la garde veut sa propre mesure.
+    rememberChallenge(CHALLENGE)
+    stubSession({ permissions: [] })
+    const router = createAppRouter(
+      createMemoryHistory({ initialEntries: ['/enroll?redirect=%2F%2Failleurs.example'] }),
+    )
+    render(<RouterProvider router={router} />)
+
+    await screen.findByRole('heading', { level: 1 })
+    expect(router.state.location.href).not.toContain('ailleurs.example')
+  })
+
   it('renvoie à la connexion quand le challenge n’est plus en mémoire', async () => {
     // Sans challenge, la vérification du premier code serait refusée : l'écran enrôlerait un
     // facteur puis déposerait l'opérateur devant un refus certain. C'est ce que produit un
     // rechargement, puisque le challenge ne vit qu'en mémoire.
     stubSession({ permissions: [], elevated: false, secondFactors: { totp: false, passkeys: 0 } })
-    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/enroll'] }))
+    const router = createAppRouter(
+      createMemoryHistory({ initialEntries: ['/enroll?redirect=%2Fbilling'] }),
+    )
     render(<RouterProvider router={router} />)
 
     expect(await screen.findByLabelText(/E-mail/)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
+    expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
   it('renvoie au second facteur quand ce compte en détient déjà un', async () => {
     // Remplacer un facteur en place exige de présenter celui qu'on remplace (`TotpEnrollmentRequest`),
     // et cette step ne présente jamais de preuve : elle n'enrôle que le premier facteur. Le
     // remplacement arrive en step-029.
-    const { router } = await visitEnroll({ factors: { totp: true } })
+    const { router } = await visitEnroll({
+      factors: { totp: true },
+      path: '/enroll?redirect=%2Fbilling',
+    })
 
     expect(screen.getByLabelText(/Code à six chiffres/)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/mfa')
+    // Le cas le plus fréquent du lot : un compte déjà enrôlé qui ouvre un lien profond. Perdre la
+    // destination ici le déposerait sur l'accueil après avoir franchi les deux facteurs.
+    expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
   it('ne redemande rien à une session déjà élevée, et rejoint la destination', async () => {
@@ -172,7 +221,9 @@ describe('la garde de l’enrôlement', () => {
     // une **erreur** sous la forme d'un état vide, que le §1.9 sépare.
     rememberChallenge(CHALLENGE)
     stubSession({ status: 503 })
-    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/enroll'] }))
+    const router = createAppRouter(
+      createMemoryHistory({ initialEntries: ['/enroll?redirect=%2Fbilling'] }),
+    )
     render(<RouterProvider router={router} />)
 
     // L'écran d'erreur est **celui du second facteur**, et c'est ce que la destination prouve : la
@@ -184,6 +235,7 @@ describe('la garde de l’enrôlement', () => {
       'Impossible de vérifier la session',
     )
     expect(screen.getByRole('alert')).toHaveTextContent('GET /api/auth/me · 503')
+    expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 })
 
@@ -236,13 +288,16 @@ describe('l’enrôlement d’une application d’authentification', () => {
     await user.click(authenticator())
 
     expect(await screen.findByText(ENROLLMENT_SECRET)).toBeVisible()
+    expect(screen.getByText(/ne sera plus jamais affiché/)).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: 'Copier la clé' }))
 
     expect(await navigator.clipboard.readText()).toBe(ENROLLMENT_SECRET)
     // Un clic réussi qui ne change rien de perceptible n'est pas un retour : le presse-papiers ne
-    // se relit pas à l'œil.
-    expect(await screen.findByText('Clé copiée.')).toBeInTheDocument()
+    // se relit pas à l'œil. Et le retour est **annoncé** : sans `aria-live`, le texte paraît dans un
+    // élément inerte qu'aucun lecteur d'écran ne relit. WCAG 2.1 AA, 4.1.3.
+    const retour = await screen.findByText('Clé copiée.')
+    expect(retour).toHaveAttribute('aria-live', 'polite')
   })
 
   it('montre les dix codes de récupération, copiables et téléchargeables', async () => {
@@ -319,6 +374,34 @@ describe('l’enrôlement d’une application d’authentification', () => {
     const stockage = JSON.stringify([{ ...localStorage }, { ...sessionStorage }])
     expect(stockage).not.toContain(RECOVERY_CODES[0])
     expect(stockage).not.toContain(ENROLLMENT_SECRET)
+  })
+
+  it('n’emporte pas sur l’écran des codes le refus d’une clé d’accès abandonnée', async () => {
+    // Le cas courant, pas une panne : la fenêtre de la cérémonie se referme, l'opérateur prend la
+    // seconde voie, et elle réussit. Le refus de la première n'a plus aucun objet — le laisser
+    // surplomber l'écran des codes contredirait l'intro juste au-dessus, sur le seul écran qui ne
+    // se réaffiche jamais.
+    stubWebAuthnSupport(true)
+    const { user } = await visitEnroll()
+
+    await user.click(passkey())
+    await screen.findByRole('alert')
+
+    await user.click(authenticator())
+    await screen.findByText(ENROLLMENT_SECRET)
+
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('dit en français que l’enrôlement n’a pas abouti quand le serveur n’a rien rédigé', async () => {
+    const { user } = await visitEnroll({ replies: { enroll: { status: 502 } } })
+
+    await user.click(authenticator())
+
+    const refus = await screen.findByRole('alert')
+    expect(refus).toHaveTextContent('HTTP 502')
+    // Le statut seul passerait aussi bien sur une phrase anglaise : c'est la rédaction qu'on tient.
+    expect(refus).toHaveTextContent(/n’a pas abouti/)
   })
 
   it('rend le refus du serveur quand un facteur a été posé entre-temps', async () => {

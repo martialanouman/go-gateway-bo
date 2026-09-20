@@ -26,6 +26,14 @@ l'instruction sur la ligne de doc qui la précède. Ce qui reste non couvert :
   et le `return await startRegistration(…)` de `createPasskey` ;
 - dans `mfa.tsx`, le `return await startAuthentication(…)` d'`assertPasskey`.
 
+La revue de mutation de step-028 l'a mesuré autrement, et plus durement : remplacer **tout** le corps
+du `case 'POST /api/auth/mfa/webauthn/register/finish'` du décor par un `throw` laisse la suite
+verte — aucun test n'atteint cette route. Dans la foulée, deux retraits restent verts eux aussi : le
+`onSuccess: verifyNewFactor` de la mutation `register` (un opérateur qui enregistre une clé resterait
+sur l'écran d'enrôlement, sans savoir que son facteur est posé et sans chemin vers la vérification),
+et la ligne du décor qui pose `passkeys + 1`. C'est la voie que le §6.9 **recommande** quand
+l'appareil la supporte.
+
 Ce qui la refermerait : un **authentificateur virtuel** posé par CDP dans le parcours Playwright —
 `WebAuthn.enable` puis `WebAuthn.addVirtualAuthenticator` sur une `CDPSession` —, qui fait répondre
 Chromium à `navigator.credentials.create()` et `.get()` sans matériel. Une seule dépense couvre les

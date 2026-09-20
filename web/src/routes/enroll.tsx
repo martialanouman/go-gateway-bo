@@ -127,13 +127,16 @@ function EnrollmentScreen() {
     onSuccess: verifyNewFactor,
   })
 
-  const refusal = enroll.error?.message ?? register.error?.message
-
+  // **L'écran des codes ne porte aucun refus, et ce n'est pas un oubli.** `enroll.error` et
+  // `enroll.data` s'excluent, et cet écran-là n'offre plus la voie de la clé d'accès : un refus
+  // qui y paraîtrait serait forcément celui d'une cérémonie abandonnée **avant** l'enrôlement qui
+  // vient de réussir. Il contredirait l'intro juste au-dessus, sur le seul écran qui ne se
+  // réaffiche jamais. Mesuré : il s'y affichait.
   if (enroll.data !== undefined) {
-    return (
-      <TotpEnrollment enrollment={enroll.data} onAcknowledged={verifyNewFactor} refusal={refusal} />
-    )
+    return <TotpEnrollment enrollment={enroll.data} onAcknowledged={verifyNewFactor} />
   }
+
+  const refusal = enroll.error?.message ?? register.error?.message
 
   return (
     <AuthLayout
@@ -216,7 +219,6 @@ const QR_SIZE = 200
 function TotpEnrollment({
   enrollment,
   onAcknowledged,
-  refusal,
 }: {
   readonly enrollment: {
     readonly secret: string
@@ -224,7 +226,6 @@ function TotpEnrollment({
     readonly recoveryCodes: readonly string[]
   }
   readonly onAcknowledged: () => void
-  readonly refusal: string | undefined
 }) {
   const [acknowledged, setAcknowledged] = useState(false)
   const codesId = useId()
@@ -235,8 +236,6 @@ function TotpEnrollment({
       intro="L’application d’authentification est enrôlée. Ce que cet écran montre ne sera plus jamais affiché : les codes de récupération sont hachés, donc irrécupérables, et aucune route ne rend une seconde fois la clé."
       title={TITLE}
     >
-      {refusal === undefined ? null : <AuthRefusal>{refusal}</AuthRefusal>}
-
       <div className="auth__qr">
         <QRCodeSVG
           // Les quatre modules de zone calme que la spécification du QR exige, posés par la

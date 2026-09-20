@@ -156,6 +156,12 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // Dessiné à sa taille, et non laissé aux 128 px du défaut.
   await expect(page.locator('.auth__qr svg')).toHaveCSS('width', '200px')
 
+  // **Les dix codes tiennent sur deux colonnes**, et c'est la seule propriété de cette liste qui
+  // porte une décision : en une seule colonne la carte dépasse l'écran, et le rappel « Quitter cet
+  // écran sans les avoir enregistrés les perd » sort du champ de vision au moment même où il sert.
+  // Aucune porte ne voit les règles `.auth__` — `classes-peintes.test.ts` ne lit que les `ui-`.
+  await expect(page.locator('.auth__codes')).toHaveCSS('grid-template-columns', /\S+ \S+/)
+
   // La clé, lue à l'écran comme sur un poste sans caméra.
   const secret = (await page.locator('.auth__secret').innerText()).trim()
   expect(secret, 'la clé d’enrôlement n’est pas affichée').not.toBe('')

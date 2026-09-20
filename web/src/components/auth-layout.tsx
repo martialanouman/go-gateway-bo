@@ -92,7 +92,13 @@ export function RestartLogin() {
 
   const restart = useMutation({
     mutationFn: async () => {
-      await api.POST('/auth/logout')
+      const { response } = await api.POST('/auth/logout')
+      // **Le refus est représenté, et c'est ce qui rend la ligne suivante vraie.** openapi-fetch ne
+      // lève pas sur un 500 : il rend `{ data, error, response }`. Sans ce `throw`, la mutation
+      // réussissait toujours, `onSuccess` aurait suffi, et l'échec que le commentaire ci-dessous
+      // dit couvrir n'existait dans aucun état observable. Mesuré : `onSettled` et le `throw`
+      // retirés **séparément** laissent la suite verte ; ensemble, elle rougit.
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
     },
     onSettled: () => {
       // `onSettled` et non `onSuccess` : si la déconnexion échoue, rester bloqué ici serait le
