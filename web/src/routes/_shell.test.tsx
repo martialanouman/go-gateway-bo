@@ -1,6 +1,7 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forgetChallenge, rememberChallenge } from '~/lib/session'
 import { createAppRouter } from '~/router'
 import { CHALLENGE, type SessionOutcome, stubSession } from '../../test/session'
@@ -76,5 +77,51 @@ describe('la garde de session de la coquille', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Impossible de vérifier la session',
     )
+  })
+})
+
+describe('« Réessayer » après une panne de session', () => {
+  it('rejoue la garde, et ne peint pas la coquille pour une session non élevée', async () => {
+    // La garde a laissé passer parce que le BFF ne répondait pas — une panne dégrade, elle ne
+    // déconnecte pas. Quand il répond de nouveau, la session s'avère **non élevée** : relire la
+    // seule requête peindrait le rail et la barre, et chaque appel gardé rendrait alors 403. C'est
+    // mot pour mot le « cockpit qui paraît ouvert et ne répond à rien » que la garde refuse.
+    rememberChallenge(CHALLENGE)
+    let enPanne = true
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (request: Request) => {
+        const { pathname } = new URL(request.url)
+        if (pathname !== '/api/auth/me') throw new Error(`appel non déclaré : ${pathname}`)
+        if (enPanne) {
+          return Response.json({ code: 'test', message: 'Panne.' }, { status: 503 })
+        }
+
+        return Response.json({
+          operator: {
+            id: '01960000-0000-7000-8000-000000000001',
+            email: 'a@b.test',
+            displayName: 'Awa',
+          },
+          permissions: [],
+          elevated: false,
+          secondFactors: { totp: true, recoveryCodesRemaining: 10, passkeys: 0 },
+          absoluteExpiresAt: '2026-09-17T20:00:00Z',
+        })
+      }),
+    )
+
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/billing'] }))
+    render(<RouterProvider router={router} />)
+
+    const alerte = await screen.findByRole('alert')
+    expect(alerte).toHaveTextContent('GET /api/auth/me · 503')
+
+    enPanne = false
+    await userEvent.setup().click(within(alerte).getByRole('button', { name: 'Réessayer' }))
+
+    await screen.findByRole('heading', { level: 1, name: /Second facteur/ })
+    expect(router.state.location.pathname).toBe('/mfa')
+    expect(screen.queryByRole('navigation', { name: 'Navigation principale' })).toBeNull()
   })
 })

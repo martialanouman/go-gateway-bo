@@ -4,7 +4,7 @@ import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { type FormEvent, useId, useState } from 'react'
 import { AuthLayout, AuthPending, AuthRefusal } from '~/components/auth-layout'
 import { Button, Field, Input } from '~/components/ui'
-import { api, meQueryOptions } from '~/lib/api'
+import { api, HttpError, meQueryOptions } from '~/lib/api'
 import {
   forgetChallenge,
   forgetSession,
@@ -55,47 +55,44 @@ export const Route = createFileRoute('/mfa')({
  * dérivé n'a plus aucune piste.
  */
 const CLOCK_HINT =
-  'Si le code est refusé plusieurs fois de suite, vérifiez l’heure de l’application d’authentification : un appareil qui a dérivé de plus de trente secondes produit des codes que le serveur refuse.'
+  'Si le code est refusé plusieurs fois de suite, vérifiez l’heure de l’application d’authentification : le serveur tolère environ une minute d’écart, et refuse les codes au-delà.'
 
 function SecondFactorScreen() {
   const { redirect: destination } = Route.useSearch()
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const { data: me } = useQuery(meQueryOptions)
+  const me = useQuery(meQueryOptions)
 
-  const factors = me?.secondFactors
-  // La garde a déjà résolu la session : `factors` est renseigné dès le premier rendu. Le repli
-  // n'ouvre rien — il conduit à l'état d'enrôlement, qui est une impasse nommée, jamais un
-  // challenge qu'on ne pourrait pas franchir.
-  const holdsTotp = factors?.totp === true
-  const holdsPasskey = (factors?.passkeys ?? 0) > 0
+  // **Pas de lecture optionnelle ici, et c'est tout le correctif.** La garde laisse passer une
+  // session que le BFF n'a pas su rendre — `kind: 'unknown'` — parce qu'une panne dégrade sans
+  // déconnecter, invariant (e). Lus à travers un `?.`, les facteurs d'une telle session valaient
+  // « aucun », et l'écran annonçait à un opérateur parfaitement enrôlé qu'il n'avait rien : une
+  // panne rendue comme un état **vide**, que le §1.9 sépare précisément d'un état d'erreur.
+  //
+  // Les deux causes se séparent donc avant d'être lues, et le produit n'affirme plus rien qu'il ne
+  // sache.
+  if (me.data === undefined) {
+    return <SessionUnreadable error={me.error} onRetry={() => void me.refetch()} />
+  }
 
-  if (!holdsTotp && !holdsPasskey) return <NoFactorEnrolled />
+  const { totp, passkeys } = me.data.secondFactors
+  if (!totp && passkeys === 0) return <NoFactorEnrolled />
 
-  return (
-    <FactorChallenge
-      destination={destination}
-      holdsPasskey={holdsPasskey}
-      holdsTotp={holdsTotp}
-      router={router}
-      queryClient={queryClient}
-    />
-  )
+  return <FactorChallenge destination={destination} holdsPasskey={passkeys > 0} holdsTotp={totp} />
 }
 
 function FactorChallenge({
   destination,
   holdsTotp,
   holdsPasskey,
-  router,
-  queryClient,
 }: {
   readonly destination: string | undefined
   readonly holdsTotp: boolean
   readonly holdsPasskey: boolean
-  readonly router: ReturnType<typeof useRouter>
-  readonly queryClient: ReturnType<typeof useQueryClient>
 }) {
+  // Les deux hooks sont lus ici plutôt que passés en props par le parent : `RestartLogin` le fait
+  // déjà dans ce fichier, et un hook qui traverse une frontière de composant se redéclare dans sa
+  // signature de type pour ne rien apporter.
+  const router = useRouter()
+  const queryClient = useQueryClient()
   const [code, setCode] = useState('')
   const [missing, setMissing] = useState<string | undefined>(undefined)
   const explanationId = useId()
@@ -174,7 +171,6 @@ function FactorChallenge({
                 setCode(event.target.value)
                 setMissing(undefined)
               }}
-              pattern="[0-9]*"
               required
               value={code}
             />
@@ -192,6 +188,7 @@ function FactorChallenge({
             {...(platformKnowsPasskeys
               ? { blocked: false as const }
               : { blocked: true as const, 'aria-describedby': explanationId })}
+            loading={verify.isPending}
             onClick={() => verify.mutate({ method: 'webauthn' })}
             variant="secondary"
           >
@@ -214,6 +211,39 @@ function FactorChallenge({
 }
 
 /**
+ * Ce que voit un opérateur quand le BFF n'a pas rendu sa session.
+ *
+ * L'état **erreur** et non l'état vide : le §1.9 les sépare parce qu'ils appellent des gestes
+ * opposés — un module éteint ne reviendra pas, une panne se réessaie. Il dit la réalité HTTP, garde
+ * « Réessayer » sous la main, et n'affirme rien des facteurs que ce compte détient.
+ *
+ * Ce n'est pas un `ErrorState` : celui-là promet « vos données locales restent affichées », et il
+ * n'y a ici aucune donnée locale — l'écran n'a jamais rien ouvert.
+ */
+function SessionUnreadable({
+  error,
+  onRetry,
+}: {
+  readonly error: unknown
+  readonly onRetry: () => void
+}) {
+  const status = error instanceof HttpError ? String(error.status) : 'réseau'
+
+  return (
+    <AuthLayout
+      intro="Le tableau de bord n’a pas obtenu de réponse du serveur : il ne sait donc pas quels seconds facteurs ce compte détient, et n’en propose aucun plutôt que d’en supposer un."
+      title="Impossible de vérifier la session"
+    >
+      <AuthRefusal>{`GET /api/auth/me · ${status}`}</AuthRefusal>
+      <Button onClick={onRetry} variant="primary">
+        Réessayer
+      </Button>
+      <RestartLogin />
+    </AuthLayout>
+  )
+}
+
+/**
  * Ce que voit un opérateur dont aucun second facteur n'est enrôlé.
  *
  * `POST /auth/login` rend un challenge **sans regarder** ce qui est enrôlé (`internal/auth`,
@@ -223,11 +253,10 @@ function FactorChallenge({
  */
 function NoFactorEnrolled() {
   return (
-    <AuthLayout title="L’enrôlement du second facteur n’est pas encore livré">
-      <p className="auth__intro">
-        Ce compte n’a ni application d’authentification ni clé d’accès, et la session en reste au
-        premier facteur : aucun écran ne s’ouvre tant que le second n’est pas franchi.
-      </p>
+    <AuthLayout
+      intro="Ce compte n’a ni application d’authentification ni clé d’accès, et la session en reste au premier facteur : aucun écran ne s’ouvre tant que le second n’est pas franchi."
+      title="L’enrôlement du second facteur n’est pas encore livré"
+    >
       <p className="auth__aside">
         L’écran d’enrôlement arrive avec step-028, au jalon M1. D’ici là, un administrateur peut
         poser un second facteur sur ce compte.
@@ -269,7 +298,7 @@ function RestartLogin() {
 }
 
 const CHALLENGE_LOST =
-  'Cette vérification a expiré : le challenge ouvert par la connexion n’est plus en mémoire. Reprenez la connexion.'
+  'Cette vérification a expiré : ce que la connexion avait ouvert n’est plus en mémoire. Reprenez la connexion.'
 
 /** Ce que `navigator.credentials.get()` produit, transmis **tel quel** au BFF. */
 async function assertPasskey() {
@@ -309,7 +338,24 @@ const CEREMONY_ABANDONED =
 function refusalOf(error: unknown, status: number, method: 'totp' | 'webauthn') {
   const fromServer = messageOf(error, status)
 
-  return method === 'totp' ? `${fromServer} ${CLOCK_HINT}` : fromServer
+  // La **cause** autant que la méthode. Conditionné au seul chemin TOTP, l'indice se collait aussi
+  // au verrouillage et à la panne — « réessayez dans cinq minutes » suivi de « vérifiez l'heure de
+  // votre téléphone », qui n'y est pour rien. C'est l'autre moitié de ce que step-035 a retiré du
+  // serveur : `invalid_second_factor` y servait des causes qu'il ne décrivait pas autant que des
+  // méthodes qu'il ne décrivait pas.
+  if (method !== 'totp' || codeOf(error) !== 'invalid_second_factor') return fromServer
+
+  return `${fromServer} ${CLOCK_HINT}`
+}
+
+/** Le `code` du DTO `Error`, qui se grep dans les journaux et ne se traduit pas. */
+function codeOf(error: unknown) {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const { code } = error as { code: unknown }
+    if (typeof code === 'string') return code
+  }
+
+  return undefined
 }
 
 function messageOf(error: unknown, status: number) {

@@ -46,8 +46,10 @@ export const Route = createFileRoute('/login')({
  * « le champ `errors[]` que le §1.4 annonce arrive avec la première route qui relaie la passerelle
  * (step-060) ».
  *
- * L'écart est sans conséquence ici, et c'est la seconde raison de ne pas l'attendre : les deux
- * refus du premier facteur — 401 et 429 — sont **globaux par conception**. Le serveur se tait sur
+ * L'écart est sans conséquence ici, et c'est la seconde raison de ne pas l'attendre : les refus
+ * que cette route rend à un formulaire **rempli** — 401 et 429 — sont globaux par conception.
+ * (Elle en déclare six en tout ; les quatre autres — 400, 403, 415, 503 — ne nomment pas davantage
+ * un champ.) Le serveur se tait sur
  * lequel des deux champs a manqué, puisque le dire nommerait les adresses qui existent. Il ne
  * remplira donc jamais `errors[]` sur cette route, et ce qui reste à dire champ par champ est ce
  * que le client sait seul : un champ vide.

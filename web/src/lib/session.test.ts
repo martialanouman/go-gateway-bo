@@ -16,6 +16,14 @@ describe('la destination rejouée après la connexion', () => {
     expect(safeDestination('/\\ailleurs.example/moisson')).toBeUndefined()
   })
 
+  it('refuse un blanc ou une contre-oblique glissés plus loin dans la valeur', () => {
+    // `/\n//ailleurs.example` ne commence ni par `//` ni par `/\` : il traversait les deux premiers
+    // refus. Le routeur ne gardait alors que le chemin — mesuré — mais le plafond était chez lui.
+    expect(safeDestination('/\n//ailleurs.example')).toBeUndefined()
+    expect(safeDestination('/billing\\..\\ailleurs')).toBeUndefined()
+    expect(safeDestination('/ bil ling')).toBeUndefined()
+  })
+
   it('refuse ce qui n’est pas un chemin absolu de ce site', () => {
     expect(safeDestination('https://ailleurs.example')).toBeUndefined()
     expect(safeDestination('javascript:alert(1)')).toBeUndefined()

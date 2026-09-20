@@ -35,10 +35,16 @@ export type Reply = {
   readonly headers?: Record<string, string>
 }
 
+/**
+ * `'pending'` : la requête **ne répond jamais**. C'est le serveur lent, seul état où l'on peut
+ * observer ce qu'un écran fait pendant qu'il attend — un double-clic, un bouton qui ne s'annonce
+ * pas occupé. En jsdom, une cérémonie WebAuthn échoue en une microtâche, et la fenêtre où le défaut
+ * vit n'existe tout simplement pas.
+ */
 export type AuthReplies = {
-  readonly login?: Reply
-  readonly verify?: Reply
-  readonly assert?: Reply
+  readonly login?: Reply | 'pending'
+  readonly verify?: Reply | 'pending'
+  readonly assert?: Reply | 'pending'
 }
 
 export const OPERATOR_NAME = 'Awa Kouadio'
@@ -67,15 +73,16 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
         // Le premier facteur ouvre la session **sans** l'élever, comme le serveur : c'est ce qui
         // rend observable qu'un écran de la coquille renvoie au second facteur plutôt qu'à la
         // connexion.
-        if (reply.status === 200)
+        if (reply !== 'pending' && reply.status === 200) {
           current = { permissions: heldPermissions(outcome), elevated: false }
+        }
 
         return respond(reply)
       }
 
       case 'POST /api/auth/mfa/verify': {
         const reply = replies.verify ?? { status: 204 }
-        if (reply.status === 204) {
+        if (reply !== 'pending' && reply.status === 204) {
           current = { permissions: heldPermissions(outcome), elevated: true }
         }
 
@@ -119,7 +126,10 @@ function heldPermissions(outcome: SessionOutcome): readonly PermissionKey[] {
   return typeof outcome === 'string' || 'status' in outcome ? [] : outcome.permissions
 }
 
-function respond({ status, body, headers }: Reply) {
+function respond(reply: Reply | 'pending') {
+  if (reply === 'pending') return new Promise<Response>(() => undefined)
+
+  const { status, body, headers } = reply
   if (body === undefined) return new Response(null, { headers, status })
 
   return Response.json(body, { headers, status })

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { EmptyState, ErrorState, LoadingState, Skeleton, ToastStack } from '~/components/ui'
 import { HttpError, isUnauthenticated, meQueryOptions } from '~/lib/api'
@@ -39,6 +39,7 @@ export function ShellPending() {
  */
 export function Shell({ children }: { readonly children: ReactNode }) {
   const me = useQuery(meQueryOptions)
+  const router = useRouter()
 
   if (isUnauthenticated(me.error)) {
     return (
@@ -83,7 +84,11 @@ export function Shell({ children }: { readonly children: ReactNode }) {
       <Frame>
         <ErrorState
           description="Le tableau de bord n’a pas pu vérifier la session ; aucun écran ne s’ouvre sans elle."
-          onRetry={() => void me.refetch()}
+          // `router.invalidate()` et non `me.refetch()` : ce qu'il faut rejouer est la **garde**,
+          // pas la seule requête. Une relecture réussie peut rendre une session **non élevée**, et
+          // la coquille se peignait alors tout entière — `beforeLoad` ne se rejoue pas de lui-même
+          // — pour un cockpit dont chaque appel gardé rendrait 403. La garde, elle, tranche.
+          onRetry={() => void router.invalidate()}
           request={`GET /api/auth/me · ${status}`}
           // Le titre par défaut accuse l'API Admin ; c'est le BFF qui répond à `/auth/me`.
           title="Impossible de vérifier la session"

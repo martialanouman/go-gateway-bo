@@ -270,3 +270,137 @@ describe('l’indice d’horloge et la clé d’accès', () => {
     expect(refus).not.toHaveTextContent(/heure/i)
   })
 })
+
+describe('quand le BFF ne rend pas la session', () => {
+  it('dit la panne et la réessaie, au lieu d’annoncer un compte sans second facteur', async () => {
+    // La garde laisse passer une session illisible — une panne dégrade, elle ne déconnecte pas.
+    // L'écran ne doit rien affirmer des facteurs qu'il n'a pas pu lire : annoncer « aucun facteur »
+    // à un opérateur parfaitement enrôlé rend une **erreur** sous la forme d'un état **vide**, que
+    // le §1.9 sépare précisément.
+    rememberChallenge(CHALLENGE)
+    stubSession({ status: 503 })
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/mfa'] }))
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+      'Impossible de vérifier la session',
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('GET /api/auth/me · 503')
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeVisible()
+
+    // Et surtout : pas un mot sur ce que ce compte détient.
+    expect(screen.queryByText(/n’a ni application d’authentification/)).toBeNull()
+    expect(screen.queryByText(/step-028/)).toBeNull()
+    // La sortie reste, comme sur les autres états.
+    expect(screen.getByRole('button', { name: 'Reprendre la connexion' })).toBeVisible()
+  })
+
+  it('relit la session quand l’opérateur réessaie, et reprend le challenge', async () => {
+    rememberChallenge(CHALLENGE)
+    let enPanne = true
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (request: Request) => {
+        const { pathname } = new URL(request.url)
+        if (pathname !== '/api/auth/me') throw new Error(`appel non déclaré : ${pathname}`)
+        if (enPanne) return Response.json({ code: 't', message: 'Panne.' }, { status: 503 })
+
+        return Response.json({
+          operator: {
+            id: '01960000-0000-7000-8000-000000000001',
+            email: 'a@b.test',
+            displayName: 'Awa',
+          },
+          permissions: [],
+          elevated: false,
+          secondFactors: { totp: true, recoveryCodesRemaining: 10, passkeys: 0 },
+          absoluteExpiresAt: '2026-09-17T20:00:00Z',
+        })
+      }),
+    )
+
+    render(
+      <RouterProvider
+        router={createAppRouter(createMemoryHistory({ initialEntries: ['/mfa'] }))}
+      />,
+    )
+    await screen.findByRole('button', { name: 'Réessayer' })
+
+    enPanne = false
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Réessayer' }))
+
+    // La panne levée, l'écran reprend son office : le challenge, et non l'annonce d'un compte nu.
+    expect(await screen.findByLabelText(/Code à six chiffres/)).toBeInTheDocument()
+  })
+})
+
+describe('l’indice d’horloge et la cause du refus', () => {
+  it('ne suit pas un verrouillage : l’horloge n’y est pour rien', async () => {
+    const { user } = await visitMfa(
+      { totp: true, passkeys: 0 },
+      {
+        replies: {
+          verify: {
+            status: 429,
+            body: {
+              code: 'too_many_attempts',
+              message:
+                'Le second facteur est temporairement bloqué après plusieurs essais : réessayez dans 5 minutes.',
+            },
+          },
+        },
+      },
+    )
+
+    await user.type(code(), '123456')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+
+    const refus = await screen.findByRole('alert')
+    expect(refus).toHaveTextContent('réessayez dans 5 minutes')
+    // « Vérifiez l'heure de votre téléphone » après « attendez cinq minutes » envoie régler une
+    // horloge qui n'est pas en cause.
+    expect(refus).not.toHaveTextContent(/heure/i)
+  })
+
+  it('ne suit pas une panne muette', async () => {
+    const { user } = await visitMfa(
+      { totp: true, passkeys: 0 },
+      { replies: { verify: { status: 502 } } },
+    )
+
+    await user.type(code(), '123456')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+
+    const refus = await screen.findByRole('alert')
+    expect(refus).toHaveTextContent('HTTP 502')
+    expect(refus).not.toHaveTextContent(/heure/i)
+  })
+})
+
+describe('la cérémonie de clé d’accès, une à la fois', () => {
+  it('s’annonce occupée, plutôt que d’en ouvrir une par clic', async () => {
+    // Chaque ouverture écrit un défi côté serveur, et la dernière périme les précédentes : une
+    // cérémonie que l'opérateur validait échouerait alors sans qu'aucun écran ne le nomme.
+    stubWebAuthnSupport(true)
+    // L'ouverture reste **en vol** : c'est le serveur lent, et la seule fenêtre où le défaut vit.
+    // En jsdom la cérémonie échoue en une microtâche, donc un décor qui répond ne laisse rien voir.
+    const { user } = await visitMfa(
+      { totp: false, passkeys: 1 },
+      { replies: { assert: 'pending' } },
+    )
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+
+    const bouton = screen.getByRole('button', { name: /clé d’accès/i })
+    await user.click(bouton)
+
+    expect(bouton).toHaveAttribute('aria-busy', 'true')
+
+    await user.click(bouton)
+    await user.click(bouton)
+
+    const ouvertures = fetch.mock.calls.filter(([request]) =>
+      request.url.endsWith('/api/auth/mfa/webauthn/assert/begin'),
+    )
+    expect(ouvertures).toHaveLength(1)
+  })
+})

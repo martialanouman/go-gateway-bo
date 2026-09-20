@@ -49,6 +49,13 @@ export function forgetSession(queryClient: QueryClient) {
 export function safeDestination(raw: unknown): string | undefined {
   if (typeof raw !== 'string' || !raw.startsWith('/')) return undefined
   if (raw.startsWith('//') || raw.startsWith('/\\')) return undefined
+  // Un blanc ou une contre-oblique **ailleurs** dans la valeur : `/\n//ailleurs.example` ne
+  // commence ni par `//` ni par `/\`, et traversait donc les deux lignes au-dessus. Ce n'est pas
+  // une redirection ouverte aujourd'hui — le routeur ne garde que le chemin de l'URL qu'il
+  // construit, mesuré — mais le plafond est alors **chez lui** et non ici. Le jour où cette valeur
+  // alimente un `<a href>`, un rechargement de document ou une redirection serveur, elle redevient
+  // un hameçon. Cette fonction promet une adresse de ce tableau de bord ; elle le tient seule.
+  if (/[\s\\]/.test(raw)) return undefined
 
   return raw
 }
