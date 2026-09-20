@@ -3,12 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useId } from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
 import { AuthLayout, AuthPending, AuthRefusal, RestartLogin } from '~/components/auth-layout'
 import { Button, Field, Input } from '~/components/ui'
-import { api, HttpError, meQueryOptions, refusalCode, refusalMessage } from '~/lib/api'
-import { MfaVerification } from '~/lib/contract.gen'
+import { api, HttpError, meQueryOptions } from '~/lib/api'
 import { formResolver } from '~/lib/form'
+import { CHALLENGE_LOST, totpAttempt, verificationRefusal } from '~/lib/second-factor'
 import {
   forgetChallenge,
   forgetSession,
@@ -59,38 +58,6 @@ export const Route = createFileRoute('/mfa')({
 
   pendingComponent: () => <AuthPending title="Second facteur" />,
   component: SecondFactorScreen,
-})
-
-/**
- * L'indice que `step-035` a retiré du serveur.
- *
- * `invalid_second_factor` sert les trois méthodes — TOTP, code de récupération, clé d'accès — et
- * disait « vérifier l'heure de l'application d'authentification » à qui venait de présenter une
- * clé. Le serveur ne le dit donc plus. **Cet écran-ci sait quelle méthode il présente**, et c'est
- * ce qui lui permet de le dire sans mentir : sans cette reprise, un opérateur dont le téléphone a
- * dérivé n'a plus aucune piste.
- */
-const CLOCK_HINT =
-  'Si le code est refusé plusieurs fois de suite, vérifiez l’heure de l’application d’authentification : le serveur tolère environ une minute d’écart, et refuse les codes au-delà.'
-
-/**
- * Ce que le formulaire du code oppose à la saisie.
- *
- * `.unwrap()` parce que le contrat déclare `code` **facultatif** : une assertion de clé d'accès n'en
- * porte aucun, et le serveur exige l'un ou l'autre selon la méthode. Ce formulaire-ci ne présente
- * que la voie TOTP, où le code est requis — c'est l'écran qui le sait, pas le contrat.
- *
- * Les bornes, elles, restent celles du contrat : `minLength: 1`, `maxLength: 64`. **Rien ici
- * n'exige six chiffres** : le `maxLength` du champ borne la saisie en haut, et le schéma se
- * contente d'un caractère. C'est délibéré — un code de récupération en fait onze, et step-028
- * ouvrira cette voie dans le même formulaire ; un `length(6)` écrit aujourd'hui serait à défaire.
- */
-const totpAttempt = z.object({
-  code: z
-    .string()
-    .trim()
-    .min(1, 'Saisissez le code à six chiffres.')
-    .pipe(MfaVerification.shape.code.unwrap()),
 })
 
 function SecondFactorScreen() {
@@ -165,7 +132,7 @@ function FactorChallenge({
             }
 
       const { error, response } = await api.POST('/auth/mfa/verify', { body })
-      if (!response.ok) throw new Error(refusalOf(error, response.status, attempt.method))
+      if (!response.ok) throw new Error(verificationRefusal(error, response.status, attempt.method))
     },
     onSuccess: elevate,
   })
@@ -269,13 +236,10 @@ function SessionUnreadable({ error }: { readonly error: unknown }) {
   )
 }
 
-const CHALLENGE_LOST =
-  'Cette vérification a expiré : ce que la connexion avait ouvert n’est plus en mémoire. Reprenez la connexion.'
-
 /** Ce que `navigator.credentials.get()` produit, transmis **tel quel** au BFF. */
 async function assertPasskey() {
   const { data, error, response } = await api.POST('/auth/mfa/webauthn/assert/begin')
-  if (data === undefined) throw new Error(refusalOf(error, response.status, 'webauthn'))
+  if (data === undefined) throw new Error(verificationRefusal(error, response.status, 'webauthn'))
 
   try {
     // Les options traversent **telles quelles**, du serveur au navigateur : le DTO du contrat les
@@ -295,30 +259,3 @@ async function assertPasskey() {
 
 const CEREMONY_ABANDONED =
   'La clé d’accès n’a pas été présentée : la fenêtre du navigateur s’est refermée, ou l’appareil n’a pas répondu. Reprenez la vérification.'
-
-/**
- * Le message rendu à l'opérateur, pris **du serveur**, augmenté de ce que le serveur ne peut pas
- * dire.
- *
- * Le BFF rédige ses refus en français et ne nomme pas laquelle des cinq causes s'applique — les
- * distinguer dirait à une machine où elle en est. Les recopier ici en ferait deux rédactions dont
- * une périmerait.
- *
- * L'indice d'horloge n'est ajouté **que** sur le chemin TOTP, et c'est tout l'objet de sa reprise :
- * ajouté partout, il redeviendrait ce que step-035 a retiré.
- */
-function refusalOf(error: unknown, status: number, method: 'totp' | 'webauthn') {
-  const fromServer = refusalMessage(
-    error,
-    `La vérification n’a pas abouti : le tableau de bord n’a pas obtenu de réponse (HTTP ${status}).`,
-  )
-
-  // La **cause** autant que la méthode. Conditionné au seul chemin TOTP, l'indice se collait aussi
-  // au verrouillage et à la panne — « réessayez dans cinq minutes » suivi de « vérifiez l'heure de
-  // votre téléphone », qui n'y est pour rien. C'est l'autre moitié de ce que step-035 a retiré du
-  // serveur : `invalid_second_factor` y servait des causes qu'il ne décrivait pas autant que des
-  // méthodes qu'il ne décrivait pas.
-  if (method !== 'totp' || refusalCode(error) !== 'invalid_second_factor') return fromServer
-
-  return `${fromServer} ${CLOCK_HINT}`
-}

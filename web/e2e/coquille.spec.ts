@@ -156,22 +156,30 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // Dessiné à sa taille, et non laissé aux 128 px du défaut.
   await expect(page.locator('.auth__qr svg')).toHaveCSS('width', '200px')
 
+  // La clé, lue à l'écran comme sur un poste sans caméra.
+  const secret = (await page.locator('.auth__secret').innerText()).trim()
+  expect(secret, 'la clé d’enrôlement n’est pas affichée').not.toBe('')
+
+  // **Rien des codes de récupération à ce stade.** Les montrer avant que le facteur ait fait ses
+  // preuves, c'est les faire enregistrer pour un authentificateur qui ne marchera peut-être jamais.
+  await expect(page.locator('.auth__codes')).toHaveCount(0)
+
+  // Le premier code, saisi sur cet écran-ci : c'est lui qui confirme l'enrôlement.
+  await page.getByLabel(/Code à six chiffres/).fill(totpCode(secret))
+  await page.getByRole('button', { name: 'Vérifier' }).click()
+
+  // Alors seulement les dix codes paraissent, et la seule sortie est l'accusé de réception.
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText('Codes de récupération')
+  await expect(page.locator('.auth__codes li')).toHaveCount(10)
+  await expect(page.getByRole('button', { name: 'Reprendre la connexion' })).toHaveCount(0)
+
   // **Les dix codes tiennent sur deux colonnes**, et c'est la seule propriété de cette liste qui
   // porte une décision : en une seule colonne la carte dépasse l'écran, et le rappel « Quitter cet
   // écran sans les avoir enregistrés les perd » sort du champ de vision au moment même où il sert.
   // Aucune porte ne voit les règles `.auth__` — `classes-peintes.test.ts` ne lit que les `ui-`.
   await expect(page.locator('.auth__codes')).toHaveCSS('grid-template-columns', /\S+ \S+/)
 
-  // La clé, lue à l'écran comme sur un poste sans caméra.
-  const secret = (await page.locator('.auth__secret').innerText()).trim()
-  expect(secret, 'la clé d’enrôlement n’est pas affichée').not.toBe('')
-
   await page.getByRole('button', { name: 'J’ai enregistré ces codes' }).click()
-  await page.getByRole('button', { name: 'Saisir le premier code' }).click()
-
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Second facteur')
-  await page.getByLabel(/Code à six chiffres/).fill(totpCode(secret))
-  await page.getByRole('button', { name: 'Vérifier' }).click()
 
   // Alors la coquille s'ouvre **sur la destination demandée**, et non sur l'accueil.
   await expect(page).toHaveURL(/\/billing$/)

@@ -47,12 +47,22 @@ personne.*
 
 ### Trois arbitrages tranchés pendant l'écriture
 
-- **L'écran enrôle, il ne vérifie pas.** Ni `POST /auth/mfa/totp/enroll` ni
-  `POST /auth/mfa/webauthn/register/finish` n'élèvent la session : seule `POST /auth/mfa/verify` le
-  fait (`internal/bff/mfa.go`, `Sessions.Elevate`). `/mfa` sait déjà présenter les deux méthodes et
-  rédiger leurs refus — l'indice de dérive d'horloge compris ; `/enroll` y conduit plutôt que d'en
-  écrire une seconde copie. Le périmètre de la step est tenu : le premier code est bien saisi dans
-  le parcours qu'elle livre.
+- **L'écran enrôle *et* confirme, en trois temps.** *Arbitré d'abord dans l'autre sens — « il
+  enrôle, il ne vérifie pas », `/mfa` conduisant la vérification — puis **renversé le 20/09/2026
+  après essai manuel** : la première forme montrait le QR et les dix codes ensemble, si bien qu'un
+  opérateur qui s'arrêtait là repartait avec des codes pour un authentificateur jamais configuré,
+  sur un compte que le serveur croyait gardé.* L'ordre est donc QR et clé → premier code → codes de
+  récupération → console. Les codes n'apparaissent qu'une fois le facteur prouvé.
+- **Le verrou de l'enrôlement abandonné, fermé côté serveur.** `Enrolled` vaut
+  `mfa_totp_secret IS NOT NULL`, et le secret est écrit avant tout scan : un onglet fermé entre les
+  deux laissait un facteur que personne ne détenait, pas même son propriétaire — dont le
+  remplacement exigeait la preuve de ce qu'il n'avait pas, et qui, premier administrateur, n'a aucun
+  supérieur pour le réinitialiser (dette 044). `mfa_totp_last_step IS NULL` le dit, et un tel facteur
+  se reprend sans preuve — **sauf** si une clé d'accès garde encore le compte, auquel cas le
+  remplacer sans élévation la contournerait. *Cette partie déborde sur step-023, délibérément : le
+  verrou est la panne même que cet écran existe pour empêcher.*
+- L'enregistrement d'une **clé d'accès** conduit toujours à `/mfa` : une clé est utilisable dès
+  qu'elle est enregistrée, il n'y a aucun code à protéger, et la cérémonie d'assertion vit déjà là.
 - **`/enroll` exige le challenge, comme `/mfa`.** Sans lui la vérification qui suit serait refusée,
   et l'écran aurait montré dix codes irrécupérables avant un cul-de-sac.
 - **Un pas sépare les codes de la sortie** — « J'ai enregistré ces codes ». La vérification les

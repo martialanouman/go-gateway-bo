@@ -56,6 +56,17 @@ async function visitEnroll({
   return { router, user: userEvent.setup() }
 }
 
+const firstCode = () => screen.getByLabelText(/Code à six chiffres/)
+
+/** Enrôler, puis présenter le premier code : l'état où les codes de récupération paraissent. */
+async function confirmEnrollment(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(authenticator())
+  await screen.findByText(ENROLLMENT_SECRET)
+  await user.type(firstCode(), '123456')
+  await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+  await screen.findByRole('heading', { level: 2, name: 'Codes de récupération' })
+}
+
 const authenticator = () => screen.getByRole('button', { name: /application d’authentification/i })
 const passkey = () => screen.getByRole('button', { name: /clé d’accès/i })
 
@@ -283,12 +294,25 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(fond?.getAttribute('fill')).not.toBe(traits?.getAttribute('fill'))
   })
 
+  it('demande le premier code sous le QR, et ne montre encore aucun code de récupération', async () => {
+    const { user } = await visitEnroll()
+    await user.click(authenticator())
+
+    expect(await screen.findByText(ENROLLMENT_SECRET)).toBeVisible()
+    expect(firstCode()).toBeRequired()
+
+    // **Le cœur du réordonnancement.** Montrer dix codes avant que le facteur ait fait ses preuves,
+    // c'est les faire enregistrer pour un authentificateur qui ne marchera peut-être jamais — et
+    // laisser partir l'opérateur sur un compte que le serveur croit gardé.
+    expect(screen.queryByText(RECOVERY_CODES[0] ?? '')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Copier les codes' })).toBeNull()
+  })
+
   it('montre la clé en clair pour un poste sans caméra, et la copie', async () => {
     const { user } = await visitEnroll()
     await user.click(authenticator())
 
     expect(await screen.findByText(ENROLLMENT_SECRET)).toBeVisible()
-    expect(screen.getByText(/ne sera plus jamais affiché/)).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: 'Copier la clé' }))
 
@@ -302,7 +326,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
 
   it('montre les dix codes de récupération, copiables et téléchargeables', async () => {
     const { user } = await visitEnroll()
-    await user.click(authenticator())
+    await confirmEnrollment(user)
 
     const liste = await screen.findByRole('list', { name: 'Codes de récupération' })
     expect(within(liste).getAllByRole('listitem')).toHaveLength(RECOVERY_CODES.length)
@@ -334,25 +358,52 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(await screen.findByText(/copiez-la à la main/)).toBeInTheDocument()
   })
 
-  it('ne conduit à la vérification qu’une fois les codes reconnus enregistrés', async () => {
-    const { router, user } = await visitEnroll()
-    await user.click(authenticator())
-    await screen.findByText(ENROLLMENT_SECRET)
+  it('conduit à la console une fois les codes reconnus enregistrés', async () => {
+    const { router, user } = await visitEnroll({ path: '/enroll?redirect=%2Fbilling' })
+    await confirmEnrollment(user)
 
-    // Tant que rien n'est reconnu, aucune sortie vers la vérification : elle emporterait les codes
-    // sans retour, et c'est le geste que l'écran doit ralentir.
-    expect(screen.queryByRole('button', { name: 'Saisir le premier code' })).toBeNull()
+    // La session est élevée et le facteur prouvé : il n'y a plus rien à reprendre, et proposer de
+    // repartir jetterait dix codes pour rien. La seule sortie est l'accusé de réception.
+    expect(screen.queryByRole('button', { name: 'Reprendre la connexion' })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'J’ai enregistré ces codes' }))
-    await user.click(screen.getByRole('button', { name: 'Saisir le premier code' }))
 
-    expect(await screen.findByLabelText(/Code à six chiffres/)).toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/mfa')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Soldes & crédits/ }),
+    ).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/billing')
+  })
+
+  it('refuse un premier code faux, et reprend l’indice de dérive d’horloge', async () => {
+    // C'est **le premier** code, tapé juste après un scan : l'horloge du téléphone est la cause la
+    // plus probable, et le serveur ne la nomme plus depuis step-035.
+    const { user } = await visitEnroll({
+      replies: {
+        verify: {
+          status: 401,
+          body: {
+            code: 'invalid_second_factor',
+            message: 'Ce second facteur n’a pas été accepté.',
+          },
+        },
+      },
+    })
+
+    await user.click(authenticator())
+    await screen.findByText(ENROLLMENT_SECRET)
+    await user.type(firstCode(), '123456')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+
+    const refus = await screen.findByRole('alert')
+    expect(refus).toHaveTextContent('Ce second facteur n’a pas été accepté')
+    expect(refus).toHaveTextContent(/heure/i)
+    // Et les codes restent invisibles : le facteur n'a rien prouvé.
+    expect(screen.queryByText(RECOVERY_CODES[0] ?? '')).toBeNull()
   })
 
   it('ne réaffiche pas les codes après un rechargement', async () => {
     const { user } = await visitEnroll()
-    await user.click(authenticator())
+    await confirmEnrollment(user)
     await screen.findByText(RECOVERY_CODES[0] ?? '')
 
     // Le rechargement : un arbre neuf, un routeur neuf, et le serveur qui porte désormais le
@@ -366,8 +417,10 @@ describe('l’enrôlement d’une application d’authentification', () => {
       />,
     )
 
-    // La garde conduit au second facteur : un facteur est en place, et il se présente.
-    expect(await screen.findByLabelText(/Code à six chiffres/)).toBeInTheDocument()
+    // La garde conduit à la console : le facteur est posé **et** franchi, la session est élevée.
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+      /cockpit d.exploitation se construit/,
+    )
     expect(document.body.textContent ?? '').not.toContain(RECOVERY_CODES[0])
     // Et rien n'en a été déposé dans le navigateur : chercher le texte à l'écran ne dirait rien
     // d'un stockage qui les garderait sous une autre clé.

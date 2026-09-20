@@ -3,10 +3,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { QRCodeSVG } from 'qrcode.react'
 import { useId, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { AuthLayout, AuthPending, AuthRefusal, RestartLogin } from '~/components/auth-layout'
-import { Button } from '~/components/ui'
+import { Button, Field, Input } from '~/components/ui'
 import { api, refusalMessage } from '~/lib/api'
-import { forgetSession, peekChallenge, readSession, safeDestination } from '~/lib/session'
+import { formResolver } from '~/lib/form'
+import { CHALLENGE_LOST, totpAttempt, verificationRefusal } from '~/lib/second-factor'
+import {
+  forgetChallenge,
+  forgetSession,
+  peekChallenge,
+  readSession,
+  safeDestination,
+} from '~/lib/session'
 
 /**
  * L'enrôlement du second facteur — l'écran par lequel un compte nu devient un compte qui entre.
@@ -16,10 +25,16 @@ import { forgetSession, peekChallenge, readSession, safeDestination } from '~/li
  * que **le premier administrateur n'a personne pour l'enrôler** — la v1.0 avait rendu le second
  * facteur obligatoire sans livrer aucun écran qui permette d'en poser un.
  *
- * **Il enrôle, il ne vérifie pas.** Ni l'enrôlement TOTP ni l'enregistrement d'une clé d'accès
- * n'élèvent la session côté serveur : seule `POST /auth/mfa/verify` le fait (`internal/bff/mfa.go`,
- * `Sessions.Elevate`). La vérification a déjà son écran, qui sait présenter les deux méthodes et
- * rédiger leurs refus ; cet écran-ci y conduit plutôt que d'en écrire une seconde copie.
+ * **Il enrôle et il confirme, dans cet ordre, sur le même écran.** L'enrôlement écrit le secret
+ * avant tout scan : entre les deux, le compte porte un facteur que personne ne détient. Le serveur
+ * rend désormais cet état récupérable (`internal/bff/mfa.go`, `unconfirmed`), et l'écran, lui,
+ * réduit la fenêtre à ce qu'elle doit être — le champ du premier code est sous le QR, et les dix
+ * codes de récupération n'apparaissent qu'une fois le facteur prouvé. Les montrer avant, c'est les
+ * faire enregistrer pour un authentificateur qui ne marchera peut-être jamais.
+ *
+ * L'enregistrement d'une clé d'accès, lui, conduit toujours à `/mfa` : une clé est utilisable dès
+ * qu'elle est enregistrée, il n'y a aucun code à protéger, et la cérémonie d'assertion vit déjà
+ * là-bas.
  */
 export const Route = createFileRoute('/enroll')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -80,12 +95,30 @@ function EnrollmentScreen() {
   // plateforme sans remplacer quoi que ce soit du produit.
   const platformKnowsPasskeys = browserSupportsWebAuthn()
 
-  /** Le facteur est posé ; c'est l'écran du second facteur qui l'élèvera. */
-  function verifyNewFactor() {
+  /**
+   * La clé d'accès est posée ; c'est l'écran du second facteur qui la présentera.
+   *
+   * **Aucun test ne l'exécute, et c'est mesuré plutôt que supposé.** jsdom n'expose pas
+   * `navigator.credentials`, donc `startRegistration` échoue toujours et ce `onSuccess` n'est
+   * jamais atteint ; le parcours Playwright, lui, passe par TOTP, seule voie qu'un poste de CI
+   * sans authentificateur puisse suivre. Dette 052 : un authentificateur virtuel posé par CDP
+   * refermerait ce chemin **et** l'assertion de `/mfa`, aujourd'hui dans le même état.
+   *
+   * L'exemption porte sur la mesure, pas sur la règle — elle se retire avec la dette.
+   */
+  /* v8 ignore next 5 */
+  function assertNewPasskey() {
     // Sans cet oubli, la garde de `/mfa` relirait une session encore fraîche — sans facteur — et
     // renverrait ici même, en boucle.
     forgetSession(queryClient)
     void router.navigate({ to: '/mfa', search: { redirect: destination } })
+  }
+
+  /** Le second facteur est franchi : la session est élevée, et les écrans s'ouvrent. */
+  function enterConsole() {
+    forgetSession(queryClient)
+    forgetChallenge()
+    void router.navigate({ href: destination ?? '/' })
   }
 
   /**
@@ -124,7 +157,7 @@ function EnrollmentScreen() {
       })
       if (data === undefined) throw new Error(enrollmentRefusal(error, response.status))
     },
-    onSuccess: verifyNewFactor,
+    onSuccess: assertNewPasskey,
   })
 
   // **L'écran des codes ne porte aucun refus, et ce n'est pas un oubli.** `enroll.error` et
@@ -133,7 +166,7 @@ function EnrollmentScreen() {
   // vient de réussir. Il contredirait l'intro juste au-dessus, sur le seul écran qui ne se
   // réaffiche jamais. Mesuré : il s'y affichait.
   if (enroll.data !== undefined) {
-    return <TotpEnrollment enrollment={enroll.data} onAcknowledged={verifyNewFactor} />
+    return <TotpEnrollment enrollment={enroll.data} onAcknowledged={enterConsole} />
   }
 
   const refusal = enroll.error?.message ?? register.error?.message
@@ -207,14 +240,19 @@ function EnrollmentScreen() {
 const QR_SIZE = 200
 
 /**
- * Ce que l'enrôlement vient de rendre, et que **rien ne rendra plus**.
+ * Ce que l'enrôlement vient de rendre, en deux temps : **d'abord prouver, ensuite garder**.
+ *
+ * La configuration montre le QR et la clé, et demande le premier code. Les dix codes de
+ * récupération n'arrivent qu'après : les montrer avant, c'est les faire enregistrer pour un
+ * authentificateur qui ne marchera peut-être jamais — et laisser partir l'opérateur sur un compte
+ * que le serveur croit gardé.
  *
  * Les codes sont hachés (`internal/mfa/recovery.go`, argon2id) : irrécupérables, y compris pour le
  * serveur. La clé, elle, est **chiffrée au repos et non hachée** — `internal/mfa/cipher.go` la
  * rouvre à chaque vérification TOTP, sans quoi aucun code ne pourrait être vérifié. Ce qui la rend
  * irréaffichable n'est donc pas la cryptographie mais l'absence de route qui la rende : aucune
- * action « révéler » n'existe, invariant (b). Ils vivent dans l'état de ce composant, le temps de
- * l'écran ; un rechargement les perd, et c'est la propriété qu'on veut, non un effet de bord.
+ * action « révéler » n'existe, invariant (b). Rien de tout cela ne quitte l'état de ce composant ;
+ * un rechargement le perd, et c'est la propriété qu'on veut, non un effet de bord.
  */
 function TotpEnrollment({
   enrollment,
@@ -227,15 +265,45 @@ function TotpEnrollment({
   }
   readonly onAcknowledged: () => void
 }) {
-  const [acknowledged, setAcknowledged] = useState(false)
-  const codesId = useId()
-  const codes = enrollment.recoveryCodes.join('\n')
+  const [confirmed, setConfirmed] = useState(false)
+
+  if (confirmed) {
+    return <RecoveryCodes codes={enrollment.recoveryCodes} onAcknowledged={onAcknowledged} />
+  }
+
+  return <TotpConfirmation enrollment={enrollment} onConfirmed={() => setConfirmed(true)} />
+}
+
+/** Le QR, la clé, et le premier code qui prouve que l'application est bien configurée. */
+function TotpConfirmation({
+  enrollment,
+  onConfirmed,
+}: {
+  readonly enrollment: { readonly secret: string; readonly otpauthUri: string }
+  readonly onConfirmed: () => void
+}) {
+  const form = useForm({ resolver: formResolver(totpAttempt), defaultValues: { code: '' } })
+
+  const verify = useMutation({
+    mutationFn: async ({ code }: { code: string }) => {
+      const challenge = peekChallenge()
+      if (challenge === undefined) throw new Error(CHALLENGE_LOST)
+
+      const { error, response } = await api.POST('/auth/mfa/verify', {
+        body: { challenge, method: 'totp' as const, code },
+      })
+      if (!response.ok) throw new Error(verificationRefusal(error, response.status, 'totp'))
+    },
+    onSuccess: onConfirmed,
+  })
 
   return (
     <AuthLayout
-      intro="L’application d’authentification est enrôlée. Ce que cet écran montre ne sera plus jamais affiché : les codes de récupération sont hachés, donc irrécupérables, et aucune route ne rend une seconde fois la clé."
+      intro="Scannez ce code avec l’application d’authentification, puis saisissez le code qu’elle affiche. Tant qu’il n’est pas accepté, l’enrôlement reste à terminer."
       title={TITLE}
     >
+      {verify.error === null ? null : <AuthRefusal>{verify.error.message}</AuthRefusal>}
+
       <div className="auth__qr">
         <QRCodeSVG
           // Les quatre modules de zone calme que la spécification du QR exige, posés par la
@@ -247,56 +315,91 @@ function TotpEnrollment({
         />
       </div>
 
-      <p className="auth__aside">
-        Scannez ce code avec l’application d’authentification. Sans caméra, saisissez la clé
-        ci-dessous à la main.
-      </p>
+      <p className="auth__aside">Sans caméra, saisissez la clé ci-dessous à la main.</p>
 
       <p className="auth__secret">{enrollment.secret}</p>
       <CopyButton done="Clé copiée." label="Copier la clé" value={enrollment.secret} />
 
+      <form
+        className="auth__form"
+        noValidate
+        onSubmit={form.handleSubmit((values) => verify.mutate(values))}
+      >
+        <Field error={form.formState.errors.code?.message} label="Code à six chiffres">
+          <Input
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            maxLength={6}
+            mono
+            required
+            {...form.register('code', {
+              // Le refus du serveur s'efface dès la frappe : il refusait un code qui n'est plus
+              // celui-là. Le refus de champ, lui, est effacé par React Hook Form, qui revalide.
+              onChange: () => verify.reset(),
+            })}
+          />
+        </Field>
+
+        <Button loading={verify.isPending} type="submit" variant="primary">
+          Vérifier
+        </Button>
+      </form>
+
+      <RestartLogin />
+    </AuthLayout>
+  )
+}
+
+/**
+ * Les dix codes, montrés une fois, sur un facteur qui vient de faire ses preuves.
+ *
+ * **Aucune reprise de connexion ici.** La session est élevée et l'authentificateur marche : il n'y
+ * a plus rien à reprendre, et l'offrir jetterait dix codes pour rien. La seule sortie est l'accusé
+ * de réception, qui ouvre la console.
+ */
+function RecoveryCodes({
+  codes,
+  onAcknowledged,
+}: {
+  readonly codes: readonly string[]
+  readonly onAcknowledged: () => void
+}) {
+  const codesId = useId()
+  const asText = codes.join('\n')
+
+  return (
+    <AuthLayout
+      intro="L’application d’authentification est confirmée. Voici les dix codes qui rouvrent la session si l’appareil est perdu — ils ne seront plus jamais affichés."
+      title={TITLE}
+    >
       <h2 className="auth__subtitle" id={codesId}>
         Codes de récupération
       </h2>
       <p className="auth__aside">
-        Ces dix codes rouvrent la session si l’appareil est perdu, et chacun ne sert qu’une fois.
-        Conservez-les hors de cet appareil — un gestionnaire de mots de passe, ou une impression en
-        lieu sûr. Quitter cet écran sans les avoir enregistrés les perd définitivement.
+        Chacun ne sert qu’une fois. Conservez-les hors de cet appareil — un gestionnaire de mots de
+        passe, ou une impression en lieu sûr. Quitter cet écran sans les avoir enregistrés les perd
+        définitivement.
       </p>
       <ul aria-labelledby={codesId} className="auth__codes">
-        {enrollment.recoveryCodes.map((code) => (
+        {codes.map((code) => (
           <li key={code}>{code}</li>
         ))}
       </ul>
-      <CopyButton done="Codes copiés." label="Copier les codes" value={codes} />
+      <CopyButton done="Codes copiés." label="Copier les codes" value={asText} />
       <a
         className="auth__download"
         // Un `data:` plutôt qu'un `blob:` : le fichier n'est qu'une chaîne, et `download` suffit à
         // le faire enregistrer. Un `URL.createObjectURL` demanderait en plus qu'on le révoque,
         // donc une fuite de plus à tenir pour rien.
         download="codes-de-recuperation-sms-gateway.txt"
-        href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${codes}\n`)}`}
+        href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${asText}\n`)}`}
       >
         Télécharger les codes
       </a>
 
-      {/*
-        **Le pas de plus est délibéré.** La vérification emporte ces codes sans retour ; les
-        reconnaître enregistrés est le seul geste qui sépare « je les ai lus » de « je les ai
-        perdus ». Sans lui, le bouton qui conduit à la suite est sous les codes dès qu'ils
-        paraissent, et le réflexe l'atteint avant l'œil.
-      */}
-      {acknowledged ? (
-        <Button onClick={onAcknowledged} variant="primary">
-          Saisir le premier code
-        </Button>
-      ) : (
-        <Button onClick={() => setAcknowledged(true)} variant="primary">
-          J’ai enregistré ces codes
-        </Button>
-      )}
-
-      <RestartLogin />
+      <Button onClick={onAcknowledged} variant="primary">
+        J’ai enregistré ces codes
+      </Button>
     </AuthLayout>
   )
 }
