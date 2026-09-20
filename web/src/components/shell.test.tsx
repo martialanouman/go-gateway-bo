@@ -62,13 +62,16 @@ describe('le rail', () => {
 })
 
 describe('sans session', () => {
-  it('nomme l’écran de connexion à venir, sans navigation', async () => {
-    visit('/routes', { status: 401 })
+  it('offre la connexion depuis une adresse inconnue, sans navigation', async () => {
+    // Une adresse inconnue, et non un écran : la garde de `_shell` renvoie les écrans à `/login`
+    // avant tout rendu. Ce qui reste ici est le seul chemin qui rend la coquille **hors** de la
+    // garde — le `notFoundComponent` de la racine.
+    visit('/cette-adresse-nexiste-pas', { status: 401 })
 
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
       'Aucune session ouverte',
     )
-    expect(screen.getByText(/step-027/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Se connecter' })).toHaveAttribute('href', '/login')
     expect(screen.queryByRole('navigation')).toBeNull()
   })
 })
@@ -101,6 +104,9 @@ describe('quand la session ne peut pas être lue', () => {
 
 describe('pendant la lecture de la session', () => {
   it('garde la silhouette de la coquille et annonce l’attente', async () => {
+    // La garde de route n'a pas encore décidé : c'est son `pendingComponent` qui peint, et il doit
+    // reprendre la silhouette qu'`index.html` a servie. Sans lui, cet écran est **vide** le temps de
+    // l'aller-retour.
     visit('/', 'pending')
 
     expect(await screen.findByText('Ouverture de la session')).toBeInTheDocument()
