@@ -101,7 +101,7 @@ import { z } from 'zod'
 //
 // **Aucun repli de ligne n'est implémenté, et rien ne le garde.** La sortie est **incluse** dans le
 // périmètre de Biome — contrairement à `api.gen.ts` — et Biome reporte à la ligne toute propriété
-// qui dépasse 100 colonnes. La plus longue d'aujourd'hui en fait 55. Un enum du contrat assez large
+// qui dépasse 100 colonnes. La plus longue d'aujourd'hui en fait 58. Un enum du contrat assez large
 // pour franchir le seuil rendrait donc `lint-web` et `check-generated` contradictoires, chacune
 // exigeant l'inverse de l'autre. Vérifié plutôt que supposé : `biome check` accepte la sortie
 // courante telle quelle. Le remède, le jour venu, est d'exclure ce fichier dans `web/biome.json`

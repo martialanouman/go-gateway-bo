@@ -68,9 +68,10 @@ const CLOCK_HINT =
  * porte aucun, et le serveur exige l'un ou l'autre selon la méthode. Ce formulaire-ci ne présente
  * que la voie TOTP, où le code est requis — c'est l'écran qui le sait, pas le contrat.
  *
- * Les bornes, elles, restent celles du contrat : `minLength: 1`, `maxLength: 64`. Le « six
- * chiffres » du libellé est tenu par le `maxLength` du champ, et non redit ici — un code de
- * récupération en fait onze, et step-028 ouvrira cette voie dans le même formulaire.
+ * Les bornes, elles, restent celles du contrat : `minLength: 1`, `maxLength: 64`. **Rien ici
+ * n'exige six chiffres** : le `maxLength` du champ borne la saisie en haut, et le schéma se
+ * contente d'un caractère. C'est délibéré — un code de récupération en fait onze, et step-028
+ * ouvrira cette voie dans le même formulaire ; un `length(6)` écrit aujourd'hui serait à défaire.
  */
 const totpAttempt = z.object({
   code: z

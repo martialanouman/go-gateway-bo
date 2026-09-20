@@ -55,3 +55,17 @@ describe('les refus que Zod rédige', () => {
     expect(refusal).toBe('Cette valeur n’est pas acceptée.')
   })
 })
+
+describe('l’accord du nombre dans le refus', () => {
+  it('écrit « 1 caractère » au singulier, et non « 1 caractères »', () => {
+    // La borne vient du refus : elle vaut 1 pour tout champ dont le contrat exige seulement qu'il ne
+    // soit pas vide — `password` et `code` en portent un chacun. Le pluriel fautif est donc le cas
+    // courant, pas le cas rare.
+    expect(refusalOf(z.string().min(1), '')).toContain('1 caractère au minimum')
+    expect(refusalOf(z.string().min(1), '')).not.toContain('caractères')
+  })
+
+  it('accorde au pluriel au-delà', () => {
+    expect(refusalOf(MfaVerification.shape.challenge, 'court')).toContain('43 caractères')
+  })
+})

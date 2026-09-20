@@ -298,12 +298,12 @@ describe('chargement à froid', () => {
       // Zod, et ce ne sont pas des adresses mais des **identifiants de dialecte** : le `$schema`
       // qu'écrit `toJSONSchema`, au même titre que `http://www.w3.org/2000/svg` plus haut est un
       // espace de noms et non une page. Vérifié sur le bundle livré (`dist/assets/form-*.js`) :
-      // les deux sont affectés à une propriété d'un objet littéral — `i.$schema = …` — et ne sont la
-      // cible d'aucun `fetch` ni d'aucun `src`.
+      // les **trois** qu'il porte sont affectées à une propriété de l'objet que `toJSONSchema`
+      // construit — `i.$schema = …` — et ne sont la cible d'aucun `fetch` ni d'aucun `src`.
       //
       // Le code qui les porte n'a d'ailleurs **aucun appelant** ici : ce dépôt n'engendre pas de
       // JSON Schema. Il traverse parce que `import { z } from 'zod'` est un espace de noms, que
-      // l'élagage ne perce pas. Mesuré : le passage aux imports nommés ne rend que 4,5 ko sur
+      // l'élagage ne perce pas. Mesuré : le passage aux imports nommés ne rend que 4,6 ko sur
       // 116,7 et ne fait pas disparaître ces chaînes, la migration des deux écrans gardant l'espace
       // de noms. Le prix d'un code engendré illisible pour 4 % n'a pas été payé.
       'http://json-schema.org/',

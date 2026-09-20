@@ -44,10 +44,11 @@ export const Route = createFileRoute('/login')({
  * Ce que le formulaire oppose à la saisie : ses propres règles **puis** celles du contrat.
  *
  * `.pipe` et non deux contrôles côte à côte, et l'ordre est ce qui compte. Un champ vide échouerait
- * aussi sur le `minLength: 1` que le contrat pose sur le mot de passe, et c'est son message
- * générique — « le serveur en attend 1 caractère au moins » — que l'opérateur lirait. Le schéma
- * engendré ne s'exécute donc qu'une fois les règles de l'écran satisfaites : chacun rédige ce qu'il
- * sait, et aucune borne n'est retapée ici.
+ * aussi sur le `minLength: 1` que le contrat pose sur le mot de passe, et c'est alors le message
+ * générique de `refusalInFrench` — « Cette saisie est trop courte : 1 caractère au minimum. » — que
+ * l'opérateur lirait, au lieu de celui qui nomme le champ. Le schéma engendré ne s'exécute donc
+ * qu'une fois les règles de l'écran satisfaites : chacun rédige ce qu'il sait, et aucune borne n'est
+ * retapée ici.
  *
  * **Le motif d'adresse est volontairement lâche** : un `@`, quelque chose de part et d'autre, et un
  * point dans le domaine. Une expression conforme à la RFC 5322 fait quatre cents caractères et
