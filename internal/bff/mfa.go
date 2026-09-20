@@ -103,8 +103,26 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 	}
 
 	replace := false
+	// **Un enrôlement jamais confirmé se reprend sans rien présenter.** L'enrôlement écrit le secret
+	// avant que l'opérateur ait scanné quoi que ce soit, si bien qu'un onglet fermé entre les deux
+	// laissait un facteur que **personne** ne détient : sa prochaine connexion lui réclamait un code
+	// qu'aucune application ne produit, le remplacement exigeait la preuve de ce qu'il n'avait pas, et
+	// le premier administrateur n'a aucun supérieur pour le réinitialiser (dette 044). Le verrou était
+	// exactement la panne que l'écran d'enrôlement existe pour empêcher.
+	//
+	// **La condition sur les clés d'accès tient la moitié qui compte.** Sans elle, un compte gardé par
+	// une passkey qui marche et portant un TOTP abandonné laisserait quiconque détient le mot de passe
+	// remplacer ce TOTP sans élévation, puis s'en servir pour franchir le second facteur. La détente
+	// ne joue donc que là où le compte ne détient **rien** d'utilisable — là où son propriétaire est
+	// déjà dehors. Elle n'élargit pas la fenêtre de la dette 004, qui rend déjà libre le premier
+	// enrôlement de toute session de premier facteur.
+	unconfirmed := state.Enrolled && !state.Proven && held.Passkeys == 0
 
-	if state.Enrolled {
+	switch {
+	case unconfirmed:
+		replace = true
+
+	case state.Enrolled:
 		if request.Body.Code == nil {
 			return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
 		}
@@ -153,7 +171,12 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 			Action:     actionMFAEnroll,
 			TargetType: auditTargetOperator,
 			TargetID:   resolved.OperatorID,
-			After:      store.NewFields().Text("method", "totp").Flag("replaced", replace),
+			// `proof_presented` sépare deux gestes que `replaced` confond : le remplacement qui a
+			// exigé un code de l'authentificateur en place, et la reprise d'un enrôlement que
+			// personne n'avait confirmé. Une enquête qui ne verrait que `replaced` ne saurait pas
+			// laquelle des deux gardes a travaillé.
+			After: store.NewFields().Text("method", "totp").
+				Flag("replaced", replace).Flag("proof_presented", replace && !unconfirmed),
 		}))
 	if err != nil {
 		return nil, err

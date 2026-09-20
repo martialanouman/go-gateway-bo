@@ -748,7 +748,14 @@ export interface operations {
              *     `mfa_elevation_required` : le compte ne porte qu'une clé d'accès, et la session n'est pas
              *     élevée — rien n'a été présenté, et c'est l'élévation qui tient lieu de preuve.
              *     `mfa_already_enrolled` : un facteur est en place et **aucune preuve** n'accompagne la
-             *     demande. `mfa_replacement_refused` : une preuve a été présentée, et c'est **elle** qui a
+             *     demande.
+             *
+             *     **Un authentificateur jamais confirmé ne compte pas comme « en place »** : le secret est
+             *     écrit avant que l'opérateur ait scanné quoi que ce soit, si bien qu'un onglet fermé entre
+             *     les deux laissait un facteur que personne ne détient — pas même son propriétaire, dont la
+             *     connexion suivante réclamait un code qu'aucune application ne produit. Un tel enrôlement
+             *     se reprend donc sans rien présenter, **sauf** si une clé d'accès garde encore le compte :
+             *     là, le remplacer sans élévation contournerait la clé. `mfa_replacement_refused` : une preuve a été présentée, et c'est **elle** qui a
              *     été refusée — le distinguer du précédent est ce qui évite de répondre « présentez votre
              *     code » à quelqu'un qui vient de le faire.
              */

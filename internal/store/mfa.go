@@ -36,6 +36,11 @@ type TOTPState struct {
 	// SealedSecret est vide quand aucun authentificateur n'est enrôlé.
 	SealedSecret string
 	Enrolled     bool
+	// Proven dit qu'au moins un code de cet opérateur a été consommé — `mfa_totp_last_step` n'est
+	// plus `NULL`. Ce n'est pas « le secret existe » : l'enrôlement écrit le secret **avant** que
+	// l'opérateur ait scanné quoi que ce soit, si bien qu'un enrôlement abandonné laisse un facteur
+	// que personne ne détient, pas même son propriétaire.
+	Proven bool
 	// CurrentStep vient de l'horloge **du serveur de base**. Le calculer en Go ferait qu'un code
 	// accepté par une instance serait refusé par l'autre, et que l'anti-rejeu comparerait deux
 	// échelles différentes.
@@ -52,6 +57,7 @@ func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds 
 ) {
 	const query = `
 		SELECT email, coalesce(mfa_totp_secret, ''), mfa_totp_secret IS NOT NULL,
+		       mfa_totp_last_step IS NOT NULL,
 		       floor(extract(epoch FROM now()) / $2)::bigint
 		FROM operators
 		WHERE id = $1 AND status = $3`
@@ -59,7 +65,7 @@ func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds 
 	var state TOTPState
 
 	err := m.pool.QueryRow(ctx, query, operatorID, periodSeconds, StatusActive).
-		Scan(&state.Email, &state.SealedSecret, &state.Enrolled, &state.CurrentStep)
+		Scan(&state.Email, &state.SealedSecret, &state.Enrolled, &state.Proven, &state.CurrentStep)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return TOTPState{}, false, nil
