@@ -264,6 +264,20 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(decodeURIComponent(fichier.getAttribute('href') ?? '')).toContain(RECOVERY_CODES[9])
   })
 
+  it('dit comment faire quand le navigateur refuse le presse-papiers', async () => {
+    const { user } = await visitEnroll()
+    await user.click(authenticator())
+    await screen.findByText(ENROLLMENT_SECRET)
+
+    // Le refus est réel : Safari et les contextes non sécurisés rendent la permission `denied`, et
+    // un bouton qui ne répond rien laisse croire que la clé est copiée. Or elle ne se réaffichera
+    // jamais.
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('refusé'))
+    await user.click(screen.getByRole('button', { name: 'Copier la clé' }))
+
+    expect(await screen.findByText(/copiez-la à la main/)).toBeInTheDocument()
+  })
+
   it('ne conduit à la vérification qu’une fois les codes reconnus enregistrés', async () => {
     const { router, user } = await visitEnroll()
     await user.click(authenticator())
