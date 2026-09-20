@@ -14,8 +14,7 @@
      qui sont le vrai point bas : sur une ligne sélectionnée (`--surface-selected`, teinte teal à
      14 %), la première valeur essayée retombait à 4,04. La hiérarchie à trois niveaux reste
      lisible. C'est **le seul écart de valeur** avec la charte ; deux tokens y sont par ailleurs
-     ajoutés (`--red-400` plus bas, `--qr-paper`). `--qr-paper` n'est consommé par aucune règle et nommé
-     par aucun test : il attend step-028, qui affiche le QR. */
+     ajoutés (`--red-400` plus bas, `--qr-paper`). */
   --n-300: #848f9e;
   --n-400: #4a5563;
   --n-500: #2f3945;
@@ -86,8 +85,7 @@
    *
    * **Seul le fond de la vignette est un token.** Les modules du QR gardent le noir pur que la
    * bibliothèque pose elle-même : les peindre par CSS a coûté un carré uni, `qrcode.react` émettant
-   * deux chemins qu'un même sélecteur prenait tous les deux — voir `.ui-enroll__qr` dans
-   * `components.css`.
+   * deux chemins qu'un même sélecteur prenait tous les deux — voir `.auth__qr` dans `app.css`.
    *
    * « papier » plutôt que « clair » : la garde « aucun thème clair » de `charte.test.ts` cherche
    * `light` dans les noms de tokens, et elle a raison de le faire. Un `--qr-light` l'aurait fait

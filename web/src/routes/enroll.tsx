@@ -1,7 +1,8 @@
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
-import { useId } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
+import { useId, useState } from 'react'
 import { AuthLayout, AuthPending, AuthRefusal, RestartLogin } from '~/components/auth-layout'
 import { Button } from '~/components/ui'
 import { api, refusalMessage } from '~/lib/api'
@@ -125,6 +126,12 @@ function EnrollmentScreen() {
 
   const refusal = enroll.error?.message ?? register.error?.message
 
+  if (enroll.data !== undefined) {
+    return (
+      <TotpEnrollment enrollment={enroll.data} onAcknowledged={verifyNewFactor} refusal={refusal} />
+    )
+  }
+
   return (
     <AuthLayout
       intro="Ce compte n’a ni application d’authentification ni clé d’accès, et aucun écran ne s’ouvre tant qu’un second facteur n’est pas posé. Deux voies mènent au même résultat."
@@ -178,6 +185,154 @@ function EnrollmentScreen() {
     </AuthLayout>
   )
 }
+
+/**
+ * La taille du QR, écrite plutôt que laissée au défaut de la bibliothèque.
+ *
+ * `qrcode.react` dessine 128 px par défaut, soit une vignette qu'une caméra de téléphone rate à
+ * distance de lecture confortable. La valeur est ici et non dans la feuille parce que la
+ * bibliothèque la porte dans la géométrie du SVG autant que dans ses attributs : la poser en CSS
+ * étirerait 128 px au lieu d'en dessiner 200.
+ */
+const QR_SIZE = 200
+
+/**
+ * Ce que l'enrôlement vient de rendre, et que **rien ne rendra plus**.
+ *
+ * Le secret est chiffré au repos et les codes sont hachés : le serveur lui-même ne saurait plus les
+ * recomposer. Aucune action « révéler » n'existe donc — invariant (b) —, et aucune route ne les
+ * relit. Ils vivent dans l'état de ce composant, le temps de l'écran ; un rechargement les perd, et
+ * c'est la propriété qu'on veut, non un effet de bord qu'on tolère.
+ */
+function TotpEnrollment({
+  enrollment,
+  onAcknowledged,
+  refusal,
+}: {
+  readonly enrollment: {
+    readonly secret: string
+    readonly otpauthUri: string
+    readonly recoveryCodes: readonly string[]
+  }
+  readonly onAcknowledged: () => void
+  readonly refusal: string | undefined
+}) {
+  const [acknowledged, setAcknowledged] = useState(false)
+  const codesId = useId()
+  const codes = enrollment.recoveryCodes.join('\n')
+
+  return (
+    <AuthLayout
+      intro="L’application d’authentification est enrôlée. Ce que cet écran montre ne sera plus jamais affiché : le secret est chiffré au repos et les codes sont hachés, donc le serveur ne saurait plus les recomposer."
+      title={TITLE}
+    >
+      {refusal === undefined ? null : <AuthRefusal>{refusal}</AuthRefusal>}
+
+      <div className="auth__qr">
+        <QRCodeSVG
+          // Les quatre modules de zone calme que la spécification du QR exige, posés par la
+          // bibliothèque plutôt que par une marge CSS : leur largeur suit le module, pas le pixel.
+          marginSize={4}
+          size={QR_SIZE}
+          title="QR code d’enrôlement de l’application d’authentification"
+          value={enrollment.otpauthUri}
+        />
+      </div>
+
+      <p className="auth__aside">
+        Scannez ce code avec l’application d’authentification. Sans caméra, saisissez la clé
+        ci-dessous à la main.
+      </p>
+
+      <p className="auth__secret">{enrollment.secret}</p>
+      <CopyButton done="Clé copiée." label="Copier la clé" value={enrollment.secret} />
+
+      <h2 className="auth__subtitle" id={codesId}>
+        Codes de récupération
+      </h2>
+      <p className="auth__aside">
+        Ces dix codes rouvrent la session si l’appareil est perdu, et chacun ne sert qu’une fois.
+        Conservez-les hors de cet appareil — un gestionnaire de mots de passe, ou une impression en
+        lieu sûr. Quitter cet écran sans les avoir enregistrés les perd définitivement.
+      </p>
+      <ul aria-labelledby={codesId} className="auth__codes">
+        {enrollment.recoveryCodes.map((code) => (
+          <li key={code}>{code}</li>
+        ))}
+      </ul>
+      <CopyButton done="Codes copiés." label="Copier les codes" value={codes} />
+      <a
+        className="auth__download"
+        // Un `data:` plutôt qu'un `blob:` : le fichier n'est qu'une chaîne, et `download` suffit à
+        // le faire enregistrer. Un `URL.createObjectURL` demanderait en plus qu'on le révoque,
+        // donc une fuite de plus à tenir pour rien.
+        download="codes-de-recuperation-sms-gateway.txt"
+        href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${codes}\n`)}`}
+      >
+        Télécharger les codes
+      </a>
+
+      {/*
+        **Le pas de plus est délibéré.** La vérification emporte ces codes sans retour ; les
+        reconnaître enregistrés est le seul geste qui sépare « je les ai lus » de « je les ai
+        perdus ». Sans lui, le bouton qui conduit à la suite est sous les codes dès qu'ils
+        paraissent, et le réflexe l'atteint avant l'œil.
+      */}
+      {acknowledged ? (
+        <Button onClick={onAcknowledged} variant="primary">
+          Saisir le premier code
+        </Button>
+      ) : (
+        <Button onClick={() => setAcknowledged(true)} variant="primary">
+          J’ai enregistré ces codes
+        </Button>
+      )}
+
+      <RestartLogin />
+    </AuthLayout>
+  )
+}
+
+/**
+ * Copier une valeur qu'on ne reverra pas, et le **dire**.
+ *
+ * Le retour est écrit plutôt que joué : un état qui s'efface tout seul demanderait une minuterie,
+ * donc un test qui mesure sa propre attente. Il est annoncé aux lecteurs d'écran, faute de quoi un
+ * clic réussi ne change rien de perceptible — le presse-papiers ne se relit pas à l'œil.
+ */
+function CopyButton({
+  label,
+  done,
+  value,
+}: {
+  readonly label: string
+  readonly done: string
+  readonly value: string
+}) {
+  const [outcome, setOutcome] = useState<string | undefined>(undefined)
+
+  return (
+    <>
+      <Button
+        onClick={() =>
+          void navigator.clipboard.writeText(value).then(
+            () => setOutcome(done),
+            () => setOutcome(COPY_REFUSED),
+          )
+        }
+        variant="secondary"
+      >
+        {label}
+      </Button>
+      <p aria-live="polite" className="auth__aside">
+        {outcome}
+      </p>
+    </>
+  )
+}
+
+const COPY_REFUSED =
+  'Le navigateur n’a pas autorisé la copie : sélectionnez la valeur et copiez-la à la main.'
 
 /** Ce que `navigator.credentials.create()` produit, transmis **tel quel** au BFF. */
 async function createPasskey(options: unknown) {

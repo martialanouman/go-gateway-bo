@@ -247,3 +247,75 @@
   font-variant-numeric: tabular-nums;
   line-height: var(--lh-normal);
 }
+
+/*
+ * Le QR d'enrôlement, **la seule surface du produit qui ne suit pas le thème sombre**.
+ *
+ * Ce n'est pas une exception esthétique : un lecteur de QR attend un contraste franc entre modules
+ * sombres et fond clair. Inverser fait échouer la moitié des applications d'authentification, et
+ * atténuer le blanc les fait échouer sur les téléphones à faible luminosité.
+ *
+ * **Aucune règle ne vise `path` ici, et c'est la règle.** `qrcode.react` émet deux chemins — le
+ * fond puis les modules — qu'un sélecteur d'élément prendrait tous les deux : c'est ainsi que la
+ * v1.0 a livré un carré uni que son parcours déclarait « visible ». Les deux couleurs restent
+ * celles que la bibliothèque pose elle-même ; seule la vignette qui les entoure est un token.
+ */
+.auth__qr {
+  justify-self: center;
+  padding: var(--sp-5);
+  border-radius: var(--radius-card);
+  background: var(--qr-paper);
+  line-height: 0;
+}
+
+/*
+ * La clé en base32, pour la saisie manuelle sur un poste sans caméra. Elle se sélectionne d'un
+ * geste — `user-select: all` — parce qu'elle se recopie caractère par caractère quand le
+ * presse-papiers est refusé, et qu'une sélection manquée fait taper un secret faux.
+ */
+.auth__secret {
+  margin: 0;
+  padding: var(--sp-6);
+  border-radius: var(--radius-input);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font: var(--text-data);
+  letter-spacing: var(--ls-mono);
+  text-align: center;
+  user-select: all;
+  word-break: break-all;
+}
+
+.auth__subtitle {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Deux colonnes : dix codes en une seule colonne allongent la carte au-delà de l'écran, et
+ * l'opérateur perd de vue le rappel qui les surplombe au moment même où il en a besoin.
+ */
+.auth__codes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4) var(--sp-6);
+  margin: 0;
+  padding: var(--sp-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font: var(--text-data);
+  letter-spacing: var(--ls-mono);
+  list-style: none;
+  user-select: all;
+}
+
+.auth__download {
+  color: var(--text-accent);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
