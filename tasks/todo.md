@@ -214,7 +214,7 @@ rattrapait l'erreur. Les trois steps de M2 qui la précèdent n'avaient alors pa
 elles, rien ne l'aurait rattrapée. **Elles en ont une depuis le 08/09/2026**, et la porte les lit —
 vérifié en inversant une dépendance dans chacun des trois en-têtes.*
 
-- [ ] step-027 — Écrans Login & MFA, branchés sur le BFF Go
+- [x] step-027 — Écrans Login & MFA, branchés sur le BFF Go
 - [ ] step-028 — Écran d'enrôlement du second facteur
 - [ ] step-029 — Gestion des opérateurs et des rôles
 

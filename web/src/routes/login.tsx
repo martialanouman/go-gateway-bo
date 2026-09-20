@@ -37,7 +37,21 @@ export const Route = createFileRoute('/login')({
   component: LoginScreen,
 })
 
-/** Ce qui manque dans le formulaire, champ par champ. Vide, il n'y a rien à dire. */
+/**
+ * Ce qui manque dans le formulaire, champ par champ. Vide, il n'y a rien à dire.
+ *
+ * **Le refus vient d'ici et non du serveur**, contrairement à ce que la fiche de step-027 annonçait
+ * (« les erreurs champ par champ depuis `errors[]` »). Vérifié dans le contrat plutôt que supposé :
+ * le schéma `Error` d'`api/openapi-bff.yaml` n'a que `code` et `message`, et il écrit lui-même que
+ * « le champ `errors[]` que le §1.4 annonce arrive avec la première route qui relaie la passerelle
+ * (step-060) ».
+ *
+ * L'écart est sans conséquence ici, et c'est la seconde raison de ne pas l'attendre : les deux
+ * refus du premier facteur — 401 et 429 — sont **globaux par conception**. Le serveur se tait sur
+ * lequel des deux champs a manqué, puisque le dire nommerait les adresses qui existent. Il ne
+ * remplira donc jamais `errors[]` sur cette route, et ce qui reste à dire champ par champ est ce
+ * que le client sait seul : un champ vide.
+ */
 type MissingFields = { email?: string; password?: string }
 
 function LoginScreen() {
