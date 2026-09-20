@@ -238,3 +238,35 @@ describe('la garde du second facteur', () => {
     expect(router.state.location.pathname).toBe('/billing')
   })
 })
+
+describe('l’indice d’horloge et la clé d’accès', () => {
+  it('ne suit pas le refus d’une cérémonie : c’est ce que step-035 a retiré du serveur', async () => {
+    // Le refus vient du **serveur**, sur l'ouverture de la cérémonie, et passe donc par la même
+    // rédaction que le refus d'un code TOTP. C'est là que l'indice se glisserait s'il était ajouté
+    // sans regarder la méthode — et c'est ce chemin-là que le serveur servait à tort.
+    stubWebAuthnSupport(true)
+    const { user } = await visitMfa(
+      { totp: false, passkeys: 1 },
+      {
+        replies: {
+          assert: {
+            status: 400,
+            body: {
+              code: 'no_passkey_enrolled',
+              message:
+                'Aucune clé d’accès n’est enregistrée sur ce compte. En enregistrer une, ou franchir le second facteur autrement.',
+            },
+          },
+        },
+      },
+    )
+
+    await user.click(screen.getByRole('button', { name: /clé d’accès/i }))
+
+    const refus = await screen.findByRole('alert')
+    expect(refus).toHaveTextContent('Aucune clé d’accès n’est enregistrée')
+    // « Vérifier l'heure de l'application d'authentification » n'a aucun sens dans le geste de qui
+    // vient de présenter une clé.
+    expect(refus).not.toHaveTextContent(/heure/i)
+  })
+})
