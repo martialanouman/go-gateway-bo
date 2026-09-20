@@ -20,12 +20,12 @@ async function visitLogin(path = '/login', replies: AuthReplies = {}) {
   render(<RouterProvider router={router} />)
   // Le formulaire, et non le titre : l'écran d'attente de la garde porte le **même** titre, si bien
   // qu'attendre un `h1` rendait la main avant que le formulaire n'existe.
-  await screen.findByLabelText(/Adresse professionnelle/)
+  await screen.findByLabelText(/E-mail/)
 
   return { router, user: userEvent.setup() }
 }
 
-const email = () => screen.getByLabelText(/Adresse professionnelle/)
+const email = () => screen.getByLabelText(/E-mail/)
 const password = () => screen.getByLabelText(/Mot de passe/)
 const submit = () => screen.getByRole('button', { name: 'Se connecter' })
 
@@ -133,7 +133,7 @@ describe('les erreurs champ par champ', () => {
     const champ = email().closest('.ui-field')
     expect(email()).toHaveAttribute('aria-invalid', 'true')
     expect(within(champ as HTMLElement).getByRole('alert')).toHaveTextContent(
-      'Cette adresse est requise',
+      'Cet e-mail est requis',
     )
     // Le mot de passe manque aussi : les deux refus s'affichent, et non le premier seulement.
     expect(password()).toHaveAttribute('aria-invalid', 'true')
@@ -192,7 +192,7 @@ describe('ce que le client croit savoir de la session', () => {
     stubSession({ permissions: [], elevated: false })
     const router = createAppRouter(createMemoryHistory({ initialEntries: ['/login'] }))
     render(<RouterProvider router={router} />)
-    await screen.findByLabelText(/Adresse professionnelle/)
+    await screen.findByLabelText(/E-mail/)
 
     const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
     const lectures = () =>

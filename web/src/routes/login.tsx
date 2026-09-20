@@ -91,9 +91,7 @@ function LoginScreen() {
     // Les deux champs sont relus d'un coup : signaler le premier puis le second ferait deux
     // aller-retours là où l'opérateur peut tout corriger en une fois.
     const incomplete: MissingFields = {
-      ...(email.trim() === ''
-        ? { email: 'Cette adresse est requise pour ouvrir une session.' }
-        : {}),
+      ...(email.trim() === '' ? { email: 'Cet e-mail est requis pour ouvrir une session.' } : {}),
       ...(password === ''
         ? { password: 'Ce mot de passe est requis pour ouvrir une session.' }
         : {}),
@@ -113,7 +111,7 @@ function LoginScreen() {
           navigateur et hors de la charte. `required` reste posé — il porte la sémantique pour les
           technologies d'assistance, et la marque visuelle en découle. */}
       <form className="auth__form" noValidate onSubmit={onSubmit}>
-        <Field error={missing.email} label="Adresse professionnelle">
+        <Field error={missing.email} label="E-mail">
           <Input
             autoComplete="username"
             autoFocus

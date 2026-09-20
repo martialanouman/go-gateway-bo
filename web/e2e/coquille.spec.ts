@@ -72,7 +72,7 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // ── Le premier facteur, puis un compte sans second facteur ──────────────────────────────────
 
   const signIn = async () => {
-    await page.getByLabel(/Adresse professionnelle/).fill(fromEnv('DASHBOARD_E2E_OPERATOR_EMAIL'))
+    await page.getByLabel(/E-mail/).fill(fromEnv('DASHBOARD_E2E_OPERATOR_EMAIL'))
     await page.getByLabel('Mot de passe').fill(fromEnv('DASHBOARD_E2E_OPERATOR_PASSWORD'))
     await page.getByRole('button', { name: 'Se connecter' }).click()
   }

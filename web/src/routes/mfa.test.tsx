@@ -142,7 +142,7 @@ describe('un opérateur sans second facteur enrôlé', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reprendre la connexion' }))
 
-    expect(await screen.findByLabelText(/Adresse professionnelle/)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/E-mail/)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
   })
 })
@@ -216,7 +216,7 @@ describe('la garde du second facteur', () => {
     )
     render(<RouterProvider router={router} />)
 
-    expect(await screen.findByLabelText(/Adresse professionnelle/)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/E-mail/)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
     // La destination survit au détour : c'est elle qu'on rejouera après les deux facteurs.
     expect(router.state.location.search).toEqual({ redirect: '/billing' })
@@ -485,7 +485,7 @@ describe('ce que l’élévation et la sortie laissent derrière', () => {
     const avant = lectures()
 
     await user.click(screen.getByRole('button', { name: 'Reprendre la connexion' }))
-    await screen.findByLabelText(/Adresse professionnelle/)
+    await screen.findByLabelText(/E-mail/)
 
     expect(peekChallenge()).toBeUndefined()
     expect(lectures()).toBeGreaterThan(avant)
@@ -501,7 +501,7 @@ describe('ce que l’élévation et la sortie laissent derrière', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reprendre la connexion' }))
 
-    expect(await screen.findByLabelText(/Adresse professionnelle/)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/E-mail/)).toBeInTheDocument()
   })
 })
 
