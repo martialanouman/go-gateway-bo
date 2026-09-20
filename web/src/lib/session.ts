@@ -26,6 +26,18 @@ export async function readSession(queryClient: QueryClient): Promise<SessionStat
 }
 
 /**
+ * Efface ce que le client croit savoir de la session, après l'avoir changée.
+ *
+ * Sans cet oubli, la connexion réussie n'ouvrait rien : la garde du second facteur relisait le
+ * **401 mis en cache** avant elle, concluait « aucune session » et renvoyait au formulaire. Un
+ * `invalidateQueries` suffirait à le faire refetcher ; `removeQueries` dit ce qui s'est passé — ce
+ * qui était connu ne vaut plus, y compris l'échec.
+ */
+export function forgetSession(queryClient: QueryClient) {
+  queryClient.removeQueries({ queryKey: meQueryOptions.queryKey })
+}
+
+/**
  * La destination rejouée après la connexion, ramenée à une adresse de ce tableau de bord — ou
  * `undefined`, qui vaut l'accueil.
  *

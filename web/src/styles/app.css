@@ -165,3 +165,85 @@
   align-content: start;
   max-width: var(--content-max);
 }
+
+/*
+ * Les deux écrans qui précèdent la session — connexion et second facteur.
+ *
+ * Une carte centrée sur la page nue, et non la coquille : sans session, le rail n'a aucune entrée
+ * qui mène ailleurs qu'à un refus. La largeur est bornée en `ch` plutôt qu'en pixels — c'est la
+ * longueur de ligne qui fait la lisibilité, et elle suit la police si la charte la change.
+ */
+.auth {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--sp-9);
+  background: var(--surface-page);
+}
+
+.auth__card {
+  display: grid;
+  gap: var(--sp-7);
+  width: min(46ch, 100%);
+  padding: var(--sp-10);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+.auth__brand {
+  margin: 0;
+  color: var(--text-accent);
+  font: var(--text-label);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-page-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.auth__intro {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-normal);
+}
+
+.auth__form {
+  display: grid;
+  gap: var(--sp-7);
+}
+
+/*
+ * `align-items: start` : l'icône doit rester sur la première ligne du message, qui en fait souvent
+ * trois — un refus verrouillé porte sa durée.
+ */
+.auth__refusal {
+  display: flex;
+  gap: var(--sp-5);
+  align-items: start;
+  margin: 0;
+  padding: var(--sp-6);
+  border: 1px solid color-mix(in srgb, var(--red-500) 30%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--tint-red);
+  color: var(--text-danger-on-tint);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-normal);
+}
+
+/* Ce que l'écran ajoute sous le formulaire : une piste, une sortie. Jamais un refus. */
+.auth__aside {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-normal);
+}
