@@ -295,6 +295,27 @@ describe('chargement à froid', () => {
       // mal formé — « … See <url> » —, et n'est la cible d'aucun `fetch` ni d'aucun `src`, ce que la
       // recherche des deux motifs confirme. Le navigateur ne la demande jamais.
       'https://simplewebauthn.dev/docs/',
+      // Zod, et ce ne sont pas des adresses mais des **identifiants de dialecte** : le `$schema`
+      // qu'écrit `toJSONSchema`, au même titre que `http://www.w3.org/2000/svg` plus haut est un
+      // espace de noms et non une page. Vérifié sur le bundle livré (`dist/assets/form-*.js`) :
+      // les deux sont affectés à une propriété d'un objet littéral — `i.$schema = …` — et ne sont la
+      // cible d'aucun `fetch` ni d'aucun `src`.
+      //
+      // Le code qui les porte n'a d'ailleurs **aucun appelant** ici : ce dépôt n'engendre pas de
+      // JSON Schema. Il traverse parce que `import { z } from 'zod'` est un espace de noms, que
+      // l'élagage ne perce pas. Mesuré : le passage aux imports nommés ne rend que 4,5 ko sur
+      // 116,7 et ne fait pas disparaître ces chaînes, la migration des deux écrans gardant l'espace
+      // de noms. Le prix d'un code engendré illisible pour 4 % n'a pas été payé.
+      'http://json-schema.org/',
+      'https://json-schema.org/',
+      // Le validateur d'IPv6 de Zod, qui compose une URL pour la donner à analyser au `URL` du
+      // navigateur : `` Hr(`http://[${e}]`) ``, où `e` est la chaîne candidate. Ce n'est pas une
+      // origine — c'est un gabarit —, et rien ne la demande.
+      //
+      // Le préfixe s'arrête à `$` **délibérément** : une adresse IPv6 littérale commence par un
+      // chiffre ou un deux-points, jamais par `$`. Écrit `http://[`, ce préfixe aurait laissé passer
+      // un `http://[2001:db8::1]:3001` écrit en dur — exactement ce que cette garde tient.
+      'http://[$',
     ]
     const allowedExactly = ['http://localhost'] // repli d'origine de TanStack Router hors navigateur
 

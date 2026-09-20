@@ -1,10 +1,14 @@
 import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
-import { type FormEvent, useId, useState } from 'react'
+import { useId } from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
 import { AuthLayout, AuthPending, AuthRefusal } from '~/components/auth-layout'
 import { Button, Field, Input } from '~/components/ui'
 import { api, HttpError, meQueryOptions } from '~/lib/api'
+import { MfaVerification } from '~/lib/contract.gen'
+import { formResolver } from '~/lib/form'
 import {
   forgetChallenge,
   forgetSession,
@@ -57,6 +61,25 @@ export const Route = createFileRoute('/mfa')({
 const CLOCK_HINT =
   'Si le code est refusé plusieurs fois de suite, vérifiez l’heure de l’application d’authentification : le serveur tolère environ une minute d’écart, et refuse les codes au-delà.'
 
+/**
+ * Ce que le formulaire du code oppose à la saisie.
+ *
+ * `.unwrap()` parce que le contrat déclare `code` **facultatif** : une assertion de clé d'accès n'en
+ * porte aucun, et le serveur exige l'un ou l'autre selon la méthode. Ce formulaire-ci ne présente
+ * que la voie TOTP, où le code est requis — c'est l'écran qui le sait, pas le contrat.
+ *
+ * Les bornes, elles, restent celles du contrat : `minLength: 1`, `maxLength: 64`. Le « six
+ * chiffres » du libellé est tenu par le `maxLength` du champ, et non redit ici — un code de
+ * récupération en fait onze, et step-028 ouvrira cette voie dans le même formulaire.
+ */
+const totpAttempt = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1, 'Saisissez le code à six chiffres.')
+    .pipe(MfaVerification.shape.code.unwrap()),
+})
+
 function SecondFactorScreen() {
   const { redirect: destination } = Route.useSearch()
   const me = useQuery(meQueryOptions)
@@ -93,8 +116,7 @@ function FactorChallenge({
   // signature de type pour ne rien apporter.
   const router = useRouter()
   const queryClient = useQueryClient()
-  const [code, setCode] = useState('')
-  const [missing, setMissing] = useState<string | undefined>(undefined)
+  const form = useForm({ resolver: formResolver(totpAttempt), defaultValues: { code: '' } })
   const explanationId = useId()
 
   // `browserSupportsWebAuthn` plutôt qu'une sonde maison : la bibliothèque connaît les cas que
@@ -134,18 +156,6 @@ function FactorChallenge({
     onSuccess: elevate,
   })
 
-  function onSubmit(event: FormEvent) {
-    event.preventDefault()
-
-    if (code.trim() === '') {
-      setMissing('Saisissez le code à six chiffres.')
-
-      return
-    }
-
-    verify.mutate({ method: 'totp', code })
-  }
-
   return (
     <AuthLayout
       intro={
@@ -158,22 +168,24 @@ function FactorChallenge({
       {verify.error === null ? null : <AuthRefusal>{verify.error.message}</AuthRefusal>}
 
       {holdsTotp ? (
-        <form className="auth__form" noValidate onSubmit={onSubmit}>
-          <Field error={missing} label="Code à six chiffres">
+        <form
+          className="auth__form"
+          noValidate
+          onSubmit={form.handleSubmit(({ code }) => verify.mutate({ method: 'totp', code }))}
+        >
+          <Field error={form.formState.errors.code?.message} label="Code à six chiffres">
             <Input
               autoComplete="one-time-code"
               autoFocus
               inputMode="numeric"
               maxLength={6}
               mono
-              name="code"
-              onChange={(event) => {
-                setCode(event.target.value)
-                setMissing(undefined)
-                verify.reset()
-              }}
               required
-              value={code}
+              {...form.register('code', {
+                // Le refus du serveur s'efface dès la frappe : il refusait un code qui n'est plus
+                // celui-là. Le refus de champ, lui, est effacé par React Hook Form, qui revalide.
+                onChange: () => verify.reset(),
+              })}
             />
           </Field>
 
