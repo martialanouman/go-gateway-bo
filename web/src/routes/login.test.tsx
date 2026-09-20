@@ -393,3 +393,25 @@ describe('les quatre couches du formulaire', () => {
     ).toHaveLength(1)
   })
 })
+
+describe('ce que le formulaire envoie vraiment', () => {
+  it('poste l’adresse débarrassée des espaces qui l’entourent', async () => {
+    // Le décor tient l'état du serveur mais n'avait jamais lu un **corps** de requête : le contrôle
+    // de format travaillait sur une adresse rognée quand l'envoi, lui, partait telle quelle. Une
+    // adresse collée depuis un gestionnaire de mots de passe traîne régulièrement une espace.
+    const { user } = await visitLogin()
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+
+    await user.type(email(), '  a.kouadio@example.test  ')
+    await user.type(password(), 'un-mot-de-passe')
+    await user.click(submit())
+
+    const posted = fetch.mock.calls
+      .map(([request]) => request)
+      .find((request) => request.url.endsWith('/api/auth/login'))
+    expect(await posted?.clone().json()).toEqual({
+      email: 'a.kouadio@example.test',
+      password: 'un-mot-de-passe',
+    })
+  })
+})

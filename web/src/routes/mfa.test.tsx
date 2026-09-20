@@ -536,3 +536,22 @@ describe('le refus serveur et ce qu’il décrit', () => {
     expect(screen.queryByText(/Saisissez le code/)).toBeNull()
   })
 })
+
+describe('un code qui n’est que des espaces', () => {
+  it('est refusé ici plutôt qu’envoyé au BFF, comme un champ vide', async () => {
+    // Sans le `.trim()` du schéma, une espace seule satisfait le `minLength: 1` du contrat et part
+    // en vérification : le serveur la refuse en 401, et l'opérateur lit « ce second facteur n'a pas
+    // été accepté » là où il fallait lire « saisissez le code ». C'est ce que step-027 tenait avec
+    // son `code.trim() === ''`.
+    const { user } = await visitMfa({ totp: true, passkeys: 0 })
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+
+    await user.type(code(), '   ')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+
+    expect(within(code().closest('.ui-field') as HTMLElement).getByRole('alert')).toHaveTextContent(
+      'Saisissez le code',
+    )
+    expect(fetch.mock.calls.filter(([r]) => r.url.endsWith('/api/auth/mfa/verify'))).toEqual([])
+  })
+})

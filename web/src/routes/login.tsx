@@ -65,7 +65,11 @@ export const Route = createFileRoute('/login')({
 const credentials = z.object({
   email: z
     .string()
-    .trim()
+    // Pas de `.trim()` : `type="email"` fait déjà partie des contrôles dont la spécification HTML
+    // impose la « value sanitization » — elle retire les espaces qui entourent la valeur, avant que
+    // le formulaire ne la lise. Mesuré plutôt que supposé, et vrai de jsdom comme du navigateur. Ce
+    // qui tient l'adresse postée est donc le `type` du champ, et c'est ce que le test vérifie : le
+    // passer à `text` fait rougir.
     .min(1, 'Saisissez un e-mail.')
     // L'exemple enseigne mieux que la règle : il montre la forme au lieu de la décrire.
     .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Cet e-mail est incomplet. Exemple : ops@exemple.ci')
