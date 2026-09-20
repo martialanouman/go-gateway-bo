@@ -50,26 +50,18 @@ export const Route = createFileRoute('/login')({
  * qu'une fois les règles de l'écran satisfaites : chacun rédige ce qu'il sait, et aucune borne n'est
  * retapée ici.
  *
- * **Le motif d'adresse est volontairement lâche** : un `@`, quelque chose de part et d'autre, et un
- * point dans le domaine. Une expression conforme à la RFC 5322 fait quatre cents caractères et
- * **rejette des adresses valides** ; le seul juge du format est de toute façon le serveur.
- *
- * **Il ne rouvre pas l'oracle d'énumération.** Le serveur refuse de distinguer l'adresse inconnue du
- * mot de passe faux ; le format, lui, ne dit rien de l'existence d'un compte — `absent@nulle.part`
- * le passe. Ce qu'il évite est un aller-retour qui coûte un argon2id et revient en 401 générique, où
- * l'opérateur soupçonne son mot de passe.
- *
- * Ce que le contrat déclare — `email.maxLength: 320`, `password` de 1 à 4 096 — n'est écrit nulle
- * part ici : `LoginRequest` vient de `cmd/zodgen`, qui le lit dans `api/openapi-bff.yaml`.
+ * **Le motif d'adresse est volontairement lâche** — un `@`, quelque chose de part et d'autre, un
+ * point dans le domaine — et il **ne rouvre pas l'oracle d'énumération** : le format ne dit rien de
+ * l'existence d'un compte, `absent@nulle.part` le passe. Ce qu'il évite est un aller-retour qui
+ * coûte un argon2id et revient en 401 générique, où l'opérateur soupçonne son mot de passe.
  */
 const credentials = z.object({
   email: z
     .string()
-    // Pas de `.trim()` : `type="email"` fait déjà partie des contrôles dont la spécification HTML
-    // impose la « value sanitization » — elle retire les espaces qui entourent la valeur, avant que
-    // le formulaire ne la lise. Mesuré plutôt que supposé, et vrai de jsdom comme du navigateur. Ce
-    // qui tient l'adresse postée est donc le `type` du champ, et c'est ce que le test vérifie : le
-    // passer à `text` fait rougir.
+    // Pas de `.trim()` : la « value sanitization » que la spécification HTML impose à
+    // `type="email"` retire déjà les espaces qui entourent la valeur. Mesuré, en jsdom comme au
+    // navigateur — c'est donc le `type` du champ qui tient l'adresse postée, et le passer à `text`
+    // fait rougir.
     .min(1, 'Saisissez un e-mail.')
     // L'exemple enseigne mieux que la règle : il montre la forme au lieu de la décrire.
     .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Cet e-mail est incomplet. Exemple : ops@exemple.ci')
@@ -127,10 +119,8 @@ function LoginScreen() {
   // douter de tous les autres, et celui-ci refusait des identifiants qui ne sont plus ceux-là. Le
   // refus de champ, lui, est effacé par React Hook Form, qui revalide.
   //
-  // **C'est le seul endroit qui l'efface, et il suffit.** Un bandeau n'existe qu'après un envoi que
-  // la validation a laissé passer, donc avec deux champs remplis ; le vider demande une frappe, qui
-  // passe ici. Un second effacement à l'envoi a été écrit, puis retiré : la mutation qui le
-  // supprimait laissait tout vert.
+  // **C'est le seul endroit qui l'efface, et il suffit** : un bandeau n'existe qu'après un envoi que
+  // la validation a laissé passer, donc avec deux champs remplis, et le vider demande une frappe.
   const forgetRefusal = { onChange: () => login.reset() }
   const { errors } = form.formState
 

@@ -115,6 +115,29 @@ func TestUnTypeQueLeGenerateurNeSaitPasRendreEstRefuse(t *testing.T) {
 	require.ErrorContains(t, err, "LoginRequest")
 }
 
+// La garde du littéral, et elle n'est pas théorique : sans elle, l'apostrophe referme la chaîne et
+// le fichier engendré n'est plus analysable — engendré **en silence**, puisque `make generate` rend
+// 0 et que c'est `typecheck-web`, une porte plus loin, qui le découvre.
+func TestUneApostropheDansUnEnumEstRefusee(t *testing.T) {
+	doc, err := load([]byte(strings.Replace(
+		miniContract,
+		"          maxLength: 320",
+		"          enum: [\"l'un\", autre]",
+		1,
+	)))
+	require.NoError(t, err)
+
+	_, err = render(doc)
+	require.ErrorContains(t, err, "l'un")
+}
+
+// `start` est la seule porte d'entrée que le Makefile emprunte, et une invocation sans ses deux
+// chemins indexerait hors bornes.
+func TestZodgenRefuseUneInvocationSansSesDeuxChemins(t *testing.T) {
+	require.ErrorContains(t, start([]string{"api/openapi-bff.yaml"}), "deux arguments")
+	require.ErrorContains(t, start(nil), "deux arguments")
+}
+
 // Ce que le générateur cherche est le corps de requête, pas l'inventaire de `components.schemas` :
 // engendrer les réponses ferait du code sans consommateur que `check-generated` forcerait à
 // maintenir à vie.

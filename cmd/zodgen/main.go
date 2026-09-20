@@ -111,13 +111,17 @@ func render(doc *openapi3.T) ([]byte, error) {
 
 	out.WriteString(header)
 
-	for _, name := range requestBodySchemas(doc) {
-		schema := doc.Components.Schemas[name]
-		if schema == nil {
-			return nil, fmt.Errorf("le corps de requête %s ne renvoie à aucun schéma de components", name)
-		}
+	bodies := requestBodySchemas(doc)
 
-		if err := writeSchema(&out, name, schema.Value); err != nil {
+	names := make([]string, 0, len(bodies))
+	for name := range bodies {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	for _, name := range names {
+		if err := writeSchema(&out, name, bodies[name]); err != nil {
 			return nil, err
 		}
 	}
@@ -125,14 +129,18 @@ func render(doc *openapi3.T) ([]byte, error) {
 	return []byte(out.String()), nil
 }
 
-// requestBodySchemas rend les noms des schémas qu'au moins un corps de requête JSON référence, une
-// fois chacun et triés.
+// requestBodySchemas rend les schémas qu'au moins un corps de requête JSON référence, par leur nom.
 //
 // La sélection est **mécanique** — parcourir les opérations — et non une liste de noms tenue à la
 // main : une liste demanderait d'y penser à chaque route posée, et l'oubli livrerait un formulaire
 // dont les bornes ne sont nulle part, sans que rien ne rougisse.
-func requestBodySchemas(doc *openapi3.T) []string {
-	seen := map[string]bool{}
+//
+// Le schéma est pris **là où la référence le résout**, et non relu ensuite dans
+// `doc.Components.Schemas`. La seconde lecture appelait une garde de nullité inatteignable : le
+// chargeur refuse un `$ref` qu'il ne résout pas — « failed to resolve "Absent" in fragment in URI »
+// —, donc `render` n'aurait jamais vu ce cas. Mesuré le 20/09/2026.
+func requestBodySchemas(doc *openapi3.T) map[string]*openapi3.Schema {
+	seen := map[string]*openapi3.Schema{}
 
 	for _, item := range doc.Paths.Map() {
 		for _, operation := range item.Operations() {
@@ -149,19 +157,12 @@ func requestBodySchemas(doc *openapi3.T) []string {
 			// contrat de ce dépôt les nomme tous, et fabriquer un nom ferait un module dont les
 			// exports changeraient au premier renommage d'opération.
 			if name, named := strings.CutPrefix(media.Schema.Ref, "#/components/schemas/"); named {
-				seen[name] = true
+				seen[name] = media.Schema.Value
 			}
 		}
 	}
 
-	names := make([]string, 0, len(seen))
-	for name := range seen {
-		names = append(names, name)
-	}
-
-	sort.Strings(names)
-
-	return names
+	return seen
 }
 
 func writeSchema(out *strings.Builder, name string, schema *openapi3.Schema) error {
