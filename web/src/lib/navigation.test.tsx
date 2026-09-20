@@ -22,8 +22,12 @@ describe('la table de navigation', () => {
     // ajoutée sans entrée serait un écran que personne ne trouve. Aucun des deux ne rougirait le test
     // qui parcourt la table.
     const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
-    const screens = Object.keys(router.routesByPath)
-      .filter((path) => path !== '/' && path !== '/_design')
+    // Enfant de `_shell`, et l'accueil mis à part : c'est ce qui fait un écran du rail. Retrancher
+    // une liste de chemins demanderait d'y penser à chaque route posée hors de la coquille, et
+    // l'oubli ajouterait une entrée au rail sans rien faire rougir.
+    const screens = Object.entries(router.routesByPath)
+      .filter(([path, route]) => path !== '/' && route.id.startsWith('/_shell/'))
+      .map(([path]) => path)
       .sort()
 
     expect(screens).toEqual(NAV_ENTRIES.map((entry) => entry.to).sort())

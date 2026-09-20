@@ -239,6 +239,14 @@ function DesignReference() {
           <Field label="Sender ID" hint="Un sender ID refusé par l'opérateur fait échouer l'envoi.">
             <Input mono placeholder="BANQUE-CI" required />
           </Field>
+          <Field
+            hint="Sans elle, les alertes partent sur l’adresse du compte."
+            label="Adresse de notification"
+            optional
+          >
+            <Input placeholder="ops@exemple.ci" type="email" />
+          </Field>
+
           <Field label="Adresse e-mail" error="Cette adresse n’est pas reconnue.">
             <Input defaultValue="operatrice@" />
           </Field>

@@ -1,6 +1,6 @@
 # step-027 — Écrans Login & MFA, branchés sur le BFF Go
 
-> **Jalon :** M1 (§6.9, §4.2) · **Statut :** À FAIRE
+> **Jalon :** M1 (§6.9, §4.2) · **Statut :** FAIT
 > **Dépend de :** step-025, **step-040** (AppShell, `usePermission`, `PermissionGate`), step-041,
 > step-042, step-036 (contrôle d'origine des mutations) · **Bloque :** step-028, step-029
 
@@ -70,12 +70,29 @@ personne. Les deux ont leur fiche dans `debts/`.*
 - Un opérateur sans second facteur enrôlé n'atteint jamais un écran dont il ne peut pas sortir.
 
 ## Definition of Done
-- [ ] `make check` vert et `make e2e` vert
-- [ ] clavier et libellés accessibles (WCAG 2.1 AA) sur les deux écrans
-- [ ] la mutation « retirer la garde de route » fait rougir le parcours de l'URL collée — et
-      **seulement** lui, ce qui est le constat qui compte
-- [ ] la mutation « renvoyer un opérateur sans facteur vers le challenge » fait rougir
-- [ ] la copie a été relue contre les réponses réelles du BFF, pas contre l'intention
+- [x] `make check` vert et `make e2e` vert
+- [x] clavier et libellés accessibles (WCAG 2.1 AA) sur les deux écrans
+- [x] la mutation « retirer la garde de route » fait rougir le parcours de l'URL collée — **mais pas
+      seulement lui**, et le constat annoncé est donc à corriger. `_shell.test.tsx` rougit aussi,
+      parce que ses tests montent l'arbre de routes réel plutôt qu'un composant isolé : la garde
+      s'exécute pour de bon en mémoire. Ce que le parcours tient **seul** est autre chose — la garde
+      au **chargement à froid, contre le binaire**, sur une adresse servie par le repli SPA. La
+      rédaction de cette case décrivait le mode d'échec de la v1.0, où la garde ne s'exécutait pas
+      dans ce cas ; elle ne décrit pas ce qui est livré ici.
+- [x] la mutation « renvoyer un opérateur sans facteur vers le challenge » fait rougir — au niveau
+      composant **et** sur le parcours
+- [x] la copie a été relue contre les réponses réelles du BFF, pas contre l'intention. Trois écarts
+      trouvés en revue et corrigés : l'indice d'horloge annonçait trente secondes quand
+      `internal/mfa/mfa.go` en tolère quatre-vingt-dix ; il se collait à **tout** refus du chemin
+      TOTP, verrouillage et panne compris ; et « challenge », nom de champ du contrat, avait fui
+      dans une phrase lue par un opérateur.
+
+## Ce que la fiche annonçait et que le contrat ne porte pas
+« Les erreurs champ par champ depuis `errors[]` » : le schéma `Error` d'`api/openapi-bff.yaml` n'a
+que `code` et `message`, et écrit lui-même que `errors[]` arrive avec step-060. Sans conséquence
+ici — les refus que `/auth/login` rend à un formulaire rempli sont globaux **par conception**, le
+serveur ne nommant jamais lequel des deux facteurs a manqué. Ce qui reste à dire champ par champ est
+ce que le client sait seul : un champ vide. Consigné dans `web/src/routes/login.tsx`.
 
 ## Hors périmètre
 L'enrôlement du second facteur → step-028. La gestion des opérateurs → step-029. Le rail et la barre

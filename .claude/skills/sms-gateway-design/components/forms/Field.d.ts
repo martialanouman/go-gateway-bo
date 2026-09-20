@@ -1,7 +1,8 @@
 export interface FieldProps {
   label?: React.ReactNode;
   htmlFor?: string;
-  required?: boolean;
+  /** Ajoute « (optionnel) » au libellé. L'inverse — marquer l'obligatoire — n'existe pas. */
+  optional?: boolean;
   /** Plain-language consequence of the setting — shown when there is no error. */
   hint?: React.ReactNode;
   error?: React.ReactNode;

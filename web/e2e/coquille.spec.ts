@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test'
+import { createHmac } from 'node:crypto'
+import { expect, type Request, test } from '@playwright/test'
 
 /**
  * Le seul parcours du dépôt, et il tourne contre le **binaire**. Ce qu'il prouve que rien d'autre ne
@@ -24,7 +25,19 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   const requested: string[] = []
   const problems: string[] = []
   page.on('request', (r) => requested.push(r.url()))
-  page.on('requestfailed', (r) => problems.push(`requête échouée : ${r.url()}`))
+  // Une requête qui a **reçu sa réponse** n'a pas échoué, quoi que Chromium en dise ensuite. Le cas
+  // est celui des `204` du produit — `/auth/logout`, `/auth/mfa/verify` : leur corps est vide, rien
+  // ne le lit, et la navigation qui suit le succès fait marquer la requête `net::ERR_ABORTED`. Le
+  // croisement garde l'observation utile là où un filtre sur `ERR_ABORTED` l'aurait aveuglée : une
+  // requête réellement perdue n'a, elle, jamais de réponse.
+  const answered = new WeakSet<Request>()
+  page.on('response', (response) => {
+    if (response.ok()) answered.add(response.request())
+  })
+  page.on('requestfailed', (r) => {
+    if (answered.has(r)) return
+    problems.push(`requête échouée : ${r.url()} — ${r.failure()?.errorText ?? '?'}`)
+  })
   page.on('pageerror', (error) => problems.push(`exception : ${error.message}`))
   page.on('console', (message) => {
     if (message.type() !== 'error') return
@@ -39,40 +52,138 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   expect(served.ok()).toBe(true)
   expect(await served.text()).toContain('data-skeleton="rail"')
 
-  // Quand un opérateur ouvre l'application sans session
+  // ── La porte d'entrée ───────────────────────────────────────────────────────────────────────
+
+  // Quand un opérateur ouvre l'application sans session, la garde de route s'exécute **sur une URL
+  // collée**, au chargement à froid : c'est le cas que la v1.0 ne traitait pas pendant que trois
+  // tests la déclaraient verte, et qu'aucun test de composant ne peut voir.
   await page.goto('/')
-
-  // Alors le squelette cède la place à un état qui nomme l'écran à venir — step-027 n'est pas livrée
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Aucune session ouverte')
-  await expect(page.getByText(/step-027/)).toBeVisible()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Connexion')
+  // Hors de la coquille : le squelette du rail a bien cédé, et rien ne l'a remplacé.
   await expect(page.locator('[data-skeleton="rail"]')).toHaveCount(0)
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toHaveCount(0)
 
-  // Étant donné une session ouverte par l'API, **depuis la page** : c'est le navigateur qui range le
-  // cookie, avec ses propres règles, et non le client de requêtes de Playwright.
-  const status = await page.evaluate(
-    async (credentials) =>
-      (
-        await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(credentials),
-        })
-      ).status,
+  // Et une **adresse profonde** collée sans session garde sa destination, plutôt que de la perdre
+  // au passage par la connexion.
+  await page.goto('/billing')
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fbilling$/)
+
+  // ── Le premier facteur, puis un compte sans second facteur ──────────────────────────────────
+
+  const signIn = async () => {
+    await page.getByLabel(/E-mail/).fill(fromEnv('DASHBOARD_E2E_OPERATOR_EMAIL'))
+    await page.getByLabel('Mot de passe').fill(fromEnv('DASHBOARD_E2E_OPERATOR_PASSWORD'))
+    await page.getByRole('button', { name: 'Se connecter' }).click()
+  }
+
+  await signIn()
+
+  // Le compte semé n'a **aucun** second facteur, et `POST /auth/login` rend un challenge sans
+  // regarder ce qui est enrôlé : le cas se découvre donc ici. L'envoyer au challenge serait
+  // l'envoyer à un refus certain.
+  await expect(page).toHaveURL(/\/mfa/)
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('n’est pas encore livré')
+  await expect(page.getByText(/step-028/)).toBeVisible()
+
+  // ── Le préfixe `__Host-`, appliqué par un vrai navigateur ───────────────────────────────────
+  //
+  // La dette de step-022 se solde ici. Son harnais portait ses cookies à la main et « accepterait
+  // n'importe quel nom » ; seul un navigateur applique le préfixe — il **refuse** un cookie
+  // `__Host-` porteur d'un `Domain`, d'un `Path` autre que `/`, ou servi sans `Secure`. Qu'une
+  // session ait vécu ci-dessus le prouve déjà ; ces lignes nomment ce qui casserait.
+  const stored = await page.context().cookies()
+  const session = stored.find((cookie) => cookie.name.startsWith('__Host-'))
+  expect(
+    session,
+    'aucun cookie `__Host-` retenu : le navigateur a refusé ce que le BFF a posé',
+  ).toBeDefined()
+  expect(session?.path, '`__Host-` exige `Path=/`').toBe('/')
+  expect(session?.secure, '`__Host-` exige `Secure`').toBe(true)
+  expect(session?.httpOnly, 'le script ne doit pas lire la session (invariant b)').toBe(true)
+
+  // Et ce n'est pas un cul-de-sac : la sortie ramène à la connexion.
+  await page.getByRole('button', { name: 'Reprendre la connexion' }).click()
+  await expect(page).toHaveURL(/\/login$/)
+
+  // ── Un second facteur enrôlé, puis le parcours complet ──────────────────────────────────────
+  //
+  // L'enrôlement passe par l'API : son écran arrive en step-028. Le geste est celui d'un décor,
+  // pas du produit — et il est fait **depuis la page**, pour que le navigateur range le cookie avec
+  // ses propres règles.
+  const secret = await page.evaluate(
+    async (credentials) => {
+      const opened = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      })
+      if (!opened.ok) throw new Error(`connexion du décor refusée : ${opened.status}`)
+
+      const enrolled = await fetch('/api/auth/mfa/totp/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      if (!enrolled.ok) throw new Error(`enrôlement du décor refusé : ${enrolled.status}`)
+      const { secret } = (await enrolled.json()) as { secret: string }
+
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      return secret
+    },
     {
       email: fromEnv('DASHBOARD_E2E_OPERATOR_EMAIL'),
       password: fromEnv('DASHBOARD_E2E_OPERATOR_PASSWORD'),
     },
   )
-  expect(status).toBe(200)
 
-  // Alors l'AppShell remplace l'état, et nomme l'opérateur
-  await page.reload()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    "Le cockpit d'exploitation se construit",
-  )
+  // Une adresse profonde, sans session, et cette fois le parcours va jusqu'au bout : connexion,
+  // second facteur, **et la destination demandée rejouée**.
+  await page.goto('/billing')
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fbilling$/)
+
+  // Lu **sur le fil**, puisque c'est la seule façon d'en connaître la valeur : le produit ne
+  // l'expose nulle part, ce qui est précisément ce qu'on vérifie plus bas.
+  let challenge = ''
+  page.on('response', async (response) => {
+    if (!response.url().endsWith('/api/auth/login') || !response.ok()) return
+    challenge = ((await response.json()) as { challenge: string }).challenge
+  })
+
+  await signIn()
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Second facteur')
+  await page.getByLabel(/Code à six chiffres/).fill(totpCode(secret))
+  await page.getByRole('button', { name: 'Vérifier' }).click()
+
+  // Alors la coquille s'ouvre **sur la destination demandée**, et non sur l'accueil.
+  await expect(page).toHaveURL(/\/billing$/)
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Soldes & crédits')
   const nav = page.getByRole('navigation', { name: 'Navigation principale' })
   await expect(nav).toBeVisible()
   await expect(page.getByRole('banner')).toContainText(fromEnv('DASHBOARD_E2E_OPERATOR_NAME'))
+
+  // Le challenge n'a laissé aucune trace — et c'est **sa valeur** qu'on cherche, captée sur le fil,
+  // non un mot qui y ressemblerait. Chercher la chaîne « challenge » passerait tout aussi bien sur
+  // un stockage qui porte le secret sous une autre clé.
+  expect(challenge, "le challenge n'a pas été observé : l'assertion ne garde rien").toBeTruthy()
+  expect(page.url(), "le challenge est passé par l'URL").not.toContain(challenge)
+
+  const storage = await page.evaluate(() =>
+    JSON.stringify([{ ...window.localStorage }, { ...window.sessionStorage }]),
+  )
+  expect(storage, 'le challenge a été déposé dans le stockage du navigateur').not.toContain(
+    challenge,
+  )
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    "Le cockpit d'exploitation se construit",
+  )
 
   // Et une entrée du rail mène à un état vide qui nomme son jalon
   const routes = nav.getByRole('link', { name: 'Routes' })
@@ -178,17 +289,15 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   await blocked.focus()
   await expect(blocked).toBeFocused()
 
-  // **L'astérisque du champ requis**, qui n'est pas une prop mais une conséquence de l'état du
-  // contrôle — donc invisible à jsdom, qui n'applique pas le CSS. C'est ici qu'on vérifie que le
-  // `:has()` trouve sa cible, et que la marque n'est pas annoncée.
-  const required = await page
+  // **Le marqueur porte l'optionnel, et rien d'autre.** La règle s'est inversée : un cockpit
+  // demande presque tous ses champs, donc semer des astérisques fait du bruit sur la règle et du
+  // silence sur l'exception. Vérifié ici et pas en test de composant parce que la disparition de la
+  // marque tenait à une règle CSS — `::after` sur `:has(:required)` —, que jsdom n'applique pas.
+  const marqueDuRequis = await page
     .locator('.ui-field:has(.ui-input:required) .ui-field__label')
     .first()
     .evaluate((element) => getComputedStyle(element, '::after').content)
-  // `'"*" / ""'` et non `toContain('*')` : c'est le ` / ""` — le texte de remplacement **vide** —
-  // qui empêche le lecteur d'écran d'annoncer « étoile » sur chaque libellé de champ requis, et
-  // `toContain('*')` passe quand on le retire.
-  expect(required, "le champ requis ne porte pas sa marque, ou l'annonce").toBe('"*" / ""')
+  expect(marqueDuRequis, 'un champ requis porte encore une marque').toBe('none')
 
   // **Les deux formes de statut ne se confondent pas**, et c'est la règle la plus stricte du
   // système : un disjoncteur ouvert sur un lien vivant et un bind mort demandent des actions
@@ -303,6 +412,50 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
 
   expect(problems).toEqual([])
 })
+
+/**
+ * Le code TOTP attendu à cet instant, calculé **dans le test** — SHA-1, six chiffres, pas de trente
+ * secondes, exactement ce que `internal/mfa/mfa.go` déclare (`digits`, `algorithm`,
+ * `PeriodSeconds`). Il n'y a pas d'écran d'enrôlement avant step-028, donc pas d'autre voie ; et
+ * `node:crypto` suffit, là où une bibliothèque de plus ne ferait que redire ces quinze lignes.
+ *
+ * Le serveur tolère un pas d'écart (`Skew: 1`), ce qui met ce calcul à l'abri d'une frontière de
+ * période franchie entre la saisie et la vérification.
+ */
+function totpCode(secretBase32: string) {
+  const counter = Buffer.alloc(8)
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 1000 / 30)))
+
+  const mac = createHmac('sha1', decodeBase32(secretBase32)).update(counter).digest()
+  // Troncature dynamique de la RFC 4226 §5.4 : les quatre bits de poids faible du dernier octet
+  // désignent où lire les quatre octets du code.
+  const offset = (mac[mac.length - 1] ?? 0) & 0x0f
+  const truncated = mac.readUInt32BE(offset) & 0x7fff_ffff
+
+  return String(truncated % 1_000_000).padStart(6, '0')
+}
+
+function decodeBase32(input: string) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  const bytes: number[] = []
+  let accumulator = 0
+  let bits = 0
+
+  for (const character of input.replace(/=+$/, '').toUpperCase()) {
+    const index = alphabet.indexOf(character)
+    if (index === -1) throw new Error(`secret base32 invalide : ${character}`)
+
+    accumulator = (accumulator << 5) | index
+    bits += 5
+
+    if (bits >= 8) {
+      bits -= 8
+      bytes.push((accumulator >>> bits) & 0xff)
+    }
+  }
+
+  return Buffer.from(bytes)
+}
 
 function fromEnv(name: string) {
   const value = process.env[name]

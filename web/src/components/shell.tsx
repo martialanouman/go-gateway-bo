@@ -1,9 +1,29 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link, useRouter } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { EmptyState, ErrorState, LoadingState, Skeleton, ToastStack } from '~/components/ui'
 import { HttpError, isUnauthenticated, meQueryOptions } from '~/lib/api'
 import { Rail } from './rail'
 import { TopBar } from './top-bar'
+
+/**
+ * La silhouette seule, pendant que la **garde de route** lit la session.
+ *
+ * Elle existe parce que la garde attend : `beforeLoad` ne rend rien tant qu'il n'a pas décidé, si
+ * bien que l'état de chargement ci-dessous n'est plus atteignable par un écran gardé. Sans ce
+ * composant, le squelette peint par `index.html` cédait la place à un écran **vide** le temps d'un
+ * aller-retour — exactement le blanc que le §1.9 interdit.
+ */
+export function ShellPending() {
+  return (
+    <Frame>
+      <LoadingState label="Ouverture de la session">
+        <Skeleton width={240} />
+        <Skeleton width={180} />
+      </LoadingState>
+    </Frame>
+  )
+}
 
 /**
  * La coquille reprend la silhouette que `index.html` a peinte — rail, barre supérieure, contenu —
@@ -19,6 +39,7 @@ import { TopBar } from './top-bar'
  */
 export function Shell({ children }: { readonly children: ReactNode }) {
   const me = useQuery(meQueryOptions)
+  const router = useRouter()
 
   if (isUnauthenticated(me.error)) {
     return (
@@ -31,7 +52,12 @@ export function Shell({ children }: { readonly children: ReactNode }) {
                 restent fermées.
               </p>
               <p>
-                L’écran de connexion n’est pas encore livré ; il arrive avec step-027, au jalon M1.
+                {/* Sans destination à rejouer : l'adresse d'où l'on vient ne correspond à aucun
+                    écran, et y revenir ramènerait à ce même message. */}
+                <Link search={{ redirect: undefined }} to="/login">
+                  Se connecter
+                </Link>{' '}
+                ouvre une session et conduit à l’accueil.
               </p>
             </>
           }
@@ -58,7 +84,11 @@ export function Shell({ children }: { readonly children: ReactNode }) {
       <Frame>
         <ErrorState
           description="Le tableau de bord n’a pas pu vérifier la session ; aucun écran ne s’ouvre sans elle."
-          onRetry={() => void me.refetch()}
+          // `router.invalidate()` et non `me.refetch()` : ce qu'il faut rejouer est la **garde**,
+          // pas la seule requête. Une relecture réussie peut rendre une session **non élevée**, et
+          // la coquille se peignait alors tout entière — `beforeLoad` ne se rejoue pas de lui-même
+          // — pour un cockpit dont chaque appel gardé rendrait 403. La garde, elle, tranche.
+          onRetry={() => void router.invalidate()}
           request={`GET /api/auth/me · ${status}`}
           // Le titre par défaut accuse l'API Admin ; c'est le BFF qui répond à `/auth/me`.
           title="Impossible de vérifier la session"
@@ -68,14 +98,9 @@ export function Shell({ children }: { readonly children: ReactNode }) {
     )
   }
 
-  return (
-    <Frame>
-      <LoadingState label="Ouverture de la session">
-        <Skeleton width={240} />
-        <Skeleton width={180} />
-      </LoadingState>
-    </Frame>
-  )
+  // Atteignable par une adresse inconnue, qui rend la coquille **hors** de la garde. La même
+  // silhouette que l'attente de la garde : deux rédactions divergeraient.
+  return <ShellPending />
 }
 
 /**

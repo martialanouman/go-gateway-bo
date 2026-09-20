@@ -290,6 +290,11 @@ describe('chargement à froid', () => {
       // `fetch` ni d'aucun `src`. Le navigateur ne la demande jamais, ce que le parcours Playwright
       // observe en refusant toute requête hors origine.
       'https://base-ui.com/production-error',
+      // Même mécanisme encore, côté `@simplewebauthn/browser`. Vérifié sur le bundle livré
+      // (`dist/assets/mfa-*.js`) : l'adresse est l'argument d'un `console.warn` qui signale un appel
+      // mal formé — « … See <url> » —, et n'est la cible d'aucun `fetch` ni d'aucun `src`, ce que la
+      // recherche des deux motifs confirme. Le navigateur ne la demande jamais.
+      'https://simplewebauthn.dev/docs/',
     ]
     const allowedExactly = ['http://localhost'] // repli d'origine de TanStack Router hors navigateur
 

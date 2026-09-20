@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DesignRouteImport } from './routes/[_]design'
 import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as MfaRouteImport } from './routes/mfa'
 import { Route as ShellIndexRouteImport } from './routes/_shell.index'
 import { Route as ShellAccountsRouteImport } from './routes/_shell.accounts'
 import { Route as ShellAuditRouteImport } from './routes/_shell.audit'
@@ -35,6 +37,16 @@ const DesignRoute = DesignRouteImport.update({
 } as any)
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MfaRoute = MfaRouteImport.update({
+  id: '/mfa',
+  path: '/mfa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShellIndexRoute = ShellIndexRouteImport.update({
@@ -121,6 +133,8 @@ const ShellTrafficRoute = ShellTrafficRouteImport.update({
 export interface FileRoutesByFullPath {
   '/_design': typeof DesignRoute
   '/': typeof ShellIndexRoute
+  '/login': typeof LoginRoute
+  '/mfa': typeof MfaRoute
   '/accounts': typeof ShellAccountsRoute
   '/audit': typeof ShellAuditRoute
   '/billing': typeof ShellBillingRoute
@@ -139,6 +153,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/_design': typeof DesignRoute
+  '/login': typeof LoginRoute
+  '/mfa': typeof MfaRoute
   '/accounts': typeof ShellAccountsRoute
   '/audit': typeof ShellAuditRoute
   '/billing': typeof ShellBillingRoute
@@ -160,6 +176,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_design': typeof DesignRoute
   '/_shell': typeof ShellRouteWithChildren
+  '/login': typeof LoginRoute
+  '/mfa': typeof MfaRoute
   '/_shell/accounts': typeof ShellAccountsRoute
   '/_shell/audit': typeof ShellAuditRoute
   '/_shell/billing': typeof ShellBillingRoute
@@ -182,6 +200,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/_design'
     | '/'
+    | '/login'
+    | '/mfa'
     | '/accounts'
     | '/audit'
     | '/billing'
@@ -200,6 +220,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/_design'
+    | '/login'
+    | '/mfa'
     | '/accounts'
     | '/audit'
     | '/billing'
@@ -220,6 +242,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_design'
     | '/_shell'
+    | '/login'
+    | '/mfa'
     | '/_shell/accounts'
     | '/_shell/audit'
     | '/_shell/billing'
@@ -241,6 +265,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   DesignRoute: typeof DesignRoute
   ShellRoute: typeof ShellRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  MfaRoute: typeof MfaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -257,6 +283,20 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ShellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mfa': {
+      id: '/mfa'
+      path: '/mfa'
+      fullPath: '/mfa'
+      preLoaderRoute: typeof MfaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shell/': {
@@ -417,6 +457,8 @@ const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   DesignRoute: DesignRoute,
   ShellRoute: ShellRouteWithChildren,
+  LoginRoute: LoginRoute,
+  MfaRoute: MfaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -24,6 +24,15 @@ export function createAppRouter(history?: RouterHistory) {
 
   return createRouter({
     routeTree,
+    // Le même client que `Wrap` fournit, et non un second : les gardes décident sur ce que les
+    // écrans afficheront.
+    context: { queryClient },
+
+    // Zéro, et non le délai d'une seconde que TanStack applique par défaut. Ce délai sert à éviter
+    // un clignotement sur une attente brève ; ici il produit l'inverse — la garde de session
+    // s'exécute avant tout rendu, donc l'écran resterait **vide** pendant ce temps, juste après que
+    // `index.html` a peint sa silhouette. Chaque route porte son propre `pendingComponent`.
+    defaultPendingMs: 0,
     scrollRestoration: true,
     ...(history ? { history } : {}),
     Wrap: ({ children }) => (

@@ -24,6 +24,14 @@ import (
 //
 // IdleWindow ferme le poste qu'on a quitté : sans elle, un cockpit laissé ouvert à midi reste
 // exploitable le soir. Deux heures, c'est plus long qu'une réunion et plus court qu'une demi-journée.
+//
+// **Aucun test ne rougit si ces deux valeurs changent**, et c'est vérifié plutôt que supposé :
+// mesuré le 20/09/2026 en les portant à trois heures et dix-sept minutes, `go test ./... -count=1`
+// rend 0. C'est assumé — ce sont des décisions, pas des invariants, et les figer par un test
+// interdirait de les régler sans réécrire ce test le même jour. Ce que le produit doit tenir est
+// l'**accord** entre l'échéance que le serveur pose et celle qu'un écran afficherait ; aucun écran
+// ne l'affiche aujourd'hui, et le jour où l'un le fera, c'est cet accord-là qu'il devra garder.
+// (Relevé par step-022, porté par step-027, qui a constaté n'avoir aucun décompte à rendre.)
 const (
 	AbsoluteLifetime = 12 * time.Hour
 	IdleWindow       = 2 * time.Hour

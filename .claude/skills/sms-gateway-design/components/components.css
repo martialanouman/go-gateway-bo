@@ -102,7 +102,7 @@
 /* ================= Field & contrôles ================= */
 .pl-field{display:flex;flex-direction:column;gap:var(--sp-4);min-width:0}
 .pl-field__label{font:var(--text-overline);letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--text-muted);display:flex;align-items:center;gap:var(--sp-4)}
-.pl-field__req{color:var(--text-danger)}
+.pl-field__optional{margin-left:6px;color:var(--text-faint);font:var(--text-caption);text-transform:none}
 .pl-field__hint{font:var(--text-caption);color:var(--text-faint)}
 .pl-field__error{font:var(--text-caption);color:var(--text-danger);display:flex;align-items:center;gap:var(--sp-3)}
 .pl-field__ok{font:var(--text-caption);color:var(--text-success);display:flex;align-items:center;gap:var(--sp-3)}
