@@ -339,3 +339,57 @@ describe('le format de l’e-mail', () => {
     expect(router.state.location.pathname).toBe('/mfa')
   })
 })
+
+describe('les bornes du contrat, à l’écran', () => {
+  it('refuse un mot de passe plus long que ce que le serveur accepte, sans partir au BFF', async () => {
+    // La borne est celle du contrat — `password.maxLength: 4096` — et elle n'est écrite ni dans cet
+    // écran ni dans ce test : elle arrive par `LoginRequest`, qu'engendre `cmd/zodgen`. Sans elle,
+    // ce corps part au BFF, qui le refuse en 400 après l'avoir lu en entier.
+    const { user } = await visitLogin()
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+
+    await user.type(email(), 'a.kouadio@example.test')
+    // `paste` et non `type` : quatre mille frappes simulées prennent des minutes, et personne ne
+    // tape un mot de passe de cette longueur — il est collé d'un gestionnaire.
+    await user.click(password())
+    await user.paste('x'.repeat(4097))
+    await user.click(submit())
+
+    expect(
+      within(password().closest('.ui-field') as HTMLElement).getByRole('alert'),
+    ).toHaveTextContent('4096')
+    expect(fetch.mock.calls.filter(([r]) => r.method === 'POST')).toEqual([])
+  })
+
+  it('laisse passer ce qui tient exactement dans la borne', async () => {
+    const { router, user } = await visitLogin()
+
+    await user.type(email(), 'a.kouadio@example.test')
+    await user.click(password())
+    await user.paste('x'.repeat(4096))
+    await user.click(submit())
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Second facteur/ }),
+    ).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/mfa')
+  })
+})
+
+describe('les quatre couches du formulaire', () => {
+  it('ne rend qu’un message par champ refusé, et non celui de chacune', async () => {
+    // React Hook Form tient l'état, Zod la forme, Base UI le rendu. Brancher en plus le moteur de
+    // validité de Base UI — `required` est posé, donc `valueMissing` est vrai — ferait deux messages
+    // dans le même champ, dont un en anglais et hors de la charte.
+    const { user } = await visitLogin()
+
+    await user.click(submit())
+
+    expect(within(email().closest('.ui-field') as HTMLElement).getAllByRole('alert')).toHaveLength(
+      1,
+    )
+    expect(
+      within(password().closest('.ui-field') as HTMLElement).getAllByRole('alert'),
+    ).toHaveLength(1)
+  })
+})
