@@ -93,12 +93,93 @@ Base UI n'a rien pour les lignes répétables ni pour la re-déclaration dynamiq
   de RHF et celui de Base UI.
 
 ## Definition of Done
-- [ ] `make check` vert et `make e2e` vert
-- [ ] les trois versions et leurs avis de sécurité sont **relevés dans la PR**, pas supposés
-- [ ] le coût sur le bundle est chiffré, avant et après, et assumé par écrit
-- [ ] la mutation « retirer une borne du schéma engendré » fait rougir
-- [ ] la mutation « resserrer une contrainte du YAML sans régénérer » fait rougir `check-generated`
-- [ ] aucun test de step-027 n'a été réécrit pour faire passer la migration
+- [x] `make check` vert et `make e2e` vert — les deux en `rc=0` le 20/09/2026
+- [x] les trois versions et leurs avis de sécurité sont **relevés dans la PR**, pas supposés
+- [x] le coût sur le bundle est chiffré, avant et après, et assumé par écrit
+- [x] la mutation « retirer une borne du schéma engendré » fait rougir — **à deux niveaux**
+- [x] la mutation « resserrer une contrainte du YAML sans régénérer » fait rougir `check-generated`
+- [x] aucun test de step-027 n'a été réécrit pour faire passer la migration — **mesuré** :
+      `git diff main...HEAD` sur les deux fichiers de test ne porte **aucune suppression**
+
+## Ce que la step a mesuré
+
+**Les trois paquets sont arrivés aux versions relevées** — `react-hook-form` 7.88.0, `zod` 4.6.5,
+`@hookform/resolvers` 5.9.1 : la quarantaine de 24 h ne les a pas rabattus. Quatre paquets ajoutés
+en tout, `@standard-schema/utils` 0.3.0 étant la seule dépendance transitive. `pnpm audit` : aucun
+avis sur les trois, le seul restant étant l'exception faker déjà connue.
+
+**Le coût sur le bundle.** L'entrée `index.js` passe de **199 603** à **199 635** octets : +32. Le
+socle part dans un chunk **différé** de **116 687** octets (35 209 en gzip), que seuls `/login` et
+`/mfa` chargent. Le prix n'est donc pas payé au premier octet servi, et il n'est jamais payé par un
+opérateur qui a déjà une session.
+
+**`Field` n'a eu besoin d'aucune modification**, contrairement à ce que cette fiche annonçait. Il
+consommait déjà un `error` de l'extérieur et forçait `match` — il était l'adaptateur en entier, pas
+« à moitié ». Et **la couture pour `errors[]` était déjà posée, gratuitement** : `register('code')`
+écrit le `name` sur le contrôle, et `setError(champ, …)` de React Hook Form remonte par le même
+`errors[champ].message` que `Field` lit déjà. Aucune prop n'a été ajoutée, donc aucune prop sans
+consommateur. Ce que step-060 branchera est un appel à `setError`, pas une modification de `Field`.
+
+**Le moteur de validité de Base UI ne double pas celui de RHF**, et c'est vérifié plutôt que
+supposé : `Field.Error match` rend nos enfants et rien d'autre, et un test compte les `role="alert"`
+d'un champ refusé — il y en a **un**.
+
+## Deux défauts que la migration aurait introduits en silence
+
+**Le pluriel fautif.** `refusalInFrench` écrivait « 1 caractères ». La borne vient du refus, donc
+elle vaut 1 pour tout champ dont le contrat exige seulement qu'il ne soit pas vide : c'était le cas
+courant, pas le cas rare.
+
+**Le `.trim()` du code MFA.** step-027 refusait une espace seule par son `code.trim() === ''`. Sans
+lui, une espace satisfait le `minLength: 1` du contrat et part en vérification : l'opérateur lit
+« ce second facteur n'a pas été accepté » là où il fallait lire « saisissez le code ». Un test le
+tient désormais, et sa mutation rougit.
+
+À l'inverse, le `.trim()` de l'adresse était **mort** : `type="email"` fait partie des contrôles
+dont la spécification HTML impose la « value sanitization », qui retire déjà les espaces qui
+entourent la valeur. Mesuré en jsdom, conforme à la spécification. Il a été retiré, et ce que le
+test tient est le `type` du champ.
+
+## Ce que la revue de mutation a trouvé
+
+Vingt-six mutations, en worktree isolé. Vingt et une rouges du premier coup ; **cinq trous**, tous
+fermés dans la PR — et parmi eux le but même de la step, gardé pour un champ sur deux :
+
+| Mécanisme | Ce que le vert cachait |
+|---|---|
+| `.pipe(LoginRequest.shape.email)` | Retiré, une adresse de **323 caractères** partait au BFF. 373 tests verts, `tsc` vert. |
+| `formResolver` sans sa rédaction | L'écran rendait « Too big: expected string to have <=4096 characters ». L'unique test assertait `'4096'`, que l'anglais porte aussi. |
+| L'ordre du `.pipe` du mot de passe | Inversé, l'opérateur lisait la borne du contrat au lieu du nom du champ. « Saisissez un mot de passe. » n'était assertée **nulle part** dans le dépôt. |
+| La garde du littéral d'enum | Une apostrophe engendrait un fichier inanalysable, `make generate` rendant 0. |
+| La garde d'arguments de `start` | Aucun test n'exerçait la porte d'entrée du Makefile. |
+
+Deux verts se sont révélés **sans effet** plutôt que sans couverture, et la distinction a été mesurée
+avant d'être écrite : le `.trim()` de l'adresse (le navigateur le fait déjà) et la garde de nullité
+de `render` — le chargeur `kin-openapi` refuse en amont tout `$ref` non résolu, « failed to resolve
+"Absent" in fragment in URI ». Trois lignes mortes retirées plutôt qu'un test de complaisance.
+
+Une mutation appliquée par script n'a **pas trouvé son motif** et s'est lue verte. Le `grep` de
+contrôle l'a dit ; sans lui, la garde du littéral serait passée pour tenue.
+
+## Ce que la step n'a pas fait, et pourquoi
+
+**Elle ne paie pas la dette 015.** Les bornes du contrat atteignent la saisie, pas la frontière :
+n'importe quel appelant contourne un schéma client. L'invariant (c) exige la garde serveur, et
+`internal/bff/auth.go` continue de retaper ses deux maxima à la main — sans aucun plancher,
+d'ailleurs. C'est écrit dans le fichier de la dette.
+
+**Elle n'étend aucun parcours de bout en bout, et c'est délibéré.** Le critère 1 vise « toute step
+qui **livre** un chemin d'écran » ; celle-ci n'en livre aucun, elle remplace le mécanisme derrière
+deux chemins que `e2e/coquille.spec.ts` traverse déjà contre le binaire. Le parcours les traverse
+toujours, en `rc=0`. Ce qu'il ne traverse pas est la borne de 4 096 caractères, que seuls les tests
+de composant exercent : la faire refuser dans le navigateur mesurerait le même schéma, une fois de
+plus, au prix d'un parcours qui dure plus longtemps.
+
+**Aucun repli de ligne dans le générateur, et rien ne le garde.** La sortie est incluse dans le
+périmètre de Biome, qui reporte à la ligne toute propriété au-delà de 100 colonnes ; la plus longue
+d'aujourd'hui en fait 58. Un enum assez large rendrait `lint-web` et `check-generated`
+contradictoires. Le remède, le jour venu, est d'exclure le fichier comme `api.gen.ts` l'est — pas
+d'implémenter le repli, que `cmd/permissionsgen` a payé cher.
 
 ## Hors périmètre
 Les écrans qui n'existent pas — step-028 et step-029 consommeront le socle, elles ne le livrent pas.
