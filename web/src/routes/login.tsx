@@ -28,7 +28,7 @@ export const Route = createFileRoute('/login')({
     // reconnecter est la seule remédiation d'un cookie qu'on croit compromis
     // (`closePresentedSession`, `internal/bff/auth.go`).
     if (session.kind === 'open' && session.me.elevated) {
-      throw redirect({ to: search.redirect ?? '/' })
+      throw redirect({ href: search.redirect ?? '/' })
     }
   },
 

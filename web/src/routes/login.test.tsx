@@ -207,3 +207,20 @@ describe('ce que le client croit savoir de la session', () => {
     expect(lectures()).toBeGreaterThan(avant)
   })
 })
+
+describe('une session déjà élevée', () => {
+  it('ne reste pas sur le formulaire : elle rejoint la destination demandée', async () => {
+    // Sans ce renvoi, un retour en arrière après la connexion déposerait l'opérateur sur un
+    // formulaire qu'il vient de franchir — un cul-de-sac dont la seule sortie est l'URL.
+    stubSession({ permissions: [] })
+    const router = createAppRouter(
+      createMemoryHistory({ initialEntries: ['/login?redirect=%2Fbilling'] }),
+    )
+    render(<RouterProvider router={router} />)
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Soldes & crédits/ }),
+    ).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/billing')
+  })
+})
