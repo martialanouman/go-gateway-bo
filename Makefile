@@ -23,6 +23,11 @@ BFF_SERVER := internal/bff/bff.gen.go
 BFF_TYPES := web/src/lib/api.gen.ts
 OPENAPI_TS := web/node_modules/.bin/openapi-typescript
 
+# La troisième sortie qui dérive de `$(CONTRACT_BFF)` : les bornes que `$(BFF_TYPES)` jette en ne
+# gardant que la forme. Le générateur est du **Go pur**, comme `$(PERMISSIONS_TS)`, mais il naît
+# quand même dans `generate` et non dans une cible à part : sa source est le contrat, qui vit ici.
+CONTRACT_ZOD := web/src/lib/contract.gen.ts
+
 # La seule sortie engendrée qui ne dérive **pas** d'un contrat OpenAPI : sa source est du Go, sous
 # `internal/permissions/`. Elle n'exige donc ni `node_modules` ni le contrat, d'où sa propre cible
 # plus bas — mais elle entre dans la même liste, que `check-generated` tient.
@@ -30,7 +35,7 @@ PERMISSIONS_TS := web/src/lib/permissions.gen.ts
 
 # Ce que `check-generated` supprime, régénère et compare. Une liste plutôt qu'un fichier : le jour où
 # une step en ajoute un, l'oublier ici le laisserait diverger sans que rien ne rougisse.
-GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER) $(BFF_TYPES) $(PERMISSIONS_TS)
+GENERATED := $(ADMIN_CLIENT) $(BFF_SERVER) $(BFF_TYPES) $(PERMISSIONS_TS) $(CONTRACT_ZOD)
 
 # Le mock de l'API Admin, et le port que `.env.example` vise avec `DASHBOARD_GATEWAY_BASE_URL`. Le
 # binaire installé, jamais `npx`, qui repaierait une résolution de paquet à chaque lancement — le
@@ -278,6 +283,7 @@ generate: ## Engendre tout ce qui dérive d'une source du dépôt : les deux con
 	go tool oapi-codegen --config api/oapi-codegen.yaml $(CONTRACT_ADMIN)
 	go tool oapi-codegen --config api/oapi-codegen-bff.yaml $(CONTRACT_BFF)
 	$(OPENAPI_TS) $(CONTRACT_BFF) -o $(BFF_TYPES)
+	go run ./cmd/zodgen $(CONTRACT_BFF) $(CONTRACT_ZOD)
 	@$(MAKE) --no-print-directory generate-permissions
 
 # Une cible à part, et non trois lignes de plus dans `generate` : celle-ci est du **Go pur**, quand
