@@ -183,3 +183,27 @@ describe('le clavier', () => {
     expect(router.state.location.pathname).toBe('/mfa')
   })
 })
+
+describe('ce que le client croit savoir de la session', () => {
+  it('relit /auth/me après la connexion, plutôt que de servir la copie d’avant', async () => {
+    // Une session **ouverte et non élevée** : le formulaire reste servi — se reconnecter est la
+    // seule remédiation d'un cookie qu'on croit compromis —, et surtout `/auth/me` a déjà répondu,
+    // donc sa réponse est en cache et fraîche pour une minute.
+    stubSession({ permissions: [], elevated: false })
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/login'] }))
+    render(<RouterProvider router={router} />)
+    await screen.findByLabelText(/Adresse professionnelle/)
+
+    const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
+    const lectures = () =>
+      fetch.mock.calls.filter(([request]) => request.url.endsWith('/api/auth/me')).length
+    const avant = lectures()
+
+    await fillAndSubmit(userEvent.setup())
+    await screen.findByRole('heading', { level: 1, name: /Second facteur/ })
+
+    // Sans l'oubli, la garde du second facteur lirait la session **d'avant la connexion**, encore
+    // fraîche : c'est ainsi qu'un `elevated` périmé renverrait en boucle sur cet écran.
+    expect(lectures()).toBeGreaterThan(avant)
+  })
+})
