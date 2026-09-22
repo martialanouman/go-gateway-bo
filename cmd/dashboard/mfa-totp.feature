@@ -184,6 +184,16 @@ Fonctionnalité: Le second facteur TOTP
     Et le serveur répond 200
     Et le secret rendu diffère du précédent
 
+  # Les gardes du client ne lisent que `secondFactors` : un facteur annoncé là envoie au challenge,
+  # et l'enrôlement reste hors d'atteinte quoi que la route accepte. Livré ainsi, trouvé à la main.
+  Scénario: un enrôlement abandonné n'est pas annoncé comme un second facteur
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur enrôle une application d'authentification
+    Alors le serveur répond 200
+    Et la session n'annonce aucun second facteur
+
   # **Le témoin de la détente ci-dessus, et il tient la moitié qui compte.** Sans sa condition sur
   # les clés d'accès, un compte gardé par une passkey qui marche et portant un TOTP abandonné
   # laisserait quiconque détient le mot de passe remplacer ce TOTP sans élévation, puis s'en servir

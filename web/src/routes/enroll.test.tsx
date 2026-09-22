@@ -401,6 +401,23 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(screen.queryByText(RECOVERY_CODES[0] ?? '')).toBeNull()
   })
 
+  it('reprend l’enrôlement abandonné plutôt que de réclamer un code impossible', async () => {
+    const { user } = await visitEnroll()
+    await user.click(authenticator())
+    await screen.findByText(ENROLLMENT_SECRET)
+
+    cleanup()
+    rememberChallenge(CHALLENGE)
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/enroll'] }))
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+      'Enrôler un second facteur',
+    )
+    expect(router.state.location.pathname).toBe('/enroll')
+    expect(screen.queryByLabelText(/Code à six chiffres/)).toBeNull()
+  })
+
   it('ne réaffiche pas les codes après un rechargement', async () => {
     const { user } = await visitEnroll()
     await confirmEnrollment(user)

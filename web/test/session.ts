@@ -129,6 +129,7 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
         const reply = replies.verify ?? { status: 204 }
         if (reply !== 'pending' && reply.status === 204) {
           current = { permissions: heldPermissions(outcome), elevated: true }
+          granted = { ...granted, totp: true }
         }
 
         return respond(reply)
@@ -151,10 +152,10 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
             recoveryCodes: RECOVERY_CODES,
           },
         }
-        // L'enrôlement **n'élève pas** la session — c'est `POST /auth/mfa/verify` qui le fait, avec
-        // le premier code. Il pose seulement le facteur.
+        // Aucun `totp` ici : le serveur ne l'annonce qu'une fois un code consommé, et un décor qui
+        // l'annonçait plus tôt a caché le défaut jusqu'à ce qu'il soit livré.
         if (reply !== 'pending' && reply.status === 200) {
-          granted = { ...granted, totp: true, recoveryCodesRemaining: RECOVERY_CODES.length }
+          granted = { ...granted, recoveryCodesRemaining: RECOVERY_CODES.length }
         }
 
         return respond(reply)

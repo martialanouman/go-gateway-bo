@@ -724,6 +724,9 @@ components:
       additionalProperties: false
       properties:
         totp:
+          # Une application **confirmée**, et non l'existence d'un secret : l'enrôlement l'écrit
+          # avant tout scan, et l'annoncer alors ferait réclamer un code qu'aucune application ne
+          # produit.
           type: boolean
         recoveryCodesRemaining:
           # Le rappel que la fiche exige : dix codes remis, et l'opérateur doit voir fondre sa réserve
