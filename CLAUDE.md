@@ -81,11 +81,20 @@ Le code les cite par leur lettre.
 **Le code est en anglais** — identifiants, packages, types, champs, fonctions. **Le narratif est en
 français** — commentaires, Gherkin, titres de test, copie produit. Détail : `tasks/plan.md` §1.7.
 
-**Commentaires avec parcimonie.** Un commentaire ne redit jamais ce que le code dit ; il ne subsiste
-que là où le code ne peut pas parler : un *pourquoi* contre-intuitif, un arbitrage dont
-l'alternative évidente est fausse, une contrainte externe invérifiable sur place. Partout ailleurs,
-un meilleur nom ou une fonction extraite — le critère 2 existe parce que **certains commentaires de
-la v1.0 mentaient** sur le code qu'ils surplombaient.
+**Aucun commentaire, sauf nécessité absolue.** Le défaut est zéro : écrire le code nu, puis n'en
+ajouter un que là où le code **ne peut pas** parler — un arbitrage dont l'alternative évidente est
+fausse, deux symboles voisins dont la différence est invisible, une contrainte externe invérifiable
+sur place. Trois lignes au plus. Partout ailleurs, un meilleur nom ou une fonction extraite.
+
+**Le récit appartient au commit, pas au fichier.** Ce qu'on vient de comprendre — l'enquête, le
+défaut trouvé, la mesure qui l'étaye — se lit dans le message de commit et dans la PR, où git le
+date et où personne ne le relit comme s'il décrivait le code d'aujourd'hui. Un commentaire se juge
+sur ce qu'un lecteur ne pourra **pas** déduire, jamais sur ce qu'il a coûté à trouver.
+
+*« Avec parcimonie » a été écrit ici, et n'a pas tenu : 47 % du diff Go de step-021, 44 % de celui
+de step-028, la seconde fois avec une mémoire qui nommait déjà la première.* Le critère 2 existe
+pour la même raison — **certains commentaires de la v1.0 mentaient** sur le code qu'ils
+surplombaient, et un commentaire de moins est un mensonge de moins à entretenir.
 
 **La copie produit** — y compris un message de refus écrit dans un handler Go — est en **français**,
 troisième personne, **conséquence d'abord**. « Sécurisé » n'est jamais une promesse : dire ce que la
