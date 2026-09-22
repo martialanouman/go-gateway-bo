@@ -81,10 +81,9 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
 
   // Le compte semé n'a **aucun** second facteur, et `POST /auth/login` rend un challenge sans
   // regarder ce qui est enrôlé : le cas se découvre donc ici. L'envoyer au challenge serait
-  // l'envoyer à un refus certain.
-  await expect(page).toHaveURL(/\/mfa/)
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('n’est pas encore livré')
-  await expect(page.getByText(/step-028/)).toBeVisible()
+  // l'envoyer à un refus certain ; la garde le conduit à l'enrôlement.
+  await expect(page).toHaveURL(/\/enroll/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Enrôler un second facteur')
 
   // ── Le préfixe `__Host-`, appliqué par un vrai navigateur ───────────────────────────────────
   //
@@ -106,40 +105,11 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   await page.getByRole('button', { name: 'Reprendre la connexion' }).click()
   await expect(page).toHaveURL(/\/login$/)
 
-  // ── Un second facteur enrôlé, puis le parcours complet ──────────────────────────────────────
+  // ── Le parcours du premier administrateur, jusqu'à la console ───────────────────────────────
   //
-  // L'enrôlement passe par l'API : son écran arrive en step-028. Le geste est celui d'un décor,
-  // pas du produit — et il est fait **depuis la page**, pour que le navigateur range le cookie avec
-  // ses propres règles.
-  const secret = await page.evaluate(
-    async (credentials) => {
-      const opened = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials),
-      })
-      if (!opened.ok) throw new Error(`connexion du décor refusée : ${opened.status}`)
-
-      const enrolled = await fetch('/api/auth/mfa/totp/enroll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      })
-      if (!enrolled.ok) throw new Error(`enrôlement du décor refusé : ${enrolled.status}`)
-      const { secret } = (await enrolled.json()) as { secret: string }
-
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-
-      return secret
-    },
-    {
-      email: fromEnv('DASHBOARD_E2E_OPERATOR_EMAIL'),
-      password: fromEnv('DASHBOARD_E2E_OPERATOR_PASSWORD'),
-    },
-  )
+  // Plus aucun décor d'API ici : c'est l'écran de step-028 qui enrôle, et le secret est lu **sur
+  // l'écran** comme un opérateur le lirait. C'est la seule façon de prouver que ce QR et cette clé
+  // mènent quelque part.
 
   // Une adresse profonde, sans session, et cette fois le parcours va jusqu'au bout : connexion,
   // second facteur, **et la destination demandée rejouée**.
@@ -156,9 +126,60 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
 
   await signIn()
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Second facteur')
+  // L'enrôlement, en gardant la destination demandée à travers les deux écrans.
+  await expect(page).toHaveURL(/\/enroll\?redirect=%2Fbilling$/)
+  await page.getByRole('button', { name: 'Configurer une application d’authentification' }).click()
+
+  // **Le QR est peint, pas seulement monté.** C'est la seule lecture possible du défaut de la
+  // v1.0 : `qrcode.react` émet deux chemins, le fond puis les modules, et la règle qui les visait
+  // tous les deux rendait un carré uni que le parcours d'alors déclarait « visible ». jsdom
+  // n'applique aucun CSS, donc aucun test de composant ne peut voir cette couleur-là.
+  const couches = page.locator('.auth__qr path')
+  await expect(couches).toHaveCount(2)
+  const [fond, modules] = await couches.evaluateAll((chemins) =>
+    chemins.map((chemin) => getComputedStyle(chemin).fill),
+  )
+  expect(fond, 'le fond et les modules du QR se peignent de la même couleur').not.toBe(modules)
+
+  // Et la vignette porte bien le token clair — la seule surface du produit qui ne suit pas le
+  // thème sombre. Résolu par le navigateur plutôt que recopié : deux recopies de la même main se
+  // confirment l'une l'autre sans rien mesurer.
+  const papier = await page.evaluate(() => {
+    const sonde = document.createElement('span')
+    sonde.style.color = 'var(--qr-paper)'
+    document.body.append(sonde)
+    const resolu = getComputedStyle(sonde).color
+    sonde.remove()
+    return resolu
+  })
+  await expect(page.locator('.auth__qr')).toHaveCSS('background-color', papier)
+  // Dessiné à sa taille, et non laissé aux 128 px du défaut.
+  await expect(page.locator('.auth__qr svg')).toHaveCSS('width', '200px')
+
+  // La clé, lue à l'écran comme sur un poste sans caméra.
+  const secret = (await page.locator('.auth__secret').innerText()).trim()
+  expect(secret, 'la clé d’enrôlement n’est pas affichée').not.toBe('')
+
+  // **Rien des codes de récupération à ce stade.** Les montrer avant que le facteur ait fait ses
+  // preuves, c'est les faire enregistrer pour un authentificateur qui ne marchera peut-être jamais.
+  await expect(page.locator('.auth__codes')).toHaveCount(0)
+
+  // Le premier code, saisi sur cet écran-ci : c'est lui qui confirme l'enrôlement.
   await page.getByLabel(/Code à six chiffres/).fill(totpCode(secret))
   await page.getByRole('button', { name: 'Vérifier' }).click()
+
+  // Alors seulement les dix codes paraissent, et la seule sortie est l'accusé de réception.
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText('Codes de récupération')
+  await expect(page.locator('.auth__codes li')).toHaveCount(10)
+  await expect(page.getByRole('button', { name: 'Reprendre la connexion' })).toHaveCount(0)
+
+  // **Les dix codes tiennent sur deux colonnes**, et c'est la seule propriété de cette liste qui
+  // porte une décision : en une seule colonne la carte dépasse l'écran, et le rappel « Quitter cet
+  // écran sans les avoir enregistrés les perd » sort du champ de vision au moment même où il sert.
+  // Aucune porte ne voit les règles `.auth__` — `classes-peintes.test.ts` ne lit que les `ui-`.
+  await expect(page.locator('.auth__codes')).toHaveCSS('grid-template-columns', /\S+ \S+/)
+
+  await page.getByRole('button', { name: 'J’ai enregistré ces codes' }).click()
 
   // Alors la coquille s'ouvre **sur la destination demandée**, et non sur l'accueil.
   await expect(page).toHaveURL(/\/billing$/)
@@ -416,8 +437,9 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
 /**
  * Le code TOTP attendu à cet instant, calculé **dans le test** — SHA-1, six chiffres, pas de trente
  * secondes, exactement ce que `internal/mfa/mfa.go` déclare (`digits`, `algorithm`,
- * `PeriodSeconds`). Il n'y a pas d'écran d'enrôlement avant step-028, donc pas d'autre voie ; et
- * `node:crypto` suffit, là où une bibliothèque de plus ne ferait que redire ces quinze lignes.
+ * `PeriodSeconds`). Le parcours tient le rôle du téléphone, et la clé qu'il consomme vient de
+ * l'écran d'enrôlement ; `node:crypto` suffit, là où une bibliothèque de plus ne ferait que redire
+ * ces quinze lignes.
  *
  * Le serveur tolère un pas d'écart (`Skew: 1`), ce qui met ce calcul à l'abri d'une frontière de
  * période franchie entre la saisie et la vérification.

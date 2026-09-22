@@ -164,6 +164,56 @@ Fonctionnalité: Le second facteur TOTP
     Et le serveur répond 200
     Et le secret rendu diffère du précédent
 
+  # **Le verrou que step-028 a découvert en s'en servant.** L'enrôlement écrit le secret avant que
+  # l'opérateur ait scanné quoi que ce soit — `Enrolled` vaut `mfa_totp_secret IS NOT NULL`. Qui
+  # ferme l'onglet à cet instant portait donc un facteur que personne ne détient, pas même lui : sa
+  # prochaine connexion lui réclamait un code qu'aucune application ne produit, le remplacement
+  # exigeait la preuve de ce qu'il n'avait pas, et le premier administrateur n'a aucun supérieur
+  # pour le réinitialiser (dette 044). C'est la panne que cet écran existe pour empêcher.
+  #
+  # `mfa_totp_last_step` tranche, et il était déjà là : `NULL` dit qu'aucun code n'a jamais été
+  # consommé. Ça n'élargit pas la fenêtre de la dette 004 — un premier enrôlement y est déjà libre
+  # pour toute session de premier facteur ; ça rend seulement récupérable ce qui ne l'était pas.
+  Scénario: un authentificateur jamais confirmé se remplace sans rien présenter
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Quand l'opérateur enrôle une application d'authentification
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 200
+    Et le secret rendu diffère du précédent
+
+  # Les gardes du client ne lisent que `secondFactors` : un facteur annoncé là envoie au challenge,
+  # et l'enrôlement reste hors d'atteinte quoi que la route accepte. Livré ainsi, trouvé à la main.
+  Scénario: un enrôlement abandonné n'est pas annoncé comme un second facteur
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur enrôle une application d'authentification
+    Alors le serveur répond 200
+    Et la session n'annonce aucun second facteur
+
+  # **Le témoin de la détente ci-dessus, et il tient la moitié qui compte.** Sans sa condition sur
+  # les clés d'accès, un compte gardé par une passkey qui marche et portant un TOTP abandonné
+  # laisserait quiconque détient le mot de passe remplacer ce TOTP sans élévation, puis s'en servir
+  # pour franchir le second facteur : la passkey ne garderait plus rien.
+  #
+  # La combinaison n'est pas théorique — c'est ce que produit un opérateur qui ajoute une
+  # application d'authentification depuis une session élevée par sa clé, et ne la confirme jamais.
+  Scénario: un authentificateur jamais confirmé ne se remplace pas quand une clé d'accès garde le compte
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et une clé d'accès enregistrée
+    Et l'opérateur a présenté sa clé d'accès
+    Et l'opérateur enrôle une application d'authentification
+    Quand l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 409
+    Et le refus dit qu'aucune preuve n'a été présentée
+
   # Six chiffres de code, trois pas valables à la fois : sans compteur, la recherche exhaustive n'est
   # bornée par rien. Et le compteur du **premier** facteur n'y suffit pas — une connexion réussie
   # n'incrémente rien, donc qui détient le mot de passe émet autant de challenges qu'il veut.
@@ -315,11 +365,10 @@ Fonctionnalité: Le second facteur TOTP
     Et l'opérateur enrôle une application d'authentification 6 fois
     Quand le verrou arrive à échéance
     Et l'opérateur enrôle une application d'authentification 5 fois
-    # 409 et non 200 : le premier des six appels a réussi, donc un facteur est en place et le
-    # remplacer demande d'en présenter la preuve. Ce qui compte ici est que ce ne soit plus 429 — la
+    # 200 : le premier des six appels a écrit un secret que personne n'a jamais confirmé, et un tel
+    # facteur se reprend sans rien présenter. Ce qui compte ici est que ce ne soit plus 429 — la
     # route répond de nouveau pour elle-même.
-    Alors le serveur répond 409
-    Et le refus dit par où passer
+    Alors le serveur répond 200
 
   # **Les deux routes partagent un seul seau, et c'est le sujet de ces deux scénarios.** La migration
   # 00007 ne bornait que la vérification ; le remplacement, qui compare lui aussi un code, ouvrait un
@@ -341,6 +390,12 @@ Fonctionnalité: Le second facteur TOTP
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
     Et l'opérateur enrôle une application d'authentification
+    # Le facteur est **confirmé** avant la suite : un enrôlement que personne n'a jamais confirmé se
+    # reprend sans preuve, donc aucun code ne serait examiné et le seau ne compterait rien. Et la
+    # session repart du premier facteur, sans quoi les codes qui suivent tomberaient sur une session
+    # déjà élevée, que la vérification sert sans rien compter.
+    Et l'opérateur présente le code du pas courant
+    Et l'opérateur se connecte avec son mot de passe
     Quand l'opérateur tente 4 remplacements avec un code faux
     Et l'opérateur présente un code faux
     Et l'opérateur présente le code du pas courant
@@ -358,6 +413,11 @@ Fonctionnalité: Le second facteur TOTP
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
     Et l'opérateur enrôle une application d'authentification
+    # Confirmé puis reconnecté, pour les deux raisons du scénario du seau partagé : un facteur que
+    # personne n'a confirmé se reprend sans preuve, et une session déjà élevée est servie sans que
+    # les codes qui suivent comptent.
+    Et l'opérateur présente le code du pas courant
+    Et l'opérateur se connecte avec son mot de passe
     Et l'opérateur présente 5 codes faux
     Quand l'opérateur remplace son authentificateur en présentant son code
     Alors la réponse est conforme au contrat du BFF

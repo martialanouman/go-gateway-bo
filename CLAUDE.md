@@ -78,20 +78,19 @@ Le code les cite par leur lettre.
 
 ## Code & langue
 
-**Le code est en anglais** — identifiants, packages, types, champs, fonctions. **Le narratif est en
-français** — commentaires, Gherkin, titres de test, copie produit. Détail : `tasks/plan.md` §1.7.
-
-**Commentaires avec parcimonie.** Un commentaire ne redit jamais ce que le code dit ; il ne subsiste
-que là où le code ne peut pas parler : un *pourquoi* contre-intuitif, un arbitrage dont
-l'alternative évidente est fausse, une contrainte externe invérifiable sur place. Partout ailleurs,
-un meilleur nom ou une fonction extraite — le critère 2 existe parce que **certains commentaires de
-la v1.0 mentaient** sur le code qu'ils surplombaient.
+**Le code est en anglais** — identifiants, packages, types, champs, fonctions. **L'interface est en
+français**. Détail : `tasks/plan.md` §1.7.
 
 **La copie produit** — y compris un message de refus écrit dans un handler Go — est en **français**,
 troisième personne, **conséquence d'abord**. « Sécurisé » n'est jamais une promesse : dire ce que la
 protection couvre et où s'arrête la frontière d'accès. Les cinq états de contenu font foi dans
 `tasks/plan.md` §1.9 et tranchent aussi côté serveur — `internal/gateway/errors_test.go` sépare un
 503 d'un module désactivé ; `web/CLAUDE.md` en redonne la liste, sans rien y arbitrer.
+
+- **Code auto-documenté** : Écris du code clair et lisible. Préfère des noms de variables et fonctions explicites plutôt que d'ajouter des commentaires.
+- **Zéro commentaire évident** : Ne commente jamais le code standard, le boilerplate ou la logique triviale (ex: pas de `// incrémente i` ou `// récupère les données`).
+- **Commentaires autorisés** : Limite les commentaires au "Pourquoi" (décisions d'architecture complexes, hacks temporaires ou optimisations non intuitives), jamais au "Quoi".
+- **Format compact** : Pas de longs blocs d'explications avant ou après le code. Rends les réponses directes et purement techniques.
 
 ## Tests — BDD
 

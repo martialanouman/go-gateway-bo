@@ -92,6 +92,7 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 		w.refusalSaysTheProofWasRejected)
 	ctx.Then(`^la réponse ne porte ni le secret ni aucun code de récupération$`, w.responseHidesTheSecret)
 	ctx.Then(`^la réponse annonce un second facteur enrôlé$`, w.announcesAnEnrolledFactor)
+	ctx.Then(`^la session n'annonce aucun second facteur$`, w.announcesNoFactor)
 }
 
 func (w *mfaWorld) enroll() error {
@@ -566,6 +567,20 @@ func (w *mfaWorld) announcesAnEnrolledFactor() error {
 	if !decoded.SecondFactors.TOTP {
 		return errors.New("la réponse annonce un compte sans second facteur : l'écran renverrait vers " +
 			"l'enrôlement d'un authentificateur déjà en place")
+	}
+
+	return nil
+}
+
+func (w *mfaWorld) announcesNoFactor() error {
+	decoded, err := w.currentOperator()
+	if err != nil {
+		return err
+	}
+
+	if decoded.SecondFactors.TOTP {
+		return errors.New("la session annonce une application d'authentification : l'écran " +
+			"réclamerait un code, et l'enrôlement resterait hors d'atteinte")
 	}
 
 	return nil

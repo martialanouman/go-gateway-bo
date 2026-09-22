@@ -103,7 +103,8 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - **Langue.** Code en **anglais**, narratif en **français** — commentaires, scénarios Gherkin, copie.
   Un libellé français peut tenir lieu d'identifiant technique, jamais le remplacer : la valeur
   verbatim reste affichée à côté, en mono et atteignable au clavier. Voir la charte.
-- **Commentaires avec parcimonie** : seulement là où le code ne peut pas parler. Voir `plan.md` §1.7.
+- **Aucun commentaire évident** : du code auto-documenté, et des commentaires réservés au *pourquoi*.
+  Voir `plan.md` §1.7.
 - **Cinq états de contenu** partout : chargement · vide · aucun résultat · module désactivé · erreur.
   Jamais un blanc, jamais une erreur déguisée en vide.
 
@@ -216,7 +217,7 @@ vérifié en inversant une dépendance dans chacun des trois en-têtes.*
 
 - [x] step-027 — Écrans Login & MFA, branchés sur le BFF Go
 - [x] step-049 — Socle de formulaires : React Hook Form, Zod engendré, `Field` en adaptateur ¤
-- [ ] step-028 — Écran d'enrôlement du second facteur
+- [x] step-028 — Écran d'enrôlement du second facteur
 - [ ] step-029 — Gestion des opérateurs et des rôles
 
 ¤ **`step-049` porte un numéro du bloc M2 et se lit ici** — l'ordre de cette liste fait foi. C'est un

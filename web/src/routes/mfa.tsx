@@ -3,12 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useId } from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
-import { AuthLayout, AuthPending, AuthRefusal } from '~/components/auth-layout'
+import { AuthLayout, AuthPending, AuthRefusal, RestartLogin } from '~/components/auth-layout'
 import { Button, Field, Input } from '~/components/ui'
 import { api, HttpError, meQueryOptions } from '~/lib/api'
-import { MfaVerification } from '~/lib/contract.gen'
 import { formResolver } from '~/lib/form'
+import { CHALLENGE_LOST, totpAttempt, verificationRefusal } from '~/lib/second-factor'
 import {
   forgetChallenge,
   forgetSession,
@@ -37,6 +36,18 @@ export const Route = createFileRoute('/mfa')({
       throw redirect({ href: search.redirect ?? '/' })
     }
 
+    // **Aucun facteur enrôlé : l'enrôlement, pas le challenge.** `POST /auth/login` rend un
+    // challenge **sans regarder** ce qui est enrôlé (`internal/auth`, `OutcomeChallenged`) : le cas
+    // se découvre donc ici, et présenter un formulaire dont chaque envoi serait refusé est la
+    // boucle que la v1.0 a livrée.
+    if (
+      session.kind === 'open' &&
+      !session.me.secondFactors.totp &&
+      session.me.secondFactors.passkeys === 0
+    ) {
+      throw redirect({ to: '/enroll', search: { redirect: search.redirect } })
+    }
+
     // Sans challenge, `POST /auth/mfa/verify` refuserait chaque envoi : le formulaire serait un
     // cul-de-sac qui ne dit pas pourquoi. Le cas n'est pas théorique — c'est ce que produit un
     // rechargement de cet écran, puisque le challenge ne vit qu'en mémoire.
@@ -47,38 +58,6 @@ export const Route = createFileRoute('/mfa')({
 
   pendingComponent: () => <AuthPending title="Second facteur" />,
   component: SecondFactorScreen,
-})
-
-/**
- * L'indice que `step-035` a retiré du serveur.
- *
- * `invalid_second_factor` sert les trois méthodes — TOTP, code de récupération, clé d'accès — et
- * disait « vérifier l'heure de l'application d'authentification » à qui venait de présenter une
- * clé. Le serveur ne le dit donc plus. **Cet écran-ci sait quelle méthode il présente**, et c'est
- * ce qui lui permet de le dire sans mentir : sans cette reprise, un opérateur dont le téléphone a
- * dérivé n'a plus aucune piste.
- */
-const CLOCK_HINT =
-  'Si le code est refusé plusieurs fois de suite, vérifiez l’heure de l’application d’authentification : le serveur tolère environ une minute d’écart, et refuse les codes au-delà.'
-
-/**
- * Ce que le formulaire du code oppose à la saisie.
- *
- * `.unwrap()` parce que le contrat déclare `code` **facultatif** : une assertion de clé d'accès n'en
- * porte aucun, et le serveur exige l'un ou l'autre selon la méthode. Ce formulaire-ci ne présente
- * que la voie TOTP, où le code est requis — c'est l'écran qui le sait, pas le contrat.
- *
- * Les bornes, elles, restent celles du contrat : `minLength: 1`, `maxLength: 64`. **Rien ici
- * n'exige six chiffres** : le `maxLength` du champ borne la saisie en haut, et le schéma se
- * contente d'un caractère. C'est délibéré — un code de récupération en fait onze, et step-028
- * ouvrira cette voie dans le même formulaire ; un `length(6)` écrit aujourd'hui serait à défaire.
- */
-const totpAttempt = z.object({
-  code: z
-    .string()
-    .trim()
-    .min(1, 'Saisissez le code à six chiffres.')
-    .pipe(MfaVerification.shape.code.unwrap()),
 })
 
 function SecondFactorScreen() {
@@ -94,11 +73,10 @@ function SecondFactorScreen() {
   // Les deux causes se séparent donc avant d'être lues, et le produit n'affirme plus rien qu'il ne
   // sache.
   if (me.data === undefined) {
-    return <SessionUnreadable error={me.error} onRetry={() => void me.refetch()} />
+    return <SessionUnreadable error={me.error} />
   }
 
   const { totp, passkeys } = me.data.secondFactors
-  if (!totp && passkeys === 0) return <NoFactorEnrolled />
 
   return <FactorChallenge destination={destination} holdsPasskey={passkeys > 0} holdsTotp={totp} />
 }
@@ -120,8 +98,10 @@ function FactorChallenge({
   const form = useForm({ resolver: formResolver(totpAttempt), defaultValues: { code: '' } })
   const explanationId = useId()
 
-  // `browserSupportsWebAuthn` plutôt qu'une sonde maison : la bibliothèque connaît les cas que
-  // `window.PublicKeyCredential !== undefined` manque, et c'est elle qui conduira la cérémonie.
+  // `browserSupportsWebAuthn` plutôt qu'une sonde maison — non qu'elle voie plus de cas : son corps
+  // est `PublicKeyCredential !== undefined && typeof … === 'function'`, mesuré en 13.3.0. Ce qu'elle
+  // apporte est d'être **la** sonde de la bibliothèque qui conduira la cérémonie. Même arbitrage
+  // qu'en `enroll.tsx`, où il est écrit en entier.
   const platformKnowsPasskeys = browserSupportsWebAuthn()
 
   function elevate() {
@@ -152,7 +132,7 @@ function FactorChallenge({
             }
 
       const { error, response } = await api.POST('/auth/mfa/verify', { body })
-      if (!response.ok) throw new Error(refusalOf(error, response.status, attempt.method))
+      if (!response.ok) throw new Error(verificationRefusal(error, response.status, attempt.method))
     },
     onSuccess: elevate,
   })
@@ -234,13 +214,12 @@ function FactorChallenge({
  * Ce n'est pas un `ErrorState` : celui-là promet « vos données locales restent affichées », et il
  * n'y a ici aucune donnée locale — l'écran n'a jamais rien ouvert.
  */
-function SessionUnreadable({
-  error,
-  onRetry,
-}: {
-  readonly error: unknown
-  readonly onRetry: () => void
-}) {
+function SessionUnreadable({ error }: { readonly error: unknown }) {
+  // `router.invalidate()` et non `me.refetch()` : ce qu'il faut rejouer est la **garde**, pas la
+  // seule requête. Une relecture réussie peut rendre un compte **sans aucun facteur**, et cet
+  // écran se peignait alors sur un challenge que le serveur refuserait — `beforeLoad` ne se rejoue
+  // pas de lui-même. La garde, elle, conduit à l'enrôlement. Même arbitrage que `shell.tsx`.
+  const router = useRouter()
   const status = error instanceof HttpError ? String(error.status) : 'réseau'
 
   return (
@@ -249,7 +228,7 @@ function SessionUnreadable({
       title="Impossible de vérifier la session"
     >
       <AuthRefusal>{`GET /api/auth/me · ${status}`}</AuthRefusal>
-      <Button onClick={onRetry} variant="primary">
+      <Button onClick={() => void router.invalidate()} variant="primary">
         Réessayer
       </Button>
       <RestartLogin />
@@ -257,67 +236,10 @@ function SessionUnreadable({
   )
 }
 
-/**
- * Ce que voit un opérateur dont aucun second facteur n'est enrôlé.
- *
- * `POST /auth/login` rend un challenge **sans regarder** ce qui est enrôlé (`internal/auth`,
- * `OutcomeChallenged`) : c'est donc ici que le cas se découvre, et l'envoyer au challenge serait
- * l'envoyer à un refus certain — la boucle que la v1.0 a livrée. L'enrôlement arrive en step-028 ;
- * d'ici là, l'écran nomme son jalon et garde une sortie, jamais un cul-de-sac.
- */
-function NoFactorEnrolled() {
-  return (
-    <AuthLayout
-      intro="Ce compte n’a ni application d’authentification ni clé d’accès, et la session en reste au premier facteur : aucun écran ne s’ouvre tant que le second n’est pas franchi."
-      title="L’enrôlement du second facteur n’est pas encore livré"
-    >
-      <p className="auth__aside">
-        L’écran d’enrôlement arrive avec step-028, au jalon M1. D’ici là, un administrateur peut
-        poser un second facteur sur ce compte.
-      </p>
-      <RestartLogin />
-    </AuthLayout>
-  )
-}
-
-/**
- * La sortie, présente sur **les deux** états de cet écran : un opérateur qui s'est trompé de compte,
- * ou dont le facteur est perdu, doit pouvoir repartir sans fermer l'onglet.
- *
- * Elle ferme la session côté serveur plutôt que de seulement naviguer : rester connecté au premier
- * facteur après avoir demandé à repartir laisserait un cookie vivant que personne ne croit ouvert.
- */
-function RestartLogin() {
-  const queryClient = useQueryClient()
-  const navigate = Route.useNavigate()
-
-  const restart = useMutation({
-    mutationFn: async () => {
-      await api.POST('/auth/logout')
-    },
-    onSettled: () => {
-      // `onSettled` et non `onSuccess` : si la déconnexion échoue, rester bloqué ici serait le
-      // cul-de-sac qu'on cherche justement à éviter. Le serveur rend le même 204 sans session.
-      forgetChallenge()
-      forgetSession(queryClient)
-      void navigate({ to: '/login', search: { redirect: undefined } })
-    },
-  })
-
-  return (
-    <Button loading={restart.isPending} onClick={() => restart.mutate()} variant="link">
-      Reprendre la connexion
-    </Button>
-  )
-}
-
-const CHALLENGE_LOST =
-  'Cette vérification a expiré : ce que la connexion avait ouvert n’est plus en mémoire. Reprenez la connexion.'
-
 /** Ce que `navigator.credentials.get()` produit, transmis **tel quel** au BFF. */
 async function assertPasskey() {
   const { data, error, response } = await api.POST('/auth/mfa/webauthn/assert/begin')
-  if (data === undefined) throw new Error(refusalOf(error, response.status, 'webauthn'))
+  if (data === undefined) throw new Error(verificationRefusal(error, response.status, 'webauthn'))
 
   try {
     // Les options traversent **telles quelles**, du serveur au navigateur : le DTO du contrat les
@@ -337,46 +259,3 @@ async function assertPasskey() {
 
 const CEREMONY_ABANDONED =
   'La clé d’accès n’a pas été présentée : la fenêtre du navigateur s’est refermée, ou l’appareil n’a pas répondu. Reprenez la vérification.'
-
-/**
- * Le message rendu à l'opérateur, pris **du serveur**, augmenté de ce que le serveur ne peut pas
- * dire.
- *
- * Le BFF rédige ses refus en français et ne nomme pas laquelle des cinq causes s'applique — les
- * distinguer dirait à une machine où elle en est. Les recopier ici en ferait deux rédactions dont
- * une périmerait.
- *
- * L'indice d'horloge n'est ajouté **que** sur le chemin TOTP, et c'est tout l'objet de sa reprise :
- * ajouté partout, il redeviendrait ce que step-035 a retiré.
- */
-function refusalOf(error: unknown, status: number, method: 'totp' | 'webauthn') {
-  const fromServer = messageOf(error, status)
-
-  // La **cause** autant que la méthode. Conditionné au seul chemin TOTP, l'indice se collait aussi
-  // au verrouillage et à la panne — « réessayez dans cinq minutes » suivi de « vérifiez l'heure de
-  // votre téléphone », qui n'y est pour rien. C'est l'autre moitié de ce que step-035 a retiré du
-  // serveur : `invalid_second_factor` y servait des causes qu'il ne décrivait pas autant que des
-  // méthodes qu'il ne décrivait pas.
-  if (method !== 'totp' || codeOf(error) !== 'invalid_second_factor') return fromServer
-
-  return `${fromServer} ${CLOCK_HINT}`
-}
-
-/** Le `code` du DTO `Error`, qui se grep dans les journaux et ne se traduit pas. */
-function codeOf(error: unknown) {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const { code } = error as { code: unknown }
-    if (typeof code === 'string') return code
-  }
-
-  return undefined
-}
-
-function messageOf(error: unknown, status: number) {
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const { message } = error as { message: unknown }
-    if (typeof message === 'string' && message !== '') return message
-  }
-
-  return `La vérification n’a pas abouti : le tableau de bord n’a pas obtenu de réponse (HTTP ${status}).`
-}

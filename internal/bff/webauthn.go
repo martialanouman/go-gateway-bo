@@ -254,7 +254,11 @@ func (a API) verifyPresentedAssertion(ctx context.Context, resolved store.Sessio
 	return a.Passkeys.VerifyAssertion(ctx, resolved.ID, resolved.OperatorID, encoded)
 }
 
-// secondFactorHeld dit si l'opérateur détient déjà de quoi élever une session. Les codes de
+// secondFactorHeld lit l'**existence** du secret et non sa confirmation : délibérément plus strict
+// que nécessaire, pour n'avoir pas à trancher le cas d'une cérémonie ouverte avant l'enrôlement et
+// finie après. L'opérateur garde sa sortie par `/enroll`.
+//
+// Les codes de
 // récupération n'en font pas partie : ils sont la sortie de secours d'un TOTP, jamais un facteur qui
 // se tient seul.
 func secondFactorHeld(held store.SecondFactors) bool {

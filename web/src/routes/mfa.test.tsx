@@ -127,23 +127,19 @@ describe('la clé d’accès', () => {
 })
 
 describe('un opérateur sans second facteur enrôlé', () => {
-  it('atterrit sur un état qui nomme son jalon, et non sur un challenge impossible', async () => {
-    await visitMfa({ totp: false, passkeys: 0, recoveryCodesRemaining: 0 })
+  it('est conduit à l’enrôlement, et non à un challenge impossible', async () => {
+    const { router } = await visitMfa(
+      { totp: false, passkeys: 0, recoveryCodesRemaining: 0 },
+      { path: '/mfa?redirect=%2Fbilling' },
+    )
 
-    // Ni champ de code ni bouton de vérification : les deux mèneraient à un refus certain.
+    // Ni champ de code ni bouton de vérification : les deux mèneraient à un refus certain, puisque
+    // `POST /auth/login` rend un challenge sans regarder ce qui est enrôlé.
     expect(screen.queryByLabelText(/Code à six chiffres/)).toBeNull()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/n’est pas encore livré/)
-    expect(screen.getByText(/step-028/)).toBeInTheDocument()
-    expect(screen.getByText(/jalon M1/)).toBeInTheDocument()
-  })
-
-  it('garde une sortie : la connexion se reprend depuis cet écran', async () => {
-    const { router, user } = await visitMfa({ totp: false, passkeys: 0 })
-
-    await user.click(screen.getByRole('button', { name: 'Reprendre la connexion' }))
-
-    expect(await screen.findByLabelText(/E-mail/)).toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/login')
+    expect(router.state.location.pathname).toBe('/enroll')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Enrôler un second facteur')
+    // La destination survit au détour : c'est elle qu'on rejouera une fois le facteur franchi.
+    expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 })
 
@@ -331,6 +327,60 @@ describe('quand le BFF ne rend pas la session', () => {
 
     // La panne levée, l'écran reprend son office : le challenge, et non l'annonce d'un compte nu.
     expect(await screen.findByLabelText(/Code à six chiffres/)).toBeInTheDocument()
+  })
+
+  it('rejoue la garde et non la seule requête : un compte nu part à l’enrôlement', async () => {
+    // Ce que `router.invalidate()` tient et qu'un `me.refetch()` ne tiendrait pas. Les deux sont
+    // indiscernables quand la session relue porte un facteur — c'est le cas du test au-dessus.
+    // Ici elle n'en porte aucun : `beforeLoad` ne se rejoue pas de lui-même, et l'écran se
+    // peindrait sur un challenge sans champ de code ni bouton, cul-de-sac muet.
+    rememberChallenge(CHALLENGE)
+    let enPanne = true
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (request: Request) => {
+        const { pathname } = new URL(request.url)
+        if (pathname !== '/api/auth/me') throw new Error(`appel non déclaré : ${pathname}`)
+        if (enPanne) return Response.json({ code: 't', message: 'Panne.' }, { status: 503 })
+
+        return Response.json({
+          operator: {
+            id: '01960000-0000-7000-8000-000000000001',
+            email: 'a@b.test',
+            displayName: 'Awa',
+          },
+          permissions: [],
+          elevated: false,
+          secondFactors: { totp: false, recoveryCodesRemaining: 0, passkeys: 0 },
+          absoluteExpiresAt: '2026-09-17T20:00:00Z',
+        })
+      }),
+    )
+
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/mfa'] }))
+    render(<RouterProvider router={router} />)
+    await screen.findByRole('button', { name: 'Réessayer' })
+
+    enPanne = false
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Réessayer' }))
+
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+      'Enrôler un second facteur',
+    )
+    expect(router.state.location.pathname).toBe('/enroll')
+  })
+
+  it('ne déconnecte pas quand le challenge est perdu **et** la session illisible', async () => {
+    // L'état exact d'un rechargement pendant une panne du BFF : le challenge ne vit qu'en mémoire
+    // du document, donc il est perdu, et `/auth/me` ne répond pas. Renvoyer à la connexion y
+    // enverrait l'opérateur rencontrer la même panne : une panne du tableau de bord **dégrade**,
+    // elle ne déconnecte pas. Invariant (e).
+    stubSession({ status: 503 })
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/mfa'] }))
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByRole('button', { name: 'Réessayer' })).toBeVisible()
+    expect(router.state.location.pathname).toBe('/mfa')
   })
 })
 

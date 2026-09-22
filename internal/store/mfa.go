@@ -36,6 +36,11 @@ type TOTPState struct {
 	// SealedSecret est vide quand aucun authentificateur n'est enrôlé.
 	SealedSecret string
 	Enrolled     bool
+	// Proven dit qu'au moins un code de cet opérateur a été consommé — `mfa_totp_last_step` n'est
+	// plus `NULL`. Ce n'est pas « le secret existe » : l'enrôlement écrit le secret **avant** que
+	// l'opérateur ait scanné quoi que ce soit, si bien qu'un enrôlement abandonné laisse un facteur
+	// que personne ne détient, pas même son propriétaire.
+	Proven bool
 	// CurrentStep vient de l'horloge **du serveur de base**. Le calculer en Go ferait qu'un code
 	// accepté par une instance serait refusé par l'autre, et que l'anti-rejeu comparerait deux
 	// échelles différentes.
@@ -52,6 +57,7 @@ func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds 
 ) {
 	const query = `
 		SELECT email, coalesce(mfa_totp_secret, ''), mfa_totp_secret IS NOT NULL,
+		       mfa_totp_last_step IS NOT NULL,
 		       floor(extract(epoch FROM now()) / $2)::bigint
 		FROM operators
 		WHERE id = $1 AND status = $3`
@@ -59,7 +65,7 @@ func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds 
 	var state TOTPState
 
 	err := m.pool.QueryRow(ctx, query, operatorID, periodSeconds, StatusActive).
-		Scan(&state.Email, &state.SealedSecret, &state.Enrolled, &state.CurrentStep)
+		Scan(&state.Email, &state.SealedSecret, &state.Enrolled, &state.Proven, &state.CurrentStep)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return TOTPState{}, false, nil
@@ -75,7 +81,11 @@ func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds 
 // SecondFactors est ce que `GET /auth/me` rend de l'état du second facteur. Ni secret, ni code : un
 // booléen et un compte ne se rejouent pas.
 type SecondFactors struct {
+	// L'enrôlement écrit le secret avant tout scan : entre l'écriture et le premier code, le compte
+	// porte un secret que personne ne détient. `GET /auth/me` rend donc TOTPConfirmed — annoncer
+	// l'autre ferait réclamer aux écrans un code qu'aucune application ne produit.
 	TOTPEnrolled           bool
+	TOTPConfirmed          bool
 	RecoveryCodesRemaining int
 	// Passkeys est le nombre de passkeys enregistrées. Un compte et non une liste : ce que l'écran
 	// doit savoir pour se rendre est s'il conduit à l'enrôlement ou au challenge, et l'inventaire
@@ -87,6 +97,7 @@ type SecondFactors struct {
 func (m *MFA) FactorsOf(ctx context.Context, operatorID string) (SecondFactors, error) {
 	const query = `
 		SELECT o.mfa_totp_secret IS NOT NULL,
+		       o.mfa_totp_secret IS NOT NULL AND o.mfa_totp_last_step IS NOT NULL,
 		       (SELECT count(*) FROM mfa_recovery_codes AS r WHERE r.operator_id = o.id),
 		       (SELECT count(*) FROM webauthn_credentials AS c WHERE c.operator_id = o.id)
 		FROM operators AS o
@@ -95,7 +106,8 @@ func (m *MFA) FactorsOf(ctx context.Context, operatorID string) (SecondFactors, 
 	var factors SecondFactors
 
 	err := m.pool.QueryRow(ctx, query, operatorID).
-		Scan(&factors.TOTPEnrolled, &factors.RecoveryCodesRemaining, &factors.Passkeys)
+		Scan(&factors.TOTPEnrolled, &factors.TOTPConfirmed, &factors.RecoveryCodesRemaining,
+			&factors.Passkeys)
 	if err != nil {
 		return SecondFactors{}, fmt.Errorf("lire les facteurs de l'opérateur : %w", err)
 	}

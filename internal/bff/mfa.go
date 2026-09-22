@@ -103,8 +103,16 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 	}
 
 	replace := false
+	// Un facteur jamais confirmé n'est détenu par personne, pas même son propriétaire : exiger sa
+	// preuve l'enfermait dehors. La condition sur les clés d'accès est ce qui empêche la détente de
+	// contourner une passkey qui, elle, garde encore le compte.
+	unconfirmed := state.Enrolled && !state.Proven && held.Passkeys == 0
 
-	if state.Enrolled {
+	switch {
+	case unconfirmed:
+		replace = true
+
+	case state.Enrolled:
 		if request.Body.Code == nil {
 			return EnrollTotp409JSONResponse(secondFactorAlreadyEnrolled()), nil
 		}
@@ -153,7 +161,8 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 			Action:     actionMFAEnroll,
 			TargetType: auditTargetOperator,
 			TargetID:   resolved.OperatorID,
-			After:      store.NewFields().Text("method", "totp").Flag("replaced", replace),
+			After: store.NewFields().Text("method", "totp").
+				Flag("replaced", replace).Flag("proof_presented", replace && !unconfirmed),
 		}))
 	if err != nil {
 		return nil, err
@@ -517,7 +526,7 @@ func secondFactorsOf(ctx context.Context, factors *mfa.Manager, operatorID strin
 	}
 
 	return SecondFactors{
-		Totp:                   held.TOTPEnrolled,
+		Totp:                   held.TOTPConfirmed,
 		RecoveryCodesRemaining: held.RecoveryCodesRemaining,
 		Passkeys:               held.Passkeys,
 	}, nil
