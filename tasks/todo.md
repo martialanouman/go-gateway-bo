@@ -103,7 +103,8 @@ passé, et deux copies ont continué à prescrire une règle que la troisième a
 - **Langue.** Code en **anglais**, narratif en **français** — commentaires, scénarios Gherkin, copie.
   Un libellé français peut tenir lieu d'identifiant technique, jamais le remplacer : la valeur
   verbatim reste affichée à côté, en mono et atteignable au clavier. Voir la charte.
-- **Commentaires avec parcimonie** : seulement là où le code ne peut pas parler. Voir `plan.md` §1.7.
+- **Aucun commentaire évident** : du code auto-documenté, et des commentaires réservés au *pourquoi*.
+  Voir `plan.md` §1.7.
 - **Cinq états de contenu** partout : chargement · vide · aucun résultat · module désactivé · erreur.
   Jamais un blanc, jamais une erreur déguisée en vide.
 

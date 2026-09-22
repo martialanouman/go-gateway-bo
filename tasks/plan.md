@@ -206,16 +206,23 @@ C'est la convention la plus structurante du dépôt, et elle change de nature av
   de fonctions. Le narratif — commentaires, scénarios BDD, copie produit — est en **français**.
 - « Sécurisé » n'est jamais une promesse : on dit ce que la protection couvre et où s'arrête la
   frontière d'accès.
-- **Commentaires avec parcimonie.** Un commentaire ne redit jamais ce que le code dit déjà. Il ne
-  subsiste que là où le code ne peut pas parler : un **pourquoi** contre-intuitif, un arbitrage dont
-  l'alternative évidente est fausse, une contrainte externe invérifiable sur place. Partout ailleurs,
-  la réponse est un meilleur nom ou une fonction extraite.
+- **Code auto-documenté** : écrire du code clair et lisible. Préférer des noms de variables et de
+  fonctions explicites plutôt qu'ajouter des commentaires.
+- **Zéro commentaire évident** : ne jamais commenter le code standard, le boilerplate ou la logique
+  triviale — pas de `// incrémente i` ni de `// récupère les données`.
+- **Commentaires autorisés** : limiter les commentaires au **pourquoi** — décisions d'architecture
+  complexes, hacks temporaires, optimisations non intuitives —, jamais au **quoi**.
+- **Format compact** : pas de longs blocs d'explication avant ou après le code.
 
   > Mesuré le 01/08/2026 sur la v1.0 : **38 % du BFF était du commentaire** (3 448 lignes sur 8 912),
   > 29 % côté composants. Une part portait un vrai « pourquoi » et se relit avec profit ; le reste
   > paraphrasait la ligne suivante, et **le critère 2 de la DoD existe précisément parce que certains
   > de ces commentaires mentaient** sur le code qu'ils surplombaient. Moins de commentaires, c'est
   > moins de prose à maintenir en cohérence avec l'implémentation.
+  >
+  > « Avec parcimonie » a tenu cette place jusqu'au 22/09/2026, et n'a pas suffi : **47 % du diff Go
+  > de step-021, 44 % de celui de step-028** — la seconde fois avec une mémoire qui nommait déjà la
+  > première. D'où quatre règles courtes plutôt qu'un principe.
 - Casse phrase pour libellés, titres et boutons ; micro-labels en capitales ; les pilules de statut
   gardent le `snake_case` de l'API.
 
