@@ -78,29 +78,19 @@ Le code les cite par leur lettre.
 
 ## Code & langue
 
-**Le code est en anglais** — identifiants, packages, types, champs, fonctions. **Le narratif est en
-français** — commentaires, Gherkin, titres de test, copie produit. Détail : `tasks/plan.md` §1.7.
-
-**Aucun commentaire, sauf nécessité absolue.** Le défaut est zéro : écrire le code nu, puis n'en
-ajouter un que là où le code **ne peut pas** parler — un arbitrage dont l'alternative évidente est
-fausse, deux symboles voisins dont la différence est invisible, une contrainte externe invérifiable
-sur place. Trois lignes au plus. Partout ailleurs, un meilleur nom ou une fonction extraite.
-
-**Le récit appartient au commit, pas au fichier.** Ce qu'on vient de comprendre — l'enquête, le
-défaut trouvé, la mesure qui l'étaye — se lit dans le message de commit et dans la PR, où git le
-date et où personne ne le relit comme s'il décrivait le code d'aujourd'hui. Un commentaire se juge
-sur ce qu'un lecteur ne pourra **pas** déduire, jamais sur ce qu'il a coûté à trouver.
-
-*« Avec parcimonie » a été écrit ici, et n'a pas tenu : 47 % du diff Go de step-021, 44 % de celui
-de step-028, la seconde fois avec une mémoire qui nommait déjà la première.* Le critère 2 existe
-pour la même raison — **certains commentaires de la v1.0 mentaient** sur le code qu'ils
-surplombaient, et un commentaire de moins est un mensonge de moins à entretenir.
+**Le code est en anglais** — identifiants, packages, types, champs, fonctions. **L'interface est en
+français**. Détail : `tasks/plan.md` §1.7.
 
 **La copie produit** — y compris un message de refus écrit dans un handler Go — est en **français**,
 troisième personne, **conséquence d'abord**. « Sécurisé » n'est jamais une promesse : dire ce que la
 protection couvre et où s'arrête la frontière d'accès. Les cinq états de contenu font foi dans
 `tasks/plan.md` §1.9 et tranchent aussi côté serveur — `internal/gateway/errors_test.go` sépare un
 503 d'un module désactivé ; `web/CLAUDE.md` en redonne la liste, sans rien y arbitrer.
+
+- **Code auto-documenté** : Écris du code clair et lisible. Préfère des noms de variables et fonctions explicites plutôt que d'ajouter des commentaires.
+- **Zéro commentaire évident** : Ne commente jamais le code standard, le boilerplate ou la logique triviale (ex: pas de `// incrémente i` ou `// récupère les données`).
+- **Commentaires autorisés** : Limite les commentaires au "Pourquoi" (décisions d'architecture complexes, hacks temporaires ou optimisations non intuitives), jamais au "Quoi".
+- **Format compact** : Pas de longs blocs d'explications avant ou après le code. Rends les réponses directes et purement techniques.
 
 ## Tests — BDD
 
