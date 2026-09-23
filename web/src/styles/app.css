@@ -319,3 +319,125 @@
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
+
+/*
+ * Les écrans d'administration — opérateurs et rôles. Aucune référence visuelle dans la charte (open
+ * item 3) : ils composent les primitives et n'inventent que la mise en page.
+ */
+.page__head {
+  display: flex;
+  gap: var(--sp-7);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.page__title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-page-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.page__notes {
+  display: grid;
+  gap: var(--sp-4);
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.page__notes p,
+.form p {
+  margin: 0;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+
+.mono,
+.role-keys,
+.permission-picker__key {
+  font: var(--text-data);
+}
+
+.form {
+  display: grid;
+  gap: var(--sp-7);
+  color: var(--text-muted);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.form-refusal {
+  margin: 0;
+  padding: var(--sp-6);
+  border: 1px solid color-mix(in srgb, var(--red-500) 30%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--tint-red);
+  color: var(--text-danger-on-tint);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.role-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4) var(--sp-7);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-primary);
+}
+
+.role-choice,
+.permission-picker__group {
+  display: grid;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.role-choice legend,
+.permission-picker__legend {
+  margin-bottom: var(--sp-4);
+  color: var(--text-muted);
+  font: var(--text-overline);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.permission-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--sp-9);
+}
+
+.role-choice__option,
+.permission-picker__option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-1) var(--sp-4);
+  align-items: baseline;
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.role-choice__option input,
+.permission-picker__option input {
+  grid-row: span 2;
+  accent-color: var(--action-primary-fg);
+}
+
+.permission-picker__description {
+  grid-column: 2;
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}

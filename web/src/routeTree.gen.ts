@@ -24,7 +24,9 @@ import { Route as ShellContentRouteImport } from './routes/_shell.content'
 import { Route as ShellCustomersRouteImport } from './routes/_shell.customers'
 import { Route as ShellExactRoutesRouteImport } from './routes/_shell.exact-routes'
 import { Route as ShellGroupsRouteImport } from './routes/_shell.groups'
+import { Route as ShellOperatorsRouteImport } from './routes/_shell.operators'
 import { Route as ShellRatePlansRouteImport } from './routes/_shell.rate-plans'
+import { Route as ShellRolesRouteImport } from './routes/_shell.roles'
 import { Route as ShellRoutesRouteImport } from './routes/_shell.routes'
 import { Route as ShellScriptsRouteImport } from './routes/_shell.scripts'
 import { Route as ShellSessionsRouteImport } from './routes/_shell.sessions'
@@ -105,9 +107,19 @@ const ShellGroupsRoute = ShellGroupsRouteImport.update({
   path: '/groups',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellOperatorsRoute = ShellOperatorsRouteImport.update({
+  id: '/operators',
+  path: '/operators',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellRatePlansRoute = ShellRatePlansRouteImport.update({
   id: '/rate-plans',
   path: '/rate-plans',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellRolesRoute = ShellRolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
   getParentRoute: () => ShellRoute,
 } as any)
 const ShellRoutesRoute = ShellRoutesRouteImport.update({
@@ -151,7 +163,9 @@ export interface FileRoutesByFullPath {
   '/customers': typeof ShellCustomersRoute
   '/exact-routes': typeof ShellExactRoutesRoute
   '/groups': typeof ShellGroupsRoute
+  '/operators': typeof ShellOperatorsRoute
   '/rate-plans': typeof ShellRatePlansRoute
+  '/roles': typeof ShellRolesRoute
   '/routes': typeof ShellRoutesRoute
   '/scripts': typeof ShellScriptsRoute
   '/sessions': typeof ShellSessionsRoute
@@ -172,7 +186,9 @@ export interface FileRoutesByTo {
   '/customers': typeof ShellCustomersRoute
   '/exact-routes': typeof ShellExactRoutesRoute
   '/groups': typeof ShellGroupsRoute
+  '/operators': typeof ShellOperatorsRoute
   '/rate-plans': typeof ShellRatePlansRoute
+  '/roles': typeof ShellRolesRoute
   '/routes': typeof ShellRoutesRoute
   '/scripts': typeof ShellScriptsRoute
   '/sessions': typeof ShellSessionsRoute
@@ -196,7 +212,9 @@ export interface FileRoutesById {
   '/_shell/customers': typeof ShellCustomersRoute
   '/_shell/exact-routes': typeof ShellExactRoutesRoute
   '/_shell/groups': typeof ShellGroupsRoute
+  '/_shell/operators': typeof ShellOperatorsRoute
   '/_shell/rate-plans': typeof ShellRatePlansRoute
+  '/_shell/roles': typeof ShellRolesRoute
   '/_shell/routes': typeof ShellRoutesRoute
   '/_shell/scripts': typeof ShellScriptsRoute
   '/_shell/sessions': typeof ShellSessionsRoute
@@ -221,7 +239,9 @@ export interface FileRouteTypes {
     | '/customers'
     | '/exact-routes'
     | '/groups'
+    | '/operators'
     | '/rate-plans'
+    | '/roles'
     | '/routes'
     | '/scripts'
     | '/sessions'
@@ -242,7 +262,9 @@ export interface FileRouteTypes {
     | '/customers'
     | '/exact-routes'
     | '/groups'
+    | '/operators'
     | '/rate-plans'
+    | '/roles'
     | '/routes'
     | '/scripts'
     | '/sessions'
@@ -265,7 +287,9 @@ export interface FileRouteTypes {
     | '/_shell/customers'
     | '/_shell/exact-routes'
     | '/_shell/groups'
+    | '/_shell/operators'
     | '/_shell/rate-plans'
+    | '/_shell/roles'
     | '/_shell/routes'
     | '/_shell/scripts'
     | '/_shell/sessions'
@@ -389,11 +413,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellGroupsRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/operators': {
+      id: '/_shell/operators'
+      path: '/operators'
+      fullPath: '/operators'
+      preLoaderRoute: typeof ShellOperatorsRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/rate-plans': {
       id: '/_shell/rate-plans'
       path: '/rate-plans'
       fullPath: '/rate-plans'
       preLoaderRoute: typeof ShellRatePlansRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/roles': {
+      id: '/_shell/roles'
+      path: '/roles'
+      fullPath: '/roles'
+      preLoaderRoute: typeof ShellRolesRouteImport
       parentRoute: typeof ShellRoute
     }
     '/_shell/routes': {
@@ -444,7 +482,9 @@ interface ShellRouteChildren {
   ShellCustomersRoute: typeof ShellCustomersRoute
   ShellExactRoutesRoute: typeof ShellExactRoutesRoute
   ShellGroupsRoute: typeof ShellGroupsRoute
+  ShellOperatorsRoute: typeof ShellOperatorsRoute
   ShellRatePlansRoute: typeof ShellRatePlansRoute
+  ShellRolesRoute: typeof ShellRolesRoute
   ShellRoutesRoute: typeof ShellRoutesRoute
   ShellScriptsRoute: typeof ShellScriptsRoute
   ShellSessionsRoute: typeof ShellSessionsRoute
@@ -463,7 +503,9 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellCustomersRoute: ShellCustomersRoute,
   ShellExactRoutesRoute: ShellExactRoutesRoute,
   ShellGroupsRoute: ShellGroupsRoute,
+  ShellOperatorsRoute: ShellOperatorsRoute,
   ShellRatePlansRoute: ShellRatePlansRoute,
+  ShellRolesRoute: ShellRolesRoute,
   ShellRoutesRoute: ShellRoutesRoute,
   ShellScriptsRoute: ShellScriptsRoute,
   ShellSessionsRoute: ShellSessionsRoute,

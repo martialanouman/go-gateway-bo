@@ -29,7 +29,8 @@ export const MILESTONES: Record<Milestone, string> = {
 export type NavEntry = {
   readonly to: NavPath
   readonly label: string
-  readonly milestone: Milestone
+  /** Le jalon d'un écran encore en attente ; absent, l'écran est livré. */
+  readonly milestone?: Milestone
   /** Une seule suffit ; vide, l'entrée s'ouvre à toute session. */
   readonly anyOf: readonly PermissionKey[]
 }
@@ -37,7 +38,7 @@ export type NavEntry = {
 export type NavGroup = { readonly label: string; readonly entries: readonly NavEntry[] }
 
 /**
- * Le rail de la charte — cinq groupes, quinze entrées — et la seule liste : les routes, le rail et
+ * Le rail de la charte — cinq groupes, quinze entrées —, plus l'administration, et la seule liste : les routes, le rail et
  * leurs tests la lisent.
  *
  * Trafic et CDR Explorer n'exigent rien parce que le catalogue n'a aucune clé pour les lire
@@ -93,6 +94,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     entries: [
       { to: '/billing', label: 'Soldes & crédits', milestone: 'M8', anyOf: ['billing:read'] },
       { to: '/rate-plans', label: 'Plans tarifaires', milestone: 'M8', anyOf: ['billing:read'] },
+    ],
+  },
+  {
+    label: 'Administration',
+    entries: [
+      { to: '/operators', label: 'Opérateurs', anyOf: ['operators:manage'] },
+      { to: '/roles', label: 'Rôles', anyOf: ['roles:manage'] },
     ],
   },
 ]
