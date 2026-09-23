@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/cucumber/godog"
 	"github.com/jackc/pgx/v5"
@@ -24,6 +25,9 @@ func initializeSeedScenario(ctx *godog.ScenarioContext) {
 	ctx.Given(`^"([^"]+)" accordée à la main au rôle "([^"]+)"$`, seed.grantByHand)
 	ctx.Given(`^un rôle personnalisé "([^"]+)" qui accorde "([^"]+)"$`, seed.createCustomRole)
 	ctx.When(`^le seed est (?:joué|rejoué)$`, seed.seed)
+	ctx.Given(`^le rôle par défaut "([^"]+)" absent, comme avant la release qui l'ajoute$`, seed.dropRole)
+	ctx.When(`^le seed est joué malgré la collision$`, seed.seedExpectingRefusal)
+	ctx.Then(`^le seed refuse en nommant "([^"]+)"$`, seed.refusedNaming)
 	ctx.Then(`^le catalogue du code et celui de la base coïncident$`, seed.catalogsMatch)
 	ctx.Then(`^les neuf rôles par défaut accordent ce que le code leur donne$`, seed.defaultRolesMatch)
 	ctx.Then(`^le rapport annonce avoir posé tout le vocabulaire$`, seed.reportedSeedingEverything)
@@ -45,6 +49,7 @@ func initializeSeedScenario(ctx *godog.ScenarioContext) {
 // scénario — godog en construit une neuve à chaque fois, donc rien ne fuit de l'un à l'autre.
 type seedWorld struct {
 	dsn              string
+	refusal          error
 	lastOutcome      store.SeedOutcome
 	vocabularyBefore string
 }
@@ -71,6 +76,28 @@ func (w *seedWorld) seed(ctx context.Context) error {
 	}
 
 	w.lastOutcome = outcome
+
+	return nil
+}
+
+func (w *seedWorld) dropRole(ctx context.Context, role string) error {
+	return w.exec(ctx, "DELETE FROM roles WHERE name = $1", role)
+}
+
+func (w *seedWorld) seedExpectingRefusal(ctx context.Context) error {
+	_, w.refusal = store.Seed(ctx, w.dsn)
+
+	return nil
+}
+
+func (w *seedWorld) refusedNaming(role string) error {
+	if w.refusal == nil {
+		return errors.New("le seed a abouti : le rôle personnalisé a été confisqué en rôle par défaut")
+	}
+
+	if !strings.Contains(w.refusal.Error(), role) {
+		return fmt.Errorf("le refus ne nomme pas %q : %w", role, w.refusal)
+	}
 
 	return nil
 }
