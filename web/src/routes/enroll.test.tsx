@@ -51,7 +51,7 @@ async function visitEnroll({
 
   render(<RouterProvider router={router} />)
   // La sortie, présente sur tous les états résolus de l'écran — et sur aucun écran d'attente.
-  await screen.findByRole('button', { name: 'Reprendre la connexion' })
+  await screen.findByRole('button', { name: 'Recommencer la connexion' })
 
   return { router, user: userEvent.setup() }
 }
@@ -240,7 +240,7 @@ describe('la garde de l’enrôlement', () => {
     // L'écran d'erreur est **celui du second facteur**, et c'est ce que la destination prouve : la
     // coquille rend le même titre et le même `GET /api/auth/me · 503` sur une adresse inconnue, si
     // bien qu'une assertion portée sur eux seuls passait déjà **sans que la route existe**. Mesuré.
-    expect(await screen.findByRole('button', { name: 'Reprendre la connexion' })).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Recommencer la connexion' })).toBeVisible()
     expect(router.state.location.pathname).toBe('/mfa')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Impossible de vérifier la session',
@@ -364,7 +364,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
 
     // La session est élevée et le facteur prouvé : il n'y a plus rien à reprendre, et proposer de
     // repartir jetterait dix codes pour rien. La seule sortie est l'accusé de réception.
-    expect(screen.queryByRole('button', { name: 'Reprendre la connexion' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Recommencer la connexion' })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'J’ai enregistré ces codes' }))
 

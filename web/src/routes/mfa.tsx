@@ -141,8 +141,8 @@ function FactorChallenge({
     <AuthLayout
       intro={
         holdsTotp
-          ? 'La session est ouverte au premier facteur : le code de l’application d’authentification l’élève, et donne accès aux écrans.'
-          : 'La session est ouverte au premier facteur : la clé d’accès l’élève, et donne accès aux écrans.'
+          ? 'Entrez le code généré par votre application d’authentification à deux facteurs.'
+          : 'La clé d’accès termine la connexion. Aucun écran ne s’ouvre avant.'
       }
       title="Second facteur"
     >
