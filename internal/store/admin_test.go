@@ -60,3 +60,37 @@ func TestUnRoleSupprimePendantSonAttributionEstUneReferenceInconnue(t *testing.T
 	assert.ErrorIs(t, <-outcome, store.ErrUnknownReference,
 		"la clé étrangère rompue remonte en panne au lieu de dire que le rôle n'existe plus")
 }
+
+// Réinitialiser, c'est retirer **tout** ce qui franchit le second facteur : un code de récupération ou
+// une passkey survivants suffiraient à celui qui a volé le téléphone et la feuille de codes. Le verrou
+// d'essais est levé avec, sans quoi le titulaire ne pourrait pas se réenrôler.
+func TestLaReinitialisationNeLaisseAucunFacteurNiVerrou(t *testing.T) {
+	t.Parallel()
+
+	pool, dsn := migratedPool(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+	registerPasskey(t, store.NewWebauthn(pool), operator, "cle")
+
+	ctx := t.Context()
+
+	_, err := pool.Exec(ctx, `
+		WITH secret AS (UPDATE operators SET mfa_totp_secret = 'scelle', mfa_totp_last_step = 1 WHERE id = $1),
+		     codes AS (INSERT INTO mfa_recovery_codes (operator_id, code_hash) VALUES ($1, 'h'))
+		INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
+		VALUES ('mfa', $1::text, 5, now())`, operator)
+	require.NoError(t, err)
+
+	require.NoError(t, store.NewAdministration(pool).ResetSecondFactors(ctx, operator,
+		store.Event{Action: "mfa.reset"}))
+
+	var survivors int
+
+	require.NoError(t, pool.QueryRow(ctx, `
+		SELECT (SELECT count(*) FROM operators WHERE id = $1 AND mfa_totp_secret IS NOT NULL)
+		     + (SELECT count(*) FROM mfa_recovery_codes WHERE operator_id = $1)
+		     + (SELECT count(*) FROM webauthn_credentials WHERE operator_id = $1)
+		     + (SELECT count(*) FROM login_attempt_counters WHERE scope = 'mfa' AND subject = $1::text)`,
+		operator).Scan(&survivors))
+
+	assert.Zero(t, survivors, "la réinitialisation laisse un facteur ou un verrou derrière elle")
+}

@@ -244,8 +244,8 @@ paths:
 
             Le refus dit ce qu'il faut faire — présenter un code de l'authentificateur en place, ou
             l'un des codes de récupération. Si les deux sont perdus, la sortie est la réinitialisation
-            par un administrateur, que la gestion des opérateurs apportera : elle n'existe pas encore,
-            et le message ne prétend pas le contraire.
+            par un administrateur détenant `operators:manage`
+            (`DELETE /operators/{operatorId}/second-factors`), et le message la nomme.
 
             **Trois causes, trois codes**, et ici le `code` est le **seul** discriminant — contrairement
             au retrait d'une clé d'accès, où le statut sépare déjà les causes. Un client qui ne lirait
@@ -1263,7 +1263,9 @@ components:
           type: array
           items: { $ref: '#/components/schemas/RoleReference' }
         secondFactorEnrolled:
-          # Ce qui dit à l'écran si la réinitialisation a un objet.
+          # Ce qui dit à l'écran si la réinitialisation a un objet : un secret posé, même jamais
+          # confirmé, ou une passkey. Plus large que `SecondFactors.totp`, délibérément — un
+          # enrôlement abandonné est encore quelque chose à retirer.
           type: boolean
       required: [id, email, displayName, status, roles, secondFactorEnrolled]
 

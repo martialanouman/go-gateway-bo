@@ -148,6 +148,37 @@ func TestChaqueOperationDuContratEstDecidee(t *testing.T) {
 	}
 }
 
+// Les routes d'administration exigent leur clé, **lectures comprises** : une exemption sur
+// `GET /operators` servirait adresses, rôles et état du second facteur à une session anonyme. Les
+// chemins viennent du contrat, la table n'y est que jugée — et seule `CreateOperator` a un scénario
+// qui rougirait sans elle, mesuré en revue de step-029.
+func TestLesRoutesDAdministrationExigentLeurCle(t *testing.T) {
+	t.Parallel()
+
+	families := map[string]permissions.Key{
+		"/operators": permissions.OperatorsManage,
+		"/roles":     permissions.RolesManage,
+	}
+
+	seen := 0
+
+	for _, declared := range contractOperations(t) {
+		for prefix, key := range families {
+			if declared.path != prefix && !strings.HasPrefix(declared.path, prefix+"/") {
+				continue
+			}
+
+			seen++
+
+			assert.Equalf(t, key, authorization[declared.goName].permission,
+				"%s %s n'exige pas %q : un opérateur qui ne la détient pas l'atteindrait",
+				declared.method, declared.path, key)
+		}
+	}
+
+	assert.GreaterOrEqual(t, seen, 9, "le contrat ne porte plus les routes d'administration : ce test ne garde rien")
+}
+
 // TestLaTableNeDecidePasDOperationInconnue est le sens inverse, et il n'est pas redondant.
 //
 // Sans lui, une entrée écrite dans le vocabulaire du YAML — `"login"` — passerait : la propriété 1

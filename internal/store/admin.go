@@ -205,6 +205,14 @@ func (a *Administration) SetOperatorRoles(ctx context.Context, actorID, id strin
 	var updated OperatorView
 
 	err := inTx(ctx, a.pool, func(tx pgx.Tx) error {
+		// Deux attributions concurrentes sur le même opérateur s'additionneraient sans ce verrou : la
+		// seconde efface avant de voir ce que la première a posé.
+		// Aucun test ne rougit si cette ligne disparaît, ce qui a été vérifié : la course ne se
+		// fabrique qu'en tenant une transaction ouverte, et le verrou est le seul effet observable.
+		if _, err := tx.Exec(ctx, `SELECT 1 FROM operators WHERE id::text = $1 FOR UPDATE`, id); err != nil {
+			return fmt.Errorf("verrouiller l'opérateur : %w", err)
+		}
+
 		before, err := operator(ctx, tx, id)
 		if err != nil {
 			return err
@@ -480,8 +488,9 @@ func grant(ctx context.Context, tx pgx.Tx, roleID string, keys []string) error {
 // `lockoutKeys` qu'il détenait avant. Le contrôle lit l'état d'après, dans la transaction : il couvre
 // donc le retrait direct d'un rôle comme l'édition du rôle qu'on détient.
 //
-// ponytail: deux administrateurs qui se retirent mutuellement leurs droits en même temps peuvent
-// encore vider l'installation ; un verrou consultatif global fermerait la course si elle s'observe.
+// ponytail: deux administrateurs qui se retirent mutuellement leurs droits, ou se désactivent
+// mutuellement, en même temps peuvent encore vider l'installation ; un verrou consultatif global
+// pris par ces gestes fermerait la course si elle s'observe.
 func withoutLockout(ctx context.Context, tx pgx.Tx, actorID string, change func() error) error {
 	before, err := lockoutKeysHeld(ctx, tx, actorID)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
@@ -34,8 +35,8 @@ func (a API) CreateOperator(ctx context.Context, request CreateOperatorRequestOb
 	}
 
 	body := request.Body
-	if body == nil || strings.TrimSpace(body.Email) == "" || strings.TrimSpace(body.DisplayName) == "" ||
-		len(body.Email) > 320 || len(body.DisplayName) > 200 || len(body.Password) > 4096 {
+	if body == nil || !within(strings.TrimSpace(body.Email), 3, 320) ||
+		!within(strings.TrimSpace(body.DisplayName), 1, 200) || !within(body.Password, 0, 4096) {
 		return CreateOperator400JSONResponse{RequeteInvalideJSONResponse(malformedOperator())}, nil
 	}
 
@@ -170,8 +171,8 @@ func (a API) CreateRole(ctx context.Context, request CreateRoleRequestObject) (C
 	}
 
 	body := request.Body
-	if body == nil || strings.TrimSpace(body.Name) == "" || len(body.Name) > 100 ||
-		len(body.Description) > 500 || len(body.Permissions) > 100 {
+	if body == nil || !within(strings.TrimSpace(body.Name), 1, 100) ||
+		!within(body.Description, 0, 500) || len(body.Permissions) > 100 {
 		return CreateRole400JSONResponse{RequeteInvalideJSONResponse(malformedRole())}, nil
 	}
 
@@ -198,7 +199,7 @@ func (a API) UpdateRole(ctx context.Context, request UpdateRoleRequestObject) (U
 	}
 
 	body := request.Body
-	if body == nil || len(body.Description) > 500 || len(body.Permissions) > 100 {
+	if body == nil || !within(body.Description, 0, 500) || len(body.Permissions) > 100 {
 		return UpdateRole400JSONResponse{RequeteInvalideJSONResponse(malformedRoleUpdate())}, nil
 	}
 
@@ -246,6 +247,13 @@ func (a API) DeleteRole(ctx context.Context, request DeleteRoleRequestObject) (D
 	return DeleteRole204Response{}, nil
 }
 
+// within compte en caractères, comme `minLength` et `maxLength` du contrat, et non en octets.
+func within(value string, minimum, maximum int) bool {
+	count := utf8.RuneCountInString(value)
+
+	return count >= minimum && count <= maximum
+}
+
 // actorOf rend l'opérateur de la session. La garde l'a déjà exigée vivante : son absence ici est une
 // anomalie, pas un refus.
 func actorOf(ctx context.Context) (string, error) {
@@ -289,8 +297,8 @@ func roleDTO(view store.RoleView) Role {
 }
 
 func malformedOperator() Error {
-	return Error{Code: "bad_request", Message: "L'opérateur n'a pas été enregistré : l'adresse (320 " +
-		"caractères au plus) et le nom affiché (200 au plus) sont obligatoires, et le mot de passe compte " +
+	return Error{Code: "bad_request", Message: "L'opérateur n'a pas été enregistré : l'adresse (de 3 à " +
+		"320 caractères) et le nom affiché (200 au plus) sont obligatoires, et le mot de passe compte " +
 		"au plus 4096 caractères."}
 }
 
