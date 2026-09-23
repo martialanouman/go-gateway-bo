@@ -981,8 +981,8 @@ export interface operations {
              *
              *     Le refus dit ce qu'il faut faire — présenter un code de l'authentificateur en place, ou
              *     l'un des codes de récupération. Si les deux sont perdus, la sortie est la réinitialisation
-             *     par un administrateur, que la gestion des opérateurs apportera : elle n'existe pas encore,
-             *     et le message ne prétend pas le contraire.
+             *     par un administrateur détenant `operators:manage`
+             *     (`DELETE /operators/{operatorId}/second-factors`), et le message la nomme.
              *
              *     **Trois causes, trois codes**, et ici le `code` est le **seul** discriminant — contrairement
              *     au retrait d'une clé d'accès, où le statut sépare déjà les causes. Un client qui ne lirait
