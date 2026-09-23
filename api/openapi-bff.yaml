@@ -610,8 +610,253 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /operators:
+    get:
+      operationId: listOperators
+      summary: Les opérateurs, leurs rôles et l'état de leur second facteur
+      responses:
+        '200':
+          description: Tous les opérateurs, actifs et désactivés.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Operator' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+    post:
+      operationId: createOperator
+      summary: Crée un opérateur, sans rôle
+      description: |
+        Le compte naît actif et sans rôle : il peut entrer, puis enrôler son second facteur, et rien
+        d'autre tant qu'on ne lui attribue pas de rôle.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OperatorCreation' }
+      responses:
+        '201':
+          description: L'opérateur est créé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Operator' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '409':
+          description: Un opérateur porte déjà cette adresse, casse comprise (`email_taken`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+
+  /operators/{operatorId}:
+    patch:
+      operationId: updateOperator
+      summary: Désactive ou réactive un opérateur
+      description: |
+        Désactiver **ferme toutes ses sessions**, dans la même transaction : réactivé plus tard, il
+        repasse par la connexion.
+      parameters:
+        - $ref: '#/components/parameters/OperatorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OperatorUpdate' }
+      responses:
+        '200':
+          description: Le nouvel état de l'opérateur.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Operator' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/OperateurInconnu' }
+        '409': { $ref: '#/components/responses/AutoVerrouillage' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+
+  /operators/{operatorId}/roles:
+    post:
+      operationId: setOperatorRoles
+      summary: Remplace les rôles d'un opérateur
+      parameters:
+        - $ref: '#/components/parameters/OperatorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OperatorRoles' }
+      responses:
+        '200':
+          description: L'opérateur avec ses nouveaux rôles.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Operator' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/OperateurInconnu' }
+        '409': { $ref: '#/components/responses/AutoVerrouillage' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+
+  /operators/{operatorId}/second-factors:
+    delete:
+      operationId: resetOperatorSecondFactors
+      summary: Réinitialise le second facteur d'un autre opérateur
+      description: |
+        Retire son application d'authentification, ses codes de récupération et ses clés d'accès,
+        lève son verrou d'essais et ferme ses sessions. À sa prochaine connexion, il enrôle un
+        nouveau facteur. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur
+        cassé. Sur son propre compte, le refus renvoie vers le remplacement en self-service.
+      parameters:
+        - $ref: '#/components/parameters/OperatorId'
+      responses:
+        '204':
+          description: Le second facteur est retiré et les sessions sont fermées.
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/OperateurInconnu' }
+        '409': { $ref: '#/components/responses/AutoVerrouillage' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+
+  /roles:
+    get:
+      operationId: listRoles
+      summary: Les rôles, leurs permissions et leurs détenteurs
+      responses:
+        '200':
+          description: Les neuf rôles par défaut et les rôles personnalisés.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+    post:
+      operationId: createRole
+      summary: Compose un rôle personnalisé
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleCreation' }
+      responses:
+        '201':
+          description: Le rôle est créé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '409':
+          description: Un rôle porte déjà ce nom (`role_name_taken`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+
+  /roles/{roleId}:
+    patch:
+      operationId: updateRole
+      summary: Remplace la description et les permissions d'un rôle personnalisé
+      parameters:
+        - $ref: '#/components/parameters/RoleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleUpdate' }
+      responses:
+        '200':
+          description: Le rôle modifié.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/RoleInconnu' }
+        '409': { $ref: '#/components/responses/RoleIntouchable' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+    delete:
+      operationId: deleteRole
+      summary: Supprime un rôle personnalisé que personne ne détient
+      parameters:
+        - $ref: '#/components/parameters/RoleId'
+      responses:
+        '204':
+          description: Le rôle est supprimé.
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/RoleInconnu' }
+        '409': { $ref: '#/components/responses/RoleIntouchable' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+
 components:
+  parameters:
+    OperatorId:
+      name: operatorId
+      in: path
+      required: true
+      schema: { type: string }
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema: { type: string }
+
   responses:
+    # Les réponses partagées par les routes d'administration. `PermissionRefusee` couvre les trois
+    # refus possibles en 403 : l'origine (`forbidden_origin`), le second facteur non franchi
+    # (`mfa_required`) et la permission manquante (`permission_denied`), qui la nomme.
+    SessionAbsente:
+      description: Aucune session vivante.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PermissionRefusee:
+      description: |
+        Refusé avant d'atteindre l'opération : origine étrangère, second facteur non franchi, ou
+        permission manquante — le message nomme alors la clé.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RequeteInvalide:
+      description: Le corps n'a pas la forme attendue, ou le mot de passe est trop court.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    OperateurInconnu:
+      description: Aucun opérateur ne porte cet identifiant.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RoleInconnu:
+      description: Aucun rôle ne porte cet identifiant.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    AutoVerrouillage:
+      description: |
+        Le geste enfermerait son auteur dehors (`self_lockout`) : se désactiver, se retirer
+        `operators:manage` ou `roles:manage`, réinitialiser son propre second facteur.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RoleIntouchable:
+      description: |
+        `role_is_default` : les neuf rôles par défaut sont livrés avec le produit et resemés à chaque
+        déploiement ; une édition serait défaite. `role_held` : le rôle est détenu, et le message
+        nomme ses détenteurs. `self_lockout` : l'édition retirerait à son auteur `operators:manage`
+        ou `roles:manage`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     # Les deux refus que pose le contrôle d'origine de `internal/bff/durcissement.go`, **avant** que la
     # requête n'atteigne l'opération. Ils sont donc possibles sur toute méthode non sûre, et déclarés
     # sur chacune : un statut qu'une opération peut rendre sans que ce fichier le dise ferait échouer
@@ -1001,6 +1246,105 @@ components:
         email: { type: string }
         displayName: { type: string }
       required: [id, email, displayName]
+
+    Operator:
+      type: object
+      description: Un opérateur tel que l'écran d'administration le montre. Aucun secret, aucun hachage.
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        email: { type: string }
+        displayName: { type: string }
+        status: { type: string, enum: [active, disabled] }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/RoleReference' }
+        secondFactorEnrolled:
+          # Ce qui dit à l'écran si la réinitialisation a un objet.
+          type: boolean
+      required: [id, email, displayName, status, roles, secondFactorEnrolled]
+
+    RoleReference:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+      required: [id, name]
+
+    OperatorCreation:
+      type: object
+      additionalProperties: false
+      properties:
+        email: { type: string, minLength: 3, maxLength: 320 }
+        displayName: { type: string, minLength: 1, maxLength: 200 }
+        password:
+          # La même politique que le compte propriétaire du bootstrap : douze caractères au moins.
+          # Le serveur la redit, rien ne valide une requête contre ce fichier à l'exécution.
+          type: string
+          minLength: 12
+          maxLength: 4096
+      required: [email, displayName, password]
+
+    OperatorUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [active, disabled] }
+      required: [status]
+
+    OperatorRoles:
+      type: object
+      additionalProperties: false
+      properties:
+        roleIds:
+          type: array
+          maxItems: 100
+          items: { type: string }
+      required: [roleIds]
+
+    Role:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        isDefault:
+          # Un rôle par défaut est en lecture seule : le seed le réécrit à chaque déploiement.
+          type: boolean
+        permissions:
+          type: array
+          items: { type: string }
+        holders:
+          # Les adresses de ses détenteurs : c'est ce qui permet à l'écran de désactiver la
+          # suppression d'un rôle détenu en disant qui le détient, avant tout aller-retour.
+          type: array
+          items: { type: string }
+      required: [id, name, description, isDefault, permissions, holders]
+
+    RoleCreation:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 500 }
+        permissions:
+          type: array
+          maxItems: 100
+          items: { type: string }
+      required: [name, description, permissions]
+
+    RoleUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        description: { type: string, maxLength: 500 }
+        permissions:
+          type: array
+          maxItems: 100
+          items: { type: string }
+      required: [description, permissions]
 
     Error:
       type: object

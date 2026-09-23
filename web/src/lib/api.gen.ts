@@ -307,6 +307,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Les opérateurs, leurs rôles et l'état de leur second facteur */
+        get: operations["listOperators"];
+        put?: never;
+        /**
+         * Crée un opérateur, sans rôle
+         * @description Le compte naît actif et sans rôle : il peut entrer, puis enrôler son second facteur, et rien
+         *     d'autre tant qu'on ne lui attribue pas de rôle.
+         */
+        post: operations["createOperator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/operators/{operatorId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Désactive ou réactive un opérateur
+         * @description Désactiver **ferme toutes ses sessions**, dans la même transaction : réactivé plus tard, il
+         *     repasse par la connexion.
+         */
+        patch: operations["updateOperator"];
+        trace?: never;
+    };
+    "/operators/{operatorId}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remplace les rôles d'un opérateur */
+        post: operations["setOperatorRoles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/operators/{operatorId}/second-factors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Réinitialise le second facteur d'un autre opérateur
+         * @description Retire son application d'authentification, ses codes de récupération et ses clés d'accès,
+         *     lève son verrou d'essais et ferme ses sessions. À sa prochaine connexion, il enrôle un
+         *     nouveau facteur. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur
+         *     cassé. Sur son propre compte, le refus renvoie vers le remplacement en self-service.
+         */
+        delete: operations["resetOperatorSecondFactors"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Les rôles, leurs permissions et leurs détenteurs */
+        get: operations["listRoles"];
+        put?: never;
+        /** Compose un rôle personnalisé */
+        post: operations["createRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/{roleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprime un rôle personnalisé que personne ne détient */
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        /** Remplace la description et les permissions d'un rôle personnalisé */
+        patch: operations["updateRole"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -499,6 +618,49 @@ export interface components {
             email: string;
             displayName: string;
         };
+        /** @description Un opérateur tel que l'écran d'administration le montre. Aucun secret, aucun hachage. */
+        Operator: {
+            id: string;
+            email: string;
+            displayName: string;
+            /** @enum {string} */
+            status: "active" | "disabled";
+            roles: components["schemas"]["RoleReference"][];
+            secondFactorEnrolled: boolean;
+        };
+        RoleReference: {
+            id: string;
+            name: string;
+        };
+        OperatorCreation: {
+            email: string;
+            displayName: string;
+            password: string;
+        };
+        OperatorUpdate: {
+            /** @enum {string} */
+            status: "active" | "disabled";
+        };
+        OperatorRoles: {
+            roleIds: string[];
+        };
+        Role: {
+            id: string;
+            name: string;
+            description: string;
+            isDefault: boolean;
+            permissions: string[];
+            holders: string[];
+        };
+        RoleCreation: {
+            name: string;
+            description: string;
+            permissions: string[];
+        };
+        RoleUpdate: {
+            description: string;
+            permissions: string[];
+        };
         /**
          * @description La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
          *     `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
@@ -510,6 +672,80 @@ export interface components {
         };
     };
     responses: {
+        /** @description Aucune session vivante. */
+        SessionAbsente: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
+         * @description Refusé avant d'atteindre l'opération : origine étrangère, second facteur non franchi, ou
+         *     permission manquante — le message nomme alors la clé.
+         */
+        PermissionRefusee: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Le corps n'a pas la forme attendue, ou le mot de passe est trop court. */
+        RequeteInvalide: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Aucun opérateur ne porte cet identifiant. */
+        OperateurInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Aucun rôle ne porte cet identifiant. */
+        RoleInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
+         * @description Le geste enfermerait son auteur dehors (`self_lockout`) : se désactiver, se retirer
+         *     `operators:manage` ou `roles:manage`, réinitialiser son propre second facteur.
+         */
+        AutoVerrouillage: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
+         * @description `role_is_default` : les neuf rôles par défaut sont livrés avec le produit et resemés à chaque
+         *     déploiement ; une édition serait défaite. `role_held` : le rôle est détenu, et le message
+         *     nomme ses détenteurs. `self_lockout` : l'édition retirerait à son auteur `operators:manage`
+         *     ou `roles:manage`.
+         */
+        RoleIntouchable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description La requête ne vient pas de l'origine du tableau de bord. */
         OrigineRefusee: {
             headers: {
@@ -529,7 +765,10 @@ export interface components {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        OperatorId: string;
+        RoleId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -1146,6 +1385,270 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    listOperators: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tous les opérateurs, actifs et désactivés. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operator"][];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+        };
+    };
+    createOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorCreation"];
+            };
+        };
+        responses: {
+            /** @description L'opérateur est créé. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operator"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            /** @description Un opérateur porte déjà cette adresse, casse comprise (`email_taken`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    updateOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operatorId: components["parameters"]["OperatorId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorUpdate"];
+            };
+        };
+        responses: {
+            /** @description Le nouvel état de l'opérateur. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operator"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["OperateurInconnu"];
+            409: components["responses"]["AutoVerrouillage"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    setOperatorRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operatorId: components["parameters"]["OperatorId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorRoles"];
+            };
+        };
+        responses: {
+            /** @description L'opérateur avec ses nouveaux rôles. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operator"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["OperateurInconnu"];
+            409: components["responses"]["AutoVerrouillage"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    resetOperatorSecondFactors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operatorId: components["parameters"]["OperatorId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le second facteur est retiré et les sessions sont fermées. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["OperateurInconnu"];
+            409: components["responses"]["AutoVerrouillage"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les neuf rôles par défaut et les rôles personnalisés. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"][];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+        };
+    };
+    createRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleCreation"];
+            };
+        };
+        responses: {
+            /** @description Le rôle est créé. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            /** @description Un rôle porte déjà ce nom (`role_name_taken`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    deleteRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le rôle est supprimé. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["RoleInconnu"];
+            409: components["responses"]["RoleIntouchable"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    updateRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                roleId: components["parameters"]["RoleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Le rôle modifié. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["RoleInconnu"];
+            409: components["responses"]["RoleIntouchable"];
             415: components["responses"]["TypeDeContenuRefuse"];
         };
     };

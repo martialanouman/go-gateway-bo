@@ -41,6 +41,8 @@ type API struct {
 	// Audit écrit le journal. Cinquième collaborateur, et le seul dont **toutes** les routes de
 	// mutation dépendent : c'est la moitié « et l'audit avec elle » de l'invariant (c).
 	Audit *store.Audit
+	// Administration porte les gestes de `operators:manage` et `roles:manage`.
+	Administration *store.Administration
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le

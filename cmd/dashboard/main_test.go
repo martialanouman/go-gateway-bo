@@ -158,7 +158,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu : laissé en retard, il n'exige plus rien, et un fichier de
 // scénarios entier renommé en `.feature.disabled` laisse la suite verte. Un plancher qui survit à ce
 // qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 77
+const minimumScenarios = 93
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -231,6 +231,7 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	factors := &mfaWorld{login: login, session: sessions}
 	factors.registerSteps(ctx)
 	(&auditWorld{login: login, mfa: factors}).registerSteps(ctx)
+	(&operatorsWorld{login: login, mfa: factors}).registerSteps(ctx)
 	(&webauthnWorld{
 		login:         login,
 		session:       sessions,

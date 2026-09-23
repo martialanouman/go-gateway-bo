@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/martialanouman/go-gateway-bo/internal/session"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // Dependencies porte ce que les routes du BFF ne savent pas fabriquer.
@@ -73,7 +74,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		// fait que sur une requête déjà bornée et porteuse d'un cookie scellé.
 		api.Use(withSession(deps.Sessions))
 
-		mountContract(api, deps.API, deps.Sessions)
+		mountContract(api, deps.API, deps.Sessions, deps.Audit)
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
@@ -120,8 +121,8 @@ func NewRouter(deps Dependencies) http.Handler {
 // `TestTheContractMountInstallsTheProductErrorHandler` qui garde le montage. Sans l'option,
 // `HandlerFromMux` rendrait le message Go en `text/plain` — mesuré le 02/08/2026 sur un contrat muté
 // avec un paramètre de requête requis, puis restauré.
-func mountContract(api chi.Router, impl StrictServerInterface, sessions *session.Manager) {
-	HandlerWithOptions(newContractHandler(impl, sessions), ChiServerOptions{
+func mountContract(api chi.Router, impl StrictServerInterface, sessions *session.Manager, audit *store.Audit) {
+	HandlerWithOptions(newContractHandler(impl, sessions, audit), ChiServerOptions{
 		BaseRouter:       api,
 		ErrorHandlerFunc: rejectRequest,
 	})
@@ -155,9 +156,10 @@ func mountContract(api chi.Router, impl StrictServerInterface, sessions *session
 // **dernier** élément est le plus extérieur : la garde s'exécute avant tout le reste, et son refus
 // court-circuite la machinerie de cookie — qui ne pose rien, ne posant que sur
 // `err == nil && pending.cookie != nil`.
-func newContractHandler(impl StrictServerInterface, sessions *session.Manager) ServerInterface {
+func newContractHandler(impl StrictServerInterface, sessions *session.Manager, audit *store.Audit,
+) ServerInterface {
 	return NewStrictHandlerWithOptions(impl,
-		[]StrictMiddlewareFunc{writePendingCookie(), requirePermission(authorization, grantsFrom(sessions))},
+		[]StrictMiddlewareFunc{writePendingCookie(), requirePermission(authorization, grantsFrom(sessions), audit.Record)},
 		StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  rejectRequest,
 			ResponseErrorHandlerFunc: reportFailedResponse,

@@ -24,6 +24,31 @@ export const MfaVerification = z.object({
   method: z.enum(['totp', 'recovery_code', 'webauthn']),
 })
 
+export const OperatorCreation = z.object({
+  displayName: z.string().min(1).max(200),
+  email: z.string().min(3).max(320),
+  password: z.string().min(12).max(4096),
+})
+
+export const OperatorRoles = z.object({
+  roleIds: z.array(z.string()).max(100),
+})
+
+export const OperatorUpdate = z.object({
+  status: z.enum(['active', 'disabled']),
+})
+
+export const RoleCreation = z.object({
+  description: z.string().max(500),
+  name: z.string().min(1).max(100),
+  permissions: z.array(z.string()).max(100),
+})
+
+export const RoleUpdate = z.object({
+  description: z.string().max(500),
+  permissions: z.array(z.string()).max(100),
+})
+
 export const TotpEnrollmentRequest = z.object({
   code: z.string().min(1).max(64).optional(),
   method: z.enum(['totp', 'recovery_code']).optional(),

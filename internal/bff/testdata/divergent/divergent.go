@@ -81,4 +81,40 @@ func (API) DeleteWebauthnPasskey(_ context.Context,
 	return bff.DeleteWebauthnPasskey204Response{}, nil
 }
 
+func (API) ListOperators(_ context.Context, _ bff.ListOperatorsRequestObject) (bff.ListOperatorsResponseObject, error) {
+	return nil, nil
+}
+
+func (API) CreateOperator(_ context.Context, _ bff.CreateOperatorRequestObject) (bff.CreateOperatorResponseObject, error) {
+	return nil, nil
+}
+
+func (API) UpdateOperator(_ context.Context, _ bff.UpdateOperatorRequestObject) (bff.UpdateOperatorResponseObject, error) {
+	return nil, nil
+}
+
+func (API) SetOperatorRoles(_ context.Context, _ bff.SetOperatorRolesRequestObject) (bff.SetOperatorRolesResponseObject, error) {
+	return nil, nil
+}
+
+func (API) ResetOperatorSecondFactors(_ context.Context, _ bff.ResetOperatorSecondFactorsRequestObject) (bff.ResetOperatorSecondFactorsResponseObject, error) {
+	return nil, nil
+}
+
+func (API) ListRoles(_ context.Context, _ bff.ListRolesRequestObject) (bff.ListRolesResponseObject, error) {
+	return nil, nil
+}
+
+func (API) CreateRole(_ context.Context, _ bff.CreateRoleRequestObject) (bff.CreateRoleResponseObject, error) {
+	return nil, nil
+}
+
+func (API) UpdateRole(_ context.Context, _ bff.UpdateRoleRequestObject) (bff.UpdateRoleResponseObject, error) {
+	return nil, nil
+}
+
+func (API) DeleteRole(_ context.Context, _ bff.DeleteRoleRequestObject) (bff.DeleteRoleResponseObject, error) {
+	return nil, nil
+}
+
 var _ = bff.NewStrictHandler(API{}, nil)

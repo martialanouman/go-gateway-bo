@@ -62,8 +62,16 @@ func servedByGuard(t *testing.T, rules map[string]rule, grants grantsOf,
 ) served {
 	t.Helper()
 
+	return servedByGuardRecording(t, rules, grants, func(context.Context, store.Event) error { return nil }, ctx)
+}
+
+func servedByGuardRecording(t *testing.T, rules map[string]rule, grants grantsOf, denied recordDenial,
+	ctx context.Context, //nolint:revive // Le contexte porte la session résolue, il n'ordonne rien.
+) served {
+	t.Helper()
+
 	handler := NewStrictHandlerWithOptions(passingAPI{},
-		[]StrictMiddlewareFunc{requirePermission(rules, grants)},
+		[]StrictMiddlewareFunc{requirePermission(rules, grants, denied)},
 		StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  rejectRequest,
 			ResponseErrorHandlerFunc: reportFailedResponse,
@@ -203,6 +211,42 @@ func TestUneSessionSansLaCleEstRefusee(t *testing.T) {
 	assert.Equal(t, "permission_denied", response.body.Code)
 	assert.Contains(t, response.body.Message, string(permissions.RolesManage),
 		"le refus ne nomme pas la clé qui manque : un administrateur ne saurait pas quoi accorder")
+}
+
+// Dette 001 : un refus de permission laisse une trace. L'écriture est bornée par les sessions élevées,
+// seules à atteindre cette branche, et c'est ce qu'une enquête cherche : qui a tenté quoi.
+func TestUnRefusDePermissionLaisseUneTrace(t *testing.T) {
+	t.Parallel()
+
+	held := func(_ context.Context, _ string) ([]string, error) { return nil, nil }
+
+	var recorded []store.Event
+
+	response := servedByGuardRecording(t, guardedTable(), held, func(_ context.Context, event store.Event) error {
+		recorded = append(recorded, event)
+
+		return nil
+	}, withResolvedSession(true, true))
+
+	require.Equal(t, http.StatusForbidden, response.status)
+	require.Len(t, recorded, 1, "le refus n'a laissé aucune trace")
+	assert.Equal(t, "permission.denied", recorded[0].Action)
+	assert.Equal(t, "operateur-de-test", recorded[0].OperatorID)
+	assert.Equal(t, "Logout", recorded[0].TargetID, "la trace ne dit pas ce qui a été tenté")
+}
+
+// Une trace qui ne peut pas s'écrire n'est pas avalée : le refus devient une panne, comme toute
+// action dont l'audit échoue.
+func TestUnRefusDontLaTraceEchoueEstUnePanne(t *testing.T) {
+	t.Parallel()
+
+	held := func(_ context.Context, _ string) ([]string, error) { return nil, nil }
+
+	response := servedByGuardRecording(t, guardedTable(), held, func(context.Context, store.Event) error {
+		return errors.New("partition absente")
+	}, withResolvedSession(true, true))
+
+	assert.Equal(t, http.StatusInternalServerError, response.status)
 }
 
 // La clé détenue laisse passer. C'est le second témoin, et il ferme la mutation « refuser toujours ».

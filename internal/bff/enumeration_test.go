@@ -35,8 +35,8 @@ const contractPath = "../../api/openapi-bff.yaml"
 // grandit : une opération ajoutée n'oblige à rien ici, et c'est la propriété 1 qui exige qu'on la
 // décide.
 const (
-	contractOperationCount = 10
-	contractMutationCount  = 8
+	contractOperationCount = 19
+	contractMutationCount  = 15
 )
 
 // mutationMethods sont les méthodes HTTP qui changent l'état, donc celles que l'invariant (c) vise.

@@ -149,11 +149,12 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	router := bff.NewRouter(bff.Dependencies{
 		Assets: assets,
 		API: bff.API{
-			Authenticator: authenticator,
-			Sessions:      sessions,
-			SecondFactor:  secondFactor,
-			Passkeys:      passkeys,
-			Audit:         store.NewAudit(pool),
+			Authenticator:  authenticator,
+			Sessions:       sessions,
+			SecondFactor:   secondFactor,
+			Passkeys:       passkeys,
+			Audit:          store.NewAudit(pool),
+			Administration: store.NewAdministration(pool),
 		},
 		TrustedProxies: cfg.Auth.TrustedProxies,
 		// La même valeur que l'origine des cérémonies WebAuthn, et c'est délibéré : un déploiement a
