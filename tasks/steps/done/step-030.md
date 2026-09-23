@@ -1,6 +1,6 @@
 # step-030 — Écrans Opérateurs et Rôles
 
-> **Jalon :** M1 (§6.10, §5.1) · **Statut :** À FAIRE
+> **Jalon :** M1 (§6.10, §5.1) · **Statut :** FAIT
 > **Dépend de :** step-029, step-049 · **Bloque :** step-039
 
 ## But
@@ -42,8 +42,26 @@ les facteurs du compte de la session, pas sur l'administration des autres.*
   opérateur, lui attribue un rôle, et cet opérateur entre.
 
 ## Definition of Done
-- [ ] `make check` vert et `make e2e` vert
+- [x] `make check` vert et `make e2e` vert
 - [ ] ~~**M1 est clos**~~ — passe à step-039
 
 ## Hors périmètre
 L'écran de consultation du journal d'audit → step-184. Toute route serveur : elles sont livrées.
+
+## Réalisé (23/09/2026)
+
+- **Dette 040 payée par l'écran lui-même** : « Voir les permissions » montre, à côté de la
+  description, la liste des clés que le rôle accorde réellement, lue en base. Une description fausse
+  y est contredite sous les yeux de l'opérateur qui décide ; elle n'est plus la seule source.
+- **`GET /roles` reste sous `roles:manage`** : sans elle, « Modifier les rôles » est désactivé et
+  expliqué. Seul `super_admin` porte l'une des deux clés aujourd'hui ; rouvrir la question le jour
+  où un rôle personnalisé les sépare.
+- **Cases natives dans des `fieldset`** plutôt qu'une primitive de plus : le clavier et le groupement
+  annoncé viennent du navigateur.
+- **`retry: false` sur les deux listes** : les trois reprises par défaut de React Query faisaient
+  attendre sept secondes l'état d'erreur d'un 403.
+
+Mutations jouées, toutes rouges : se désactiver permis, réinitialisation sans objet permise, rôles
+sans `roles:manage` permis, toast de succès retiré, reprises par défaut, rôle par défaut modifiable,
+rôle détenu supprimable, clés du rôle cachées. Parcours Playwright étendu : l'administrateur crée un
+opérateur, lui attribue `auditor`, et cet opérateur entre jusqu'à l'enrôlement.
