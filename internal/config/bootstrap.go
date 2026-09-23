@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/martialanouman/go-gateway-bo/internal/auth"
 )
 
 // Noms des variables du **premier opérateur**. Elles ne sont lues que par `cmd/bootstrap`, jamais
@@ -13,15 +15,6 @@ const (
 	EnvBootstrapOperatorName     = "DASHBOARD_BOOTSTRAP_OPERATOR_NAME"
 	EnvBootstrapOperatorPassword = "DASHBOARD_BOOTSTRAP_OPERATOR_PASSWORD"
 )
-
-// minimumOperatorPasswordLength borne le mot de passe du compte propriétaire. Douze caractères, et
-// aucune exigence de composition : la longueur est la seule contrainte dont l'effet sur la difficulté
-// se démontre, là où « une majuscule et un chiffre » produit surtout `Motdepasse1`.
-//
-// C'est la **seule** politique de mot de passe du produit à ce jour, et elle ne s'applique qu'ici :
-// la spec n'en énonce aucune, et l'écran de gestion des opérateurs tranchera pour les comptes
-// suivants. Le dire plutôt que de laisser croire que le produit en porte une.
-const minimumOperatorPasswordLength = 12
 
 // Bootstrap est la configuration de la **commande** `bootstrap`, pas du serveur.
 //
@@ -109,9 +102,9 @@ func (r *reader) operatorPassword(name string) string {
 		return ""
 	}
 
-	if len([]rune(value)) < minimumOperatorPasswordLength {
+	if !auth.PasswordLongEnough(value) {
 		r.reject(name, "mot de passe d'au moins %d caractères attendu ; la valeur n'est pas citée",
-			minimumOperatorPasswordLength)
+			auth.MinimumPasswordLength)
 
 		return ""
 	}
