@@ -7,6 +7,7 @@ import { createAppRouter } from '~/router'
 import {
   type AdministrationReplies,
   COLLEAGUE,
+  ON_CALL,
   SELF,
   stubAdministration,
 } from '../../test/administration'
@@ -14,8 +15,9 @@ import {
 async function visit(
   permissions: readonly PermissionKey[] = ['operators:manage', 'roles:manage'],
   replies: AdministrationReplies = {},
+  operators = [SELF, COLLEAGUE],
 ) {
-  const fetch = stubAdministration({ permissions }, {}, replies)
+  const fetch = stubAdministration({ permissions }, { operators }, replies)
   render(
     <RouterProvider
       router={createAppRouter(createMemoryHistory({ initialEntries: ['/operators'] }))}
@@ -185,5 +187,98 @@ describe('l’écran des opérateurs', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Votre compte ne détient pas la permission.')
     expect(within(alert).getByRole('button', { name: 'Réessayer' })).toBeInTheDocument()
+  })
+
+  it('réinitialise le second facteur d’un collègue après une confirmation qui dit tout ce qui part', async () => {
+    const user = userEvent.setup()
+    await visit(undefined, {}, [SELF, { ...COLLEAGUE, secondFactorEnrolled: true }])
+
+    await user.click(
+      row(COLLEAGUE.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
+    )
+    const dialog = await screen.findByRole('dialog', {
+      name: `Réinitialiser le second facteur de ${COLLEAGUE.displayName}`,
+    })
+    expect(dialog).toHaveTextContent(/codes de récupération/)
+    expect(dialog).toHaveTextContent(/sessions fermées/)
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Réinitialiser le second facteur' }),
+    )
+
+    expect(await row(COLLEAGUE.email).findByText('Aucun')).toBeInTheDocument()
+  })
+
+  it('réactive un collègue désactivé, sans confirmation', async () => {
+    const user = userEvent.setup()
+    await visit(undefined, {}, [SELF, { ...COLLEAGUE, status: 'disabled' }])
+
+    await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Réactiver' }))
+
+    expect(
+      await row(COLLEAGUE.email).findByRole('button', { name: 'Désactiver' }),
+    ).toBeInTheDocument()
+  })
+
+  it('retire un rôle à un collègue', async () => {
+    const user = userEvent.setup()
+    await visit(undefined, {}, [
+      SELF,
+      { ...COLLEAGUE, roles: [{ id: ON_CALL.id, name: ON_CALL.name }] },
+    ])
+
+    await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Modifier les rôles' }))
+    const dialog = await screen.findByRole('dialog', { name: `Rôles de ${COLLEAGUE.displayName}` })
+    await user.click(await within(dialog).findByRole('checkbox', { name: /astreinte/ }))
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer les rôles' }))
+
+    expect(await row(COLLEAGUE.email).findByText('Aucun rôle')).toBeInTheDocument()
+  })
+
+  it('rend en erreur, dans la fenêtre, une liste de rôles illisible, et la relit sur demande', async () => {
+    const user = userEvent.setup()
+    const fetch = await visit(undefined, {
+      'GET /api/roles': {
+        status: 500,
+        body: { code: 'internal_error', message: 'Panne de test.' },
+      },
+    })
+
+    await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Modifier les rôles' }))
+    const dialog = await screen.findByRole('dialog', { name: `Rôles de ${COLLEAGUE.displayName}` })
+    const alert = await within(dialog).findByRole('alert')
+    expect(alert).toHaveTextContent('Panne de test.')
+
+    await user.click(within(alert).getByRole('button', { name: 'Réessayer' }))
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.filter(([request]) => new URL(request.url).pathname === '/api/roles'),
+      ).toHaveLength(2),
+    )
+  })
+
+  it('relit la liste quand l’opérateur demande de réessayer après une panne', async () => {
+    const user = userEvent.setup()
+    const fetch = stubAdministration(
+      { permissions: ['operators:manage'] },
+      {},
+      {
+        'GET /api/operators': { status: 500, body: { code: 'internal_error', message: 'Panne.' } },
+      },
+    )
+    render(
+      <RouterProvider
+        router={createAppRouter(createMemoryHistory({ initialEntries: ['/operators'] }))}
+      />,
+    )
+
+    await user.click(
+      within(await screen.findByRole('alert')).getByRole('button', { name: 'Réessayer' }),
+    )
+
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.filter(([request]) => new URL(request.url).pathname === '/api/operators'),
+      ).toHaveLength(2),
+    )
   })
 })

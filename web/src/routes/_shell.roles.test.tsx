@@ -92,6 +92,11 @@ describe('l’écran des rôles', () => {
     await user.click(row(ON_CALL.name).getByRole('button', { name: 'Modifier' }))
     const dialog = await screen.findByRole('dialog', { name: `Modifier ${ON_CALL.name}` })
     expect(within(dialog).getByRole('checkbox', { name: /alerts:read/ })).toBeChecked()
+    await user.clear(within(dialog).getByLabelText(/Description/))
+    await user.type(
+      within(dialog).getByLabelText(/Description/),
+      'Alertes, lecture et acquittement.',
+    )
     await user.click(within(dialog).getByRole('checkbox', { name: /alerts:write/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer le rôle' }))
 
@@ -104,6 +109,7 @@ describe('l’écran des rôles', () => {
     const view = await screen.findByRole('dialog', { name: `Rôle ${ON_CALL.name}` })
     expect(within(view).getByText('alerts:write')).toBeInTheDocument()
     expect(within(view).getByText('alerts:read')).toBeInTheDocument()
+    expect(view).toHaveTextContent('Alertes, lecture et acquittement.')
   })
 
   it('supprime un rôle personnalisé que personne ne détient, après confirmation', async () => {
@@ -128,6 +134,30 @@ describe('l’écran des rôles', () => {
 
     await waitFor(() =>
       expect(screen.queryByRole('cell', { name: ON_CALL.name })).not.toBeInTheDocument(),
+    )
+  })
+
+  it('rend une panne en état d’erreur, et relit la liste sur demande', async () => {
+    const user = userEvent.setup()
+    const fetch = stubAdministration(
+      { permissions: ['roles:manage'] },
+      {},
+      { 'GET /api/roles': { status: 500, body: { code: 'internal_error', message: 'Panne.' } } },
+    )
+    render(
+      <RouterProvider
+        router={createAppRouter(createMemoryHistory({ initialEntries: ['/roles'] }))}
+      />,
+    )
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Panne.')
+    await user.click(within(alert).getByRole('button', { name: 'Réessayer' }))
+
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.filter(([request]) => new URL(request.url).pathname === '/api/roles'),
+      ).toHaveLength(2),
     )
   })
 })

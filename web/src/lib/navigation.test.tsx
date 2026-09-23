@@ -1,6 +1,7 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { PendingScreen } from '~/components/pending-screen'
 import { createAppRouter } from '~/router'
 import { stubSession } from '../../test/session'
 import { NAV_ENTRIES, NAV_GROUPS, type NavPath, navEntry } from './navigation'
@@ -57,5 +58,11 @@ describe('chaque route non livrée', () => {
     const heading = await screen.findByRole('heading', { level: 1 })
     expect(heading).toHaveTextContent(label)
     expect(screen.getByText(new RegExp(`jalon ${milestone} `))).toBeInTheDocument()
+  })
+})
+
+describe('l’écran d’attente', () => {
+  it('refuse d’annoncer en attente un écran livré', () => {
+    expect(() => render(<PendingScreen to="/operators" />)).toThrow('/operators est livré')
   })
 })
