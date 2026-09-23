@@ -196,9 +196,9 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
 
       <div className="page__notes">
         <p id={selfId}>
-          Votre propre compte ne se désactive ni ne se réinitialise ici : un autre détenteur de «
-          operators:manage » peut le faire. Pour remplacer votre facteur, présentez l’actuel à
-          l’enrôlement.
+          Le compte de la session ne se désactive ni ne se réinitialise ici : un autre détenteur de{' '}
+          <span className="mono">operators:manage</span> peut le faire. Le remplacement de son
+          propre facteur n’a pas encore d’écran.
         </p>
         <p id={nothingToResetId}>
           Réinitialisation sans objet : cet opérateur n’a aucun second facteur en place. Il en
@@ -206,10 +206,11 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
         </p>
         {canListRoles ? null : (
           <p id={rolesLockedId}>
-            Attribuer des rôles demande aussi « roles:manage », seule clé qui ouvre la liste des
-            rôles.
+            « Modifier les rôles » reste fermé sans <span className="mono">roles:manage</span> :
+            c’est la seule clé qui ouvre la liste des rôles à choisir.
           </p>
         )}
+        <p>Réactiver rend l’accès sans confirmation. Action journalisée.</p>
       </div>
 
       {pending?.kind === 'roles' ? (
@@ -267,7 +268,10 @@ function CreateOperator({
       orRefusal(api.POST('/operators', { body }), 'L’opérateur n’a pas été créé'),
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: operatorsQueryKey })
-      toast({ title: `${created.displayName} peut entrer`, severity: 'success' })
+      toast({
+        title: `Compte de ${created.displayName} créé : actif, sans rôle, second facteur à enrôler`,
+        severity: 'success',
+      })
       dismiss()
     },
   })
@@ -300,8 +304,8 @@ function CreateOperator({
         onSubmit={form.handleSubmit((values) => create.mutate(values))}
       >
         <p>
-          Le compte naît actif et sans rôle. Transmettez-lui le mot de passe hors du tableau de bord
-          : il enrôlera son second facteur à sa première connexion. Action journalisée.
+          Le compte naît actif et sans rôle. Le mot de passe se transmet hors du tableau de bord ;
+          le titulaire enrôle son second facteur à sa première connexion. Action journalisée.
         </p>
         <Refusal error={create.error} />
         <Field error={errors.email?.message} label="Adresse e-mail">
@@ -384,7 +388,8 @@ function AssignRoles({
       ) : (
         <fieldset className="role-choice">
           <legend>
-            Les permissions s’additionnent : l’opérateur détient l’union de ses rôles.
+            Les permissions s’additionnent : l’opérateur détient l’union de ses rôles, dès sa
+            prochaine requête. Action journalisée.
           </legend>
           {roles.data.map((role) => (
             <label className="role-choice__option" key={role.id}>
@@ -433,8 +438,9 @@ function ConfirmDisable({
     >
       <Refusal error={setStatus.error} />
       <p>
-        Ses sessions sont fermées immédiatement, et il ne peut plus se connecter. Le compte se
-        réactive plus tard ; il repassera alors par la connexion. Action journalisée.
+        Ses sessions sont fermées immédiatement, et il ne peut plus se connecter. Ses rôles et son
+        second facteur restent en place ; « Réactiver » lui rend l’accès, par une nouvelle
+        connexion. Action journalisée.
       </p>
     </Modal>
   )

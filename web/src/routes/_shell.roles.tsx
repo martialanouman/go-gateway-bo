@@ -132,16 +132,22 @@ function RolesTable({
 
       <div className="page__notes">
         <p id={defaultId}>
-          Les neuf rôles par défaut restent tels quels : livrés avec le produit, ils sont réécrits à
-          chaque déploiement, et une modification serait défaite. Composez un rôle personnalisé à
-          partir de leurs permissions.
+          Les neuf rôles par défaut ne se modifient ni ne se suppriment : livrés avec le produit,
+          ils sont réécrits à chaque déploiement, et tout changement serait défait. Un rôle
+          personnalisé se compose à partir de leurs permissions.
         </p>
         {roles
           .filter((role) => !role.isDefault && role.holders.length > 0)
           .map((role) => (
             <p id={`${heldId}-${role.id}`} key={role.id}>
-              <span className="mono">{role.name}</span> ne se supprime pas tant qu’il est détenu,
-              par {role.holders.join(', ')}. Retirez-le d’abord à ces opérateurs.
+              <span className="mono">{role.name}</span> ne se supprime pas tant qu’il est détenu par{' '}
+              {role.holders.map((holder, index) => (
+                <span key={holder}>
+                  {index === 0 ? null : ', '}
+                  <span className="mono">{holder}</span>
+                </span>
+              ))}
+              . Il se retire d’abord à ces opérateurs, depuis l’écran Opérateurs.
             </p>
           ))}
       </div>
@@ -151,8 +157,7 @@ function RolesTable({
 
 /**
  * Les clés à côté de la phrase : la description d'un rôle par défaut n'est gardée que par la
- * relecture (dette 040 de step-020), et c'est la liste des clés — engendrée du catalogue — qui dit
- * ce que le rôle accorde réellement.
+ * relecture, et c'est la liste des clés, lue en base, qui dit ce que le rôle accorde réellement.
  */
 function RoleView({ role, onClose }: { readonly role: Role; readonly onClose: () => void }) {
   return (
@@ -216,8 +221,9 @@ function RoleEditor({ role, onClose }: { readonly role?: Role; readonly onClose:
     >
       <div className="form">
         <p>
-          Le rôle accorde exactement les clés cochées. Qui détient « roles:manage » peut s’accorder
-          tout le reste : la liste n’est pas bornée aux clés que vous détenez. Action journalisée.
+          Le rôle accorde exactement les clés cochées, choisies dans tout le catalogue : la liste
+          n’est pas bornée aux clés de l’auteur. Modifier un rôle détenu change aussitôt les droits
+          de ses détenteurs. Action journalisée.
         </p>
         <Refusal error={save.error} />
         {role === undefined ? (

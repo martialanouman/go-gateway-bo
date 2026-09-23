@@ -56,11 +56,11 @@ describe('l’écran des opérateurs', () => {
 
     expectBlockedAndExplained(
       row(SELF.email).getByRole('button', { name: 'Désactiver' }),
-      /propre compte/,
+      /compte de la session/,
     )
     expectBlockedAndExplained(
       row(SELF.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-      /propre compte/,
+      /compte de la session/,
     )
   })
 
@@ -94,7 +94,7 @@ describe('l’écran des opérateurs', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
 
     expect(await screen.findByRole('cell', { name: /n\.benali@example\.test/ })).toBeInTheDocument()
-    expect(await screen.findByText('Nadia Benali peut entrer')).toBeInTheDocument()
+    expect(await screen.findByText(/Compte de Nadia Benali créé/)).toBeInTheDocument()
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Nouvel opérateur' })).not.toBeInTheDocument(),
     )
