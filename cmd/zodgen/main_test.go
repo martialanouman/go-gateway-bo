@@ -102,12 +102,12 @@ func TestUnObjetLibreTraverseSansEtreDecrit(t *testing.T) {
 	require.Contains(t, rendered, "email: z.record(z.string(), z.unknown()),")
 }
 
-// **Le générateur refuse plutôt que de deviner.** Un type qu'il ne sait pas rendre — un tableau, un
-// nombre borné, un objet imbriqué — sortirait sinon en `z.unknown()` : un schéma qui accepte tout,
-// vert à l'exécution, et qui ne garde plus rien. C'est le mode d'échec d'un générateur partiel, et
+// **Le générateur refuse plutôt que de deviner.** Un type qu'il ne sait pas rendre — un nombre borné,
+// un objet imbriqué — sortirait sinon en `z.unknown()` : un schéma qui accepte tout, vert à
+// l'exécution, et qui ne garde plus rien. C'est le mode d'échec d'un générateur partiel, et
 // il est muet.
 func TestUnTypeQueLeGenerateurNeSaitPasRendreEstRefuse(t *testing.T) {
-	doc, err := load([]byte(strings.Replace(miniContract, "type: string\n          maxLength: 320", "type: array\n          items: { type: string }", 1)))
+	doc, err := load([]byte(strings.Replace(miniContract, "type: string\n          maxLength: 320", "type: integer\n          maximum: 10", 1)))
 	require.NoError(t, err)
 
 	_, err = render(doc)
@@ -186,4 +186,11 @@ func TestLeContratDuDepotEstEngendrableEnEntier(t *testing.T) {
 	} {
 		require.Contains(t, string(rendered), "export const "+schema+" = z.object({")
 	}
+}
+
+func TestUnTableauPorteSesElementsEtSaBorne(t *testing.T) {
+	contract := strings.Replace(miniContract, "      required: [email, password]",
+		"        roleIds:\n          type: array\n          maxItems: 100\n          items: { type: string, maxLength: 64 }\n      required: [email, password]", 1)
+
+	require.Contains(t, renderContract(t, contract), "roleIds: z.array(z.string().max(64)).max(100).optional(),")
 }
