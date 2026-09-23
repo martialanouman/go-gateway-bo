@@ -1,7 +1,7 @@
 # step-030 — Écrans Opérateurs et Rôles
 
 > **Jalon :** M1 (§6.10, §5.1) · **Statut :** À FAIRE
-> **Dépend de :** step-029, step-049 · **Bloque :** — (clôt M1)
+> **Dépend de :** step-029, step-049 · **Bloque :** step-039
 
 ## But
 Le plan de coupe de step-029, exécuté : step-029 a livré les neuf routes d'administration et leurs
@@ -22,9 +22,9 @@ première ligne de step-029, comme sa fiche le demandait.*
 
 ### Dettes héritées de step-029
 - **040** — les descriptions des neuf rôles, que cet écran affiche.
-- **042** — le nom des passkeys, et avec lui le sort de `DELETE /auth/mfa/webauthn/passkeys/{id}`.
-- **052** — le succès d'une cérémonie WebAuthn, par un authentificateur virtuel CDP dans Playwright.
-- **053** — le remplacement d'un facteur en place n'a pas d'écran.
+
+*042, 052 et 053 sont passées en step-039 le 23/09/2026, avant la première ligne : elles portent sur
+les facteurs du compte de la session, pas sur l'administration des autres.*
 
 ## Points d'implémentation clés
 - **`GET /roles` exige `roles:manage`**, et l'écran Opérateurs en a besoin pour attribuer : un
@@ -34,8 +34,6 @@ première ligne de step-029, comme sa fiche le demandait.*
 - **Un compte créé et jamais entré n'a pas de second facteur** : `secondFactorEnrolled` le montre ; la
   fenêtre se ferme au premier passage du titulaire (arbitrage de la dette 004, écrit sur
   `BeginWebauthnRegistration`).
-- **Les passkeys** : inventaire et nom (dette 042), ou sort écrit de
-  `DELETE /auth/mfa/webauthn/passkeys/{id}`.
 
 ## Tests (écrits dans la même PR)
 - **Composants (Vitest)** : l'éditeur de rôle groupe les 44 clés par catégorie, le clavier suit, les
@@ -45,8 +43,7 @@ première ligne de step-029, comme sa fiche le demandait.*
 
 ## Definition of Done
 - [ ] `make check` vert et `make e2e` vert
-- [ ] **M1 est clos** : les **treize** fiches sont dans `tasks/steps/done/`, et le checkpoint du
-      `plan.md` §6 est vérifié plutôt que déclaré.
+- [ ] ~~**M1 est clos**~~ — passe à step-039
 
 ## Hors périmètre
 L'écran de consultation du journal d'audit → step-184. Toute route serveur : elles sont livrées.
