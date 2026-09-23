@@ -12,10 +12,10 @@ import {
   Modal,
   Skeleton,
 } from '~/components/ui'
+import { blockedBy, orRefusal, Refusal, rolesQueryKey, useRoles } from '~/lib/administration'
 import { api, meQueryOptions } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
 import { usePermission } from '~/lib/permissions'
-import { blockedBy, orRefusal, Refusal, rolesQueryKey, useRoles } from './_shell.operators'
 
 type Role = components['schemas']['Role']
 
