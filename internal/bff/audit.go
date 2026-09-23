@@ -20,6 +20,16 @@ const (
 	actionMFAVerify       = "mfa.verify"
 	actionPasskeyRegister = "passkey.register"
 	actionPasskeyRemove   = "passkey.remove"
+
+	actionPermissionDenied = "permission.denied"
+	actionOperatorCreate   = "operator.create"
+	actionOperatorDisable  = "operator.disable"
+	actionOperatorEnable   = "operator.enable"
+	actionOperatorRolesSet = "operator.assign_roles"
+	actionOperatorMFAReset = "mfa.reset"
+	actionRoleCreate       = "role.create"
+	actionRoleUpdate       = "role.update"
+	actionRoleDelete       = "role.delete"
 )
 
 // Les types de cible que ces actions désignent. Le §3.1 les laisse libres ; les nommer ici évite que
@@ -28,6 +38,9 @@ const (
 const (
 	auditTargetOperator = "operator"
 	auditTargetPasskey  = "passkey"
+	auditTargetRole     = "role"
+	// auditTargetOperation désigne l'opération du contrat qu'un refus a arrêtée.
+	auditTargetOperation = "operation"
 )
 
 // auditExemptions nomme les mutations qui ne laissent **pas** de trace, et pourquoi.
@@ -52,9 +65,9 @@ var auditExemptions = map[string]string{
 // dans la transaction de l'action, côté `store` : ou les deux, ou aucune. **Sauf pour `Logout`**, qui
 // passe encore par `Audit.Record` sur le pool — l'arbitrage est écrit sur le handler.
 //
-// **Seuls les succès sont journalisés.** Un refus est déjà compté par le verrou d'essais, et
-// journaliser les échecs de connexion ouvrirait une écriture par requête non authentifiée — ce que
-// `login_attempt_counters` existe précisément pour éviter d'exposer.
+// **Seuls les succès sont journalisés, sauf le refus de permission** (`recordDenial`). Un échec de
+// connexion est déjà compté par le verrou d'essais, et le journaliser ouvrirait une écriture par
+// requête non authentifiée — ce que `login_attempt_counters` existe précisément pour éviter d'exposer.
 func (a API) event(ctx context.Context, event store.Event) store.Event {
 	if address, ok := clientAddressFrom(ctx); ok {
 		event.IPAddress = address

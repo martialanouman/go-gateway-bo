@@ -1,6 +1,6 @@
 # 042 — Aucune passkey ne porte de nom : la table est livrée sans colonne `name`
 
-> **Porteur :** step-029
+> **Porteur :** step-030
 
 ## Ce qu'elle coûte si elle dure
 
@@ -15,9 +15,12 @@ elle livre l'entrée du premier administrateur, pas la gestion de ses facteurs.
 C'est la règle que cette dette cite elle-même, tenue pour de bon : « la colonne s'écrira avec la step
 qui saura ce qu'elle doit contenir ». step-028 ne le sait pas.
 
-**Ce que step-029 doit trancher avec elle**, et dans le même mouvement que la dette 045 — « une
+**Ce que step-030 doit trancher avec elle**, et dans le même mouvement que la dette 045 — « une
 opération au contrat que personne n'appelle : la trancher, et écrire la raison » : ou bien elle fait
 naître l'inventaire des passkeys, et le nom y gagne son emploi ; ou bien `DELETE
 /auth/mfa/webauthn/passkeys/{passkeyId}` reçoit le même sort écrit que `GET /permissions`, et cette
 dette se ferme avec lui. Poser la colonne sans l'une ni l'autre livrerait une donnée sans
 consommateur, ce que step-037 a précisément élagué.
+
+**Re-portée de step-029 à step-030 le 23/09/2026** : step-029 a livré les routes, et les écrans
+qui font mordre cette dette sont partis en step-030 (coupe préparée par la fiche de step-029).

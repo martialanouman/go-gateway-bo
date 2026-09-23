@@ -340,7 +340,7 @@ DELETE /auth/mfa/webauthn/passkeys/{passkeyId} # (Amendement step-024) retire un
                                        # trompait : retirer sa propre clé est du self-service, et
                                        # aucune clé du catalogue n'y correspond. L'élévation la garde,
                                        # le journal d'audit en garde la trace ; c'est operators:manage
-                                       # qui gardera le retrait SUR AUTRUI, en step-029.
+                                       # qui garde le retrait SUR AUTRUI (DELETE /operators/{id}/second-factors).
                                        # Elle n'est pas la seule à ÉCRIRE : register/finish pose un
                                        # second facteur, et cet événement-là doit être audité même
                                        # exempté de garde.
@@ -458,10 +458,14 @@ GET     /audit-log?operator=&targetType=&dateFrom=&dateTo=
 POST    /internal/alertmanager-webhook               # server-to-server, mTLS/shared secret (§6.8)
 
 # Operators, roles & permissions (operators:manage / roles:manage)
-GET/POST/PATCH/DELETE  /operators
+GET/POST/PATCH         /operators                     # PATCH : désactiver / réactiver
 POST                    /operators/{id}/roles
-GET                     /permissions                  # read-only catalog
+DELETE                  /operators/{id}/second-factors # réinitialisation par un administrateur
 GET/POST/PATCH/DELETE  /roles
+# (Amendement step-029) Ni DELETE /operators ni GET /permissions. Le journal d'audit tient ses
+# auteurs en RESTRICT : un opérateur qui part se désactive, il ne se supprime pas. Le catalogue
+# voyage déjà dans le bundle (permissions.gen.ts, engendré depuis le Go) ; une route sans appelant
+# serait maintenue à vie sans que rien la prouve.
 ```
 
 ### 5.2 Enveloppe de message WebSocket

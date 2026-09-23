@@ -56,3 +56,14 @@ Fonctionnalité: Le vocabulaire de l'autorisation est semé depuis le catalogue 
     Quand le seed est rejoué
     Alors le rôle "astreinte_nuit" accorde toujours "sessions:disconnect"
     Et le rapport ne nomme jamais "astreinte_nuit"
+
+  # Une release qui ajouterait un rôle par défaut dont le nom est déjà porté par un rôle personnalisé
+  # ne le confisque pas : le seed refuse, et le déploiement nomme le rôle à renommer ou supprimer.
+  Scénario: un rôle personnalisé homonyme d'un rôle par défaut fait refuser le seed
+    Étant donné une base migrée
+    Et le seed déjà joué
+    Et le rôle par défaut "ops" absent, comme avant la release qui l'ajoute
+    Et un rôle personnalisé "ops" qui accorde "sessions:disconnect"
+    Quand le seed est joué malgré la collision
+    Alors le seed refuse en nommant "ops"
+    Et le rôle "ops" accorde toujours "sessions:disconnect"

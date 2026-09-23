@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/martialanouman/go-gateway-bo/internal/permissions"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // rule dit ce qu'une opération du contrat exige avant d'être servie.
@@ -40,7 +41,7 @@ func exempt(reason string) rule {
 
 func (r rule) exempted() bool { return r.exemption != "" }
 
-// authorization décide pour **les dix opérations du contrat**, pas seulement pour les mutations.
+// authorization décide pour **toutes les opérations du contrat**, pas seulement pour les mutations.
 //
 // **Le défaut est fermé** : une opération absente de cette table est refusée. C'est ce qui rend
 // bruyant le piège des deux vocabulaires — la clé est le nom de méthode Go que le code engendré
@@ -49,10 +50,18 @@ func (r rule) exempted() bool { return r.exemption != "" }
 // laisser passer aurait ouvert la garde en silence. La porte d'énumération tient le même invariant
 // par le type-checker, et les deux ensemble sont ce qui ferme le piège.
 //
-// **Aucune entrée n'exige de clé aujourd'hui.** Les **huit** mutations vivent sous `/auth/`, où
-// l'autorisation est l'affaire de chaque route ; les deux autres opérations sont des lectures. Le
-// premier `requires` arrive avec `POST /operators`, en step-029.
+// Les mutations de `/auth/` sont exemptées : l'autorisation y est l'affaire de chaque route. Les routes
+// d'administration exigent chacune sa clé, lectures comprises.
 var authorization = map[string]rule{
+	"ListOperators":              requires(permissions.OperatorsManage),
+	"CreateOperator":             requires(permissions.OperatorsManage),
+	"UpdateOperator":             requires(permissions.OperatorsManage),
+	"SetOperatorRoles":           requires(permissions.OperatorsManage),
+	"ResetOperatorSecondFactors": requires(permissions.OperatorsManage),
+	"ListRoles":                  requires(permissions.RolesManage),
+	"CreateRole":                 requires(permissions.RolesManage),
+	"UpdateRole":                 requires(permissions.RolesManage),
+	"DeleteRole":                 requires(permissions.RolesManage),
 	"Health": exempt("la sonde de l'orchestrateur, qui n'a pas de session et ne doit jamais " +
 		"dépendre d'une autre brique pour répondre"),
 	"Login": exempt("la porte d'entrée : exiger une session pour en ouvrir une n'a pas de sens. " +
@@ -75,19 +84,23 @@ var authorization = map[string]rule{
 	"DeleteWebauthnPasskey": exempt("retirer sa propre clé d'accès est du self-service, pas un acte " +
 		"sur autrui : aucune clé du catalogue n'y correspond, et en créer une qu'il faudrait donner " +
 		"aux neuf rôles n'exclurait personne. L'élévation la garde, le journal en garde la trace, et " +
-		"c'est `operators:manage` qui gardera le retrait sur autrui (step-029)"),
+		"c'est `operators:manage` qui garde le retrait sur autrui, par `ResetOperatorSecondFactors`"),
 }
 
 // grantsOf rend l'union des permissions d'un opérateur.
 //
-// Le type existe pour que la garde soit **exerçable** : `internal/bff` ne monte aucune base, et sans
-// cette couture la branche « la clé manque » n'aurait aucun test avant step-029 — donc la mutation
-// qui retire la comparaison resterait verte, ce que la DoD de la step refuse.
+// Le type existe pour que la garde soit **exerçable sans base** : `internal/bff` n'en monte aucune, et
+// les tests unitaires de la garde injectent leur source.
 //
 // Le prix de toute couture est qu'un test peut vérifier un mécanisme que la production ne câble pas.
 // Ce qui le ferme ici est `TestLaGardeEstCablee`, qui exige que `newContractHandler` atteigne
 // `(*session.Manager).Grants` — la vraie source, pas n'importe quelle fonction du bon type.
 type grantsOf func(ctx context.Context, operatorID string) ([]string, error)
+
+// recordDenial écrit la trace d'un refus de permission (dette 001). La règle « seuls les succès sont
+// journalisés » protège les écritures non authentifiées ; ce refus-ci ne vient que d'une session
+// vivante et élevée, donc l'écriture est bornée par les sessions, et c'est ce qu'une enquête cherche.
+type recordDenial func(ctx context.Context, event store.Event) error
 
 // requirePermission garde chaque opération selon la table.
 //
@@ -104,7 +117,7 @@ type grantsOf func(ctx context.Context, operatorID string) ([]string, error)
 // L'alternative — rendre l'objet de réponse typé de l'opération — exigerait une seconde table
 // `operationID → constructeur du 403 de cette opération-là`, et son défaut retomberait sur
 // `unexpected response type`, donc **500 au lieu de 403** : une garde qui se trompe en panne.
-func requirePermission(rules map[string]rule, grants grantsOf) StrictMiddlewareFunc {
+func requirePermission(rules map[string]rule, grants grantsOf, denied recordDenial) StrictMiddlewareFunc {
 	return func(next StrictHandlerFunc, operationID string) StrictHandlerFunc {
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
 			required, declared := rules[operationID]
@@ -146,6 +159,20 @@ func requirePermission(rules map[string]rule, grants grantsOf) StrictMiddlewareF
 			}
 
 			if !slices.Contains(held, string(required.permission)) {
+				event := store.Event{
+					OperatorID: resolved.OperatorID,
+					Action:     actionPermissionDenied,
+					TargetType: auditTargetOperation,
+					TargetID:   operationID,
+				}
+				if address, ok := clientAddressFrom(ctx); ok {
+					event.IPAddress = address
+				}
+
+				if err := denied(ctx, event); err != nil {
+					return nil, err
+				}
+
 				writeJSON(w, http.StatusForbidden, permissionMissing(required.permission))
 
 				return nil, nil

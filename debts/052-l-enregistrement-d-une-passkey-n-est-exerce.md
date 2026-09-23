@@ -1,6 +1,6 @@
 # 052 — Le succès d'une cérémonie WebAuthn n'est exercé par aucun test, ni à l'enregistrement ni à l'assertion
 
-> **Porteur :** step-029
+> **Porteur :** step-030
 
 ## Ce qu'elle coûte si elle dure
 
@@ -37,5 +37,8 @@ l'appareil la supporte.
 Ce qui la refermerait : un **authentificateur virtuel** posé par CDP dans le parcours Playwright —
 `WebAuthn.enable` puis `WebAuthn.addVirtualAuthenticator` sur une `CDPSession` —, qui fait répondre
 Chromium à `navigator.credentials.create()` et `.get()` sans matériel. Une seule dépense couvre les
-deux chemins, et step-029 est la première step qui touche les passkeys pour elles-mêmes :
+deux chemins, et step-030 est la première step qui touche les passkeys pour elles-mêmes :
 inventaire, nom, retrait.
+
+**Re-portée de step-029 à step-030 le 23/09/2026** : step-029 a livré les routes, et les écrans
+qui font mordre cette dette sont partis en step-030 (coupe préparée par la fiche de step-029).

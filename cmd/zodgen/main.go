@@ -200,8 +200,8 @@ func writeSchema(out *strings.Builder, name string, schema *openapi3.Schema) err
 
 // zodFor rend l'expression Zod d'une propriété, ou **refuse**.
 //
-// Le refus est la moitié qui compte. Un type que ce générateur ne sait pas rendre — un tableau, un
-// nombre borné, un objet imbriqué — sortirait autrement en `z.unknown()` : un schéma qui accepte
+// Le refus est la moitié qui compte. Un type que ce générateur ne sait pas rendre — un nombre borné,
+// un objet imbriqué — sortirait autrement en `z.unknown()` : un schéma qui accepte
 // tout, vert à l'exécution, et qui ne garde plus rien. C'est le mode d'échec d'un générateur
 // partiel, et il est muet. La step qui ajoutera au contrat un type absent d'ici l'apprendra de
 // `make generate`, pas d'un formulaire qui laisse passer.
@@ -217,6 +217,19 @@ func zodFor(schema *openapi3.Schema) (string, error) {
 	switch {
 	case schema.Type.Is("string"):
 		return stringExpression(schema), nil
+
+	case schema.Type.Is("array") && schema.Items != nil:
+		items, err := zodFor(schema.Items.Value)
+		if err != nil {
+			return "", err
+		}
+
+		expression := "z.array(" + items + ")"
+		if schema.MaxItems != nil {
+			expression += fmt.Sprintf(".max(%d)", *schema.MaxItems)
+		}
+
+		return expression, nil
 
 	// L'objet **libre** du contrat — `assertion`, `attestation` — traverse sans que ses clés soient
 	// décrites : leur forme appartient à la spécification WebAuthn, et c'est la bibliothèque qui

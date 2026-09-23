@@ -25,9 +25,9 @@ import (
 // fonction a rendu. La distinction n'est pas théorique — rendre `(nil, nil)` sans écrire produit un
 // **200 vide**, et seule une traversée complète le montre.
 //
-// La table est injectée. En production elle n'exige aucune clé (voir `authorization`), donc aucune
-// des branches qui comptent ne serait atteinte avant step-029 : le mécanisme serait livré sans qu'une
-// seule mutation le fasse rougir. La couture a son propre risque — vérifier ce que la production ne
+// La table est injectée : ces tests prouvent le mécanisme sur une opération exemptée en production,
+// sans base. Les scénarios de `operateurs.feature` l'exercent sur les vraies routes. La couture a son
+// propre risque — vérifier ce que la production ne
 // câble pas — et c'est `TestLaGardeEstCablee` qui le ferme.
 const guardedOperation = "Logout"
 
@@ -62,8 +62,16 @@ func servedByGuard(t *testing.T, rules map[string]rule, grants grantsOf,
 ) served {
 	t.Helper()
 
+	return servedByGuardRecording(t, rules, grants, func(context.Context, store.Event) error { return nil }, ctx)
+}
+
+func servedByGuardRecording(t *testing.T, rules map[string]rule, grants grantsOf, denied recordDenial,
+	ctx context.Context, //nolint:revive // Le contexte porte la session résolue, il n'ordonne rien.
+) served {
+	t.Helper()
+
 	handler := NewStrictHandlerWithOptions(passingAPI{},
-		[]StrictMiddlewareFunc{requirePermission(rules, grants)},
+		[]StrictMiddlewareFunc{requirePermission(rules, grants, denied)},
 		StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  rejectRequest,
 			ResponseErrorHandlerFunc: reportFailedResponse,
@@ -186,7 +194,6 @@ func TestUneSessionNonElevueEstRefuseeAvantTouteLecture(t *testing.T) {
 	assert.Equal(t, "mfa_required", response.body.Code)
 }
 
-// La branche que la production ne peut pas exercer avant step-029, et que la DoD exige tenue.
 func TestUneSessionSansLaCleEstRefusee(t *testing.T) {
 	t.Parallel()
 
@@ -203,6 +210,42 @@ func TestUneSessionSansLaCleEstRefusee(t *testing.T) {
 	assert.Equal(t, "permission_denied", response.body.Code)
 	assert.Contains(t, response.body.Message, string(permissions.RolesManage),
 		"le refus ne nomme pas la clé qui manque : un administrateur ne saurait pas quoi accorder")
+}
+
+// Dette 001 : un refus de permission laisse une trace. L'écriture est bornée par les sessions élevées,
+// seules à atteindre cette branche, et c'est ce qu'une enquête cherche : qui a tenté quoi.
+func TestUnRefusDePermissionLaisseUneTrace(t *testing.T) {
+	t.Parallel()
+
+	held := func(_ context.Context, _ string) ([]string, error) { return nil, nil }
+
+	var recorded []store.Event
+
+	response := servedByGuardRecording(t, guardedTable(), held, func(_ context.Context, event store.Event) error {
+		recorded = append(recorded, event)
+
+		return nil
+	}, withResolvedSession(true, true))
+
+	require.Equal(t, http.StatusForbidden, response.status)
+	require.Len(t, recorded, 1, "le refus n'a laissé aucune trace")
+	assert.Equal(t, "permission.denied", recorded[0].Action)
+	assert.Equal(t, "operateur-de-test", recorded[0].OperatorID)
+	assert.Equal(t, "Logout", recorded[0].TargetID, "la trace ne dit pas ce qui a été tenté")
+}
+
+// Une trace qui ne peut pas s'écrire n'est pas avalée : le refus devient une panne, comme toute
+// action dont l'audit échoue.
+func TestUnRefusDontLaTraceEchoueEstUnePanne(t *testing.T) {
+	t.Parallel()
+
+	held := func(_ context.Context, _ string) ([]string, error) { return nil, nil }
+
+	response := servedByGuardRecording(t, guardedTable(), held, func(context.Context, store.Event) error {
+		return errors.New("partition absente")
+	}, withResolvedSession(true, true))
+
+	assert.Equal(t, http.StatusInternalServerError, response.status)
 }
 
 // La clé détenue laisse passer. C'est le second témoin, et il ferme la mutation « refuser toujours ».
@@ -235,8 +278,8 @@ func TestUnePanneDeLectureDesPermissionsNestPasUnRefus(t *testing.T) {
 // TestLaGardeEstCablee ferme le risque propre à la couture `grantsOf`.
 //
 // Les tests ci-dessus injectent leur table et leur source de permissions ; ils prouvent le mécanisme
-// et **rien du produit**. En production, toutes les entrées de `authorization` sont exemptées : la
-// garde retirée du slice, aucun scénario ne rougit — mesuré. Ce qui reste à tenir, c'est donc que le
+// et **rien du produit**. Retirer la garde du slice ne fait rougir qu'**un** scénario — celui de
+// l'auditeur qui crée un opérateur, mesuré en step-029. Ce test le dit sans lancer le binaire : le
 // montage la pose, et sur la vraie source.
 //
 // **Les appels sont rattachés à la fonction qui les porte**, et pas cherchés dans le paquet entier :
@@ -252,7 +295,7 @@ func TestLaGardeEstCablee(t *testing.T) {
 	calls := callsByFunction(t, loadThisPackage(t))
 
 	assert.True(t, calls["newContractHandler"]["requirePermission"],
-		"le montage n'installe pas la garde de permission : toute route que step-029 ajoutera serait "+
+		"le montage n'installe pas la garde de permission : toute route d'administration serait "+
 			"servie sans qu'aucune permission soit exigée, et la table ne garderait rien")
 
 	assert.True(t, calls["newContractHandler"]["grantsFrom"],

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -234,6 +235,9 @@ const upsertRoles = `
 WITH wanted (name, description) AS (
 	SELECT * FROM unnest($1::text[], $2::text[])
 ),
+collision AS (
+	SELECT r.name FROM roles r JOIN wanted w USING (name) WHERE NOT r.is_default
+),
 inserted AS (
 	INSERT INTO roles (name, description, is_default)
 	SELECT w.name, w.description, true FROM wanted w
@@ -241,23 +245,23 @@ inserted AS (
 	RETURNING name
 ),
 updated AS (
-	UPDATE roles r SET description = w.description, is_default = true
+	UPDATE roles r SET description = w.description
 	FROM wanted w
 	WHERE r.name = w.name
-	  AND (r.description, r.is_default) IS DISTINCT FROM (w.description, true)
+	  AND r.description IS DISTINCT FROM w.description
 	RETURNING r.name
 )
-SELECT 'inserted', name FROM inserted
+SELECT 'collision', name FROM collision
+UNION ALL SELECT 'inserted', name FROM inserted
 UNION ALL SELECT 'updated', name FROM updated
 UNION ALL SELECT 'unknown', r.name FROM roles r
 	WHERE r.is_default AND NOT EXISTS (SELECT 1 FROM wanted w WHERE w.name = r.name)`
 
-// seedRoles projette les neuf rôles par défaut. Ce que la requête ci-dessus ne distingue pas, et
-// qu'il faut savoir : **l'identité d'un rôle est son nom**. Un rôle composé depuis l'écran qui
-// porterait le nom d'un rôle par défaut serait basculé en `is_default`, verrait sa description
-// écrasée et ses attributions ramenées à la liste du code. Le rapport le compte, donc ce n'est pas
-// silencieux, mais c'est destructeur par défaut : l'écran de gestion des rôles devra interdire ces
-// neuf noms, ou trancher ce qu'il fait d'une collision.
+// seedRoles projette les neuf rôles par défaut. **L'identité d'un rôle est son nom**, et `is_default`
+// sépare les lignes du code de celles qu'un humain a composées : le seed ne franchit jamais cette
+// ligne. Un rôle personnalisé qui porte le nom d'un rôle par défaut — qu'une release ajouterait après
+// coup — fait refuser le seed, donc le déploiement, en le nommant ; le basculer en `is_default`
+// écraserait sa description et ses attributions.
 func seedRoles(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error {
 	defaults := permissions.DefaultRoles()
 
@@ -269,9 +273,13 @@ func seedRoles(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error {
 		descriptions = append(descriptions, role.Description)
 	}
 
-	return eachClassifiedRow(ctx, tx, upsertRoles,
+	var collisions []string
+
+	err := eachClassifiedRow(ctx, tx, upsertRoles,
 		func(kind, name string) error {
 			switch kind {
+			case "collision":
+				collisions = append(collisions, name)
 			case "inserted":
 				outcome.RolesInserted = append(outcome.RolesInserted, name)
 			case "updated":
@@ -285,6 +293,18 @@ func seedRoles(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error {
 			return nil
 		},
 		names, descriptions)
+	if err != nil {
+		return err
+	}
+
+	if len(collisions) > 0 {
+		return fmt.Errorf("rien n'a été semé : le rôle personnalisé %s porte le nom d'un rôle par défaut "+
+			"de cette version. Aucune route ne renomme un rôle : retirez-le à ses détenteurs, "+
+			"supprimez-le (DELETE /roles/{id}), puis relancez",
+			strings.Join(collisions, ", "))
+	}
+
+	return nil
 }
 
 // La révocation est ce qui distingue ce seed d'un simple remplissage : sans elle, une clé qu'une
@@ -304,9 +324,8 @@ func seedRoles(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error {
 // quelque chose — mais c'est le SQL qui ne se défend pas seul, et deux des neuf rôles n'ont qu'une
 // clé.
 //
-// Un `AND r.is_default` à côté serait **inatteignable**, et c'est mesuré : `upsertRoles`, deux
-// instructions plus haut, force `is_default = true` sur exactement les rôles de `wanted`, dans la
-// même transaction. Une garde qu'aucune mutation ne peut faire tomber ne garde rien.
+// Un `AND r.is_default` à côté serait **inatteignable** : `seedRoles`, juste avant, refuse toute
+// collision, donc chaque rôle de `wanted` est déjà un rôle par défaut quand cette requête s'exécute.
 const reconcileGrants = `
 WITH wanted (role_name, permission_key) AS (
 	SELECT * FROM unnest($1::text[], $2::text[])

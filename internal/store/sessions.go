@@ -88,7 +88,8 @@ func (s *Sessions) Create(ctx context.Context, operatorID string, tokenHash []by
 //
 // Le statut de l'opérateur est vérifié ici plutôt qu'après coup : hors du `WHERE`, la session d'un
 // compte désactivé verrait sa fenêtre glissante repoussée par chacune de ses tentatives. La
-// révocation **active** au moment de la désactivation appartient à l'écran de gestion des opérateurs.
+// révocation **active**, elle, a lieu à la désactivation (`Administration.SetOperatorStatus`) : sans
+// elle, une réactivation ressusciterait les sessions.
 //
 // Zéro ligne rendue ne distingue pas « jamais existé », « échue », « oisive » et « compte
 // désactivé » — ce qui est exactement ce qu'on rend au navigateur.

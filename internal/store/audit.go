@@ -94,8 +94,9 @@ func NewAudit(pool *pgxpool.Pool) *Audit {
 // Record écrit une ligne hors de toute transaction : l'écriture suit le succès, et une panne entre
 // les deux perd la trace.
 //
-// **Un seul appelant en production aujourd'hui** : `bff.API.Logout`, dont l'audit reste dehors par
-// arbitrage — la raison est écrite sur le handler. Les actions **proxyfiées** vers la passerelle
+// **Deux appelants en production** : `bff.API.Logout`, dont l'audit reste dehors par arbitrage — la
+// raison est écrite sur le handler —, et la trace d'un refus de permission (`bff.recordDenial`), qui
+// n'a pas d'action à accompagner. Les actions **proxyfiées** vers la passerelle
 // n'auront pas d'autre forme, faute de transaction commune avec leur audit.
 func (a *Audit) Record(ctx context.Context, event Event) error {
 	return record(ctx, a.pool, event)

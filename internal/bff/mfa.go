@@ -386,8 +386,8 @@ func refusedReplacementProof() Error {
 		Code: "mfa_replacement_refused",
 		Message: "Ce second facteur n'a pas été accepté : celui qui est en place n'a pas été " +
 			"remplacé. Le présenter à nouveau — un code de récupération convient aussi. Si les deux " +
-			"sont perdus, leur réinitialisation par un administrateur arrivera avec la gestion des " +
-			"opérateurs.",
+			"sont perdus, un administrateur détenant « operators:manage » peut réinitialiser votre " +
+			"second facteur.",
 	}
 }
 
@@ -510,8 +510,8 @@ func secondFactorAlreadyEnrolled() Error {
 	return Error{
 		Code: "mfa_already_enrolled",
 		Message: "Un second facteur est déjà en place sur ce compte. Le remplacer demande de franchir " +
-			"d'abord celui qui est en place. S'il est perdu, sa réinitialisation par un administrateur " +
-			"arrivera avec la gestion des opérateurs.",
+			"d'abord celui qui est en place. S'il est perdu, un administrateur détenant " +
+			"« operators:manage » peut le réinitialiser.",
 	}
 }
 

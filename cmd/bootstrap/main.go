@@ -9,7 +9,8 @@
 // Elle est **rejouable** : un déploiement l'appelle à chaque fois, et une base déjà semée le reste à
 // l'identique. Ce qu'elle change, elle le dit ; ce qu'elle ne comprend pas, elle le nomme sur la
 // sortie d'erreur sans arrêter la livraison — le retrait d'une clé du catalogue est une migration,
-// qui révoque d'abord.
+// qui révoque d'abord. Sauf un rôle personnalisé homonyme d'un rôle par défaut, qui arrête la
+// livraison en le nommant.
 //
 // # Le compte propriétaire
 //

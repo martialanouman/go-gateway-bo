@@ -31,7 +31,7 @@ func (failingAPI) Health(_ context.Context, _ HealthRequestObject) (HealthRespon
 	return nil, errors.New("appel de " + internalTopology + "/admin/v1/health: connexion refusée")
 }
 
-// Aucune des neuf méthodes ci-dessous n'est exercée par cette suite : ce qu'elle observe est le
+// Aucune des méthodes ci-dessous n'est exercée par cette suite : ce qu'elle observe est le
 // gestionnaire d'erreur du montage, et `Health` suffit à le déclencher. Elles sont là parce que
 // l'interface stricte les exige — c'est précisément ce qu'on lui demande, refuser de compiler une
 // implémentation partielle.
@@ -96,7 +96,7 @@ func TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser(t *testing.T) {
 	// Aucun gestionnaire de session : `Health` est exempté par la table d'autorisation, donc la garde
 	// laisse passer sans jamais lire de permissions. Un `nil` qui serait déréférencé ferait paniquer
 	// ce test plutôt que le laisser vert.
-	mountContract(router, failingAPI{}, nil)
+	mountContract(router, failingAPI{}, nil, nil)
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
@@ -166,4 +166,40 @@ func TestARejectedRequestRendersTheProductDTO(t *testing.T) {
 				string(payload))
 		})
 	}
+}
+
+func (failingAPI) ListOperators(_ context.Context, _ ListOperatorsRequestObject) (ListOperatorsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) CreateOperator(_ context.Context, _ CreateOperatorRequestObject) (CreateOperatorResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) UpdateOperator(_ context.Context, _ UpdateOperatorRequestObject) (UpdateOperatorResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) SetOperatorRoles(_ context.Context, _ SetOperatorRolesRequestObject) (SetOperatorRolesResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) ResetOperatorSecondFactors(_ context.Context, _ ResetOperatorSecondFactorsRequestObject) (ResetOperatorSecondFactorsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) ListRoles(_ context.Context, _ ListRolesRequestObject) (ListRolesResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) CreateRole(_ context.Context, _ CreateRoleRequestObject) (CreateRoleResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) UpdateRole(_ context.Context, _ UpdateRoleRequestObject) (UpdateRoleResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) DeleteRole(_ context.Context, _ DeleteRoleRequestObject) (DeleteRoleResponseObject, error) {
+	return nil, errors.ErrUnsupported
 }
