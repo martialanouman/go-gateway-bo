@@ -220,6 +220,10 @@ func (a *Administration) SetOperatorRoles(ctx context.Context, actorID, id strin
 			tag, err := tx.Exec(ctx, `
 				INSERT INTO operator_roles (operator_id, role_id)
 				SELECT $1, r.id FROM roles r WHERE r.id::text = ANY($2)`, before.ID, wanted)
+			if isViolation(err, foreignKeyViolation) {
+				return ErrUnknownReference
+			}
+
 			if err != nil {
 				return fmt.Errorf("attribuer les rôles : %w", err)
 			}
@@ -243,8 +247,8 @@ func (a *Administration) SetOperatorRoles(ctx context.Context, actorID, id strin
 	return updated, err
 }
 
-// ResetSecondFactors retire tout ce qui fait le second facteur d'un opérateur, lève son verrou
-// d'essais et ferme ses sessions : à sa prochaine connexion il enrôle un facteur neuf.
+// ResetSecondFactors retire tout ce qui fait le second facteur d'un opérateur, lève son verrou de
+// second facteur (compteur `mfa`) et ferme ses sessions : à sa prochaine connexion il enrôle un facteur neuf.
 func (a *Administration) ResetSecondFactors(ctx context.Context, id string, event Event) error {
 	return inTx(ctx, a.pool, func(tx pgx.Tx) error {
 		var operatorID string

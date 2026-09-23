@@ -15,7 +15,7 @@ elle livre l'entrée du premier administrateur, pas la gestion de ses facteurs.
 C'est la règle que cette dette cite elle-même, tenue pour de bon : « la colonne s'écrira avec la step
 qui saura ce qu'elle doit contenir ». step-028 ne le sait pas.
 
-**Ce que step-029 doit trancher avec elle**, et dans le même mouvement que la dette 045 — « une
+**Ce que step-030 doit trancher avec elle**, et dans le même mouvement que la dette 045 — « une
 opération au contrat que personne n'appelle : la trancher, et écrire la raison » : ou bien elle fait
 naître l'inventaire des passkeys, et le nom y gagne son emploi ; ou bien `DELETE
 /auth/mfa/webauthn/passkeys/{passkeyId}` reçoit le même sort écrit que `GET /permissions`, et cette

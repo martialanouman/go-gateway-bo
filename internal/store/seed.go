@@ -299,7 +299,8 @@ func seedRoles(ctx context.Context, tx pgx.Tx, outcome *SeedOutcome) error {
 
 	if len(collisions) > 0 {
 		return fmt.Errorf("rien n'a été semé : le rôle personnalisé %s porte le nom d'un rôle par défaut "+
-			"de cette version. Renommez-le ou supprimez-le depuis l'écran des rôles, puis relancez",
+			"de cette version. Aucune route ne renomme un rôle : retirez-le à ses détenteurs, "+
+			"supprimez-le (DELETE /roles/{id}), puis relancez",
 			strings.Join(collisions, ", "))
 	}
 

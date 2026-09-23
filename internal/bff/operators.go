@@ -71,7 +71,7 @@ func (a API) UpdateOperator(ctx context.Context, request UpdateOperatorRequestOb
 	}
 
 	if request.Body == nil || !request.Body.Status.Valid() {
-		return UpdateOperator400JSONResponse{RequeteInvalideJSONResponse(malformedOperator())}, nil
+		return UpdateOperator400JSONResponse{RequeteInvalideJSONResponse(malformedStatus())}, nil
 	}
 
 	status := string(request.Body.Status)
@@ -105,7 +105,7 @@ func (a API) SetOperatorRoles(ctx context.Context, request SetOperatorRolesReque
 	}
 
 	if request.Body == nil || len(request.Body.RoleIds) > 100 {
-		return SetOperatorRoles400JSONResponse{RequeteInvalideJSONResponse(malformedOperator())}, nil
+		return SetOperatorRoles400JSONResponse{RequeteInvalideJSONResponse(malformedRoleSet())}, nil
 	}
 
 	updated, err := a.Administration.SetOperatorRoles(ctx, actor, request.OperatorId, request.Body.RoleIds,
@@ -199,7 +199,7 @@ func (a API) UpdateRole(ctx context.Context, request UpdateRoleRequestObject) (U
 
 	body := request.Body
 	if body == nil || len(body.Description) > 500 || len(body.Permissions) > 100 {
-		return UpdateRole400JSONResponse{RequeteInvalideJSONResponse(malformedRole())}, nil
+		return UpdateRole400JSONResponse{RequeteInvalideJSONResponse(malformedRoleUpdate())}, nil
 	}
 
 	updated, err := a.Administration.UpdateRole(ctx, actor, request.RoleId, body.Description, body.Permissions,
@@ -289,13 +289,30 @@ func roleDTO(view store.RoleView) Role {
 }
 
 func malformedOperator() Error {
-	return Error{Code: "bad_request", Message: "L'opérateur n'a pas été enregistré : l'adresse et le nom " +
-		"affiché sont obligatoires, et la requête doit suivre la forme attendue."}
+	return Error{Code: "bad_request", Message: "L'opérateur n'a pas été enregistré : l'adresse (320 " +
+		"caractères au plus) et le nom affiché (200 au plus) sont obligatoires, et le mot de passe compte " +
+		"au plus 4096 caractères."}
+}
+
+func malformedStatus() Error {
+	return Error{Code: "bad_request", Message: "L'opérateur n'a pas été modifié : son statut doit valoir " +
+		"« active » ou « disabled »."}
+}
+
+func malformedRoleSet() Error {
+	return Error{Code: "bad_request", Message: "Les rôles n'ont pas été changés : la requête désigne au " +
+		"plus 100 rôles, sous la forme attendue."}
 }
 
 func malformedRole() Error {
-	return Error{Code: "bad_request", Message: "Le rôle n'a pas été enregistré : son nom est obligatoire, " +
-		"et la requête doit suivre la forme attendue."}
+	return Error{Code: "bad_request", Message: "Le rôle n'a pas été enregistré : son nom (100 caractères au " +
+		"plus) est obligatoire, la description compte au plus 500 caractères et la liste au plus 100 " +
+		"permissions."}
+}
+
+func malformedRoleUpdate() Error {
+	return Error{Code: "bad_request", Message: "Le rôle n'a pas été modifié : la description compte au plus " +
+		"500 caractères et la liste au plus 100 permissions."}
 }
 
 func passwordTooShort() Error {
@@ -338,14 +355,14 @@ func cannotDisableSelf() Error {
 
 func cannotResetOwnFactor() Error {
 	return Error{Code: "self_lockout", Message: "Votre second facteur reste en place : la réinitialisation " +
-		"vise un autre opérateur. Pour remplacer le vôtre, passez par l'enrôlement, en présentant un code " +
-		"du facteur actuel."}
+		"vise un autre opérateur. Pour remplacer le vôtre, présentez à l'enrôlement un code de " +
+		"l'application actuelle ou un code de récupération ; aucun écran ne le permet encore."}
 }
 
 func selfLockout() Error {
 	return Error{Code: "self_lockout", Message: "Rien n'a été changé : ce geste vous retirerait « " +
-		"operators:manage » ou « roles:manage », et plus personne ne pourrait peut-être administrer " +
-		"l'installation. Un autre administrateur peut le faire pour vous."}
+		"operators:manage » ou « roles:manage ». Seul un autre détenteur de ces clés peut vous les " +
+		"retirer ; s'il n'en existe aucun, attribuez-les d'abord à un second opérateur."}
 }
 
 func defaultRoleIsReadOnly() Error {

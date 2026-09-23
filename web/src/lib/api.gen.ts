@@ -380,9 +380,10 @@ export interface paths {
         /**
          * Réinitialise le second facteur d'un autre opérateur
          * @description Retire son application d'authentification, ses codes de récupération et ses clés d'accès,
-         *     lève son verrou d'essais et ferme ses sessions. À sa prochaine connexion, il enrôle un
-         *     nouveau facteur. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur
-         *     cassé. Sur son propre compte, le refus renvoie vers le remplacement en self-service.
+         *     lève son verrou de second facteur et ferme ses sessions. À sa prochaine connexion, il enrôle
+         *     un nouveau facteur. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur
+         *     cassé. Sur son propre compte, elle est refusée : le remplacement se fait en présentant le
+         *     facteur actuel.
          */
         delete: operations["resetOperatorSecondFactors"];
         options?: never;
@@ -693,7 +694,10 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Le corps n'a pas la forme attendue, ou le mot de passe est trop court. */
+        /**
+         * @description Le corps n'a pas la forme attendue, le mot de passe est trop court, ou il désigne un rôle ou
+         *     une permission inconnus.
+         */
         RequeteInvalide: {
             headers: {
                 [name: string]: unknown;
@@ -1435,7 +1439,7 @@ export interface operations {
             400: components["responses"]["RequeteInvalide"];
             401: components["responses"]["SessionAbsente"];
             403: components["responses"]["PermissionRefusee"];
-            /** @description Un opérateur porte déjà cette adresse, casse comprise (`email_taken`). */
+            /** @description Un opérateur porte déjà cette adresse, sans tenir compte de la casse (`email_taken`). */
             409: {
                 headers: {
                     [name: string]: unknown;

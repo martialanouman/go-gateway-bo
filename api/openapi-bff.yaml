@@ -645,7 +645,7 @@ paths:
         '401': { $ref: '#/components/responses/SessionAbsente' }
         '403': { $ref: '#/components/responses/PermissionRefusee' }
         '409':
-          description: Un opérateur porte déjà cette adresse, casse comprise (`email_taken`).
+          description: Un opérateur porte déjà cette adresse, sans tenir compte de la casse (`email_taken`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -708,9 +708,10 @@ paths:
       summary: Réinitialise le second facteur d'un autre opérateur
       description: |
         Retire son application d'authentification, ses codes de récupération et ses clés d'accès,
-        lève son verrou d'essais et ferme ses sessions. À sa prochaine connexion, il enrôle un
-        nouveau facteur. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur
-        cassé. Sur son propre compte, le refus renvoie vers le remplacement en self-service.
+        lève son verrou de second facteur et ferme ses sessions. À sa prochaine connexion, il enrôle
+        un nouveau facteur. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur
+        cassé. Sur son propre compte, elle est refusée : le remplacement se fait en présentant le
+        facteur actuel.
       parameters:
         - $ref: '#/components/parameters/OperatorId'
       responses:
@@ -827,7 +828,9 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     RequeteInvalide:
-      description: Le corps n'a pas la forme attendue, ou le mot de passe est trop court.
+      description: |
+        Le corps n'a pas la forme attendue, le mot de passe est trop court, ou il désigne un rôle ou
+        une permission inconnus.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

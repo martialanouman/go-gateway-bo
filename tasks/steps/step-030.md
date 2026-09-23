@@ -31,8 +31,11 @@ première ligne de step-029, comme sa fiche le demandait.*
   détenteur de `operators:manage` seul ne verra pas la liste. Seul `super_admin` porte l'une ou
   l'autre aujourd'hui ; si un rôle personnalisé les sépare, trancher ici — contrôle désactivé et
   expliqué, ou `GET /roles` ouvert à `operators:manage`.
-- **Un compte créé et jamais entré n'a pas de second facteur** : `secondFactorEnrolled` le montre, et
-  c'est à l'administrateur de le désactiver. C'est l'arbitrage de la dette 004, fermée en step-029.
+- **Un compte créé et jamais entré n'a pas de second facteur** : `secondFactorEnrolled` le montre ; la
+  fenêtre se ferme au premier passage du titulaire (arbitrage de la dette 004, écrit sur
+  `BeginWebauthnRegistration`).
+- **Les passkeys** : inventaire et nom (dette 042), ou sort écrit de
+  `DELETE /auth/mfa/webauthn/passkeys/{id}`.
 
 ## Tests (écrits dans la même PR)
 - **Composants (Vitest)** : l'éditeur de rôle groupe les 44 clés par catégorie, le clavier suit, les

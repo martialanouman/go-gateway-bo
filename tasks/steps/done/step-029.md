@@ -142,7 +142,7 @@ Arbitrages, chacun écrit là où il vit :
   ses auteurs en `RESTRICT` (un opérateur qui part se désactive), et le catalogue est déjà dans le
   bundle. Paie 045.
 - **Réinitialisation du second facteur** : `DELETE /operators/{id}/second-factors` retire TOTP,
-  codes, passkeys et verrou d'essais, et ferme les sessions ; refusée sur soi. Paie 044 et 008.
+  codes, passkeys et verrou de second facteur, et ferme les sessions ; refusée sur soi. Paie 044 et 008.
 - **Politique de mot de passe** : douze caractères, `auth.PasswordLongEnough`, commune au bootstrap
   et à `POST /operators`. Paie 005.
 - **Dette 004 fermée sans mécanisme**, arbitrage de Fable après contre-argument : un jeton

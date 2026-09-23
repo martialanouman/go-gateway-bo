@@ -37,7 +37,7 @@ l'appareil la supporte.
 Ce qui la refermerait : un **authentificateur virtuel** posé par CDP dans le parcours Playwright —
 `WebAuthn.enable` puis `WebAuthn.addVirtualAuthenticator` sur une `CDPSession` —, qui fait répondre
 Chromium à `navigator.credentials.create()` et `.get()` sans matériel. Une seule dépense couvre les
-deux chemins, et step-029 est la première step qui touche les passkeys pour elles-mêmes :
+deux chemins, et step-030 est la première step qui touche les passkeys pour elles-mêmes :
 inventaire, nom, retrait.
 
 **Re-portée de step-029 à step-030 le 23/09/2026** : step-029 a livré les routes, et les écrans
