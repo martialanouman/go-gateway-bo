@@ -444,4 +444,19 @@ describe('l’écran des opérateurs', () => {
       ),
     ).toBe(false)
   })
+
+  it('ne montre une explication que si un contrôle de la page y renvoie', async () => {
+    await visit(undefined, {}, [SELF, { ...COLLEAGUE, secondFactorEnrolled: true }])
+
+    expect(screen.queryByText(/Réinitialisation sans objet/)).not.toBeInTheDocument()
+  })
+
+  it('écrit « Aucun rôle » en texte courant, et les noms de rôle seuls en mono', async () => {
+    await visit()
+
+    expect(
+      row(COLLEAGUE.email).getByText('Aucun rôle').closest('.mono, .ui-table__cell--mono'),
+    ).toBeNull()
+    expect(row(SELF.email).getByText('super_admin')).toHaveClass('mono')
+  })
 })

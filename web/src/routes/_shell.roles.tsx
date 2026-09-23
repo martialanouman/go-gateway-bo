@@ -49,10 +49,12 @@ function RolesScreen() {
         </Button>
       </header>
       {canManage ? null : (
-        <p className="page__notes" id={createLockedId}>
-          La composition d’un rôle demande <span className="mono">roles:manage</span>, que ce compte
-          ne détient pas.
-        </p>
+        <div className="page__notes">
+          <p id={createLockedId}>
+            La composition d’un rôle demande <span className="mono">roles:manage</span>, que ce
+            compte ne détient pas.
+          </p>
+        </div>
       )}
 
       {roles.isPending ? (

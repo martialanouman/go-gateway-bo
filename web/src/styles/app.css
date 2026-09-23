@@ -395,6 +395,9 @@
 .role-choice,
 .permission-picker__group {
   display: grid;
+  /* Étiré à la hauteur de la catégorie voisine, un groupe court répartissait l'espace entre ses
+     lignes, et la description décrochait de sa clé. */
+  align-content: start;
   gap: var(--sp-4);
   margin: 0;
   padding: 0;

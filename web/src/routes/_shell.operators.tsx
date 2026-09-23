@@ -51,10 +51,12 @@ function OperatorsScreen() {
         </Button>
       </header>
       {canManage ? null : (
-        <p className="page__notes" id={createLockedId}>
-          La création d’un opérateur demande <span className="mono">operators:manage</span>, que ce
-          compte ne détient pas.
-        </p>
+        <div className="page__notes">
+          <p id={createLockedId}>
+            La création d’un opérateur demande <span className="mono">operators:manage</span>, que
+            ce compte ne détient pas.
+          </p>
+        </div>
       )}
 
       {operators.isPending ? (
@@ -116,11 +118,12 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
           {
             key: 'roles',
             header: 'Rôles',
-            mono: true,
             cell: (operator) =>
-              operator.roles.length === 0
-                ? 'Aucun rôle'
-                : operator.roles.map((role) => role.name).join(', '),
+              operator.roles.length === 0 ? (
+                'Aucun rôle'
+              ) : (
+                <span className="mono">{operator.roles.map((role) => role.name).join(', ')}</span>
+              ),
           },
           {
             key: 'factor',
@@ -187,10 +190,12 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
           <span className="mono">operators:manage</span> peut le faire. Le remplacement de son
           propre facteur n’a pas encore d’écran.
         </p>
-        <p id={nothingToResetId}>
-          Réinitialisation sans objet : cet opérateur n’a aucun second facteur en place. Il en
-          enrôlera un à sa prochaine connexion.
-        </p>
+        {operators.some((operator) => !operator.secondFactorEnrolled) ? (
+          <p id={nothingToResetId}>
+            Réinitialisation sans objet : cet opérateur n’a aucun second facteur en place. Il en
+            enrôlera un à sa prochaine connexion.
+          </p>
+        ) : null}
         {canListRoles ? null : (
           <p id={rolesLockedId}>
             « Modifier les rôles » reste fermé sans <span className="mono">roles:manage</span> :
