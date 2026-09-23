@@ -25,9 +25,9 @@ import (
 // fonction a rendu. La distinction n'est pas théorique — rendre `(nil, nil)` sans écrire produit un
 // **200 vide**, et seule une traversée complète le montre.
 //
-// La table est injectée. En production elle n'exige aucune clé (voir `authorization`), donc aucune
-// des branches qui comptent ne serait atteinte avant step-029 : le mécanisme serait livré sans qu'une
-// seule mutation le fasse rougir. La couture a son propre risque — vérifier ce que la production ne
+// La table est injectée : ces tests prouvent le mécanisme sur une opération exemptée en production,
+// sans base. Les scénarios de `operateurs.feature` l'exercent sur les vraies routes. La couture a son
+// propre risque — vérifier ce que la production ne
 // câble pas — et c'est `TestLaGardeEstCablee` qui le ferme.
 const guardedOperation = "Logout"
 
@@ -194,7 +194,6 @@ func TestUneSessionNonElevueEstRefuseeAvantTouteLecture(t *testing.T) {
 	assert.Equal(t, "mfa_required", response.body.Code)
 }
 
-// La branche que la production ne peut pas exercer avant step-029, et que la DoD exige tenue.
 func TestUneSessionSansLaCleEstRefusee(t *testing.T) {
 	t.Parallel()
 
@@ -279,8 +278,8 @@ func TestUnePanneDeLectureDesPermissionsNestPasUnRefus(t *testing.T) {
 // TestLaGardeEstCablee ferme le risque propre à la couture `grantsOf`.
 //
 // Les tests ci-dessus injectent leur table et leur source de permissions ; ils prouvent le mécanisme
-// et **rien du produit**. En production, toutes les entrées de `authorization` sont exemptées : la
-// garde retirée du slice, aucun scénario ne rougit — mesuré. Ce qui reste à tenir, c'est donc que le
+// et **rien du produit**. Retirer la garde du slice ne fait rougir qu'**un** scénario — celui de
+// l'auditeur qui crée un opérateur, mesuré en step-029. Ce test le dit sans lancer le binaire : le
 // montage la pose, et sur la vraie source.
 //
 // **Les appels sont rattachés à la fonction qui les porte**, et pas cherchés dans le paquet entier :
@@ -296,7 +295,7 @@ func TestLaGardeEstCablee(t *testing.T) {
 	calls := callsByFunction(t, loadThisPackage(t))
 
 	assert.True(t, calls["newContractHandler"]["requirePermission"],
-		"le montage n'installe pas la garde de permission : toute route que step-029 ajoutera serait "+
+		"le montage n'installe pas la garde de permission : toute route d'administration serait "+
 			"servie sans qu'aucune permission soit exigée, et la table ne garderait rien")
 
 	assert.True(t, calls["newContractHandler"]["grantsFrom"],

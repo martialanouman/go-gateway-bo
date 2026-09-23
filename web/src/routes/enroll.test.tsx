@@ -199,7 +199,7 @@ describe('la garde de l’enrôlement', () => {
   it('renvoie au second facteur quand ce compte en détient déjà un', async () => {
     // Remplacer un facteur en place exige de présenter celui qu'on remplace (`TotpEnrollmentRequest`),
     // et cette step ne présente jamais de preuve : elle n'enrôle que le premier facteur. Le
-    // remplacement arrive en step-029.
+    // remplacement n'a pas encore d'écran (dette 053).
     const { router } = await visitEnroll({
       factors: { totp: true },
       path: '/enroll?redirect=%2Fbilling',

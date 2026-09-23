@@ -21,7 +21,9 @@ import (
 // c'est le même arbitrage que le remplacement d'un authentificateur TOTP.
 //
 // Le premier enrôlement, lui, est libre : c'est l'amorçage, et il n'y a rien à contourner. La fenêtre
-// que cela ouvre sur un déploiement neuf est nommée dans la fiche de step-023 et bornée par step-029.
+// se ferme au premier passage du titulaire ; un usurpateur qui l'aurait devancé laisse
+// `passkey.register` au journal, et le titulaire le découvre au challenge d'un facteur qu'il n'a pas
+// posé. Un jeton d'activation n'y changerait rien : volé, il vaut un compte comme le mot de passe.
 func (a API) BeginWebauthnRegistration(ctx context.Context, _ BeginWebauthnRegistrationRequestObject,
 ) (BeginWebauthnRegistrationResponseObject, error) {
 	resolved, alive, err := sessionFrom(ctx)

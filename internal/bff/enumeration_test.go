@@ -18,9 +18,9 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 )
 
-// La porte de l'invariant (c), et c'est elle la vraie livraison de cette step : aucune opération de
-// M1 n'exige de permission, mais **aucune step ne pourra plus en ajouter une sans décider**.
-// La DoD de step-029 s'engage déjà à la faire rougir en retirant la garde de `POST /operators`.
+// La porte de l'invariant (c) : **aucune step ne peut ajouter une opération sans décider** ce qu'elle
+// exige.
+// Mesuré en step-029 : retirer la garde de `POST /operators` fait rougir ce test et le scénario.
 //
 // **Les cas viennent du contrat, jamais de la table qu'ils gardent.** Une porte dont la population
 // est tirée de la donnée qu'elle contrôle ne voit pas sa dérive : elle dirait seulement que la table

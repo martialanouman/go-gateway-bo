@@ -1,7 +1,7 @@
 # step-029 — Gestion des opérateurs et des rôles
 
-> **Jalon :** M1 (§6.10, §5.1) · **Statut :** À FAIRE
-> **Dépend de :** step-025, step-026, step-028, step-033 · **Bloque :** — (clôt M1)
+> **Jalon :** M1 (§6.10, §5.1) · **Statut :** FAIT — routes seules, écrans en step-030
+> **Dépend de :** step-025, step-026, step-028, step-033 · **Bloque :** step-030
 
 ## But
 Administrer qui entre et ce qu'il peut faire, depuis l'interface plutôt que depuis la base. C'est la
@@ -115,19 +115,54 @@ personne. Les huit ont leur fiche dans `debts/`.*
   opérateur, lui attribue un rôle, et cet opérateur entre.
 
 ## Definition of Done
-- [ ] `make check` vert et `make e2e` vert
-- [ ] la mutation « autoriser le retrait de sa propre permission d'administration » fait rougir
-- [ ] la mutation « ne pas révoquer les sessions à la désactivation » fait rougir — le compte reste
+- [x] `make check` vert — `make e2e` part avec les écrans, en step-030
+- [x] la mutation « autoriser le retrait de sa propre permission d'administration » fait rougir
+- [x] la mutation « ne pas révoquer les sessions à la désactivation » fait rougir — le compte reste
       vivant, et c'est le genre de défaut qu'un test de rendu ne voit jamais
-- [ ] la mutation « retirer la garde de `POST /operators` » fait rougir le test d'énumération de
+- [x] la mutation « retirer la garde de `POST /operators` » fait rougir le test d'énumération de
       step-025 **et** le scénario
-- [ ] le sort de `GET /permissions` est tranché et écrit — dans la spec si elle est amendée
-- [ ] la politique de mot de passe des comptes créés depuis l'écran est tranchée et écrite ; sans quoi
+- [x] le sort de `GET /permissions` est tranché et écrit — dans la spec si elle est amendée
+- [x] la politique de mot de passe des comptes créés depuis l'écran est tranchée et écrite ; sans quoi
       la seule du produit reste celle du bootstrap, qui ne s'applique qu'au premier opérateur
-- [ ] **M1 est clos** : les **douze** fiches sont dans `tasks/steps/done/`, et le checkpoint du
+- [ ] ~~**M1 est clos**~~ — passe à step-030 : les **douze** fiches sont dans `tasks/steps/done/`, et le checkpoint du
       `plan.md` §6 est vérifié plutôt que déclaré. *Dix jusqu'au 31/08/2026, puis step-031 et step-032
       ont rejoint le jalon.*
 
 ## Hors périmètre
 L'écran de consultation du journal d'audit → step-184. Les rôles personnalisés à portée restreinte
 (par client, par groupe) — non prévus par la spec, à ne pas inventer ici. Toute surface métier.
+
+## Réalisé (23/09/2026)
+
+**Coupe exécutée avant la première ligne** : les routes et leurs scénarios ici, les écrans en
+`step-030`, qui hérite des dettes 040, 042 et 052, et de la 053, née ici.
+
+Arbitrages, chacun écrit là où il vit :
+- **`DELETE /operators` et `GET /permissions` ne sont pas livrés** — §5.1 amendé : le journal tient
+  ses auteurs en `RESTRICT` (un opérateur qui part se désactive), et le catalogue est déjà dans le
+  bundle. Paie 045.
+- **Réinitialisation du second facteur** : `DELETE /operators/{id}/second-factors` retire TOTP,
+  codes, passkeys et verrou d'essais, et ferme les sessions ; refusée sur soi. Paie 044 et 008.
+- **Politique de mot de passe** : douze caractères, `auth.PasswordLongEnough`, commune au bootstrap
+  et à `POST /operators`. Paie 005.
+- **Dette 004 fermée sans mécanisme**, arbitrage de Fable après contre-argument : un jeton
+  d'activation ne ferme rien qu'un mot de passe choisi par l'administrateur ne ferme — volé, il vaut
+  un compte de même ; la réinitialisation rendrait un jeton à l'administrateur, qui se substituerait
+  autant ; la détection est la même au premier passage du titulaire. Écrit sur
+  `BeginWebauthnRegistration`.
+- **Rôles par défaut en lecture seule**, et le seed refuse un rôle personnalisé homonyme au lieu de le
+  confisquer. Paie 036 et 007.
+- **Refus de permission audités** (`permission.denied`) : l'écriture est bornée par les sessions
+  élevées, seules à atteindre ce refus. Paie 001.
+- **Désactiver ferme les sessions** dans la même transaction. `Sessions.Resolve` les refusait déjà
+  tant que le compte est désactivé ; c'est la réactivation qui les aurait ressuscitées, et c'est ce
+  que le scénario observe. Paie 006.
+
+Mutations jouées, toutes rouges : anti-verrouillage retiré (2 scénarios), révocation à la
+désactivation retirée (1), garde de `POST /operators` retirée (énumération + 3 scénarios), trace du
+refus retirée (2 unitaires + 1 scénario), révocation à la réinitialisation retirée (1), rôle par
+défaut modifiable (1), se désactiver permis (1), réinitialiser le sien permis (1), garde retirée du
+montage (1), collision au seed (1 scénario de `seed.feature`).
+
+**Non tranché, signalé** : aucune route ne change un mot de passe, ni en self-service ni par un
+administrateur ; un mot de passe fuité se traite aujourd'hui par la désactivation.

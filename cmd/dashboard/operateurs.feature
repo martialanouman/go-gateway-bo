@@ -41,7 +41,7 @@ Fonctionnalité: Administrer les opérateurs et les rôles
     Quand l'opérateur attribue le rôle "auditor" au comparse
     Alors le serveur répond 200
     Et la réponse valide le contrat du BFF
-    Et le journal porte 1 événement "operator.roles.set"
+    Et le journal porte 1 événement "operator.assign_roles"
 
   Scénario: se retirer operators:manage est refusé
     Quand l'opérateur s'attribue le seul rôle "auditor"
@@ -69,7 +69,7 @@ Fonctionnalité: Administrer les opérateurs et les rôles
     Quand l'opérateur réinitialise le second facteur du comparse
     Alors le serveur répond 204
     Et la réponse valide le contrat du BFF
-    Et le journal porte 1 événement "operator.mfa.reset"
+    Et le journal porte 1 événement "mfa.reset"
     Et la session du comparse est refusée
     Et le comparse se reconnecte sans aucun second facteur
 

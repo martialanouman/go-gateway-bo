@@ -200,8 +200,8 @@ func declaringFile(t *testing.T, pkg *packages.Package, handler http.Handler) st
 // **appelé**.
 //
 // `chi.Walk` ne rapporte pas le `NotFound` d'un sous-routeur : `handleUnknownAPIRoute` n'a donc pas à
-// être exempté ici. Ce qu'il rapporte : les dix opérations du contrat sous `/api`, plus `/assets/*`,
-// `/ws` et `/*` une fois par méthode — vingt-quatre entrées.
+// être exempté ici. Ce qu'il rapporte : les opérations du contrat sous `/api`, plus `/assets/*`,
+// `/ws` et `/*` une fois par méthode.
 func TestOnlyGeneratedCodeServesTheAPIRoutes(t *testing.T) {
 	t.Parallel()
 

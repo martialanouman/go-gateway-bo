@@ -84,7 +84,7 @@ Fonctionnalité: La session, d'une requête à l'autre
     Et le navigateur demande "/api/auth/me"
     Alors le serveur répond 401
 
-  # C'est la seule remédiation dont un opérateur dispose avant step-029. S'il croit son cookie
+  # C'est la seule remédiation dont un opérateur dispose seul. S'il croit son cookie
   # compromis, se reconnecter doit fermer la session que ce cookie porte — sinon le navigateur échange
   # sa valeur contre la nouvelle, plus personne n'atteint l'ancienne, et celui qui en détient la copie
   # garde douze heures d'accès.

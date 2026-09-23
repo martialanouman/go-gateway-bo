@@ -157,7 +157,7 @@ le montre, et le marqueur ‡ servait déjà à autre chose en M9.*
 
 ◊◊ **Deux steps ajoutées le 31/08/2026, et leur numéro ne suit pas leur position** — l'ordre de cette
 liste fait foi. Elles ne dépendent d'aucun écran et paient des dettes du code déjà livré. Le bloc M1
-est `020-039` ; `030` reste réservé au plan de coupe de `step-029`. Précédent : `step-009`, insérée
+est `020-039` ; `030` porte les écrans de `step-029` depuis la coupe du 23/09/2026. Précédent : `step-009`, insérée
 après coup pour solder une dette de contrat.
 
 ¶ **Les `CREATE TABLE` appartiennent à step-005, pas à celle-ci.** Cette ligne s'intitulait « Schéma
@@ -197,7 +197,7 @@ visuelle, et on ne la dessine pas à l'aveugle. Détail dans `steps/step-042.md`
 ◊◊◊ **Sept steps issues de l'audit du 16/09/2026**, placées avant les écrans de M1 : `step-029` ajoute
 des mutations qui doivent naître avec l'audit transactionnel de `033`, `step-027` est le premier écran
 à envoyer un `POST` et suppose le contrôle d'origine de `036`, et `step-040` monte les toasts que `048`
-teste. Les numéros sont les derniers libres des blocs M1 (`030` reste réservé) et M2. Chaque constat
+teste. Les numéros sont les derniers libres des blocs M1 (`030` alors réservé) et M2. Chaque constat
 est au registre des dettes ci-dessous, avec sa step.
 
 ## M1 (écrans) — Login, MFA, opérateurs & rôles  (§6.9, §6.10, §5.1)
@@ -218,7 +218,8 @@ vérifié en inversant une dépendance dans chacun des trois en-têtes.*
 - [x] step-027 — Écrans Login & MFA, branchés sur le BFF Go
 - [x] step-049 — Socle de formulaires : React Hook Form, Zod engendré, `Field` en adaptateur ¤
 - [x] step-028 — Écran d'enrôlement du second facteur
-- [ ] step-029 — Gestion des opérateurs et des rôles
+- [x] step-029 — Gestion des opérateurs et des rôles : les routes du BFF
+- [ ] step-030 — Écrans Opérateurs et Rôles
 
 ¤ **`step-049` porte un numéro du bloc M2 et se lit ici** — l'ordre de cette liste fait foi. C'est un
 socle de primitives, pas un écran, et il doit précéder les **deux** écrans de formulaire qui restent

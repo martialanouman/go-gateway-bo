@@ -143,7 +143,8 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 // closePresentedSession ferme la session que **cette requête** portait, avant d'en ouvrir une neuve.
 //
 // C'est ce qui fait de « se reconnecter » une remédiation, et pas seulement une commodité. Sans elle,
-// un opérateur qui croit son cookie compromis n'a aucun moyen de le révoquer avant step-029 : le
+// un opérateur qui croit son cookie compromis n'a aucun moyen de le révoquer seul — la désactivation
+// par un administrateur ferme toutes ses sessions, mais elle ne se demande pas à soi-même : le
 // navigateur échange sa valeur contre la nouvelle, donc `/auth/logout` n'atteindra plus jamais
 // l'ancienne, qui reste valable jusqu'à douze heures — et celui qui en détient la copie avec elle.
 //

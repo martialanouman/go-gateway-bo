@@ -41,7 +41,7 @@ func exempt(reason string) rule {
 
 func (r rule) exempted() bool { return r.exemption != "" }
 
-// authorization décide pour **les dix opérations du contrat**, pas seulement pour les mutations.
+// authorization décide pour **toutes les opérations du contrat**, pas seulement pour les mutations.
 //
 // **Le défaut est fermé** : une opération absente de cette table est refusée. C'est ce qui rend
 // bruyant le piège des deux vocabulaires — la clé est le nom de méthode Go que le code engendré
@@ -89,9 +89,8 @@ var authorization = map[string]rule{
 
 // grantsOf rend l'union des permissions d'un opérateur.
 //
-// Le type existe pour que la garde soit **exerçable** : `internal/bff` ne monte aucune base, et sans
-// cette couture la branche « la clé manque » n'aurait aucun test avant step-029 — donc la mutation
-// qui retire la comparaison resterait verte, ce que la DoD de la step refuse.
+// Le type existe pour que la garde soit **exerçable sans base** : `internal/bff` n'en monte aucune, et
+// les tests unitaires de la garde injectent leur source.
 //
 // Le prix de toute couture est qu'un test peut vérifier un mécanisme que la production ne câble pas.
 // Ce qui le ferme ici est `TestLaGardeEstCablee`, qui exige que `newContractHandler` atteigne

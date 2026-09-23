@@ -460,7 +460,7 @@ contrat resté en 2.5.0. Cette ligne a annoncé « 000 → 008 » pendant vingt-
 **Objectif :** savoir qui est connecté, ce qu'il a le droit de faire, et garder trace de ce qu'il fait.
 **Dépend de :** M0 — et, pour ses **trois** dernières steps, `041`, `042` et `040` de M2 (voir §15).
 **Steps :** 020 → 029, plus **031** et **032** — *ajoutées le 31/08/2026 pour payer les dettes que
-aucune step ne rencontrait ; `030` reste réservé au plan de coupe de step-029. Elles se lisent avant
+aucune step ne rencontrait ; `030` porte les écrans de step-029, coupe exécutée le 23/09/2026. Elles se lisent avant
 `027` : l'ordre de `todo.md` fait foi, pas le numéro.*
 
 **Livrables**

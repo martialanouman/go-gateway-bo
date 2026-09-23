@@ -61,7 +61,7 @@ export const Route = createFileRoute('/enroll')({
 
     // **Un facteur en place se présente, il ne se double pas.** Le serveur exige la preuve de celui
     // qu'on remplace (`TotpEnrollmentRequest`), et cet écran n'en présente aucune : il n'enrôle que
-    // le premier facteur. Le remplacement arrive en step-029, avec le formulaire qui porte la preuve.
+    // le premier facteur. Le remplacement n'a pas encore d'écran : dette 053.
     const { totp, passkeys } = session.me.secondFactors
     if (totp || passkeys > 0) {
       throw redirect({ to: '/mfa', search: { redirect: search.redirect } })

@@ -291,7 +291,7 @@ export interface paths {
          *     pas un acte sur autrui : aucune clé du catalogue n'y correspond, et en créer une qu'il faudrait
          *     donner aux neuf rôles pour que le geste marche n'exclurait personne. Ce qui la garde est
          *     l'élévation, et ce qui en garde la trace est le journal d'audit. C'est `operators:manage` qui
-         *     gardera le retrait **sur autrui**, en step-029.
+         *     garde le retrait **sur autrui**, par `DELETE /operators/{operatorId}/second-factors`.
          *
          *     Elle exige donc une session élevée — mais **pas** de présenter la passkey qu'on
          *     retire : on la retire précisément quand on ne l'a plus, appareil perdu ou clé cassée, et
