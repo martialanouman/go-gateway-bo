@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { PermissionPicker } from '~/components/admin/permission-picker'
 import {
   Button,
@@ -12,8 +12,9 @@ import {
   Modal,
   Skeleton,
 } from '~/components/ui'
-import { api } from '~/lib/api'
+import { api, meQueryOptions } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
+import { usePermission } from '~/lib/permissions'
 import { blockedBy, orRefusal, Refusal, rolesQueryKey, useRoles } from './_shell.operators'
 
 type Role = components['schemas']['Role']
@@ -29,15 +30,30 @@ function RolesScreen() {
   const roles = useRoles(true)
   const [pending, setPending] = useState<Pending>(undefined)
   const close = () => setPending(undefined)
+  const canManage = usePermission('roles:manage')
+  const createLockedId = useId()
+  const title = useRef<HTMLHeadingElement>(null)
 
   return (
     <div className="page">
       <header className="page__head">
-        <h1 className="page__title">Rôles</h1>
-        <Button onClick={() => setPending({ kind: 'create' })} variant="primary">
+        <h1 className="page__title" ref={title} tabIndex={-1}>
+          Rôles
+        </h1>
+        <Button
+          {...blockedBy(canManage ? undefined : createLockedId)}
+          onClick={() => setPending({ kind: 'create' })}
+          variant="primary"
+        >
           Nouveau rôle
         </Button>
       </header>
+      {canManage ? null : (
+        <p className="page__notes" id={createLockedId}>
+          La composition d’un rôle demande <span className="mono">roles:manage</span>, que ce compte
+          ne détient pas.
+        </p>
+      )}
 
       {roles.isPending ? (
         <LoadingState label="Chargement des rôles…">
@@ -59,7 +75,17 @@ function RolesScreen() {
       {pending?.kind === 'create' ? <RoleEditor onClose={close} /> : null}
       {pending?.kind === 'edit' ? <RoleEditor onClose={close} role={pending.role} /> : null}
       {pending?.kind === 'view' ? <RoleView onClose={close} role={pending.role} /> : null}
-      {pending?.kind === 'delete' ? <ConfirmDelete onClose={close} role={pending.role} /> : null}
+      {pending?.kind === 'delete' ? (
+        <ConfirmDelete
+          onClose={close}
+          onDeleted={() => {
+            close()
+            // La ligne du déclencheur disparaît avec le rôle : sans ceci, le focus tombe sur `body`.
+            title.current?.focus()
+          }}
+          role={pending.role}
+        />
+      ) : null}
     </div>
   )
 }
@@ -200,6 +226,9 @@ function RoleEditor({ role, onClose }: { readonly role?: Role; readonly onClose:
           ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
+      // Un rôle détenu par la session change ses droits : même raison, et même absence de test,
+      // que dans l'attribution des rôles.
+      await queryClient.invalidateQueries({ queryKey: meQueryOptions.queryKey })
       onClose()
     },
   })
@@ -250,7 +279,15 @@ function RoleEditor({ role, onClose }: { readonly role?: Role; readonly onClose:
   )
 }
 
-function ConfirmDelete({ role, onClose }: { readonly role: Role; readonly onClose: () => void }) {
+function ConfirmDelete({
+  role,
+  onClose,
+  onDeleted,
+}: {
+  readonly role: Role
+  readonly onClose: () => void
+  readonly onDeleted: () => void
+}) {
   const queryClient = useQueryClient()
   const remove = useMutation({
     mutationFn: () =>
@@ -260,7 +297,7 @@ function ConfirmDelete({ role, onClose }: { readonly role: Role; readonly onClos
       ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
-      onClose()
+      onDeleted()
     },
   })
 

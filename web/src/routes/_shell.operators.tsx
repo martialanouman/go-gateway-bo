@@ -63,15 +63,27 @@ function OperatorsScreen() {
     retry: false,
   })
   const [creating, setCreating] = useState(false)
+  const canManage = usePermission('operators:manage')
+  const createLockedId = useId()
 
   return (
     <div className="page">
       <header className="page__head">
         <h1 className="page__title">Opérateurs</h1>
-        <Button onClick={() => setCreating(true)} variant="primary">
+        <Button
+          {...blockedBy(canManage ? undefined : createLockedId)}
+          onClick={() => setCreating(true)}
+          variant="primary"
+        >
           Nouvel opérateur
         </Button>
       </header>
+      {canManage ? null : (
+        <p className="page__notes" id={createLockedId}>
+          La création d’un opérateur demande <span className="mono">operators:manage</span>, que ce
+          compte ne détient pas.
+        </p>
+      )}
 
       {operators.isPending ? (
         <LoadingState label="Chargement des opérateurs…">
@@ -111,6 +123,7 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
 
   return (
     <>
+      <Refusal error={setStatus.error} />
       <DataTable
         caption="Opérateurs du tableau de bord"
         columns={[
@@ -168,7 +181,9 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
                     </Button>
                   ) : (
                     <Button
-                      loading={setStatus.isPending}
+                      loading={
+                        setStatus.isPending && setStatus.variables?.operator.id === operator.id
+                      }
                       onClick={() => setStatus.mutate({ operator, status: 'active' })}
                       size="sm"
                     >
@@ -264,6 +279,9 @@ function CreateOperator({
     defaultValues: { email: '', displayName: '', password: '' },
   })
   const create = useMutation({
+    // Le mot de passe est dans les variables de la mutation : sans `gcTime: 0`, le cache le garde
+    // cinq minutes après la fermeture de la fenêtre (invariant b).
+    gcTime: 0,
     mutationFn: (body: z.output<typeof OperatorCreation>) =>
       orRefusal(api.POST('/operators', { body }), 'L’opérateur n’a pas été créé'),
     onSuccess: async (created) => {
@@ -340,6 +358,7 @@ function AssignRoles({
 }) {
   const queryClient = useQueryClient()
   const roles = useRoles(true)
+  const unreadId = useId()
   const [chosen, setChosen] = useState(operator.roles.map((role) => role.id))
   const assign = useMutation({
     mutationFn: () =>
@@ -352,7 +371,10 @@ function AssignRoles({
       ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: operatorsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: rolesQueryKey })
+      // Ses propres rôles peuvent changer : le rail et les gardes de l'écran relisent la session.
+      // Aucun test ne rougit si cette ligne disparaît, ce qui a été vérifié : le décor rend des
+      // permissions de session fixes, et c'est le serveur qui fait foi à la requête suivante.
+      await queryClient.invalidateQueries({ queryKey: meQueryOptions.queryKey })
       onClose()
     },
   })
@@ -368,7 +390,12 @@ function AssignRoles({
       footer={
         <>
           <Button onClick={onClose}>Annuler</Button>
-          <Button loading={assign.isPending} onClick={() => assign.mutate()} variant="primary">
+          <Button
+            {...blockedBy(roles.isError ? unreadId : undefined)}
+            loading={assign.isPending || roles.isPending}
+            onClick={() => assign.mutate()}
+            variant="primary"
+          >
             Enregistrer les rôles
           </Button>
         </>
@@ -384,13 +411,20 @@ function AssignRoles({
           <Skeleton height={20} />
         </LoadingState>
       ) : roles.isError ? (
-        <ErrorState description={roles.error.message} onRetry={() => void roles.refetch()} />
+        <div id={unreadId}>
+          <ErrorState
+            description={roles.error.message}
+            onRetry={() => void roles.refetch()}
+            title="Les rôles n’ont pas pu être chargés : rien ne peut être enregistré"
+          />
+        </div>
       ) : (
         <fieldset className="role-choice">
-          <legend>
+          <legend>Rôles</legend>
+          <p>
             Les permissions s’additionnent : l’opérateur détient l’union de ses rôles, dès sa
             prochaine requête. Action journalisée.
-          </legend>
+          </p>
           {roles.data.map((role) => (
             <label className="role-choice__option" key={role.id}>
               <input

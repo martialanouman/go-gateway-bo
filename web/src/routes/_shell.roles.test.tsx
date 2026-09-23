@@ -160,4 +160,110 @@ describe('l’écran des rôles', () => {
       ).toHaveLength(2),
     )
   })
+
+  it('pose le focus sur le titre après une suppression, plutôt que de le perdre avec la ligne', async () => {
+    const user = userEvent.setup()
+    stubAdministration(
+      { permissions: ['roles:manage'] },
+      { roles: [SUPER_ADMIN, { ...ON_CALL, holders: [] }] },
+    )
+    render(
+      <RouterProvider
+        router={createAppRouter(createMemoryHistory({ initialEntries: ['/roles'] }))}
+      />,
+    )
+
+    await user.click(
+      within(
+        (await screen.findByRole('cell', { name: ON_CALL.name })).closest('tr') as HTMLElement,
+      ).getByRole('button', { name: 'Supprimer' }),
+    )
+    await user.click(
+      within(await screen.findByRole('dialog', { name: `Supprimer ${ON_CALL.name}` })).getByRole(
+        'button',
+        {
+          name: 'Supprimer le rôle',
+        },
+      ),
+    )
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1, name: 'Rôles' })).toHaveFocus(),
+    )
+  })
+
+  it('désactive et explique la création sans roles:manage', async () => {
+    stubAdministration(
+      { permissions: [] },
+      {},
+      {
+        'GET /api/roles': { status: 403, body: { code: 'permission_denied', message: 'Refusé.' } },
+      },
+    )
+    render(
+      <RouterProvider
+        router={createAppRouter(createMemoryHistory({ initialEntries: ['/roles'] }))}
+      />,
+    )
+
+    expectBlockedAndExplained(
+      await screen.findByRole('button', { name: 'Nouveau rôle' }),
+      /roles:manage/,
+    )
+  })
+
+  it('rend dans l’éditeur le refus d’un nom déjà porté', async () => {
+    const user = userEvent.setup()
+    stubAdministration(
+      { permissions: ['roles:manage'] },
+      {},
+      {
+        'POST /api/roles': {
+          status: 409,
+          body: { code: 'role_name_taken', message: 'Nom déjà porté.' },
+        },
+      },
+    )
+    render(
+      <RouterProvider
+        router={createAppRouter(createMemoryHistory({ initialEntries: ['/roles'] }))}
+      />,
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Nouveau rôle' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Nouveau rôle' })
+    await user.type(within(dialog).getByLabelText('Nom'), 'ops')
+    await user.click(within(dialog).getByRole('button', { name: 'Créer le rôle' }))
+
+    expect(await within(dialog).findByText('Nom déjà porté.')).toBeInTheDocument()
+  })
+
+  it('rend dans la confirmation le refus d’une suppression devenue impossible', async () => {
+    const user = userEvent.setup()
+    stubAdministration(
+      { permissions: ['roles:manage'] },
+      { roles: [SUPER_ADMIN, { ...ON_CALL, holders: [] }] },
+      {
+        [`DELETE /api/roles/${ON_CALL.id}`]: {
+          status: 409,
+          body: { code: 'role_held', message: 'Détenu entre-temps.' },
+        },
+      },
+    )
+    render(
+      <RouterProvider
+        router={createAppRouter(createMemoryHistory({ initialEntries: ['/roles'] }))}
+      />,
+    )
+
+    await user.click(
+      within(
+        (await screen.findByRole('cell', { name: ON_CALL.name })).closest('tr') as HTMLElement,
+      ).getByRole('button', { name: 'Supprimer' }),
+    )
+    const dialog = await screen.findByRole('dialog', { name: `Supprimer ${ON_CALL.name}` })
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer le rôle' }))
+
+    expect(await within(dialog).findByText('Détenu entre-temps.')).toBeInTheDocument()
+  })
 })
