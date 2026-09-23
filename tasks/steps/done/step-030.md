@@ -65,3 +65,15 @@ Mutations jouées, toutes rouges : se désactiver permis, réinitialisation sans
 sans `roles:manage` permis, toast de succès retiré, reprises par défaut, rôle par défaut modifiable,
 rôle détenu supprimable, clés du rôle cachées. Parcours Playwright étendu : l'administrateur crée un
 opérateur, lui attribue `auditor`, et cet opérateur entre jusqu'à l'enrôlement.
+
+Ajoutées après revue, toutes rouges : `gcTime: 0` retiré (le mot de passe restait cinq minutes dans
+le cache des mutations, invariant b), `form.reset()` retiré (formulaire rouvert prérempli), création
+sans la clé permise, échec de réactivation muet, focus perdu après suppression, rôles illisibles
+enregistrables, et chacun des sept refus serveur rendus dans les fenêtres. **Restent vertes, et c'est
+écrit sur le code** : les deux relectures de la session après un changement de rôles — le décor rend
+des permissions de session fixes.
+
+**Signalé, non corrigé** : l'état d'erreur de la charte affiche toujours « Vos données locales restent
+affichées », faux quand un écran échoue à son premier chargement. La phrase appartient à la primitive
+`ErrorState` ; la trancher touche tous les écrans, hors de cette step.
+
