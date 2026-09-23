@@ -35,7 +35,7 @@ const CLOCK_HINT =
   'Si le code est refusé plusieurs fois de suite, vérifiez l’heure de l’application d’authentification : le serveur tolère environ une minute d’écart, et refuse les codes au-delà.'
 
 export const CHALLENGE_LOST =
-  'Cette vérification a expiré : ce que la connexion avait ouvert n’est plus en mémoire. Reprenez la connexion.'
+  'Cette vérification a expiré : ce que la connexion avait ouvert n’est plus en mémoire. Recommencez la connexion.'
 
 /**
  * Le message rendu à l'opérateur, pris **du serveur**, augmenté de ce que le serveur ne peut pas

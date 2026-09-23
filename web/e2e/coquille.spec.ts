@@ -102,7 +102,7 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   expect(session?.httpOnly, 'le script ne doit pas lire la session (invariant b)').toBe(true)
 
   // Et ce n'est pas un cul-de-sac : la sortie ramène à la connexion.
-  await page.getByRole('button', { name: 'Reprendre la connexion' }).click()
+  await page.getByRole('button', { name: 'Recommencer la connexion' }).click()
   await expect(page).toHaveURL(/\/login$/)
 
   // ── Le parcours du premier administrateur, jusqu'à la console ───────────────────────────────
@@ -171,7 +171,7 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   // Alors seulement les dix codes paraissent, et la seule sortie est l'accusé de réception.
   await expect(page.getByRole('heading', { level: 2 })).toHaveText('Codes de récupération')
   await expect(page.locator('.auth__codes li')).toHaveCount(10)
-  await expect(page.getByRole('button', { name: 'Reprendre la connexion' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Recommencer la connexion' })).toHaveCount(0)
 
   // **Les dix codes tiennent sur deux colonnes**, et c'est la seule propriété de cette liste qui
   // porte une décision : en une seule colonne la carte dépasse l'écran, et le rappel « Quitter cet

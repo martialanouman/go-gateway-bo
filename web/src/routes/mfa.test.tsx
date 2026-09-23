@@ -41,7 +41,7 @@ async function visitMfa(
   render(<RouterProvider router={router} />)
   // La sortie, présente sur les **deux** états résolus de l'écran et sur aucun écran d'attente —
   // lequel porte le même titre que le challenge, et rendait donc la main trop tôt.
-  await screen.findByRole('button', { name: 'Reprendre la connexion' })
+  await screen.findByRole('button', { name: 'Recommencer la connexion' })
 
   return { router, user: userEvent.setup() }
 }
@@ -53,6 +53,11 @@ describe('le challenge TOTP', () => {
     await visitMfa({ totp: true, passkeys: 0 })
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Second facteur')
+    expect(
+      screen.getByText(
+        /Entrez le code généré par votre application d’authentification à deux facteurs/,
+      ),
+    ).toBeVisible()
     expect(code()).toBeRequired()
     // Six chiffres : le clavier numérique s'ouvre sur mobile, et le champ refuse le texte.
     expect(code()).toHaveAttribute('inputMode', 'numeric')
@@ -117,6 +122,14 @@ describe('la clé d’accès', () => {
     const explication = bouton.getAttribute('aria-describedby')
     expect(explication).not.toBeNull()
     expect(document.getElementById(explication ?? '')).toHaveTextContent(/ce navigateur/i)
+  })
+
+  it('est ce que l’intro nomme quand le compte n’a qu’elle', async () => {
+    await visitMfa({ totp: false, passkeys: 1 })
+
+    expect(screen.getByText(/La clé d’accès termine la connexion/)).toBeVisible()
+    expect(screen.queryByText(/application d’authentification/)).toBeNull()
+    expect(screen.queryByLabelText(/Code à six chiffres/)).toBeNull()
   })
 
   it('n’est pas proposée quand le compte n’en a aucune', async () => {
@@ -288,7 +301,7 @@ describe('quand le BFF ne rend pas la session', () => {
     expect(screen.queryByText(/n’a ni application d’authentification/)).toBeNull()
     expect(screen.queryByText(/step-028/)).toBeNull()
     // La sortie reste, comme sur les autres états.
-    expect(screen.getByRole('button', { name: 'Reprendre la connexion' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Recommencer la connexion' })).toBeVisible()
   })
 
   it('relit la session quand l’opérateur réessaie, et reprend le challenge', async () => {
@@ -534,7 +547,7 @@ describe('ce que l’élévation et la sortie laissent derrière', () => {
     const lectures = () => fetch.mock.calls.filter(([r]) => r.url.endsWith('/api/auth/me')).length
     const avant = lectures()
 
-    await user.click(screen.getByRole('button', { name: 'Reprendre la connexion' }))
+    await user.click(screen.getByRole('button', { name: 'Recommencer la connexion' }))
     await screen.findByLabelText(/E-mail/)
 
     expect(peekChallenge()).toBeUndefined()
@@ -549,7 +562,7 @@ describe('ce que l’élévation et la sortie laissent derrière', () => {
       { replies: { logout: { status: 500, body: { code: 'oops', message: 'Panne.' } } } },
     )
 
-    await user.click(screen.getByRole('button', { name: 'Reprendre la connexion' }))
+    await user.click(screen.getByRole('button', { name: 'Recommencer la connexion' }))
 
     expect(await screen.findByLabelText(/E-mail/)).toBeInTheDocument()
   })

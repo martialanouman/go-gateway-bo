@@ -111,7 +111,7 @@ export function RestartLogin() {
 
   return (
     <Button loading={restart.isPending} onClick={() => restart.mutate()} variant="link">
-      Reprendre la connexion
+      Recommencer la connexion
     </Button>
   )
 }
