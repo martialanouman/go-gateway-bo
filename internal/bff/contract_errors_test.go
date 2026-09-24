@@ -113,8 +113,8 @@ func TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser(t *testing.T) {
 	assert.NotContains(t, string(payload), internalTopology,
 		"la topologie interne s'affiche dans le navigateur")
 	assert.JSONEq(t,
-		`{"code":"internal_error","message":"Le serveur n'a pas pu produire cette réponse. `+
-			`Réessayez ; si elle persiste, la panne est côté serveur."}`,
+		`{"code":"internal_error","message":"La demande n'a pas abouti : le serveur a rencontré une erreur imprévue. `+
+			`Réessayez dans un instant ; si l'erreur revient, prévenez un administrateur du tableau de bord."}`,
 		string(payload))
 }
 
