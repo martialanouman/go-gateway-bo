@@ -269,6 +269,14 @@ func TestLesValeursDuPremierOperateurSontValideesQuandElleSontLa(t *testing.T) {
 			},
 			mention: config.EnvBootstrapOperatorPassword,
 		},
+		"un mot de passe long mais sans variété": {
+			env: map[string]string{
+				config.EnvBootstrapOperatorEmail:    "camille@exemple.test",
+				config.EnvBootstrapOperatorName:     "Camille Durand",
+				config.EnvBootstrapOperatorPassword: "un mot de passe assez long",
+			},
+			mention: config.EnvBootstrapOperatorPassword,
+		},
 	}
 
 	for name, testCase := range cases {
@@ -287,7 +295,7 @@ func TestLesValeursDuPremierOperateurSontValideesQuandElleSontLa(t *testing.T) {
 func TestUneEspaceDeBordDuMotDePasseEstConservee(t *testing.T) {
 	t.Parallel()
 
-	const withSpace = " un mot de passe qui commence par une espace "
+	const withSpace = " Un mot de passe qui commence1 par une espace "
 
 	cfg, err := config.LoadBootstrap(lookupFrom(map[string]string{
 		config.EnvBootstrapOperatorEmail:    "camille@exemple.test",

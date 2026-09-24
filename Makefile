@@ -215,7 +215,7 @@ E2E_ADMIN_URL = postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=
 E2E_DATABASE_URL = postgres://dashboard:dashboard@127.0.0.1:5432/dashboard_e2e?sslmode=disable
 E2E_OPERATOR_EMAIL = parcours@example.test
 E2E_OPERATOR_NAME = Opératrice de parcours
-E2E_OPERATOR_PASSWORD = un-mot-de-passe-de-parcours
+E2E_OPERATOR_PASSWORD = Un-mot-de-passe-de-parcours-1
 
 e2e: build ## Parcours Playwright, contre le binaire (:3101)
 	@printf '%s' "$(E2E_ADMIN_URL)" | go run ./scripts/e2edb
