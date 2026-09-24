@@ -53,15 +53,15 @@ func (r rule) exempted() bool { return r.exemption != "" }
 // Les mutations de `/auth/` sont exemptées : l'autorisation y est l'affaire de chaque route. Les routes
 // d'administration exigent chacune sa clé, lectures comprises.
 var authorization = map[string]rule{
-	"ListOperators":              requires(permissions.OperatorsManage),
-	"CreateOperator":             requires(permissions.OperatorsManage),
-	"UpdateOperator":             requires(permissions.OperatorsManage),
-	"SetOperatorRoles":           requires(permissions.OperatorsManage),
-	"ResetOperatorSecondFactors": requires(permissions.OperatorsManage),
-	"ListRoles":                  requires(permissions.RolesManage),
-	"CreateRole":                 requires(permissions.RolesManage),
-	"UpdateRole":                 requires(permissions.RolesManage),
-	"DeleteRole":                 requires(permissions.RolesManage),
+	"ListOperators":             requires(permissions.OperatorsManage),
+	"CreateOperator":            requires(permissions.OperatorsManage),
+	"UpdateOperator":            requires(permissions.OperatorsManage),
+	"SetOperatorRoles":          requires(permissions.OperatorsManage),
+	"RequestOperatorAccessLink": requires(permissions.OperatorsManage),
+	"ListRoles":                 requires(permissions.RolesManage),
+	"CreateRole":                requires(permissions.RolesManage),
+	"UpdateRole":                requires(permissions.RolesManage),
+	"DeleteRole":                requires(permissions.RolesManage),
 	"Health": exempt("la sonde de l'orchestrateur, qui n'a pas de session et ne doit jamais " +
 		"dépendre d'une autre brique pour répondre"),
 	"Login": exempt("la porte d'entrée : exiger une session pour en ouvrir une n'a pas de sens. " +
@@ -84,7 +84,10 @@ var authorization = map[string]rule{
 	"DeleteWebauthnPasskey": exempt("retirer sa propre clé d'accès est du self-service, pas un acte " +
 		"sur autrui : aucune clé du catalogue n'y correspond, et en créer une qu'il faudrait donner " +
 		"aux neuf rôles n'exclurait personne. L'élévation la garde, le journal en garde la trace, et " +
-		"c'est `operators:manage` qui garde le retrait sur autrui, par `ResetOperatorSecondFactors`"),
+		"sur autrui, la sortie est un lien de réinitialisation, par `RequestOperatorAccessLink`"),
+	"SetPasswordFromAccessLink": exempt("la porte de qui n'a pas encore de mot de passe : aucune " +
+		"session ne peut exister. Ce qui la garde est le jeton, 256 bits à usage unique, vérifié " +
+		"avant tout hachage"),
 }
 
 // grantsOf rend l'union des permissions d'un opérateur.

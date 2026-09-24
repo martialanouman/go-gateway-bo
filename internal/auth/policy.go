@@ -5,15 +5,8 @@ import (
 	"unicode/utf8"
 )
 
-// MinimumPasswordLength est la borne de longueur, commune à `PasswordLongEnough` et `CheckPassword`.
 const MinimumPasswordLength = 12
 
-func PasswordLongEnough(password string) bool {
-	return utf8.RuneCountInString(password) >= MinimumPasswordLength
-}
-
-// CheckPassword rend ce qui manque, en français ; vide veut dire conforme.
-//
 // La composition est un choix de l'utilisateur contre SP 800-63B, signalé le 24/09/2026.
 func CheckPassword(password string) []string {
 	var upper, lower, digit, special bool

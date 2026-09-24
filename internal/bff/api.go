@@ -43,6 +43,8 @@ type API struct {
 	Audit *store.Audit
 	// Administration porte les gestes de `operators:manage` et `roles:manage`.
 	Administration *store.Administration
+	// AccessLinks consomme le lien d'accès, sur une route publique.
+	AccessLinks *store.AccessLinks
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le

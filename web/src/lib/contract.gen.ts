@@ -12,6 +12,11 @@
 
 import { z } from 'zod'
 
+export const AccessLinkUse = z.object({
+  password: z.string().max(4096),
+  token: z.string().max(64),
+})
+
 export const LoginRequest = z.object({
   email: z.string().max(320),
   password: z.string().min(1).max(4096),
@@ -27,7 +32,6 @@ export const MfaVerification = z.object({
 export const OperatorCreation = z.object({
   displayName: z.string().min(1).max(200),
   email: z.string().min(3).max(320),
-  password: z.string().min(12).max(4096),
 })
 
 export const OperatorRoles = z.object({

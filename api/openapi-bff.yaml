@@ -133,6 +133,52 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /auth/access-link:
+    post:
+      operationId: setPasswordFromAccessLink
+      summary: Définit son mot de passe par un lien à usage unique
+      description: |
+        Publique : celui qui n'a pas encore de mot de passe n'a aucune session. Ce qui la garde est
+        le jeton, 256 bits à usage unique, vérifié **avant** tout hachage.
+
+        Le mot de passe compte douze caractères au moins, dont une majuscule, une minuscule, un
+        chiffre et un caractère spécial. Pour un lien `reset`, l'usage retire aussi les facteurs et
+        ferme les sessions, dans la même transaction.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccessLinkUse' }
+      responses:
+        '204':
+          description: Le mot de passe est enregistré ; le lien ne vaut plus rien.
+        '400':
+          description: |
+            `password_policy` : le mot de passe ne suit pas la politique, et le message nomme ce qui
+            manque ; le lien reste valable. `bad_request` : le corps n'a pas la forme attendue.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '410':
+          description: |
+            `access_link_invalid` : le lien a servi, expiré, été remplacé, ou vise un compte désactivé.
+            **Un seul refus** pour les quatre causes : les distinguer dirait à qui détient un vieux
+            lien ce qu'il est devenu.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
+        '503':
+          description: |
+            Les dix places de hachage argon2id sont occupées. Rien n'a été enregistré et le lien reste
+            valable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /auth/me:
     get:
       operationId: me
@@ -243,9 +289,9 @@ paths:
             enrôlerait un neuf et évincerait l'opérateur.
 
             Le refus dit ce qu'il faut faire — présenter un code de l'authentificateur en place, ou
-            l'un des codes de récupération. Si les deux sont perdus, la sortie est la réinitialisation
-            par un administrateur détenant `operators:manage`
-            (`DELETE /operators/{operatorId}/second-factors`), et le message la nomme.
+            l'un des codes de récupération. Si les deux sont perdus, la sortie est un lien de
+            réinitialisation envoyé par un administrateur détenant `operators:manage`
+            (`POST /operators/{operatorId}/access-link`), et le message la nomme.
 
             **Trois causes, trois codes**, et ici le `code` est le **seul** discriminant — contrairement
             au retrait d'une clé d'accès, où le statut sépare déjà les causes. Un client qui ne lirait
@@ -553,8 +599,9 @@ paths:
         step-024 jusqu'à step-025, qui l'a corrigée. Retirer sa propre clé d'accès est du self-service,
         pas un acte sur autrui : aucune clé du catalogue n'y correspond, et en créer une qu'il faudrait
         donner aux neuf rôles pour que le geste marche n'exclurait personne. Ce qui la garde est
-        l'élévation, et ce qui en garde la trace est le journal d'audit. C'est `operators:manage` qui
-        garde le retrait **sur autrui**, par `DELETE /operators/{operatorId}/second-factors`.
+        l'élévation, et ce qui en garde la trace est le journal d'audit. Sur autrui, la sortie est un
+        lien de réinitialisation envoyé par un administrateur détenant `operators:manage`
+        (`POST /operators/{operatorId}/access-link`).
 
         Elle exige donc une session élevée — mais **pas** de présenter la passkey qu'on
         retire : on la retire précisément quand on ne l'a plus, appareil perdu ou clé cassée, et
@@ -626,10 +673,11 @@ paths:
         '403': { $ref: '#/components/responses/PermissionRefusee' }
     post:
       operationId: createOperator
-      summary: Crée un opérateur, sans rôle
+      summary: Crée un opérateur, sans rôle ni mot de passe
       description: |
-        Le compte naît actif et sans rôle : il peut entrer, puis enrôler son second facteur, et rien
-        d'autre tant qu'on ne lui attribue pas de rôle.
+        Le compte naît actif, sans rôle et **sans mot de passe** : personne ne connaît celui d'un
+        autre. Un lien d'activation, valable 72 heures, est mis en file dans la même transaction ;
+        son titulaire y définit son mot de passe, puis enrôle son second facteur.
       requestBody:
         required: true
         content:
@@ -702,25 +750,27 @@ paths:
         '409': { $ref: '#/components/responses/AutoVerrouillage' }
         '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
 
-  /operators/{operatorId}/second-factors:
-    delete:
-      operationId: resetOperatorSecondFactors
-      summary: Réinitialise le second facteur d'un autre opérateur
+  /operators/{operatorId}/access-link:
+    post:
+      operationId: requestOperatorAccessLink
+      summary: Envoie un lien d'accès à usage unique
       description: |
-        Retire son application d'authentification, ses codes de récupération et ses clés d'accès,
-        lève son verrou de second facteur et ferme ses sessions. À sa prochaine connexion, il enrôle
-        un nouveau facteur. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur
-        cassé. Sur son propre compte, elle est refusée : le remplacement se fait en présentant le
-        facteur actuel.
+        Met en file un lien que le titulaire reçoit par e-mail : `activation` (72 heures) si le compte
+        n'a pas encore de mot de passe, `reset` (1 heure) sinon. Un nouveau lien invalide le précédent.
+
+        **Rien ne change avant l'usage** : l'ancien mot de passe, les facteurs et les sessions restent
+        valables jusqu'à ce que le titulaire utilise le lien. À l'usage d'un `reset`, son application
+        d'authentification, ses codes de récupération et ses clés d'accès sont retirés et ses sessions
+        fermées. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur cassé.
       parameters:
         - $ref: '#/components/parameters/OperatorId'
       responses:
-        '204':
-          description: Le second facteur est retiré et les sessions sont fermées.
+        '202':
+          description: Le lien est en file ; il part dans les secondes qui suivent.
         '401': { $ref: '#/components/responses/SessionAbsente' }
         '403': { $ref: '#/components/responses/PermissionRefusee' }
         '404': { $ref: '#/components/responses/OperateurInconnu' }
-        '409': { $ref: '#/components/responses/AutoVerrouillage' }
+        '409': { $ref: '#/components/responses/CompteDesactive' }
         '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
 
   /roles:
@@ -829,8 +879,7 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     RequeteInvalide:
       description: |
-        Le corps n'a pas la forme attendue, le mot de passe est trop court, ou il désigne un rôle ou
-        une permission inconnus.
+        Le corps n'a pas la forme attendue, ou il désigne un rôle ou une permission inconnus.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -847,7 +896,13 @@ components:
     AutoVerrouillage:
       description: |
         Le geste enfermerait son auteur dehors (`self_lockout`) : se désactiver, se retirer
-        `operators:manage` ou `roles:manage`, réinitialiser son propre second facteur.
+        `operators:manage` ou `roles:manage`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    CompteDesactive:
+      description: |
+        `operator_disabled` : aucun lien ne part vers un compte désactivé. Le réactiver d'abord.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -1263,11 +1318,24 @@ components:
           type: array
           items: { $ref: '#/components/schemas/RoleReference' }
         secondFactorEnrolled:
-          # Ce qui dit à l'écran si la réinitialisation a un objet : un secret posé, même jamais
-          # confirmé, ou une passkey. Plus large que `SecondFactors.totp`, délibérément — un
-          # enrôlement abandonné est encore quelque chose à retirer.
+          # Un secret posé, même jamais confirmé, ou une passkey : ce qu'un lien de reset retirerait.
+          # Plus large que `SecondFactors.totp`, délibérément — un enrôlement abandonné est encore
+          # quelque chose à retirer.
           type: boolean
-      required: [id, email, displayName, status, roles, secondFactorEnrolled]
+        accessLink:
+          # Nul quand aucun lien n'est en file ni en attente d'usage.
+          oneOf:
+            - $ref: '#/components/schemas/AccessLink'
+            - type: 'null'
+      required: [id, email, displayName, status, roles, secondFactorEnrolled, accessLink]
+
+    AccessLink:
+      type: object
+      additionalProperties: false
+      properties:
+        kind: { type: string, enum: [activation, reset] }
+        state: { type: string, enum: [queued, sent, failed] }
+      required: [kind, state]
 
     RoleReference:
       type: object
@@ -1283,13 +1351,15 @@ components:
       properties:
         email: { type: string, minLength: 3, maxLength: 320 }
         displayName: { type: string, minLength: 1, maxLength: 200 }
-        password:
-          # La même politique que le compte propriétaire du bootstrap : douze caractères au moins.
-          # Le serveur la redit, rien ne valide une requête contre ce fichier à l'exécution.
-          type: string
-          minLength: 12
-          maxLength: 4096
-      required: [email, displayName, password]
+      required: [email, displayName]
+
+    AccessLinkUse:
+      type: object
+      additionalProperties: false
+      properties:
+        token: { type: string, maxLength: 64 }
+        password: { type: string, maxLength: 4096 }
+      required: [token, password]
 
     OperatorUpdate:
       type: object

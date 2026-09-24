@@ -58,19 +58,6 @@ describe('l’écran des opérateurs', () => {
       row(SELF.email).getByRole('button', { name: 'Désactiver' }),
       /compte de la session/,
     )
-    expectBlockedAndExplained(
-      row(SELF.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-      /compte de la session/,
-    )
-  })
-
-  it('désactive et explique une réinitialisation qui n’aurait rien à retirer', async () => {
-    await visit()
-
-    expectBlockedAndExplained(
-      row(COLLEAGUE.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-      /Aucun second facteur/,
-    )
   })
 
   it('désactive et explique l’attribution de rôles sans roles:manage, qui seule liste les rôles', async () => {
@@ -90,7 +77,6 @@ describe('l’écran des opérateurs', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
     await user.type(within(dialog).getByLabelText('Adresse e-mail'), 'n.benali@example.test')
     await user.type(within(dialog).getByLabelText('Nom affiché'), 'Nadia Benali')
-    await user.type(within(dialog).getByLabelText('Mot de passe'), 'un mot de passe assez long')
     await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
 
     expect(await screen.findByRole('cell', { name: /n\.benali@example\.test/ })).toBeInTheDocument()
@@ -98,21 +84,6 @@ describe('l’écran des opérateurs', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Nouvel opérateur' })).not.toBeInTheDocument(),
     )
-  })
-
-  it('refuse un mot de passe trop court avant l’aller-retour, en disant la borne du contrat', async () => {
-    const user = userEvent.setup()
-    const fetch = await visit()
-
-    await user.click(screen.getByRole('button', { name: 'Nouvel opérateur' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
-    await user.type(within(dialog).getByLabelText('Adresse e-mail'), 'n.benali@example.test')
-    await user.type(within(dialog).getByLabelText('Nom affiché'), 'Nadia Benali')
-    await user.type(within(dialog).getByLabelText('Mot de passe'), 'court')
-    await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
-
-    expect(await within(dialog).findByText(/12 caractères au minimum/)).toBeInTheDocument()
-    expect(fetch.mock.calls.some(([request]) => request.method === 'POST')).toBe(false)
   })
 
   it('rend le refus du serveur tel qu’il le rédige', async () => {
@@ -128,7 +99,6 @@ describe('l’écran des opérateurs', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
     await user.type(within(dialog).getByLabelText('Adresse e-mail'), COLLEAGUE.email)
     await user.type(within(dialog).getByLabelText('Nom affiché'), 'Martin Leroy')
-    await user.type(within(dialog).getByLabelText('Mot de passe'), 'un mot de passe assez long')
     await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
 
     expect(
@@ -187,25 +157,6 @@ describe('l’écran des opérateurs', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Votre compte ne détient pas la permission.')
     expect(within(alert).getByRole('button', { name: 'Réessayer' })).toBeInTheDocument()
-  })
-
-  it('réinitialise le second facteur d’un collègue après une confirmation qui dit tout ce qui part', async () => {
-    const user = userEvent.setup()
-    await visit(undefined, {}, [SELF, { ...COLLEAGUE, secondFactorEnrolled: true }])
-
-    await user.click(
-      row(COLLEAGUE.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-    )
-    const dialog = await screen.findByRole('dialog', {
-      name: `Réinitialiser le second facteur de ${COLLEAGUE.displayName}`,
-    })
-    expect(dialog).toHaveTextContent(/codes de récupération/)
-    expect(dialog).toHaveTextContent(/sessions fermées/)
-    await user.click(
-      within(dialog).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-    )
-
-    expect(await row(COLLEAGUE.email).findByText('Aucun')).toBeInTheDocument()
   })
 
   it('réactive un collègue désactivé, sans confirmation', async () => {
@@ -282,47 +233,6 @@ describe('l’écran des opérateurs', () => {
     )
   })
 
-  it('ne garde le mot de passe saisi ni dans le formulaire rouvert ni dans le cache (invariant b)', async () => {
-    const user = userEvent.setup()
-    stubAdministration(
-      { permissions: ['operators:manage', 'roles:manage'] },
-      {},
-      {
-        'POST /api/operators': {
-          status: 409,
-          body: { code: 'email_taken', message: 'Déjà pris.' },
-        },
-      },
-    )
-    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/operators'] }))
-    render(<RouterProvider router={router} />)
-    await screen.findByRole('cell', { name: new RegExp(COLLEAGUE.email) })
-
-    await user.click(screen.getByRole('button', { name: 'Nouvel opérateur' }))
-    let dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
-    await user.type(within(dialog).getByLabelText('Adresse e-mail'), COLLEAGUE.email)
-    await user.type(within(dialog).getByLabelText('Nom affiché'), 'Martin Leroy')
-    await user.type(within(dialog).getByLabelText('Mot de passe'), 'un secret assez long')
-    await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
-    await within(dialog).findByText('Déjà pris.')
-    await user.click(within(dialog).getByRole('button', { name: 'Annuler' }))
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Nouvel opérateur' })).not.toBeInTheDocument(),
-    )
-
-    const cached = JSON.stringify(
-      router.options.context.queryClient
-        .getMutationCache()
-        .getAll()
-        .map((m) => m.state.variables),
-    )
-    expect(cached).not.toContain('un secret assez long')
-
-    await user.click(screen.getByRole('button', { name: 'Nouvel opérateur' }))
-    dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
-    expect(within(dialog).getByLabelText('Mot de passe')).toHaveValue('')
-  })
-
   it('rend l’échec d’une réactivation, sur la ligne qui l’a demandée', async () => {
     const user = userEvent.setup()
     await visit(
@@ -397,32 +307,6 @@ describe('l’écran des opérateurs', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Désactiver le compte' }))
 
     expect(await within(dialog).findByText('Le compte reste actif.')).toBeInTheDocument()
-  })
-
-  it('rend dans la confirmation le refus d’une réinitialisation', async () => {
-    const user = userEvent.setup()
-    await visit(
-      undefined,
-      {
-        [`DELETE /api/operators/${COLLEAGUE.id}/second-factors`]: {
-          status: 404,
-          body: { code: 'not_found', message: 'Opérateur introuvable.' },
-        },
-      },
-      [SELF, { ...COLLEAGUE, secondFactorEnrolled: true }],
-    )
-
-    await user.click(
-      row(COLLEAGUE.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-    )
-    const dialog = await screen.findByRole('dialog', {
-      name: `Réinitialiser le second facteur de ${COLLEAGUE.displayName}`,
-    })
-    await user.click(
-      within(dialog).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-    )
-
-    expect(await within(dialog).findByText('Opérateur introuvable.')).toBeInTheDocument()
   })
 
   it('n’enregistre pas des rôles que la fenêtre n’a pas su lire', async () => {

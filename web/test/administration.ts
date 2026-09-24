@@ -15,6 +15,7 @@ export const SELF: Operator = {
   status: 'active',
   roles: [{ id: 'role-super-admin', name: 'Propriétaire' }],
   secondFactorEnrolled: true,
+  accessLink: null,
 }
 
 export const COLLEAGUE: Operator = {
@@ -24,6 +25,7 @@ export const COLLEAGUE: Operator = {
   status: 'active',
   roles: [],
   secondFactorEnrolled: false,
+  accessLink: null,
 }
 
 export const SUPER_ADMIN: Role = {
@@ -94,6 +96,7 @@ export function stubAdministration(
           status: 'active',
           roles: [],
           secondFactorEnrolled: false,
+          accessLink: { kind: 'activation', state: 'queued' },
         }
         operators = [...operators, created]
         return Response.json(created, { status: 201 })
@@ -112,12 +115,9 @@ export function stubAdministration(
             .map(({ id: roleId, name }) => ({ id: roleId, name })),
         }
       }
-      if (detail === 'second-factors') updated = { ...target, secondFactorEnrolled: false }
 
       operators = operators.map((operator) => (operator.id === id ? updated : operator))
-      return detail === 'second-factors'
-        ? new Response(null, { status: 204 })
-        : Response.json(updated)
+      return Response.json(updated)
     }
 
     if (collection === 'roles') {

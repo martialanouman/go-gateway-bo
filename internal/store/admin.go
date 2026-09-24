@@ -303,34 +303,6 @@ func (a *Administration) RequestAccessLink(ctx context.Context, id string, event
 	})
 }
 
-// ResetSecondFactors disparaît avec sa route, au commit qui retire celle-ci du contrat.
-func (a *Administration) ResetSecondFactors(ctx context.Context, id string, event Event) error {
-	return inTx(ctx, a.pool, func(tx pgx.Tx) error {
-		var operatorID string
-
-		err := tx.QueryRow(ctx, `SELECT id::text FROM operators WHERE id::text = $1 FOR UPDATE`, id).Scan(&operatorID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrOperatorUnknown
-		}
-
-		if err != nil {
-			return fmt.Errorf("verrouiller l'opérateur : %w", err)
-		}
-
-		if err = clearSecondFactors(ctx, tx, operatorID); err != nil {
-			return err
-		}
-
-		if err = revokeSessions(ctx, tx, operatorID); err != nil {
-			return err
-		}
-
-		event.TargetID = operatorID
-
-		return record(ctx, tx, event)
-	})
-}
-
 func revokeSessions(ctx context.Context, tx pgx.Tx, operatorID string) error {
 	if _, err := tx.Exec(ctx, `DELETE FROM sessions WHERE operator_id::text = $1`, operatorID); err != nil {
 		return fmt.Errorf("fermer les sessions de l'opérateur : %w", err)
