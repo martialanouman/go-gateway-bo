@@ -19,6 +19,7 @@ le compte de la session, pas sur l'administration des autres.*
 - **042** — le nom des passkeys, et avec lui l'emploi de `DELETE /auth/mfa/webauthn/passkeys/{id}`.
 - **052** — le succès d'une cérémonie WebAuthn, par un authentificateur virtuel CDP dans Playwright.
 - **053** — le remplacement d'un facteur en place n'a pas d'écran.
+- **055** — une panne serveur compte comme un échec de second facteur.
 
 ## Tests (écrits dans la même PR)
 - **Parcours (Playwright)** : un authentificateur virtuel posé par CDP enregistre une passkey et
