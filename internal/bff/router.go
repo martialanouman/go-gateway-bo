@@ -195,7 +195,7 @@ func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
 func reportFailedResponse(w http.ResponseWriter, _ *http.Request, _ error) {
 	writeJSON(w, http.StatusInternalServerError, Error{
 		Code:    "internal_error",
-		Message: "Le serveur n'a pas pu produire cette réponse. Réessayez ; si elle persiste, la panne est côté serveur.",
+		Message: "La demande n'a pas abouti : le serveur a rencontré une erreur imprévue. Réessayez dans un instant ; si l'erreur revient, prévenez un administrateur du tableau de bord.",
 	})
 }
 
