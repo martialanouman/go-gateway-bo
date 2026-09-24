@@ -47,6 +47,7 @@ type OperatorView struct {
 	RoleIDs              []string
 	RoleNames            []string
 	SecondFactorEnrolled bool
+	AccessLink           *AccessLinkView
 }
 
 type RoleView struct {
@@ -81,12 +82,17 @@ const operatorsQuery = `
 	       coalesce(array_agg(r.id::text ORDER BY r.name) FILTER (WHERE r.id IS NOT NULL), '{}'),
 	       coalesce(array_agg(r.name ORDER BY r.name) FILTER (WHERE r.id IS NOT NULL), '{}'),
 	       o.mfa_totp_secret IS NOT NULL
-	           OR EXISTS (SELECT 1 FROM webauthn_credentials c WHERE c.operator_id = o.id)
+	           OR EXISTS (SELECT 1 FROM webauthn_credentials c WHERE c.operator_id = o.id),
+	       l.kind,
+	       CASE WHEN l.token_hash IS NOT NULL THEN 'sent'
+	            WHEN l.attempts >= 10 THEN 'failed'
+	            ELSE 'queued' END
 	FROM operators o
 	LEFT JOIN operator_roles orl ON orl.operator_id = o.id
 	LEFT JOIN roles r ON r.id = orl.role_id
+	LEFT JOIN access_links l ON l.operator_id = o.id
 	WHERE $1 = '' OR o.id::text = $1
-	GROUP BY o.id
+	GROUP BY o.id, l.operator_id
 	ORDER BY lower(o.email)`
 
 func operators(ctx context.Context, q querier, id string) ([]OperatorView, error) {
@@ -96,9 +102,16 @@ func operators(ctx context.Context, q querier, id string) ([]OperatorView, error
 	}
 
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (OperatorView, error) {
-		var v OperatorView
+		var (
+			v           OperatorView
+			kind, state *string
+		)
+
 		err := row.Scan(&v.ID, &v.Email, &v.DisplayName, &v.Status, &v.RoleIDs, &v.RoleNames,
-			&v.SecondFactorEnrolled)
+			&v.SecondFactorEnrolled, &kind, &state)
+		if kind != nil {
+			v.AccessLink = &AccessLinkView{Kind: *kind, State: *state}
+		}
 
 		return v, err
 	})
@@ -121,10 +134,9 @@ func (a *Administration) Operators(ctx context.Context) ([]OperatorView, error) 
 	return operators(ctx, a.pool, "")
 }
 
-// CreateOperator crée un compte actif et sans rôle. `event.TargetID` est posé ici, l'identifiant
-// n'existant qu'après l'insertion.
-func (a *Administration) CreateOperator(ctx context.Context, email, displayName, passwordHash string,
-	event Event,
+// CreateOperator crée un compte actif, sans rôle ni mot de passe, et met son lien d'activation en file.
+// `event.TargetID` est posé ici, l'identifiant n'existant qu'après l'insertion.
+func (a *Administration) CreateOperator(ctx context.Context, email, displayName string, event Event,
 ) (OperatorView, error) {
 	var created OperatorView
 
@@ -132,14 +144,18 @@ func (a *Administration) CreateOperator(ctx context.Context, email, displayName,
 		var id string
 
 		err := tx.QueryRow(ctx,
-			`INSERT INTO operators (email, display_name, password_hash) VALUES ($1, $2, $3) RETURNING id::text`,
-			email, displayName, passwordHash).Scan(&id)
+			`INSERT INTO operators (email, display_name) VALUES ($1, $2) RETURNING id::text`,
+			email, displayName).Scan(&id)
 		if isViolation(err, uniqueViolation) {
 			return ErrEmailTaken
 		}
 
 		if err != nil {
 			return fmt.Errorf("créer l'opérateur : %w", err)
+		}
+
+		if _, err = requestLink(ctx, tx, id); err != nil {
+			return err
 		}
 
 		if created, err = operator(ctx, tx, id); err != nil {
@@ -255,31 +271,54 @@ func (a *Administration) SetOperatorRoles(ctx context.Context, actorID, id strin
 	return updated, err
 }
 
-// ResetSecondFactors retire tout ce qui fait le second facteur d'un opérateur, lève son verrou de
-// second facteur (compteur `mfa`) et ferme ses sessions : à sa prochaine connexion il enrôle un facteur neuf.
-func (a *Administration) ResetSecondFactors(ctx context.Context, id string, event Event) error {
+// RequestAccessLink met en file un lien d'activation ou de reset, selon que le compte a déjà un mot de
+// passe. Le précédent lien, parti ou non, cesse de valoir.
+func (a *Administration) RequestAccessLink(ctx context.Context, id string, event Event) error {
 	return inTx(ctx, a.pool, func(tx pgx.Tx) error {
-		var operatorID string
+		var operatorID, status string
 
-		err := tx.QueryRow(ctx, `
-			UPDATE operators SET mfa_totp_secret = NULL, mfa_totp_last_step = NULL
-			WHERE id::text = $1 RETURNING id::text`, id).Scan(&operatorID)
+		err := tx.QueryRow(ctx, `SELECT id::text, status FROM operators WHERE id::text = $1 FOR UPDATE`, id).
+			Scan(&operatorID, &status)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrOperatorUnknown
 		}
 
 		if err != nil {
-			return fmt.Errorf("retirer l'application d'authentification : %w", err)
+			return fmt.Errorf("verrouiller l'opérateur : %w", err)
 		}
 
-		for _, cleanup := range []string{
-			`DELETE FROM mfa_recovery_codes WHERE operator_id = $1`,
-			`DELETE FROM webauthn_credentials WHERE operator_id = $1`,
-			`DELETE FROM login_attempt_counters WHERE scope = '` + ScopeSecondFactor + `' AND subject = $1::text`,
-		} {
-			if _, err = tx.Exec(ctx, cleanup, operatorID); err != nil {
-				return fmt.Errorf("réinitialiser le second facteur : %w", err)
-			}
+		if status != StatusActive {
+			return ErrOperatorDisabled
+		}
+
+		kind, err := requestLink(ctx, tx, operatorID)
+		if err != nil {
+			return err
+		}
+
+		event.TargetID = operatorID
+		event.After = NewFields().Text("kind", kind)
+
+		return record(ctx, tx, event)
+	})
+}
+
+// ResetSecondFactors disparaît avec sa route, au commit qui retire celle-ci du contrat.
+func (a *Administration) ResetSecondFactors(ctx context.Context, id string, event Event) error {
+	return inTx(ctx, a.pool, func(tx pgx.Tx) error {
+		var operatorID string
+
+		err := tx.QueryRow(ctx, `SELECT id::text FROM operators WHERE id::text = $1 FOR UPDATE`, id).Scan(&operatorID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrOperatorUnknown
+		}
+
+		if err != nil {
+			return fmt.Errorf("verrouiller l'opérateur : %w", err)
+		}
+
+		if err = clearSecondFactors(ctx, tx, operatorID); err != nil {
+			return err
 		}
 
 		if err = revokeSessions(ctx, tx, operatorID); err != nil {

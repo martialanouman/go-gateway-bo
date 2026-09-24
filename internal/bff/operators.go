@@ -44,13 +44,8 @@ func (a API) CreateOperator(ctx context.Context, request CreateOperatorRequestOb
 		return CreateOperator400JSONResponse{RequeteInvalideJSONResponse(passwordTooShort())}, nil
 	}
 
-	hash, err := auth.Hash(body.Password)
-	if err != nil {
-		return nil, err
-	}
-
 	created, err := a.Administration.CreateOperator(ctx, strings.TrimSpace(body.Email),
-		strings.TrimSpace(body.DisplayName), hash, a.event(ctx, store.Event{
+		strings.TrimSpace(body.DisplayName), a.event(ctx, store.Event{
 			OperatorID: actor, Action: actionOperatorCreate, TargetType: auditTargetOperator,
 		}))
 	if errors.Is(err, store.ErrEmailTaken) {

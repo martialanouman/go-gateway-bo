@@ -73,11 +73,14 @@ const (
 // `operators_email_lower_key` posé par 00001, donc la requête l'emprunte. L'appelant minuscule la
 // valeur lui-même, et la **même** valeur sert de clé au compteur d'échecs — une seule normalisation
 // pour les deux, sans quoi une adresse pourrait être comptée sous une clé et cherchée sous une autre.
+//
+// Un compte sans mot de passe est rendu absent : il passe par le hachage factice, donc le même refus
+// dans la même durée qu'une adresse inconnue.
 func (l *Logins) OperatorByEmail(ctx context.Context, lowerEmail string) (*Operator, error) {
 	const query = `
 		SELECT id::text, password_hash, status
 		FROM operators
-		WHERE lower(email) = $1`
+		WHERE lower(email) = $1 AND password_hash IS NOT NULL`
 
 	var operator Operator
 
