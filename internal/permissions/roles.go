@@ -9,7 +9,10 @@ import "slices"
 // partir du même catalogue ; ceux-ci sont l'image de la spécification, et le seed les y ramène à
 // chaque déploiement.
 type DefaultRole struct {
-	Name        string
+	Name string
+	// Label est le nom que l'écran montre ; Name reste la clé en base, que le seed et le bootstrap
+	// désignent.
+	Label       string
 	Description string
 	Keys        []Key
 }
@@ -51,13 +54,15 @@ const SuperAdminRole = "super_admin"
 // `tasks/steps/step-020.md`, chacun avec la phrase de la spécification qui le décide.
 var defaultRoles = []DefaultRole{
 	{
-		Name: SuperAdminRole,
+		Name:  SuperAdminRole,
+		Label: "Propriétaire",
 		Description: "Détient toutes les permissions, gestion des opérateurs et des rôles comprise — " +
 			"c'est le rôle du propriétaire du produit",
 		Keys: everyCatalogKey(),
 	},
 	{
-		Name: "ops",
+		Name:  "ops",
+		Label: "Exploitation",
 		Description: "Exploite le réseau : routage, scripts — publication en production comprise —, " +
 			"réécriture de sender, connecteurs et leurs binds (rebind compris), sessions, anti-spam, " +
 			"numéros entrants, désabonnements et alertes en écriture ; MSISDN en clair et export de " +
@@ -78,7 +83,8 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name: "script_author",
+		Name:  "script_author",
+		Label: "Scripts",
 		Description: "Écrit et modifie les scripts de routage sans pouvoir les mettre en " +
 			"production — la publication passe par ops ou super_admin",
 		Keys: []Key{
@@ -86,7 +92,8 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name: "support_readonly",
+		Name:  "support_readonly",
+		Label: "Support",
 		Description: "Investigue en lecture seule — comptes, routage, connecteurs, sessions, CDR, " +
 			"facturation et alertes, MSISDN en clair compris ; ne voit ni le code source d'un script, " +
 			"ni les règles de réécriture, ni les identifiants, ni le corps d'un message",
@@ -98,7 +105,8 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name: "billing_admin",
+		Name:  "billing_admin",
+		Label: "Finance",
 		Description: "Tient la facturation de bout en bout, rechargements et fournisseurs compris ; " +
 			"lit par ailleurs les clients, les comptes, les groupes, le routage, les connecteurs, les " +
 			"sessions et les alertes, sans voir les MSISDN en clair",
@@ -111,13 +119,15 @@ var defaultRoles = []DefaultRole{
 	},
 	{
 		Name:        "billing_readonly",
+		Label:       "Reporting",
 		Description: "Consulte les soldes, le grand livre et les plans tarifaires, et rien d'autre",
 		Keys: []Key{
 			BillingRead,
 		},
 	},
 	{
-		Name: "account_manager",
+		Name:  "account_manager",
+		Label: "Clientèle",
 		Description: "Ouvre et suit les clients — fiches, comptes SMPP, groupes, identifiants " +
 			"(création et rotation comprises) et facturation, balance_scope compris ; ne peut ni " +
 			"recharger un solde ni toucher au routage, aux connecteurs ou au fournisseur de facturation",
@@ -130,7 +140,8 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name: "compliance",
+		Name:  "compliance",
+		Label: "Conformité",
 		Description: "Conformité : lève les désabonnements, gère les numéros entrants en lecture, " +
 			"exécute un effacement RGPD et détruit la clé de chiffrement d'un contenu — le seul rôle " +
 			"par défaut à le pouvoir avec super_admin. Lit les clients, les comptes, les groupes et " +
@@ -145,7 +156,8 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name: "auditor",
+		Name:  "auditor",
+		Label: "Audit",
 		Description: "Consulte le journal d'audit, et rien d'autre — les MSISDN y restent masqués, " +
 			"les corréler davantage relève d'une élévation explicite",
 		Keys: []Key{

@@ -294,3 +294,18 @@ func missing(expected, actual []permissions.Key) []permissions.Key {
 
 	return absent
 }
+
+// L'écran des rôles montre ce libellé à la place de l'identifiant, qui reste la clé en base : court,
+// en français, et sans doublon — deux rôles au même nom à l'écran seraient indiscernables.
+func TestChaqueRoleParDefautPorteUnLibelleCourtEtUnique(t *testing.T) {
+	seen := map[string]string{}
+
+	for _, role := range permissions.DefaultRoles() {
+		require.NotEmptyf(t, role.Label, "%s n'a pas de libellé", role.Name)
+		require.NotContainsf(t, role.Label, " ", "%s : « %s » tient en plus d'un mot", role.Name, role.Label)
+
+		other, taken := seen[role.Label]
+		require.Falsef(t, taken, "« %s » nomme %s et %s", role.Label, other, role.Name)
+		seen[role.Label] = role.Name
+	}
+}
