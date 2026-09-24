@@ -5,13 +5,13 @@ Fonctionnalité: Administrer les opérateurs et les rôles
 
   Contexte:
     Étant donné une installation avec un opérateur
-    Et l'opérateur détient le rôle "super_admin"
+    Et l'opérateur détient le rôle "Propriétaire"
     Et un comparse "martin.leroy@exemple.test" sans rôle
     Et un serveur démarré
     Et l'opérateur ouvre une session élevée
 
   Scénario: sans operators:manage, la création est refusée, expliquée et tracée
-    Étant donné l'opérateur ne détient plus que le rôle "auditor"
+    Étant donné l'opérateur ne détient plus que le rôle "Audit"
     Quand l'opérateur crée l'opérateur "nadia.benali@exemple.test"
     Alors le serveur répond 403
     Et le refus nomme la permission "operators:manage"
@@ -38,13 +38,13 @@ Fonctionnalité: Administrer les opérateurs et les rôles
     Et la liste porte "martin.leroy@exemple.test" sans rôle
 
   Scénario: attribuer un rôle à un comparse
-    Quand l'opérateur attribue le rôle "auditor" au comparse
+    Quand l'opérateur attribue le rôle "Audit" au comparse
     Alors le serveur répond 200
     Et la réponse valide le contrat du BFF
     Et le journal porte 1 événement "operator.assign_roles"
 
   Scénario: se retirer operators:manage est refusé
-    Quand l'opérateur s'attribue le seul rôle "auditor"
+    Quand l'opérateur s'attribue le seul rôle "Audit"
     Alors le serveur répond 409
     Et la réponse valide le contrat du BFF
     Et l'opérateur détient toujours la permission "operators:manage"
@@ -95,10 +95,10 @@ Fonctionnalité: Administrer les opérateurs et les rôles
     Et la liste porte les neuf rôles par défaut
 
   Scénario: un rôle par défaut ne se modifie ni ne se supprime
-    Quand l'opérateur supprime le rôle "auditor"
+    Quand l'opérateur supprime le rôle "Audit"
     Alors le serveur répond 409
     Et la réponse valide le contrat du BFF
-    Quand l'opérateur accorde aussi "alerts:write" au rôle "auditor"
+    Quand l'opérateur accorde aussi "alerts:write" au rôle "Audit"
     Alors le serveur répond 409
 
   Scénario: supprimer un rôle détenu est refusé en nommant ses détenteurs

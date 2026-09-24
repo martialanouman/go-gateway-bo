@@ -14,14 +14,7 @@ import {
   Skeleton,
   useToast,
 } from '~/components/ui'
-import {
-  blockedBy,
-  operatorsQueryKey,
-  orRefusal,
-  Refusal,
-  roleLabel,
-  useRoles,
-} from '~/lib/administration'
+import { blockedBy, operatorsQueryKey, orRefusal, Refusal, useRoles } from '~/lib/administration'
 import { api, meQueryOptions } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
 import { OperatorCreation } from '~/lib/contract.gen'
@@ -122,7 +115,7 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
             cell: (operator) =>
               operator.roles.length === 0
                 ? 'Aucun rôle'
-                : operator.roles.map((role) => roleLabel(role.name)).join(', '),
+                : operator.roles.map((role) => role.name).join(', '),
           },
           {
             key: 'factor',
@@ -390,9 +383,7 @@ function AssignRoles({
                 onChange={() => toggle(role)}
                 type="checkbox"
               />
-              <span className="role-choice__name">
-                {roleLabel(role.name)} <span className="role-choice__id">{role.name}</span>
-              </span>{' '}
+              <span className="role-choice__name">{role.name}</span>{' '}
               <span className="role-choice__description">{role.description}</span>
             </label>
           ))}

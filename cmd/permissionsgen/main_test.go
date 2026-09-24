@@ -264,16 +264,3 @@ func TestTheCommittedFileIsWhatTheGeneratorProduces(t *testing.T) {
 	assert.Equal(t, renderCatalog(t), string(committed),
 		"%s diffère du catalogue — le régénérer et le commiter", committedPath)
 }
-
-// L'écran des rôles lit ces libellés : chacun des neuf rôles par défaut y figure, sous son
-// identifiant, avec le libellé du catalogue et rien d'autre.
-func TestEveryDefaultRoleLabelIsEmittedUnderItsName(t *testing.T) {
-	t.Parallel()
-
-	rendered := renderCatalog(t)
-
-	for _, role := range permissions.DefaultRoles() {
-		assert.Containsf(t, rendered, "  "+role.Name+": '"+role.Label+"',\n",
-			"le libellé de %s n'est pas émis", role.Name)
-	}
-}

@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, refusalMessage } from './api'
-import { DEFAULT_ROLE_LABELS } from './permissions.gen'
 
 export const operatorsQueryKey = ['admin', 'operators'] as const
 export const rolesQueryKey = ['admin', 'roles'] as const
@@ -8,11 +7,6 @@ export const rolesQueryKey = ['admin', 'roles'] as const
 /** Un contrôle interdit reste rendu, et porte la phrase qui dit pourquoi dans son infobulle. */
 export function blockedBy(reason: string | undefined) {
   return reason === undefined ? {} : { blockedReason: reason }
-}
-
-/** Le nom qu'un rôle montre : le libellé du catalogue pour un rôle par défaut, son nom sinon. */
-export function roleLabel(name: string) {
-  return DEFAULT_ROLE_LABELS[name] ?? name
 }
 
 /** Un refus du BFF devient l'erreur de la requête, avec la phrase qu'il a rédigée. */

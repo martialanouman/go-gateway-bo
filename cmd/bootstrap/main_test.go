@@ -75,14 +75,14 @@ func TestLaPremiereExecutionCompteCeQuElleAPose(t *testing.T) {
 
 	report(out, errOut, store.SeedOutcome{
 		PermissionsInserted: []permissions.Key{permissions.AuditRead, permissions.RolesManage},
-		RolesInserted:       []string{"auditor", "ops"},
-		GrantsAdded:         []store.Grant{{Role: "auditor", Key: permissions.AuditRead}},
+		RolesInserted:       []string{"Audit", "Exploitation"},
+		GrantsAdded:         []store.Grant{{Role: "Audit", Key: permissions.AuditRead}},
 	}, store.FirstOperatorOutcome{})
 
 	printed := out.String()
 
 	assert.Contains(t, printed, "2 permission(s)")
-	assert.Contains(t, printed, "auditor")
+	assert.Contains(t, printed, "Audit")
 	assert.Contains(t, printed, "1 attribution(s)")
 	// Le compte rendu dit **aussi** ce qui est arrivé au compte propriétaire, y compris quand rien
 	// n'est arrivé : c'est la ligne qui garantit à l'exploitant que personne n'a été créé en douce.

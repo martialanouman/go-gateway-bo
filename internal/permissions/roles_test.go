@@ -19,7 +19,7 @@ import (
 // avant de toucher à cette table : un rôle trop étroit produit une demande qu'on traite, un rôle
 // trop large accorde en silence exactement ce qu'il existe pour interdire.
 //
-// `super_admin` n'y figure pas : le §6.10 dit « toutes les permissions », donc il se dérive du
+// `Propriétaire` n'y figure pas : le §6.10 dit « toutes les permissions », donc il se dérive du
 // catalogue et se vérifie autrement — l'écrire ici demanderait de recopier les 44 clés, et cette
 // copie-là ne dirait rien de plus que le catalogue.
 var specRoles = map[string][]permissions.Key{
@@ -27,7 +27,7 @@ var specRoles = map[string][]permissions.Key{
 	// connectors:rebind), sessions, anti-spam, scripts (dont scripts:publish), réécriture, numéros
 	// entrants ; suppressions:read/write sans :delete ; alerts:read/write ; cdr:read_pii et
 	// cdr:export_bulk ; lecture seule facturation/audit »
-	"ops": {
+	"Exploitation": {
 		permissions.RoutesRead, permissions.RoutesWrite, permissions.RoutesImport,
 		permissions.ScriptsRead, permissions.ScriptsWrite, permissions.ScriptsPublish,
 		permissions.SenderRewriteRead, permissions.SenderRewriteWrite,
@@ -41,15 +41,15 @@ var specRoles = map[string][]permissions.Key{
 		permissions.BillingRead, permissions.AuditRead,
 	},
 
-	// « scripts:read/write (pas publish — revue par ops/super_admin) »
-	"script_author": {
+	// « scripts:read/write (pas publish — revue par Exploitation/Propriétaire) »
+	"Scripts": {
 		permissions.ScriptsRead, permissions.ScriptsWrite,
 	},
 
 	// « Lecture seule (comptes, routage, connecteurs, sessions, CDR/trace, facturation, alertes) +
 	// cdr:read_pii — hors secrets d'identifiants, code source de script, réécriture, et corps des
 	// messages (content:read jamais implicite) »
-	"support_readonly": {
+	"Support": {
 		permissions.CustomersRead, permissions.AccountsRead, permissions.GroupsRead,
 		permissions.RoutesRead, permissions.ConnectorsRead, permissions.SessionsRead,
 		permissions.BillingRead, permissions.AlertsRead,
@@ -57,8 +57,8 @@ var specRoles = map[string][]permissions.Key{
 	},
 
 	// « Facturation complète (billing:read/write/topup/provider:write/scope_change), lecture seule
-	// ailleurs (mêmes exclusions que support_readonly, et sans cdr:read_pii) »
-	"billing_admin": {
+	// ailleurs (mêmes exclusions que Support, et sans cdr:read_pii) »
+	"Finance": {
 		permissions.BillingRead, permissions.BillingWrite, permissions.BillingTopup,
 		permissions.BillingProviderWrite, permissions.BillingScopeChange,
 		permissions.CustomersRead, permissions.AccountsRead, permissions.GroupsRead,
@@ -67,14 +67,14 @@ var specRoles = map[string][]permissions.Key{
 	},
 
 	// « billing:read uniquement »
-	"billing_readonly": {
+	"Reporting": {
 		permissions.BillingRead,
 	},
 
 	// « customers:read/write, accounts:read/write, credentials:read/write/rotate, groups:read/write,
 	// billing:read/write/scope_change ; pas de routage/connecteur/fournisseur de facturation, pas de
 	// billing:topup »
-	"account_manager": {
+	"Clientèle": {
 		permissions.CustomersRead, permissions.CustomersWrite,
 		permissions.AccountsRead, permissions.AccountsWrite,
 		permissions.CredentialsRead, permissions.CredentialsWrite, permissions.CredentialsRotate,
@@ -84,7 +84,7 @@ var specRoles = map[string][]permissions.Key{
 
 	// « suppressions:read/write/delete, inbound:read, gdpr:erase, content:erase, lecture seule
 	// comptes/CDR, cdr:read_pii, cdr:export_bulk. […] Pas de content:read par défaut »
-	"compliance": {
+	"Conformité": {
 		permissions.SuppressionsRead, permissions.SuppressionsWrite, permissions.SuppressionsDelete,
 		permissions.InboundRead,
 		permissions.GDPRErase, permissions.ContentErase,
@@ -93,18 +93,18 @@ var specRoles = map[string][]permissions.Key{
 	},
 
 	// « audit:read uniquement — pas cdr:read_pii »
-	"auditor": {
+	"Audit": {
 		permissions.AuditRead,
 	},
 }
 
-// specRoleCount est le plancher de la table ci-dessus, `super_admin` compris. Il n'est pas
+// specRoleCount est le plancher de la table ci-dessus, `Propriétaire` compris. Il n'est pas
 // décoratif : la même forme a déjà servi dans `internal/store/base_test.go`, où un inventaire vidé
 // laissait son contrôle **vert** — il passait en n'ayant rien cherché.
 const specRoleCount = 9
 
 // deliberateOrphans sont les trois clés que le §6.10 laisse hors de tout rôle par défaut sauf
-// `super_admin`, et il dit pourquoi : `content:read` n'est jamais implicite — elle s'accorde par un
+// `Propriétaire`, et il dit pourquoi : `content:read` n'est jamais implicite — elle s'accorde par un
 // rôle taillé pour un opérateur nommé ; `operators:manage` et `roles:manage` parce que qui peut
 // éditer les rôles peut s'accorder tout le reste.
 //
@@ -121,7 +121,7 @@ func TestChaqueRoleParDefautAccordeExactementCeQueLaSpecDit(t *testing.T) {
 	t.Parallel()
 
 	require.Len(t, specRoles, specRoleCount-1,
-		"la table de vérité porte %d rôle(s) hors super_admin pour %d attendus : ce contrôle ne "+
+		"la table de vérité porte %d rôle(s) hors Propriétaire pour %d attendus : ce contrôle ne "+
 			"regarde plus les rôles que le §6.10 décrit", len(specRoles), specRoleCount-1)
 
 	granted := grantsByRole(t)
@@ -145,7 +145,7 @@ func TestChaqueRoleParDefautAccordeExactementCeQueLaSpecDit(t *testing.T) {
 	}
 }
 
-// Le §6.10 dit « toutes les permissions » : `super_admin` est donc dérivé du catalogue, et cette
+// Le §6.10 dit « toutes les permissions » : `Propriétaire` est donc dérivé du catalogue, et cette
 // égalité est ce qui le tient. Une clé ajoutée au catalogue par une release future lui revient
 // d'office — sans quoi le propriétaire du produit perdrait l'accès à ce que la release ajoute, et
 // ne pourrait même pas se l'accorder, `roles:manage` étant une de ces clés.
@@ -154,16 +154,16 @@ func TestSuperAdminEstExactementLeCatalogue(t *testing.T) {
 
 	granted := grantsByRole(t)
 
-	actual, exists := granted["super_admin"]
-	require.True(t, exists, "le rôle super_admin n'existe pas")
+	actual, exists := granted["Propriétaire"]
+	require.True(t, exists, "le rôle Propriétaire n'existe pas")
 
 	all := make([]permissions.Key, 0, len(permissions.All()))
 	for _, entry := range permissions.All() {
 		all = append(all, entry.Key)
 	}
 
-	assert.Empty(t, missing(all, actual), "super_admin n'a pas %v", missing(all, actual))
-	assert.Empty(t, missing(actual, all), "super_admin accorde %v, hors catalogue", missing(actual, all))
+	assert.Empty(t, missing(all, actual), "Propriétaire n'a pas %v", missing(all, actual))
+	assert.Empty(t, missing(actual, all), "Propriétaire accorde %v, hors catalogue", missing(actual, all))
 }
 
 func TestAucuneCleOrphelineHorsDesTroisDeliberees(t *testing.T) {
@@ -172,7 +172,7 @@ func TestAucuneCleOrphelineHorsDesTroisDeliberees(t *testing.T) {
 	held := map[permissions.Key]bool{}
 
 	for _, role := range permissions.DefaultRoles() {
-		if role.Name == "super_admin" {
+		if role.Name == "Propriétaire" {
 			continue
 		}
 
@@ -190,7 +190,7 @@ func TestAucuneCleOrphelineHorsDesTroisDeliberees(t *testing.T) {
 	}
 
 	assert.ElementsMatch(t, deliberateOrphans, orphans,
-		"les clés qu'aucun rôle par défaut ne détient hors super_admin ne sont plus les trois que le "+
+		"les clés qu'aucun rôle par défaut ne détient hors Propriétaire ne sont plus les trois que le "+
 			"§6.10 laisse orphelines délibérément : une clé orpheline par oubli est inaccessible à "+
 			"tous, sans qu'aucun écran ne le dise")
 }
@@ -293,19 +293,4 @@ func missing(expected, actual []permissions.Key) []permissions.Key {
 	}
 
 	return absent
-}
-
-// L'écran des rôles montre ce libellé à la place de l'identifiant, qui reste la clé en base : court,
-// en français, et sans doublon — deux rôles au même nom à l'écran seraient indiscernables.
-func TestChaqueRoleParDefautPorteUnLibelleCourtEtUnique(t *testing.T) {
-	seen := map[string]string{}
-
-	for _, role := range permissions.DefaultRoles() {
-		require.NotEmptyf(t, role.Label, "%s n'a pas de libellé", role.Name)
-		require.NotContainsf(t, role.Label, " ", "%s : « %s » tient en plus d'un mot", role.Name, role.Label)
-
-		other, taken := seen[role.Label]
-		require.Falsef(t, taken, "« %s » nomme %s et %s", role.Label, other, role.Name)
-		seen[role.Label] = role.Name
-	}
 }

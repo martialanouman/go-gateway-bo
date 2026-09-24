@@ -308,15 +308,3 @@ export const PERMISSIONS: readonly Permission[] = [
     description: 'Créer et modifier des rôles, c’est-à-dire redistribuer toutes les permissions',
   },
 ]
-
-export const DEFAULT_ROLE_LABELS: Readonly<Record<string, string>> = {
-  super_admin: 'Propriétaire',
-  ops: 'Exploitation',
-  script_author: 'Scripts',
-  support_readonly: 'Support',
-  billing_admin: 'Finance',
-  billing_readonly: 'Reporting',
-  account_manager: 'Clientèle',
-  compliance: 'Conformité',
-  auditor: 'Audit',
-}

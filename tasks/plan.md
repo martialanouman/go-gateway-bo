@@ -485,9 +485,9 @@ aucune step ne rencontrait ; `030` porte les écrans de step-029, coupe exécut�
 passerelle elle-même (côté `go-gateway`, voir §15).
 
 **Critères d'acceptation**
-- Table de vérité des neuf rôles vérifiée, **y compris les exclusions** : `ops` sans
-  `suppressions:delete`, `script_author` sans `scripts:publish`, `support_readonly` sans
-  `content:read`, `account_manager` sans `billing:topup`.
+- Table de vérité des neuf rôles vérifiée, **y compris les exclusions** : `Exploitation` sans
+  `suppressions:delete`, `Scripts` sans `scripts:publish`, `Support` sans
+  `content:read`, `Clientèle` sans `billing:topup`.
 - **Invariant (c)** : le test d'énumération échoue si une opération de mutation n'a ni garde de
   permission ni écriture d'audit. Il tire ses cas du **contrat** et non du routeur — mesuré en
   step-004, `chi.Walk` prouve qu'une route est montée mais n'atteint pas le slice de middlewares,
@@ -633,7 +633,7 @@ passerelle, jamais ici.
 **Critères d'acceptation**
 - Le bandeau de précédence apparaît dans les trois cas et énonce que la conformité continue de
   s'appliquer.
-- `script_author` ne peut pas publier, et l'écran explique pourquoi.
+- `Scripts` ne peut pas publier, et l'écran explique pourquoi.
 - Publier sur une portée déjà pourvue nomme le script remplacé et applique l'unicité.
 - Le réordonnancement est faisable **au clavier**.
 - Monaco n'est pas chargé sur les autres écrans — **et le chunk survit à un déploiement roulant**
@@ -678,7 +678,7 @@ conservé**.
 - Après crypto-shred, l'onglet Corps affiche **« effacé »**, pas « non stocké ».
 - Cible MSISDN : l'opt-out subsiste après effacement ; l'attestation n'est disponible qu'après
   achèvement réel du job.
-- `account_manager` ne peut pas recharger ; le changement de portée reste inerte à solde non nul.
+- `Clientèle` ne peut pas recharger ; le changement de portée reste inerte à solde non nul.
 
 ---
 

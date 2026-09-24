@@ -12,14 +12,7 @@ import {
   Modal,
   Skeleton,
 } from '~/components/ui'
-import {
-  blockedBy,
-  orRefusal,
-  Refusal,
-  roleLabel,
-  rolesQueryKey,
-  useRoles,
-} from '~/lib/administration'
+import { blockedBy, orRefusal, Refusal, rolesQueryKey, useRoles } from '~/lib/administration'
 import { api, meQueryOptions } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
 import { usePermission } from '~/lib/permissions'
@@ -107,12 +100,7 @@ function RolesTable({
         {
           key: 'name',
           header: 'Nom',
-          cell: (role) => (
-            <span className="operator-cell">
-              <span>{roleLabel(role.name)}</span>
-              {role.isDefault ? <span className="operator-cell__email">{role.name}</span> : null}
-            </span>
-          ),
+          cell: (role) => role.name,
         },
         { key: 'description', header: 'Description', cell: (role) => role.description },
         {
@@ -176,7 +164,7 @@ function RoleView({ role, onClose }: { readonly role: Role; readonly onClose: ()
       footer={<Button onClick={onClose}>Fermer</Button>}
       onClose={onClose}
       open
-      title={`Rôle ${roleLabel(role.name)}`}
+      title={`Rôle ${role.name}`}
     >
       <p>{role.description}</p>
       <ul className="role-keys">

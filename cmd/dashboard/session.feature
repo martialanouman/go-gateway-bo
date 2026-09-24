@@ -36,12 +36,12 @@ Fonctionnalité: La session, d'une requête à l'autre
     Et la réponse interdit toute mise en cache
 
   # Les deux rôles sont choisis **non emboîtés** : six clés propres à chacun, six partagées. Avec une
-  # paire emboîtée — `billing_readonly` est inclus dans `billing_admin` — ce scénario ne distinguait
+  # paire emboîtée — `Reporting` est inclus dans `Finance` — ce scénario ne distinguait
   # pas une union d'un « garder le plus fourni des deux », et restait vert sur un serveur qui ignore
   # un rôle sur deux. Mesuré en revue le 11/08/2026.
   Scénario: les permissions rendues réunissent les rôles détenus, sans répéter celles qu'ils partagent
     Étant donné une installation avec un opérateur
-    Et l'opérateur détient les rôles "billing_admin" et "account_manager"
+    Et l'opérateur détient les rôles "Finance" et "Clientèle"
     Et un serveur démarré
     Quand l'opérateur se connecte avec son mot de passe
     Et le navigateur demande "/api/auth/me"

@@ -25,7 +25,7 @@ async function visit() {
 }
 
 function row(name: string) {
-  const found = screen.getByText(name, { selector: 'span' }).closest('tr')
+  const found = screen.getByRole('cell', { name }).closest('tr')
   if (found === null) throw new Error(`aucune ligne pour ${name}`)
   return within(found)
 }

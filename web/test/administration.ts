@@ -13,7 +13,7 @@ export const SELF: Operator = {
   email: 'a.kouadio@example.test',
   displayName: 'Awa Kouadio',
   status: 'active',
-  roles: [{ id: 'role-super-admin', name: 'super_admin' }],
+  roles: [{ id: 'role-super-admin', name: 'Propriétaire' }],
   secondFactorEnrolled: true,
 }
 
@@ -28,7 +28,7 @@ export const COLLEAGUE: Operator = {
 
 export const SUPER_ADMIN: Role = {
   id: 'role-super-admin',
-  name: 'super_admin',
+  name: 'Propriétaire',
   description: 'Propriétaire : toutes les permissions.',
   isDefault: true,
   permissions: ['operators:manage', 'roles:manage'],
@@ -37,7 +37,7 @@ export const SUPER_ADMIN: Role = {
 
 export const AUDITOR: Role = {
   id: 'role-auditor',
-  name: 'auditor',
+  name: 'Audit',
   description: 'Revue conformité et sécurité.',
   isDefault: true,
   permissions: ['audit:read'],

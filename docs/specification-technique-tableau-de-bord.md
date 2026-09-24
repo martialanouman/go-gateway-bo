@@ -110,8 +110,10 @@ permissions                          -- fixed catalog, seeded/versioned with rel
 
 roles
   id (uuidv7, pk)
-  name                   (unique, e.g. super_admin, ops, support_readonly, billing_admin, billing_readonly,
-                          script_author, account_manager, compliance, auditor)
+  name                   (unique, e.g. Propriétaire, Exploitation, Support, Finance, Reporting,
+                          Scripts, Clientèle, Conformité, Audit)
+                         -- (Amendement step-030) noms français d'un mot, comme ceux composés à
+                         -- l'écran ; migration 00010 pour les bases existantes
   description
   is_default (bool), created_by (nullable), created_at
 
@@ -576,17 +578,17 @@ Autorisation **basée sur les permissions** : chaque action protégée correspon
 
 | Rôle | Cas d'usage | Portée |
 |---|---|---|
-| `super_admin` | Propriétaire | Toutes les permissions, y compris `operators:manage`/`roles:manage` |
-| `ops` | Exploitation réseau | Lecture/écriture routage (dont numéros exacts, `routes:import`), connecteurs (**dont `connectors:rebind`**), sessions, anti-spam, scripts (**dont `scripts:publish`**), réécriture, numéros entrants ; `suppressions:read/write` **sans `:delete`** ; `alerts:read/write` ; `cdr:read_pii` et `cdr:export_bulk` ; lecture seule facturation/audit |
-| `script_author` | Ingénieurs scripts | `scripts:read/write` (pas `publish` — revue par `ops`/`super_admin`) |
-| `support_readonly` | Support L1 | Lecture seule (comptes, routage, connecteurs, sessions, CDR/trace, facturation, alertes) + `cdr:read_pii` — **hors** secrets d'identifiants, code source de script, réécriture, et **corps des messages** (`content:read` jamais implicite) |
-| `billing_admin` | Finance | Facturation complète (`billing:read/write/topup/provider:write/scope_change`), lecture seule ailleurs (mêmes exclusions que `support_readonly`, et sans `cdr:read_pii`) |
-| `billing_readonly` | Reporting finance | `billing:read` uniquement |
-| `account_manager` | Onboarding client | `customers:read/write`, `accounts:read/write`, `credentials:read/write/rotate`, `groups:read/write`, `billing:read/write/scope_change` ; pas de routage/connecteur/fournisseur de facturation, pas de `billing:topup` |
-| `compliance` | Conformité / juridique | `suppressions:read/write/delete`, `inbound:read`, `gdpr:erase`, **`content:erase`**, lecture seule comptes/CDR, `cdr:read_pii`, `cdr:export_bulk`. Seul rôle par défaut habilité à **lever** un désabonnement et à **exécuter un effacement RGPD**. Pas de `content:read` par défaut |
-| `auditor` | Revue conformité/sécurité | `audit:read` uniquement — **pas** `cdr:read_pii` : une ligne d'audit se corrèle avec un numéro masqué, et davantage relève d'une élévation explicite |
+| `Propriétaire` | Propriétaire | Toutes les permissions, y compris `operators:manage`/`roles:manage` |
+| `Exploitation` | Exploitation réseau | Lecture/écriture routage (dont numéros exacts, `routes:import`), connecteurs (**dont `connectors:rebind`**), sessions, anti-spam, scripts (**dont `scripts:publish`**), réécriture, numéros entrants ; `suppressions:read/write` **sans `:delete`** ; `alerts:read/write` ; `cdr:read_pii` et `cdr:export_bulk` ; lecture seule facturation/audit |
+| `Scripts` | Ingénieurs scripts | `scripts:read/write` (pas `publish` — revue par `Exploitation`/`Propriétaire`) |
+| `Support` | Support L1 | Lecture seule (comptes, routage, connecteurs, sessions, CDR/trace, facturation, alertes) + `cdr:read_pii` — **hors** secrets d'identifiants, code source de script, réécriture, et **corps des messages** (`content:read` jamais implicite) |
+| `Finance` | Finance | Facturation complète (`billing:read/write/topup/provider:write/scope_change`), lecture seule ailleurs (mêmes exclusions que `Support`, et sans `cdr:read_pii`) |
+| `Reporting` | Reporting finance | `billing:read` uniquement |
+| `Clientèle` | Onboarding client | `customers:read/write`, `accounts:read/write`, `credentials:read/write/rotate`, `groups:read/write`, `billing:read/write/scope_change` ; pas de routage/connecteur/fournisseur de facturation, pas de `billing:topup` |
+| `Conformité` | Conformité / juridique | `suppressions:read/write/delete`, `inbound:read`, `gdpr:erase`, **`content:erase`**, lecture seule comptes/CDR, `cdr:read_pii`, `cdr:export_bulk`. Seul rôle par défaut habilité à **lever** un désabonnement et à **exécuter un effacement RGPD**. Pas de `content:read` par défaut |
+| `Audit` | Revue conformité/sécurité | `audit:read` uniquement — **pas** `cdr:read_pii` : une ligne d'audit se corrèle avec un numéro masqué, et davantage relève d'une élévation explicite |
 
-**Trois clés ne sont détenues par aucun rôle par défaut hors `super_admin`, délibérément** : `content:read` (jamais
+**Trois clés ne sont détenues par aucun rôle par défaut hors `Propriétaire`, délibérément** : `content:read` (jamais
 implicite — accordée par un rôle taillé pour un opérateur nommé), `operators:manage` et
 `roles:manage` (qui peut éditer les rôles peut s'accorder tout le reste). Toute autre clé orpheline
 est un oubli, et un test bloquant le signale. *(Amendement step-020 : `connectors:read/write/rebind`
@@ -668,7 +670,7 @@ Deux niveaux (`content:read` pour lire un corps ; `content:erase` et `gdpr:erase
 | Solde MT et compteur MO présentés comme deux objets différents | Empêche le malentendu « le MO bloque comme le MT » ; l'UI le rend explicite (le MT bloque à zéro, le MO monte et ne bloque rien). |
 | Lecture de contenu derrière `content:read` (hors lecture seule, auditée) + dégradation propre | Le corps (OTP/PII) est la lecture la plus sensible ; jamais implicite, chaque accès tracé, états explicites plutôt qu'un blanc. |
 | Effacement RGPD avec choix de cible (client vs personne) | Un droit à l'oubli exécutable et prouvable ; l'UI expose les deux cibles et leurs conséquences plutôt qu'un bouton unique trompeur. |
-| `suppressions:delete` séparée + rôle `compliance` | Réautoriser un désabonné est l'acte à risque juridique ; réservé à un rôle dédié, pas à l'exploitation courante. |
+| `suppressions:delete` séparée + rôle `Conformité` | Réautoriser un désabonné est l'acte à risque juridique ; réservé à un rôle dédié, pas à l'exploitation courante. |
 | Bandeau de priorité sur le routage exact | Empêche de croire qu'une route « directe » contourne la conformité ; le court-circuit ne saute que la résolution. |
 | Éditeur Monaco intégré avec test/validation | Itération rapide sans cycle de déploiement ; mitigé par RBAC et garanties de bac à sable côté passerelle. |
 | Autorisation fine (permissions) vs rôles fixes | Supporte des organisations hors des préréglages sans changement de code ; coûte plus de modélisation en amont. |
@@ -685,6 +687,6 @@ Deux niveaux (`content:read` pour lire un corps ; `content:erase` et `gdpr:erase
 
 La fonctionnalité distinctive est de rassembler des workflows normalement séparés — configuration de route déclarative, développement de script de routage, observabilité de trafic/session en direct, conformité (opt-out, autorisation d'expéditeur, effacement RGPD) — en une seule surface : un opérateur peut observer une anomalie, creuser dans le CDR Explorer, ouvrir la route responsable, et sauter dans l'éditeur Monaco pour écrire/tester/publier un script, sans quitter le tableau de bord ni attendre un déploiement, tandis que la santé par script boucle la boucle.
 
-Cette boucle s'étend à la facturation et au traçage : chaque message porte un ID de trace et, s'il est facturable, une décision de facturation ; un opérateur peut aller d'une anomalie à la cascade de spans complète, à voir si une réservation a été rejetée — dans un seul outil. Le modèle de permission rend cette visibilité large sans risque : un `support_readonly` obtient la même profondeur d'investigation qu'un `super_admin`, sans capacité de changement, et sans jamais voir un secret d'identifiant ni le **corps d'un message** auquel il n'a pas explicitement droit.
+Cette boucle s'étend à la facturation et au traçage : chaque message porte un ID de trace et, s'il est facturable, une décision de facturation ; un opérateur peut aller d'une anomalie à la cascade de spans complète, à voir si une réservation a été rejetée — dans un seul outil. Le modèle de permission rend cette visibilité large sans risque : un `Support` obtient la même profondeur d’investigation qu’un `Propriétaire`, sans capacité de changement, et sans jamais voir un secret d'identifiant ni le **corps d'un message** auquel il n'a pas explicitement droit.
 
 La **stratification de la fiabilité d'alerting** fait que les signaux d'infrastructure sont évalués et notifiés indépendamment de la disponibilité du tableau de bord, tandis que les alertes métier reposent sur une source durable à offset persisté — le tableau de bord reste où l'on configure et consulte, sans être un point de défaillance unique pour la détection. La topologie HA multi-instance ferme le dernier SPOF : la fiabilité de l'outil d'exploitation n'est pas inférieure à celle du système qu'il supervise.

@@ -140,25 +140,6 @@ func render(entries []permissions.Entry, categories []permissions.Category) ([]b
 
 	out.WriteString("]\n")
 
-	return writeRoleLabels(&out, permissions.DefaultRoles())
-}
-
-// writeRoleLabels émet le nom que l'écran montre pour chaque rôle par défaut, sous l'identifiant que
-// la base porte. Un rôle personnalisé n'y figure pas : son nom est déjà celui qu'un humain a choisi.
-func writeRoleLabels(out *strings.Builder, roles []permissions.DefaultRole) ([]byte, error) {
-	out.WriteString("\nexport const DEFAULT_ROLE_LABELS: Readonly<Record<string, string>> = {\n")
-
-	for _, role := range roles {
-		if strings.ContainsAny(role.Label, forbiddenInLiteral) {
-			return nil, fmt.Errorf("le libellé de %s porte un caractère qu'un littéral TypeScript ne "+
-				"porte pas tel quel", role.Name)
-		}
-
-		fmt.Fprintf(out, "  %s: '%s',\n", role.Name, role.Label)
-	}
-
-	out.WriteString("}\n")
-
 	return []byte(out.String()), nil
 }
 

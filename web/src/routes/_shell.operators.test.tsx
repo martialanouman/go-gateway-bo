@@ -142,7 +142,7 @@ describe('l’écran des opérateurs', () => {
 
     await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Modifier les rôles' }))
     const dialog = await screen.findByRole('dialog', { name: `Rôles de ${COLLEAGUE.displayName}` })
-    await user.click(await within(dialog).findByRole('checkbox', { name: /auditor/ }))
+    await user.click(await within(dialog).findByRole('checkbox', { name: /Audit/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer les rôles' }))
 
     expect(await row(COLLEAGUE.email).findByText('Audit')).toBeInTheDocument()
@@ -375,7 +375,7 @@ describe('l’écran des opérateurs', () => {
 
     await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Modifier les rôles' }))
     const dialog = await screen.findByRole('dialog', { name: `Rôles de ${COLLEAGUE.displayName}` })
-    await within(dialog).findByRole('checkbox', { name: /auditor/ })
+    await within(dialog).findByRole('checkbox', { name: /Audit/ })
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer les rôles' }))
 
     expect(await within(dialog).findByText('Rien n’a été changé.')).toBeInTheDocument()
