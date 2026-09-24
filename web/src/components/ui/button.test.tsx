@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Button } from './button'
@@ -145,6 +145,40 @@ describe('Button', () => {
     expect(button).toHaveFocus()
 
     await user.click(button)
+    expect(onClick).not.toHaveBeenCalled()
+  })
+})
+
+describe('un bouton interdit par une raison', () => {
+  it('reste dans le parcours clavier, désactivé, et porte sa raison comme description', () => {
+    render(
+      <Button blockedReason="Le compte de la session ne se désactive pas ici.">Désactiver</Button>,
+    )
+
+    const button = screen.getByRole('button', { name: 'Désactiver' })
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    expect(button).toHaveAccessibleDescription('Le compte de la session ne se désactive pas ici.')
+  })
+
+  it('montre sa raison dans une infobulle au focus clavier, sans rien déclencher au clic', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    render(
+      <Button blockedReason="Réinitialisation sans objet." onClick={onClick}>
+        Réinitialiser
+      </Button>,
+    )
+
+    await user.tab()
+    // La bulle n'a pas de rôle `tooltip` : Base UI n'en pose aucun, et la raison est déjà annoncée par
+    // `aria-describedby`. Ce qu'on vérifie ici est ce qu'un voyant lit.
+    await waitFor(() =>
+      expect(document.querySelector('.ui-tooltip')).toHaveTextContent(
+        'Réinitialisation sans objet.',
+      ),
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Réinitialiser' }))
     expect(onClick).not.toHaveBeenCalled()
   })
 })

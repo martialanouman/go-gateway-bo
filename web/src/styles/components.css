@@ -680,3 +680,28 @@
 .ui-table__row:hover .ui-table__cell {
   background: var(--surface-hover);
 }
+
+/*
+ * L'infobulle d'un contrôle interdit : couche flottante, donc la seule ici à porter une ombre.
+ */
+.ui-tooltip {
+  max-width: 320px;
+  padding: var(--sp-4) var(--sp-6);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-3);
+  color: var(--text-primary);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lu par les technologies d'assistance, invisible à l'écran : la description d'un contrôle interdit. */
+.ui-visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
