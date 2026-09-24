@@ -497,7 +497,7 @@ func presentedFactorIsWellFormed(request TotpEnrollmentRequest) bool {
 // d'horloge appartient à l'écran qui présente un code TOTP (`web/src/lib/second-factor.ts`).
 func refusedSecondFactor() Error {
 	return Error{
-		Code: "invalid_second_factor",
+		Code:    "invalid_second_factor",
 		Message: "Second facteur refusé. Réessayez, ou recommencez la connexion.",
 	}
 }
