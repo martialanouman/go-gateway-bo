@@ -1,7 +1,7 @@
 # step-039 — Les facteurs de son propre compte
 
 > **Jalon :** M1 (§6.9) · **Statut :** À FAIRE
-> **Dépend de :** step-028, step-030 · **Bloque :** — (clôt M1)
+> **Dépend de :** step-028, step-030, step-050 · **Bloque :** — (clôt M1)
 
 ## But
 Ce qu'un opérateur fait de ses propres seconds facteurs une fois entré : les voir, en ajouter, en
@@ -32,4 +32,4 @@ le compte de la session, pas sur l'administration des autres.*
       `plan.md` §6 est vérifié plutôt que déclaré.
 
 ## Hors périmètre
-La réinitialisation par un administrateur (livrée en step-029, écran en step-030).
+La réinitialisation par un administrateur : le lien de reset de step-050.
