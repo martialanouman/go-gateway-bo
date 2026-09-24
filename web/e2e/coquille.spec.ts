@@ -431,6 +431,34 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   )
   await page.emulateMedia({ reducedMotion: null })
 
+  // step-030 : le premier administrateur fait entrer un second opérateur, sans toucher à la base.
+  await page.goto('/operators')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Opérateurs')
+  await page.getByRole('button', { name: 'Nouvel opérateur' }).click()
+  const creation = page.getByRole('dialog', { name: 'Nouvel opérateur' })
+  const recrue = { email: 'recrue@example.test', password: 'un mot de passe de recrue' }
+  await creation.getByLabel('Adresse e-mail').fill(recrue.email)
+  await creation.getByLabel('Nom affiché').fill('Recrue de parcours')
+  await creation.getByLabel('Mot de passe').fill(recrue.password)
+  await creation.getByRole('button', { name: 'Créer l’opérateur' }).click()
+
+  const ligne = page.getByRole('row', { name: new RegExp(recrue.email) })
+  await expect(ligne).toContainText('Aucun rôle')
+  await ligne.getByRole('button', { name: 'Modifier les rôles' }).click()
+  const attribution = page.getByRole('dialog', { name: 'Rôles de Recrue de parcours' })
+  await attribution.getByRole('checkbox', { name: /Audit/ }).check()
+  await attribution.getByRole('button', { name: 'Enregistrer les rôles' }).click()
+  await expect(ligne).toContainText('Audit')
+
+  await page.getByRole('banner').getByRole('button', { name: 'Se déconnecter' }).click()
+  await page.getByRole('link', { name: 'Se connecter' }).click()
+  await expect(page).toHaveURL(/\/login/)
+  await page.getByLabel(/E-mail/).fill(recrue.email)
+  await page.getByLabel('Mot de passe').fill(recrue.password)
+  await page.getByRole('button', { name: 'Se connecter' }).click()
+  // Il entre, et c'est l'enrôlement qui l'accueille : un compte créé n'a encore aucun facteur.
+  await expect(page).toHaveURL(/\/enroll/)
+
   expect(problems).toEqual([])
 })
 

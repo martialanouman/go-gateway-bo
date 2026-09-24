@@ -1,20 +1,27 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { PendingScreen } from '~/components/pending-screen'
 import { createAppRouter } from '~/router'
 import { stubSession } from '../../test/session'
 import { NAV_ENTRIES, NAV_GROUPS, type NavPath, navEntry } from './navigation'
 
 describe('la table de navigation', () => {
-  it('reprend les cinq groupes et quinze entrées de la charte', () => {
+  it('reprend les cinq groupes de la charte, plus l’administration', () => {
     expect(NAV_GROUPS.map((group) => group.label)).toEqual([
       'Exploitation',
       'Clients',
       'Routage',
       'Conformité',
       'Facturation',
+      'Administration',
     ])
-    expect(NAV_ENTRIES).toHaveLength(15)
+    expect(NAV_ENTRIES).toHaveLength(17)
+  })
+
+  it('ouvre chaque écran d’administration sur sa seule clé', () => {
+    expect(navEntry('/operators').anyOf).toEqual(['operators:manage'])
+    expect(navEntry('/roles').anyOf).toEqual(['roles:manage'])
   })
 
   it('déclare une route par entrée, et aucune route d’écran hors de la table', () => {
@@ -39,7 +46,11 @@ describe('la table de navigation', () => {
 })
 
 describe('chaque route non livrée', () => {
-  it.each(NAV_ENTRIES)('$to nomme le jalon $milestone', async ({ to, label, milestone }) => {
+  const pending = NAV_ENTRIES.flatMap(({ milestone, ...entry }) =>
+    milestone === undefined ? [] : [{ ...entry, milestone }],
+  )
+
+  it.each(pending)('$to nomme le jalon $milestone', async ({ to, label, milestone }) => {
     stubSession({ permissions: [] })
     const router = createAppRouter(createMemoryHistory({ initialEntries: [to] }))
     render(<RouterProvider router={router} />)
@@ -47,5 +58,11 @@ describe('chaque route non livrée', () => {
     const heading = await screen.findByRole('heading', { level: 1 })
     expect(heading).toHaveTextContent(label)
     expect(screen.getByText(new RegExp(`jalon ${milestone} `))).toBeInTheDocument()
+  })
+})
+
+describe('l’écran d’attente', () => {
+  it('refuse d’annoncer en attente un écran livré', () => {
+    expect(() => render(<PendingScreen to="/operators" />)).toThrow('/operators est livré')
   })
 })

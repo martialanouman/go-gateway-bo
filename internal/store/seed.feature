@@ -44,10 +44,10 @@ Fonctionnalité: Le vocabulaire de l'autorisation est semé depuis le catalogue 
   Scénario: une attribution ajoutée à la main sur un rôle par défaut est révoquée
     Étant donné une base migrée
     Et le seed déjà joué
-    Et "content:read" accordée à la main au rôle "auditor"
+    Et "content:read" accordée à la main au rôle "Audit"
     Quand le seed est rejoué
-    Alors le rapport révoque "content:read" du rôle "auditor"
-    Et le rôle "auditor" n'accorde plus "content:read"
+    Alors le rapport révoque "content:read" du rôle "Audit"
+    Et le rôle "Audit" n'accorde plus "content:read"
 
   Scénario: un rôle créé depuis l'interface n'est pas touché par le seed
     Étant donné une base migrée
@@ -62,8 +62,8 @@ Fonctionnalité: Le vocabulaire de l'autorisation est semé depuis le catalogue 
   Scénario: un rôle personnalisé homonyme d'un rôle par défaut fait refuser le seed
     Étant donné une base migrée
     Et le seed déjà joué
-    Et le rôle par défaut "ops" absent, comme avant la release qui l'ajoute
-    Et un rôle personnalisé "ops" qui accorde "sessions:disconnect"
+    Et le rôle par défaut "Exploitation" absent, comme avant la release qui l'ajoute
+    Et un rôle personnalisé "Exploitation" qui accorde "sessions:disconnect"
     Quand le seed est joué malgré la collision
-    Alors le seed refuse en nommant "ops"
-    Et le rôle "ops" accorde toujours "sessions:disconnect"
+    Alors le seed refuse en nommant "Exploitation"
+    Et le rôle "Exploitation" accorde toujours "sessions:disconnect"

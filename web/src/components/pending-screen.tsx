@@ -7,6 +7,7 @@ import { MILESTONES, type NavPath, navEntry } from '~/lib/navigation'
  */
 export function PendingScreen({ to }: { readonly to: NavPath }) {
   const { label, milestone } = navEntry(to)
+  if (milestone === undefined) throw new Error(`${to} est livré : il n'a pas d'écran d'attente`)
 
   return (
     <div className="page">

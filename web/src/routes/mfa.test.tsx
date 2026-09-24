@@ -100,11 +100,11 @@ describe('le challenge TOTP', () => {
     await user.click(screen.getByRole('button', { name: 'Vérifier' }))
 
     const refus = await screen.findByRole('alert')
-    // Le refus du serveur, mot pour mot…
-    expect(refus).toHaveTextContent('Ce second facteur n’a pas été accepté')
-    // …et l'indice que step-035 lui a retiré, parce qu'il servait aussi la clé d'accès. Cet
-    // écran-ci sait qu'il présente un code TOTP : lui seul peut le dire sans mentir.
-    expect(refus).toHaveTextContent(/heure/i)
+    // Cet écran-ci sait qu'il présente un code TOTP : il le dit en une phrase courte, avec l'indice
+    // d'horloge que le serveur ne peut pas donner, puisque son refus sert aussi la clé d'accès.
+    expect(refus).toHaveTextContent(
+      'Code refusé. Vérifiez-le et réessayez ; si le refus persiste, l’heure du téléphone est peut-être décalée de plus d’une minute.',
+    )
   })
 })
 
@@ -587,12 +587,12 @@ describe('le refus serveur et ce qu’il décrit', () => {
 
     await user.type(code(), '123456')
     await user.click(screen.getByRole('button', { name: 'Vérifier' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('n’a pas été accepté')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Code refusé')
 
     await user.clear(code())
     await user.click(screen.getByRole('button', { name: 'Vérifier' }))
 
-    expect(screen.queryByText(/n’a pas été accepté/)).toBeNull()
+    expect(screen.queryByText(/Code refusé/)).toBeNull()
     expect(code()).toHaveAttribute('aria-invalid', 'true')
 
     await user.type(code(), '6')

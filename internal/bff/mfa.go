@@ -494,13 +494,11 @@ func presentedFactorIsWellFormed(request TotpEnrollmentRequest) bool {
 // pas dans le geste de qui vient de présenter une clé d'accès.
 //
 // Une copie qui vaut pour trois chemins ne peut nommer que ce qui leur est commun. L'indice de dérive
-// d'horloge n'a donc plus de porteur aujourd'hui : il appartient à l'écran qui présente un code TOTP,
-// et sa fiche — step-027 — porte l'obligation de le rendre.
+// d'horloge appartient à l'écran qui présente un code TOTP (`web/src/lib/second-factor.ts`).
 func refusedSecondFactor() Error {
 	return Error{
-		Code: "invalid_second_factor",
-		Message: "Ce second facteur n'a pas été accepté. Le présenter à nouveau, ou reprendre la " +
-			"connexion depuis le début.",
+		Code:    "invalid_second_factor",
+		Message: "Second facteur refusé. Réessayez, ou recommencez la connexion.",
 	}
 }
 

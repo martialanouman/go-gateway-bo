@@ -1,5 +1,6 @@
 import { Button as BaseButton } from '@base-ui/react/button'
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import { Tooltip } from '@base-ui/react/tooltip'
+import { type ComponentPropsWithoutRef, type ReactNode, useId } from 'react'
 
 /**
  * Le bouton du produit.
@@ -43,7 +44,17 @@ export type ButtonProps = Omit<
   readonly loading?: boolean
   readonly children?: ReactNode
 } & (
-    | { readonly blocked?: false }
+    | { readonly blocked?: false; readonly blockedReason?: undefined }
+    | {
+        /**
+         * Action interdite, et la phrase qui dit pourquoi : le bouton porte lui-même son
+         * explication. Elle s'affiche dans une infobulle au survol et au focus clavier, et reste
+         * reliée par `aria-describedby` à un texte toujours présent — la bulle, elle, n'existe que
+         * pendant qu'elle est ouverte.
+         */
+        readonly blockedReason: string
+        readonly blocked?: undefined
+      }
     | {
         /**
          * Action **interdite pour l'instant**, dont l'existence doit rester visible.
@@ -59,6 +70,7 @@ export type ButtonProps = Omit<
          */
         readonly blocked: true
         readonly 'aria-describedby': string
+        readonly blockedReason?: undefined
       }
   )
 
@@ -67,6 +79,7 @@ export function Button({
   size = 'md',
   loading = false,
   blocked = false,
+  blockedReason,
   disabled = false,
   type = 'button',
   className,
@@ -86,6 +99,36 @@ export function Button({
   ]
     .filter(Boolean)
     .join(' ')
+
+  const reasonId = useId()
+
+  if (blockedReason !== undefined) {
+    return (
+      <Tooltip.Root>
+        <Tooltip.Trigger
+          render={
+            <BaseButton
+              aria-describedby={reasonId}
+              aria-disabled
+              className={classes}
+              onClick={(event) => event.preventDefault()}
+              type={type}
+            />
+          }
+        >
+          {children}
+        </Tooltip.Trigger>
+        <span className="ui-visually-hidden" id={reasonId}>
+          {blockedReason}
+        </span>
+        <Tooltip.Portal>
+          <Tooltip.Positioner sideOffset={6}>
+            <Tooltip.Popup className="ui-tooltip">{blockedReason}</Tooltip.Popup>
+          </Tooltip.Positioner>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    )
+  }
 
   return (
     <BaseButton

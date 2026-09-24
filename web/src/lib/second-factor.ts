@@ -23,31 +23,22 @@ export const totpAttempt = z.object({
 })
 
 /**
- * L'indice que `step-035` a retiré du serveur.
- *
- * `invalid_second_factor` sert les trois méthodes — TOTP, code de récupération, clé d'accès — et
- * disait « vérifier l'heure de l'application d'authentification » à qui venait de présenter une
- * clé. Le serveur ne le dit donc plus. **Un écran, lui, sait quelle méthode il présente**, et c'est
- * ce qui lui permet de le dire sans mentir : sans cette reprise, un opérateur dont le téléphone a
- * dérivé n'a plus aucune piste.
+ * Le refus d'un code TOTP, rédigé **ici** et non repris du serveur. `invalid_second_factor` sert les
+ * trois méthodes, donc le serveur ne peut ni dire « code » ni parler d'horloge ; cet écran sait qu'il
+ * présente un code, et c'est la seule piste d'un opérateur dont le téléphone a dérivé.
  */
-const CLOCK_HINT =
-  'Si le code est refusé plusieurs fois de suite, vérifiez l’heure de l’application d’authentification : le serveur tolère environ une minute d’écart, et refuse les codes au-delà.'
+const REFUSED_CODE =
+  'Code refusé. Vérifiez-le et réessayez ; si le refus persiste, l’heure du téléphone est peut-être décalée de plus d’une minute.'
 
 export const CHALLENGE_LOST =
   'Cette vérification a expiré : ce que la connexion avait ouvert n’est plus en mémoire. Recommencez la connexion.'
 
 /**
- * Le message rendu à l'opérateur, pris **du serveur**, augmenté de ce que le serveur ne peut pas
- * dire.
+ * Le message rendu à l'opérateur, pris **du serveur** sauf pour un code TOTP refusé.
  *
- * Le BFF rédige ses refus en français et ne nomme pas laquelle des cinq causes s'applique — les
- * distinguer dirait à une machine où elle en est.
- *
- * L'indice d'horloge n'est ajouté **que** sur le chemin TOTP, et sur la seule cause qui s'y prête :
- * ajouté partout, il redeviendrait ce que step-035 a retiré. Conditionné à la méthode seule, il se
- * collait aussi au verrouillage et à la panne — « réessayez dans cinq minutes » suivi de « vérifiez
- * l'heure de votre téléphone », qui n'y est pour rien.
+ * La substitution ne vaut **que** sur le chemin TOTP et sur la seule cause qui s'y prête : le
+ * verrouillage et la panne gardent la phrase du serveur, qui porte la durée restante ou la réalité
+ * HTTP — l'heure du téléphone n'y est pour rien.
  */
 export function verificationRefusal(error: unknown, status: number, method: 'totp' | 'webauthn') {
   const fromServer = refusalMessage(
@@ -57,5 +48,5 @@ export function verificationRefusal(error: unknown, status: number, method: 'tot
 
   if (method !== 'totp' || refusalCode(error) !== 'invalid_second_factor') return fromServer
 
-  return `${fromServer} ${CLOCK_HINT}`
+  return REFUSED_CODE
 }

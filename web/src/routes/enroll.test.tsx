@@ -395,8 +395,8 @@ describe('l’enrôlement d’une application d’authentification', () => {
     await user.click(screen.getByRole('button', { name: 'Vérifier' }))
 
     const refus = await screen.findByRole('alert')
-    expect(refus).toHaveTextContent('Ce second facteur n’a pas été accepté')
-    expect(refus).toHaveTextContent(/heure/i)
+    expect(refus).toHaveTextContent(/^Code refusé\./)
+    expect(refus).toHaveTextContent(/heure du téléphone/)
     // Et les codes restent invisibles : le facteur n'a rien prouvé.
     expect(screen.queryByText(RECOVERY_CODES[0] ?? '')).toBeNull()
   })

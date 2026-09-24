@@ -33,21 +33,21 @@ func DefaultRoles() []DefaultRole {
 // `store.CreateFirstOperator` doit l'attacher au premier compte : le citer en littéral des deux côtés
 // ferait qu'un renommage ici laisserait la commande d'installation chercher un rôle qui n'existe
 // plus, et livrer un compte qui n'accorde rien.
-const SuperAdminRole = "super_admin"
+const SuperAdminRole = "Propriétaire"
 
 // defaultRoles est la politique elle-même, **écrite à la main d'après le §6.10**, et sa fidélité est
 // tenue par `roles_test.go`, dont la table de vérité est transcrite depuis la spécification et non
-// dérivée d'ici. Les exclusions portent le sens autant que les inclusions — `ops` sans
-// `suppressions:delete`, `script_author` sans `scripts:publish`, `support_readonly` sans
-// `content:read`, `account_manager` sans `billing:topup`, `auditor` sans `cdr:read_pii` — et une
+// dérivée d'ici. Les exclusions portent le sens autant que les inclusions — `Exploitation` sans
+// `suppressions:delete`, `Scripts` sans `scripts:publish`, `Support` sans
+// `content:read`, `Clientèle` sans `billing:topup`, `Audit` sans `cdr:read_pii` — et une
 // exclusion oubliée n'a aucun symptôme visible : elle accorde, en silence, exactement ce que le rôle
 // existe pour interdire.
 //
-// Trois clés n'appartiennent à aucun rôle sauf `super_admin`, délibérément : `content:read`,
+// Trois clés n'appartiennent à aucun rôle sauf `Propriétaire`, délibérément : `content:read`,
 // `operators:manage` et `roles:manage`. Toute autre clé orpheline est un oubli, et le test le dit.
 //
 // Les arbitrages que la prose du §6.10 ne tranche pas mécaniquement — `sessions:disconnect` pour
-// `ops`, `credentials:read` refusé à `support_readonly` — sont écrits dans DN-3 de
+// `Exploitation`, `credentials:read` refusé à `Support` — sont écrits dans DN-3 de
 // `tasks/steps/step-020.md`, chacun avec la phrase de la spécification qui le décide.
 var defaultRoles = []DefaultRole{
 	{
@@ -57,7 +57,7 @@ var defaultRoles = []DefaultRole{
 		Keys: everyCatalogKey(),
 	},
 	{
-		Name: "ops",
+		Name: "Exploitation",
 		Description: "Exploite le réseau : routage, scripts — publication en production comprise —, " +
 			"réécriture de sender, connecteurs et leurs binds (rebind compris), sessions, anti-spam, " +
 			"numéros entrants, désabonnements et alertes en écriture ; MSISDN en clair et export de " +
@@ -78,15 +78,15 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name: "script_author",
+		Name: "Scripts",
 		Description: "Écrit et modifie les scripts de routage sans pouvoir les mettre en " +
-			"production — la publication passe par ops ou super_admin",
+			"production — la publication passe par Exploitation ou Propriétaire",
 		Keys: []Key{
 			ScriptsRead, ScriptsWrite,
 		},
 	},
 	{
-		Name: "support_readonly",
+		Name: "Support",
 		Description: "Investigue en lecture seule — comptes, routage, connecteurs, sessions, CDR, " +
 			"facturation et alertes, MSISDN en clair compris ; ne voit ni le code source d'un script, " +
 			"ni les règles de réécriture, ni les identifiants, ni le corps d'un message",
@@ -98,7 +98,7 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name: "billing_admin",
+		Name: "Finance",
 		Description: "Tient la facturation de bout en bout, rechargements et fournisseurs compris ; " +
 			"lit par ailleurs les clients, les comptes, les groupes, le routage, les connecteurs, les " +
 			"sessions et les alertes, sans voir les MSISDN en clair",
@@ -110,14 +110,14 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name:        "billing_readonly",
+		Name:        "Reporting",
 		Description: "Consulte les soldes, le grand livre et les plans tarifaires, et rien d'autre",
 		Keys: []Key{
 			BillingRead,
 		},
 	},
 	{
-		Name: "account_manager",
+		Name: "Clientèle",
 		Description: "Ouvre et suit les clients — fiches, comptes SMPP, groupes, identifiants " +
 			"(création et rotation comprises) et facturation, balance_scope compris ; ne peut ni " +
 			"recharger un solde ni toucher au routage, aux connecteurs ou au fournisseur de facturation",
@@ -130,10 +130,10 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name: "compliance",
+		Name: "Conformité",
 		Description: "Conformité : lève les désabonnements, gère les numéros entrants en lecture, " +
 			"exécute un effacement RGPD et détruit la clé de chiffrement d'un contenu — le seul rôle " +
-			"par défaut à le pouvoir avec super_admin. Lit les clients, les comptes, les groupes et " +
+			"par défaut à le pouvoir avec Propriétaire. Lit les clients, les comptes, les groupes et " +
 			"les CDR, MSISDN en clair et export de masse compris, sans jamais afficher le corps d'un " +
 			"message",
 		Keys: []Key{
@@ -145,7 +145,7 @@ var defaultRoles = []DefaultRole{
 		},
 	},
 	{
-		Name: "auditor",
+		Name: "Audit",
 		Description: "Consulte le journal d'audit, et rien d'autre — les MSISDN y restent masqués, " +
 			"les corréler davantage relève d'une élévation explicite",
 		Keys: []Key{
@@ -156,7 +156,7 @@ var defaultRoles = []DefaultRole{
 
 // everyCatalogKey rend les clés du catalogue, dans son ordre.
 //
-// `super_admin` est **dérivé** plutôt qu'écrit : le §6.10 dit « toutes les permissions », et une
+// `Propriétaire` est **dérivé** plutôt qu'écrit : le §6.10 dit « toutes les permissions », et une
 // liste tenue en parallèle prendrait du retard à chaque clé ajoutée. Le propriétaire du produit
 // perdrait alors l'accès à ce que la release ajoute, sans pouvoir se l'accorder lui-même —
 // `roles:manage` étant précisément une de ces clés.

@@ -21,6 +21,6 @@
 //
 // Le catalogue ici, la garde serveur qui l'exige, et le tableau des rôles par défaut. Une clé sans
 // garde est une permission qui ne garde rien ; une garde sans clé au catalogue refuse tout le
-// monde ; une clé qu'aucun rôle ne détient est inaccessible à tous sauf `super_admin`. Les trois
+// monde ; une clé qu'aucun rôle ne détient est inaccessible à tous sauf `Propriétaire`. Les trois
 // erreurs sont silencieuses.
 package permissions

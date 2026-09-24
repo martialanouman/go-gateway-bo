@@ -1,6 +1,6 @@
 # 042 — Aucune passkey ne porte de nom : la table est livrée sans colonne `name`
 
-> **Porteur :** step-030
+> **Porteur :** step-039
 
 ## Ce qu'elle coûte si elle dure
 
@@ -24,3 +24,6 @@ consommateur, ce que step-037 a précisément élagué.
 
 **Re-portée de step-029 à step-030 le 23/09/2026** : step-029 a livré les routes, et les écrans
 qui font mordre cette dette sont partis en step-030 (coupe préparée par la fiche de step-029).
+
+**Re-portée de step-030 à step-039 le 23/09/2026** : elle porte sur les facteurs du compte de la
+session, que step-039 administre ; step-030 administre les autres opérateurs.
