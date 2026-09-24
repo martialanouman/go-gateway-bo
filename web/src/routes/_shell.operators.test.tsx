@@ -46,7 +46,7 @@ describe('l’écran des opérateurs', () => {
   it('liste les opérateurs avec leurs rôles et l’état de leur second facteur', async () => {
     await visit()
 
-    expect(row(SELF.email).getByText('super_admin')).toBeInTheDocument()
+    expect(row(SELF.email).getByText('Propriétaire')).toBeInTheDocument()
     expect(row(COLLEAGUE.email).getByText('Aucun rôle')).toBeInTheDocument()
     expect(row(COLLEAGUE.email).getByText('Aucun')).toBeInTheDocument()
   })
@@ -69,7 +69,7 @@ describe('l’écran des opérateurs', () => {
 
     expectBlockedAndExplained(
       row(COLLEAGUE.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-      /aucun second facteur/,
+      /Aucun second facteur/,
     )
   })
 
@@ -145,7 +145,7 @@ describe('l’écran des opérateurs', () => {
     await user.click(await within(dialog).findByRole('checkbox', { name: /auditor/ }))
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer les rôles' }))
 
-    expect(await row(COLLEAGUE.email).findByText('auditor')).toBeInTheDocument()
+    expect(await row(COLLEAGUE.email).findByText('Audit')).toBeInTheDocument()
   })
 
   it('confirme la désactivation en nommant sa conséquence, puis l’applique', async () => {
@@ -445,18 +445,18 @@ describe('l’écran des opérateurs', () => {
     ).toBe(false)
   })
 
-  it('ne montre une explication que si un contrôle de la page y renvoie', async () => {
-    await visit(undefined, {}, [SELF, { ...COLLEAGUE, secondFactorEnrolled: true }])
-
-    expect(screen.queryByText(/Réinitialisation sans objet/)).not.toBeInTheDocument()
-  })
-
-  it('écrit « Aucun rôle » en texte courant, et les noms de rôle seuls en mono', async () => {
+  it('écrit les rôles en français, en texte courant', async () => {
     await visit()
 
-    expect(
-      row(COLLEAGUE.email).getByText('Aucun rôle').closest('.mono, .ui-table__cell--mono'),
-    ).toBeNull()
-    expect(row(SELF.email).getByText('super_admin')).toHaveClass('mono')
+    for (const text of ['Aucun rôle', 'Propriétaire']) {
+      const holder = text === 'Aucun rôle' ? COLLEAGUE.email : SELF.email
+      expect(row(holder).getByText(text).closest('.mono, .ui-table__cell--mono')).toBeNull()
+    }
+  })
+
+  it('montre « Configuré » pour un opérateur qui a un second facteur', async () => {
+    await visit()
+
+    expect(row(SELF.email).getByText('Configuré')).toBeInTheDocument()
   })
 })

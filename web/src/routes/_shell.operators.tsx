@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
 import {
@@ -14,7 +14,14 @@ import {
   Skeleton,
   useToast,
 } from '~/components/ui'
-import { blockedBy, operatorsQueryKey, orRefusal, Refusal, useRoles } from '~/lib/administration'
+import {
+  blockedBy,
+  operatorsQueryKey,
+  orRefusal,
+  Refusal,
+  roleLabel,
+  useRoles,
+} from '~/lib/administration'
 import { api, meQueryOptions } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
 import { OperatorCreation } from '~/lib/contract.gen'
@@ -23,6 +30,9 @@ import { usePermission } from '~/lib/permissions'
 
 type Operator = components['schemas']['Operator']
 type Role = components['schemas']['Role']
+
+const SELF_REASON =
+  'Le compte de la session ne se désactive ni ne se réinitialise ici : un autre détenteur de operators:manage peut le faire.'
 
 export const Route = createFileRoute('/_shell/operators')({ component: OperatorsScreen })
 
@@ -36,28 +46,21 @@ function OperatorsScreen() {
   })
   const [creating, setCreating] = useState(false)
   const canManage = usePermission('operators:manage')
-  const createLockedId = useId()
 
   return (
     <div className="page">
       <header className="page__head">
         <h1 className="page__title">Opérateurs</h1>
         <Button
-          {...blockedBy(canManage ? undefined : createLockedId)}
+          {...blockedBy(
+            canManage ? undefined : 'La création d’un opérateur demande operators:manage.',
+          )}
           onClick={() => setCreating(true)}
           variant="primary"
         >
           Nouvel opérateur
         </Button>
       </header>
-      {canManage ? null : (
-        <div className="page__notes">
-          <p id={createLockedId}>
-            La création d’un opérateur demande <span className="mono">operators:manage</span>, que
-            ce compte ne détient pas.
-          </p>
-        </div>
-      )}
 
       {operators.isPending ? (
         <LoadingState label="Chargement des opérateurs…">
@@ -90,9 +93,6 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
   const canListRoles = usePermission('roles:manage')
   const [pending, setPending] = useState<Pending>(undefined)
   const setStatus = useSetStatus()
-  const selfId = useId()
-  const nothingToResetId = useId()
-  const rolesLockedId = useId()
   const close = () => setPending(undefined)
 
   return (
@@ -105,9 +105,10 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
             key: 'operator',
             header: 'Opérateur',
             cell: (operator) => (
-              <>
-                {operator.displayName} <span className="mono">{operator.email}</span>
-              </>
+              <span className="operator-cell">
+                <span>{operator.displayName}</span>
+                <span className="operator-cell__email">{operator.email}</span>
+              </span>
             ),
           },
           {
@@ -119,16 +120,14 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
             key: 'roles',
             header: 'Rôles',
             cell: (operator) =>
-              operator.roles.length === 0 ? (
-                'Aucun rôle'
-              ) : (
-                <span className="mono">{operator.roles.map((role) => role.name).join(', ')}</span>
-              ),
+              operator.roles.length === 0
+                ? 'Aucun rôle'
+                : operator.roles.map((role) => roleLabel(role.name)).join(', '),
           },
           {
             key: 'factor',
             header: 'Second facteur',
-            cell: (operator) => (operator.secondFactorEnrolled ? 'En place' : 'Aucun'),
+            cell: (operator) => (operator.secondFactorEnrolled ? 'Configuré' : 'Aucun'),
           },
           {
             key: 'actions',
@@ -139,7 +138,11 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
               return (
                 <div className="row-actions">
                   <Button
-                    {...blockedBy(canListRoles ? undefined : rolesLockedId)}
+                    {...blockedBy(
+                      canListRoles
+                        ? undefined
+                        : 'La liste des rôles à attribuer demande roles:manage.',
+                    )}
                     onClick={() => setPending({ kind: 'roles', operator })}
                     size="sm"
                   >
@@ -147,7 +150,7 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
                   </Button>
                   {operator.status === 'active' ? (
                     <Button
-                      {...blockedBy(self ? selfId : undefined)}
+                      {...blockedBy(self ? SELF_REASON : undefined)}
                       onClick={() => setPending({ kind: 'disable', operator })}
                       size="sm"
                       variant="danger"
@@ -167,7 +170,11 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
                   )}
                   <Button
                     {...blockedBy(
-                      self ? selfId : operator.secondFactorEnrolled ? undefined : nothingToResetId,
+                      self
+                        ? SELF_REASON
+                        : operator.secondFactorEnrolled
+                          ? undefined
+                          : 'Aucun second facteur à réinitialiser : il en enrôlera un à sa prochaine connexion.',
                     )}
                     onClick={() => setPending({ kind: 'reset', operator })}
                     size="sm"
@@ -183,27 +190,6 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
         rowKey={(operator) => operator.id}
         rows={operators}
       />
-
-      <div className="page__notes">
-        <p id={selfId}>
-          Le compte de la session ne se désactive ni ne se réinitialise ici : un autre détenteur de{' '}
-          <span className="mono">operators:manage</span> peut le faire. Le remplacement de son
-          propre facteur n’a pas encore d’écran.
-        </p>
-        {operators.some((operator) => !operator.secondFactorEnrolled) ? (
-          <p id={nothingToResetId}>
-            Réinitialisation sans objet : cet opérateur n’a aucun second facteur en place. Il en
-            enrôlera un à sa prochaine connexion.
-          </p>
-        ) : null}
-        {canListRoles ? null : (
-          <p id={rolesLockedId}>
-            « Modifier les rôles » reste fermé sans <span className="mono">roles:manage</span> :
-            c’est la seule clé qui ouvre la liste des rôles à choisir.
-          </p>
-        )}
-        <p>Réactiver rend l’accès sans confirmation. Action journalisée.</p>
-      </div>
 
       {pending?.kind === 'roles' ? (
         <AssignRoles onClose={close} operator={pending.operator} />
@@ -327,7 +313,6 @@ function AssignRoles({
 }) {
   const queryClient = useQueryClient()
   const roles = useRoles(true)
-  const unreadId = useId()
   const [chosen, setChosen] = useState(operator.roles.map((role) => role.id))
   const assign = useMutation({
     mutationFn: () =>
@@ -360,7 +345,11 @@ function AssignRoles({
         <>
           <Button onClick={onClose}>Annuler</Button>
           <Button
-            {...blockedBy(roles.isError ? unreadId : undefined)}
+            {...blockedBy(
+              roles.isError
+                ? 'Les rôles n’ont pas pu être chargés : rien ne peut être enregistré.'
+                : undefined,
+            )}
             loading={assign.isPending || roles.isPending}
             onClick={() => assign.mutate()}
             variant="primary"
@@ -380,7 +369,7 @@ function AssignRoles({
           <Skeleton height={20} />
         </LoadingState>
       ) : roles.isError ? (
-        <div id={unreadId}>
+        <div>
           <ErrorState
             description={roles.error.message}
             onRetry={() => void roles.refetch()}
@@ -401,7 +390,10 @@ function AssignRoles({
                 onChange={() => toggle(role)}
                 type="checkbox"
               />
-              <span className="mono">{role.name}</span> {role.description}
+              <span className="role-choice__name">
+                {roleLabel(role.name)} <span className="role-choice__id">{role.name}</span>
+              </span>{' '}
+              <span className="role-choice__description">{role.description}</span>
             </label>
           ))}
         </fieldset>

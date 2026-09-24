@@ -25,7 +25,7 @@ async function visit() {
 }
 
 function row(name: string) {
-  const found = screen.getByRole('cell', { name }).closest('tr')
+  const found = screen.getByText(name, { selector: 'span' }).closest('tr')
   if (found === null) throw new Error(`aucune ligne pour ${name}`)
   return within(found)
 }
@@ -63,7 +63,7 @@ describe('l’écran des rôles', () => {
     await visit()
 
     await user.click(row(SUPER_ADMIN.name).getByRole('button', { name: 'Voir les permissions' }))
-    const dialog = await screen.findByRole('dialog', { name: `Rôle ${SUPER_ADMIN.name}` })
+    const dialog = await screen.findByRole('dialog', { name: 'Rôle Propriétaire' })
     expect(dialog).toHaveTextContent(SUPER_ADMIN.description)
     expect(within(dialog).getByText('operators:manage')).toBeInTheDocument()
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()

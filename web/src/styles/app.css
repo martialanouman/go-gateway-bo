@@ -425,22 +425,35 @@
   display: grid;
   grid-template-columns: auto 1fr;
   gap: var(--sp-1) var(--sp-4);
-  align-items: baseline;
+  align-items: center;
   color: var(--text-primary);
   font: var(--text-body);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
 
+/* La case s'aligne sur la première ligne — la clé ou le nom —, la description passe dessous. */
 .role-choice__option input,
 .permission-picker__option input {
-  grid-row: span 2;
+  margin: 0;
   accent-color: var(--action-primary-fg);
 }
 
-.permission-picker__description {
+.permission-picker__description,
+.role-choice__description {
   grid-column: 2;
   color: var(--text-muted);
   font: var(--text-caption);
   font-variant-numeric: tabular-nums;
+}
+
+.operator-cell {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.operator-cell__email,
+.role-choice__id {
+  color: var(--text-muted);
+  font: var(--text-data);
 }

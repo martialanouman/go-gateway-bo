@@ -448,7 +448,7 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   const attribution = page.getByRole('dialog', { name: 'Rôles de Recrue de parcours' })
   await attribution.getByRole('checkbox', { name: /auditor/ }).check()
   await attribution.getByRole('button', { name: 'Enregistrer les rôles' }).click()
-  await expect(ligne).toContainText('auditor')
+  await expect(ligne).toContainText('Audit')
 
   await page.getByRole('banner').getByRole('button', { name: 'Se déconnecter' }).click()
   await page.getByRole('link', { name: 'Se connecter' }).click()
