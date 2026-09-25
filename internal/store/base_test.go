@@ -127,7 +127,7 @@ var initialMigrations = []string{
 	"00009_ceremony_throttling.sql",
 	"00010_default_role_names.sql",
 	"00011_access_links.sql",
-	"00012_passkey_names.sql",
+	"00012_passkey_names_and_totp_pending.sql",
 }
 
 const latestSchemaVersion = 12

@@ -18,9 +18,10 @@ le compte de la session, pas sur l'administration des autres.*
 ### Écarts de contrat (trouvés en ouvrant la step)
 - **`GET /auth/mfa/webauthn/passkeys`** — aucune route ne listait les clés : sans elle, ni nom à
   afficher ni identifiant à retirer.
-- **`POST /auth/mfa/totp/confirm`** — un remplacement avec preuve remet `mfa_totp_last_step` à
-  `NULL` : le secret neuf reste non confirmé, `/auth/me` l'annonce absent, et il se réenrôle sans
-  preuve à la connexion suivante. `POST /auth/mfa/verify` ne peut pas le confirmer : il exige un
+- **`POST /auth/mfa/totp/confirm`** — un remplacement écrasait le secret en place et le laissait
+  non confirmé : `/auth/me` l'annonçait absent, et il se réenrôlait sans preuve à la connexion
+  suivante. Désormais le remplaçant et ses codes attendent à côté de l'ancien, qui reste seul en
+  vigueur jusqu'à cette confirmation. `POST /auth/mfa/verify` ne peut pas confirmer : il exige un
   challenge de connexion que la session élevée n'a plus.
 - **`WebauthnRegistration.name`** — requis, 1 à 64 caractères (dette 042).
 

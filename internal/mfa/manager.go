@@ -82,8 +82,9 @@ func (m *Manager) Factors(ctx context.Context, operatorID string) (store.SecondF
 
 // Enroll tire un authentificateur, l'écrit, et rend ce qui n'est montré qu'une fois. `false` dit
 // qu'un second facteur était déjà en place et que `replace` ne l'autorisait pas — la garde est
-// appliquée par l'écriture elle-même, voir `store.MFA.Enroll`.
-func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, replace bool,
+// appliquée par l'écriture elle-même, voir `store.MFA.Enroll`. `pending` le pose en attente à côté
+// du facteur confirmé, qui reste seul valide jusqu'à `ConfirmTOTP`.
+func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, replace, pending bool,
 	event store.Event,
 ) (Enrollment, bool, error) {
 	enrollment, err := m.authenticator.Enroll(operatorID, accountName)
@@ -91,8 +92,19 @@ func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, re
 		return Enrollment{}, false, err
 	}
 
-	written, err := m.factors.Enroll(ctx, operatorID, enrollment.SealedSecret,
-		enrollment.RecoveryCodeHashes, replace, event)
+	write := func() (bool, error) {
+		return m.factors.Enroll(ctx, operatorID, enrollment.SealedSecret,
+			enrollment.RecoveryCodeHashes, replace, event)
+	}
+
+	if pending {
+		write = func() (bool, error) {
+			return m.factors.EnrollPending(ctx, operatorID, enrollment.SealedSecret,
+				enrollment.RecoveryCodeHashes, event)
+		}
+	}
+
+	written, err := write()
 	if err != nil || !written {
 		return Enrollment{}, false, err
 	}
@@ -106,22 +118,6 @@ func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, re
 // est un rejeu, donc un refus. C'est `ConsumeStep` qui tranche, dans son `WHERE`, et non une lecture
 // suivie d'une décision.
 func (m *Manager) VerifyTOTP(ctx context.Context, operatorID, code string) (bool, error) {
-	return m.verifyTOTP(ctx, operatorID, code, func(step int64) (bool, error) {
-		return m.factors.ConsumeStep(ctx, operatorID, step)
-	})
-}
-
-// ConfirmTOTP vérifie comme `VerifyTOTP`, et journalise la confirmation avec le pas consommé.
-func (m *Manager) ConfirmTOTP(ctx context.Context, operatorID, code string, event store.Event,
-) (bool, error) {
-	return m.verifyTOTP(ctx, operatorID, code, func(step int64) (bool, error) {
-		return m.factors.ConfirmStep(ctx, operatorID, step, event)
-	})
-}
-
-func (m *Manager) verifyTOTP(ctx context.Context, operatorID, code string,
-	consume func(step int64) (bool, error),
-) (bool, error) {
 	state, found, err := m.State(ctx, operatorID)
 	if err != nil || !found || !state.Enrolled {
 		return false, err
@@ -132,7 +128,23 @@ func (m *Manager) verifyTOTP(ctx context.Context, operatorID, code string,
 		return false, err
 	}
 
-	return consume(step)
+	return m.factors.ConsumeStep(ctx, operatorID, step)
+}
+
+// ConfirmTOTP confronte le code au secret **en attente**, et le fait passer actif s'il colle.
+func (m *Manager) ConfirmTOTP(ctx context.Context, operatorID, code string, event store.Event,
+) (bool, error) {
+	state, found, err := m.State(ctx, operatorID)
+	if err != nil || !found || state.PendingSecret == "" {
+		return false, err
+	}
+
+	step, ok, err := m.authenticator.Verify(state.PendingSecret, operatorID, code, state.CurrentStep)
+	if err != nil || !ok {
+		return false, err
+	}
+
+	return m.factors.ConfirmPending(ctx, operatorID, state.PendingSecret, step, event)
 }
 
 // VerifyRecoveryCode confronte le code aux hachages restants **puis** détruit celui qui a servi.

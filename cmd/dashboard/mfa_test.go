@@ -73,6 +73,9 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 		w.replaceProvingTheCurrentCode)
 	ctx.Given(`^l'opérateur remplace son authentificateur en présentant son code$`,
 		w.replaceProvingTheCurrentCode)
+	ctx.Given(`^l'opérateur remplace son authentificateur en présentant un code de récupération$`,
+		w.replaceProvingARecoveryCode)
+	ctx.Then(`^le refus dit qu'aucun remplacement n'attend$`, w.refusalSaysNothingIsPending)
 	ctx.When(`^l'opérateur confirme sa nouvelle application d'authentification$`, w.confirmCurrentCode)
 	ctx.When(`^l'opérateur confirme sa nouvelle application d'authentification avec un code faux$`,
 		w.confirmWrongCode)
@@ -128,7 +131,7 @@ func (w *mfaWorld) enrollTimes(count int) error {
 }
 
 // enrollProving enrôle en présentant — ou non — une preuve du facteur en place. Le premier
-// enrôlement n'a rien à prouver ; le remplacement détruit ce qu'il remplace, donc il l'exige.
+// enrôlement n'a rien à prouver ; le remplacement détruira à sa confirmation ce qu'il remplace, donc il l'exige.
 func (w *mfaWorld) enrollProving(proof map[string]string) error {
 	w.previousSecret = w.enrolled.Secret
 
@@ -160,7 +163,7 @@ func (w *mfaWorld) enrollProving(proof map[string]string) error {
 }
 
 // replaceProvingTheCurrentCode remplace l'authentificateur en présentant un code de celui qui est en
-// place — la preuve que le remplacement exige, puisqu'il le détruit.
+// place — la preuve que le remplacement exige, puisqu'il le détruira.
 // Le code présenté est celui du pas **suivant** : la vérification qui précède vient de consommer le
 // pas courant, et l'anti-rejeu refuse à juste titre de le resservir. C'est ce que vit l'opérateur —
 // il rouvre son application et y lit un autre code.
@@ -799,4 +802,20 @@ func (w *mfaWorld) confirmationIsRefused() error {
 	}
 
 	return w.messageMentions("n'a pas été accepté")
+}
+
+func (w *mfaWorld) replaceProvingARecoveryCode() error {
+	if len(w.enrolled.RecoveryCodes) == 0 {
+		return errors.New("aucun code de récupération : le scénario n'a rien à présenter")
+	}
+
+	return w.enrollProving(map[string]string{"method": "recovery_code", "code": w.enrolled.RecoveryCodes[0]})
+}
+
+func (w *mfaWorld) refusalSaysNothingIsPending() error {
+	if err := w.refusalIs(409, "mfa_nothing_to_confirm"); err != nil {
+		return err
+	}
+
+	return w.messageMentions("remplacer d'abord")
 }

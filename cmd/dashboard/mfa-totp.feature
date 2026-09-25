@@ -113,8 +113,8 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 401
     Et il lui reste 9 codes de récupération
 
-  # **Le remplacement détruit ce qu'il remplace** — le secret en place et les dix codes de
-  # récupération partent ensemble. Il exige donc de présenter ce qu'on détruit, et ni le mot de passe
+  # **Le remplacement détruira à sa confirmation ce qu'il remplace** — le secret en place et les dix
+  # codes de récupération partent ensemble. Il exige donc de présenter ce qu'on détruit, et ni le mot de passe
   # ni un cookie de session élevée ne suffisent : sans cela, un cookie capté évincerait définitivement
   # l'opérateur.
   Scénario: remplacer son authentificateur sans le présenter est refusé
@@ -164,9 +164,26 @@ Fonctionnalité: Le second facteur TOTP
     Et le serveur répond 200
     Et le secret rendu diffère du précédent
 
-  # Un remplacement remet l'anti-rejeu à zéro : le secret neuf n'est confirmé qu'au premier code
-  # consommé. Sans confirmation, `/auth/me` l'annonçait absent et il se réenrôlait sans preuve.
-  Scénario: remplacer puis confirmer : la connexion suivante réclame le code du nouveau secret
+  # Un remplacement attend sa confirmation à côté du facteur en place : le compte n'est jamais sans
+  # facteur que quelqu'un détient. Le témoin des deux scénarios qui suivent.
+  Scénario: un remplacement abandonné laisse l'ancien code valide
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    # Un code de récupération et non un code TOTP : il laisse l'anti-rejeu de l'ancien secret au pas
+    # courant, et son pas suivant reste présentable.
+    Et l'opérateur remplace son authentificateur en présentant un code de récupération
+    Quand l'opérateur se connecte avec son mot de passe
+    Et l'opérateur présente le code du pas courant
+    Alors le serveur répond 401
+    Quand l'opérateur présente le code du pas suivant de l'ancien secret
+    Alors le serveur répond 204
+    Et la session annonce une application d'authentification
+    Et il lui reste 9 codes de récupération
+
+  Scénario: après confirmation, l'ancien code est refusé et le nouveau élève
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
@@ -176,8 +193,9 @@ Fonctionnalité: Le second facteur TOTP
     Quand l'opérateur confirme sa nouvelle application d'authentification
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 204
-    Et la session annonce une application d'authentification
     Et le journal porte 1 événement "mfa.confirm"
+    # Les dix codes du remplaçant, et eux seuls : les anciens partent avec l'ancien secret.
+    Et il lui reste 10 codes de récupération
     Quand l'opérateur se connecte avec son mot de passe
     # Le pas suivant et non le courant : la confirmation vient de consommer le courant, et
     # l'anti-rejeu le refuserait quel que soit le secret.
@@ -187,15 +205,27 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 204
     Et le second facteur est vérifié
 
+  Scénario: confirmer sans remplacement en cours est refusé
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    Quand l'opérateur confirme sa nouvelle application d'authentification
+    Alors la réponse est conforme au contrat du BFF
+    Et le refus dit qu'aucun remplacement n'attend
+
   Scénario: confirmer sans session élevée est refusé
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
     Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    Et l'opérateur remplace son authentificateur en présentant son code
+    Et l'opérateur se connecte avec son mot de passe
     Quand l'opérateur confirme sa nouvelle application d'authentification
     Alors la réponse est conforme au contrat du BFF
     Et le refus dit comment franchir le second facteur
-    Et la session n'annonce aucun second facteur
 
   # 400 et non 401 : un client qui lit tout 401 comme une session close renverrait l'opérateur au
   # login, élévation perdue, pour un chiffre de travers.

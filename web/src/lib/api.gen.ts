@@ -157,6 +157,10 @@ export interface paths {
          *     L'enrôlement n'élève pas la session : c'est `POST /auth/mfa/verify` qui le fait, avec le
          *     premier code. Tant qu'il n'a pas eu lieu, la session reste au premier facteur.
          *
+         *     **Un remplacement ne prend effet qu'à sa confirmation** (`POST /auth/mfa/totp/confirm`) :
+         *     jusque-là, le secret et les codes rendus attendent, et ceux qui sont en place restent seuls
+         *     valides. Un nouveau remplacement écrase l'attente.
+         *
          *     **Remplacer un authentificateur exige de présenter celui qu'on remplace.** Sans cette
          *     exigence, le geste qui détruit un facteur serait protégé moins que celui qui l'utilise : le
          *     seul rempart serait le bit d'élévation, qui vaut douze heures, donc un cookie capté suffirait
@@ -186,13 +190,15 @@ export interface paths {
         put?: never;
         /**
          * Confirmer une application d'authentification qui vient d'être remplacée
-         * @description Un remplacement avec preuve rend un secret neuf **non confirmé** : aucun code n'en a encore
-         *     été consommé. Sans cette route, `/auth/me` l'annonçait absent et il se réenrôlait sans preuve
-         *     à la connexion suivante. `POST /auth/mfa/verify` ne peut pas le confirmer : il exige un
-         *     challenge de connexion, que la session élevée qui a remplacé n'a plus.
+         * @description Un remplacement avec preuve pose le secret neuf et ses dix codes **en attente**, à côté de
+         *     ceux qui sont en place : ces derniers restent seuls valides, et le compte n'est jamais sans
+         *     facteur confirmé. Cette route confronte le code au secret en attente et, s'il colle, le fait
+         *     passer actif avec ses codes, en retirant les anciens, dans une seule transaction.
+         *     `POST /auth/mfa/verify` ne peut pas le faire : il exige un challenge de connexion, que la
+         *     session élevée qui a remplacé n'a plus.
          *
          *     Session **élevée** exigée : c'est elle qui a remplacé. L'essai compte dans le seau du second
-         *     facteur, comme sur `verify`, et le code consommé ne se rejoue pas.
+         *     facteur, comme sur `verify`.
          */
         post: operations["confirmTotp"];
         delete?: never;
@@ -554,8 +560,8 @@ export interface components {
          *     pour le remplacer.
          *
          *     Le premier enrôlement n'a rien à prouver — il n'y a pas encore de facteur, et la session de
-         *     premier facteur dit déjà de qui il s'agit. Le remplacement, lui, **détruit** l'authentificateur
-         *     en place et ses dix codes de récupération : il exige donc de présenter ce qu'on détruit.
+         *     premier facteur dit déjà de qui il s'agit. Le remplacement, lui, **détruira** à sa confirmation
+         *     l'authentificateur en place et ses dix codes : il exige donc de présenter ce qu'il détruira.
          *
          *     **Pourquoi un code et non un challenge frais**, alors que le challenge est ce que la
          *     vérification exige : se reconnecter pour en obtenir un ferme la session présentée et la
@@ -1257,9 +1263,9 @@ export interface operations {
             };
             403: components["responses"]["OrigineRefusee"];
             /**
-             * @description `mfa_elevation_required` : la session n'a pas franchi le second facteur. Confirmer depuis
-             *     une session de premier facteur donnerait à qui détient le mot de passe un facteur qu'il
-             *     vient de se poser.
+             * @description Deux causes, deux codes. `mfa_elevation_required` : la session n'a pas franchi le second
+             *     facteur. `mfa_nothing_to_confirm` : aucun remplacement n'attend — le message dit de
+             *     remplacer d'abord.
              */
             409: {
                 headers: {

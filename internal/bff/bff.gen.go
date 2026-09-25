@@ -366,8 +366,8 @@ type TotpEnrollment struct {
 // pour le remplacer.
 //
 // Le premier enrôlement n'a rien à prouver — il n'y a pas encore de facteur, et la session de
-// premier facteur dit déjà de qui il s'agit. Le remplacement, lui, **détruit** l'authentificateur
-// en place et ses dix codes de récupération : il exige donc de présenter ce qu'on détruit.
+// premier facteur dit déjà de qui il s'agit. Le remplacement, lui, **détruira** à sa confirmation
+// l'authentificateur en place et ses dix codes : il exige donc de présenter ce qu'il détruira.
 //
 // **Pourquoi un code et non un challenge frais**, alors que le challenge est ce que la
 // vérification exige : se reconnecter pour en obtenir un ferme la session présentée et la

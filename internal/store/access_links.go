@@ -283,7 +283,9 @@ func AccessTokenDigest(token string) ([]byte, bool) {
 // quoi le titulaire ne pourrait pas se réenrôler.
 func clearSecondFactors(ctx context.Context, tx pgx.Tx, operatorID string) error {
 	for _, cleanup := range []string{
-		`UPDATE operators SET mfa_totp_secret = NULL, mfa_totp_last_step = NULL WHERE id = $1::uuid`,
+		`UPDATE operators
+		 SET mfa_totp_secret = NULL, mfa_totp_last_step = NULL, mfa_totp_pending_secret = NULL
+		 WHERE id = $1::uuid`,
 		`DELETE FROM mfa_recovery_codes WHERE operator_id = $1::uuid`,
 		`DELETE FROM webauthn_credentials WHERE operator_id = $1::uuid`,
 		`DELETE FROM login_attempt_counters WHERE scope = '` + ScopeSecondFactor + `' AND subject = $1::text`,

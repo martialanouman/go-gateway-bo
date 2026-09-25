@@ -36,6 +36,8 @@ type TOTPState struct {
 	// SealedSecret est vide quand aucun authentificateur n'est enrôlé.
 	SealedSecret string
 	Enrolled     bool
+	// PendingSecret est le remplaçant chiffré qui attend sa confirmation, vide sinon.
+	PendingSecret string
 	// Proven dit qu'au moins un code de cet opérateur a été consommé — `mfa_totp_last_step` n'est
 	// plus `NULL`. Ce n'est pas « le secret existe » : l'enrôlement écrit le secret **avant** que
 	// l'opérateur ait scanné quoi que ce soit, si bien qu'un enrôlement abandonné laisse un facteur
@@ -58,14 +60,16 @@ func (m *MFA) TOTPStateOf(ctx context.Context, operatorID string, periodSeconds 
 	const query = `
 		SELECT email, coalesce(mfa_totp_secret, ''), mfa_totp_secret IS NOT NULL,
 		       mfa_totp_last_step IS NOT NULL,
-		       floor(extract(epoch FROM now()) / $2)::bigint
+		       floor(extract(epoch FROM now()) / $2)::bigint,
+		       coalesce(mfa_totp_pending_secret, '')
 		FROM operators
 		WHERE id = $1 AND status = $3`
 
 	var state TOTPState
 
 	err := m.pool.QueryRow(ctx, query, operatorID, periodSeconds, StatusActive).
-		Scan(&state.Email, &state.SealedSecret, &state.Enrolled, &state.Proven, &state.CurrentStep)
+		Scan(&state.Email, &state.SealedSecret, &state.Enrolled, &state.Proven, &state.CurrentStep,
+			&state.PendingSecret)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return TOTPState{}, false, nil
@@ -98,7 +102,8 @@ func (m *MFA) FactorsOf(ctx context.Context, operatorID string) (SecondFactors, 
 	const query = `
 		SELECT o.mfa_totp_secret IS NOT NULL,
 		       o.mfa_totp_secret IS NOT NULL AND o.mfa_totp_last_step IS NOT NULL,
-		       (SELECT count(*) FROM mfa_recovery_codes AS r WHERE r.operator_id = o.id),
+		       (SELECT count(*) FROM mfa_recovery_codes AS r
+		        WHERE r.operator_id = o.id AND NOT r.pending),
 		       (SELECT count(*) FROM webauthn_credentials AS c WHERE c.operator_id = o.id)
 		FROM operators AS o
 		WHERE o.id = $1`
@@ -139,27 +144,76 @@ func (m *MFA) ConsumeStep(ctx context.Context, operatorID string, step int64) (b
 	return tag.RowsAffected() > 0, nil
 }
 
-// ConfirmStep consomme le pas comme `ConsumeStep`, et journalise la confirmation dans la même
-// transaction : ou les deux, ou aucune.
-func (m *MFA) ConfirmStep(ctx context.Context, operatorID string, step int64, event Event) (bool,
-	error,
-) {
-	const query = `
-		UPDATE operators
-		SET mfa_totp_last_step = $2
-		WHERE id = $1
-		  AND (mfa_totp_last_step IS NULL OR mfa_totp_last_step < $2)`
+// EnrollPending pose un remplaçant **à côté** du secret en place, avec ses codes : ni l'un ni les
+// autres ne servent avant `ConfirmPending`, et un remplacement suivant écrase l'attente. `false` dit
+// qu'aucun secret n'est en place — le lien de réinitialisation l'a retiré entre-temps.
+func (m *MFA) EnrollPending(ctx context.Context, operatorID, sealedSecret string, codeHashes []string,
+	event Event,
+) (bool, error) {
+	written := false
 
+	err := inTx(ctx, m.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+			UPDATE operators SET mfa_totp_pending_secret = $2
+			WHERE id = $1 AND mfa_totp_secret IS NOT NULL`, operatorID, sealedSecret)
+		if err != nil {
+			return fmt.Errorf("écrire le secret en attente : %w", err)
+		}
+
+		if written = tag.RowsAffected() > 0; !written {
+			return nil
+		}
+
+		_, err = tx.Exec(ctx, `DELETE FROM mfa_recovery_codes WHERE operator_id = $1 AND pending`,
+			operatorID)
+		if err != nil {
+			return fmt.Errorf("retirer les codes en attente : %w", err)
+		}
+
+		for _, hash := range codeHashes {
+			_, err = tx.Exec(ctx, `
+				INSERT INTO mfa_recovery_codes (operator_id, code_hash, pending) VALUES ($1, $2, true)`,
+				operatorID, hash)
+			if err != nil {
+				return fmt.Errorf("écrire un code de récupération en attente : %w", err)
+			}
+		}
+
+		return record(ctx, tx, event)
+	})
+
+	return written && err == nil, err
+}
+
+// ConfirmPending fait passer actifs le secret en attente et ses codes, et retire les anciens.
+// `pendingSecret` est celui que l'appelant a vérifié : un remplacement concurrent l'a changé, et
+// rien n'est confirmé. Le pas consommé devient celui du secret neuf.
+func (m *MFA) ConfirmPending(ctx context.Context, operatorID, pendingSecret string, step int64,
+	event Event,
+) (bool, error) {
 	confirmed := false
 
 	err := inTx(ctx, m.pool, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, query, operatorID, step)
+		tag, err := tx.Exec(ctx, `
+			UPDATE operators
+			SET mfa_totp_secret = mfa_totp_pending_secret, mfa_totp_pending_secret = NULL,
+			    mfa_totp_last_step = $3
+			WHERE id = $1 AND mfa_totp_pending_secret = $2`, operatorID, pendingSecret, step)
 		if err != nil {
-			return fmt.Errorf("confirmer le pas de second facteur : %w", err)
+			return fmt.Errorf("confirmer le secret en attente : %w", err)
 		}
 
 		if confirmed = tag.RowsAffected() > 0; !confirmed {
 			return nil
+		}
+
+		for _, statement := range []string{
+			`DELETE FROM mfa_recovery_codes WHERE operator_id = $1 AND NOT pending`,
+			`UPDATE mfa_recovery_codes SET pending = false WHERE operator_id = $1`,
+		} {
+			if _, err = tx.Exec(ctx, statement, operatorID); err != nil {
+				return fmt.Errorf("faire passer actifs les codes en attente : %w", err)
+			}
 		}
 
 		return record(ctx, tx, event)
@@ -195,7 +249,8 @@ func (m *MFA) Enroll(ctx context.Context, operatorID, sealedSecret string, codeH
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 
 	tag, err := tx.Exec(ctx, `
-		UPDATE operators SET mfa_totp_secret = $2, mfa_totp_last_step = NULL
+		UPDATE operators
+		SET mfa_totp_secret = $2, mfa_totp_last_step = NULL, mfa_totp_pending_secret = NULL
 		WHERE id = $1 AND ($3 OR mfa_totp_secret IS NULL)`,
 		operatorID, sealedSecret, replace)
 	if err != nil {
@@ -240,7 +295,9 @@ type RecoveryCode struct {
 // après en avoir trouvé un qui colle — la raison est écrite sur `mfa.MatchRecoveryCode`.
 func (m *MFA) RecoveryCodesOf(ctx context.Context, operatorID string) ([]RecoveryCode, error) {
 	const query = `
-		SELECT id::text, code_hash FROM mfa_recovery_codes WHERE operator_id = $1 ORDER BY created_at, id`
+		SELECT id::text, code_hash FROM mfa_recovery_codes
+		WHERE operator_id = $1 AND NOT pending
+		ORDER BY created_at, id`
 
 	rows, err := m.pool.Query(ctx, query, operatorID)
 	if err != nil {

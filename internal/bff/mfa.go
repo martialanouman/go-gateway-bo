@@ -74,8 +74,8 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 	}
 
 	// **La garde de la step.** Le premier enrôlement est libre — il faut bien pouvoir entrer une
-	// première fois, et il n'y a rien à prouver. Le remplacement, lui, **détruit** l'authentificateur
-	// en place et ses dix codes de récupération : il exige donc de présenter ce qu'on détruit.
+	// première fois, et il n'y a rien à prouver. Le remplacement, lui, **détruira** à sa confirmation
+	// l'authentificateur en place et ses dix codes : il exige donc de présenter ce qu'il détruira.
 	//
 	// Une preuve du mot de passe n'y suffirait pas — un cookie de session élevée capté évincerait
 	// définitivement l'opérateur. Et un challenge frais serait **inatteignable** : se reconnecter pour
@@ -155,14 +155,18 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 	// L'état d'après ne porte que ce qu'une enquête doit savoir : un facteur a été posé, et il a
 	// remplacé ou non celui d'avant. Ni le secret, ni les codes — `Fields` n'a d'ailleurs pas de
 	// méthode pour les y mettre.
+	// Un facteur confirmé reste seul valide jusqu'à la confirmation de son remplaçant : le compte n'est
+	// jamais sans facteur que quelqu'un détient.
+	proven := replace && !unconfirmed
+
 	enrollment, written, err := a.SecondFactor.Enroll(ctx, resolved.OperatorID, state.Email, replace,
-		a.event(ctx, store.Event{
+		proven, a.event(ctx, store.Event{
 			OperatorID: resolved.OperatorID,
 			Action:     actionMFAEnroll,
 			TargetType: auditTargetOperator,
 			TargetID:   resolved.OperatorID,
 			After: store.NewFields().Text("method", "totp").
-				Flag("replaced", replace).Flag("proof_presented", replace && !unconfirmed),
+				Flag("replaced", replace).Flag("proof_presented", proven),
 		}))
 	if err != nil {
 		return nil, err
@@ -417,7 +421,7 @@ func tooManyEnrollments(remaining time.Duration) EnrollTotp429JSONResponse {
 // Essayer les deux ferait payer les argon2id du chemin de récupération à chaque code TOTP faux,
 // et la durée de la réponse dirait alors laquelle des deux voies a répondu.
 //
-// Il sert les **deux** routes : la vérification qui élève, et le remplacement qui détruit. Le geste
+// Il sert les **deux** routes : la vérification qui élève, et le remplacement. Le geste
 // est le même — présenter le facteur en place — et l'écrire deux fois en ferait deux rédactions qui
 // divergeraient, dont l'une consommerait le pas de temps et l'autre non.
 func (a API) verifyPresentedFactor(ctx context.Context, operatorID string, method, code string,
@@ -530,8 +534,8 @@ func secondFactorsOf(ctx context.Context, factors *mfa.Manager, operatorID strin
 	}, nil
 }
 
-// ConfirmTotp confirme l'application d'authentification que cette session élevée vient de remplacer.
-// `VerifyMfa` ne le peut pas : il exige un challenge de connexion, que la session n'a plus.
+// ConfirmTotp fait passer active l'application d'authentification qui attend depuis un remplacement.
+// `VerifyMfa` ne le peut pas : il exige un challenge de connexion, que la session élevée n'a plus.
 func (a API) ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) (ConfirmTotpResponseObject,
 	error,
 ) {
@@ -551,6 +555,19 @@ func (a API) ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) 
 
 	if !resolved.Elevated {
 		return ConfirmTotp409JSONResponse(elevationRequiredToConfirm()), nil
+	}
+
+	state, found, err := a.SecondFactor.State(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !found {
+		return ConfirmTotp401JSONResponse(notAuthenticated()), nil
+	}
+
+	if state.PendingSecret == "" {
+		return ConfirmTotp409JSONResponse(nothingToConfirm()), nil
 	}
 
 	lock, err := a.SecondFactor.Reserve(ctx, resolved.OperatorID)
@@ -612,6 +629,15 @@ func confirmationLocked(remaining time.Duration) ConfirmTotp429JSONResponse {
 	}
 }
 
+func nothingToConfirm() Error {
+	return Error{
+		Code: "mfa_nothing_to_confirm",
+		Message: "Aucune application d'authentification n'attend de confirmation sur ce compte : rien " +
+			"n'a changé. Pour en changer, la remplacer d'abord en présentant un code de celle qui est " +
+			"en place.",
+	}
+}
+
 func elevationRequiredToConfirm() Error {
 	return Error{
 		Code: "mfa_elevation_required",
@@ -625,7 +651,8 @@ func elevationRequiredToConfirm() Error {
 func refusedConfirmationCode() Error {
 	return Error{
 		Code: "mfa_code_refused",
-		Message: "Ce code n'a pas été accepté : l'application d'authentification n'est pas encore " +
-			"confirmée. Saisir le code qu'elle affiche maintenant.",
+		Message: "Ce code n'a pas été accepté : la nouvelle application d'authentification n'est pas " +
+			"confirmée, et l'ancienne reste en vigueur. Saisir le code que la nouvelle affiche " +
+			"maintenant.",
 	}
 }
