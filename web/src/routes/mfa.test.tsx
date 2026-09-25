@@ -228,7 +228,7 @@ describe('la garde du second facteur', () => {
     expect(await screen.findByLabelText(/E-mail/)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
     // La destination survit au détour : c'est elle qu'on rejouera après les deux facteurs.
-    expect(router.state.location.search).toEqual({ passwordSet: false, redirect: '/billing' })
+    expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
   it('ne redemande pas un facteur déjà franchi, et rejoint la destination', async () => {

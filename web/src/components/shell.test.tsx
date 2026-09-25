@@ -71,10 +71,7 @@ describe('sans session', () => {
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
       'Aucune session ouverte',
     )
-    expect(screen.getByRole('link', { name: 'Se connecter' })).toHaveAttribute(
-      'href',
-      '/login?passwordSet=false',
-    )
+    expect(screen.getByRole('link', { name: 'Se connecter' })).toHaveAttribute('href', '/login')
     expect(screen.queryByRole('navigation')).toBeNull()
   })
 })

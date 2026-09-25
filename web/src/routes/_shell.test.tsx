@@ -35,7 +35,7 @@ describe('la garde de session de la coquille', () => {
     const router = await visit('/billing', { status: 401 })
 
     expect(router.state.location.pathname).toBe('/login')
-    expect(router.state.location.search).toEqual({ passwordSet: false, redirect: '/billing' })
+    expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
   it('renvoie au second facteur une session qui ne l’a pas franchi', async () => {
@@ -58,7 +58,7 @@ describe('la garde de session de la coquille', () => {
     const router = await visit('/billing', { permissions: [], elevated: false })
 
     expect(router.state.location.pathname).toBe('/login')
-    expect(router.state.location.search).toEqual({ passwordSet: false, redirect: '/billing' })
+    expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
   it('ouvre l’écran demandé quand la session est élevée', async () => {

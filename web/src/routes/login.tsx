@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, stripSearchParams } from '@tanstack/react-router'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { AuthLayout, AuthNotice, AuthPending, AuthRefusal } from '~/components/auth-layout'
@@ -25,6 +25,10 @@ export const Route = createFileRoute('/login')({
     // pas un refus, seulement l'état par défaut de cet écran.
     passwordSet: search.passwordSet === true || search.passwordSet === 'true',
   }),
+
+  // Sans quoi `passwordSet: false` — la valeur que chaque redirection vers `/login` doit fournir,
+  // le schéma ne le rendant pas optionnel — s'écrirait dans l'URL de toute connexion normale.
+  search: { middlewares: [stripSearchParams({ passwordSet: false })] },
 
   beforeLoad: async ({ context, search }) => {
     const session = await readSession(context.queryClient)
