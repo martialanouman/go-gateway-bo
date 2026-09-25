@@ -330,6 +330,25 @@ func TestUnLienSurUnCompteDesactiveEstRefuse(t *testing.T) {
 
 // Réactiver ne rend pas vie à ce que la désactivation a fermé : ni le lien parti, ni la demande en
 // file, qui partirait sans que personne l'ait redemandée.
+// operatorView rend la ligne d'un opérateur précis, pour lire son AccessLink sans dépendre de
+// l'ordre — `Operators` trie par adresse.
+func operatorView(t *testing.T, admin *store.Administration, id string) store.OperatorView {
+	t.Helper()
+
+	views, err := admin.Operators(t.Context())
+	require.NoError(t, err)
+
+	for _, v := range views {
+		if v.ID == id {
+			return v
+		}
+	}
+
+	t.Fatalf("opérateur %s introuvable", id)
+
+	return store.OperatorView{}
+}
+
 func TestUneReactivationNeRanimeAucunLien(t *testing.T) {
 	t.Parallel()
 
@@ -342,15 +361,23 @@ func TestUneReactivationNeRanimeAucunLien(t *testing.T) {
 	digest := digestOf(t, deliver(t, links))
 	requestReset(t, pool, queued)
 
+	created, err := admin.CreateOperator(t.Context(), "jamais@exemple.test", "Jamais Activé",
+		store.Event{Action: "operator.create"})
+	require.NoError(t, err)
+	neverActivated := created.ID
+	activationDigest := digestOf(t, deliver(t, links))
+
 	for _, status := range []string{"disabled", store.StatusActive} {
-		for _, operator := range []string{sent, queued} {
+		for _, operator := range []string{sent, queued, neverActivated} {
 			_, err := admin.SetOperatorStatus(t.Context(), operator, status, store.Event{Action: "operator.status"})
 			require.NoError(t, err)
 		}
 	}
 
 	require.ErrorIs(t, links.Consume(t.Context(), digest, "neuf", store.Event{Action: "operator.password_set"}),
-		store.ErrLinkInvalid)
+		store.ErrLinkInvalid, "l'ancien jeton de reset reste refusé")
+	require.ErrorIs(t, links.Consume(t.Context(), activationDigest, "neuf", store.Event{Action: "operator.password_set"}),
+		store.ErrLinkInvalid, "l'ancien jeton d'activation reste refusé")
 
 	var calls atomic.Int32
 
@@ -358,8 +385,18 @@ func TestUneReactivationNeRanimeAucunLien(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, delivered, "une demande faite avant la désactivation part après la réactivation")
 
+	assert.Nil(t, operatorView(t, admin, sent).AccessLink, "un compte avec mot de passe s'affiche actif")
+	assert.Nil(t, operatorView(t, admin, queued).AccessLink, "un compte avec mot de passe s'affiche actif")
+	assert.Equal(t, &store.AccessLinkView{Kind: store.LinkActivation, State: store.LinkQueued},
+		operatorView(t, admin, neverActivated).AccessLink,
+		"un compte jamais activé attend un envoi, il n'a pas échoué")
+
 	requestReset(t, pool, queued)
-	assert.NotEmpty(t, deliver(t, links), "un renvoi après la réactivation ne part pas")
+	assert.NotEmpty(t, deliver(t, links), "un renvoi de reset après la réactivation ne part pas")
+
+	require.NoError(t, admin.RequestAccessLink(t.Context(), neverActivated,
+		store.Event{Action: "operator.access_link"}))
+	assert.NotEmpty(t, deliver(t, links), "un renvoi d'activation après la réactivation ne part pas")
 }
 
 // Sans quoi le titulaire verrouillé par ses erreurs resterait refusé, jusqu'à la fin de la fenêtre,

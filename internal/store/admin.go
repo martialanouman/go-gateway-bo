@@ -307,12 +307,20 @@ func (a *Administration) RequestAccessLink(ctx context.Context, id string, event
 	})
 }
 
-// closeAccessLink garde la ligne : son `kind` dit encore à l'écran qu'un compte n'a jamais été activé.
+// closeAccessLink efface un lien de reset — le compte a un mot de passe, l'écran doit dire « Actif » —
+// et gare un lien d'activation plutôt que de le marquer en échec : `next_attempt_at = 'infinity'`
+// tient le worker à l'écart tant que personne ne redemande un envoi.
 func closeAccessLink(ctx context.Context, tx pgx.Tx, operatorID string) error {
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM access_links WHERE operator_id::text = $1 AND kind = 'reset'`, operatorID); err != nil {
+		return fmt.Errorf("effacer le lien de reset de l'opérateur : %w", err)
+	}
+
 	if _, err := tx.Exec(ctx, `
-		UPDATE access_links SET token_hash = NULL, expires_at = NULL, sent_at = NULL, attempts = $2
-		WHERE operator_id::text = $1`, operatorID, MaxDeliveryAttempts); err != nil {
-		return fmt.Errorf("fermer le lien d'accès de l'opérateur : %w", err)
+		UPDATE access_links
+		SET token_hash = NULL, expires_at = NULL, sent_at = NULL, attempts = 0, next_attempt_at = 'infinity'
+		WHERE operator_id::text = $1 AND kind = 'activation'`, operatorID); err != nil {
+		return fmt.Errorf("garer le lien d'activation de l'opérateur : %w", err)
 	}
 
 	return nil

@@ -204,9 +204,11 @@ access_links                         -- (Amendement step-050) le lien d'activati
                                          -- que la demande attend dans la file
   expires_at, sent_at    (nullable)      -- posés à l'envoi ; 72 h pour une activation, 1 h pour un reset
   attempts, next_attempt_at              -- report exponentiel 30 s × 2^n plafonné à 10 min ; abandon
-                                         -- après 10 échecs. La désactivation du compte efface
-                                         -- l'empreinte et pose attempts = 10 : une réactivation ne
-                                         -- ranime ni le lien parti ni la demande en file
+                                         -- après 10 échecs. La désactivation du compte supprime un
+                                         -- lien de reset (le mot de passe reste posé, l'écran dit
+                                         -- « Actif ») et gare un lien d'activation (jeton nul,
+                                         -- attempts = 0, next_attempt_at = 'infinity') : une
+                                         -- réactivation ne ranime ni l'un ni l'autre
                                          -- consommé = ligne SUPPRIMÉE
 
 audit_log
