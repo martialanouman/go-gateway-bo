@@ -121,6 +121,20 @@ func (c *Counter) reset(ctx context.Context, subject string) error {
 	return nil
 }
 
+// release rend un essai réservé que rien n'a jugé : une erreur interne ne dit rien du code présenté
+// (dette 055). Jamais sous zéro, et sans toucher `last_failure_at`.
+func (c *Counter) release(ctx context.Context, subject string) error {
+	const query = `
+		UPDATE login_attempt_counters SET failures = greatest(failures - 1, 0)
+		WHERE scope = $2 AND subject = $1`
+
+	if _, err := c.pool.Exec(ctx, query, subject, c.scope); err != nil {
+		return fmt.Errorf("rendre un essai sur la dimension %s : %w", c.scope, err)
+	}
+
+	return nil
+}
+
 // reserve compte l'essai **avant** qu'il soit vérifié, et rend le verrou qui pèse — non nul veut dire
 // « refusé », et l'essai n'a alors rien ajouté.
 //

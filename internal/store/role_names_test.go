@@ -34,7 +34,8 @@ func TestLaMigrationRenommeLesRolesParDefautSansPerdreLeursDetenteurs(t *testing
 	require.NoError(t, err)
 
 	// Une base d'avant 00010 n'a pas non plus les migrations qui la suivent.
-	_, err = pool.Exec(ctx, `DROP TABLE access_links; DELETE FROM goose_db_version WHERE version_id >= 10`)
+	_, err = pool.Exec(ctx, `DROP TABLE access_links; ALTER TABLE webauthn_credentials DROP COLUMN name;
+		DELETE FROM goose_db_version WHERE version_id >= 10`)
 	require.NoError(t, err)
 
 	_, err = store.Migrate(ctx, dsn)

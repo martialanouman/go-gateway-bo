@@ -561,3 +561,33 @@ func TestLesFacteursRenduSontUnBooleenEtUnCompte(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, factors.RecoveryCodesRemaining)
 }
+
+func TestRendreUnEssaiLibereLeVerrouSansDescendreSousZero(t *testing.T) {
+	t.Parallel()
+
+	mfa, dsn := mfaOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	require.NoError(t, mfa.Release(t.Context(), operator), "rendre sans rien avoir réservé")
+
+	for range testMaxFailures {
+		_, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
+		require.NoError(t, err)
+		require.NoError(t, mfa.Release(t.Context(), operator))
+	}
+
+	for range testMaxFailures + 1 {
+		require.NoError(t, mfa.Release(t.Context(), operator))
+	}
+
+	for essai := 1; essai <= testMaxFailures; essai++ {
+		lock, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
+		require.NoError(t, err)
+		require.False(t, lock.Locked(), "le verrou mord au %d° essai : un essai rendu compte encore, "+
+			"ou le compteur est descendu sous zéro", essai)
+	}
+
+	lock, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	assert.True(t, lock.Locked(), "le compteur est descendu sous zéro : le seuil recule d'autant")
+}

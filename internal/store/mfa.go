@@ -260,6 +260,11 @@ func (m *MFA) Reserve(ctx context.Context, operatorID string, window time.Durati
 	return m.attempts.reserve(ctx, operatorID, window, threshold)
 }
 
+// Release rend l'essai réservé par `Reserve` quand la vérification a échoué sur une erreur interne.
+func (m *MFA) Release(ctx context.Context, operatorID string) error {
+	return m.attempts.release(ctx, operatorID)
+}
+
 // ClearFailures efface le compteur après un second facteur franchi.
 //
 // **Il n'y a pas ici la dissymétrie du premier facteur**, qui n'efface que le compteur d'adresse et
