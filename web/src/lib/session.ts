@@ -84,3 +84,23 @@ export function peekChallenge() {
 export function forgetChallenge() {
   pendingChallenge = undefined
 }
+
+/**
+ * Le jeton d'accès reçu dans le fragment de `/access`, sur le même modèle que le challenge.
+ *
+ * Il vit en mémoire du document et nulle part ailleurs — le fragment ne survit à aucun rendu
+ * (invariant (a)), et le jeton ne vaut qu'un usage : le perdre au rechargement est voulu.
+ */
+let pendingAccessToken: string | undefined
+
+export function rememberAccessToken(value: string) {
+  pendingAccessToken = value
+}
+
+export function peekAccessToken() {
+  return pendingAccessToken
+}
+
+export function forgetAccessToken() {
+  pendingAccessToken = undefined
+}

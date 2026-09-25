@@ -163,7 +163,7 @@ describe('la garde de l’enrôlement', () => {
 
     expect(await screen.findByLabelText(/E-mail/)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
-    expect(router.state.location.search).toEqual({ redirect: '/billing' })
+    expect(router.state.location.search).toEqual({ passwordSet: false, redirect: '/billing' })
   })
 
   it('ne suit pas une URL de schéma relatif collée dans le paramètre', async () => {
@@ -193,7 +193,7 @@ describe('la garde de l’enrôlement', () => {
 
     expect(await screen.findByLabelText(/E-mail/)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
-    expect(router.state.location.search).toEqual({ redirect: '/billing' })
+    expect(router.state.location.search).toEqual({ passwordSet: false, redirect: '/billing' })
   })
 
   it('renvoie au second facteur quand ce compte en détient déjà un', async () => {

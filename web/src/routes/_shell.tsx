@@ -28,7 +28,7 @@ export const Route = createFileRoute('/_shell')({
     const requested = location.href === '/' ? undefined : location.href
 
     if (session.kind === 'none') {
-      throw redirect({ to: '/login', search: { redirect: requested } })
+      throw redirect({ to: '/login', search: { redirect: requested, passwordSet: false } })
     }
 
     if (session.kind === 'open' && !session.me.elevated) {

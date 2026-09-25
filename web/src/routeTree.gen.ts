@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DesignRouteImport } from './routes/[_]design'
 import { Route as ShellRouteImport } from './routes/_shell'
+import { Route as AccessRouteImport } from './routes/access'
 import { Route as EnrollRouteImport } from './routes/enroll'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MfaRouteImport } from './routes/mfa'
@@ -40,6 +41,11 @@ const DesignRoute = DesignRouteImport.update({
 } as any)
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccessRoute = AccessRouteImport.update({
+  id: '/access',
+  path: '/access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EnrollRoute = EnrollRouteImport.update({
@@ -151,6 +157,7 @@ const ShellTrafficRoute = ShellTrafficRouteImport.update({
 export interface FileRoutesByFullPath {
   '/_design': typeof DesignRoute
   '/': typeof ShellIndexRoute
+  '/access': typeof AccessRoute
   '/enroll': typeof EnrollRoute
   '/login': typeof LoginRoute
   '/mfa': typeof MfaRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/_design': typeof DesignRoute
+  '/access': typeof AccessRoute
   '/enroll': typeof EnrollRoute
   '/login': typeof LoginRoute
   '/mfa': typeof MfaRoute
@@ -200,6 +208,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_design': typeof DesignRoute
   '/_shell': typeof ShellRouteWithChildren
+  '/access': typeof AccessRoute
   '/enroll': typeof EnrollRoute
   '/login': typeof LoginRoute
   '/mfa': typeof MfaRoute
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/_design'
     | '/'
+    | '/access'
     | '/enroll'
     | '/login'
     | '/mfa'
@@ -250,6 +260,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/_design'
+    | '/access'
     | '/enroll'
     | '/login'
     | '/mfa'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_design'
     | '/_shell'
+    | '/access'
     | '/enroll'
     | '/login'
     | '/mfa'
@@ -301,6 +313,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   DesignRoute: typeof DesignRoute
   ShellRoute: typeof ShellRouteWithChildren
+  AccessRoute: typeof AccessRoute
   EnrollRoute: typeof EnrollRoute
   LoginRoute: typeof LoginRoute
   MfaRoute: typeof MfaRoute
@@ -320,6 +333,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ShellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/access': {
+      id: '/access'
+      path: '/access'
+      fullPath: '/access'
+      preLoaderRoute: typeof AccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/enroll': {
@@ -519,6 +539,7 @@ const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   DesignRoute: DesignRoute,
   ShellRoute: ShellRouteWithChildren,
+  AccessRoute: AccessRoute,
   EnrollRoute: EnrollRoute,
   LoginRoute: LoginRoute,
   MfaRoute: MfaRoute,
