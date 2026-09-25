@@ -1,5 +1,8 @@
 -- Un compte naît sans mot de passe : son titulaire le définit par le lien. La file ne porte que la
 -- demande ; le jeton est tiré à l'envoi et seul son SHA-256 est gardé.
+-- Non additive : pendant le déploiement roulant, un binaire d'avant 00011 rend 500 au lieu de 401 à la
+-- connexion sur un compte créé sans mot de passe (scan d'un NULL dans une string) ; l'oracle cesse
+-- avec la dernière instance ancienne.
 
 -- +goose Up
 

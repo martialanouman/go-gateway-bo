@@ -56,7 +56,7 @@ func ExpectedVersionPhrase(embedded int64) string {
 // produit tourne à ≥2 instances en déploiement roulant, donc une instance en cours de remplacement
 // voit le schéma que sa remplaçante vient de poser. Refuser là interdirait tout retour arrière, et
 // les migrations de ce dépôt sont additives — un binaire plus ancien ignore une colonne qu'il ne lit
-// pas.
+// pas. Exception : 00011 rend `password_hash` nullable, voir son en-tête.
 //
 // Rien n'est écrit ici : voir `appliedSchemaVersion`, dont c'est la raison d'être.
 func VerifySchema(ctx context.Context, dsn string) error {
