@@ -388,6 +388,17 @@ describe('l’écran des opérateurs', () => {
     )
   })
 
+  it('laisse « Envoyer un lien » actif sur la ligne de la session, qui ouvre la confirmation', async () => {
+    const user = userEvent.setup()
+    await visit()
+
+    await user.click(row(SELF.email).getByRole('button', { name: 'Envoyer un lien' }))
+
+    expect(
+      await screen.findByRole('dialog', { name: `Envoyer un lien à ${SELF.displayName}` }),
+    ).toBeInTheDocument()
+  })
+
   it('envoie un lien de réinitialisation après une confirmation qui dit que rien ne change avant son usage', async () => {
     const user = userEvent.setup()
     const fetch = await visit()
