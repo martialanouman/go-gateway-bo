@@ -152,21 +152,22 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		}
 	}
 
+	// Dès qu'un facteur confirmé garde le compte — TOTP confirmé ou passkey —, le nouveau secret attend
+	// sa confirmation à côté : le compte n'est jamais sans facteur que quelqu'un détient.
+	pending := (state.Enrolled && state.Proven) || held.Passkeys > 0
+
 	// L'état d'après ne porte que ce qu'une enquête doit savoir : un facteur a été posé, et il a
 	// remplacé ou non celui d'avant. Ni le secret, ni les codes — `Fields` n'a d'ailleurs pas de
 	// méthode pour les y mettre.
-	// Un facteur confirmé reste seul valide jusqu'à la confirmation de son remplaçant : le compte n'est
-	// jamais sans facteur que quelqu'un détient.
-	proven := replace && !unconfirmed
-
 	enrollment, written, err := a.SecondFactor.Enroll(ctx, resolved.OperatorID, state.Email, replace,
-		proven, a.event(ctx, store.Event{
+		pending, a.event(ctx, store.Event{
 			OperatorID: resolved.OperatorID,
 			Action:     actionMFAEnroll,
 			TargetType: auditTargetOperator,
 			TargetID:   resolved.OperatorID,
 			After: store.NewFields().Text("method", "totp").
-				Flag("replaced", replace).Flag("proof_presented", proven),
+				Flag("replaced", replace).Flag("proof_presented", replace && !unconfirmed).
+				Flag("pending", pending),
 		}))
 	if err != nil {
 		return nil, err

@@ -83,7 +83,7 @@ func (m *Manager) Factors(ctx context.Context, operatorID string) (store.SecondF
 // Enroll tire un authentificateur, l'écrit, et rend ce qui n'est montré qu'une fois. `false` dit
 // qu'un second facteur était déjà en place et que `replace` ne l'autorisait pas — la garde est
 // appliquée par l'écriture elle-même, voir `store.MFA.Enroll`. `pending` le pose en attente à côté
-// du facteur confirmé, qui reste seul valide jusqu'à `ConfirmTOTP`.
+// du facteur confirmé — TOTP ou passkey —, qui reste seul valide jusqu'à `ConfirmTOTP`.
 func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, replace, pending bool,
 	event store.Event,
 ) (Enrollment, bool, error) {

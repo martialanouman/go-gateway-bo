@@ -157,9 +157,10 @@ export interface paths {
          *     L'enrôlement n'élève pas la session : c'est `POST /auth/mfa/verify` qui le fait, avec le
          *     premier code. Tant qu'il n'a pas eu lieu, la session reste au premier facteur.
          *
-         *     **Un remplacement ne prend effet qu'à sa confirmation** (`POST /auth/mfa/totp/confirm`) :
-         *     jusque-là, le secret et les codes rendus attendent, et ceux qui sont en place restent seuls
-         *     valides. Un nouveau remplacement écrase l'attente.
+         *     **Sur un compte qu'un facteur confirmé garde déjà — TOTP confirmé ou passkey —,
+         *     l'enrôlement ne prend effet qu'à sa confirmation** (`POST /auth/mfa/totp/confirm`) :
+         *     jusque-là, le secret et les codes rendus attendent, et ce qui est en place reste seul
+         *     valide. Un nouvel enrôlement écrase l'attente.
          *
          *     **Remplacer un authentificateur exige de présenter celui qu'on remplace.** Sans cette
          *     exigence, le geste qui détruit un facteur serait protégé moins que celui qui l'utilise : le
@@ -190,9 +191,9 @@ export interface paths {
         put?: never;
         /**
          * Confirmer une application d'authentification qui vient d'être remplacée
-         * @description Un remplacement avec preuve pose le secret neuf et ses dix codes **en attente**, à côté de
-         *     ceux qui sont en place : ces derniers restent seuls valides, et le compte n'est jamais sans
-         *     facteur confirmé. Cette route confronte le code au secret en attente et, s'il colle, le fait
+         * @description Un enrôlement sur un compte qu'un facteur confirmé garde déjà — TOTP confirmé ou passkey —
+         *     pose le secret neuf et ses dix codes **en attente**, à côté de ce qui est en place : ce
+         *     dernier reste seul valide, et le compte n'est jamais sans facteur confirmé. Cette route confronte le code au secret en attente et, s'il colle, le fait
          *     passer actif avec ses codes, en retirant les anciens, dans une seule transaction.
          *     `POST /auth/mfa/verify` ne peut pas le faire : il exige un challenge de connexion, que la
          *     session élevée qui a remplacé n'a plus.
@@ -1264,7 +1265,7 @@ export interface operations {
             403: components["responses"]["OrigineRefusee"];
             /**
              * @description Deux causes, deux codes. `mfa_elevation_required` : la session n'a pas franchi le second
-             *     facteur. `mfa_nothing_to_confirm` : aucun remplacement n'attend — le message dit de
+             *     facteur. `mfa_nothing_to_confirm` : aucun enrôlement n'attend — le message dit de
              *     remplacer d'abord.
              */
             409: {

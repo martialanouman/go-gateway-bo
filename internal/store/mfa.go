@@ -146,7 +146,7 @@ func (m *MFA) ConsumeStep(ctx context.Context, operatorID string, step int64) (b
 
 // EnrollPending pose un remplaçant **à côté** du secret en place, avec ses codes : ni l'un ni les
 // autres ne servent avant `ConfirmPending`, et un remplacement suivant écrase l'attente. `false` dit
-// qu'aucun secret n'est en place — le lien de réinitialisation l'a retiré entre-temps.
+// qu'aucun facteur ne garde plus le compte — le lien de réinitialisation l'a vidé entre-temps.
 func (m *MFA) EnrollPending(ctx context.Context, operatorID, sealedSecret string, codeHashes []string,
 	event Event,
 ) (bool, error) {
@@ -154,8 +154,10 @@ func (m *MFA) EnrollPending(ctx context.Context, operatorID, sealedSecret string
 
 	err := inTx(ctx, m.pool, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
-			UPDATE operators SET mfa_totp_pending_secret = $2
-			WHERE id = $1 AND mfa_totp_secret IS NOT NULL`, operatorID, sealedSecret)
+			UPDATE operators AS o SET mfa_totp_pending_secret = $2
+			WHERE o.id = $1 AND (o.mfa_totp_secret IS NOT NULL
+			      OR EXISTS (SELECT 1 FROM webauthn_credentials AS c WHERE c.operator_id = o.id))`,
+			operatorID, sealedSecret)
 		if err != nil {
 			return fmt.Errorf("écrire le secret en attente : %w", err)
 		}

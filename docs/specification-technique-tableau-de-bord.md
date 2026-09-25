@@ -607,8 +607,11 @@ sont en place, et **l'ancien facteur reste seul en vigueur jusqu'à la confirmat
 n'est jamais sans facteur que quelqu'un détient. `POST /auth/mfa/totp/confirm`, depuis la session
 élevée qui a remplacé, confronte un code au secret en attente, compte l'essai dans le même seau que
 la vérification, puis fait passer actifs le secret et ses codes en retirant les anciens, en une
-transaction. Un nouveau remplacement écrase l'attente ; le lien de réinitialisation l'efface. Le
-premier enrôlement, sans TOTP confirmé, s'écrit directement et se confirme par `verify`. Une passkey
+transaction. Un nouveau remplacement écrase l'attente ; le lien de réinitialisation l'efface. **La
+règle vaut pour tout enrôlement sur un compte qu'un facteur confirmé garde déjà** — TOTP confirmé ou
+passkey : un compte à clé d'accès qui ajoute une application passe lui aussi par l'attente et la
+confirmation. Seul un compte sans aucun facteur confirmé, au premier enrôlement, écrit directement le
+secret actif, confirmé ensuite par `verify`. Une passkey
 porte un **nom** de 1 à 64 caractères, choisi à l'enregistrement : c'est par lui qu'un opérateur
 reconnaît celle qu'il retire.
 

@@ -286,14 +286,11 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 200
     Et la session n'annonce aucun second facteur
 
-  # **Le témoin de la détente ci-dessus, et il tient la moitié qui compte.** Sans sa condition sur
-  # les clés d'accès, un compte gardé par une passkey qui marche et portant un TOTP abandonné
-  # laisserait quiconque détient le mot de passe remplacer ce TOTP sans élévation, puis s'en servir
-  # pour franchir le second facteur : la passkey ne garderait plus rien.
-  #
-  # La combinaison n'est pas théorique — c'est ce que produit un opérateur qui ajoute une
-  # application d'authentification depuis une session élevée par sa clé, et ne la confirme jamais.
-  Scénario: un authentificateur jamais confirmé ne se remplace pas quand une clé d'accès garde le compte
+  # **Le témoin de la détente ci-dessus, et il tient la moitié qui compte.** Une application ajoutée
+  # depuis une session élevée par la clé attend sa confirmation ; abandonnée, elle ne doit pas se
+  # laisser remplacer par qui ne détient que le mot de passe, sans quoi il s'en poserait une neuve
+  # et la passkey ne garderait plus rien. C'est l'élévation qui tient lieu de preuve.
+  Scénario: une application en attente ne se remplace pas sans élévation quand une clé d'accès garde le compte
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
@@ -304,7 +301,7 @@ Fonctionnalité: Le second facteur TOTP
     Et l'opérateur enrôle une application d'authentification
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 409
-    Et le refus dit qu'aucune preuve n'a été présentée
+    Et le refus dit comment ajouter un facteur
 
   # Six chiffres de code, trois pas valables à la fois : sans compteur, la recherche exhaustive n'est
   # bornée par rien. Et le compteur du **premier** facteur n'y suffit pas — une connexion réussie
