@@ -5,8 +5,8 @@
 
 ## But
 Ce qu'un opérateur fait de ses propres seconds facteurs une fois entré : les voir, en ajouter, en
-retirer, remplacer celui qu'il a perdu. step-028 n'a livré que le premier enrôlement, et les routes
-existent toutes (`/auth/mfa/*`). *Détachée de step-030 le 23/09/2026 : ses trois dettes portent sur
+retirer, remplacer celui qu'il a perdu. step-028 n'a livré que le premier enrôlement. *Corrigé le
+25/09/2026 : « les routes existent toutes » était faux — trois écarts de contrat, ci-dessous.* *Détachée de step-030 le 23/09/2026 : ses trois dettes portent sur
 le compte de la session, pas sur l'administration des autres.*
 
 ## Périmètre (ce que fait CETTE PR)
@@ -14,6 +14,15 @@ le compte de la session, pas sur l'administration des autres.*
 - Le remplacement de l'application d'authentification, en présentant un code de l'actuelle ou un
   code de récupération (`TotpEnrollmentRequest`).
 - L'ajout et le retrait d'une passkey, le dernier facteur restant désactivé et expliqué.
+
+### Écarts de contrat (trouvés en ouvrant la step)
+- **`GET /auth/mfa/webauthn/passkeys`** — aucune route ne listait les clés : sans elle, ni nom à
+  afficher ni identifiant à retirer.
+- **`POST /auth/mfa/totp/confirm`** — un remplacement avec preuve remet `mfa_totp_last_step` à
+  `NULL` : le secret neuf reste non confirmé, `/auth/me` l'annonce absent, et il se réenrôle sans
+  preuve à la connexion suivante. `POST /auth/mfa/verify` ne peut pas le confirmer : il exige un
+  challenge de connexion que la session élevée n'a plus.
+- **`WebauthnRegistration.name`** — requis, 1 à 64 caractères (dette 042).
 
 ### Dettes héritées
 - **042** — le nom des passkeys, et avec lui l'emploi de `DELETE /auth/mfa/webauthn/passkeys/{id}`.
