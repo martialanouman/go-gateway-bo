@@ -17,11 +17,11 @@ import (
 
 const crlf = "\r\n"
 
-// smtpDialTimeout borne la connexion, smtpDeadline la conversation entière : le store tient la
-// transaction et le verrou de ligne pendant tout l'envoi, donc les deux doivent rester courts.
+// Le store tient le verrou de ligne pendant tout l'envoi, qu'un renvoi ou une désactivation attend :
+// la somme des deux délais reste nettement sous apiRequestDeadline (30 s), sans quoi elle rendrait 500.
 const (
-	smtpDialTimeout = 10 * time.Second
-	smtpDeadline    = 30 * time.Second
+	smtpDialTimeout = 5 * time.Second
+	smtpDeadline    = 10 * time.Second
 )
 
 // composeAccessLinkMail écrit le message SMTP en clair, en-têtes et corps CRLF compris (RFC 5322).
@@ -90,7 +90,7 @@ func smtpSender(cfg config.MailConfig, product string) store.SendLink {
 		}
 
 		// Le seul lien entre ctx et une conn qui ne le connaît pas : fermer la connexion annule tout
-		// appel bloqué dessus, sans attendre le plafond de 30 s posé ci-dessus.
+		// appel bloqué dessus, sans attendre le plafond posé ci-dessus.
 		done := make(chan struct{})
 		defer close(done)
 
