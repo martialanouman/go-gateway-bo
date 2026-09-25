@@ -198,6 +198,10 @@ func (a *Administration) SetOperatorStatus(ctx context.Context, id, status strin
 			if err = revokeSessions(ctx, tx, id); err != nil {
 				return err
 			}
+
+			if err = closeAccessLink(ctx, tx, id); err != nil {
+				return err
+			}
 		}
 
 		if updated, err = operator(ctx, tx, id); err != nil {
@@ -301,6 +305,17 @@ func (a *Administration) RequestAccessLink(ctx context.Context, id string, event
 
 		return record(ctx, tx, event)
 	})
+}
+
+// closeAccessLink garde la ligne : son `kind` dit encore à l'écran qu'un compte n'a jamais été activé.
+func closeAccessLink(ctx context.Context, tx pgx.Tx, operatorID string) error {
+	if _, err := tx.Exec(ctx, `
+		UPDATE access_links SET token_hash = NULL, expires_at = NULL, sent_at = NULL, attempts = $2
+		WHERE operator_id::text = $1`, operatorID, MaxDeliveryAttempts); err != nil {
+		return fmt.Errorf("fermer le lien d'accès de l'opérateur : %w", err)
+	}
+
+	return nil
 }
 
 func revokeSessions(ctx context.Context, tx pgx.Tx, operatorID string) error {

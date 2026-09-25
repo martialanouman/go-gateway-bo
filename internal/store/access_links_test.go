@@ -326,3 +326,37 @@ func TestUnLienSurUnCompteDesactiveEstRefuse(t *testing.T) {
 	assert.ErrorIs(t, links.Consume(t.Context(), digest, "neuf", store.Event{Action: "operator.password_set"}),
 		store.ErrLinkInvalid)
 }
+
+// Réactiver ne rend pas vie à ce que la désactivation a fermé : ni le lien parti, ni la demande en
+// file, qui partirait sans que personne l'ait redemandée.
+func TestUneReactivationNeRanimeAucunLien(t *testing.T) {
+	t.Parallel()
+
+	pool, dsn := migratedPool(t)
+	admin := store.NewAdministration(pool)
+	links := store.NewAccessLinks(pool)
+	sent := insertOperator(t, dsn, "camille@exemple.test", "hash")
+	queued := insertOperator(t, dsn, "nadia@exemple.test", "hash")
+	requestReset(t, pool, sent)
+	digest := digestOf(t, deliver(t, links))
+	requestReset(t, pool, queued)
+
+	for _, status := range []string{"disabled", store.StatusActive} {
+		for _, operator := range []string{sent, queued} {
+			_, err := admin.SetOperatorStatus(t.Context(), operator, status, store.Event{Action: "operator.status"})
+			require.NoError(t, err)
+		}
+	}
+
+	require.ErrorIs(t, links.Consume(t.Context(), digest, "neuf", store.Event{Action: "operator.password_set"}),
+		store.ErrLinkInvalid)
+
+	var calls atomic.Int32
+
+	delivered, err := links.DeliverNext(t.Context(), failing(&calls))
+	require.NoError(t, err)
+	assert.False(t, delivered, "une demande faite avant la désactivation part après la réactivation")
+
+	requestReset(t, pool, queued)
+	assert.NotEmpty(t, deliver(t, links), "un renvoi après la réactivation ne part pas")
+}
