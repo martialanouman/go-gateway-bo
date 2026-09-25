@@ -217,6 +217,8 @@ E2E_OPERATOR_EMAIL = parcours@example.test
 E2E_OPERATOR_NAME = Opératrice de parcours
 E2E_OPERATOR_PASSWORD = Un-mot-de-passe-de-parcours-1
 
+# Le parcours de step-050 lit ses liens d'accès dans Mailpit, jamais reçus pour de vrai : sans
+# `docker compose up -d`, il tourne sans SMTP joignable et rougit sur l'attente du mail.
 e2e: build ## Parcours Playwright, contre le binaire (:3101)
 	@printf '%s' "$(E2E_ADMIN_URL)" | go run ./scripts/e2edb
 	@printf '%s' "$(E2E_DATABASE_URL)" | go run ./cmd/migrate
