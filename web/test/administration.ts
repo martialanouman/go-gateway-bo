@@ -82,8 +82,9 @@ export function stubAdministration(
     if (declared !== undefined) return respond(declared)
 
     const [, , collection, id, detail] = pathname.split('/')
-    const body =
-      request.method === 'GET' || request.method === 'DELETE' ? undefined : await request.json()
+    // `POST /operators/{id}/access-link` n'a pas de corps ; `request.json()` sur un flux vide lève.
+    const raw = request.method === 'GET' || request.method === 'DELETE' ? '' : await request.text()
+    const body = raw ? JSON.parse(raw) : undefined
 
     if (collection === 'operators') {
       if (request.method === 'GET') return Response.json(operators)
@@ -104,6 +105,15 @@ export function stubAdministration(
 
       const target = operators.find((operator) => operator.id === id)
       if (target === undefined) return respond({ status: 404, body: refusal('not_found') })
+
+      if (request.method === 'POST' && detail === 'access-link') {
+        const sent: Operator = {
+          ...target,
+          accessLink: { kind: target.accessLink?.kind ?? 'reset', state: 'sent' },
+        }
+        operators = operators.map((operator) => (operator.id === id ? sent : operator))
+        return new Response(null, { status: 202 })
+      }
 
       let updated = target
       if (request.method === 'PATCH') updated = { ...target, status: body.status }

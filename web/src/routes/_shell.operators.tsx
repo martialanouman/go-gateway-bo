@@ -24,6 +24,16 @@ import { usePermission } from '~/lib/permissions'
 type Operator = components['schemas']['Operator']
 type Role = components['schemas']['Role']
 
+/** L'affichage porte l'état de l'envoi, jamais la validité du lien : un lien parti reste « sent ». */
+function accessLinkStatus(operator: Operator): string {
+  if (operator.status === 'disabled') return 'Désactivé'
+  const link = operator.accessLink
+  if (link === null) return 'Actif'
+  if (link.state === 'failed') return 'Envoi en échec'
+  if (link.state === 'sent') return 'Lien envoyé'
+  return link.kind === 'activation' ? 'Activation en attente' : 'Envoi en attente'
+}
+
 const SELF_REASON =
   'Le compte de la session ne se désactive pas ici : un autre détenteur de operators:manage peut le faire.'
 
@@ -77,7 +87,9 @@ function OperatorsScreen() {
   )
 }
 
-type Pending = { readonly kind: 'roles' | 'disable'; readonly operator: Operator } | undefined
+type Pending =
+  | { readonly kind: 'roles' | 'disable' | 'link'; readonly operator: Operator }
+  | undefined
 
 function OperatorsTable({ operators }: { readonly operators: readonly Operator[] }) {
   const { data: me } = useQuery(meQueryOptions)
@@ -105,7 +117,7 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
           {
             key: 'status',
             header: 'Statut',
-            cell: (operator) => (operator.status === 'active' ? 'Actif' : 'Désactivé'),
+            cell: accessLinkStatus,
           },
           {
             key: 'roles',
@@ -159,6 +171,17 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
                       Réactiver
                     </Button>
                   )}
+                  <Button
+                    {...blockedBy(
+                      operator.status === 'disabled'
+                        ? 'Le compte est désactivé : réactivez-le avant d’envoyer un lien.'
+                        : undefined,
+                    )}
+                    onClick={() => setPending({ kind: 'link', operator })}
+                    size="sm"
+                  >
+                    Envoyer un lien
+                  </Button>
                 </div>
               )
             },
@@ -173,6 +196,9 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
       ) : null}
       {pending?.kind === 'disable' ? (
         <ConfirmDisable onClose={close} operator={pending.operator} />
+      ) : null}
+      {pending?.kind === 'link' ? (
+        <ConfirmSendLink onClose={close} operator={pending.operator} />
       ) : null}
     </>
   )
@@ -213,7 +239,7 @@ function CreateOperator({
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: operatorsQueryKey })
       toast({
-        title: `Compte de ${created.displayName} créé : actif, sans rôle, second facteur à enrôler`,
+        title: `Compte créé. Le lien d’activation part à ${created.email} ; il vaut 72 heures.`,
         severity: 'success',
       })
       dismiss()
@@ -393,6 +419,65 @@ function ConfirmDisable({
         Ses sessions sont fermées immédiatement, et il ne peut plus se connecter. Ses rôles et son
         second facteur restent en place ; « Réactiver » lui rend l’accès, par une nouvelle
         connexion. Action journalisée.
+      </p>
+    </Modal>
+  )
+}
+
+function ConfirmSendLink({
+  operator,
+  onClose,
+}: {
+  readonly operator: Operator
+  readonly onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  // Un compte sans mot de passe porte toujours sa ligne d'activation : elle ne disparaît qu'à
+  // l'usage, donc tout autre cas (null compris) appelle un lien de réinitialisation.
+  const isActivation = operator.accessLink?.kind === 'activation'
+  const send = useMutation({
+    mutationFn: () =>
+      orRefusal(
+        api.POST('/operators/{operatorId}/access-link', {
+          params: { path: { operatorId: operator.id } },
+        }),
+        'Le lien n’a pas été envoyé',
+      ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: operatorsQueryKey })
+      onClose()
+    },
+  })
+
+  return (
+    <Modal
+      footer={
+        <>
+          <Button onClick={onClose}>Annuler</Button>
+          <Button loading={send.isPending} onClick={() => send.mutate()} variant="primary">
+            Envoyer le lien
+          </Button>
+        </>
+      }
+      onClose={onClose}
+      open
+      title={`Envoyer un lien à ${operator.displayName}`}
+    >
+      <Refusal error={send.error} />
+      <p>
+        {isActivation ? (
+          <>
+            Un lien d’activation part à {operator.email} ; il vaut 72 heures. Un lien envoyé plus
+            tôt cesse de valoir. Action journalisée.
+          </>
+        ) : (
+          <>
+            Un lien de réinitialisation part à {operator.email} ; il vaut 1 heure. Rien ne change
+            avant son usage : son mot de passe, son second facteur et ses sessions restent valables
+            jusque-là. À l’usage, il définit un nouveau mot de passe, son second facteur est retiré
+            et ses sessions sont fermées. Action journalisée.
+          </>
+        )}
       </p>
     </Modal>
   )

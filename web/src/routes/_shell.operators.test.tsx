@@ -80,7 +80,11 @@ describe('l’écran des opérateurs', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
 
     expect(await screen.findByRole('cell', { name: /n\.benali@example\.test/ })).toBeInTheDocument()
-    expect(await screen.findByText(/Compte de Nadia Benali créé/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Compte créé. Le lien d’activation part à n.benali@example.test ; il vaut 72 heures.',
+      ),
+    ).toBeInTheDocument()
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Nouvel opérateur' })).not.toBeInTheDocument(),
     )
@@ -342,5 +346,82 @@ describe('l’écran des opérateurs', () => {
     await visit()
 
     expect(row(SELF.email).getByText('Configuré')).toBeInTheDocument()
+  })
+
+  it('rend l’état de l’envoi du lien d’accès dans la colonne Statut', async () => {
+    const activating = {
+      ...COLLEAGUE,
+      accessLink: { kind: 'activation', state: 'queued' } as const,
+    }
+    const sent = {
+      ...COLLEAGUE,
+      id: 'op-sent',
+      email: 'lien.envoye@example.test',
+      accessLink: { kind: 'reset', state: 'sent' } as const,
+    }
+    const failed = {
+      ...COLLEAGUE,
+      id: 'op-failed',
+      email: 'envoi.echec@example.test',
+      accessLink: { kind: 'activation', state: 'failed' } as const,
+    }
+    const resetting = {
+      ...COLLEAGUE,
+      id: 'op-resetting',
+      email: 'envoi.attente@example.test',
+      accessLink: { kind: 'reset', state: 'queued' } as const,
+    }
+    await visit(undefined, {}, [SELF, activating, sent, failed, resetting])
+
+    expect(row(activating.email).getByText('Activation en attente')).toBeInTheDocument()
+    expect(row(sent.email).getByText('Lien envoyé')).toBeInTheDocument()
+    expect(row(failed.email).getByText('Envoi en échec')).toBeInTheDocument()
+    expect(row(resetting.email).getByText('Envoi en attente')).toBeInTheDocument()
+  })
+
+  it('désactive et explique « Envoyer un lien » sur un compte désactivé', async () => {
+    await visit(undefined, {}, [SELF, { ...COLLEAGUE, status: 'disabled' }])
+
+    expectBlockedAndExplained(
+      row(COLLEAGUE.email).getByRole('button', { name: 'Envoyer un lien' }),
+      /désactivé/,
+    )
+  })
+
+  it('envoie un lien de réinitialisation après une confirmation qui dit que rien ne change avant son usage', async () => {
+    const user = userEvent.setup()
+    const fetch = await visit()
+
+    await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Envoyer un lien' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: `Envoyer un lien à ${COLLEAGUE.displayName}`,
+    })
+    expect(dialog).toHaveTextContent(/Rien ne change avant son usage/)
+    expect(dialog).toHaveTextContent(/second facteur est retiré/)
+    await user.click(within(dialog).getByRole('button', { name: 'Envoyer le lien' }))
+
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.some(
+          ([request]) =>
+            request.method === 'POST' &&
+            new URL(request.url).pathname === `/api/operators/${COLLEAGUE.id}/access-link`,
+        ),
+      ).toBe(true),
+    )
+    expect(await row(COLLEAGUE.email).findByText('Lien envoyé')).toBeInTheDocument()
+  })
+
+  it('confirme l’envoi d’un lien d’activation en disant sa durée', async () => {
+    const user = userEvent.setup()
+    const pending = { ...COLLEAGUE, accessLink: { kind: 'activation', state: 'queued' } as const }
+    await visit(undefined, {}, [SELF, pending])
+
+    await user.click(row(pending.email).getByRole('button', { name: 'Envoyer un lien' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: `Envoyer un lien à ${pending.displayName}`,
+    })
+    expect(dialog).toHaveTextContent(/72 heures/)
+    expect(dialog).toHaveTextContent(/lien envoyé plus tôt cesse de valoir/)
   })
 })
