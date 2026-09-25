@@ -494,8 +494,9 @@ func (w *operatorsWorld) comparseSignsInWithoutFactor() error {
 		return err
 	}
 
-	if factors.SecondFactors.TOTP || factors.SecondFactors.Passkeys != 0 {
-		return fmt.Errorf("le comparse détient encore un second facteur : %+v", factors.SecondFactors)
+	held := factors.SecondFactors
+	if held.TOTP || held.Passkeys != 0 || held.RecoveryCodesRemaining != 0 {
+		return fmt.Errorf("le comparse détient encore un second facteur : %+v", held)
 	}
 
 	return nil
