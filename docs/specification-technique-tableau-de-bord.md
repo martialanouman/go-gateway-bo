@@ -79,7 +79,10 @@ Tous les ID sont des UUIDv7, cohérent avec la convention plateforme.
 operators
   id (uuidv7, pk)
   email, display_name
-  password_hash                          -- email/password auth (§6.9)
+  password_hash          (nullable)      -- email/password auth (§6.9)
+                                          -- (Amendement step-050) NULL tant que le titulaire ne l'a
+                                          -- pas défini par son lien d'activation ; l'administrateur
+                                          -- ne le choisit plus
   mfa_totp_secret        (nullable)       -- enrolled authenticator (TOTP), CHIFFRÉ au repos
                                           -- (Amendement step-023) AES-256-GCM, clé dérivée de
                                           -- DASHBOARD_TOTP_ENCRYPTION_KEY, identifiant de
@@ -190,6 +193,21 @@ webauthn_challenges                  -- (Amendement step-024) le défi d'une cé
                                          -- à laquelle la cérémonie est liée
   created_at, expires_at
   consumed_at            (nullable)      -- usage unique, même forme qu'en mfa_challenges
+
+access_links                         -- (Amendement step-050) le lien d'activation ou de reset envoyé par e-mail
+  operator_id (pk, fk)                   -- UNE ligne par opérateur : une nouvelle demande efface
+                                         -- l'empreinte du lien précédent, parti ou non
+  kind                   (activation|reset) -- activation si le compte n'a pas encore de mot de passe
+                                         -- au moment de la demande
+  token_hash             (nullable)      -- SHA-256 du jeton ; le jeton en clair n'est jamais stocké.
+                                         -- Tiré à l'envoi et écrit après un envoi réussi : NULL tant
+                                         -- que la demande attend dans la file
+  expires_at, sent_at    (nullable)      -- posés à l'envoi ; 72 h pour une activation, 1 h pour un reset
+  attempts, next_attempt_at              -- report exponentiel 30 s × 2^n plafonné à 10 min ; abandon
+                                         -- après 10 échecs. La désactivation du compte efface
+                                         -- l'empreinte et pose attempts = 10 : une réactivation ne
+                                         -- ranime ni le lien parti ni la demande en file
+                                         -- consommé = ligne SUPPRIMÉE
 
 audit_log
   id (uuidv7, pk)
