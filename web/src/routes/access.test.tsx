@@ -131,6 +131,21 @@ describe('ce que le serveur rend à l’envoi', () => {
     expect(screen.getByLabelText('Mot de passe')).toHaveValue(VALID_PASSWORD)
   })
 
+  it('efface le refus du serveur dès la frappe, comme login.tsx', async () => {
+    const { user } = await visitAccess('/access#JETON', {
+      body: { code: 'overloaded', message: 'Le serveur vérifie déjà…' },
+      status: 503,
+    })
+
+    await fillAndSubmit(user)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Le serveur vérifie déjà')
+
+    await user.type(screen.getByLabelText('Mot de passe'), '!')
+
+    // Un refus qui survit à ce qu'il reproche fait douter de tous les autres.
+    expect(screen.queryByText(/Le serveur vérifie déjà/)).toBeNull()
+  })
+
   it('un succès efface le jeton et mène à l’avis de connexion', async () => {
     const { router, user } = await visitAccess('/access#JETON')
 
@@ -143,5 +158,23 @@ describe('ce que le serveur rend à l’envoi', () => {
       'Mot de passe enregistré. Connectez-vous pour configurer votre second facteur.',
     )
     expect(peekAccessToken()).toBeUndefined()
+  })
+})
+
+describe('ce que le cache garde après coup', () => {
+  it('efface la mutation du cache après le départ de l’écran — jeton et mot de passe compris', async () => {
+    const { fetch, router, user } = await visitAccess('/access#JETON')
+
+    await fillAndSubmit(user)
+    await screen.findByRole('heading', { level: 1, name: 'Connexion' })
+
+    // Une macrotâche réelle : le `setTimeout` de collecte posé à la disparition de l'écran a déjà pu
+    // s'exécuter s'il vaut `0` (`gcTime: 0`). Sans lui, le plafond par défaut de TanStack Query vaut
+    // cinq minutes, et l'entrée — `variables` compris, jeton et mot de passe en clair — y serait
+    // toujours à ce point.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(router.options.context.queryClient.getMutationCache().findAll()).toEqual([])
+    expect(fetch.mock.calls.filter(([request]) => request.method === 'POST')).toHaveLength(1)
   })
 })

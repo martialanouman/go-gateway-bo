@@ -89,6 +89,10 @@ function AccessForm({ token }: { readonly token: string }) {
   })
 
   const setPassword = useMutation({
+    // Les variables de la mutation portent le jeton et le mot de passe en clair : sans `gcTime: 0`,
+    // TanStack Query les garde cinq minutes dans le cache après le départ de l'écran (invariant b),
+    // comme la création d'un opérateur (`_shell.operators.tsx`).
+    gcTime: 0,
     mutationFn: async ({ password }: z.output<typeof passwordForm>) => {
       // Pas de `data` à lire : le succès rend 204 sans corps (`setPasswordFromAccessLink`).
       const { error, response } = await api.POST('/auth/access-link', {
@@ -114,6 +118,9 @@ function AccessForm({ token }: { readonly token: string }) {
     )
   }
 
+  // Comme `login.tsx` : le refus du serveur porte sur une saisie qui vient de changer, et un
+  // message qui lui survit fait douter de tous les autres.
+  const forgetRefusal = { onChange: () => setPassword.reset() }
   const { errors } = form.formState
 
   return (
@@ -135,7 +142,7 @@ function AccessForm({ token }: { readonly token: string }) {
             autoFocus
             required
             type="password"
-            {...form.register('password')}
+            {...form.register('password', forgetRefusal)}
           />
         </Field>
 
@@ -144,7 +151,7 @@ function AccessForm({ token }: { readonly token: string }) {
             autoComplete="new-password"
             required
             type="password"
-            {...form.register('confirmation')}
+            {...form.register('confirmation', forgetRefusal)}
           />
         </Field>
 
