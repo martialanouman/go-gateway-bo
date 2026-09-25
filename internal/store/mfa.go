@@ -139,6 +139,35 @@ func (m *MFA) ConsumeStep(ctx context.Context, operatorID string, step int64) (b
 	return tag.RowsAffected() > 0, nil
 }
 
+// ConfirmStep consomme le pas comme `ConsumeStep`, et journalise la confirmation dans la même
+// transaction : ou les deux, ou aucune.
+func (m *MFA) ConfirmStep(ctx context.Context, operatorID string, step int64, event Event) (bool,
+	error,
+) {
+	const query = `
+		UPDATE operators
+		SET mfa_totp_last_step = $2
+		WHERE id = $1
+		  AND (mfa_totp_last_step IS NULL OR mfa_totp_last_step < $2)`
+
+	confirmed := false
+
+	err := inTx(ctx, m.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, query, operatorID, step)
+		if err != nil {
+			return fmt.Errorf("confirmer le pas de second facteur : %w", err)
+		}
+
+		if confirmed = tag.RowsAffected() > 0; !confirmed {
+			return nil
+		}
+
+		return record(ctx, tx, event)
+	})
+
+	return confirmed && err == nil, err
+}
+
 // Enroll pose le secret chiffré et **remplace** les codes de récupération. `false` dit qu'un second
 // facteur était déjà en place et que `replace` ne l'autorisait pas.
 //

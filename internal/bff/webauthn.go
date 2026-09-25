@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -13,6 +14,8 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
+
+const maximumPasskeyNameLength = 64
 
 // BeginWebauthnRegistration ouvre l'enregistrement d'une passkey.
 //
@@ -75,6 +78,11 @@ func (a API) FinishWebauthnRegistration(ctx context.Context,
 		return FinishWebauthnRegistration400JSONResponse(badRequest()), nil
 	}
 
+	name, named := passkeyName(request.Body.Name)
+	if !named {
+		return FinishWebauthnRegistration400JSONResponse(badRequest()), nil
+	}
+
 	// La map vient d'un décodage JSON réussi, donc elle se re-sérialise toujours. Un échec ici n'est
 	// pas une requête mal formée mais une panne, et le taire en 400 ferait chercher la faute au client.
 	attestation, err := json.Marshal(request.Body.Attestation)
@@ -110,11 +118,12 @@ func (a API) FinishWebauthnRegistration(ctx context.Context,
 	//
 	// Sans `TargetID` : la passkey n'a pas encore d'identifiant, et c'est le store qui le pose une
 	// fois l'insertion faite.
-	id, err := a.Passkeys.FinishRegistration(ctx, resolved.ID, resolved.OperatorID, attestation,
+	id, err := a.Passkeys.FinishRegistration(ctx, resolved.ID, resolved.OperatorID, name, attestation,
 		a.event(ctx, store.Event{
 			OperatorID: resolved.OperatorID,
 			Action:     actionPasskeyRegister,
 			TargetType: auditTargetPasskey,
+			After:      store.NewFields().Text("name", name),
 		}))
 	if err != nil {
 		if mfa.IsRefusedCeremony(err) {
@@ -298,13 +307,11 @@ func lastSecondFactor() Error {
 // n'en est pas un » rendent le même refus — la comparaison `c.id::text = $2` du store les traite
 // ensemble, et les distinguer dirait ce que possède quelqu'un d'autre.
 //
-// L'inventaire qu'il annonce n'existe pas encore : aucune route ne liste les clés. Le futur est donc
-// écrit au futur, comme dans `secondFactorAlreadyEnrolled`.
 func unknownPasskey() Error {
 	return Error{
 		Code: "passkey_unknown",
-		Message: "Cette clé d'accès n'est pas sur ce compte : rien n'a été retiré. L'inventaire qui " +
-			"nomme les clés du compte arrivera avec l'écran de gestion du second facteur.",
+		Message: "Cette clé d'accès n'est pas sur ce compte : rien n'a été retiré. Les clés du " +
+			"compte sont listées dans « Mon compte ».",
 	}
 }
 
@@ -459,5 +466,35 @@ func userHandleOf(id any) string {
 
 func (a API) ListWebauthnPasskeys(ctx context.Context, _ ListWebauthnPasskeysRequestObject,
 ) (ListWebauthnPasskeysResponseObject, error) {
-	return nil, errors.New("pas encore livré")
+	resolved, alive, err := sessionFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !alive {
+		return ListWebauthnPasskeys401JSONResponse(notAuthenticated()), nil
+	}
+
+	passkeys, err := a.Passkeys.List(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make(ListWebauthnPasskeys200JSONResponse, 0, len(passkeys))
+	for _, passkey := range passkeys {
+		summaries = append(summaries, PasskeySummary{
+			Id:        passkey.ID,
+			Name:      passkey.Name,
+			CreatedAt: passkey.CreatedAt,
+		})
+	}
+
+	return summaries, nil
+}
+
+// passkeyName rend le nom présenté, bords nettoyés, et dit s'il tient dans les bornes du contrat.
+func passkeyName(presented string) (string, bool) {
+	name := strings.TrimSpace(presented)
+
+	return name, name != "" && len([]rune(name)) <= maximumPasskeyNameLength
 }

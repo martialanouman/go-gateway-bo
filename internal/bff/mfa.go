@@ -144,7 +144,7 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 				return EnrollTotp503JSONResponse(overloaded()), nil
 			}
 
-			return nil, err
+			return nil, a.releaseUnjudgedAttempt(ctx, resolved.OperatorID, err)
 		}
 
 		if !replace {
@@ -251,7 +251,7 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 
 	challenge, live, err := a.SecondFactor.Challenge(ctx, request.Body.Challenge)
 	if err != nil {
-		return nil, err
+		return nil, a.releaseUnjudgedAttempt(ctx, resolved.OperatorID, err)
 	}
 
 	if !live || challenge.OperatorID != resolved.OperatorID {
@@ -264,7 +264,7 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 			return VerifyMfa503JSONResponse(overloaded()), nil
 		}
 
-		return nil, err
+		return nil, a.releaseUnjudgedAttempt(ctx, resolved.OperatorID, err)
 	}
 
 	if !verified {
@@ -530,8 +530,102 @@ func secondFactorsOf(ctx context.Context, factors *mfa.Manager, operatorID strin
 	}, nil
 }
 
+// ConfirmTotp confirme l'application d'authentification que cette session élevée vient de remplacer.
+// `VerifyMfa` ne le peut pas : il exige un challenge de connexion, que la session n'a plus.
 func (a API) ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) (ConfirmTotpResponseObject,
 	error,
 ) {
-	return nil, errors.New("pas encore livré")
+	if request.Body == nil || request.Body.Code == "" ||
+		len([]rune(request.Body.Code)) > maximumCodeLength {
+		return ConfirmTotp400JSONResponse(badRequest()), nil
+	}
+
+	resolved, alive, err := sessionFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !alive {
+		return ConfirmTotp401JSONResponse(notAuthenticated()), nil
+	}
+
+	if !resolved.Elevated {
+		return ConfirmTotp409JSONResponse(elevationRequiredToConfirm()), nil
+	}
+
+	lock, err := a.SecondFactor.Reserve(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if lock.Locked() {
+		return confirmationLocked(lock.Remaining), nil
+	}
+
+	confirmed, err := a.SecondFactor.ConfirmTOTP(ctx, resolved.OperatorID, request.Body.Code,
+		a.event(ctx, store.Event{
+			OperatorID: resolved.OperatorID,
+			Action:     actionMFAConfirm,
+			TargetType: auditTargetOperator,
+			TargetID:   resolved.OperatorID,
+			After:      store.NewFields().Text("method", "totp"),
+		}))
+	if err != nil {
+		if errors.Is(err, auth.ErrOverloaded) {
+			return ConfirmTotp503JSONResponse(overloaded()), nil
+		}
+
+		return nil, a.releaseUnjudgedAttempt(ctx, resolved.OperatorID, err)
+	}
+
+	if !confirmed {
+		if lock.Failures >= mfa.MaxFailures {
+			return confirmationLocked(mfa.LockWindow), nil
+		}
+
+		return ConfirmTotp400JSONResponse(refusedConfirmationCode()), nil
+	}
+
+	if err = a.SecondFactor.Succeed(ctx, resolved.OperatorID); err != nil {
+		return nil, err
+	}
+
+	return ConfirmTotp204Response{}, nil
+}
+
+// releaseUnjudgedAttempt rend l'essai réservé quand la vérification a échoué sans juger le code
+// (dette 055) : une erreur interne ne dit rien du code présenté. La saturation, elle, reste comptée.
+func (a API) releaseUnjudgedAttempt(ctx context.Context, operatorID string, cause error) error {
+	if err := a.SecondFactor.Release(ctx, operatorID); err != nil {
+		return errors.Join(cause, err)
+	}
+
+	return cause
+}
+
+func confirmationLocked(remaining time.Duration) ConfirmTotp429JSONResponse {
+	seconds := retryAfterSeconds(remaining)
+
+	return ConfirmTotp429JSONResponse{
+		Headers: ConfirmTotp429ResponseHeaders{RetryAfter: seconds},
+		Body:    secondFactorLocked(seconds),
+	}
+}
+
+func elevationRequiredToConfirm() Error {
+	return Error{
+		Code: "mfa_elevation_required",
+		Message: "Confirmer une application d'authentification demande d'avoir franchi le second " +
+			"facteur sur cette session. Le franchir, puis reprendre la confirmation.",
+	}
+}
+
+// refusedConfirmationCode part en 400 et non en 401 : la session est vivante, et un client qui lit
+// tout 401 comme « session close » renverrait l'opérateur au login.
+func refusedConfirmationCode() Error {
+	return Error{
+		Code: "mfa_code_refused",
+		Message: "Ce code n'a pas été accepté : l'application d'authentification n'est pas encore " +
+			"confirmée. Saisir le code qu'elle affiche maintenant.",
+	}
 }

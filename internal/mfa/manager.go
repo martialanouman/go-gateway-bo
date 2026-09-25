@@ -106,6 +106,22 @@ func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, re
 // est un rejeu, donc un refus. C'est `ConsumeStep` qui tranche, dans son `WHERE`, et non une lecture
 // suivie d'une décision.
 func (m *Manager) VerifyTOTP(ctx context.Context, operatorID, code string) (bool, error) {
+	return m.verifyTOTP(ctx, operatorID, code, func(step int64) (bool, error) {
+		return m.factors.ConsumeStep(ctx, operatorID, step)
+	})
+}
+
+// ConfirmTOTP vérifie comme `VerifyTOTP`, et journalise la confirmation avec le pas consommé.
+func (m *Manager) ConfirmTOTP(ctx context.Context, operatorID, code string, event store.Event,
+) (bool, error) {
+	return m.verifyTOTP(ctx, operatorID, code, func(step int64) (bool, error) {
+		return m.factors.ConfirmStep(ctx, operatorID, step, event)
+	})
+}
+
+func (m *Manager) verifyTOTP(ctx context.Context, operatorID, code string,
+	consume func(step int64) (bool, error),
+) (bool, error) {
 	state, found, err := m.State(ctx, operatorID)
 	if err != nil || !found || !state.Enrolled {
 		return false, err
@@ -116,7 +132,7 @@ func (m *Manager) VerifyTOTP(ctx context.Context, operatorID, code string) (bool
 		return false, err
 	}
 
-	return m.factors.ConsumeStep(ctx, operatorID, step)
+	return consume(step)
 }
 
 // VerifyRecoveryCode confronte le code aux hachages restants **puis** détruit celui qui a servi.
@@ -172,6 +188,11 @@ func (m *Manager) ConsumeChallenge(ctx context.Context, id string) (bool, error)
 // envoyait de requêtes.
 func (m *Manager) Reserve(ctx context.Context, operatorID string) (store.Lock, error) {
 	return m.factors.Reserve(ctx, operatorID, LockWindow, MaxFailures)
+}
+
+// Release rend l'essai réservé quand la vérification a échoué sur une erreur interne (dette 055).
+func (m *Manager) Release(ctx context.Context, operatorID string) error {
+	return m.factors.Release(ctx, operatorID)
 }
 
 // Succeed efface le compteur d'un opérateur qui vient de franchir son second facteur.

@@ -18,6 +18,7 @@ const (
 	actionLogout          = "operator.logout"
 	actionMFAEnroll       = "mfa.enroll"
 	actionMFAVerify       = "mfa.verify"
+	actionMFAConfirm      = "mfa.confirm"
 	actionPasskeyRegister = "passkey.register"
 	actionPasskeyRemove   = "passkey.remove"
 	actionPasswordSet     = "operator.password_set"
