@@ -110,6 +110,7 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^la réponse ne porte ni le secret ni aucun code de récupération$`, w.responseHidesTheSecret)
 	ctx.Then(`^la réponse annonce un second facteur enrôlé$`, w.announcesAnEnrolledFactor)
 	ctx.Then(`^la session n'annonce aucun second facteur$`, w.announcesNoFactor)
+	ctx.Given(`^la session n'annonce aucun second facteur$`, w.announcesNoFactor)
 }
 
 func (w *mfaWorld) enroll() error {

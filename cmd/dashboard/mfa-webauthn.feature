@@ -144,6 +144,21 @@ Fonctionnalité: Le second facteur par passkey
     Alors le serveur répond 400
     Et il lui reste 0 clé d'accès
 
+  # Un compte gardé par une clé porte déjà un facteur confirmé : l'application ajoutée attend sa
+  # confirmation, que la session élevée par la clé peut donner sans challenge de connexion.
+  Scénario: un compte à clé d'accès ajoute une application d'authentification et la confirme
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et une clé d'accès enregistrée
+    Et l'opérateur a présenté sa clé d'accès
+    Et l'opérateur enrôle une application d'authentification
+    Et la session n'annonce aucun second facteur
+    Quand l'opérateur confirme sa nouvelle application d'authentification
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 204
+    Et la session annonce une application d'authentification
+
   Scénario: retirer une clé d'accès quand il en reste une autre réussit
     Étant donné une installation avec un opérateur
     Et un serveur démarré
