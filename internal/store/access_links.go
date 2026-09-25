@@ -180,15 +180,26 @@ func (l *AccessLinks) Valid(ctx context.Context, digest []byte) (bool, error) {
 	return valid, nil
 }
 
-// Consume pose le mot de passe et, pour un reset, retire les facteurs et ferme les sessions : rien de
-// tout cela ne change avant l'usage du lien.
+// Consume pose le mot de passe et, pour un reset, retire les facteurs, le verrou de l'adresse et les
+// sessions : rien de tout cela ne change avant l'usage du lien.
+//
+// L'opérateur se verrouille avant le lien, dans l'ordre de RequestAccessLink et de SetOperatorStatus,
+// sans quoi deux transactions croisées s'interbloquent. Aucun test ne rougit sans `FOR UPDATE` ; c'est
+// mesuré : la course ne se fabrique pas sans couture dans le store.
 func (l *AccessLinks) Consume(ctx context.Context, digest []byte, passwordHash string, event Event) error {
 	return inTx(ctx, l.pool, func(tx pgx.Tx) error {
 		var id, kind string
 
 		err := tx.QueryRow(ctx, `
-			DELETE FROM access_links l USING operators o WHERE `+usableLink+`
-			RETURNING l.operator_id::text, l.kind`, digest).Scan(&id, &kind)
+			SELECT o.id::text FROM operators o
+			WHERE o.id = (SELECT operator_id FROM access_links WHERE token_hash = $1)
+			FOR UPDATE`, digest).Scan(&id)
+		if err == nil {
+			err = tx.QueryRow(ctx, `
+				DELETE FROM access_links l USING operators o WHERE `+usableLink+`
+				RETURNING l.kind`, digest).Scan(&kind)
+		}
+
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrLinkInvalid
 		}
@@ -209,6 +220,14 @@ func (l *AccessLinks) Consume(ctx context.Context, digest []byte, passwordHash s
 
 			if err = revokeSessions(ctx, tx, id); err != nil {
 				return err
+			}
+
+			// La clé est celle de Reserve : l'adresse que OperatorByEmail compare, `lower(email)`.
+			if _, err = tx.Exec(ctx, `
+				DELETE FROM login_attempt_counters
+				WHERE scope = '`+ScopeEmail+`' AND subject = (SELECT lower(email) FROM operators WHERE id = $1::uuid)`,
+				id); err != nil {
+				return fmt.Errorf("lever le verrou de l'adresse : %w", err)
 			}
 		}
 

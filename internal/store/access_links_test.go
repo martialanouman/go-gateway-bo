@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -359,4 +360,27 @@ func TestUneReactivationNeRanimeAucunLien(t *testing.T) {
 
 	requestReset(t, pool, queued)
 	assert.NotEmpty(t, deliver(t, links), "un renvoi après la réactivation ne part pas")
+}
+
+// Sans quoi le titulaire verrouillé par ses erreurs resterait refusé, jusqu'à la fin de la fenêtre,
+// avec le mot de passe qu'il vient de choisir.
+func TestLeResetLeveLeVerrouDeLAdresse(t *testing.T) {
+	t.Parallel()
+
+	pool, dsn := migratedPool(t)
+	links := store.NewAccessLinks(pool)
+	operator := insertOperator(t, dsn, "Camille@Exemple.test", "hash")
+	execOn(t, dsn, `
+		INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
+		VALUES ('email', 'camille@exemple.test', 5, now()), ('email', 'nadia@exemple.test', 5, now())`)
+
+	requestReset(t, pool, operator)
+	require.NoError(t, links.Consume(t.Context(), digestOf(t, deliver(t, links)), "neuf",
+		store.Event{Action: "operator.password_set"}))
+
+	rows, err := pool.Query(t.Context(), `SELECT subject FROM login_attempt_counters WHERE scope = 'email'`)
+	require.NoError(t, err)
+	subjects, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	require.NoError(t, err)
+	assert.Equal(t, []string{"nadia@exemple.test"}, subjects)
 }
