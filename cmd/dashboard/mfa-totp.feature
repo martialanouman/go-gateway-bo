@@ -164,6 +164,68 @@ Fonctionnalité: Le second facteur TOTP
     Et le serveur répond 200
     Et le secret rendu diffère du précédent
 
+  # Un remplacement remet l'anti-rejeu à zéro : le secret neuf n'est confirmé qu'au premier code
+  # consommé. Sans confirmation, `/auth/me` l'annonçait absent et il se réenrôlait sans preuve.
+  Scénario: remplacer puis confirmer : la connexion suivante réclame le code du nouveau secret
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    Et l'opérateur remplace son authentificateur en présentant son code
+    Quand l'opérateur confirme sa nouvelle application d'authentification
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 204
+    Et la session annonce une application d'authentification
+    Et le journal porte 1 événement "mfa.confirm"
+    Quand l'opérateur se connecte avec son mot de passe
+    # Le pas suivant et non le courant : la confirmation vient de consommer le courant, et
+    # l'anti-rejeu le refuserait quel que soit le secret.
+    Et l'opérateur présente le code du pas suivant de l'ancien secret
+    Alors le serveur répond 401
+    Quand l'opérateur présente le code du pas suivant
+    Alors le serveur répond 204
+    Et le second facteur est vérifié
+
+  Scénario: confirmer sans session élevée est refusé
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Quand l'opérateur confirme sa nouvelle application d'authentification
+    Alors la réponse est conforme au contrat du BFF
+    Et le refus dit comment franchir le second facteur
+    Et la session n'annonce aucun second facteur
+
+  # 400 et non 401 : un client qui lit tout 401 comme une session close renverrait l'opérateur au
+  # login, élévation perdue, pour un chiffre de travers.
+  Scénario: un code de confirmation faux est refusé sans fermer la session
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    Et l'opérateur remplace son authentificateur en présentant son code
+    Quand l'opérateur confirme sa nouvelle application d'authentification avec un code faux
+    Alors la réponse est conforme au contrat du BFF
+    Et le code de confirmation est refusé
+    Et le second facteur est vérifié
+
+  # Dette 055. Une erreur interne ne dit rien du code essayé : la compter bloquait pour un quart
+  # d'heure l'opérateur qui réessayait, comme le message du 500 l'y invite.
+  Scénario: une panne pendant la vérification ne compte pas comme un essai
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et le secret de l'application d'authentification devient illisible
+    Quand l'opérateur présente 5 fois le code du pas courant
+    Alors le serveur répond 500
+    Quand le secret de l'application d'authentification redevient lisible
+    Et l'opérateur présente le code du pas courant
+    Alors le serveur répond 204
+    Et le second facteur est vérifié
+
   # **Le verrou que step-028 a découvert en s'en servant.** L'enrôlement écrit le secret avant que
   # l'opérateur ait scanné quoi que ce soit — `Enrolled` vaut `mfa_totp_secret IS NOT NULL`. Qui
   # ferme l'onglet à cet instant portait donc un facteur que personne ne détient, pas même lui : sa
