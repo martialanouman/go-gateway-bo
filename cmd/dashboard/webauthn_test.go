@@ -53,7 +53,6 @@ type webauthnWorld struct {
 
 const defaultPasskeyName = "Clé de scénario"
 
-
 // registerSteps vit ici et non dans `initializeScenario`, comme celui de `mfaWorld` : c'est la
 // quatrième step d'authentification d'affilée, et le registre de `main_test.go` grossissait d'une
 // vingtaine de lignes à chaque fois.

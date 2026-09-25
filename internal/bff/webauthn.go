@@ -306,7 +306,6 @@ func lastSecondFactor() Error {
 // elle est vivante et élevée. « Elle n'existe pas », « elle n'est pas à vous » et « cet identifiant
 // n'en est pas un » rendent le même refus — la comparaison `c.id::text = $2` du store les traite
 // ensemble, et les distinguer dirait ce que possède quelqu'un d'autre.
-//
 func unknownPasskey() Error {
 	return Error{
 		Code: "passkey_unknown",
