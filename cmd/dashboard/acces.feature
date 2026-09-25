@@ -31,20 +31,41 @@ Fonctionnalité: Définir son mot de passe par un lien à usage unique
     Et la session du comparse est refusée
     Et le comparse se reconnecte sans aucun second facteur
 
-  Scénario: un lien ne sert qu'une fois, n'expire pas en silence et cède au suivant
+  Scénario: un lien ne sert qu'une fois
     Étant donné le comparse n'a pas de mot de passe et a reçu un lien d'activation
     Et le comparse garde une copie de son lien
     Quand le comparse utilise son lien avec le mot de passe "Nouveau-mot-de-passe-1"
-    Et le comparse réutilise la copie de son lien
+    Alors le serveur répond 204
+    Quand le comparse réutilise la copie de son lien
     Alors le serveur répond 410
     Et la réponse valide le contrat du BFF
     Et le refus dit "Ce lien n'est plus valable : demandez-en un nouveau à un administrateur."
-    Étant donné le lien du comparse a expiré
+
+  Scénario: un lien expiré est refusé
+    Étant donné le comparse n'a pas de mot de passe et a reçu un lien d'activation
+    Et le lien du comparse a expiré
+    Quand le comparse utilise son lien avec le mot de passe "Nouveau-mot-de-passe-1"
+    Alors le serveur répond 410
+    Et le refus dit "Ce lien n'est plus valable : demandez-en un nouveau à un administrateur."
+
+  Scénario: un nouveau lien invalide le précédent
+    Étant donné le comparse n'a pas de mot de passe et a reçu un lien d'activation
+    Et le comparse garde une copie de son lien
+    Et l'opérateur ouvre une session élevée
+    Quand l'opérateur envoie un lien au comparse
+    Alors le serveur répond 202
+    Étant donné le lien du comparse est parti
     Quand le comparse réutilise la copie de son lien
-    Alors le refus dit "Ce lien n'est plus valable : demandez-en un nouveau à un administrateur."
-    Étant donné le comparse a reçu un second lien
-    Quand le comparse réutilise la copie de son lien
-    Alors le refus dit "Ce lien n'est plus valable : demandez-en un nouveau à un administrateur."
+    Alors le serveur répond 410
+    Et le refus dit "Ce lien n'est plus valable : demandez-en un nouveau à un administrateur."
+    Quand le comparse utilise son lien avec le mot de passe "Nouveau-mot-de-passe-1"
+    Alors le serveur répond 204
+
+  Scénario: un lien inventé est refusé avant la politique du mot de passe
+    Quand quelqu'un utilise un lien inventé avec le mot de passe "motdepasselong"
+    Alors le serveur répond 410
+    Et la réponse valide le contrat du BFF
+    Et le refus dit "Ce lien n'est plus valable : demandez-en un nouveau à un administrateur."
 
   Scénario: un mot de passe faible est refusé en nommant ce qui manque
     Étant donné le comparse n'a pas de mot de passe et a reçu un lien d'activation

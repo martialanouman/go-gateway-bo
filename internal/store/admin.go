@@ -85,7 +85,7 @@ const operatorsQuery = `
 	           OR EXISTS (SELECT 1 FROM webauthn_credentials c WHERE c.operator_id = o.id),
 	       l.kind,
 	       CASE WHEN l.token_hash IS NOT NULL THEN 'sent'
-	            WHEN l.attempts >= 10 THEN 'failed'
+	            WHEN l.attempts >= $2 THEN 'failed'
 	            ELSE 'queued' END
 	FROM operators o
 	LEFT JOIN operator_roles orl ON orl.operator_id = o.id
@@ -96,7 +96,7 @@ const operatorsQuery = `
 	ORDER BY lower(o.email)`
 
 func operators(ctx context.Context, q querier, id string) ([]OperatorView, error) {
-	rows, err := q.Query(ctx, operatorsQuery, id)
+	rows, err := q.Query(ctx, operatorsQuery, id, MaxDeliveryAttempts)
 	if err != nil {
 		return nil, fmt.Errorf("lire les opérateurs : %w", err)
 	}

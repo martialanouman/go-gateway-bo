@@ -943,7 +943,8 @@ export interface operations {
             };
             /**
              * @description `password_policy` : le mot de passe ne suit pas la politique, et le message nomme ce qui
-             *     manque ; le lien reste valable. `bad_request` : le corps n'a pas la forme attendue.
+             *     manque. La politique n'est jugée qu'après le jeton : ce refus ne vise qu'un lien valable,
+             *     qui le reste. `bad_request` : le corps n'a pas la forme attendue.
              */
             400: {
                 headers: {

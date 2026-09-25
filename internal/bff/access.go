@@ -18,10 +18,6 @@ func (a API) SetPasswordFromAccessLink(ctx context.Context, request SetPasswordF
 		return SetPasswordFromAccessLink400JSONResponse(badRequest()), nil
 	}
 
-	if missing := auth.CheckPassword(body.Password); len(missing) > 0 {
-		return SetPasswordFromAccessLink400JSONResponse(weakPassword(missing)), nil
-	}
-
 	digest, ok := store.AccessTokenDigest(body.Token)
 	if !ok {
 		return SetPasswordFromAccessLink410JSONResponse(linkNoLongerValid()), nil
@@ -34,6 +30,11 @@ func (a API) SetPasswordFromAccessLink(ctx context.Context, request SetPasswordF
 
 	if !valid {
 		return SetPasswordFromAccessLink410JSONResponse(linkNoLongerValid()), nil
+	}
+
+	// La politique après le jeton : son refus annonce que le lien reste valable.
+	if missing := auth.CheckPassword(body.Password); len(missing) > 0 {
+		return SetPasswordFromAccessLink400JSONResponse(weakPassword(missing)), nil
 	}
 
 	var hash string

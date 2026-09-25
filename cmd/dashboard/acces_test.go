@@ -6,9 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/cucumber/godog"
+	"github.com/jackc/pgx/v5"
 )
 
 // accessWorld joue le titulaire d'un lien. Le binaire de scénario n'envoie aucun e-mail : le décor
@@ -23,12 +25,10 @@ func (w *accessWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^le comparse n'a pas de mot de passe et a reçu un lien d'activation$`, w.receivesActivationLink)
 	ctx.Given(`^le lien du comparse est parti$`, w.linkIsSent)
 	ctx.Given(`^le lien du comparse a expiré$`, func(ctx context.Context) error {
-		return w.operators.exec(ctx, `
+		return w.execOne(ctx, "faire expirer le lien", `
 			UPDATE access_links SET expires_at = now() - interval '1 second'
-			WHERE operator_id = (SELECT id FROM operators WHERE lower(email) = lower($1))`, w.operators.comparse)
-	})
-	ctx.Given(`^le comparse a reçu un second lien$`, func(ctx context.Context) error {
-		return w.queueAndSend(ctx, "reset")
+			WHERE token_hash IS NOT NULL
+			  AND operator_id = (SELECT id FROM operators WHERE lower(email) = lower($1))`, w.operators.comparse)
 	})
 	ctx.Given(`^le comparse garde une copie de son lien$`, func() error {
 		w.copied = w.token
@@ -42,6 +42,14 @@ func (w *accessWorld) registerSteps(ctx *godog.ScenarioContext) {
 		}
 
 		return w.post(w.copied, "Encore-un-mot-de-passe-2")
+	})
+	ctx.When(`^quelqu'un utilise un lien inventé avec le mot de passe "([^"]*)"$`, func(password string) error {
+		raw := make([]byte, 32)
+		if _, err := rand.Read(raw); err != nil {
+			return err
+		}
+
+		return w.post(base64.RawURLEncoding.EncodeToString(raw), password)
 	})
 	ctx.When(`^le comparse se connecte avec "([^"]*)"$`, w.signIn)
 	ctx.Then(`^le comparse entre avec "([^"]*)"$`, func(password string) error {
@@ -61,14 +69,9 @@ func (w *accessWorld) receivesActivationLink(ctx context.Context) error {
 		return err
 	}
 
-	return w.queueAndSend(ctx, "activation")
-}
-
-func (w *accessWorld) queueAndSend(ctx context.Context, kind string) error {
-	err := w.operators.exec(ctx, `
+	err = w.operators.exec(ctx, `
 		INSERT INTO access_links (operator_id, kind)
-		SELECT id, $2 FROM operators WHERE lower(email) = lower($1)
-		ON CONFLICT (operator_id) DO NOTHING`, w.operators.comparse, kind)
+		SELECT id, 'activation' FROM operators WHERE lower(email) = lower($1)`, w.operators.comparse)
 	if err != nil {
 		return err
 	}
@@ -76,7 +79,29 @@ func (w *accessWorld) queueAndSend(ctx context.Context, kind string) error {
 	return w.linkIsSent(ctx)
 }
 
-// linkIsSent fait ce que le worker fait après un envoi réussi, sur la demande en file.
+// execOne refuse un décor qui ne touche aucune ligne : il ne prouverait rien.
+func (w *accessWorld) execOne(ctx context.Context, what, query string, args ...any) error {
+	conn, err := pgx.Connect(ctx, w.operators.login.dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	tag, err := conn.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("%s : %w", what, err)
+	}
+
+	if tag.RowsAffected() != 1 {
+		return fmt.Errorf("%s : %d ligne(s) touchée(s) au lieu d'une", what, tag.RowsAffected())
+	}
+
+	return nil
+}
+
+// linkIsSent fait ce que le worker fait après un envoi réussi : il ne prend qu'une demande sans
+// empreinte, donc un lien que la redemande n'a pas invalidé fait échouer le décor.
 func (w *accessWorld) linkIsSent(ctx context.Context) error {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
@@ -86,9 +111,10 @@ func (w *accessWorld) linkIsSent(ctx context.Context) error {
 	digest := sha256.Sum256(raw)
 	w.token = base64.RawURLEncoding.EncodeToString(raw)
 
-	return w.operators.exec(ctx, `
+	return w.execOne(ctx, "envoyer le lien", `
 		UPDATE access_links SET token_hash = $2, sent_at = now(), expires_at = now() + interval '1 hour'
-		WHERE operator_id = (SELECT id FROM operators WHERE lower(email) = lower($1))`,
+		WHERE token_hash IS NULL
+		  AND operator_id = (SELECT id FROM operators WHERE lower(email) = lower($1))`,
 		w.operators.comparse, digest[:])
 }
 

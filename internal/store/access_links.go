@@ -235,7 +235,10 @@ func KeepDeliveringAccessLinks(ctx context.Context, links *AccessLinks, every ti
 					report(err)
 				}
 
-				if !delivered || ctx.Err() != nil {
+				// Sur erreur, la ligne peut être restée due : la reprendre enverrait un courriel par
+				// tour. Aucun test ne rougit sans `err != nil` : un commit qui échoue après l'envoi ne
+				// se fabrique pas sans couture dans le store.
+				if !delivered || err != nil || ctx.Err() != nil {
 					break
 				}
 			}
