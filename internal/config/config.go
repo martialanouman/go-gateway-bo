@@ -133,7 +133,7 @@ type Config struct {
 	ProductName string
 	// Auth porte ce dont le premier facteur a besoin au démarrage.
 	Auth AuthConfig
-	// Mail porte ce que l'envoi des liens d'accès a besoin au démarrage.
+	// Mail porte ce dont l'envoi des liens d'accès a besoin au démarrage.
 	Mail MailConfig
 }
 

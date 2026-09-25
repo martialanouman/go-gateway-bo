@@ -1,11 +1,16 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/martialanouman/go-gateway-bo/internal/config"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -69,4 +74,56 @@ func TestLesEnTetesObligatoiresSontPresents(t *testing.T) {
 	assert.Contains(t, message, "MIME-Version: 1.0")
 	assert.Contains(t, message, "Content-Transfer-Encoding: 8bit")
 	assert.Contains(t, message, "Date: ")
+}
+
+// fakeSMTPServer répond à la main aux trois premières étapes d'une conversation SMTP (EHLO, MAIL
+// FROM), puis à RCPT TO avec la réplique donnée — celle d'un vrai serveur, texte compris. Elle rend
+// l'adresse d'écoute et s'arrête d'elle-même après une connexion.
+func fakeSMTPServer(t *testing.T, rcptReply string) string {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		reader := bufio.NewReader(conn)
+		fmt.Fprint(conn, "220 fake.test Service ready\r\n")
+		_, _ = reader.ReadString('\n') // EHLO
+		fmt.Fprint(conn, "250 fake.test\r\n")
+		_, _ = reader.ReadString('\n') // MAIL FROM
+		fmt.Fprint(conn, "250 OK\r\n")
+		_, _ = reader.ReadString('\n') // RCPT TO
+		fmt.Fprint(conn, rcptReply+"\r\n")
+	}()
+
+	return ln.Addr().String()
+}
+
+// Un refus RCPT réel cite couramment l'adresse rejetée dans son texte (RFC 5321 §4.2, exemple
+// classique du code 550) : ce test prouve que ce texte n'atteint jamais l'erreur rendue par
+// smtpSender, ni le jeton ni le corps du message qu'un serveur plus bavard pourrait aussi citer.
+func TestUnRefusRCPTNeCiteNiLAdresseNiLeJetonNiLeCorps(t *testing.T) {
+	addr := fakeSMTPServer(t, "550 5.1.1 <nadia@exemple.test>: Recipient address rejected")
+
+	send := smtpSender(config.MailConfig{
+		Addr: addr, From: "ops@exemple.test", PublicURL: "https://cockpit.exemple.test",
+	}, "Cockpit")
+
+	err := send(t.Context(), store.PendingLink{
+		Email: "nadia@exemple.test", DisplayName: "Nadia", Kind: store.LinkActivation,
+		ExpiresAt: time.Now().Add(store.ActivationTTL),
+	}, "JETON-SECRET")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "550")
+	assert.NotContains(t, err.Error(), "nadia@exemple.test")
+	assert.NotContains(t, err.Error(), "JETON-SECRET")
+	assert.NotContains(t, err.Error(), "Recipient address rejected")
 }

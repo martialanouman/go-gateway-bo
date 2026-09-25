@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"mime"
 	"net"
 	"net/smtp"
+	"net/textproto"
 	"strings"
 	"time"
 
@@ -73,12 +75,8 @@ func accessLinkBody(product, publicURL string, link store.PendingLink, token str
 	}, crlf)
 }
 
-// smtpSender envoie chaque lien par net/smtp, sans STARTTLS ni AUTH (hors périmètre, Mailpit n'en
-// exige aucun). Le worker ne porte aucune requête HTTP : il n'y a pas d'en-tête Host à lire, donc la
-// base des liens vient de la configuration, jamais de la requête qui a demandé le lien.
-//
-// L'erreur rendue ne cite ni le message, ni le jeton, ni l'adresse du destinataire : le store en
-// journalise le détail sans jamais leur donner d'empreinte publique.
+// smtpSender envoie chaque lien par net/smtp. Le worker ne porte aucune requête HTTP : il n'y a pas
+// d'en-tête Host à lire, donc la base des liens vient de la configuration (DASHBOARD_PUBLIC_URL).
 func smtpSender(cfg config.MailConfig, product string) store.SendLink {
 	return func(ctx context.Context, link store.PendingLink, token string) error {
 		conn, err := net.DialTimeout("tcp", cfg.Addr, smtpDialTimeout)
@@ -109,23 +107,24 @@ func smtpSender(cfg config.MailConfig, product string) store.SendLink {
 			return fmt.Errorf("hôte SMTP : %w", err)
 		}
 
+		// Ni STARTTLS ni AUTH : hors périmètre du step, Mailpit n'en exige aucun.
 		client, err := smtp.NewClient(conn, host)
 		if err != nil {
-			return fmt.Errorf("poignée de main SMTP : %w", err)
+			return fmt.Errorf("poignée de main SMTP : %w", sanitizeSMTPError(err))
 		}
 		defer client.Close()
 
 		if err = client.Mail(cfg.From); err != nil {
-			return fmt.Errorf("commande MAIL SMTP : %w", err)
+			return fmt.Errorf("commande MAIL SMTP : %w", sanitizeSMTPError(err))
 		}
 
 		if err = client.Rcpt(link.Email); err != nil {
-			return fmt.Errorf("commande RCPT SMTP : %w", err)
+			return fmt.Errorf("commande RCPT SMTP : %w", sanitizeSMTPError(err))
 		}
 
 		writer, err := client.Data()
 		if err != nil {
-			return fmt.Errorf("commande DATA SMTP : %w", err)
+			return fmt.Errorf("commande DATA SMTP : %w", sanitizeSMTPError(err))
 		}
 
 		message := composeAccessLinkMail(product, cfg.From, cfg.PublicURL, link, token)
@@ -133,13 +132,29 @@ func smtpSender(cfg config.MailConfig, product string) store.SendLink {
 		if _, err = writer.Write([]byte(message)); err != nil {
 			_ = writer.Close()
 
-			return fmt.Errorf("écriture du message SMTP : %w", err)
+			return fmt.Errorf("écriture du message SMTP : %w", sanitizeSMTPError(err))
 		}
 
 		if err = writer.Close(); err != nil {
-			return fmt.Errorf("clôture du message SMTP : %w", err)
+			return fmt.Errorf("clôture du message SMTP : %w", sanitizeSMTPError(err))
 		}
 
-		return client.Quit()
+		if err = client.Quit(); err != nil {
+			return fmt.Errorf("commande QUIT SMTP : %w", sanitizeSMTPError(err))
+		}
+
+		return nil
 	}
+}
+
+// sanitizeSMTPError ne garde d'une réponse SMTP que son code : son texte est écrit par le serveur et
+// peut citer l'adresse du destinataire ou le corps refusé. Une erreur réseau n'en porte pas et
+// traverse intacte.
+func sanitizeSMTPError(err error) error {
+	var protoErr *textproto.Error
+	if errors.As(err, &protoErr) {
+		return fmt.Errorf("réponse SMTP %d", protoErr.Code)
+	}
+
+	return err
 }
