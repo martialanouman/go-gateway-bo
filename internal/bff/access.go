@@ -69,8 +69,10 @@ func (a API) SetPasswordFromAccessLink(ctx context.Context, request SetPasswordF
 // linkNoLongerValid est le refus unique : servi, expiré, remplacé ou compte désactivé se lisent de
 // même, pour ne rien apprendre à qui détient un vieux lien.
 func linkNoLongerValid() Error {
-	return Error{Code: "access_link_invalid",
-		Message: "Ce lien n'est plus valable : demandez-en un nouveau à un administrateur."}
+	return Error{
+		Code:    "access_link_invalid",
+		Message: "Ce lien n'est plus valable : demandez-en un nouveau à un administrateur.",
+	}
 }
 
 func weakPassword(missing []string) Error {

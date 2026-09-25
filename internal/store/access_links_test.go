@@ -253,7 +253,7 @@ func TestUnNouveauLienInvalideLePrecedent(t *testing.T) {
 	requestReset(t, pool, operator)
 	latest := digestOf(t, deliver(t, links))
 
-	assert.ErrorIs(t, links.Consume(t.Context(), former, "ancien", store.Event{Action: "operator.password_set"}),
+	require.ErrorIs(t, links.Consume(t.Context(), former, "ancien", store.Event{Action: "operator.password_set"}),
 		store.ErrLinkInvalid)
 	assert.NoError(t, links.Consume(t.Context(), latest, "neuf", store.Event{Action: "operator.password_set"}))
 }
@@ -321,7 +321,7 @@ func TestUnLienSurUnCompteDesactiveEstRefuse(t *testing.T) {
 	digest := digestOf(t, deliver(t, links))
 	execOn(t, dsn, `UPDATE operators SET status = 'disabled' WHERE id = $1`, operator)
 
-	assert.ErrorIs(t, store.NewAdministration(pool).RequestAccessLink(t.Context(), operator,
+	require.ErrorIs(t, store.NewAdministration(pool).RequestAccessLink(t.Context(), operator,
 		store.Event{Action: "operator.access_link"}), store.ErrOperatorDisabled)
 	assert.ErrorIs(t, links.Consume(t.Context(), digest, "neuf", store.Event{Action: "operator.password_set"}),
 		store.ErrLinkInvalid)

@@ -83,7 +83,7 @@ func smtpSender(cfg config.MailConfig, product string) store.SendLink {
 		if err != nil {
 			return fmt.Errorf("connexion au serveur SMTP : %w", err)
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		if err = conn.SetDeadline(time.Now().Add(smtpDeadline)); err != nil {
 			return fmt.Errorf("délai de la connexion SMTP : %w", err)
@@ -112,7 +112,7 @@ func smtpSender(cfg config.MailConfig, product string) store.SendLink {
 		if err != nil {
 			return fmt.Errorf("poignée de main SMTP : %w", sanitizeSMTPError(err))
 		}
-		defer client.Close()
+		defer func() { _ = client.Close() }()
 
 		if err = client.Mail(cfg.From); err != nil {
 			return fmt.Errorf("commande MAIL SMTP : %w", sanitizeSMTPError(err))

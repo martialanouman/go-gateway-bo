@@ -24,7 +24,7 @@ func TestCheckPasswordNamesWhatIsMissing(t *testing.T) {
 		"ABCDEFGHIJ1!":  {"une minuscule"},
 		"Abcdefghijk!":  {"un chiffre"},
 		"Abcdefghijk1":  {"un caractère spécial"},
-		"Élévationxx1 ": nil, // majuscule accentuée, espace = caractère spécial
+		"Élévation xx1": nil, // majuscule accentuée, espace = caractère spécial
 	} {
 		assert.Equal(t, missing, CheckPassword(password), password)
 	}
