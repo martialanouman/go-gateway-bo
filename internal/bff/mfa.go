@@ -529,3 +529,9 @@ func secondFactorsOf(ctx context.Context, factors *mfa.Manager, operatorID strin
 		Passkeys:               held.Passkeys,
 	}, nil
 }
+
+func (a API) ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) (ConfirmTotpResponseObject,
+	error,
+) {
+	return nil, errors.New("pas encore livré")
+}

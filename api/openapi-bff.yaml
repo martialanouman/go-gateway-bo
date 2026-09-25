@@ -341,6 +341,72 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /auth/mfa/totp/confirm:
+    post:
+      operationId: confirmTotp
+      summary: Confirmer une application d'authentification qui vient d'être remplacée
+      description: |
+        Un remplacement avec preuve rend un secret neuf **non confirmé** : aucun code n'en a encore
+        été consommé. Sans cette route, `/auth/me` l'annonçait absent et il se réenrôlait sans preuve
+        à la connexion suivante. `POST /auth/mfa/verify` ne peut pas le confirmer : il exige un
+        challenge de connexion, que la session élevée qui a remplacé n'a plus.
+
+        Session **élevée** exigée : c'est elle qui a remplacé. L'essai compte dans le seau du second
+        facteur, comme sur `verify`, et le code consommé ne se rejoue pas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TotpConfirmation' }
+      responses:
+        '403':
+          $ref: '#/components/responses/OrigineRefusee'
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
+        '204':
+          description: L'application d'authentification est confirmée.
+        '400':
+          description: |
+            Deux causes, deux codes. `bad_request` : la requête n'a pas la forme que la route attend.
+            `mfa_code_refused` : le code n'a pas été accepté. **400 et non 401**, pour la raison du
+            refus d'une cérémonie WebAuthn : la session est vivante, et un client qui lit tout 401
+            comme « session close » renverrait l'opérateur au login.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Aucune session vivante.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            `mfa_elevation_required` : la session n'a pas franchi le second facteur. Confirmer depuis
+            une session de premier facteur donnerait à qui détient le mot de passe un facteur qu'il
+            vient de se poser.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: |
+            Trop d'essais de second facteur sur ce compte — le même seau que `verify`. Le message
+            porte la durée restante.
+          headers:
+            Retry-After:
+              description: Secondes restant à attendre. Un entier et jamais une date HTTP.
+              required: true
+              schema: { type: integer, minimum: 1 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: |
+            Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir. Ce n'est pas un refus :
+            l'essai compte tout de même dans le quota, posé avant la vérification.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /auth/mfa/verify:
     post:
       operationId: verifyMfa
@@ -585,6 +651,27 @@ paths:
               description: Secondes restant à attendre. Un entier et jamais une date HTTP.
               required: true
               schema: { type: integer, minimum: 1 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/mfa/webauthn/passkeys:
+    get:
+      operationId: listWebauthnPasskeys
+      summary: Les passkeys de l'opérateur de la session
+      description: |
+        Nom et date d'enregistrement de chaque passkey, dans l'ordre de leur enregistrement. Rien de
+        la clé : l'identifiant rendu est celui de la ligne, par lequel on la retire.
+      responses:
+        '200':
+          description: Les passkeys de l'opérateur, éventuellement aucune.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PasskeySummary' }
+        '401':
+          description: Aucune session vivante.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1079,6 +1166,17 @@ components:
           maxLength: 64
       required: []
 
+    TotpConfirmation:
+      type: object
+      description: Le code de l'application d'authentification qui vient d'être remplacée.
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+      required: [code]
+
     TotpEnrollment:
       type: object
       description: |
@@ -1271,7 +1369,25 @@ components:
           # `MfaVerification` : sans lui, le type TypeScript n'accepte aucune clé.
           type: object
           additionalProperties: true
-      required: [attestation]
+        name:
+          # Ce par quoi l'opérateur reconnaîtra la clé qu'il retire. Espaces retirés aux bords par
+          # le serveur ; vide après coup, la requête est refusée sur sa forme.
+          type: string
+          minLength: 1
+          maxLength: 64
+      required: [attestation, name]
+
+    PasskeySummary:
+      type: object
+      description: Une passkey telle que l'inventaire la montre. Rien de la clé.
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, createdAt]
 
     WebauthnCredential:
       type: object

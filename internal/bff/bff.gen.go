@@ -298,6 +298,13 @@ type OperatorUpdate struct {
 // OperatorUpdateStatus defines model for OperatorUpdate.Status.
 type OperatorUpdateStatus string
 
+// PasskeySummary Une passkey telle que l'inventaire la montre. Rien de la clé.
+type PasskeySummary struct {
+	CreatedAt time.Time `json:"createdAt"`
+	Id        string    `json:"id"`
+	Name      string    `json:"name"`
+}
+
 // Role defines model for Role.
 type Role struct {
 	Description string   `json:"description"`
@@ -337,6 +344,11 @@ type SecondFactors struct {
 	Passkeys               int  `json:"passkeys"`
 	RecoveryCodesRemaining int  `json:"recoveryCodesRemaining"`
 	Totp                   bool `json:"totp"`
+}
+
+// TotpConfirmation Le code de l'application d'authentification qui vient d'être remplacée.
+type TotpConfirmation struct {
+	Code string `json:"code"`
 }
 
 // TotpEnrollment Rendu **une seule fois**, à l'enrôlement. Aucune route ne le rend ensuite, et c'est la seule
@@ -417,6 +429,7 @@ type WebauthnCredentialDescriptorType string
 // deux rédactions dont une périmerait.
 type WebauthnRegistration struct {
 	Attestation map[string]interface{} `json:"attestation"`
+	Name        string                 `json:"name"`
 }
 
 // WebauthnRegistrationOptions Ce que le client passe **tel quel** à `navigator.credentials.create()`. L'enveloppe `publicKey`
@@ -520,6 +533,9 @@ type SetPasswordFromAccessLinkJSONRequestBody = AccessLinkUse
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
+// ConfirmTotpJSONRequestBody defines body for ConfirmTotp for application/json ContentType.
+type ConfirmTotpJSONRequestBody = TotpConfirmation
+
 // EnrollTotpJSONRequestBody defines body for EnrollTotp for application/json ContentType.
 type EnrollTotpJSONRequestBody = TotpEnrollmentRequest
 
@@ -558,6 +574,9 @@ type ServerInterface interface {
 	// Me L'opérateur connecté et ce qu'il a le droit de faire
 	// (GET /auth/me)
 	Me(w http.ResponseWriter, r *http.Request)
+	// ConfirmTotp Confirmer une application d'authentification qui vient d'être remplacée
+	// (POST /auth/mfa/totp/confirm)
+	ConfirmTotp(w http.ResponseWriter, r *http.Request)
 	// EnrollTotp Enrôler une application d'authentification
 	// (POST /auth/mfa/totp/enroll)
 	EnrollTotp(w http.ResponseWriter, r *http.Request)
@@ -567,6 +586,9 @@ type ServerInterface interface {
 	// BeginWebauthnAssertion Ouvre une assertion de passkey
 	// (POST /auth/mfa/webauthn/assert/begin)
 	BeginWebauthnAssertion(w http.ResponseWriter, r *http.Request)
+	// ListWebauthnPasskeys Les passkeys de l'opérateur de la session
+	// (GET /auth/mfa/webauthn/passkeys)
+	ListWebauthnPasskeys(w http.ResponseWriter, r *http.Request)
 	// DeleteWebauthnPasskey Retire une passkey
 	// (DELETE /auth/mfa/webauthn/passkeys/{passkeyId})
 	DeleteWebauthnPasskey(w http.ResponseWriter, r *http.Request, passkeyId string)
@@ -636,6 +658,12 @@ func (_ Unimplemented) Me(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ConfirmTotp Confirmer une application d'authentification qui vient d'être remplacée
+// (POST /auth/mfa/totp/confirm)
+func (_ Unimplemented) ConfirmTotp(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // EnrollTotp Enrôler une application d'authentification
 // (POST /auth/mfa/totp/enroll)
 func (_ Unimplemented) EnrollTotp(w http.ResponseWriter, r *http.Request) {
@@ -651,6 +679,12 @@ func (_ Unimplemented) VerifyMfa(w http.ResponseWriter, r *http.Request) {
 // BeginWebauthnAssertion Ouvre une assertion de passkey
 // (POST /auth/mfa/webauthn/assert/begin)
 func (_ Unimplemented) BeginWebauthnAssertion(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListWebauthnPasskeys Les passkeys de l'opérateur de la session
+// (GET /auth/mfa/webauthn/passkeys)
+func (_ Unimplemented) ListWebauthnPasskeys(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -797,6 +831,20 @@ func (siw *ServerInterfaceWrapper) Me(w http.ResponseWriter, r *http.Request) {
 	handler.ServeHTTP(w, r)
 }
 
+// ConfirmTotp operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmTotp(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmTotp(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // EnrollTotp operation middleware
 func (siw *ServerInterfaceWrapper) EnrollTotp(w http.ResponseWriter, r *http.Request) {
 
@@ -830,6 +878,20 @@ func (siw *ServerInterfaceWrapper) BeginWebauthnAssertion(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.BeginWebauthnAssertion(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWebauthnPasskeys operation middleware
+func (siw *ServerInterfaceWrapper) ListWebauthnPasskeys(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWebauthnPasskeys(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1225,6 +1287,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/auth/mfa/totp/enroll", wrapper.EnrollTotp)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/mfa/totp/confirm", wrapper.ConfirmTotp)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/mfa/verify", wrapper.VerifyMfa)
 	})
 	r.Group(func(r chi.Router) {
@@ -1235,6 +1300,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/mfa/webauthn/assert/begin", wrapper.BeginWebauthnAssertion)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/mfa/webauthn/passkeys", wrapper.ListWebauthnPasskeys)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/auth/mfa/webauthn/passkeys/{passkeyId}", wrapper.DeleteWebauthnPasskey)
@@ -1570,6 +1638,130 @@ func (response Me401JSONResponse) VisitMeResponse(w http.ResponseWriter) error {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTotpRequestObject struct {
+	Body *ConfirmTotpJSONRequestBody
+}
+
+type ConfirmTotpResponseObject interface {
+	VisitConfirmTotpResponse(w http.ResponseWriter) error
+}
+
+type ConfirmTotp204Response struct {
+}
+
+func (response ConfirmTotp204Response) VisitConfirmTotpResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ConfirmTotp400JSONResponse Error
+
+func (response ConfirmTotp400JSONResponse) VisitConfirmTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTotp401JSONResponse Error
+
+func (response ConfirmTotp401JSONResponse) VisitConfirmTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTotp403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response ConfirmTotp403JSONResponse) VisitConfirmTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTotp409JSONResponse Error
+
+func (response ConfirmTotp409JSONResponse) VisitConfirmTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTotp415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response ConfirmTotp415JSONResponse) VisitConfirmTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTotp429ResponseHeaders struct {
+	RetryAfter int
+}
+
+type ConfirmTotp429JSONResponse struct {
+	Body    Error
+	Headers ConfirmTotp429ResponseHeaders
+}
+
+func (response ConfirmTotp429JSONResponse) VisitConfirmTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmTotp503JSONResponse Error
+
+func (response ConfirmTotp503JSONResponse) VisitConfirmTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1911,6 +2103,41 @@ func (response BeginWebauthnAssertion429JSONResponse) VisitBeginWebauthnAssertio
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
 	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWebauthnPasskeysRequestObject struct {
+}
+
+type ListWebauthnPasskeysResponseObject interface {
+	VisitListWebauthnPasskeysResponse(w http.ResponseWriter) error
+}
+
+type ListWebauthnPasskeys200JSONResponse []PasskeySummary
+
+func (response ListWebauthnPasskeys200JSONResponse) VisitListWebauthnPasskeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWebauthnPasskeys401JSONResponse Error
+
+func (response ListWebauthnPasskeys401JSONResponse) VisitListWebauthnPasskeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3022,6 +3249,9 @@ type StrictServerInterface interface {
 	// Me L'opérateur connecté et ce qu'il a le droit de faire
 	// (GET /auth/me)
 	Me(ctx context.Context, request MeRequestObject) (MeResponseObject, error)
+	// ConfirmTotp Confirmer une application d'authentification qui vient d'être remplacée
+	// (POST /auth/mfa/totp/confirm)
+	ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) (ConfirmTotpResponseObject, error)
 	// EnrollTotp Enrôler une application d'authentification
 	// (POST /auth/mfa/totp/enroll)
 	EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (EnrollTotpResponseObject, error)
@@ -3031,6 +3261,9 @@ type StrictServerInterface interface {
 	// BeginWebauthnAssertion Ouvre une assertion de passkey
 	// (POST /auth/mfa/webauthn/assert/begin)
 	BeginWebauthnAssertion(ctx context.Context, request BeginWebauthnAssertionRequestObject) (BeginWebauthnAssertionResponseObject, error)
+	// ListWebauthnPasskeys Les passkeys de l'opérateur de la session
+	// (GET /auth/mfa/webauthn/passkeys)
+	ListWebauthnPasskeys(ctx context.Context, request ListWebauthnPasskeysRequestObject) (ListWebauthnPasskeysResponseObject, error)
 	// DeleteWebauthnPasskey Retire une passkey
 	// (DELETE /auth/mfa/webauthn/passkeys/{passkeyId})
 	DeleteWebauthnPasskey(ctx context.Context, request DeleteWebauthnPasskeyRequestObject) (DeleteWebauthnPasskeyResponseObject, error)
@@ -3221,6 +3454,37 @@ func (sh *strictHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ConfirmTotp operation middleware
+func (sh *strictHandler) ConfirmTotp(w http.ResponseWriter, r *http.Request) {
+	var request ConfirmTotpRequestObject
+
+	var body ConfirmTotpJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmTotp(ctx, request.(ConfirmTotpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmTotp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmTotpResponseObject); ok {
+		if err := validResponse.VisitConfirmTotpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // EnrollTotp operation middleware
 func (sh *strictHandler) EnrollTotp(w http.ResponseWriter, r *http.Request) {
 	var request EnrollTotpRequestObject
@@ -3300,6 +3564,30 @@ func (sh *strictHandler) BeginWebauthnAssertion(w http.ResponseWriter, r *http.R
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(BeginWebauthnAssertionResponseObject); ok {
 		if err := validResponse.VisitBeginWebauthnAssertionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListWebauthnPasskeys operation middleware
+func (sh *strictHandler) ListWebauthnPasskeys(w http.ResponseWriter, r *http.Request) {
+	var request ListWebauthnPasskeysRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListWebauthnPasskeys(ctx, request.(ListWebauthnPasskeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListWebauthnPasskeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListWebauthnPasskeysResponseObject); ok {
+		if err := validResponse.VisitListWebauthnPasskeysResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -175,6 +175,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/mfa/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirmer une application d'authentification qui vient d'être remplacée
+         * @description Un remplacement avec preuve rend un secret neuf **non confirmé** : aucun code n'en a encore
+         *     été consommé. Sans cette route, `/auth/me` l'annonçait absent et il se réenrôlait sans preuve
+         *     à la connexion suivante. `POST /auth/mfa/verify` ne peut pas le confirmer : il exige un
+         *     challenge de connexion, que la session élevée qui a remplacé n'a plus.
+         *
+         *     Session **élevée** exigée : c'est elle qui a remplacé. L'essai compte dans le seau du second
+         *     facteur, comme sur `verify`, et le code consommé ne se rejoue pas.
+         */
+        post: operations["confirmTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/mfa/verify": {
         parameters: {
             query?: never;
@@ -291,6 +317,27 @@ export interface paths {
          *     TOTP. Ouvrir une cérémonie ne prouve rien et n'élève rien.
          */
         post: operations["beginWebauthnAssertion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Les passkeys de l'opérateur de la session
+         * @description Nom et date d'enregistrement de chaque passkey, dans l'ordre de leur enregistrement. Rien de
+         *     la clé : l'identifiant rendu est celui de la ligne, par lequel on la retire.
+         */
+        get: operations["listWebauthnPasskeys"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -525,6 +572,10 @@ export interface components {
             method?: "totp" | "recovery_code";
             code?: string;
         };
+        /** @description Le code de l'application d'authentification qui vient d'être remplacée. */
+        TotpConfirmation: {
+            code: string;
+        };
         /**
          * @description Rendu **une seule fois**, à l'enrôlement. Aucune route ne le rend ensuite, et c'est la seule
          *     chose qui rend la clé irréaffichable : elle est chiffrée au repos, non hachée, et
@@ -625,6 +676,14 @@ export interface components {
             attestation: {
                 [key: string]: unknown;
             };
+            name: string;
+        };
+        /** @description Une passkey telle que l'inventaire la montre. Rien de la clé. */
+        PasskeySummary: {
+            id: string;
+            name: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         /**
          * @description La passkey qui vient d'être enregistrée. **Seul son identifiant**, et c'est ce dont le client a
@@ -1153,6 +1212,92 @@ export interface operations {
             };
         };
     };
+    confirmTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpConfirmation"];
+            };
+        };
+        responses: {
+            /** @description L'application d'authentification est confirmée. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description Deux causes, deux codes. `bad_request` : la requête n'a pas la forme que la route attend.
+             *     `mfa_code_refused` : le code n'a pas été accepté. **400 et non 401**, pour la raison du
+             *     refus d'une cérémonie WebAuthn : la session est vivante, et un client qui lit tout 401
+             *     comme « session close » renverrait l'opérateur au login.
+             */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Aucune session vivante. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            403: components["responses"]["OrigineRefusee"];
+            /**
+             * @description `mfa_elevation_required` : la session n'a pas franchi le second facteur. Confirmer depuis
+             *     une session de premier facteur donnerait à qui détient le mot de passe un facteur qu'il
+             *     vient de se poser.
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            415: components["responses"]["TypeDeContenuRefuse"];
+            /**
+             * @description Trop d'essais de second facteur sur ce compte — le même seau que `verify`. Le message
+             *     porte la durée restante.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir. Ce n'est pas un refus :
+             *     l'essai compte tout de même dans le quota, posé avant la vérification.
+             */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     verifyMfa: {
         parameters: {
             query?: never;
@@ -1421,6 +1566,35 @@ export interface operations {
                 headers: {
                     /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
                     "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listWebauthnPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les passkeys de l'opérateur, éventuellement aucune. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySummary"][];
+                };
+            };
+            /** @description Aucune session vivante. */
+            401: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

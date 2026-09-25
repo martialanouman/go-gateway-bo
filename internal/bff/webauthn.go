@@ -456,3 +456,8 @@ func userHandleOf(id any) string {
 		return ""
 	}
 }
+
+func (a API) ListWebauthnPasskeys(ctx context.Context, _ ListWebauthnPasskeysRequestObject,
+) (ListWebauthnPasskeysResponseObject, error) {
+	return nil, errors.New("pas encore livré")
+}
