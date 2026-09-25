@@ -52,6 +52,10 @@ const (
 
 	EnvWebauthnRPID   = "DASHBOARD_WEBAUTHN_RP_ID"
 	EnvWebauthnOrigin = "DASHBOARD_WEBAUTHN_ORIGIN"
+
+	EnvSMTPAddr  = "DASHBOARD_SMTP_ADDR"
+	EnvSMTPFrom  = "DASHBOARD_SMTP_FROM"
+	EnvPublicURL = "DASHBOARD_PUBLIC_URL"
 )
 
 // minimumBruteForceSaltLength borne le sel d'anti-brute-force. Trente-deux caractères : ce que rend
@@ -129,6 +133,19 @@ type Config struct {
 	ProductName string
 	// Auth porte ce dont le premier facteur a besoin au démarrage.
 	Auth AuthConfig
+	// Mail porte ce que l'envoi des liens d'accès a besoin au démarrage.
+	Mail MailConfig
+}
+
+// MailConfig décrit l'envoi des liens d'accès par SMTP.
+type MailConfig struct {
+	// Addr est l'adresse du serveur SMTP, au format host:port accepté par net.Dial.
+	Addr string
+	// From est l'expéditeur des liens d'accès.
+	From string
+	// PublicURL est la base des liens envoyés par e-mail. Le worker qui les envoie ne porte aucune
+	// requête HTTP : il n'y a pas d'en-tête Host à lire, donc cette base **ne vient que d'ici**.
+	PublicURL string
 }
 
 // AuthConfig décrit ce que l'authentification lit dans l'environnement.
@@ -229,6 +246,11 @@ func Load(lookup Lookup) (Config, error) {
 			TrustedProxies: r.requiredPrefixList(EnvTrustedProxies),
 			WebauthnRPID:   r.requiredValue(EnvWebauthnRPID),
 			WebauthnOrigin: r.webauthnOrigin(EnvWebauthnOrigin),
+		},
+		Mail: MailConfig{
+			Addr:      r.requiredDialAddr(EnvSMTPAddr),
+			From:      r.requiredValue(EnvSMTPFrom),
+			PublicURL: r.requiredPublicURL(EnvPublicURL),
 		},
 	}
 
@@ -731,6 +753,50 @@ func (r *reader) listenAddr(name string) string {
 	// Le port est recomposé depuis le nombre analysé, et non repris verbatim : sinon `:+80` et
 	// `:00000000080` traverseraient la validation et seraient stockés tels quels.
 	return net.JoinHostPort(host, strconv.Itoa(number))
+}
+
+// requiredDialAddr exige une adresse host:port qu'on puisse composer avec net.Dial. Elle diffère de
+// listenAddr sur un point : un hôte vide y désignerait « toutes les interfaces », ce qu'aucun serveur
+// SMTP distant ne fait, donc il est refusé ici et accepté là-bas.
+func (r *reader) requiredDialAddr(name string) string {
+	value, ok := r.required(name)
+	if !ok {
+		return ""
+	}
+
+	host, port, err := net.SplitHostPort(value)
+	if err != nil || host == "" {
+		r.reject(name, "adresse attendue au format host:port, reçu %q", value)
+
+		return ""
+	}
+
+	number, err := strconv.Atoi(port)
+	if err != nil || number < 0 || number > 65535 {
+		r.reject(name, "port numérique valide attendu dans %q", value)
+
+		return ""
+	}
+
+	return net.JoinHostPort(host, strconv.Itoa(number))
+}
+
+// requiredPublicURL exige une URL absolue sans barre oblique finale : le worker compose l'adresse
+// d'un lien en la concaténant directement à "/access#" + jeton, et une barre finale y ferait un
+// double « / ».
+func (r *reader) requiredPublicURL(name string) string {
+	value := r.requiredAbsoluteURL(name, "http", "https")
+	if value == "" {
+		return ""
+	}
+
+	if strings.HasSuffix(value, "/") {
+		r.reject(name, "URL sans barre oblique finale attendue, reçu %q", RedactURL(value))
+
+		return ""
+	}
+
+	return value
 }
 
 // positiveDuration traite une valeur blanche comme une absence : une variable facultative laissée

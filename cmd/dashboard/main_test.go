@@ -329,6 +329,11 @@ func completeConfiguration() map[string]string {
 		// `none` est la façon d'écrire « aucun proxy » : vide se lirait aussi bien comme ça que comme
 		// un oubli, et l'oubli verrouille tous les opérateurs d'un coup derrière un load balancer.
 		"DASHBOARD_TRUSTED_PROXIES": "none",
+		// `127.0.0.1:1` est un port refusé par tout serveur SMTP : le worker échoue et repousse la
+		// demande, ce qu'aucun scénario ne lit — aucun d'eux n'observe l'envoi d'un lien.
+		"DASHBOARD_SMTP_ADDR":  "127.0.0.1:1",
+		"DASHBOARD_SMTP_FROM":  "cockpit@exemple.test",
+		"DASHBOARD_PUBLIC_URL": configuredOrigin,
 	}
 }
 

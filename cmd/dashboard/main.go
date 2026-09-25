@@ -146,6 +146,14 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		logger.Error("les partitions du journal d'audit n'ont pas pu être renouvelées", "error", err)
 	})
 
+	// Une seule instance : le BFF consomme les liens qu'elle porte, ce worker les envoie.
+	links := store.NewAccessLinks(pool)
+
+	go store.KeepDeliveringAccessLinks(ctx, links, 5*time.Second, smtpSender(cfg.Mail, cfg.ProductName),
+		func(err error) {
+			logger.Error("un lien d'accès n'est pas parti", "error", err)
+		})
+
 	router := bff.NewRouter(bff.Dependencies{
 		Assets: assets,
 		API: bff.API{
@@ -155,7 +163,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 			Passkeys:       passkeys,
 			Audit:          store.NewAudit(pool),
 			Administration: store.NewAdministration(pool),
-			AccessLinks:    store.NewAccessLinks(pool),
+			AccessLinks:    links,
 		},
 		TrustedProxies: cfg.Auth.TrustedProxies,
 		// La même valeur que l'origine des cérémonies WebAuthn, et c'est délibéré : un déploiement a

@@ -300,6 +300,9 @@ jobs:
           DASHBOARD_WEBAUTHN_RP_ID=localhost \
           DASHBOARD_WEBAUTHN_ORIGIN=http://localhost:3001 \
           DASHBOARD_TRUSTED_PROXIES=none \
+          DASHBOARD_SMTP_ADDR=127.0.0.1:1025 \
+          DASHBOARD_SMTP_FROM=cockpit@example.test \
+          DASHBOARD_PUBLIC_URL=http://127.0.0.1:3001 \
             ./bin/dashboard &
           bff=$!
           # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de
