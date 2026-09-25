@@ -58,19 +58,6 @@ describe('l’écran des opérateurs', () => {
       row(SELF.email).getByRole('button', { name: 'Désactiver' }),
       /compte de la session/,
     )
-    expectBlockedAndExplained(
-      row(SELF.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-      /compte de la session/,
-    )
-  })
-
-  it('désactive et explique une réinitialisation qui n’aurait rien à retirer', async () => {
-    await visit()
-
-    expectBlockedAndExplained(
-      row(COLLEAGUE.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-      /Aucun second facteur/,
-    )
   })
 
   it('désactive et explique l’attribution de rôles sans roles:manage, qui seule liste les rôles', async () => {
@@ -90,29 +77,17 @@ describe('l’écran des opérateurs', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
     await user.type(within(dialog).getByLabelText('Adresse e-mail'), 'n.benali@example.test')
     await user.type(within(dialog).getByLabelText('Nom affiché'), 'Nadia Benali')
-    await user.type(within(dialog).getByLabelText('Mot de passe'), 'un mot de passe assez long')
     await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
 
     expect(await screen.findByRole('cell', { name: /n\.benali@example\.test/ })).toBeInTheDocument()
-    expect(await screen.findByText(/Compte de Nadia Benali créé/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Compte créé. Le lien d’activation part à n.benali@example.test ; il vaut 72 heures.',
+      ),
+    ).toBeInTheDocument()
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Nouvel opérateur' })).not.toBeInTheDocument(),
     )
-  })
-
-  it('refuse un mot de passe trop court avant l’aller-retour, en disant la borne du contrat', async () => {
-    const user = userEvent.setup()
-    const fetch = await visit()
-
-    await user.click(screen.getByRole('button', { name: 'Nouvel opérateur' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
-    await user.type(within(dialog).getByLabelText('Adresse e-mail'), 'n.benali@example.test')
-    await user.type(within(dialog).getByLabelText('Nom affiché'), 'Nadia Benali')
-    await user.type(within(dialog).getByLabelText('Mot de passe'), 'court')
-    await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
-
-    expect(await within(dialog).findByText(/12 caractères au minimum/)).toBeInTheDocument()
-    expect(fetch.mock.calls.some(([request]) => request.method === 'POST')).toBe(false)
   })
 
   it('rend le refus du serveur tel qu’il le rédige', async () => {
@@ -128,7 +103,6 @@ describe('l’écran des opérateurs', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
     await user.type(within(dialog).getByLabelText('Adresse e-mail'), COLLEAGUE.email)
     await user.type(within(dialog).getByLabelText('Nom affiché'), 'Martin Leroy')
-    await user.type(within(dialog).getByLabelText('Mot de passe'), 'un mot de passe assez long')
     await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
 
     expect(
@@ -187,25 +161,6 @@ describe('l’écran des opérateurs', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Votre compte ne détient pas la permission.')
     expect(within(alert).getByRole('button', { name: 'Réessayer' })).toBeInTheDocument()
-  })
-
-  it('réinitialise le second facteur d’un collègue après une confirmation qui dit tout ce qui part', async () => {
-    const user = userEvent.setup()
-    await visit(undefined, {}, [SELF, { ...COLLEAGUE, secondFactorEnrolled: true }])
-
-    await user.click(
-      row(COLLEAGUE.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-    )
-    const dialog = await screen.findByRole('dialog', {
-      name: `Réinitialiser le second facteur de ${COLLEAGUE.displayName}`,
-    })
-    expect(dialog).toHaveTextContent(/codes de récupération/)
-    expect(dialog).toHaveTextContent(/sessions fermées/)
-    await user.click(
-      within(dialog).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-    )
-
-    expect(await row(COLLEAGUE.email).findByText('Aucun')).toBeInTheDocument()
   })
 
   it('réactive un collègue désactivé, sans confirmation', async () => {
@@ -280,47 +235,6 @@ describe('l’écran des opérateurs', () => {
         fetch.mock.calls.filter(([request]) => new URL(request.url).pathname === '/api/operators'),
       ).toHaveLength(2),
     )
-  })
-
-  it('ne garde le mot de passe saisi ni dans le formulaire rouvert ni dans le cache (invariant b)', async () => {
-    const user = userEvent.setup()
-    stubAdministration(
-      { permissions: ['operators:manage', 'roles:manage'] },
-      {},
-      {
-        'POST /api/operators': {
-          status: 409,
-          body: { code: 'email_taken', message: 'Déjà pris.' },
-        },
-      },
-    )
-    const router = createAppRouter(createMemoryHistory({ initialEntries: ['/operators'] }))
-    render(<RouterProvider router={router} />)
-    await screen.findByRole('cell', { name: new RegExp(COLLEAGUE.email) })
-
-    await user.click(screen.getByRole('button', { name: 'Nouvel opérateur' }))
-    let dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
-    await user.type(within(dialog).getByLabelText('Adresse e-mail'), COLLEAGUE.email)
-    await user.type(within(dialog).getByLabelText('Nom affiché'), 'Martin Leroy')
-    await user.type(within(dialog).getByLabelText('Mot de passe'), 'un secret assez long')
-    await user.click(within(dialog).getByRole('button', { name: 'Créer l’opérateur' }))
-    await within(dialog).findByText('Déjà pris.')
-    await user.click(within(dialog).getByRole('button', { name: 'Annuler' }))
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Nouvel opérateur' })).not.toBeInTheDocument(),
-    )
-
-    const cached = JSON.stringify(
-      router.options.context.queryClient
-        .getMutationCache()
-        .getAll()
-        .map((m) => m.state.variables),
-    )
-    expect(cached).not.toContain('un secret assez long')
-
-    await user.click(screen.getByRole('button', { name: 'Nouvel opérateur' }))
-    dialog = await screen.findByRole('dialog', { name: 'Nouvel opérateur' })
-    expect(within(dialog).getByLabelText('Mot de passe')).toHaveValue('')
   })
 
   it('rend l’échec d’une réactivation, sur la ligne qui l’a demandée', async () => {
@@ -399,32 +313,6 @@ describe('l’écran des opérateurs', () => {
     expect(await within(dialog).findByText('Le compte reste actif.')).toBeInTheDocument()
   })
 
-  it('rend dans la confirmation le refus d’une réinitialisation', async () => {
-    const user = userEvent.setup()
-    await visit(
-      undefined,
-      {
-        [`DELETE /api/operators/${COLLEAGUE.id}/second-factors`]: {
-          status: 404,
-          body: { code: 'not_found', message: 'Opérateur introuvable.' },
-        },
-      },
-      [SELF, { ...COLLEAGUE, secondFactorEnrolled: true }],
-    )
-
-    await user.click(
-      row(COLLEAGUE.email).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-    )
-    const dialog = await screen.findByRole('dialog', {
-      name: `Réinitialiser le second facteur de ${COLLEAGUE.displayName}`,
-    })
-    await user.click(
-      within(dialog).getByRole('button', { name: 'Réinitialiser le second facteur' }),
-    )
-
-    expect(await within(dialog).findByText('Opérateur introuvable.')).toBeInTheDocument()
-  })
-
   it('n’enregistre pas des rôles que la fenêtre n’a pas su lire', async () => {
     const user = userEvent.setup()
     const fetch = await visit(undefined, {
@@ -458,5 +346,93 @@ describe('l’écran des opérateurs', () => {
     await visit()
 
     expect(row(SELF.email).getByText('Configuré')).toBeInTheDocument()
+  })
+
+  it('rend l’état de l’envoi du lien d’accès dans la colonne Statut', async () => {
+    const activating = {
+      ...COLLEAGUE,
+      accessLink: { kind: 'activation', state: 'queued' } as const,
+    }
+    const sent = {
+      ...COLLEAGUE,
+      id: 'op-sent',
+      email: 'lien.envoye@example.test',
+      accessLink: { kind: 'reset', state: 'sent' } as const,
+    }
+    const failed = {
+      ...COLLEAGUE,
+      id: 'op-failed',
+      email: 'envoi.echec@example.test',
+      accessLink: { kind: 'activation', state: 'failed' } as const,
+    }
+    const resetting = {
+      ...COLLEAGUE,
+      id: 'op-resetting',
+      email: 'envoi.attente@example.test',
+      accessLink: { kind: 'reset', state: 'queued' } as const,
+    }
+    await visit(undefined, {}, [SELF, activating, sent, failed, resetting])
+
+    expect(row(activating.email).getByText('Activation en attente')).toBeInTheDocument()
+    expect(row(sent.email).getByText('Lien envoyé')).toBeInTheDocument()
+    expect(row(failed.email).getByText('Envoi en échec')).toBeInTheDocument()
+    expect(row(resetting.email).getByText('Envoi en attente')).toBeInTheDocument()
+  })
+
+  it('désactive et explique « Envoyer un lien » sur un compte désactivé', async () => {
+    await visit(undefined, {}, [SELF, { ...COLLEAGUE, status: 'disabled' }])
+
+    expectBlockedAndExplained(
+      row(COLLEAGUE.email).getByRole('button', { name: 'Envoyer un lien' }),
+      /désactivé/,
+    )
+  })
+
+  it('laisse « Envoyer un lien » actif sur la ligne de la session, qui ouvre la confirmation', async () => {
+    const user = userEvent.setup()
+    await visit()
+
+    await user.click(row(SELF.email).getByRole('button', { name: 'Envoyer un lien' }))
+
+    expect(
+      await screen.findByRole('dialog', { name: `Envoyer un lien à ${SELF.displayName}` }),
+    ).toBeInTheDocument()
+  })
+
+  it('envoie un lien de réinitialisation après une confirmation qui dit que rien ne change avant son usage', async () => {
+    const user = userEvent.setup()
+    const fetch = await visit()
+
+    await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Envoyer un lien' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: `Envoyer un lien à ${COLLEAGUE.displayName}`,
+    })
+    expect(dialog).toHaveTextContent(/Rien ne change avant son usage/)
+    expect(dialog).toHaveTextContent(/second facteur est retiré/)
+    await user.click(within(dialog).getByRole('button', { name: 'Envoyer le lien' }))
+
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.some(
+          ([request]) =>
+            request.method === 'POST' &&
+            new URL(request.url).pathname === `/api/operators/${COLLEAGUE.id}/access-link`,
+        ),
+      ).toBe(true),
+    )
+    expect(await row(COLLEAGUE.email).findByText('Lien envoyé')).toBeInTheDocument()
+  })
+
+  it('confirme l’envoi d’un lien d’activation en disant sa durée', async () => {
+    const user = userEvent.setup()
+    const pending = { ...COLLEAGUE, accessLink: { kind: 'activation', state: 'queued' } as const }
+    await visit(undefined, {}, [SELF, pending])
+
+    await user.click(row(pending.email).getByRole('button', { name: 'Envoyer un lien' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: `Envoyer un lien à ${pending.displayName}`,
+    })
+    expect(dialog).toHaveTextContent(/72 heures/)
+    expect(dialog).toHaveTextContent(/lien envoyé plus tôt cesse de valoir/)
   })
 })

@@ -184,7 +184,11 @@ func (failingAPI) SetOperatorRoles(_ context.Context, _ SetOperatorRolesRequestO
 	return nil, errors.ErrUnsupported
 }
 
-func (failingAPI) ResetOperatorSecondFactors(_ context.Context, _ ResetOperatorSecondFactorsRequestObject) (ResetOperatorSecondFactorsResponseObject, error) {
+func (failingAPI) RequestOperatorAccessLink(_ context.Context, _ RequestOperatorAccessLinkRequestObject) (RequestOperatorAccessLinkResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) SetPasswordFromAccessLink(_ context.Context, _ SetPasswordFromAccessLinkRequestObject) (SetPasswordFromAccessLinkResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }
 

@@ -17,16 +17,14 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 )
 
-// chosenPassword est celui que l'administrateur choisit pour les comptes qu'il crée : douze
-// caractères au moins, la politique du bootstrap.
-const chosenPassword = "un mot de passe choisi par l'administrateur"
-
 // operatorsWorld porte deux navigateurs : celui de l'administrateur, que le harnais tient, et celui
 // du comparse, mis de côté pendant que l'administrateur agit.
 type operatorsWorld struct {
 	login    *loginWorld
 	mfa      *mfaWorld
 	comparse string
+	// comparsePassword suit le mot de passe que le comparse s'est lui-même défini par son lien.
+	comparsePassword string
 	// comparseCookies est le navigateur du comparse, retenu pour être rejoué après le geste de
 	// l'administrateur.
 	comparseCookies map[string]string
@@ -44,10 +42,11 @@ func (w *operatorsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^l'opérateur a créé le rôle "([^"]*)" accordant "([^"]*)"$`, w.createRole)
 	ctx.Given(`^l'opérateur a attribué le rôle "([^"]*)" au comparse$`, w.assignRoleToComparse)
 
-	ctx.When(`^l'opérateur crée l'opérateur "([^"]*)"$`, func(email string) error {
-		return w.createOperator(email, chosenPassword)
+	ctx.Given(`^le comparse est désactivé$`, func(ctx context.Context) error {
+		return w.exec(ctx, `UPDATE operators SET status = 'disabled' WHERE lower(email) = lower($1)`, w.comparse)
 	})
-	ctx.When(`^l'opérateur crée l'opérateur "([^"]*)" avec le mot de passe "([^"]*)"$`, w.createOperator)
+	ctx.When(`^l'opérateur crée l'opérateur "([^"]*)"$`, w.createOperator)
+	ctx.When(`^l'opérateur envoie un lien au comparse$`, w.requestAccessLink)
 	ctx.When(`^l'opérateur demande la liste des opérateurs$`, func() error {
 		return w.login.process.fetch("/api/operators")
 	})
@@ -65,12 +64,6 @@ func (w *operatorsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur réactive le comparse$`, func(ctx context.Context) error {
 		return w.setStatus(ctx, w.comparse, "active")
 	})
-	ctx.When(`^l'opérateur réinitialise le second facteur du comparse$`, func(ctx context.Context) error {
-		return w.resetSecondFactors(ctx, w.comparse)
-	})
-	ctx.When(`^l'opérateur réinitialise son propre second facteur$`, func(ctx context.Context) error {
-		return w.resetSecondFactors(ctx, scenarioEmail)
-	})
 	ctx.When(`^l'opérateur crée le rôle "([^"]*)" accordant "([^"]*)"$`, w.createRole)
 	ctx.When(`^l'opérateur accorde aussi "([^"]*)" au rôle "([^"]*)"$`, w.grantToRole)
 	ctx.When(`^l'opérateur retire "([^"]*)" du rôle "([^"]*)"$`, w.revokeFromRole)
@@ -78,11 +71,12 @@ func (w *operatorsWorld) registerSteps(ctx *godog.ScenarioContext) {
 
 	ctx.Then(`^le refus nomme la permission "([^"]*)"$`, w.bodyNames)
 	ctx.Then(`^le refus nomme "([^"]*)"$`, w.bodyNames)
-	ctx.Then(`^"([^"]*)" se connecte avec le mot de passe choisi pour elle$`, w.signsInWithChosenPassword)
+	ctx.Then(`^un lien "([^"]*)" attend l'envoi pour "([^"]*)"$`, w.linkIsQueued)
 	ctx.Then(`^la liste porte "([^"]*)" sans rôle$`, w.listCarriesOperatorWithoutRole)
 	ctx.Then(`^la liste porte les neuf rôles par défaut$`, w.listCarriesDefaultRoles)
 	ctx.Then(`^l'opérateur détient toujours la permission "([^"]*)"$`, w.stillHolds)
-	ctx.Then(`^la session du comparse est refusée$`, w.comparseSessionIsRefused)
+	ctx.Then(`^la session du comparse est refusée$`, w.comparseSessionAnswers(http.StatusUnauthorized))
+	ctx.Then(`^la session du comparse est encore acceptée$`, w.comparseSessionAnswers(http.StatusOK))
 	ctx.Then(`^le comparse se reconnecte sans aucun second facteur$`, w.comparseSignsInWithoutFactor)
 }
 
@@ -152,6 +146,7 @@ func (w *operatorsWorld) comparseWithoutRole(ctx context.Context, email string) 
 	}
 
 	w.comparse = email
+	w.comparsePassword = scenarioPassword
 
 	return w.exec(ctx,
 		`INSERT INTO operators (email, display_name, password_hash) VALUES ($1, 'Martin Leroy', $2)`,
@@ -230,10 +225,44 @@ func (w *operatorsWorld) sendJSON(method, path string, body any) error {
 	return w.login.process.send(method, path, "application/json", string(encoded))
 }
 
-func (w *operatorsWorld) createOperator(email, password string) error {
+func (w *operatorsWorld) createOperator(email string) error {
 	return w.sendJSON(http.MethodPost, "/api/operators", map[string]string{
-		"email": email, "displayName": "Nadia Benali", "password": password,
+		"email": email, "displayName": "Nadia Benali",
 	})
+}
+
+func (w *operatorsWorld) requestAccessLink(ctx context.Context) error {
+	id, err := w.operatorID(ctx, w.comparse)
+	if err != nil {
+		return err
+	}
+
+	return w.login.process.send(http.MethodPost, "/api/operators/"+id+"/access-link", "", "")
+}
+
+func (w *operatorsWorld) linkIsQueued(ctx context.Context, kind, email string) error {
+	conn, err := pgx.Connect(ctx, w.login.dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var queued bool
+
+	err = conn.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM access_links l JOIN operators o ON o.id = l.operator_id
+		               WHERE lower(o.email) = lower($1) AND l.kind = $2 AND l.token_hash IS NULL
+		                 AND o.password_hash IS NULL)`, email, kind).Scan(&queued)
+	if err != nil {
+		return fmt.Errorf("lire la file des liens : %w", err)
+	}
+
+	if !queued {
+		return fmt.Errorf("aucun lien %q n'attend l'envoi pour %s, ou le compte a déjà un mot de passe", kind, email)
+	}
+
+	return nil
 }
 
 func (w *operatorsWorld) setRoles(ctx context.Context, email string, roles ...string) error {
@@ -271,15 +300,6 @@ func (w *operatorsWorld) setStatus(ctx context.Context, email, status string) er
 	}
 
 	return w.sendJSON(http.MethodPatch, "/api/operators/"+id, map[string]string{"status": status})
-}
-
-func (w *operatorsWorld) resetSecondFactors(ctx context.Context, email string) error {
-	id, err := w.operatorID(ctx, email)
-	if err != nil {
-		return err
-	}
-
-	return w.login.process.remove("/api/operators/" + id + "/second-factors")
 }
 
 func (w *operatorsWorld) createRole(role, keys string) error {
@@ -350,14 +370,6 @@ func (w *operatorsWorld) bodyNames(fragment string) error {
 	}
 
 	return nil
-}
-
-func (w *operatorsWorld) signsInWithChosenPassword(email string) error {
-	if err := w.login.postCredentials(email, chosenPassword); err != nil {
-		return err
-	}
-
-	return w.expect(http.StatusOK, "la connexion de l'opérateur créé")
 }
 
 type listedOperator struct {
@@ -435,38 +447,40 @@ func (w *operatorsWorld) stillHolds(key string) error {
 	return nil
 }
 
-func (w *operatorsWorld) comparseSessionIsRefused() error {
-	if w.comparseCookies == nil {
-		return errors.New("le comparse n'a jamais ouvert de session : ce pas ne prouverait rien")
-	}
+func (w *operatorsWorld) comparseSessionAnswers(expected int) func() error {
+	return func() error {
+		if w.comparseCookies == nil {
+			return errors.New("le comparse n'a jamais ouvert de session : ce pas ne prouverait rien")
+		}
 
-	status := 0
+		status := 0
 
-	err := w.asComparse(func() error {
-		if err := w.login.process.fetch("/api/auth/me"); err != nil {
+		err := w.asComparse(func() error {
+			if err := w.login.process.fetch("/api/auth/me"); err != nil {
+				return err
+			}
+
+			status = w.login.process.received.status
+
+			return nil
+		})
+		if err != nil {
 			return err
 		}
 
-		status = w.login.process.received.status
+		if status != expected {
+			return fmt.Errorf("la session du comparse répond %d au lieu de %d", status, expected)
+		}
 
 		return nil
-	})
-	if err != nil {
-		return err
 	}
-
-	if status != http.StatusUnauthorized {
-		return fmt.Errorf("la session du comparse répond %d : elle a survécu au geste", status)
-	}
-
-	return nil
 }
 
 func (w *operatorsWorld) comparseSignsInWithoutFactor() error {
 	var factors me
 
 	err := w.asComparse(func() error {
-		if err := w.login.postCredentials(w.comparse, scenarioPassword); err != nil {
+		if err := w.login.postCredentials(w.comparse, w.comparsePassword); err != nil {
 			return err
 		}
 
@@ -480,8 +494,9 @@ func (w *operatorsWorld) comparseSignsInWithoutFactor() error {
 		return err
 	}
 
-	if factors.SecondFactors.TOTP || factors.SecondFactors.Passkeys != 0 {
-		return fmt.Errorf("le comparse détient encore un second facteur : %+v", factors.SecondFactors)
+	held := factors.SecondFactors
+	if held.TOTP || held.Passkeys != 0 || held.RecoveryCodesRemaining != 0 {
+		return fmt.Errorf("le comparse détient encore un second facteur : %+v", held)
 	}
 
 	return nil

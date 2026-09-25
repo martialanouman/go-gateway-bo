@@ -6,7 +6,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
@@ -36,21 +35,12 @@ func (a API) CreateOperator(ctx context.Context, request CreateOperatorRequestOb
 
 	body := request.Body
 	if body == nil || !within(strings.TrimSpace(body.Email), 3, 320) ||
-		!within(strings.TrimSpace(body.DisplayName), 1, 200) || !within(body.Password, 0, 4096) {
+		!within(strings.TrimSpace(body.DisplayName), 1, 200) {
 		return CreateOperator400JSONResponse{RequeteInvalideJSONResponse(malformedOperator())}, nil
 	}
 
-	if !auth.PasswordLongEnough(body.Password) {
-		return CreateOperator400JSONResponse{RequeteInvalideJSONResponse(passwordTooShort())}, nil
-	}
-
-	hash, err := auth.Hash(body.Password)
-	if err != nil {
-		return nil, err
-	}
-
 	created, err := a.Administration.CreateOperator(ctx, strings.TrimSpace(body.Email),
-		strings.TrimSpace(body.DisplayName), hash, a.event(ctx, store.Event{
+		strings.TrimSpace(body.DisplayName), a.event(ctx, store.Event{
 			OperatorID: actor, Action: actionOperatorCreate, TargetType: auditTargetOperator,
 		}))
 	if errors.Is(err, store.ErrEmailTaken) {
@@ -126,28 +116,27 @@ func (a API) SetOperatorRoles(ctx context.Context, request SetOperatorRolesReque
 	return SetOperatorRoles200JSONResponse(operatorDTO(updated)), nil
 }
 
-func (a API) ResetOperatorSecondFactors(ctx context.Context, request ResetOperatorSecondFactorsRequestObject,
-) (ResetOperatorSecondFactorsResponseObject, error) {
+func (a API) RequestOperatorAccessLink(ctx context.Context, request RequestOperatorAccessLinkRequestObject,
+) (RequestOperatorAccessLinkResponseObject, error) {
 	actor, err := actorOf(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if request.OperatorId == actor {
-		return ResetOperatorSecondFactors409JSONResponse{AutoVerrouillageJSONResponse(cannotResetOwnFactor())}, nil
-	}
+	err = a.Administration.RequestAccessLink(ctx, request.OperatorId, a.event(ctx, store.Event{
+		OperatorID: actor, Action: actionOperatorAccessLink, TargetType: auditTargetOperator,
+	}))
 
-	err = a.Administration.ResetSecondFactors(ctx, request.OperatorId,
-		a.event(ctx, store.Event{OperatorID: actor, Action: actionOperatorMFAReset, TargetType: auditTargetOperator}))
-	if errors.Is(err, store.ErrOperatorUnknown) {
-		return ResetOperatorSecondFactors404JSONResponse{OperateurInconnuJSONResponse(unknownOperator())}, nil
-	}
-
-	if err != nil {
+	switch {
+	case errors.Is(err, store.ErrOperatorUnknown):
+		return RequestOperatorAccessLink404JSONResponse{OperateurInconnuJSONResponse(unknownOperator())}, nil
+	case errors.Is(err, store.ErrOperatorDisabled):
+		return RequestOperatorAccessLink409JSONResponse{CompteDesactiveJSONResponse(operatorDisabled())}, nil
+	case err != nil:
 		return nil, err
 	}
 
-	return ResetOperatorSecondFactors204Response{}, nil
+	return RequestOperatorAccessLink202Response{}, nil
 }
 
 func (a API) ListRoles(ctx context.Context, _ ListRolesRequestObject) (ListRolesResponseObject, error) {
@@ -275,6 +264,11 @@ func operatorDTO(view store.OperatorView) Operator {
 		roles = append(roles, RoleReference{Id: id, Name: view.RoleNames[i]})
 	}
 
+	var link *AccessLink
+	if view.AccessLink != nil {
+		link = &AccessLink{Kind: AccessLinkKind(view.AccessLink.Kind), State: AccessLinkState(view.AccessLink.State)}
+	}
+
 	return Operator{
 		Id:                   view.ID,
 		Email:                view.Email,
@@ -282,6 +276,7 @@ func operatorDTO(view store.OperatorView) Operator {
 		Status:               OperatorStatus(view.Status),
 		Roles:                roles,
 		SecondFactorEnrolled: view.SecondFactorEnrolled,
+		AccessLink:           link,
 	}
 }
 
@@ -298,8 +293,7 @@ func roleDTO(view store.RoleView) Role {
 
 func malformedOperator() Error {
 	return Error{Code: "bad_request", Message: "L'opérateur n'a pas été enregistré : l'adresse (de 3 à " +
-		"320 caractères) et le nom affiché (200 au plus) sont obligatoires, et le mot de passe compte " +
-		"au plus 4096 caractères."}
+		"320 caractères) et le nom affiché (200 au plus) sont obligatoires."}
 }
 
 func malformedStatus() Error {
@@ -321,11 +315,6 @@ func malformedRole() Error {
 func malformedRoleUpdate() Error {
 	return Error{Code: "bad_request", Message: "Le rôle n'a pas été modifié : la description compte au plus " +
 		"500 caractères et la liste au plus 100 permissions."}
-}
-
-func passwordTooShort() Error {
-	return Error{Code: "password_too_short", Message: "L'opérateur n'a pas été créé : son mot de passe doit " +
-		"compter au moins 12 caractères. La longueur est la seule règle ; aucune composition n'est exigée."}
 }
 
 func emailTaken() Error {
@@ -361,10 +350,9 @@ func cannotDisableSelf() Error {
 		"désactiver vous-même. Un autre administrateur détenant « operators:manage » peut le faire."}
 }
 
-func cannotResetOwnFactor() Error {
-	return Error{Code: "self_lockout", Message: "Votre second facteur reste en place : la réinitialisation " +
-		"vise un autre opérateur. Pour remplacer le vôtre, présentez à l'enrôlement un code de " +
-		"l'application actuelle ou un code de récupération ; aucun écran ne le permet encore."}
+func operatorDisabled() Error {
+	return Error{Code: "operator_disabled", Message: "Aucun lien n'est parti : le compte est désactivé. " +
+		"Réactivez-le, puis envoyez le lien."}
 }
 
 func selfLockout() Error {

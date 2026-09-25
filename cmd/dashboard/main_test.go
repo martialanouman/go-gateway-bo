@@ -158,7 +158,7 @@ func TestScenarios(t *testing.T) {
 // Il vaut donc le corpus, sans jeu : laissé en retard, il n'exige plus rien, et un fichier de
 // scénarios entier renommé en `.feature.disabled` laisse la suite verte. Un plancher qui survit à ce
 // qu'il doit interdire est une phrase, pas une porte.
-const minimumScenarios = 93
+const minimumScenarios = 100
 
 // Le registre d'opérations est passé par la suite et non construit ici : `initializeScenario` est
 // rappelé à chaque scénario, et un registre neuf à chaque fois n'aurait jamais vu que la dernière
@@ -231,7 +231,9 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	factors := &mfaWorld{login: login, session: sessions}
 	factors.registerSteps(ctx)
 	(&auditWorld{login: login, mfa: factors}).registerSteps(ctx)
-	(&operatorsWorld{login: login, mfa: factors}).registerSteps(ctx)
+	operators := &operatorsWorld{login: login, mfa: factors}
+	operators.registerSteps(ctx)
+	(&accessWorld{operators: operators}).registerSteps(ctx)
 	(&webauthnWorld{
 		login:         login,
 		session:       sessions,
@@ -327,6 +329,11 @@ func completeConfiguration() map[string]string {
 		// `none` est la façon d'écrire « aucun proxy » : vide se lirait aussi bien comme ça que comme
 		// un oubli, et l'oubli verrouille tous les opérateurs d'un coup derrière un load balancer.
 		"DASHBOARD_TRUSTED_PROXIES": "none",
+		// `127.0.0.1:1` est un port refusé par tout serveur SMTP : le worker échoue et repousse la
+		// demande, ce qu'aucun scénario ne lit — aucun d'eux n'observe l'envoi d'un lien.
+		"DASHBOARD_SMTP_ADDR":  "127.0.0.1:1",
+		"DASHBOARD_SMTP_FROM":  "cockpit@exemple.test",
+		"DASHBOARD_PUBLIC_URL": configuredOrigin,
 	}
 }
 

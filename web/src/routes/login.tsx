@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, stripSearchParams } from '@tanstack/react-router'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { AuthLayout, AuthPending, AuthRefusal } from '~/components/auth-layout'
+import { AuthLayout, AuthNotice, AuthPending, AuthRefusal } from '~/components/auth-layout'
 import { Button, Field, Input } from '~/components/ui'
 import { api, refusalMessage } from '~/lib/api'
 import { LoginRequest } from '~/lib/contract.gen'
@@ -21,7 +21,14 @@ export const Route = createFileRoute('/login')({
   // de ce tableau de bord, ou rien.
   validateSearch: (search: Record<string, unknown>) => ({
     redirect: safeDestination(search.redirect),
+    // `/access` y navigue après un succès. Une valeur absente ou invalide n'affiche rien : ce n'est
+    // pas un refus, seulement l'état par défaut de cet écran.
+    passwordSet: search.passwordSet === true || search.passwordSet === 'true',
   }),
+
+  // Sans quoi `passwordSet: false` — la valeur que chaque redirection vers `/login` doit fournir,
+  // le schéma ne le rendant pas optionnel — s'écrirait dans l'URL de toute connexion normale.
+  search: { middlewares: [stripSearchParams({ passwordSet: false })] },
 
   beforeLoad: async ({ context, search }) => {
     const session = await readSession(context.queryClient)
@@ -83,7 +90,7 @@ const credentials = z.object({
  * existent.
  */
 function LoginScreen() {
-  const { redirect: destination } = Route.useSearch()
+  const { redirect: destination, passwordSet } = Route.useSearch()
   const navigate = Route.useNavigate()
   const queryClient = useQueryClient()
 
@@ -126,6 +133,12 @@ function LoginScreen() {
 
   return (
     <AuthLayout title="Connexion">
+      {passwordSet ? (
+        <AuthNotice>
+          Mot de passe enregistré. Connectez-vous pour configurer votre second facteur.
+        </AuthNotice>
+      ) : null}
+
       {login.error === null ? null : <AuthRefusal>{login.error.message}</AuthRefusal>}
 
       {/* `noValidate` : la validation native rendrait ses propres messages, dans la langue du

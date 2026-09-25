@@ -89,8 +89,8 @@ unique reçu par e-mail, puis enrôle son second facteur par le parcours existan
   contre `Host`.
 
 ## Definition of Done
-- [ ] `make check` vert et `make e2e` vert
-- [ ] Aucun jeton en clair en base, dans un journal, une URL transmise ou un audit — vérifié sur le
+- [x] `make check` vert et `make e2e` vert — les deux en `rc=0` le 25/09/2026
+- [x] Aucun jeton en clair en base, dans un journal, une URL transmise ou un audit — vérifié sur le
       livré.
 
 ## Hors périmètre

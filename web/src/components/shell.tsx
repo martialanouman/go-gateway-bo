@@ -54,7 +54,7 @@ export function Shell({ children }: { readonly children: ReactNode }) {
               <p>
                 {/* Sans destination à rejouer : l'adresse d'où l'on vient ne correspond à aucun
                     écran, et y revenir ramènerait à ce même message. */}
-                <Link search={{ redirect: undefined }} to="/login">
+                <Link search={{ passwordSet: false, redirect: undefined }} to="/login">
                   Se connecter
                 </Link>{' '}
                 ouvre une session et conduit à l’accueil.

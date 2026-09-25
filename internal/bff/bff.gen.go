@@ -15,6 +15,45 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for AccessLinkKind.
+const (
+	AccessLinkKindActivation AccessLinkKind = "activation"
+	AccessLinkKindReset      AccessLinkKind = "reset"
+)
+
+// Valid indicates whether the value is a known member of the AccessLinkKind enum.
+func (e AccessLinkKind) Valid() bool {
+	switch e {
+	case AccessLinkKindActivation:
+		return true
+	case AccessLinkKindReset:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccessLinkState.
+const (
+	AccessLinkStateFailed AccessLinkState = "failed"
+	AccessLinkStateQueued AccessLinkState = "queued"
+	AccessLinkStateSent   AccessLinkState = "sent"
+)
+
+// Valid indicates whether the value is a known member of the AccessLinkState enum.
+func (e AccessLinkState) Valid() bool {
+	switch e {
+	case AccessLinkStateFailed:
+		return true
+	case AccessLinkStateQueued:
+		return true
+	case AccessLinkStateSent:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	HealthStatusOk HealthStatus = "ok"
@@ -135,6 +174,24 @@ func (e WebauthnRegistrationOptionsPublicKeyPubKeyCredParamsType) Valid() bool {
 	}
 }
 
+// AccessLink defines model for AccessLink.
+type AccessLink struct {
+	Kind  AccessLinkKind  `json:"kind"`
+	State AccessLinkState `json:"state"`
+}
+
+// AccessLinkKind defines model for AccessLink.Kind.
+type AccessLinkKind string
+
+// AccessLinkState defines model for AccessLink.State.
+type AccessLinkState string
+
+// AccessLinkUse defines model for AccessLinkUse.
+type AccessLinkUse struct {
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
 // CurrentOperator De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
 // `mfa_totp_secret`, ni les identifiants WebAuthn : le type de domaine du store ne traverse pas
 // cette frontière (§1.11), et `additionalProperties: false` fait refuser tout champ qu'un
@@ -210,6 +267,7 @@ type MfaVerificationMethod string
 
 // Operator Un opérateur tel que l'écran d'administration le montre. Aucun secret, aucun hachage.
 type Operator struct {
+	AccessLink           *AccessLink     `json:"accessLink"`
 	DisplayName          string          `json:"displayName"`
 	Email                string          `json:"email"`
 	Id                   string          `json:"id"`
@@ -225,7 +283,6 @@ type OperatorStatus string
 type OperatorCreation struct {
 	DisplayName string `json:"displayName"`
 	Email       string `json:"email"`
-	Password    string `json:"password"`
 }
 
 // OperatorRoles defines model for OperatorRoles.
@@ -412,6 +469,11 @@ type RoleId = string
 // première route qui relaie la passerelle (step-060).
 type AutoVerrouillage = Error
 
+// CompteDesactive La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
+// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
+// première route qui relaie la passerelle (step-060).
+type CompteDesactive = Error
+
 // OperateurInconnu La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
 // première route qui relaie la passerelle (step-060).
@@ -452,6 +514,9 @@ type SessionAbsente = Error
 // première route qui relaie la passerelle (step-060).
 type TypeDeContenuRefuse = Error
 
+// SetPasswordFromAccessLinkJSONRequestBody defines body for SetPasswordFromAccessLink for application/json ContentType.
+type SetPasswordFromAccessLinkJSONRequestBody = AccessLinkUse
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -481,6 +546,9 @@ type UpdateRoleJSONRequestBody = RoleUpdate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// SetPasswordFromAccessLink Définit son mot de passe par un lien à usage unique
+	// (POST /auth/access-link)
+	SetPasswordFromAccessLink(w http.ResponseWriter, r *http.Request)
 	// Login Premier facteur — adresse et mot de passe
 	// (POST /auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
@@ -514,18 +582,18 @@ type ServerInterface interface {
 	// ListOperators Les opérateurs, leurs rôles et l'état de leur second facteur
 	// (GET /operators)
 	ListOperators(w http.ResponseWriter, r *http.Request)
-	// CreateOperator Crée un opérateur, sans rôle
+	// CreateOperator Crée un opérateur, sans rôle ni mot de passe
 	// (POST /operators)
 	CreateOperator(w http.ResponseWriter, r *http.Request)
 	// UpdateOperator Désactive ou réactive un opérateur
 	// (PATCH /operators/{operatorId})
 	UpdateOperator(w http.ResponseWriter, r *http.Request, operatorId OperatorId)
+	// RequestOperatorAccessLink Envoie un lien d'accès à usage unique
+	// (POST /operators/{operatorId}/access-link)
+	RequestOperatorAccessLink(w http.ResponseWriter, r *http.Request, operatorId OperatorId)
 	// SetOperatorRoles Remplace les rôles d'un opérateur
 	// (POST /operators/{operatorId}/roles)
 	SetOperatorRoles(w http.ResponseWriter, r *http.Request, operatorId OperatorId)
-	// ResetOperatorSecondFactors Réinitialise le second facteur d'un autre opérateur
-	// (DELETE /operators/{operatorId}/second-factors)
-	ResetOperatorSecondFactors(w http.ResponseWriter, r *http.Request, operatorId OperatorId)
 	// ListRoles Les rôles, leurs permissions et leurs détenteurs
 	// (GET /roles)
 	ListRoles(w http.ResponseWriter, r *http.Request)
@@ -543,6 +611,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// SetPasswordFromAccessLink Définit son mot de passe par un lien à usage unique
+// (POST /auth/access-link)
+func (_ Unimplemented) SetPasswordFromAccessLink(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Login Premier facteur — adresse et mot de passe
 // (POST /auth/login)
@@ -610,7 +684,7 @@ func (_ Unimplemented) ListOperators(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// CreateOperator Crée un opérateur, sans rôle
+// CreateOperator Crée un opérateur, sans rôle ni mot de passe
 // (POST /operators)
 func (_ Unimplemented) CreateOperator(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -622,15 +696,15 @@ func (_ Unimplemented) UpdateOperator(w http.ResponseWriter, r *http.Request, op
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// SetOperatorRoles Remplace les rôles d'un opérateur
-// (POST /operators/{operatorId}/roles)
-func (_ Unimplemented) SetOperatorRoles(w http.ResponseWriter, r *http.Request, operatorId OperatorId) {
+// RequestOperatorAccessLink Envoie un lien d'accès à usage unique
+// (POST /operators/{operatorId}/access-link)
+func (_ Unimplemented) RequestOperatorAccessLink(w http.ResponseWriter, r *http.Request, operatorId OperatorId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// ResetOperatorSecondFactors Réinitialise le second facteur d'un autre opérateur
-// (DELETE /operators/{operatorId}/second-factors)
-func (_ Unimplemented) ResetOperatorSecondFactors(w http.ResponseWriter, r *http.Request, operatorId OperatorId) {
+// SetOperatorRoles Remplace les rôles d'un opérateur
+// (POST /operators/{operatorId}/roles)
+func (_ Unimplemented) SetOperatorRoles(w http.ResponseWriter, r *http.Request, operatorId OperatorId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -666,6 +740,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// SetPasswordFromAccessLink operation middleware
+func (siw *ServerInterfaceWrapper) SetPasswordFromAccessLink(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetPasswordFromAccessLink(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
@@ -873,6 +961,32 @@ func (siw *ServerInterfaceWrapper) UpdateOperator(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// RequestOperatorAccessLink operation middleware
+func (siw *ServerInterfaceWrapper) RequestOperatorAccessLink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "operatorId" -------------
+	var operatorId OperatorId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operatorId", chi.URLParam(r, "operatorId"), &operatorId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "operatorId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestOperatorAccessLink(w, r, operatorId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SetOperatorRoles operation middleware
 func (siw *ServerInterfaceWrapper) SetOperatorRoles(w http.ResponseWriter, r *http.Request) {
 
@@ -890,32 +1004,6 @@ func (siw *ServerInterfaceWrapper) SetOperatorRoles(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetOperatorRoles(w, r, operatorId)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ResetOperatorSecondFactors operation middleware
-func (siw *ServerInterfaceWrapper) ResetOperatorSecondFactors(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "operatorId" -------------
-	var operatorId OperatorId
-
-	err = runtime.BindStyledParameterWithOptions("simple", "operatorId", chi.URLParam(r, "operatorId"), &operatorId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "operatorId", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ResetOperatorSecondFactors(w, r, operatorId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1125,6 +1213,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/auth/login", wrapper.Login)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/access-link", wrapper.SetPasswordFromAccessLink)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/auth/me", wrapper.Me)
 	})
 	r.Group(func(r chi.Router) {
@@ -1161,7 +1252,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/operators/{operatorId}/roles", wrapper.SetOperatorRoles)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/operators/{operatorId}/second-factors", wrapper.ResetOperatorSecondFactors)
+		r.Post(options.BaseURL+"/operators/{operatorId}/access-link", wrapper.RequestOperatorAccessLink)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/roles", wrapper.ListRoles)
@@ -1181,6 +1272,8 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 
 type AutoVerrouillageJSONResponse Error
 
+type CompteDesactiveJSONResponse Error
+
 type OperateurInconnuJSONResponse Error
 
 type OrigineRefuseeJSONResponse Error
@@ -1196,6 +1289,94 @@ type RoleIntouchableJSONResponse Error
 type SessionAbsenteJSONResponse Error
 
 type TypeDeContenuRefuseJSONResponse Error
+
+type SetPasswordFromAccessLinkRequestObject struct {
+	Body *SetPasswordFromAccessLinkJSONRequestBody
+}
+
+type SetPasswordFromAccessLinkResponseObject interface {
+	VisitSetPasswordFromAccessLinkResponse(w http.ResponseWriter) error
+}
+
+type SetPasswordFromAccessLink204Response struct {
+}
+
+func (response SetPasswordFromAccessLink204Response) VisitSetPasswordFromAccessLinkResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SetPasswordFromAccessLink400JSONResponse Error
+
+func (response SetPasswordFromAccessLink400JSONResponse) VisitSetPasswordFromAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetPasswordFromAccessLink403JSONResponse struct{ OrigineRefuseeJSONResponse }
+
+func (response SetPasswordFromAccessLink403JSONResponse) VisitSetPasswordFromAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetPasswordFromAccessLink410JSONResponse Error
+
+func (response SetPasswordFromAccessLink410JSONResponse) VisitSetPasswordFromAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetPasswordFromAccessLink415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response SetPasswordFromAccessLink415JSONResponse) VisitSetPasswordFromAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetPasswordFromAccessLink503JSONResponse Error
+
+func (response SetPasswordFromAccessLink503JSONResponse) VisitSetPasswordFromAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type LoginRequestObject struct {
 	Body *LoginJSONRequestBody
@@ -2290,6 +2471,94 @@ func (response UpdateOperator415JSONResponse) VisitUpdateOperatorResponse(w http
 	return err
 }
 
+type RequestOperatorAccessLinkRequestObject struct {
+	OperatorId OperatorId `json:"operatorId"`
+}
+
+type RequestOperatorAccessLinkResponseObject interface {
+	VisitRequestOperatorAccessLinkResponse(w http.ResponseWriter) error
+}
+
+type RequestOperatorAccessLink202Response struct {
+}
+
+func (response RequestOperatorAccessLink202Response) VisitRequestOperatorAccessLinkResponse(w http.ResponseWriter) error {
+	w.WriteHeader(202)
+	return nil
+}
+
+type RequestOperatorAccessLink401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response RequestOperatorAccessLink401JSONResponse) VisitRequestOperatorAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestOperatorAccessLink403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response RequestOperatorAccessLink403JSONResponse) VisitRequestOperatorAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestOperatorAccessLink404JSONResponse struct{ OperateurInconnuJSONResponse }
+
+func (response RequestOperatorAccessLink404JSONResponse) VisitRequestOperatorAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestOperatorAccessLink409JSONResponse struct{ CompteDesactiveJSONResponse }
+
+func (response RequestOperatorAccessLink409JSONResponse) VisitRequestOperatorAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestOperatorAccessLink415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response RequestOperatorAccessLink415JSONResponse) VisitRequestOperatorAccessLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SetOperatorRolesRequestObject struct {
 	OperatorId OperatorId `json:"operatorId"`
 	Body       *SetOperatorRolesJSONRequestBody
@@ -2388,94 +2657,6 @@ type SetOperatorRoles415JSONResponse struct {
 }
 
 func (response SetOperatorRoles415JSONResponse) VisitSetOperatorRolesResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(415)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ResetOperatorSecondFactorsRequestObject struct {
-	OperatorId OperatorId `json:"operatorId"`
-}
-
-type ResetOperatorSecondFactorsResponseObject interface {
-	VisitResetOperatorSecondFactorsResponse(w http.ResponseWriter) error
-}
-
-type ResetOperatorSecondFactors204Response struct {
-}
-
-func (response ResetOperatorSecondFactors204Response) VisitResetOperatorSecondFactorsResponse(w http.ResponseWriter) error {
-	w.WriteHeader(204)
-	return nil
-}
-
-type ResetOperatorSecondFactors401JSONResponse struct{ SessionAbsenteJSONResponse }
-
-func (response ResetOperatorSecondFactors401JSONResponse) VisitResetOperatorSecondFactorsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ResetOperatorSecondFactors403JSONResponse struct{ PermissionRefuseeJSONResponse }
-
-func (response ResetOperatorSecondFactors403JSONResponse) VisitResetOperatorSecondFactorsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ResetOperatorSecondFactors404JSONResponse struct{ OperateurInconnuJSONResponse }
-
-func (response ResetOperatorSecondFactors404JSONResponse) VisitResetOperatorSecondFactorsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ResetOperatorSecondFactors409JSONResponse struct{ AutoVerrouillageJSONResponse }
-
-func (response ResetOperatorSecondFactors409JSONResponse) VisitResetOperatorSecondFactorsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ResetOperatorSecondFactors415JSONResponse struct {
-	TypeDeContenuRefuseJSONResponse
-}
-
-func (response ResetOperatorSecondFactors415JSONResponse) VisitResetOperatorSecondFactorsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2829,6 +3010,9 @@ func (response UpdateRole415JSONResponse) VisitUpdateRoleResponse(w http.Respons
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// SetPasswordFromAccessLink Définit son mot de passe par un lien à usage unique
+	// (POST /auth/access-link)
+	SetPasswordFromAccessLink(ctx context.Context, request SetPasswordFromAccessLinkRequestObject) (SetPasswordFromAccessLinkResponseObject, error)
 	// Login Premier facteur — adresse et mot de passe
 	// (POST /auth/login)
 	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
@@ -2862,18 +3046,18 @@ type StrictServerInterface interface {
 	// ListOperators Les opérateurs, leurs rôles et l'état de leur second facteur
 	// (GET /operators)
 	ListOperators(ctx context.Context, request ListOperatorsRequestObject) (ListOperatorsResponseObject, error)
-	// CreateOperator Crée un opérateur, sans rôle
+	// CreateOperator Crée un opérateur, sans rôle ni mot de passe
 	// (POST /operators)
 	CreateOperator(ctx context.Context, request CreateOperatorRequestObject) (CreateOperatorResponseObject, error)
 	// UpdateOperator Désactive ou réactive un opérateur
 	// (PATCH /operators/{operatorId})
 	UpdateOperator(ctx context.Context, request UpdateOperatorRequestObject) (UpdateOperatorResponseObject, error)
+	// RequestOperatorAccessLink Envoie un lien d'accès à usage unique
+	// (POST /operators/{operatorId}/access-link)
+	RequestOperatorAccessLink(ctx context.Context, request RequestOperatorAccessLinkRequestObject) (RequestOperatorAccessLinkResponseObject, error)
 	// SetOperatorRoles Remplace les rôles d'un opérateur
 	// (POST /operators/{operatorId}/roles)
 	SetOperatorRoles(ctx context.Context, request SetOperatorRolesRequestObject) (SetOperatorRolesResponseObject, error)
-	// ResetOperatorSecondFactors Réinitialise le second facteur d'un autre opérateur
-	// (DELETE /operators/{operatorId}/second-factors)
-	ResetOperatorSecondFactors(ctx context.Context, request ResetOperatorSecondFactorsRequestObject) (ResetOperatorSecondFactorsResponseObject, error)
 	// ListRoles Les rôles, leurs permissions et leurs détenteurs
 	// (GET /roles)
 	ListRoles(ctx context.Context, request ListRolesRequestObject) (ListRolesResponseObject, error)
@@ -2925,6 +3109,37 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// SetPasswordFromAccessLink operation middleware
+func (sh *strictHandler) SetPasswordFromAccessLink(w http.ResponseWriter, r *http.Request) {
+	var request SetPasswordFromAccessLinkRequestObject
+
+	var body SetPasswordFromAccessLinkJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetPasswordFromAccessLink(ctx, request.(SetPasswordFromAccessLinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetPasswordFromAccessLink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetPasswordFromAccessLinkResponseObject); ok {
+		if err := validResponse.VisitSetPasswordFromAccessLinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // Login operation middleware
@@ -3285,6 +3500,32 @@ func (sh *strictHandler) UpdateOperator(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// RequestOperatorAccessLink operation middleware
+func (sh *strictHandler) RequestOperatorAccessLink(w http.ResponseWriter, r *http.Request, operatorId OperatorId) {
+	var request RequestOperatorAccessLinkRequestObject
+
+	request.OperatorId = operatorId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RequestOperatorAccessLink(ctx, request.(RequestOperatorAccessLinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RequestOperatorAccessLink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RequestOperatorAccessLinkResponseObject); ok {
+		if err := validResponse.VisitRequestOperatorAccessLinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // SetOperatorRoles operation middleware
 func (sh *strictHandler) SetOperatorRoles(w http.ResponseWriter, r *http.Request, operatorId OperatorId) {
 	var request SetOperatorRolesRequestObject
@@ -3311,32 +3552,6 @@ func (sh *strictHandler) SetOperatorRoles(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetOperatorRolesResponseObject); ok {
 		if err := validResponse.VisitSetOperatorRolesResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ResetOperatorSecondFactors operation middleware
-func (sh *strictHandler) ResetOperatorSecondFactors(w http.ResponseWriter, r *http.Request, operatorId OperatorId) {
-	var request ResetOperatorSecondFactorsRequestObject
-
-	request.OperatorId = operatorId
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ResetOperatorSecondFactors(ctx, request.(ResetOperatorSecondFactorsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ResetOperatorSecondFactors")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ResetOperatorSecondFactorsResponseObject); ok {
-		if err := validResponse.VisitResetOperatorSecondFactorsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

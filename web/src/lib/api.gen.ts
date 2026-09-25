@@ -56,6 +56,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/access-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Définit son mot de passe par un lien à usage unique
+         * @description Publique : celui qui n'a pas encore de mot de passe n'a aucune session. Ce qui la garde est
+         *     le jeton, 256 bits à usage unique, vérifié **avant** tout hachage.
+         *
+         *     Le mot de passe compte douze caractères au moins, dont une majuscule, une minuscule, un
+         *     chiffre et un caractère spécial. Pour un lien `reset`, l'usage retire aussi les facteurs et
+         *     ferme les sessions, dans la même transaction.
+         */
+        post: operations["setPasswordFromAccessLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/me": {
         parameters: {
             query?: never;
@@ -290,8 +315,9 @@ export interface paths {
          *     step-024 jusqu'à step-025, qui l'a corrigée. Retirer sa propre clé d'accès est du self-service,
          *     pas un acte sur autrui : aucune clé du catalogue n'y correspond, et en créer une qu'il faudrait
          *     donner aux neuf rôles pour que le geste marche n'exclurait personne. Ce qui la garde est
-         *     l'élévation, et ce qui en garde la trace est le journal d'audit. C'est `operators:manage` qui
-         *     garde le retrait **sur autrui**, par `DELETE /operators/{operatorId}/second-factors`.
+         *     l'élévation, et ce qui en garde la trace est le journal d'audit. Sur autrui, la sortie est un
+         *     lien de réinitialisation envoyé par un administrateur détenant `operators:manage`
+         *     (`POST /operators/{operatorId}/access-link`).
          *
          *     Elle exige donc une session élevée — mais **pas** de présenter la passkey qu'on
          *     retire : on la retire précisément quand on ne l'a plus, appareil perdu ou clé cassée, et
@@ -318,9 +344,10 @@ export interface paths {
         get: operations["listOperators"];
         put?: never;
         /**
-         * Crée un opérateur, sans rôle
-         * @description Le compte naît actif et sans rôle : il peut entrer, puis enrôler son second facteur, et rien
-         *     d'autre tant qu'on ne lui attribue pas de rôle.
+         * Crée un opérateur, sans rôle ni mot de passe
+         * @description Le compte naît actif, sans rôle et **sans mot de passe** : personne ne connaît celui d'un
+         *     autre. Un lien d'activation, valable 72 heures, est mis en file dans la même transaction ;
+         *     son titulaire y définit son mot de passe, puis enrôle son second facteur.
          */
         post: operations["createOperator"];
         delete?: never;
@@ -367,7 +394,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/operators/{operatorId}/second-factors": {
+    "/operators/{operatorId}/access-link": {
         parameters: {
             query?: never;
             header?: never;
@@ -376,16 +403,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post?: never;
         /**
-         * Réinitialise le second facteur d'un autre opérateur
-         * @description Retire son application d'authentification, ses codes de récupération et ses clés d'accès,
-         *     lève son verrou de second facteur et ferme ses sessions. À sa prochaine connexion, il enrôle
-         *     un nouveau facteur. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur
-         *     cassé. Sur son propre compte, elle est refusée : le remplacement se fait en présentant le
-         *     facteur actuel.
+         * Envoie un lien d'accès à usage unique
+         * @description Met en file un lien que le titulaire reçoit par e-mail : `activation` (72 heures) si le compte
+         *     n'a pas encore de mot de passe, `reset` (1 heure) sinon. Un nouveau lien invalide le précédent.
+         *
+         *     **Rien ne change avant l'usage** : l'ancien mot de passe, les facteurs et les sessions restent
+         *     valables jusqu'à ce que le titulaire utilise le lien. À l'usage d'un `reset`, son application
+         *     d'authentification, ses codes de récupération et ses clés d'accès sont retirés et ses sessions
+         *     fermées. C'est la sortie d'un téléphone perdu ou d'un authentificateur au compteur cassé.
          */
-        delete: operations["resetOperatorSecondFactors"];
+        post: operations["requestOperatorAccessLink"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -628,6 +657,13 @@ export interface components {
             status: "active" | "disabled";
             roles: components["schemas"]["RoleReference"][];
             secondFactorEnrolled: boolean;
+            accessLink: components["schemas"]["AccessLink"] | null;
+        };
+        AccessLink: {
+            /** @enum {string} */
+            kind: "activation" | "reset";
+            /** @enum {string} */
+            state: "queued" | "sent" | "failed";
         };
         RoleReference: {
             id: string;
@@ -636,6 +672,9 @@ export interface components {
         OperatorCreation: {
             email: string;
             displayName: string;
+        };
+        AccessLinkUse: {
+            token: string;
             password: string;
         };
         OperatorUpdate: {
@@ -694,10 +733,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /**
-         * @description Le corps n'a pas la forme attendue, le mot de passe est trop court, ou il désigne un rôle ou
-         *     une permission inconnus.
-         */
+        /** @description Le corps n'a pas la forme attendue, ou il désigne un rôle ou une permission inconnus. */
         RequeteInvalide: {
             headers: {
                 [name: string]: unknown;
@@ -726,9 +762,18 @@ export interface components {
         };
         /**
          * @description Le geste enfermerait son auteur dehors (`self_lockout`) : se désactiver, se retirer
-         *     `operators:manage` ou `roles:manage`, réinitialiser son propre second facteur.
+         *     `operators:manage` ou `roles:manage`.
          */
         AutoVerrouillage: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description `operator_disabled` : aucun lien ne part vers un compte désactivé. Le réactiver d'abord. */
+        CompteDesactive: {
             headers: {
                 [name: string]: unknown;
             };
@@ -876,6 +921,68 @@ export interface operations {
             };
         };
     };
+    setPasswordFromAccessLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessLinkUse"];
+            };
+        };
+        responses: {
+            /** @description Le mot de passe est enregistré ; le lien ne vaut plus rien. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description `password_policy` : le mot de passe ne suit pas la politique, et le message nomme ce qui
+             *     manque. La politique n'est jugée qu'après le jeton : ce refus ne vise qu'un lien valable,
+             *     qui le reste. `bad_request` : le corps n'a pas la forme attendue.
+             */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            403: components["responses"]["OrigineRefusee"];
+            /**
+             * @description `access_link_invalid` : le lien a servi, expiré, été remplacé, ou vise un compte désactivé.
+             *     **Un seul refus** pour les quatre causes : les distinguer dirait à qui détient un vieux
+             *     lien ce qu'il est devenu.
+             */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            415: components["responses"]["TypeDeContenuRefuse"];
+            /**
+             * @description Les dix places de hachage argon2id sont occupées. Rien n'a été enregistré et le lien reste
+             *     valable.
+             */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     me: {
         parameters: {
             query?: never;
@@ -980,9 +1087,9 @@ export interface operations {
              *     enrôlerait un neuf et évincerait l'opérateur.
              *
              *     Le refus dit ce qu'il faut faire — présenter un code de l'authentificateur en place, ou
-             *     l'un des codes de récupération. Si les deux sont perdus, la sortie est la réinitialisation
-             *     par un administrateur détenant `operators:manage`
-             *     (`DELETE /operators/{operatorId}/second-factors`), et le message la nomme.
+             *     l'un des codes de récupération. Si les deux sont perdus, la sortie est un lien de
+             *     réinitialisation envoyé par un administrateur détenant `operators:manage`
+             *     (`POST /operators/{operatorId}/access-link`), et le message la nomme.
              *
              *     **Trois causes, trois codes**, et ici le `code` est le **seul** discriminant — contrairement
              *     au retrait d'une clé d'accès, où le statut sépare déjà les causes. Un client qui ne lirait
@@ -1515,7 +1622,7 @@ export interface operations {
             415: components["responses"]["TypeDeContenuRefuse"];
         };
     };
-    resetOperatorSecondFactors: {
+    requestOperatorAccessLink: {
         parameters: {
             query?: never;
             header?: never;
@@ -1526,8 +1633,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Le second facteur est retiré et les sessions sont fermées. */
-            204: {
+            /** @description Le lien est en file ; il part dans les secondes qui suivent. */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1536,7 +1643,7 @@ export interface operations {
             401: components["responses"]["SessionAbsente"];
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["OperateurInconnu"];
-            409: components["responses"]["AutoVerrouillage"];
+            409: components["responses"]["CompteDesactive"];
             415: components["responses"]["TypeDeContenuRefuse"];
         };
     };

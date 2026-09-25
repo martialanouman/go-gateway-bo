@@ -18,18 +18,12 @@ Fonctionnalité: Administrer les opérateurs et les rôles
     Et la réponse valide le contrat du BFF
     Et le journal porte 1 événement "permission.denied"
 
-  Scénario: avec operators:manage, l'opérateur créé peut entrer
+  Scénario: avec operators:manage, l'opérateur créé attend son lien d'activation
     Quand l'opérateur crée l'opérateur "nadia.benali@exemple.test"
     Alors le serveur répond 201
     Et la réponse valide le contrat du BFF
     Et le journal porte 1 événement "operator.create"
-    Et "nadia.benali@exemple.test" se connecte avec le mot de passe choisi pour elle
-
-  Scénario: un mot de passe trop court est refusé à la création
-    Quand l'opérateur crée l'opérateur "nadia.benali@exemple.test" avec le mot de passe "court"
-    Alors le serveur répond 400
-    Et la réponse valide le contrat du BFF
-    Et le journal porte 0 événement "operator.create"
+    Et un lien "activation" attend l'envoi pour "nadia.benali@exemple.test"
 
   Scénario: la liste des opérateurs dit qui détient quoi
     Quand l'opérateur demande la liste des opérateurs
@@ -63,20 +57,19 @@ Fonctionnalité: Administrer les opérateurs et les rôles
     Et le journal porte 1 événement "operator.disable"
     Et la session du comparse est refusée
 
-  Scénario: réinitialiser le second facteur d'un comparse le laisse se réenrôler
-    Étant donné le comparse a enrôlé une application d'authentification
-    Et le comparse est connecté dans un autre navigateur
-    Quand l'opérateur réinitialise le second facteur du comparse
-    Alors le serveur répond 204
-    Et la réponse valide le contrat du BFF
-    Et le journal porte 1 événement "mfa.reset"
-    Et la session du comparse est refusée
-    Et le comparse se reconnecte sans aucun second facteur
+  Scénario: sans operators:manage, l'envoi d'un lien est refusé et tracé
+    Étant donné l'opérateur ne détient plus que le rôle "Audit"
+    Quand l'opérateur envoie un lien au comparse
+    Alors le serveur répond 403
+    Et le refus nomme la permission "operators:manage"
+    Et le journal porte 1 événement "permission.denied"
 
-  Scénario: réinitialiser son propre second facteur est refusé
-    Quand l'opérateur réinitialise son propre second facteur
+  Scénario: un lien ne part pas vers un compte désactivé
+    Étant donné le comparse est désactivé
+    Quand l'opérateur envoie un lien au comparse
     Alors le serveur répond 409
     Et la réponse valide le contrat du BFF
+    Et le journal porte 0 événement "operator.access_link"
 
   Scénario: composer un rôle personnalisé puis le modifier
     Quand l'opérateur crée le rôle "astreinte" accordant "alerts:read"

@@ -126,9 +126,10 @@ var initialMigrations = []string{
 	"00008_webauthn.sql",
 	"00009_ceremony_throttling.sql",
 	"00010_default_role_names.sql",
+	"00011_access_links.sql",
 }
 
-const latestSchemaVersion = 10
+const latestSchemaVersion = 11
 
 func (w *schemaWorld) everyMigrationWasReported() error {
 	if !slices.Equal(w.lastOutcome.Applied, initialMigrations) {

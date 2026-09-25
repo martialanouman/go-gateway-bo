@@ -78,6 +78,20 @@ export function AuthRefusal({ children }: { readonly children: ReactNode }) {
 }
 
 /**
+ * L'avis qui suit une action réussie, hors formulaire — ici, la définition d'un mot de passe par
+ * lien d'accès, avant la connexion qui suit. `role="status"` et non `"alert"` : rien n'a échoué, une
+ * région polie suffit.
+ */
+export function AuthNotice({ children }: { readonly children: ReactNode }) {
+  return (
+    <p className="auth__notice" role="status">
+      <Icon name="check" size={13} />
+      <span>{children}</span>
+    </p>
+  )
+}
+
+/**
  * La sortie des **deux écrans qui suivent la connexion** — enrôlement et second facteur —, sur
  * chacun de leurs états résolus : un opérateur qui s'est trompé de compte, dont le facteur est
  * perdu, ou qui renonce à enrôler, doit pouvoir repartir sans fermer l'onglet. L'écran de connexion
@@ -105,7 +119,7 @@ export function RestartLogin() {
       // cul-de-sac qu'on cherche justement à éviter. Le serveur rend le même 204 sans session.
       forgetChallenge()
       forgetSession(queryClient)
-      void navigate({ to: '/login', search: { redirect: undefined } })
+      void navigate({ to: '/login', search: { redirect: undefined, passwordSet: false } })
     },
   })
 

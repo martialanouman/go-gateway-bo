@@ -9,7 +9,7 @@ import (
 // Les actions que le journal porte, en `domaine.verbe` — la convention du §3.1. Elles se grep dans le
 // journal, donc elles ne se traduisent pas et ne se composent pas à la volée.
 //
-// **Six des huit mutations de `/auth/` en portent une.** Les deux exemptées sont les ouvertures de
+// **Sept des neuf mutations de `/auth/` en portent une.** Les deux exemptées sont les ouvertures de
 // cérémonie WebAuthn : elles n'ont aucun effet durable — un défi tiré, remplacé au prochain appel, et
 // consommé ou échu en cinq minutes. Les tracer produirait du bruit qu'une enquête devrait apprendre à
 // écarter, ce qui est le meilleur moyen de lui faire écarter autre chose.
@@ -20,16 +20,17 @@ const (
 	actionMFAVerify       = "mfa.verify"
 	actionPasskeyRegister = "passkey.register"
 	actionPasskeyRemove   = "passkey.remove"
+	actionPasswordSet     = "operator.password_set"
 
-	actionPermissionDenied = "permission.denied"
-	actionOperatorCreate   = "operator.create"
-	actionOperatorDisable  = "operator.disable"
-	actionOperatorEnable   = "operator.enable"
-	actionOperatorRolesSet = "operator.assign_roles"
-	actionOperatorMFAReset = "mfa.reset"
-	actionRoleCreate       = "role.create"
-	actionRoleUpdate       = "role.update"
-	actionRoleDelete       = "role.delete"
+	actionPermissionDenied   = "permission.denied"
+	actionOperatorCreate     = "operator.create"
+	actionOperatorDisable    = "operator.disable"
+	actionOperatorEnable     = "operator.enable"
+	actionOperatorRolesSet   = "operator.assign_roles"
+	actionOperatorAccessLink = "operator.access_link"
+	actionRoleCreate         = "role.create"
+	actionRoleUpdate         = "role.update"
+	actionRoleDelete         = "role.delete"
 )
 
 // Les types de cible que ces actions désignent. Le §3.1 les laisse libres ; les nommer ici évite que

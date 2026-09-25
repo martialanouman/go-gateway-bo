@@ -45,7 +45,7 @@ export const Route = createFileRoute('/enroll')({
     const session = await readSession(context.queryClient)
 
     if (session.kind === 'none') {
-      throw redirect({ to: '/login', search: { redirect: search.redirect } })
+      throw redirect({ to: '/login', search: { redirect: search.redirect, passwordSet: false } })
     }
 
     // Une session illisible ne dit pas ce que ce compte détient, et proposer un enrôlement à un
@@ -72,7 +72,7 @@ export const Route = createFileRoute('/enroll')({
     // certain. Le cas n'est pas théorique — c'est ce que produit un rechargement, puisque le
     // challenge ne vit qu'en mémoire du document.
     if (peekChallenge() === undefined) {
-      throw redirect({ to: '/login', search: { redirect: search.redirect } })
+      throw redirect({ to: '/login', search: { redirect: search.redirect, passwordSet: false } })
     }
   },
 

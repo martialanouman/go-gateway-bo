@@ -97,7 +97,11 @@ func (API) SetOperatorRoles(_ context.Context, _ bff.SetOperatorRolesRequestObje
 	return nil, nil
 }
 
-func (API) ResetOperatorSecondFactors(_ context.Context, _ bff.ResetOperatorSecondFactorsRequestObject) (bff.ResetOperatorSecondFactorsResponseObject, error) {
+func (API) RequestOperatorAccessLink(_ context.Context, _ bff.RequestOperatorAccessLinkRequestObject) (bff.RequestOperatorAccessLinkResponseObject, error) {
+	return nil, nil
+}
+
+func (API) SetPasswordFromAccessLink(_ context.Context, _ bff.SetPasswordFromAccessLinkRequestObject) (bff.SetPasswordFromAccessLinkResponseObject, error) {
 	return nil, nil
 }
 

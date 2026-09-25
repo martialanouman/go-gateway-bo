@@ -432,32 +432,125 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   await page.emulateMedia({ reducedMotion: null })
 
   // step-030 : le premier administrateur fait entrer un second opérateur, sans toucher à la base.
+  const mailpit = 'http://127.0.0.1:8025'
+  // Un lancement précédent laisse ses messages dans Mailpit : sans cette purge, la recherche
+  // ci-dessous pourrait répondre avec le lien d'un autre run.
+  await request.delete(`${mailpit}/api/v1/messages`)
+
   await page.goto('/operators')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Opérateurs')
   await page.getByRole('button', { name: 'Nouvel opérateur' }).click()
   const creation = page.getByRole('dialog', { name: 'Nouvel opérateur' })
-  const recrue = { email: 'recrue@example.test', password: 'un mot de passe de recrue' }
+  const recrue = { email: 'recrue@example.test', displayName: 'Recrue de parcours' }
   await creation.getByLabel('Adresse e-mail').fill(recrue.email)
-  await creation.getByLabel('Nom affiché').fill('Recrue de parcours')
-  await creation.getByLabel('Mot de passe').fill(recrue.password)
+  await creation.getByLabel('Nom affiché').fill(recrue.displayName)
   await creation.getByRole('button', { name: 'Créer l’opérateur' }).click()
+
+  // Le compte naît sans mot de passe : c'est le toast, pas le formulaire, qui dit comment il
+  // s'active.
+  await expect(
+    page.getByText(`Compte créé. Le lien d’activation part à ${recrue.email} ; il vaut 72 heures.`),
+  ).toBeVisible()
 
   const ligne = page.getByRole('row', { name: new RegExp(recrue.email) })
   await expect(ligne).toContainText('Aucun rôle')
+  await expect(ligne).toContainText('Activation en attente')
+
   await ligne.getByRole('button', { name: 'Modifier les rôles' }).click()
-  const attribution = page.getByRole('dialog', { name: 'Rôles de Recrue de parcours' })
+  const attribution = page.getByRole('dialog', { name: `Rôles de ${recrue.displayName}` })
   await attribution.getByRole('checkbox', { name: /Audit/ }).check()
   await attribution.getByRole('button', { name: 'Enregistrer les rôles' }).click()
   await expect(ligne).toContainText('Audit')
 
+  // Le worker envoie hors de toute requête HTTP que ce parcours observe : seule une relecture de
+  // la liste — un rechargement — montre l'issue.
+  await expect
+    .poll(
+      async () => {
+        await page.reload()
+        return ligne.innerText()
+      },
+      { timeout: 20_000 },
+    )
+    .toContain('Lien envoyé')
+
   await page.getByRole('banner').getByRole('button', { name: 'Se déconnecter' }).click()
   await page.getByRole('link', { name: 'Se connecter' }).click()
   await expect(page).toHaveURL(/\/login/)
+
+  let lien = ''
+  await expect
+    .poll(
+      async () => {
+        const found = await request.get(
+          `${mailpit}/api/v1/search?query=${encodeURIComponent(`to:${recrue.email}`)}`,
+        )
+        const { messages } = (await found.json()) as { messages: { ID: string }[] }
+        if (messages[0] === undefined) return ''
+        const texte = await (await request.get(`${mailpit}/view/${messages[0].ID}.txt`)).text()
+        lien = texte.match(/https?:\/\/\S+\/access#\S+/)?.[0] ?? ''
+        return lien
+      },
+      { timeout: 20_000 },
+    )
+    .not.toBe('')
+  expect(lien.startsWith('http://localhost:3101/access#')).toBe(true)
+
+  const token = lien.split('#')[1] ?? ''
+  expect(token, 'le jeton est vide : le lien lu ne porte pas de fragment').not.toBe('')
+
+  // Invariant (a) étendu au jeton : aucune requête ne doit le porter, hors le seul appel qui le
+  // consomme. Posé avant `goto`, comme l'écouteur de la coquille peinte ci-dessus.
+  const tokenLeaks: string[] = []
+  let consumedByAccessLink = false
+  const watchToken = (r: Request) => {
+    const url = r.url()
+    if (r.method() === 'POST' && url.endsWith('/api/auth/access-link')) {
+      if (r.postData()?.includes(token)) consumedByAccessLink = true
+      return
+    }
+    if (url.includes(token)) tokenLeaks.push(`URL : ${r.method()} ${url}`)
+    else if (r.postData()?.includes(token)) tokenLeaks.push(`corps : ${r.method()} ${url}`)
+  }
+  page.on('request', watchToken)
+
+  await page.goto(lien)
+  // `exact` : sinon le nom accessible de « Confirmer le mot de passe » matche aussi ce libellé.
+  const nouveauMotDePasse = page.getByLabel('Mot de passe', { exact: true })
+  await expect(nouveauMotDePasse).toBeVisible()
+  expect(page.url(), 'le fragment du jeton a survécu au premier rendu').not.toContain('#')
+
+  const motDePasse = 'Recrue-de-parcours-1'
+  await nouveauMotDePasse.fill(motDePasse)
+  await page.getByLabel('Confirmer le mot de passe').fill(motDePasse)
+  await page.getByRole('button', { name: 'Enregistrer' }).click()
+
+  await expect(page).toHaveURL(/\/login\?passwordSet=true$/)
+  await expect(page.getByRole('status')).toContainText(
+    'Mot de passe enregistré. Connectez-vous pour configurer votre second facteur.',
+  )
+
+  page.off('request', watchToken)
+  expect(tokenLeaks, 'le jeton a fui hors du seul appel qui doit le porter').toEqual([])
+  expect(consumedByAccessLink, "le jeton n'a pas atteint POST /api/auth/access-link").toBe(true)
+
   await page.getByLabel(/E-mail/).fill(recrue.email)
-  await page.getByLabel('Mot de passe').fill(recrue.password)
+  await page.getByLabel('Mot de passe').fill(motDePasse)
   await page.getByRole('button', { name: 'Se connecter' }).click()
   // Il entre, et c'est l'enrôlement qui l'accueille : un compte créé n'a encore aucun facteur.
   await expect(page).toHaveURL(/\/enroll/)
+
+  // Le second facteur de la recrue, comme celui du premier administrateur plus haut : même écran,
+  // même calcul de code, preuve que le lien mène jusqu'à une session pleinement enrôlée.
+  await page.getByRole('button', { name: 'Configurer une application d’authentification' }).click()
+  const secretRecrue = (await page.locator('.auth__secret').innerText()).trim()
+  await page.getByLabel(/Code à six chiffres/).fill(totpCode(secretRecrue))
+  await page.getByRole('button', { name: 'Vérifier' }).click()
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText('Codes de récupération')
+  await page.getByRole('button', { name: 'J’ai enregistré ces codes' }).click()
+
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible()
 
   expect(problems).toEqual([])
 })

@@ -34,8 +34,19 @@ func minimalEnv() map[string]string {
 		config.EnvWebauthnRPID:      testWebauthnRPID,
 		config.EnvWebauthnOrigin:    testWebauthnOrigin,
 		config.EnvTrustedProxies:    config.NoTrustedProxy,
+		config.EnvSMTPAddr:          testSMTPAddr,
+		config.EnvSMTPFrom:          testSMTPFrom,
+		config.EnvPublicURL:         testPublicURL,
 	}
 }
+
+// Rien d'un secret d'installation : le worker les compose dans chaque lien, le navigateur et
+// Mailpit les voient tous les deux.
+const (
+	testSMTPAddr  = "127.0.0.1:1025"
+	testSMTPFrom  = "cockpit@exemple.test"
+	testPublicURL = "https://dashboard.exemple.test"
+)
 
 // Les trois ont la longueur qu'exige Load, et rien d'un secret d'installation : ces tests ne signent
 // ni ne chiffrent rien, ils vérifient que la variable est exigée et bornée.
@@ -82,6 +93,9 @@ func realGatewayEnv() map[string]string {
 		config.EnvWebauthnRPID:        testWebauthnRPID,
 		config.EnvWebauthnOrigin:      testWebauthnOrigin,
 		config.EnvTrustedProxies:      config.NoTrustedProxy,
+		config.EnvSMTPAddr:            testSMTPAddr,
+		config.EnvSMTPFrom:            testSMTPFrom,
+		config.EnvPublicURL:           testPublicURL,
 	}
 }
 
@@ -390,6 +404,35 @@ func TestLoadDatabase(t *testing.T) {
 	})
 }
 
+func TestLoadMail(t *testing.T) {
+	t.Parallel()
+
+	t.Run("charge l'adresse SMTP, l'expéditeur et l'URL publique", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(minimalEnv()))
+
+		require.NoError(t, err)
+		assert.Equal(t, testSMTPAddr, cfg.Mail.Addr)
+		assert.Equal(t, testSMTPFrom, cfg.Mail.From)
+		assert.Equal(t, testPublicURL, cfg.Mail.PublicURL)
+	})
+
+	for _, name := range []string{config.EnvSMTPAddr, config.EnvSMTPFrom, config.EnvPublicURL} {
+		t.Run("exige "+name, func(t *testing.T) {
+			t.Parallel()
+
+			env := minimalEnv()
+			delete(env, name)
+
+			_, err := config.Load(lookupFrom(env))
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), name+" : variable obligatoire absente")
+		})
+	}
+}
+
 func TestLoadRejectsMalformedValues(t *testing.T) {
 	t.Parallel()
 
@@ -487,6 +530,30 @@ func TestLoadRejectsMalformedValues(t *testing.T) {
 			},
 			mention: config.EnvDatabaseURL,
 		},
+		"une adresse SMTP sans port": {
+			overrides: map[string]string{config.EnvSMTPAddr: "127.0.0.1"},
+			mention:   config.EnvSMTPAddr,
+		},
+		// Un hôte vide dirait « toutes les interfaces » à un serveur d'écoute, jamais à une adresse
+		// qu'on compose : il n'y a rien à joindre à l'autre bout.
+		"une adresse SMTP sans hôte": {
+			overrides: map[string]string{config.EnvSMTPAddr: ":1025"},
+			mention:   config.EnvSMTPAddr,
+		},
+		"une adresse SMTP dont le port n'est pas un nombre": {
+			overrides: map[string]string{config.EnvSMTPAddr: "127.0.0.1:smtp"},
+			mention:   config.EnvSMTPAddr,
+		},
+		"une URL publique sans schéma": {
+			overrides: map[string]string{config.EnvPublicURL: "dashboard.exemple.test"},
+			mention:   config.EnvPublicURL,
+		},
+		// Le worker compose le lien en concaténant directement "/access#" + jeton : une barre finale y
+		// ferait un double « / ».
+		"une URL publique avec une barre oblique finale": {
+			overrides: map[string]string{config.EnvPublicURL: testPublicURL + "/"},
+			mention:   config.EnvPublicURL,
+		},
 	}
 
 	for name, tc := range cases {
@@ -544,6 +611,9 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvTrustedProxies,
 		config.EnvWebauthnRPID,
 		config.EnvWebauthnOrigin,
+		config.EnvSMTPAddr,
+		config.EnvSMTPFrom,
+		config.EnvPublicURL,
 		config.EnvBootstrapOperatorEmail,
 		config.EnvBootstrapOperatorName,
 		config.EnvBootstrapOperatorPassword,

@@ -439,6 +439,28 @@ describe('la borne de l’adresse, que rien ne tenait', () => {
   })
 })
 
+describe('l’avis qui suit un lien d’accès', () => {
+  it('affiche l’avis quand `passwordSet=true` est présent', async () => {
+    await visitLogin('/login?passwordSet=true')
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Mot de passe enregistré. Connectez-vous pour configurer votre second facteur.',
+    )
+  })
+
+  it('n’affiche rien sans le paramètre', async () => {
+    await visitLogin()
+
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('n’affiche rien pour une valeur invalide', async () => {
+    await visitLogin('/login?passwordSet=nimportequoi')
+
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+})
+
 describe('le refus du mot de passe vide, et sa rédaction', () => {
   it('nomme le champ plutôt que de citer la borne du contrat', async () => {
     // L'ordre du `.pipe` est ce qui décide : les règles de l'écran **puis** celles du contrat. Le

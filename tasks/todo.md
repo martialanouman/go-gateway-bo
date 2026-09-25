@@ -220,7 +220,7 @@ vérifié en inversant une dépendance dans chacun des trois en-têtes.*
 - [x] step-028 — Écran d'enrôlement du second facteur
 - [x] step-029 — Gestion des opérateurs et des rôles : les routes du BFF
 - [x] step-030 — Écrans Opérateurs et Rôles
-- [ ] step-050 — Lien d'accès à usage unique : activation et réinitialisation par e-mail
+- [x] step-050 — Lien d'accès à usage unique : activation et réinitialisation par e-mail
 - [ ] step-039 — Les facteurs de son propre compte
 
 ¤ **`step-049` porte un numéro du bloc M2 et se lit ici** — l'ordre de cette liste fait foi. C'est un

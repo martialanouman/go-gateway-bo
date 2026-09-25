@@ -24,8 +24,18 @@ import { usePermission } from '~/lib/permissions'
 type Operator = components['schemas']['Operator']
 type Role = components['schemas']['Role']
 
+/** L'affichage porte l'état de l'envoi, jamais la validité du lien : un lien parti reste « sent ». */
+function accessLinkStatus(operator: Operator): string {
+  if (operator.status === 'disabled') return 'Désactivé'
+  const link = operator.accessLink
+  if (link === null) return 'Actif'
+  if (link.state === 'failed') return 'Envoi en échec'
+  if (link.state === 'sent') return 'Lien envoyé'
+  return link.kind === 'activation' ? 'Activation en attente' : 'Envoi en attente'
+}
+
 const SELF_REASON =
-  'Le compte de la session ne se désactive ni ne se réinitialise ici : un autre détenteur de operators:manage peut le faire.'
+  'Le compte de la session ne se désactive pas ici : un autre détenteur de operators:manage peut le faire.'
 
 export const Route = createFileRoute('/_shell/operators')({ component: OperatorsScreen })
 
@@ -78,7 +88,7 @@ function OperatorsScreen() {
 }
 
 type Pending =
-  | { readonly kind: 'roles' | 'disable' | 'reset'; readonly operator: Operator }
+  | { readonly kind: 'roles' | 'disable' | 'link'; readonly operator: Operator }
   | undefined
 
 function OperatorsTable({ operators }: { readonly operators: readonly Operator[] }) {
@@ -107,7 +117,7 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
           {
             key: 'status',
             header: 'Statut',
-            cell: (operator) => (operator.status === 'active' ? 'Actif' : 'Désactivé'),
+            cell: accessLinkStatus,
           },
           {
             key: 'roles',
@@ -163,17 +173,14 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
                   )}
                   <Button
                     {...blockedBy(
-                      self
-                        ? SELF_REASON
-                        : operator.secondFactorEnrolled
-                          ? undefined
-                          : 'Aucun second facteur à réinitialiser : il en enrôlera un à sa prochaine connexion.',
+                      operator.status === 'disabled'
+                        ? 'Le compte est désactivé : réactivez-le avant d’envoyer un lien.'
+                        : undefined,
                     )}
-                    onClick={() => setPending({ kind: 'reset', operator })}
+                    onClick={() => setPending({ kind: 'link', operator })}
                     size="sm"
-                    variant="danger"
                   >
-                    Réinitialiser le second facteur
+                    Envoyer un lien
                   </Button>
                 </div>
               )
@@ -190,8 +197,8 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
       {pending?.kind === 'disable' ? (
         <ConfirmDisable onClose={close} operator={pending.operator} />
       ) : null}
-      {pending?.kind === 'reset' ? (
-        <ConfirmReset onClose={close} operator={pending.operator} />
+      {pending?.kind === 'link' ? (
+        <ConfirmSendLink onClose={close} operator={pending.operator} />
       ) : null}
     </>
   )
@@ -224,18 +231,15 @@ function CreateOperator({
   const toast = useToast()
   const form = useForm({
     resolver: formResolver(OperatorCreation),
-    defaultValues: { email: '', displayName: '', password: '' },
+    defaultValues: { email: '', displayName: '' },
   })
   const create = useMutation({
-    // Le mot de passe est dans les variables de la mutation : sans `gcTime: 0`, le cache le garde
-    // cinq minutes après la fermeture de la fenêtre (invariant b).
-    gcTime: 0,
     mutationFn: (body: z.output<typeof OperatorCreation>) =>
       orRefusal(api.POST('/operators', { body }), 'L’opérateur n’a pas été créé'),
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: operatorsQueryKey })
       toast({
-        title: `Compte de ${created.displayName} créé : actif, sans rôle, second facteur à enrôler`,
+        title: `Compte créé. Le lien d’activation part à ${created.email} ; il vaut 72 heures.`,
         severity: 'success',
       })
       dismiss()
@@ -270,8 +274,8 @@ function CreateOperator({
         onSubmit={form.handleSubmit((values) => create.mutate(values))}
       >
         <p>
-          Le compte naît actif et sans rôle. Le mot de passe se transmet hors du tableau de bord ;
-          le titulaire enrôle son second facteur à sa première connexion. Action journalisée.
+          Le compte naît actif, sans rôle ni mot de passe : son titulaire le définit par un lien
+          d’activation reçu par e-mail, puis enrôle son second facteur. Action journalisée.
         </p>
         <Refusal error={create.error} />
         <Field error={errors.email?.message} label="Adresse e-mail">
@@ -279,18 +283,6 @@ function CreateOperator({
         </Field>
         <Field error={errors.displayName?.message} label="Nom affiché">
           <Input autoComplete="off" required {...form.register('displayName')} />
-        </Field>
-        <Field
-          error={errors.password?.message}
-          hint="Douze caractères au moins ; aucune composition n’est exigée."
-          label="Mot de passe"
-        >
-          <Input
-            autoComplete="new-password"
-            required
-            type="password"
-            {...form.register('password')}
-          />
         </Field>
       </form>
     </Modal>
@@ -432,7 +424,7 @@ function ConfirmDisable({
   )
 }
 
-function ConfirmReset({
+function ConfirmSendLink({
   operator,
   onClose,
 }: {
@@ -440,13 +432,16 @@ function ConfirmReset({
   readonly onClose: () => void
 }) {
   const queryClient = useQueryClient()
-  const reset = useMutation({
+  // Un compte sans mot de passe porte toujours sa ligne d'activation : elle ne disparaît qu'à
+  // l'usage, donc tout autre cas (null compris) appelle un lien de réinitialisation.
+  const isActivation = operator.accessLink?.kind === 'activation'
+  const send = useMutation({
     mutationFn: () =>
       orRefusal(
-        api.DELETE('/operators/{operatorId}/second-factors', {
+        api.POST('/operators/{operatorId}/access-link', {
           params: { path: { operatorId: operator.id } },
         }),
-        'Le second facteur n’a pas été réinitialisé',
+        'Le lien n’a pas été envoyé',
       ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: operatorsQueryKey })
@@ -459,20 +454,30 @@ function ConfirmReset({
       footer={
         <>
           <Button onClick={onClose}>Annuler</Button>
-          <Button loading={reset.isPending} onClick={() => reset.mutate()} variant="danger">
-            Réinitialiser le second facteur
+          <Button loading={send.isPending} onClick={() => send.mutate()} variant="primary">
+            Envoyer le lien
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Réinitialiser le second facteur de ${operator.displayName}`}
+      title={`Envoyer un lien à ${operator.displayName}`}
     >
-      <Refusal error={reset.error} />
+      <Refusal error={send.error} />
       <p>
-        Son application d’authentification, ses codes de récupération et ses clés d’accès sont
-        retirés, et ses sessions fermées. À sa prochaine connexion, il enrôle un nouveau facteur.
-        Action journalisée.
+        {isActivation ? (
+          <>
+            Un lien d’activation part à {operator.email} ; il vaut 72 heures. Un lien envoyé plus
+            tôt cesse de valoir. Action journalisée.
+          </>
+        ) : (
+          <>
+            Un lien de réinitialisation part à {operator.email} ; il vaut 1 heure. Rien ne change
+            avant son usage : son mot de passe, son second facteur et ses sessions restent valables
+            jusque-là. À l’usage, il définit un nouveau mot de passe, son second facteur est retiré
+            et ses sessions sont fermées. Action journalisée.
+          </>
+        )}
       </p>
     </Modal>
   )

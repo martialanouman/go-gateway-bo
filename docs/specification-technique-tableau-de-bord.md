@@ -79,7 +79,10 @@ Tous les ID sont des UUIDv7, cohérent avec la convention plateforme.
 operators
   id (uuidv7, pk)
   email, display_name
-  password_hash                          -- email/password auth (§6.9)
+  password_hash          (nullable)      -- email/password auth (§6.9)
+                                          -- (Amendement step-050) NULL tant que le titulaire ne l'a
+                                          -- pas défini par son lien d'activation ; l'administrateur
+                                          -- ne le choisit plus
   mfa_totp_secret        (nullable)       -- enrolled authenticator (TOTP), CHIFFRÉ au repos
                                           -- (Amendement step-023) AES-256-GCM, clé dérivée de
                                           -- DASHBOARD_TOTP_ENCRYPTION_KEY, identifiant de
@@ -190,6 +193,23 @@ webauthn_challenges                  -- (Amendement step-024) le défi d'une cé
                                          -- à laquelle la cérémonie est liée
   created_at, expires_at
   consumed_at            (nullable)      -- usage unique, même forme qu'en mfa_challenges
+
+access_links                         -- (Amendement step-050) le lien d'activation ou de reset envoyé par e-mail
+  operator_id (pk, fk)                   -- UNE ligne par opérateur : une nouvelle demande efface
+                                         -- l'empreinte du lien précédent, parti ou non
+  kind                   (activation|reset) -- activation si le compte n'a pas encore de mot de passe
+                                         -- au moment de la demande
+  token_hash             (nullable)      -- SHA-256 du jeton ; le jeton en clair n'est jamais stocké.
+                                         -- Tiré à l'envoi et écrit après un envoi réussi : NULL tant
+                                         -- que la demande attend dans la file
+  expires_at, sent_at    (nullable)      -- posés à l'envoi ; 72 h pour une activation, 1 h pour un reset
+  attempts, next_attempt_at              -- report exponentiel 30 s × 2^n plafonné à 10 min ; abandon
+                                         -- après 10 échecs. La désactivation du compte supprime un
+                                         -- lien de reset (le mot de passe reste posé, l'écran dit
+                                         -- « Actif ») et gare un lien d'activation (jeton nul,
+                                         -- attempts = 0, next_attempt_at = 'infinity') : une
+                                         -- réactivation ne ranime ni l'un ni l'autre
+                                         -- consommé = ligne SUPPRIMÉE
 
 audit_log
   id (uuidv7, pk)
@@ -341,11 +361,16 @@ DELETE /auth/mfa/webauthn/passkeys/{passkeyId} # (Amendement step-024) retire un
                                        # permission — la ligne précédente disait l'inverse et se
                                        # trompait : retirer sa propre clé est du self-service, et
                                        # aucune clé du catalogue n'y correspond. L'élévation la garde,
-                                       # le journal d'audit en garde la trace ; c'est operators:manage
-                                       # qui garde le retrait SUR AUTRUI (DELETE /operators/{id}/second-factors).
+                                       # le journal d'audit en garde la trace ; sur autrui, la sortie
+                                       # est un lien de réinitialisation, envoyé par operators:manage
+                                       # (POST /operators/{id}/access-link ; Amendement step-050).
                                        # Elle n'est pas la seule à ÉCRIRE : register/finish pose un
                                        # second facteur, et cet événement-là doit être audité même
                                        # exempté de garde.
+POST   /auth/access-link               # (Amendement step-050) publique : { token, password } -> 204,
+                                       # jeton à usage unique vérifié avant tout hachage. Invalide,
+                                       # expiré, consommé ou remplacé reçoit le même refus, en 410,
+                                       # pour ne rien apprendre à qui détient un vieux lien.
 POST   /auth/logout
 GET    /auth/me                        # current operator + resolved permission set (union of held roles)
 
@@ -462,7 +487,10 @@ POST    /internal/alertmanager-webhook               # server-to-server, mTLS/sh
 # Operators, roles & permissions (operators:manage / roles:manage)
 GET/POST/PATCH         /operators                     # PATCH : désactiver / réactiver
 POST                    /operators/{id}/roles
-DELETE                  /operators/{id}/second-factors # réinitialisation par un administrateur
+POST                    /operators/{id}/access-link    # (Amendement step-050) lien d'activation (72 h,
+                                       # compte sans mot de passe) ou de réinitialisation (1 h, compte
+                                       # actif) ; le serveur choisit selon l'état du compte. 202 ; 409
+                                       # sur un compte désactivé.
 GET/POST/PATCH/DELETE  /roles
 # (Amendement step-029) Ni DELETE /operators ni GET /permissions. Le journal d'audit tient ses
 # auteurs en RESTRICT : un opérateur qui part se désactive, il ne se supprime pas. Le catalogue
@@ -569,6 +597,26 @@ Un enrôlement exige au minimum une session de premier facteur ; **remplacer** u
 Un opérateur peut détenir plusieurs passkeys, et TOTP **et** passkey à la fois : le serveur les accepte à parité, et laquelle proposer en premier est une décision d'écran. Ajouter un facteur à un opérateur qui en détient déjà un exige une session élevée, pour la même raison que le remplacement ci-dessus. **Supprimer** une passkey exige l'élévation mais non de la présenter — on retire une passkey précisément quand on ne l'a plus, et l'exiger rendrait le geste impossible dans le seul cas qui le motive.
 
 Rien de ce qui est stocké pour une passkey n'est un secret : la clé est **publique**, et aucune lecture de la base ne permet de forger une assertion. C'est ce qui dispense cette table du chiffrement au repos qu'exige le secret TOTP.
+
+**(Amendement step-050) Le compte naît sans mot de passe, et se pose par lien.** Créé depuis
+Opérateurs, un compte ne reçoit aucun mot de passe choisi par l'administrateur : un lien
+d'**activation**, valable 72 heures et à usage unique, part par e-mail. Le même mécanisme sert la
+**réinitialisation** — 1 heure — quand l'opérateur perd son mot de passe ou son second facteur ;
+`POST /operators/{id}/access-link`, gardée par `operators:manage` et auditée `operator.access_link`,
+tranche entre les deux selon que le compte porte déjà un mot de passe, et répond 202 (409 si le
+compte est désactivé). Un nouveau lien invalide le précédent. Rien ne change avant l'usage : à
+l'usage d'une réinitialisation, `POST /auth/access-link` — publique, jeton contre nouveau mot de
+passe, auditée `operator.password_set` — remplace le mot de passe puis retire TOTP, codes de
+récupération et passkeys, et ferme les sessions en cours, dans une seule transaction. Un jeton
+invalide, expiré, consommé ou remplacé reçoit le même refus, en 410, pour ne rien apprendre à qui
+détient un vieux lien. Le retrait direct des facteurs d'un opérateur par un administrateur
+disparaît : le lien de réinitialisation en tient lieu.
+
+La politique de mot de passe impose douze caractères au moins, une majuscule, une minuscule, un
+chiffre et un caractère spécial ; le refus nomme ce qui manque. **Sa composition est un choix de
+l'utilisateur contre la recommandation NIST SP 800-63B, signalé le 24/09/2026.** Elle s'applique à
+tout mot de passe défini, y compris celui du premier opérateur : le bootstrap garde son mot de passe
+en ligne de commande.
 
 ### 6.10 Modèle de permission & rôles par défaut
 

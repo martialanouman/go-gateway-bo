@@ -120,7 +120,7 @@ func ownerEnv(name string) (string, bool) {
 	value, found := map[string]string{
 		config.EnvBootstrapOperatorEmail:    "camille.durand@exemple.test",
 		config.EnvBootstrapOperatorName:     "Camille Durand",
-		config.EnvBootstrapOperatorPassword: "un mot de passe d'installation",
+		config.EnvBootstrapOperatorPassword: "Un mot de passe d'installation1",
 	}[name]
 
 	return value, found

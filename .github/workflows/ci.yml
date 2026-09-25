@@ -300,6 +300,9 @@ jobs:
           DASHBOARD_WEBAUTHN_RP_ID=localhost \
           DASHBOARD_WEBAUTHN_ORIGIN=http://localhost:3001 \
           DASHBOARD_TRUSTED_PROXIES=none \
+          DASHBOARD_SMTP_ADDR=127.0.0.1:1025 \
+          DASHBOARD_SMTP_FROM=cockpit@example.test \
+          DASHBOARD_PUBLIC_URL=http://127.0.0.1:3001 \
             ./bin/dashboard &
           bff=$!
           # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de
@@ -380,6 +383,19 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U dashboard -d dashboard"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+      # Le lien d'accès de step-050 part par SMTP et se lit par l'API HTTP — jamais reçu pour de
+      # vrai. `--health-cmd` reprend le `HEALTHCHECK` que l'image déclare déjà (`/mailpit readyz`),
+      # sans tube ni outil que l'image n'a pas.
+      mailpit:
+        image: axllent/mailpit:v1.31.2
+        ports:
+          - 1025:1025
+          - 8025:8025
+        options: >-
+          --health-cmd "/mailpit readyz"
           --health-interval 2s
           --health-timeout 3s
           --health-retries 15

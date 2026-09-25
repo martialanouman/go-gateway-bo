@@ -201,7 +201,7 @@ func otherOwnerEnv(name string) (string, bool) {
 	value, found := map[string]string{
 		config.EnvBootstrapOperatorEmail:    "quelqun.dautre@exemple.test",
 		config.EnvBootstrapOperatorName:     "Quelqu'un d'autre",
-		config.EnvBootstrapOperatorPassword: "un autre mot de passe d'installation",
+		config.EnvBootstrapOperatorPassword: "Un autre mot de passe d'installation1",
 	}[name]
 
 	return value, found

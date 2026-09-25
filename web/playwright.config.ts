@@ -88,6 +88,12 @@ export default defineConfig({
       // Vide ne se distingue pas d'un oubli, et l'oubli fait compter toutes les tentatives sur
       // l'adresse du load balancer. Aucun proxy ne s'interpose ici.
       DASHBOARD_TRUSTED_PROXIES: 'none',
+      // Mailpit (`docker compose up -d`) : les parcours qui lisent un lien d'accès l'y lisent par son
+      // API, jamais reçu pour de vrai. L'URL publique est l'origine de ce serveur, seule source de la
+      // base des liens — le worker qui les envoie ne porte aucune requête HTTP.
+      DASHBOARD_SMTP_ADDR: '127.0.0.1:1025',
+      DASHBOARD_SMTP_FROM: 'cockpit@example.test',
+      DASHBOARD_PUBLIC_URL: `http://${host}:${port}`,
     },
   },
 })

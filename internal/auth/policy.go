@@ -1,13 +1,45 @@
 package auth
 
-import "unicode/utf8"
+import (
+	"unicode"
+	"unicode/utf8"
+)
 
-// MinimumPasswordLength est la seule politique de mot de passe du produit, pour le compte
-// propriétaire du bootstrap comme pour ceux que crée `operators:manage`. Aucune exigence de
-// composition : la longueur est la seule contrainte dont l'effet sur la difficulté se démontre, là où
-// « une majuscule et un chiffre » produit surtout `Motdepasse1`.
 const MinimumPasswordLength = 12
 
-func PasswordLongEnough(password string) bool {
-	return utf8.RuneCountInString(password) >= MinimumPasswordLength
+// La composition est un choix de l'utilisateur contre SP 800-63B, signalé le 24/09/2026.
+func CheckPassword(password string) []string {
+	var upper, lower, digit, special bool
+
+	for _, r := range password {
+		switch {
+		case unicode.IsUpper(r):
+			upper = true
+		case unicode.IsLower(r):
+			lower = true
+		case unicode.IsDigit(r):
+			digit = true
+		case !unicode.IsLetter(r):
+			special = true
+		}
+	}
+
+	var missing []string
+
+	for _, rule := range []struct {
+		ok   bool
+		name string
+	}{
+		{utf8.RuneCountInString(password) >= MinimumPasswordLength, "douze caractères au moins"},
+		{upper, "une majuscule"},
+		{lower, "une minuscule"},
+		{digit, "un chiffre"},
+		{special, "un caractère spécial"},
+	} {
+		if !rule.ok {
+			missing = append(missing, rule.name)
+		}
+	}
+
+	return missing
 }

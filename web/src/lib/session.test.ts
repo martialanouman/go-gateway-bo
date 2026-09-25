@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { forgetChallenge, peekChallenge, rememberChallenge, safeDestination } from './session'
+import {
+  forgetAccessToken,
+  forgetChallenge,
+  peekAccessToken,
+  peekChallenge,
+  rememberAccessToken,
+  rememberChallenge,
+  safeDestination,
+} from './session'
 
 describe('la destination rejouée après la connexion', () => {
   it('garde une adresse de ce tableau de bord, chemin, filtres et ancre compris', () => {
@@ -47,5 +55,19 @@ describe('le challenge de second facteur', () => {
 
     forgetChallenge()
     expect(peekChallenge()).toBeUndefined()
+  })
+})
+
+describe('le jeton du lien d’accès', () => {
+  it('se retient puis s’oublie, et ne laisse aucune trace ailleurs que dans le module', () => {
+    rememberAccessToken('un-jeton')
+    expect(peekAccessToken()).toBe('un-jeton')
+
+    expect(window.location.search).not.toContain('un-jeton')
+    expect(window.sessionStorage.getItem('access-token')).toBeNull()
+    expect(Object.values({ ...window.localStorage })).not.toContain('un-jeton')
+
+    forgetAccessToken()
+    expect(peekAccessToken()).toBeUndefined()
   })
 })

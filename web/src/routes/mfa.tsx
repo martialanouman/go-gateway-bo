@@ -29,7 +29,7 @@ export const Route = createFileRoute('/mfa')({
     const session = await readSession(context.queryClient)
 
     if (session.kind === 'none') {
-      throw redirect({ to: '/login', search: { redirect: search.redirect } })
+      throw redirect({ to: '/login', search: { redirect: search.redirect, passwordSet: false } })
     }
 
     if (session.kind === 'open' && session.me.elevated) {
@@ -52,7 +52,7 @@ export const Route = createFileRoute('/mfa')({
     // cul-de-sac qui ne dit pas pourquoi. Le cas n'est pas théorique — c'est ce que produit un
     // rechargement de cet écran, puisque le challenge ne vit qu'en mémoire.
     if (session.kind === 'open' && peekChallenge() === undefined) {
-      throw redirect({ to: '/login', search: { redirect: search.redirect } })
+      throw redirect({ to: '/login', search: { redirect: search.redirect, passwordSet: false } })
     }
   },
 

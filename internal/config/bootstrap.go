@@ -102,9 +102,9 @@ func (r *reader) operatorPassword(name string) string {
 		return ""
 	}
 
-	if !auth.PasswordLongEnough(value) {
-		r.reject(name, "mot de passe d'au moins %d caractères attendu ; la valeur n'est pas citée",
-			auth.MinimumPasswordLength)
+	if missing := auth.CheckPassword(value); len(missing) > 0 {
+		r.reject(name, "le mot de passe ne suit pas la politique, il lui manque : %s ; la valeur "+
+			"n'est pas citée", strings.Join(missing, ", "))
 
 		return ""
 	}

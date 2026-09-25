@@ -20,6 +20,7 @@ le compte de la session, pas sur l'administration des autres.*
 - **052** — le succès d'une cérémonie WebAuthn, par un authentificateur virtuel CDP dans Playwright.
 - **053** — le remplacement d'un facteur en place n'a pas d'écran.
 - **055** — une panne serveur compte comme un échec de second facteur.
+- **056** — le mot de passe de connexion reste cinq minutes dans le cache de mutation.
 
 ## Tests (écrits dans la même PR)
 - **Parcours (Playwright)** : un authentificateur virtuel posé par CDP enregistre une passkey et
