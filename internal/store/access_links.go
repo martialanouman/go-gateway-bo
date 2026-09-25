@@ -85,7 +85,8 @@ func linkTTL(kind string) time.Duration {
 
 // DeliverNext envoie la plus ancienne demande due. La ligne reste verrouillée pendant l'envoi : le
 // jeton n'est écrit qu'après un envoi réussi, donc un échec ne laisse aucune empreinte d'un lien
-// jamais reçu. Elle rend `true` même en échec, pour que la boucle passe à la ligne suivante.
+// jamais reçu. `true` dit qu'une ligne a été prise, même en échec ; sur erreur, la boucle s'arrête
+// pourtant jusqu'au tour suivant.
 func (l *AccessLinks) DeliverNext(ctx context.Context, send SendLink) (bool, error) {
 	tx, err := l.pool.Begin(ctx)
 	if err != nil {

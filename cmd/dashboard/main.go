@@ -146,7 +146,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		logger.Error("les partitions du journal d'audit n'ont pas pu être renouvelées", "error", err)
 	})
 
-	// Une seule instance : le BFF consomme les liens qu'elle porte, ce worker les envoie.
+	// Le même AccessLinks sert le BFF, qui consomme, et le worker, qui envoie.
 	links := store.NewAccessLinks(pool)
 
 	go store.KeepDeliveringAccessLinks(ctx, links, 5*time.Second, smtpSender(cfg.Mail, cfg.ProductName),

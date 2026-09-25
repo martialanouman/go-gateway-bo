@@ -101,7 +101,7 @@ func TestUnSMTPEnEchecLaisseLeJetonNulEtRepousse(t *testing.T) {
 	var calls atomic.Int32
 
 	delivered, err := links.DeliverNext(t.Context(), failing(&calls))
-	assert.True(t, delivered, "un échec doit laisser la boucle passer à la ligne suivante")
+	assert.True(t, delivered, "un échec rend la ligne prise pour non prise")
 	require.ErrorIs(t, err, errSMTP)
 
 	var withoutToken bool
