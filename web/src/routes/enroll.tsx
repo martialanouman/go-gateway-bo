@@ -153,7 +153,10 @@ function EnrollmentScreen() {
         // Le contrat déclare `attestation` comme un objet **libre** — sa forme appartient à la
         // spécification WebAuthn, et c'est la bibliothèque du serveur qui l'analyse. Rien n'est lu
         // ici : le transit est littéral.
-        body: { attestation: attestation as unknown as Record<string, unknown> },
+        body: {
+          attestation: attestation as unknown as Record<string, unknown>,
+          name: "Clé d'accès",
+        },
       })
       if (data === undefined) throw new Error(enrollmentRefusal(error, response.status))
     },

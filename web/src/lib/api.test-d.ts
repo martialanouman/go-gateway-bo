@@ -231,7 +231,7 @@ type FinishRegistrationOperation = paths['/auth/mfa/webauthn/register/finish']['
 // never>` : la seconde forme n'accepterait aucune clé.
 expectTypeOf<
   FinishRegistrationOperation['requestBody']['content']['application/json']
->().toEqualTypeOf<{ attestation: { [key: string]: unknown } }>()
+>().toEqualTypeOf<{ attestation: { [key: string]: unknown }; name: string }>()
 
 // Seul l'identifiant en retour, et c'est ce dont le client a besoin : de quoi la retirer plus tard.
 // Rien de la clé — pas même publique, qu'aucun écran n'affiche.
