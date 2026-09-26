@@ -235,11 +235,30 @@ func TestUnClientLentEstCoupe(t *testing.T) {
 		h.publish(TrafficTopic, frame)
 	}
 
-	// Le code 1008 part derrière des trames que le client ne lit pas : il ne l'atteint pas toujours.
-	// Ce qui se prouve, c'est la coupure — bien avant writeTimeout.
+	// Le 1008 part derrière des trames que ce client ne lit pas : il ne l'atteint pas. Ce qui se
+	// prouve, c'est la coupure, au plus writeTimeout après le débordement.
 	start := time.Now()
-	awaitSubscribers(t, h, TrafficTopic, 0)
-	assert.Less(t, time.Since(start), writeTimeout/2)
+	require.Eventually(t, func() bool { return subscribers(h, TrafficTopic) == 0 },
+		writeTimeout+time.Second, 10*time.Millisecond)
+	assert.Less(t, time.Since(start), writeTimeout+time.Second)
+}
+
+// Un client qui lit, débordé par une rafale, peut encore recevoir le 1008 : c'est ce qui lui permet
+// de distinguer « trop lent » d'une coupure réseau.
+func TestUnClientDebordeParUneRafaleRecoitLeCodeDeLenteur(t *testing.T) {
+	t.Parallel()
+
+	h := quietHub()
+	conn := dial(t, serveOn(t, h, grantAll))
+
+	send(t, conn, `{"action":"subscribe","topics":["metrics.traffic"]}`)
+	awaitSubscribers(t, h, TrafficTopic, 1)
+
+	for range 10 * queueSize {
+		h.publish(TrafficTopic, []byte(`{"topic":"metrics.traffic"}`))
+	}
+
+	assert.Equal(t, websocket.StatusPolicyViolation, closeStatusOf(t, conn))
 }
 
 func TestUneSessionQuiPrendFinFermeLaSocket(t *testing.T) {

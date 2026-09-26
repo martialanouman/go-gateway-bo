@@ -64,11 +64,8 @@ func New(logger *slog.Logger) *Hub {
 }
 
 type client struct {
-	queue   chan []byte
-	lagging chan struct{}
-	// abandon interrompt l'écriture en cours : sur une fenêtre TCP pleine, elle tiendrait la socket
-	// jusqu'à writeTimeout.
-	abandon     context.CancelFunc
+	queue       chan []byte
+	lagging     chan struct{}
 	markLagging sync.Once
 }
 
@@ -77,10 +74,7 @@ func (c *client) offer(frame []byte) {
 	select {
 	case c.queue <- frame:
 	default:
-		c.markLagging.Do(func() {
-			close(c.lagging)
-			c.abandon()
-		})
+		c.markLagging.Do(func() { close(c.lagging) })
 	}
 }
 
@@ -147,14 +141,14 @@ func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, access Access) {
 		return
 	}
 
-	clientCtx, abandon := context.WithCancel(ctx)
-	defer abandon()
+	readCtx, stopReading := context.WithCancel(ctx)
+	defer stopReading()
 
-	c := &client{queue: make(chan []byte, queueSize), lagging: make(chan struct{}), abandon: abandon}
+	c := &client{queue: make(chan []byte, queueSize), lagging: make(chan struct{})}
 	defer h.unsubscribeAll(c)
 
 	requests := make(chan []byte)
-	go read(clientCtx, conn, requests)
+	go read(readCtx, conn, requests)
 
 	revalidation := time.NewTicker(h.revalidateEvery)
 	defer revalidation.Stop()
@@ -183,7 +177,9 @@ func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, access Access) {
 			h.handle(c, raw, granted)
 
 		case frame := <-c.queue:
-			writeCtx, cancel := context.WithTimeout(clientCtx, writeTimeout)
+			// Une écriture bloquée par un client qui ne lit plus s'arrête ici. L'annuler plus tôt
+			// fermerait la connexion avant que le 1008 parte, y compris quand elle aurait pu partir.
+			writeCtx, cancel := context.WithTimeout(ctx, writeTimeout)
 			err = conn.Write(writeCtx, websocket.MessageText, frame)
 			cancel()
 
