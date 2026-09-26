@@ -15,8 +15,8 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/gateway"
 )
 
-// Le serveur propose HTTP/2 par ALPN, comme la passerelle derrière son ingress : un client qui
-// l'accepte ne peut plus monter en WebSocket, faute de 101 en HTTP/2.
+// Le serveur propose HTTP/2 par ALPN, comme la passerelle derrière son ingress : la montée ne passe
+// que parce que net/http la garde en HTTP/1.1.
 func TestStreamClientUpgradesOverMutualTLSWithTheMachineToken(t *testing.T) {
 	t.Parallel()
 
