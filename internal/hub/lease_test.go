@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeuxCandidatsNObtiennentQuUnSeulBail(t *testing.T) {
+func TestTwoCandidatesGetASingleLease(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -26,7 +26,7 @@ func TestDeuxCandidatsNObtiennentQuUnSeulBail(t *testing.T) {
 
 // Un porteur qui a perdu son bail ne doit pas prolonger celui de son successeur : les deux
 // consommeraient la passerelle.
-func TestLeRenouvellementEchoueQuandLeBailAChangeDeMain(t *testing.T) {
+func TestRenewalFailsOnceTheLeaseChangedHands(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -39,7 +39,7 @@ func TestLeRenouvellementEchoueQuandLeBailAChangeDeMain(t *testing.T) {
 	assert.Equal(t, "b", rdb.Get(t.Context(), namespace).Val())
 }
 
-func TestLeRenouvellementProlongeLeBailDeSonPorteur(t *testing.T) {
+func TestRenewalExtendsTheHoldersLease(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -52,7 +52,7 @@ func TestLeRenouvellementProlongeLeBailDeSonPorteur(t *testing.T) {
 	assert.Greater(t, rdb.PTTL(t.Context(), namespace).Val(), 30*time.Second)
 }
 
-func TestRendreLeBailNeSupprimePasCeluiDUnAutre(t *testing.T) {
+func TestReleaseNeverDeletesAnotherHoldersLease(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -67,7 +67,7 @@ func TestRendreLeBailNeSupprimePasCeluiDUnAutre(t *testing.T) {
 
 // Un renouvellement appliqué mais lu comme un échec laisse le bail à son porteur : le reprendre ne
 // doit pas attendre son expiration.
-func TestUnPorteurReprendSonPropreBail(t *testing.T) {
+func TestAHolderReacquiresItsOwnLease(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)

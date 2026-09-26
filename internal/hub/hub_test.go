@@ -117,7 +117,7 @@ func awaitSubscribers(t *testing.T, h *Hub, topic Topic, want int) {
 	require.Eventually(t, func() bool { return subscribers(h, topic) == want }, wait, 5*time.Millisecond)
 }
 
-func TestLesTroisTramesAmontSontReemisesParLeurDTO(t *testing.T) {
+func TestUpstreamFramesAreRelayedThroughTheirDTO(t *testing.T) {
 	t.Parallel()
 
 	for _, testCase := range []struct {
@@ -173,7 +173,7 @@ func feedAt(t *testing.T, path string) feed {
 }
 
 // Le seul rempart entre un changement de format amont et une lecture fausse en silence.
-func TestUneTrameDUneVersionInconnueNEstPasRelayee(t *testing.T) {
+func TestAFrameOfAnUnknownVersionIsNotRelayed(t *testing.T) {
 	t.Parallel()
 
 	for _, f := range feeds {
@@ -182,7 +182,7 @@ func TestUneTrameDUneVersionInconnueNEstPasRelayee(t *testing.T) {
 	}
 }
 
-func TestUnSujetInconnuEtUnMessageIllisibleSontRefusesSansFermerLaSocket(t *testing.T) {
+func TestUnknownTopicsAndUnreadableMessagesAreRefusedWithoutClosingTheSocket(t *testing.T) {
 	t.Parallel()
 
 	conn := dial(t, serveOn(t, quietHub(), grantAll))
@@ -202,7 +202,7 @@ func TestUnSujetInconnuEtUnMessageIllisibleSontRefusesSansFermerLaSocket(t *test
 	assert.Equal(t, "stale", next(t, conn).Status)
 }
 
-func TestSeDesabonnerArreteLaDiffusion(t *testing.T) {
+func TestUnsubscribingStopsTheBroadcast(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -217,7 +217,7 @@ func TestSeDesabonnerArreteLaDiffusion(t *testing.T) {
 
 // La file est bornée : un client qui ne lit plus est coupé, et la mémoire du serveur ne suit pas son
 // retard.
-func TestUnClientLentEstCoupe(t *testing.T) {
+func TestASlowClientIsCut(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -245,7 +245,7 @@ func TestUnClientLentEstCoupe(t *testing.T) {
 
 // Un client qui lit, débordé par une rafale, peut encore recevoir le 1008 : c'est ce qui lui permet
 // de distinguer « trop lent » d'une coupure réseau.
-func TestUnClientDebordeParUneRafaleRecoitLeCodeDeLenteur(t *testing.T) {
+func TestAClientOverflowedByABurstReceivesThePolicyViolationCode(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -261,7 +261,7 @@ func TestUnClientDebordeParUneRafaleRecoitLeCodeDeLenteur(t *testing.T) {
 	assert.Equal(t, websocket.StatusPolicyViolation, closeStatusOf(t, conn))
 }
 
-func TestUneSessionQuiPrendFinFermeLaSocket(t *testing.T) {
+func TestAnEndedSessionClosesTheSocket(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -276,7 +276,7 @@ func TestUneSessionQuiPrendFinFermeLaSocket(t *testing.T) {
 	assert.Equal(t, statusSessionEnded, closeStatusOf(t, conn))
 }
 
-func TestUneSessionInverifiableFermeLaSocket(t *testing.T) {
+func TestAnUncheckableSessionClosesTheSocket(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -295,7 +295,7 @@ func TestUneSessionInverifiableFermeLaSocket(t *testing.T) {
 	assert.Equal(t, websocket.StatusInternalError, closeStatusOf(t, conn))
 }
 
-func TestUnePermissionRetireeDesabonneSonSujetEtLeDit(t *testing.T) {
+func TestARevokedPermissionUnsubscribesItsTopicAndSaysSo(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -322,7 +322,7 @@ func TestUnePermissionRetireeDesabonneSonSujetEtLeDit(t *testing.T) {
 	awaitSubscribers(t, h, SessionsTopic, 0)
 }
 
-func TestLArretDuHubFermeLesSockets(t *testing.T) {
+func TestStoppingTheHubClosesTheSockets(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -341,7 +341,7 @@ func TestLArretDuHubFermeLesSockets(t *testing.T) {
 }
 
 // Pas de t.Parallel : le compte de goroutines est celui du processus entier.
-func TestAucuneGoroutineNeSurvitAuxSocketsFermees(t *testing.T) {
+func TestNoGoroutineOutlivesClosedSockets(t *testing.T) {
 	h := quietHub()
 	url := serveOn(t, h, grantAll)
 
@@ -367,7 +367,7 @@ func TestAucuneGoroutineNeSurvitAuxSocketsFermees(t *testing.T) {
 
 // Un amont qui accepte la montée puis ferme aussitôt n'est pas rappelé chaque seconde : le sujet
 // clignoterait entre live et stale.
-func TestUnFluxQuiTombeAussitotOuvertNeRemetPasLeBackoffAZero(t *testing.T) {
+func TestAFeedThatDropsRightAfterOpeningDoesNotResetTheBackoff(t *testing.T) {
 	t.Parallel()
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

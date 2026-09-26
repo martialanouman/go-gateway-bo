@@ -158,7 +158,7 @@ func awaitStatus(t *testing.T, conn *websocket.Conn, topic, status string) {
 	}
 }
 
-func TestDeuxInstancesNOuvrentQuUneConnexionParFluxEtRediffusentToutes(t *testing.T) {
+func TestTwoInstancesOpenOneConnectionPerFeedAndBothRebroadcast(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -186,7 +186,7 @@ func TestDeuxInstancesNOuvrentQuUneConnexionParFluxEtRediffusentToutes(t *testin
 }
 
 // Un porteur qui a perdu son bail doit lâcher la passerelle avant qu'un successeur ne la joigne.
-func TestLaPerteDuBailFermeLesFluxAmont(t *testing.T) {
+func TestLosingTheLeaseClosesTheUpstreamFeeds(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -215,7 +215,7 @@ func TestLaPerteDuBailFermeLesFluxAmont(t *testing.T) {
 }
 
 // Sans battement de cœur, une instance ne sait plus si ce qu'elle affiche est frais.
-func TestUnBattementDeCoeurManqueRendLesSujetsStale(t *testing.T) {
+func TestAMissedHeartbeatMakesTopicsStale(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -248,7 +248,7 @@ func TestUnBattementDeCoeurManqueRendLesSujetsStale(t *testing.T) {
 }
 
 // Une passerelle qui se tait sans fermer ne doit pas laisser le sujet live.
-func TestUnFluxAmontMuetPasseStale(t *testing.T) {
+func TestASilentUpstreamFeedGoesStale(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -262,7 +262,7 @@ func TestUnFluxAmontMuetPasseStale(t *testing.T) {
 	awaitStatus(t, conn, "billing.alerts", "stale")
 }
 
-func TestLesPingsAmontGardentLeFluxLive(t *testing.T) {
+func TestUpstreamPingsKeepTheFeedLive(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -289,7 +289,7 @@ func TestLesPingsAmontGardentLeFluxLive(t *testing.T) {
 }
 
 // Le battement republie tous les états toutes les 2 s : un client ne doit recevoir qu'un changement.
-func TestUnEtatInchangeNEstPasRediffuse(t *testing.T) {
+func TestAnUnchangedStatusIsNotRebroadcast(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -306,7 +306,7 @@ func TestUnEtatInchangeNEstPasRediffuse(t *testing.T) {
 }
 
 // Pas de t.Parallel : le compte de goroutines est celui du processus entier.
-func TestAucuneGoroutineNeSurvitALArretDuRelais(t *testing.T) {
+func TestNoGoroutineOutlivesTheRelay(t *testing.T) {
 	rdb, namespace := redisFor(t)
 	gateway := newUpstream(t)
 	before := goroutines()
@@ -402,7 +402,7 @@ func (r *frozenRedis) pipe(dst, src net.Conn) {
 
 // Le bloquant de la revue : un porteur coupé de Redis sans que la connexion tombe restait bloqué
 // dans son renouvellement, pendant qu'un successeur prenait le bail et joignait la passerelle.
-func TestUnPorteurCoupeDeRedisLacheLaPasserelleAvantLExpirationDuBail(t *testing.T) {
+func TestAHolderCutOffFromRedisDropsTheGatewayBeforeTheLeaseExpires(t *testing.T) {
 	t.Parallel()
 
 	_, namespace := redisFor(t)
@@ -452,7 +452,7 @@ func TestUnPorteurCoupeDeRedisLacheLaPasserelleAvantLExpirationDuBail(t *testing
 
 // Sans ContextTimeoutEnabled, go-redis ignore l'échéance des contextes pendant une lecture : sur un
 // Redis gelé, l'arrêt du hub attendrait ReadTimeout, relances comprises, et l'arrêt du binaire avec lui.
-func TestLArretDuHubNAttendPasUnRedisGele(t *testing.T) {
+func TestStoppingTheHubDoesNotWaitForAFrozenRedis(t *testing.T) {
 	t.Parallel()
 
 	_, namespace := redisFor(t)
@@ -483,7 +483,7 @@ func TestLArretDuHubNAttendPasUnRedisGele(t *testing.T) {
 
 // Un état live reçu sans battement de cœur ensuite — au démarrage, ou quand Redis retombe avant le
 // premier battement — doit finir stale : le chien de garde ne se désarme jamais.
-func TestUnEtatLiveSansBattementFinitStale(t *testing.T) {
+func TestALiveStatusWithoutHeartbeatEndsStale(t *testing.T) {
 	t.Parallel()
 
 	rdb, namespace := redisFor(t)
@@ -512,7 +512,7 @@ func TestUnEtatLiveSansBattementFinitStale(t *testing.T) {
 // déploiement roulant, un déploiement mal configuré. Ce qui en sort vers les sockets repasse par le
 // DTO du sujet : un champ que le struct ne déclare pas ne part pas, et la trame, elle, part — une
 // version plus récente qui ajoute un champ ne doit pas figer le sujet sur les instances anciennes.
-func TestUneTrameDuCanalNeRediffuseQueSonDTO(t *testing.T) {
+func TestAChannelFrameIsRebroadcastOnlyThroughItsDTO(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()

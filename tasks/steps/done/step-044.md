@@ -90,23 +90,23 @@ nomme le test qui tombe.
 
 | Mutation (le défaut réel qu'elle rejoue) | Ce qui tombe |
 |---|---|
-| Renouvellement sans comparer le porteur | `TestLeRenouvellementEchoueQuandLeBailAChangeDeMain`, `TestLaPerteDuBailFermeLesFluxAmont` |
-| Restitution sans comparer le porteur | `TestRendreLeBailNeSupprimePasCeluiDUnAutre` |
-| Bail perdu sans arrêt des consommateurs amont | `TestLaPerteDuBailFermeLesFluxAmont` |
-| Battement de cœur manqué ignoré | `TestUnBattementDeCoeurManqueRendLesSujetsStale` ; scénario « Redis coupé » |
-| Ping amont qui ne réarme pas l'échéance | `TestLesPingsAmontGardentLeFluxLive` (vert à la première passe : le test durait moins qu'un cycle silence + reconnexion, réécrit pour guetter le `stale`) |
-| Flux amont muet sans échéance | `TestUnFluxAmontMuetPasseStale` |
-| Bail pris sans exclusivité (`SET` au lieu de `SET NX`) | `TestDeuxCandidatsNObtiennentQuUnSeulBail`, `TestDeuxInstancesNOuvrentQuUneConnexionParFluxEtRediffusentToutes` ; scénarios « l'instance sans bail » et « le porteur tué » |
-| Bail non rendu à l'arrêt | `TestAucuneGoroutineNeSurvitALArretDuRelais` |
-| États rediffusés sans changement | `TestUnEtatInchangeNEstPasRediffuse` (vert à la première passe : aucun test ne le gardait, ajouté) |
+| Renouvellement sans comparer le porteur | `TestRenewalFailsOnceTheLeaseChangedHands`, `TestLosingTheLeaseClosesTheUpstreamFeeds` |
+| Restitution sans comparer le porteur | `TestReleaseNeverDeletesAnotherHoldersLease` |
+| Bail perdu sans arrêt des consommateurs amont | `TestLosingTheLeaseClosesTheUpstreamFeeds` |
+| Battement de cœur manqué ignoré | `TestAMissedHeartbeatMakesTopicsStale` ; scénario « Redis coupé » |
+| Ping amont qui ne réarme pas l'échéance | `TestUpstreamPingsKeepTheFeedLive` (vert à la première passe : le test durait moins qu'un cycle silence + reconnexion, réécrit pour guetter le `stale`) |
+| Flux amont muet sans échéance | `TestASilentUpstreamFeedGoesStale` |
+| Bail pris sans exclusivité (`SET` au lieu de `SET NX`) | `TestTwoCandidatesGetASingleLease`, `TestTwoInstancesOpenOneConnectionPerFeedAndBothRebroadcast` ; scénarios « l'instance sans bail » et « le porteur tué » |
+| Bail non rendu à l'arrêt | `TestNoGoroutineOutlivesTheRelay` |
+| États rediffusés sans changement | `TestAnUnchangedStatusIsNotRebroadcast` (vert à la première passe : aucun test ne le gardait, ajouté) |
 | Espace de noms non contrôlé | `TestLoadRedis` |
-| Porteur coupé de Redis qui attend le retour de son renouvellement (la première version livrée) | `TestUnPorteurCoupeDeRedisLacheLaPasserelleAvantLExpirationDuBail` : flux amont encore ouverts après 10 s de gel |
-| `acquire` qui refuse le bail déjà à soi (la première version livrée) | `TestUnPorteurReprendSonPropreBail` |
-| Chien de garde désarmé après un premier `stale` (la première version livrée) | `TestUnEtatLiveSansBattementFinitStale` |
-| Trame du canal rediffusée sans repasser par son DTO (la première version livrée) | `TestUneTrameDuCanalNeRediffuseQueSonDTO` : le champ `body` arrivait au client. La version intermédiaire rejetait la trame entière, ce qui aurait figé un sujet pendant un déploiement roulant ; elle re-sérialise désormais |
+| Porteur coupé de Redis qui attend le retour de son renouvellement (la première version livrée) | `TestAHolderCutOffFromRedisDropsTheGatewayBeforeTheLeaseExpires` : flux amont encore ouverts après 10 s de gel |
+| `acquire` qui refuse le bail déjà à soi (la première version livrée) | `TestAHolderReacquiresItsOwnLease` |
+| Chien de garde désarmé après un premier `stale` (la première version livrée) | `TestALiveStatusWithoutHeartbeatEndsStale` |
+| Trame du canal rediffusée sans repasser par son DTO (la première version livrée) | `TestAChannelFrameIsRebroadcastOnlyThroughItsDTO` : le champ `body` arrivait au client. La version intermédiaire rejetait la trame entière, ce qui aurait figé un sujet pendant un déploiement roulant ; elle re-sérialise désormais |
 | Arrêt qui ferme Redis sans attendre la restitution du bail (la première version livrée) | scénario « le porteur du bail arrêté proprement » : reprise en 6,1 s |
-| Client Redis sans `ContextTimeoutEnabled` | `TestLArretDuHubNAttendPasUnRedisGele` |
-| Restitution à l'arrêt bornée par `writeTimeout` au lieu de `leaseEvery` (la version intermédiaire) | `TestLArretDuHubNAttendPasUnRedisGele` : arrêt en 5,08 s |
+| Client Redis sans `ContextTimeoutEnabled` | `TestStoppingTheHubDoesNotWaitForAFrozenRedis` |
+| Restitution à l'arrêt bornée par `writeTimeout` au lieu de `leaseEvery` (la version intermédiaire) | `TestStoppingTheHubDoesNotWaitForAFrozenRedis` : arrêt en 5,08 s |
 | Connexion amont non fermée sur annulation pendant une publication bloquée | **rien** : la publication est bornée à `leaseEvery`, la fermeture arrive au plus tard à l'expiration du bail ; l'intervalle n'est pas mesurable sans test instable. Écrit dans `upstream.go` (critère 4) |
 
 **Acceptés, relevés en revue.** Un battement parti juste avant un changement d'état peut arriver
