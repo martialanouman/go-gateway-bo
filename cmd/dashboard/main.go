@@ -147,7 +147,8 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// Seule la forme de l'adresse est jugée ici : un Redis injoignable ne doit pas empêcher le
 	// démarrage, puisque seul le temps réel en dépend (invariant e). `config.Load` a déjà analysé
 	// l'URL : l'erreur de `url.Parse`, qui la recopierait avec son mot de passe, ne peut pas sortir
-	// d'ici ; celles de go-redis v9.22.0 ne citent que le schéma, le chemin ou le numéro de base.
+	// d'ici ; celles de go-redis v9.22.0 citent au plus le schéma, le chemin, le numéro de base ou un
+	// paramètre de requête — jamais l'hôte ni le mot de passe.
 	redisOptions, err := redis.ParseURL(cfg.Redis.URL)
 	if err != nil {
 		return fmt.Errorf("adresse de Redis : %w", err)

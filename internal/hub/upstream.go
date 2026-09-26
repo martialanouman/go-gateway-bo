@@ -59,7 +59,7 @@ func (h *Hub) consume(ctx context.Context, f feed, dial Dialer, view *leaderView
 	}
 }
 
-// pump relaie un flux jusqu'à sa chute. Dette 058 : une passerelle partie sans fermer la connexion
+// pump relaie un flux jusqu'à sa chute. Une passerelle partie sans fermer la connexion
 // laisserait `Read` bloqué et le sujet `live` ; une trame valide ou un ping réarme l'échéance, rien
 // d'autre.
 func (h *Hub) pump(ctx context.Context, conn *websocket.Conn, f feed, view *leaderView, alive <-chan struct{}) error {

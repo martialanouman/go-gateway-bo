@@ -524,6 +524,24 @@ func (r *reader) requiredValue(name string) string {
 	return value
 }
 
+var redisNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+
+// redisNamespace refuse le deux-points, séparateur des clés que l'espace de noms préfixe.
+func (r *reader) redisNamespace(name string) string {
+	value := r.optional(name)
+	if value == "" {
+		return "dashboard"
+	}
+
+	if !redisNamespacePattern.MatchString(value) {
+		r.reject(name, "minuscules, chiffres et tirets attendus, sans tiret en tête, reçu %q", value)
+
+		return ""
+	}
+
+	return value
+}
+
 // productName lit le nom du produit et refuse ce que l'URI `otpauth://` ne sait pas porter.
 //
 // `totp.Generate` compose son label en `"/" + issuer + ":" + accountName` et Go n'échappe **ni `:` ni
@@ -536,24 +554,6 @@ func (r *reader) requiredValue(name string) string {
 //
 // La borne haute existe parce que le QR est dessiné dans le navigateur : une URI trop longue dépasse
 // la capacité du code et l'écran d'enrôlement rendrait un carré illisible plutôt qu'une erreur.
-var redisNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
-
-// redisNamespace refuse le deux-points, séparateur des clés que l'espace de noms préfixe.
-func (r *reader) redisNamespace(name string) string {
-	value := r.optional(name)
-	if value == "" {
-		return "dashboard"
-	}
-
-	if !redisNamespacePattern.MatchString(value) {
-		r.reject(name, "minuscules, chiffres et tirets attendus, reçu %q", value)
-
-		return ""
-	}
-
-	return value
-}
-
 func (r *reader) productName(name string) string {
 	value, ok := r.required(name)
 	if !ok {

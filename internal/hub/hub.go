@@ -50,8 +50,8 @@ type Hub struct {
 	// Trois battements manqués rendent les sujets `stale`.
 	heartbeatEvery   time.Duration
 	heartbeatTimeout time.Duration
-	// La passerelle pingue toutes les 20 s (`go-gateway/internal/adminapi/stream.go`) : 60 s de
-	// silence tolèrent deux pings perdus.
+	// La passerelle pingue toutes les 20 s (`go-gateway/internal/adminapi/stream.go`) : 60 s, soit
+	// trois intervalles, tolèrent un ping en retard avec marge.
 	upstreamSilence time.Duration
 
 	mu          sync.Mutex

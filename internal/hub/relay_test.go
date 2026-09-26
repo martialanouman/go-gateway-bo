@@ -247,7 +247,7 @@ func TestUnBattementDeCoeurManqueRendLesSujetsStale(t *testing.T) {
 	awaitStatus(t, conn, "metrics.traffic", "stale")
 }
 
-// Dette 058 : une passerelle qui se tait sans fermer ne doit pas laisser le sujet live.
+// Une passerelle qui se tait sans fermer ne doit pas laisser le sujet live.
 func TestUnFluxAmontMuetPasseStale(t *testing.T) {
 	t.Parallel()
 

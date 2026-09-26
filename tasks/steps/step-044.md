@@ -21,12 +21,18 @@ relais sans intervention.
   sans lequel rien ne fonctionne.
 - **Un espace de noms** (`DASHBOARD_REDIS_NAMESPACE`, `dashboard` par défaut, minuscules, chiffres
   et tirets) préfixe le bail et le canal. Le Pub/Sub de Redis ignore le numéro de base : sans lui,
-  deux déploiements sur un même Redis (préproduction et production) se disputeraient le bail, et deux
-  suites de tests en parallèle aussi. *Constaté en implémentation le 26/09/2026.*
+  deux déploiements sur un même Redis (préproduction et production) mêleraient leurs canaux même sur
+  des bases distinctes, et se disputeraient le bail sur la même base. Deux suites de tests en
+  parallèle aussi. *Constaté en implémentation le 26/09/2026.*
 - **Le bail** : clé `dashboard:realtime:leader`, valeur = identifiant aléatoire de l'instance,
-  `SET NX PX 6000`. Le porteur le renouvelle toutes les 2 s, par un script Lua qui compare avant de
-  prolonger. Les autres tentent de le prendre toutes les 2 s. Un renouvellement refusé ou en échec
-  arrête aussitôt les consommateurs amont. À l'arrêt propre, le porteur rend le bail, par un script
+  pris par un script Lua (`SET NX PX 6000`, ou prolongé si la
+  valeur est déjà la sienne). Le porteur le renouvelle toutes les 2 s, par un script Lua qui compare avant de
+  prolonger. Les autres tentent de le prendre toutes les 2 s. Un renouvellement refusé arrête aussitôt
+  les consommateurs amont. Un renouvellement en échec ne tranche pas : c'est l'**échéance locale** qui
+  le fait, 4 s après le dernier renouvellement réussi (le TTL moins un intervalle), que Redis réponde
+  ou non. Un appel Redis bloqué (partition, connexion à moitié morte) ne peut donc pas laisser deux
+  instances sur la passerelle : le bail expire 2 s après cet arrêt. *Relevé en revue le 26/09/2026 :
+  la première version attendait le retour de l'appel.* À l'arrêt propre, le porteur rend le bail, par un script
   Lua qui compare avant de supprimer, et un autre le reprend dans les 2 s. Si le porteur est tué, la
   reprise prend au plus 6 s + 2 s.
 - **Le canal** : `dashboard:realtime` (préfixe compris). Il transporte les messages déjà sérialisés par les DTO de
@@ -48,9 +54,10 @@ relais sans intervention.
   depuis. La dette 057 (trames non décrites) ne se paie pas ici : elle attend une PR dans
   `go-gateway/api/`, et son porteur passe à step-045.
 - **`internal/hub`** : le bail (`lease.go`), la republication et l'abonnement (`relay.go`), le battement
-  de cœur, et l'échéance amont de la dette 058. `Hub.Run` prend un client Redis et l'identifiant
-  d'instance.
-- **Configuration** : `DASHBOARD_REDIS_URL`, posée aussi dans `.env.example`, la CI (Go et e2e) et
+  de cœur, et l'échéance amont de la dette 058. `Hub.Run` prend un client Redis et l'espace de
+  noms ; l'identifiant d'instance est tiré par `hub.New`.
+- **Configuration** : `DASHBOARD_REDIS_URL`, posée aussi dans `.env.example`, dans la CI (au lancement du
+  binaire de `build-web` ; le job Go reçoit `DASHBOARD_TEST_REDIS_URL` et son service) et dans
   `playwright.config.ts`. Le service `redis` revient dans `docker-compose.yml` en `redis:8-alpine`, l'image qu'il
   avait avant son retrait (step-037), et la CI prend la même.
 - **Dépendances** : `github.com/redis/go-redis/v9` v9.22.0, et en test
@@ -93,6 +100,16 @@ nomme le test qui tombe.
 | Bail non rendu à l'arrêt | `TestAucuneGoroutineNeSurvitALArretDuRelais` |
 | États rediffusés sans changement | `TestUnEtatInchangeNEstPasRediffuse` (vert à la première passe : aucun test ne le gardait, ajouté) |
 | Espace de noms non contrôlé | `TestLoadRedis` |
+| Porteur coupé de Redis qui attend le retour de son renouvellement (la première version livrée) | `TestUnPorteurCoupeDeRedisLacheLaPasserelleAvantLExpirationDuBail` : flux amont encore ouverts après 10 s de gel |
+| `acquire` qui refuse le bail déjà à soi (la première version livrée) | `TestUnPorteurReprendSonPropreBail` |
+| Chien de garde désarmé après un premier `stale` (la première version livrée) | `TestUnEtatLiveSansBattementFinitStale` |
+| Trame du canal rediffusée sans repasser par son DTO (la première version livrée) | `TestUneTrameDuCanalQuiNeTientPasDansSonDTONEstPasRediffusee` : le champ `body` arrivait au client |
+| Arrêt qui ferme Redis sans attendre la restitution du bail (la première version livrée) | scénario « le porteur du bail arrêté proprement » : reprise en 6,1 s |
+
+**Acceptés, relevés en revue.** Un battement parti juste avant un changement d'état peut arriver
+après lui (deux connexions du pool, sans ordre) : le sujet s'affiche `live` au plus 2 s de trop, et
+le battement suivant corrige. À la bascule, le nouveau porteur annonce `stale` sans `since` : l'écran
+perd « périmé depuis » le temps de la reprise.
 
 ## Definition of Done
 - [ ] `make check` vert, et le scénario deux instances rejoué **en CI** (checkpoint M2).
