@@ -100,3 +100,10 @@ minimumReleaseAgeStrict: true
 # paquet publié il y a quelques heures — le scénario même que la quarantaine couvre. La seule raison
 # valable est un correctif de sécurité qui ne peut pas attendre (`pnpm audit --fix` l'ajoute alors
 # lui-même) ; le justifier ici, avec la version.
+#
+# Une exception, le 26/09/2026 : le contrat 6.8.0, publié le même jour à 17:02 UTC, est installé
+# avant sa maturité sur décision de l'utilisateur, qui en est l'auteur (dépôt `go-gateway`). Elle
+# porte sur ce seul paquet, à cette seule version. À retirer dès le 27/09/2026 17:02 UTC, quand la
+# 6.8.0 sort d'elle-même de la quarantaine : passé ce jour, l'exception ne couvrirait plus rien.
+minimumReleaseAgeExclude:
+  - '@martialanouman/gateway-api-contracts@6.8.0'

@@ -21,4 +21,4 @@ Fonctionnalité: Le BFF interroge l'API Admin de la passerelle
   Scénario: un refus de la passerelle arrive au BFF avec son motif
     Étant donné le mock de l'API Admin monté sur le contrat publié
     Quand la passerelle refuse la liste des clients en 422
-    Alors le BFF rend une erreur qui porte le motif "forbidden_scope"
+    Alors le BFF rend une erreur qui porte le motif que la passerelle a servi

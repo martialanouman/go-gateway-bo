@@ -171,7 +171,7 @@ func ErrorFrom(status int, body []byte) error {
 
 	return &APIError{
 		Status:  status,
-		Code:    envelope.Code,
+		Code:    string(envelope.Code),
 		Message: envelope.Message,
 		Fields:  fieldErrors(envelope),
 	}
