@@ -5664,21 +5664,21 @@ type ClientInterface interface {
 
 	// StreamBillingAlerts WebSocket — MO floor-reached alerts
 	//
-	// Upgrade to a WebSocket. Emits one metricstream BillingAlert per frame (`{v, feed, customer_id, owner_type, owner_id, alert, balance}`). Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
+	// Upgrade to a WebSocket. Each text frame is one `BillingAlert` (see `x-websocket-message`); branch on `v`. Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
 	//
 	// Corresponds with GET /admin/stream/billing-alerts (the `StreamBillingAlerts` operationId).
 	StreamBillingAlerts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StreamMetrics WebSocket — live metrics stream
 	//
-	// Upgrade to a WebSocket. Emits one metricstream Snapshot per frame (`{v, feed, service, instance, emitted_at, samples[]}`); branch on `v`. `101 Switching Protocols` on upgrade.
+	// Upgrade to a WebSocket. Each text frame is one `MetricSnapshot` (see `x-websocket-message`); branch on `v`. `101 Switching Protocols` on upgrade.
 	//
 	// Corresponds with GET /admin/stream/metrics (the `StreamMetrics` operationId).
 	StreamMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StreamSessions WebSocket — live session events
 	//
-	// Upgrade to a WebSocket. Emits one metricstream SessionEvent per frame (`{v, feed, account_id, system_id, state, sessions}`). `101 Switching Protocols` on upgrade.
+	// Upgrade to a WebSocket. Each text frame is one `SessionEvent` (see `x-websocket-message`); branch on `v`. `101 Switching Protocols` on upgrade.
 	//
 	// Corresponds with GET /admin/stream/sessions (the `StreamSessions` operationId).
 	StreamSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8752,7 +8752,7 @@ func (c *Client) UpdateWebhook(ctx context.Context, id Id, webhookId openapi_typ
 
 // StreamBillingAlerts WebSocket — MO floor-reached alerts
 //
-// Upgrade to a WebSocket. Emits one metricstream BillingAlert per frame (`{v, feed, customer_id, owner_type, owner_id, alert, balance}`). Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
+// Upgrade to a WebSocket. Each text frame is one `BillingAlert` (see `x-websocket-message`); branch on `v`. Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
 //
 // Corresponds with GET /admin/stream/billing-alerts (the `StreamBillingAlerts` operationId).
 func (c *Client) StreamBillingAlerts(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8769,7 +8769,7 @@ func (c *Client) StreamBillingAlerts(ctx context.Context, reqEditors ...RequestE
 
 // StreamMetrics WebSocket — live metrics stream
 //
-// Upgrade to a WebSocket. Emits one metricstream Snapshot per frame (`{v, feed, service, instance, emitted_at, samples[]}`); branch on `v`. `101 Switching Protocols` on upgrade.
+// Upgrade to a WebSocket. Each text frame is one `MetricSnapshot` (see `x-websocket-message`); branch on `v`. `101 Switching Protocols` on upgrade.
 //
 // Corresponds with GET /admin/stream/metrics (the `StreamMetrics` operationId).
 func (c *Client) StreamMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8786,7 +8786,7 @@ func (c *Client) StreamMetrics(ctx context.Context, reqEditors ...RequestEditorF
 
 // StreamSessions WebSocket — live session events
 //
-// Upgrade to a WebSocket. Emits one metricstream SessionEvent per frame (`{v, feed, account_id, system_id, state, sessions}`). `101 Switching Protocols` on upgrade.
+// Upgrade to a WebSocket. Each text frame is one `SessionEvent` (see `x-websocket-message`); branch on `v`. `101 Switching Protocols` on upgrade.
 //
 // Corresponds with GET /admin/stream/sessions (the `StreamSessions` operationId).
 func (c *Client) StreamSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16241,7 +16241,7 @@ type ClientWithResponsesInterface interface {
 
 	// StreamBillingAlertsWithResponse WebSocket — MO floor-reached alerts
 	//
-	// Upgrade to a WebSocket. Emits one metricstream BillingAlert per frame (`{v, feed, customer_id, owner_type, owner_id, alert, balance}`). Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
+	// Upgrade to a WebSocket. Each text frame is one `BillingAlert` (see `x-websocket-message`); branch on `v`. Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16250,7 +16250,7 @@ type ClientWithResponsesInterface interface {
 
 	// StreamMetricsWithResponse WebSocket — live metrics stream
 	//
-	// Upgrade to a WebSocket. Emits one metricstream Snapshot per frame (`{v, feed, service, instance, emitted_at, samples[]}`); branch on `v`. `101 Switching Protocols` on upgrade.
+	// Upgrade to a WebSocket. Each text frame is one `MetricSnapshot` (see `x-websocket-message`); branch on `v`. `101 Switching Protocols` on upgrade.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16259,7 +16259,7 @@ type ClientWithResponsesInterface interface {
 
 	// StreamSessionsWithResponse WebSocket — live session events
 	//
-	// Upgrade to a WebSocket. Emits one metricstream SessionEvent per frame (`{v, feed, account_id, system_id, state, sessions}`). `101 Switching Protocols` on upgrade.
+	// Upgrade to a WebSocket. Each text frame is one `SessionEvent` (see `x-websocket-message`); branch on `v`. `101 Switching Protocols` on upgrade.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -27337,7 +27337,7 @@ func (c *ClientWithResponses) UpdateWebhookWithResponse(ctx context.Context, id 
 
 // StreamBillingAlertsWithResponse WebSocket — MO floor-reached alerts
 //
-// Upgrade to a WebSocket. Emits one metricstream BillingAlert per frame (`{v, feed, customer_id, owner_type, owner_id, alert, balance}`). Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
+// Upgrade to a WebSocket. Each text frame is one `BillingAlert` (see `x-websocket-message`); branch on `v`. Only `mo_floor_reached` is emitted today; low-balance and breaker-open alerts have no configured threshold yet. `101 Switching Protocols` on upgrade.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27352,7 +27352,7 @@ func (c *ClientWithResponses) StreamBillingAlertsWithResponse(ctx context.Contex
 
 // StreamMetricsWithResponse WebSocket — live metrics stream
 //
-// Upgrade to a WebSocket. Emits one metricstream Snapshot per frame (`{v, feed, service, instance, emitted_at, samples[]}`); branch on `v`. `101 Switching Protocols` on upgrade.
+// Upgrade to a WebSocket. Each text frame is one `MetricSnapshot` (see `x-websocket-message`); branch on `v`. `101 Switching Protocols` on upgrade.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27367,7 +27367,7 @@ func (c *ClientWithResponses) StreamMetricsWithResponse(ctx context.Context, req
 
 // StreamSessionsWithResponse WebSocket — live session events
 //
-// Upgrade to a WebSocket. Emits one metricstream SessionEvent per frame (`{v, feed, account_id, system_id, state, sessions}`). `101 Switching Protocols` on upgrade.
+// Upgrade to a WebSocket. Each text frame is one `SessionEvent` (see `x-websocket-message`); branch on `v`. `101 Switching Protocols` on upgrade.
 //
 // Returns a wrapper object for the known response body format(s).
 //

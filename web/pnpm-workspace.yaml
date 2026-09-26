@@ -106,4 +106,4 @@ minimumReleaseAgeStrict: true
 # porte sur ce seul paquet, à cette seule version. À retirer dès le 27/09/2026 17:02 UTC, quand la
 # 6.8.0 sort d'elle-même de la quarantaine : passé ce jour, l'exception ne couvrirait plus rien.
 minimumReleaseAgeExclude:
-  - '@martialanouman/gateway-api-contracts@6.8.0'
+  - '@martialanouman/gateway-api-contracts@6.9.0'
