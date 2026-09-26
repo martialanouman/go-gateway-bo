@@ -263,6 +263,8 @@ const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })
 function Passkeys({ factors }: { readonly factors: Me['secondFactors'] }) {
   const invalidateFactors = useInvalidateFactors()
   const [adding, setAdding] = useState(false)
+  const addButton = useRef<HTMLButtonElement>(null)
+  const wasAdding = useRef(false)
   const passkeys = useQuery({
     queryKey: passkeysQueryKey,
     queryFn: () =>
@@ -277,9 +279,19 @@ function Passkeys({ factors }: { readonly factors: Me['secondFactors'] }) {
         }),
         'La clé d’accès n’a pas été retirée',
       ),
-    onSuccess: invalidateFactors,
+    onSuccess: async () => {
+      // La ligne qui portait le focus disparaît avec la clé : sans ceci, il tombe sur `body`.
+      addButton.current?.focus()
+      await invalidateFactors()
+    },
   })
   const lastFactor = factors.passkeys === 1 && !factors.totp
+
+  // Le formulaire qui portait le focus se referme : il revient au bouton qui l'avait ouvert.
+  useEffect(() => {
+    if (adding) wasAdding.current = true
+    else if (wasAdding.current) addButton.current?.focus()
+  }, [adding])
 
   return (
     <Panel title="Clés d’accès">
@@ -295,6 +307,7 @@ function Passkeys({ factors }: { readonly factors: Me['secondFactors'] }) {
         <Button
           {...blockedBy(browserSupportsWebAuthn() ? undefined : NO_PASSKEY_PLATFORM)}
           onClick={() => setAdding(true)}
+          ref={addButton}
         >
           Ajouter
         </Button>

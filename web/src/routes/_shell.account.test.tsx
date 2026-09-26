@@ -310,6 +310,70 @@ describe('le clavier', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Mon compte' })).toHaveFocus()
   })
 
+  it('rend le focus à « Ajouter » quand le nommage d’une clé est abandonné', async () => {
+    vi.spyOn(_browserSupportsWebAuthnInternals, 'stubThis').mockReturnValue(true)
+    const { user } = await visitAccount({ totp: true, passkeys: 0 })
+
+    await user.click(passkeysSection().getByRole('button', { name: 'Ajouter' }))
+    await user.click(passkeysSection().getByRole('button', { name: 'Annuler' }))
+
+    expect(passkeysSection().getByRole('button', { name: 'Ajouter' })).toHaveFocus()
+  })
+
+  it('rend le focus à « Ajouter » une fois la clé enregistrée', async () => {
+    vi.spyOn(_browserSupportsWebAuthnInternals, 'stubThis').mockReturnValue(true)
+    stubAuthenticator()
+    const { user } = await visitAccount({ totp: true, passkeys: 0 })
+
+    await user.click(passkeysSection().getByRole('button', { name: 'Ajouter' }))
+    await user.type(passkeysSection().getByLabelText(/Nom de la clé/), 'Portable{Enter}')
+    await passkeysSection().findByRole('cell', { name: 'Portable' })
+
+    expect(passkeysSection().getByRole('button', { name: 'Ajouter' })).toHaveFocus()
+  })
+
+  it('garde le focus sur « Enregistrer » quand l’enregistrement est refusé', async () => {
+    vi.spyOn(_browserSupportsWebAuthnInternals, 'stubThis').mockReturnValue(true)
+    stubAuthenticator()
+    const { user } = await visitAccount(
+      { totp: true, passkeys: 0 },
+      {
+        registered: { status: 400, body: { code: 'x', message: 'La clé d’accès a été refusée.' } },
+      },
+    )
+
+    await user.click(passkeysSection().getByRole('button', { name: 'Ajouter' }))
+    await user.type(passkeysSection().getByLabelText(/Nom de la clé/), 'Portable')
+    await user.click(passkeysSection().getByRole('button', { name: 'Enregistrer' }))
+    await passkeysSection().findByRole('alert')
+
+    expect(passkeysSection().getByRole('button', { name: 'Enregistrer' })).toHaveFocus()
+  })
+
+  it('rend le focus à « Ajouter » quand la ligne de la clé retirée disparaît', async () => {
+    const { user } = await visitAccount({ totp: true, passkeys: 2 })
+
+    await user.click(await removeButtonOf('Clé 1'))
+    await vi.waitFor(() =>
+      expect(passkeysSection().queryByRole('cell', { name: 'Clé 1' })).toBeNull(),
+    )
+
+    expect(passkeysSection().getByRole('button', { name: 'Ajouter' })).toHaveFocus()
+  })
+
+  it('garde le focus sur « Retirer » quand le retrait est refusé', async () => {
+    const { user } = await visitAccount(
+      { totp: true, passkeys: 1 },
+      { unregister: { status: 409, body: { code: 'mfa_last_factor', message: 'Refusé.' } } },
+    )
+
+    const retirer = await removeButtonOf('Clé 1')
+    await user.click(retirer)
+    await screen.findByRole('alert')
+
+    expect(retirer).toHaveFocus()
+  })
+
   it('conduit le remplacement sans souris, du bouton à la preuve', async () => {
     const { fetch, user } = await visitAccount({ totp: true, passkeys: 0 })
 

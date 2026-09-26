@@ -1,6 +1,6 @@
 import { Button as BaseButton } from '@base-ui/react/button'
 import { Tooltip } from '@base-ui/react/tooltip'
-import { type ComponentPropsWithoutRef, type ReactNode, useId } from 'react'
+import { type ComponentPropsWithRef, type ReactNode, useId } from 'react'
 
 /**
  * Le bouton du produit.
@@ -29,10 +29,7 @@ export type ButtonSize = 'sm' | 'md'
  * serait interpolée littéralement dans l'attribut — `class="ui-button (s) => s.disabled ? …"`.
  * Invisible au typecheck, invisible en revue, découvert à l'écran.
  */
-export type ButtonProps = Omit<
-  ComponentPropsWithoutRef<typeof BaseButton>,
-  'render' | 'className'
-> & {
+export type ButtonProps = Omit<ComponentPropsWithRef<typeof BaseButton>, 'render' | 'className'> & {
   readonly className?: string
   readonly variant?: ButtonVariant
   readonly size?: ButtonSize
@@ -85,6 +82,7 @@ export function Button({
   className,
   children,
   onClick,
+  ref,
   ...rest
 }: ButtonProps) {
   // Ni `--loading` ni `--blocked` : les deux états sont peints par `.ui-button[aria-disabled]`,
@@ -112,6 +110,7 @@ export function Button({
               aria-disabled
               className={classes}
               onClick={(event) => event.preventDefault()}
+              ref={ref}
               type={type}
             />
           }
@@ -135,6 +134,7 @@ export function Button({
       // Sans `type="button"` par défaut, un bouton dans un formulaire le soumet, et un « Annuler »
       // enverrait la requête qu'il prétend abandonner.
       type={type}
+      ref={ref}
       className={classes}
       disabled={disabled}
       // **`preventDefault`, et non un `onClick` neutralisé.** Neutraliser le gestionnaire ne couvre
