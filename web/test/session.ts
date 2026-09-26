@@ -165,7 +165,16 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
         // Aucun `totp` ici : le serveur ne l'annonce qu'une fois un code consommé, et un décor qui
         // l'annonçait plus tôt a caché le défaut jusqu'à ce qu'il soit livré.
         if (reply !== 'pending' && reply.status === 200) {
-          granted = { ...granted, recoveryCodesRemaining: RECOVERY_CODES.length }
+          const { method } = (await request.clone().json()) as { method?: string }
+          const held = 'status' in current || current === 'pending' ? {} : current.secondFactors
+          // Une preuve par code de récupération le consomme, comme le serveur.
+          granted = {
+            ...granted,
+            recoveryCodesRemaining:
+              method === 'recovery_code'
+                ? (granted.recoveryCodesRemaining ?? held?.recoveryCodesRemaining ?? 10) - 1
+                : RECOVERY_CODES.length,
+          }
         }
 
         return respond(reply)

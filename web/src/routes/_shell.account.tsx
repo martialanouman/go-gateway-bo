@@ -66,6 +66,8 @@ function AccountScreen() {
         api.POST('/auth/mfa/totp/enroll', { body }),
         'L’application d’authentification n’a pas été enrôlée',
       ),
+    // Une preuve par code de récupération en consomme un, que l'écran ne doit plus compter.
+    onSuccess: invalidateFactors,
   })
 
   async function confirm(code: string) {

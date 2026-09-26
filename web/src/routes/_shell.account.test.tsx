@@ -227,6 +227,19 @@ describe('l’application d’authentification', () => {
     expect(cached).not.toContain(ENROLLMENT_SECRET)
   })
 
+  it('décompte le code de récupération présenté en preuve, même si le remplacement est abandonné', async () => {
+    const { user } = await visitAccount({ totp: true, recoveryCodesRemaining: 7, passkeys: 0 })
+
+    await user.click(totpSection().getByRole('button', { name: 'Remplacer' }))
+    await user.click(screen.getByRole('radio', { name: 'Code de récupération' }))
+    await user.type(screen.getByRole('textbox', { name: /^Code/ }), 'a1b2c-3d4e5')
+    await user.click(screen.getByRole('button', { name: 'Continuer' }))
+    await screen.findByText(ENROLLMENT_SECRET)
+    await user.click(screen.getByRole('button', { name: 'Annuler' }))
+
+    expect(await section('Codes de récupération').findByText('6 restants')).toBeVisible()
+  })
+
   it('rend le refus d’une preuve fausse, et ne montre aucun secret', async () => {
     const { user } = await visitAccount(
       { totp: true, passkeys: 0 },
