@@ -1,6 +1,6 @@
 # Génération du client Go de l'API Admin. Le contrat n'est pas ici : il est lu sous
 # `web/node_modules/@martialanouman/gateway-api-contracts/`, où `make generate` va le chercher, et
-# `internal/gateway/contrat_test.go` refuse qu'une copie entre dans le dépôt.
+# `internal/gateway/contract_copy_test.go` refuse qu'une copie entre dans le dépôt.
 #
 # Les chemins sont relatifs au répertoire de travail, jamais à ce fichier — `Overlay.Path` et
 # `output` sont passés tels quels à `os.Open` / `os.WriteFile` par `cmd/oapi-codegen`. Toutes les

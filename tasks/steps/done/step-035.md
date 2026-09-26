@@ -30,7 +30,7 @@ Chacune a été lancée le 16/09/2026 et a laissé la suite verte.
 - `internal/config/auth_test.go:173` (`TestLesTroisSecretsNeSeConfondentPas`) teste un mapping : `Load`
   n'empêche jamais trois secrets identiques.
 - `internal/mfa/manager_test.go:52` est toujours vrai : HKDF n'échoue pour aucune phrase secrète.
-- `internal/store/base.feature:10` parle de « huit migrations » ; il y en a neuf.
+- `internal/store/database.feature:10` parle de « huit migrations » ; il y en a neuf.
 - `internal/bddtest/postgres.go:218` : `processAlive` lit un processus vivant mais non signalable
   (EPERM) comme mort, et le nettoyage supprime alors une base encore utilisée.
 
@@ -137,7 +137,7 @@ l'autre.
   s'écarte quand le signal aboutit — le bon arbitrage, mais il faut le savoir : la CI ne pose aucun
   `container:`, donc le job tourne sous un utilisateur non privilégié et le cas s'exécute. Le jour où
   un job passerait en conteneur root, cette garde cesserait d'être tenue **sans aucun signal**.
-- **Le nombre du Gherkin de `internal/store/base.feature` reste décoratif.** « les neuf migrations »
+- **Le nombre du Gherkin de `internal/store/database.feature` reste décoratif.** « les neuf migrations »
   est juste, mais `everyMigrationWasReported` compare `initialMigrations` et `latestSchemaVersion` : le
   nombre écrit dans la phrase peut redériver sans que rien ne rougisse. Le fermer demanderait de
   capturer le nombre et de le passer au pas.

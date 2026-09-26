@@ -58,7 +58,7 @@ contre `pgx` nu (`plan.md` §19, renvoyée ici par l'amendement du 02/08/2026).
 ## Definition of Done
 - [x] `make check` vert
 - [x] `make bootstrap` existe et sème ; deux exécutions successives laissent la base **identique** —
-      comparée, pas supposée : `cmd/bootstrap/commande_test.go` joue la commande deux fois et compare
+      comparée, pas supposée : `cmd/bootstrap/command_test.go` joue la commande deux fois et compare
       une empreinte qui inclut les `uuidv7()` et les `created_at`, donc un seed qui détruirait puis
       recréerait à l'identique se verrait
 - [x] le choix `sqlc` / `pgx` nu est écrit avec sa raison (DN-1), et `plan.md` §19 ne le donne plus

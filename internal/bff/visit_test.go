@@ -133,7 +133,7 @@ func loadModule(t *testing.T) []*packages.Package {
 // Les portes **mordent**, et la preuve en reste dans le dépôt : une sonde jouée puis retirée ne
 // distingue plus une porte mordante d'une porte débranchée.
 //
-// **Chaque règle a son propre témoin.** Un témoin unique — le seul paquet `testdata/fuite` — reste
+// **Chaque règle a son propre témoin.** Un témoin unique — le seul paquet `testdata/leak` — reste
 // vert quand on débranche la règle de domaine : le type y est attrapé par la règle des méthodes, et
 // l'assertion ne regarderait que « quelque chose a parlé ». Un témoin qui ne dit pas **laquelle** des
 // portes a parlé prouve la mauvaise borne.
@@ -229,7 +229,7 @@ func loadWitness(t *testing.T) *packages.Package {
 	loaded, err := packages.Load(&packages.Config{
 		Mode: packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps |
 			packages.NeedSyntax | packages.NeedTypesInfo,
-	}, "./testdata/fuite")
+	}, "./testdata/leak")
 	require.NoError(t, err)
 	require.Len(t, loaded, 1)
 	require.Empty(t, loaded[0].Errors, "le témoin ne type-checke pas, il ne prouve rien")

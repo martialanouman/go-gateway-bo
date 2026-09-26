@@ -36,7 +36,7 @@ condition de faisabilité du projet (`plan.md` §16).
   **cible de génération est commitée** et la CI vérifie que le fichier est à jour.
 
 ## Tests (écrits dans la même PR)
-- **Scénario** `passerelle.feature` : *Étant donné* le mock Prism, *Quand* le BFF liste les clients,
+- **Scénario** `gateway.feature` : *Étant donné* le mock Prism, *Quand* le BFF liste les clients,
   *Alors* il obtient une réponse typée ; *Quand* la passerelle répond une erreur `{ code, message }`,
   *Alors* le BFF rend son erreur typée équivalente.
 - Unitaire : le renouvellement se déclenche avant expiration et **une seule requête part** quand deux

@@ -50,7 +50,7 @@ arrive avec le jalon M2. » Cette step la remplace.
   correspond à aucun enfant de `_shell`, et `__root.test.tsx` l'asserte. Remplacer le corps du
   composant est le périmètre ; déplacer le composant casserait l'adresse inconnue en silence.
 - **Le squelette de chargement à froid doit tenir après l'ajout de l'AppShell** — c'est un point du
-  Checkpoint M2. `web/chargement-a-froid.test.ts` tient la fidélité de **quatre tokens que le `<style>`
+  Checkpoint M2. `web/cold-load.test.ts` tient la fidélité de **quatre tokens que le `<style>`
   en ligne d'`index.html` duplique** — dont `--shell-rail-width` et `--shell-topbar-height` — face aux
   fichiers de `src/styles/tokens/`. La duplication est imposée : la première peinture n'a aucune
   feuille à sa disposition. Toute géométrie de coquille qui bouge doit donc bouger aux deux endroits,
@@ -66,7 +66,7 @@ arrive avec le jalon M2. » Cette step la remplace.
 - **Composants (Vitest)** : le rail filtré par un jeu de permissions partiel, `PermissionGate` sur une
   clé absente, l'état 401 qui nomme step-027, et une route de l'arborescence dont l'état vide nomme
   son jalon.
-- **Parcours (Playwright), contre le binaire** : l'**extension** de `e2e/coquille.spec.ts`, jamais un
+- **Parcours (Playwright), contre le binaire** : l'**extension** de `e2e/shell.spec.ts`, jamais un
   fichier de plus — le plafond de `plan.md` §17.4 est de cinq parcours, et c'est un budget. Le
   squelette peint, puis l'AppShell qui le remplace, puis une entrée de rail qui mène à un état vide
   nommant son jalon.
@@ -84,7 +84,7 @@ arrive avec le jalon M2. » Cette step la remplace.
       route par route et non sur un échantillon
 - [x] la mutation « retirer le filtre de permission du rail » fait rougir
 - [x] la mutation « `PermissionGate` laisse passer une clé absente » fait rougir
-- [x] le squelette de chargement à froid tient toujours, et `chargement-a-froid.test.ts` le prouve sur
+- [x] le squelette de chargement à froid tient toujours, et `cold-load.test.ts` le prouve sur
       le bundle de production, pas sur l'intention
 - [x] l'absence de rôle dans la barre supérieure est écrite là où elle se constate, avec le renvoi au
       contrat qui la décide

@@ -40,7 +40,7 @@ de bord ne lit **jamais** la base de la passerelle (§1.3).
 - L'ordre des migrations est un contrat : elles ne se réécrivent jamais, elles s'ajoutent.
 
 ## Tests (écrits dans la même PR)
-- **Scénario** `base.feature` : *Étant donné* une base vierge, *Quand* les migrations sont jouées,
+- **Scénario** `database.feature` : *Étant donné* une base vierge, *Quand* les migrations sont jouées,
   *Alors* le schéma attendu existe ; *Quand* elles sont rejouées, *Alors* rien ne change et rien
   n'échoue.
 - Une partition d'`audit_log` est créée pour le mois courant et pour le suivant.
@@ -99,7 +99,7 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| La partition du mois suivant retirée *(la mutation que la DoD nomme)* | `base.feature`, sur un **effet** : le journal refuse un événement daté du mois prochain |
+| La partition du mois suivant retirée *(la mutation que la DoD nomme)* | `database.feature`, sur un **effet** : le journal refuse un événement daté du mois prochain |
 | La fermeture sur annulation du contexte retirée | `TestThePoolClosesWithTheRootContext…` |
 | `MinConns` porté à 5 | les deux tests de paresse |
 | `MaxConns`, `MinConns`, `MinIdleConns` retirés un à un | « le pool a ouvert une 11ᵉ connexion », « le DSN a obtenu ses 5 connexions oisives » |

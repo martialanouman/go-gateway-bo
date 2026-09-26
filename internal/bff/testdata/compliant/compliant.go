@@ -1,7 +1,7 @@
-// Package conforme est le témoin positif de `compile_test.go` : il doit compiler. Sans lui, un
+// Package compliant est le témoin positif de `compile_test.go` : il doit compiler. Sans lui, un
 // harnais cassé — mauvais chemin, import erroné, `go build` introuvable — ferait échouer les deux
 // fixtures et la porte resterait verte en ne prouvant rien.
-package conforme
+package compliant
 
 import (
 	"context"

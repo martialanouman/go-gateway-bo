@@ -82,7 +82,7 @@ unique reçu par e-mail, puis enrôle son second facteur par le parcours existan
 - **Go** : `CheckPassword` ; worker — SMTP en échec laisse `token_hash` nul et repousse, backoff,
   arrêt à 10 ; deux workers, une ligne, **un** envoi, observé dans `pg_locks`.
 - **Vitest** : fragment effacé ; `refine` ; « Envoyer un lien » désactivé sur un compte désactivé.
-- **Playwright**, en étendant `coquille.spec.ts` : création → lien lu par l'API Mailpit → `/access` →
+- **Playwright**, en étendant `shell.spec.ts` : création → lien lu par l'API Mailpit → `/access` →
   login → enrôlement → console.
 - **Mutations** : garde, usage unique, expiration, invalidation par un nouveau lien, effacement des
   facteurs, révocation des sessions, `SKIP LOCKED`, effacement du fragment, `DASHBOARD_PUBLIC_URL`

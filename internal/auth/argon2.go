@@ -56,7 +56,7 @@ type Params struct {
 
 // currentParams est le profil « seconde option » de la RFC 9106 §4 à la lettre — m=64 MiB, t=3, p=4.
 // Ce qui l'a retenu contre les neuf autres profils mesurés vit avec le benchmark qui les produit,
-// au-dessus de `BenchmarkVerification` dans `mesure_test.go`.
+// au-dessus de `BenchmarkVerification` dans `measure_test.go`.
 //
 // Le prix assumé, écrit plutôt que tu : une base volée s'attaque à 26 ms le candidat. C'est
 // exactement ce que le relèvement existe pour corriger, et il ne coûte que ces trois nombres — les

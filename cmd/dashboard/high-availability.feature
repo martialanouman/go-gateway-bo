@@ -3,7 +3,7 @@ Fonctionnalité: Plusieurs instances, un seul consommateur de la passerelle
   Seule l'instance qui porte le bail Redis consomme les trois flux de la passerelle ; elle republie
   sur Redis, et chaque instance rediffuse ce qu'elle y lit. Tuer le porteur fait passer les sujets
   périmés, puis l'autre instance prend le bail et les rend vivants. Deux binaires, un PostgreSQL, un
-  Redis joint à travers un relais que le harnais sait couper, et le faux amont de `temps-reel.feature`.
+  Redis joint à travers un relais que le harnais sait couper, et le faux amont de `realtime.feature`.
 
   Contexte:
     Étant donné une installation avec un opérateur

@@ -177,7 +177,7 @@ utilisateur, et il vivra dans le `internal/bddtest` de DN-1.
 ### DN-4 — Le test qui lit la sortie de build reste dans la suite unitaire
 
 Le piège tel qu'il est écrit affirme deux choses fausses. **Mesuré le 03/08/2026** :
-`web/chargement-a-froid.test.ts` construit lui-même dans un `mkdtemp` via un sous-process — il ne lit
+`web/cold-load.test.ts` construit lui-même dans un `mkdtemp` via un sous-process — il ne lit
 aucun `dist/` résiduel — et la suite Vitest **complète** tourne en **1,70 s**, ce fichier compris
 (**1,53 s** isolé, 0,92 s pour `src/` seul). Les 120 s qu'on lui prête sont son *timeout*, pas sa
 durée.
@@ -338,7 +338,7 @@ gagnée, et sortirait du périmètre. La convention s'applique aux tests que cet
 
 **Les quatre critères transverses.**
 
-1. *Le chemin qu'un humain traverse.* `web/e2e/coquille.spec.ts`, contre le **binaire**, rien de
+1. *Le chemin qu'un humain traverse.* `web/e2e/shell.spec.ts`, contre le **binaire**, rien de
    simulé dans le produit. Il a prouvé en propre ce qu'aucune autre porte ne voit : l'asset embarqué
    remplacé par un `throw`, le document servi reste correct et seules les assertions de rendu tombent.
 2. *Toute affirmation confrontée à sa source.* C'est le critère qui a coûté le plus cher ici — trois
@@ -366,7 +366,7 @@ tombe : « retrait de X → aucune porte ne rougit » est un constat, à conditi
 | Couverture client : un module orphelin d'une ligne ajouté sous `src/lib/` | `vitest run` — `ERROR: Coverage for lines (0%) … for src/lib/orphelin.ts` |
 | Couverture client : `coverage.include` retiré, orphelin conservé | **rien ne rougit** — le module est absent du rapport et `exit=0`. C'est la mesure qui justifie la ligne |
 | Couverture client : `perFile` retiré, orphelin d'une ligne sans fonction | **rien ne rougit** — les quatre seuils globaux passent (78,57 % de lignes pour 75 exigés) |
-| Après adoption : `cmd/dashboard/contrat.feature` renommé en `.disabled` | `TestScenarios` — « 7 scénario(s) exécuté(s) pour un plancher de 8 » |
+| Après adoption : `cmd/dashboard/contract.feature` renommé en `.disabled` | `TestScenarios` — « 7 scénario(s) exécuté(s) pour un plancher de 8 » |
 | Avant adoption : `go test -run 'TestScenarios/le_schéma' ./internal/store/` | `TestScenarios` tombait — c'était le défaut, et c'est le rouge qui a précédé l'adoption. Vert après |
 | Garde d'imports : `internal/bff/api.go` importe `bddtest` | `TestNoProductionPackageReachesTheHarness` — « le harnais entre dans le binaire livré par … », **deux fois** : pour `internal/bff`, et pour `cmd/dashboard` qui l'atteint à travers lui. La chaîne complète est imprimée, et c'est le transitif qui se voit |
 | Garde d'imports : chemin du harnais faussé d'une lettre | la garde reste **verte** — et c'est le **témoin** qui tombe : « l'analyse ne retrouve pas les suites qui importent le harnais : elle ne garde rien, et la garde jumelle est verte pour cette raison-là ». C'est ce que le témoin existe pour attraper |

@@ -8,7 +8,7 @@ BIN := bin/dashboard
 WEBASSETS := internal/webassets/dist
 
 # Le contrat de l'API Admin est consommé depuis GitHub Packages et **jamais copié ici** : la
-# génération le lit là où pnpm l'a installé. `internal/gateway/contrat_test.go` en fait une porte.
+# génération le lit là où pnpm l'a installé. `internal/gateway/contract_copy_test.go` en fait une porte.
 # C'est ce chemin qui range `generate` du côté qui a les deux toolchains.
 CONTRACT_ADMIN := web/node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml
 ADMIN_CLIENT := internal/gateway/client.gen.go

@@ -16,7 +16,7 @@ import (
 
 // maximumPasswordLength et maximumEmailLength redisent en Go les bornes que le contrat déclare. Le
 // redire n'est pas une duplication : **rien dans ce dépôt ne valide une requête à l'exécution** contre
-// le YAML — le code engendré ne le fait pas, et `contrat.feature` ne valide que les réponses.
+// le YAML — le code engendré ne le fait pas, et `contract.feature` ne valide que les réponses.
 //
 // Le corps entier est déjà borné à huit kibioctets par `RequestSize`. Ces deux lignes bornent les
 // **champs**, et ce n'est pas redondant : huit kibioctets de mot de passe restent huit kibioctets à

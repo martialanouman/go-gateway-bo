@@ -112,7 +112,7 @@ ici plutôt que repris du rapport.
 | 3 | `internal/bff/auth.go:216` citait encore `LockFor`, supprimé par cette PR | Dernière référence pendante de l'arbre |
 | 4 | `serialization_test.go` affirmait que `types.Unalias` empêche la porte de refuser huit sites | Mutation faite : `types.Unalias` retiré de `declarationFile` → **vert**. Il ne porte plus rien depuis le retrait de l'alias ; le commentaire le dit désormais |
 | 5 | `README.md:39` et `plan.md:433` annonçaient Redis dans `docker compose up -d` | Vérifié absent du fichier depuis cette PR |
-| 6 | `.toolbar` et `.toolbar__end` n'ont plus d'émetteur depuis la suppression de `page.tsx` | `classes-peintes.test.ts` ne juge que les sélecteurs `ui-*` : le défaut symétrique qu'il documente lui échappait |
+| 6 | `.toolbar` et `.toolbar__end` n'ont plus d'émetteur depuis la suppression de `page.tsx` | `painted-classes.test.ts` ne juge que les sélecteurs `ui-*` : le défaut symétrique qu'il documente lui échappait |
 
 ## Hors périmètre
 Les commentaires → step-038.

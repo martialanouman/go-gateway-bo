@@ -50,7 +50,7 @@ const prismStartup = 30 * time.Second
 
 // `godog` ne pose aucun plancher : `Paths` qui ne trouve rien rend une suite **vide et réussie**, et
 // `Strict` ne couvre que les steps non définies d'un scénario lu. Vérifié en renommant
-// `passerelle.feature` — la suite rend `ok` sans avoir joint le mock une seule fois. Le registre qui
+// `gateway.feature` — la suite rend `ok` sans avoir joint le mock une seule fois. Le registre qui
 // ferme ces deux trous vit dans `internal/bddtest`, avec ses propres tests unitaires.
 func TestScenarios(t *testing.T) {
 	baseURL := adminMock(t)
@@ -114,7 +114,7 @@ func TestTheMockServesEveryOperationTheContractDeclares(t *testing.T) {
 
 // declaredOperations compte ce que le contrat déclare, sur la ligne qui le déclare : une clé
 // `operationId:`, jamais une mention en prose ou en commentaire — même discriminant que
-// `contrat_test.go`. Le plancher refuse un compte nul : un fichier déplacé ou une clé renommée en
+// `contract_copy_test.go`. Le plancher refuse un compte nul : un fichier déplacé ou une clé renommée en
 // amont rendrait 0, et l'égalité avec un mock qui n'annonce rien passerait pour verte.
 func declaredOperations(t *testing.T) int {
 	t.Helper()

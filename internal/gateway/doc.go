@@ -9,7 +9,7 @@
 // comme une propriété du langage plutôt que comme une consigne.
 //
 // Le contrat de cette API n'appartient pas à ce dépôt : il est consommé depuis le paquet
-// `@martialanouman/gateway-api-contracts` et n'y est jamais recopié. `contrat_test.go` en fait une
+// `@martialanouman/gateway-api-contracts` et n'y est jamais recopié. `contract_copy_test.go` en fait une
 // porte.
 //
 // # Le piège du client engendré : idempotency_key

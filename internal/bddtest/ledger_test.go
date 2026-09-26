@@ -89,10 +89,10 @@ func TestTheLedgerIsSilentOnAFullyExercisedCorpus(t *testing.T) {
 func TestTheFloorIsTheCallersAndNotThePackages(t *testing.T) {
 	t.Parallel()
 
-	ran := ledgerOf("base.feature", 2)
+	ran := ledgerOf("database.feature", 2)
 
-	assert.Empty(t, ran.shortfalls([]string{"base.feature"}, 2))
-	assert.NotEmpty(t, ran.shortfalls([]string{"base.feature"}, 3),
+	assert.Empty(t, ran.shortfalls([]string{"database.feature"}, 2))
+	assert.NotEmpty(t, ran.shortfalls([]string{"database.feature"}, 3),
 		"un plancher plus haut que ce qui a tourné doit se voir, sinon chaque suite hérite du plus bas")
 }
 

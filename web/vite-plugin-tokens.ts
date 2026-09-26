@@ -14,7 +14,7 @@
  * - **`apply: 'build'`** : `vite dev` ne le joue pas. `make check` construit, donc rien n'atteint une
  *   PR ; mais en développement, un token inventé reste silencieux jusqu'au premier build.
  * - **Les `var()` composés à l'exécution** — `` style={{ font: `var(${token})` }} `` — ne laissent
- *   aucun nom dans le CSS émis. C'est le motif même de `/_design`, et c'est `test/charte.test.ts`
+ *   aucun nom dans le CSS émis. C'est le motif même de `/_design`, et c'est `test/charter.test.ts`
  *   qui le garde, pas ce plugin.
  * - Il lit le CSS **émis**, donc après `@import` et minification. Un token qu'aucune règle atteinte
  *   ne consomme n'existe pas pour lui, ce qui est le bon comportement : on garde ce qui est servi.

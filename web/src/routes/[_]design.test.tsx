@@ -12,7 +12,7 @@ import { createAppRouter } from '~/router'
  * caractère et rendent le segment littéral.
  *
  * Ce que ce fichier n'observe pas : le contraste des paires qu'elle rend, tenu par
- * `test/charte.test.ts`, qui lit les mêmes tables ; ni l'absence de requête vers un tiers, tenue par
+ * `test/charter.test.ts`, qui lit les mêmes tables ; ni l'absence de requête vers un tiers, tenue par
  * le parcours Playwright contre le binaire.
  */
 async function visitDesign() {

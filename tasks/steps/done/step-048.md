@@ -16,10 +16,10 @@ nomment disparaît. Aujourd'hui, plusieurs restent verts quoi qu'il arrive.
 | `web/src/components/ui/toast.tsx:70`, `toast.test.tsx:194` | La durée d'un toast critique est appliquée, mais rien ne le vérifie : le test ne lit que la constante `TOAST_TIMEOUT`. Mutation lancée (durée critique non transmise) : la suite reste verte. |
 | `toast.tsx:98`, `toast.test.tsx:75` | `aria-label="Notifications"` est déjà la valeur par défaut de Base UI : le retirer laisse le test vert. |
 | `toast.tsx:67` | `useToast` ne passe jamais `priority: 'high'` : une alerte critique serait annoncée poliment par le lecteur d'écran. *(Plausible : à confirmer contre la documentation de Base UI par `ctx7`.)* |
-| `web/test/classes-peintes.test.ts:53`, `:98` | Une famille de classes calculées est jugée couverte par `startsWith` : supprimer `.ui-dot--degraded` ou `.ui-toast--critical` du CSS laisse le test vert, et une règle morte passe aussi. |
+| `web/test/painted-classes.test.ts:53`, `:98` | Une famille de classes calculées est jugée couverte par `startsWith` : supprimer `.ui-dot--degraded` ou `.ui-toast--critical` du CSS laisse le test vert, et une règle morte passe aussi. |
 | `web/src/components/ui/content-state.test.tsx:114-120` | La phrase « vos données locales restent affichées » est fournie par le test, pas par `ErrorState`. |
 | `web/src/components/ui/select.test.tsx:36` | Intitulé « entièrement au clavier », l'option est choisie par `user.click`. |
-| `web/vite-plugin-tokens.test.ts:83`, `web/test/charte.test.ts:180` | Deux gardes de câblage cherchent une chaîne dans le texte source, commentaires compris : `// declaredTokens(),` les laisse vertes. |
+| `web/vite-plugin-tokens.test.ts:83`, `web/test/charter.test.ts:180` | Deux gardes de câblage cherchent une chaîne dans le texte source, commentaires compris : `// declaredTokens(),` les laisse vertes. |
 | `web/src/components/ui/button.tsx:57-58`, `:69`, `:95` | `blocked` n'impose pas d'explication : `<Button blocked>` sans raison compile, alors qu'un contrôle interdit doit être « désactivé et expliqué ». *(Plausible.)* |
 
 ## Périmètre (ce que fait CETTE PR)

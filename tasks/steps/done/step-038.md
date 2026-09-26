@@ -37,9 +37,9 @@ auront corrigé ou déplacé certains.
   `web/playwright.config.ts`, `web/vite-plugin-tokens.ts`, `web/src/lib/api.test-d.ts`,
   `web/src/components/ui/field.tsx`, `internal/store/lock.go`.
 - **Les plus gros blocs** : `Makefile:320-369` (50 lignes) et `:86-117` (32),
-  `internal/auth/argon2.go:55-87` (33 lignes de benchmark, à déplacer dans `mesure_test.go`),
+  `internal/auth/argon2.go:55-87` (33 lignes de benchmark, à déplacer dans `measure_test.go`),
   `cmd/dashboard/main_test.go:443-470`, `cmd/dashboard/performance_test.go:13-42`,
-  `web/chargement-a-froid.test.ts:183-212`, `web/src/components/ui/status-pill.tsx:3-35`.
+  `web/cold-load.test.ts:183-212`, `web/src/components/ui/status-pill.tsx:3-35`.
 - **Des numéros de ligne de fichiers engendrés**, qui périront à la prochaine régénération :
   `internal/bff/router.go:120-162`, `internal/gateway/errors.go:149-170`, `internal/gateway/doc.go:17-22`.
 
@@ -54,9 +54,9 @@ auront corrigé ou déplacé certains.
 
 ## Mesure (refaite sur le livré, le 19/09/2026)
 
-    ./scripts/mesure-commentaires.sh          # HEAD
-    git worktree add /tmp/wt main && cp scripts/mesure-commentaires.sh /tmp/wt/scripts/
-    (cd /tmp/wt && ./scripts/mesure-commentaires.sh)   # main
+    ./scripts/measure-comments.sh          # HEAD
+    git worktree add /tmp/wt main && cp scripts/measure-comments.sh /tmp/wt/scripts/
+    (cd /tmp/wt && ./scripts/measure-comments.sh)   # main
 
 |                       | avant (`main`)        | après                 |
 |---|---|---|

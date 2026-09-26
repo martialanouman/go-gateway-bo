@@ -190,7 +190,7 @@ test('the binary serves the painted shell, then the application replaces it', as
   // **Les dix codes tiennent sur deux colonnes**, et c'est la seule propriété de cette liste qui
   // porte une décision : en une seule colonne la carte dépasse l'écran, et le rappel « Quitter cet
   // écran sans les avoir enregistrés les perd » sort du champ de vision au moment même où il sert.
-  // Aucune porte ne voit les règles `.auth__` — `classes-peintes.test.ts` ne lit que les `ui-`.
+  // Aucune porte ne voit les règles `.auth__` — `painted-classes.test.ts` ne lit que les `ui-`.
   await expect(page.locator('.auth__codes')).toHaveCSS('grid-template-columns', /\S+ \S+/)
 
   await page.getByRole('button', { name: 'J’ai enregistré ces codes' }).click()

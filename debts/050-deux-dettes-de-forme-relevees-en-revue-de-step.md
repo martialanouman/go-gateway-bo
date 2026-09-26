@@ -1,6 +1,6 @@
 # 050 — Deux dettes de forme relevées en revue de step-008 : le plugin accepte un token déclaré dans une portée qui ne s'applique pas, et `design-reference.css` atterrit dans la feuille d'entrée
 
-> **Porteur :** **sans porteur** — deux déclencheurs mesurables : pour le plugin, un token déclaré hors portée qui cause un défaut réel (jamais observé à ce jour) ; pour la feuille, la borne gzip de `chargement-a-froid.test.ts` approchée à moins de 2 Ko — au 15/09/2026, 5,89 Ko sur 14,34.
+> **Porteur :** **sans porteur** — deux déclencheurs mesurables : pour le plugin, un token déclaré hors portée qui cause un défaut réel (jamais observé à ce jour) ; pour la feuille, la borne gzip de `cold-load.test.ts` approchée à moins de 2 Ko — au 15/09/2026, 5,89 Ko sur 14,34.
 
 ## Ce qu'elle coûte si elle dure
 

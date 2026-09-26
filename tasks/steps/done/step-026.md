@@ -154,7 +154,7 @@ La signature est vérifiée avec le nom, sans quoi un homonyme sans rapport fera
 rien pouvoir servir.
 
 ### DN-8 — Un témoin **par règle**, permanent, parce que le premier prouvait la mauvaise borne
-La première version n'avait qu'un témoin — le paquet `testdata/fuite` — et une assertion qui demandait
+La première version n'avait qu'un témoin — le paquet `testdata/leak` — et une assertion qui demandait
 seulement que « quelque chose ait parlé ». Débranchée, la règle de domaine laissait le témoin **vert** :
 le type y était attrapé par la règle des méthodes.
 
