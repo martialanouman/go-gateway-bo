@@ -500,8 +500,11 @@ passerelle elle-même (côté `go-gateway`, voir §15).
 - Parcours de bout en bout login → MFA (TOTP et passkey) → console.
 
 ### Checkpoint M1
-- [ ] Retirer une garde de permission au hasard fait rougir la suite. **Vérifié, pas supposé.**
-- [ ] Le parcours de bout en bout tourne contre le binaire, sans rien de simulé dans le produit.
+- [x] Retirer une garde de permission au hasard fait rougir la suite. **Vérifié, pas supposé.**
+      Le 26/09/2026 : tirée `"CreateRole": requires(permissions.RolesManage)`, mutée en exemption,
+      rouge sur `TestLesRoutesDAdministrationExigentLeurCle` (les scénarios godog restent verts).
+- [x] Le parcours de bout en bout tourne contre le binaire, sans rien de simulé dans le produit.
+      Le 26/09/2026 : `make e2e` rc=0, `coquille.spec.ts` contre `bin/dashboard` sur :3101.
 
 ---
 
