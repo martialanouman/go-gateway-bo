@@ -91,6 +91,9 @@ export default defineConfig({
       DASHBOARD_SMTP_ADDR: '127.0.0.1:1025',
       DASHBOARD_SMTP_FROM: 'cockpit@example.test',
       DASHBOARD_PUBLIC_URL: `http://${host}:${port}`,
+      // Le Redis de `docker compose`. Injoignable, il ne bloque pas le démarrage : aucun parcours
+      // n'ouvre encore la socket temps réel.
+      DASHBOARD_REDIS_URL: 'redis://127.0.0.1:6379/0',
     },
   },
 })
