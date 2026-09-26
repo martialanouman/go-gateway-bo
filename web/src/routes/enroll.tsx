@@ -2,11 +2,13 @@ import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useId } from 'react'
+import { useForm } from 'react-hook-form'
 import { AuthLayout, AuthPending, AuthRefusal, RestartLogin } from '~/components/auth-layout'
 import { TotpEnrollment } from '~/components/totp-enrollment'
-import { Button } from '~/components/ui'
+import { Button, Field, Input } from '~/components/ui'
 import { api, refusalMessage } from '~/lib/api'
-import { registerPasskey } from '~/lib/passkey'
+import { formResolver } from '~/lib/form'
+import { passkeyNaming, registerPasskey } from '~/lib/passkey'
 import { CHALLENGE_LOST, verificationRefusal } from '~/lib/second-factor'
 import {
   forgetChallenge,
@@ -93,18 +95,7 @@ function EnrollmentScreen() {
   // plateforme sans remplacer quoi que ce soit du produit.
   const platformKnowsPasskeys = browserSupportsWebAuthn()
 
-  /**
-   * La clé d'accès est posée ; c'est l'écran du second facteur qui la présentera.
-   *
-   * **Aucun test ne l'exécute, et c'est mesuré plutôt que supposé.** jsdom n'expose pas
-   * `navigator.credentials`, donc `startRegistration` échoue toujours et ce `onSuccess` n'est
-   * jamais atteint ; le parcours Playwright, lui, passe par TOTP, seule voie qu'un poste de CI
-   * sans authentificateur puisse suivre. Dette 052 : un authentificateur virtuel posé par CDP
-   * refermerait ce chemin **et** l'assertion de `/mfa`, aujourd'hui dans le même état.
-   *
-   * L'exemption porte sur la mesure, pas sur la règle — elle se retire avec la dette.
-   */
-  /* v8 ignore next 5 */
+  /** La clé d'accès est posée ; c'est l'écran du second facteur qui la présentera. */
   function assertNewPasskey() {
     // Sans cet oubli, la garde de `/mfa` relirait une session encore fraîche — sans facteur — et
     // renverrait ici même, en boucle.
@@ -138,8 +129,10 @@ function EnrollmentScreen() {
     },
   })
 
+  const naming = useForm({ resolver: formResolver(passkeyNaming), defaultValues: { name: '' } })
+
   const register = useMutation({
-    mutationFn: () => registerPasskey('Clé d’accès'),
+    mutationFn: ({ name }: { name: string }) => registerPasskey(name),
     onSuccess: assertNewPasskey,
   })
 
@@ -180,16 +173,24 @@ function EnrollmentScreen() {
         d'abord. Elle reste rendue, et expliquée, sur un poste qui ne la connaît pas : la retirer
         ferait disparaître la moitié de l'écran sans dire pourquoi.
       */}
-      <Button
-        {...(platformKnowsPasskeys
-          ? { blocked: false as const }
-          : { blocked: true as const, 'aria-describedby': explanationId })}
-        loading={register.isPending}
-        onClick={() => register.mutate()}
-        variant={platformKnowsPasskeys ? 'primary' : 'secondary'}
-      >
-        Enregistrer une clé d’accès
-      </Button>
+      {platformKnowsPasskeys ? (
+        <form
+          className="auth__form"
+          noValidate
+          onSubmit={naming.handleSubmit((values) => register.mutate(values))}
+        >
+          <Field error={naming.formState.errors.name?.message} label="Nom de la clé">
+            <Input autoComplete="off" maxLength={64} required {...naming.register('name')} />
+          </Field>
+          <Button loading={register.isPending} type="submit" variant="primary">
+            Enregistrer une clé d’accès
+          </Button>
+        </form>
+      ) : (
+        <Button aria-describedby={explanationId} blocked>
+          Enregistrer une clé d’accès
+        </Button>
+      )}
       {platformKnowsPasskeys ? (
         <p className="auth__aside">
           L’appareil déverrouille la session comme il déverrouille son écran : empreinte, visage ou

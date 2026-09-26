@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { onTestFinished, vi } from 'vitest'
 import type { components } from '~/lib/api.gen'
 import type { PermissionKey } from '~/lib/permissions.gen'
 
@@ -257,4 +257,27 @@ function me(outcome: {
     },
     absoluteExpiresAt: '2026-09-17T20:00:00Z',
   }
+}
+
+/**
+ * L'authentificateur de la plateforme, que jsdom n'a pas : `navigator.credentials.create` rend une
+ * attestation que le décor accepte telle quelle. C'est la plateforme qu'on déclare, pas le produit.
+ */
+export function stubAuthenticator() {
+  const bytes = () => new Uint8Array([1, 2, 3]).buffer
+  Object.defineProperty(navigator, 'credentials', {
+    configurable: true,
+    value: {
+      create: async () => ({
+        id: 'AQID',
+        rawId: bytes(),
+        type: 'public-key',
+        response: { clientDataJSON: bytes(), attestationObject: bytes() },
+        getClientExtensionResults: () => ({}),
+      }),
+    },
+  })
+  onTestFinished(() => {
+    Reflect.deleteProperty(navigator, 'credentials')
+  })
 }

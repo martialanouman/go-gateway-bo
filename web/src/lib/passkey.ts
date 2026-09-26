@@ -1,5 +1,15 @@
 import { startRegistration } from '@simplewebauthn/browser'
+import { z } from 'zod'
 import { api, refusalMessage } from './api'
+import { WebauthnRegistration } from './contract.gen'
+
+export const passkeyNaming = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Nommez la clé : c’est ce nom qui la distingue quand il faudra en retirer une.')
+    .pipe(WebauthnRegistration.shape.name),
+})
 
 export const CEREMONY_ABANDONED =
   'La clé d’accès n’a pas été enregistrée : la fenêtre du navigateur s’est refermée, ou l’appareil n’a pas répondu. Reprenez l’enregistrement.'

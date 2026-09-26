@@ -14,6 +14,7 @@ import {
   ENROLLMENT_SECRET,
   OTPAUTH_URI,
   RECOVERY_CODES,
+  stubAuthenticator,
   stubSession,
 } from '../../test/session'
 
@@ -69,6 +70,11 @@ async function confirmEnrollment(user: ReturnType<typeof userEvent.setup>) {
 
 const authenticator = () => screen.getByRole('button', { name: /application d’authentification/i })
 const passkey = () => screen.getByRole('button', { name: /clé d’accès/i })
+
+async function registerNamed(user: ReturnType<typeof userEvent.setup>, name = 'Portable') {
+  await user.type(screen.getByLabelText(/Nom de la clé/), name)
+  await user.click(passkey())
+}
 
 /** Le SVG que la bibliothèque a dessiné, atteint par le nom accessible que l'écran lui donne. */
 async function qrCode() {
@@ -454,7 +460,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     stubWebAuthnSupport(true)
     const { user } = await visitEnroll()
 
-    await user.click(passkey())
+    await registerNamed(user)
     await screen.findByRole('alert')
 
     await user.click(authenticator())
@@ -517,7 +523,7 @@ describe('l’enregistrement d’une clé d’accès', () => {
       },
     })
 
-    await user.click(passkey())
+    await registerNamed(user)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('réessayez dans 5 minutes')
   })
@@ -528,10 +534,50 @@ describe('l’enregistrement d’une clé d’accès', () => {
     stubWebAuthnSupport(true)
     const { user } = await visitEnroll()
 
-    await user.click(passkey())
+    await registerNamed(user)
 
     const refus = await screen.findByRole('alert')
     expect(refus).toHaveTextContent('La clé d’accès n’a pas été enregistrée')
     expect(refus.textContent ?? '').not.toMatch(/[Ee]rror|not allowed|browser does/)
   })
+
+  it('enregistre la clé sous le nom saisi, puis mène à sa présentation', async () => {
+    stubWebAuthnSupport(true)
+    stubAuthenticator()
+    const { user } = await visitEnroll()
+
+    await registerNamed(user, '  YubiKey du bureau  ')
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Second facteur/ }),
+    ).toBeInTheDocument()
+    expect(await postedBody('/api/auth/mfa/webauthn/register/finish')).toMatchObject({
+      name: 'YubiKey du bureau',
+    })
+  })
+
+  it('refuse d’ouvrir la cérémonie sans nom, et dit pourquoi', async () => {
+    stubWebAuthnSupport(true)
+    const { user } = await visitEnroll()
+
+    await user.click(passkey())
+
+    expect(await screen.findByText(/Nommez la clé/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Nom de la clé/)).toHaveAttribute('aria-invalid', 'true')
+    const posts = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.filter(([request]) => (request as Request).method === 'POST')
+    expect(posts).toEqual([])
+  })
 })
+
+/** Le corps posté sur une route, lu sur l'appel que le décor a reçu. */
+async function postedBody(path: string) {
+  const call = vi
+    .mocked(globalThis.fetch)
+    .mock.calls.map(([request]) => request as Request)
+    .find((request) => request.method === 'POST' && request.url.endsWith(path))
+  if (call === undefined) throw new Error(`aucun POST sur ${path}`)
+
+  return call.clone().json()
+}
