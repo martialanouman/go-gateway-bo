@@ -13,7 +13,7 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
 - **Trames amont décodées par des structs locaux.** Le contrat, y compris sa dernière version publiée
   (6.8.0 le 26/09/2026), ne décrit les trames qu'en une phrase de `description`. Le BFF déclare ses
   trois structs d'après `go-gateway/internal/metricstream/metricstream.go` (source citée au-dessus de
-  chacun). Un `v` inconnu jette la trame et le journalise. **Dette inscrite** dans `debts/`, payée
+  chacun). Un `v` inconnu jette la trame et le journalise. **Dette 057** dans `debts/`, payée
   par une PR amont qui déclare les trois schémas en `components`, suivie d'un bump. *Arbitré le
   26/09/2026 avec l'utilisateur.*
 - **`metrics.traffic` relaie, il n'agrège pas.** Un Snapshot par réplica amont, relayé comme DTO
@@ -31,7 +31,9 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
   socket se ferme en 1008 : « Connexion trop lente : les messages en retard ont été abandonnés. » Si
   on jetait des trames une à une, on pourrait perdre en silence une trame d'état (`stale`/`live`).
   En reconnectant, le client reçoit l'état courant.
-- **La session est relue toutes les 30 s** sur chaque socket. Session morte (déconnexion, compte
+- **La session est relue toutes les 30 s** sur chaque socket, **sans être prolongée**
+  (`store.Sessions.Alive`) : `Resolve` repousse la fenêtre d'inactivité, et un onglet ouvert
+  garderait sinon la session vivante indéfiniment. Session morte (déconnexion, compte
   désactivé, expiration) : fermeture en 4401. Permissions relues au même moment : un sujet qui n'est
   plus permis se désabonne, avec un refus qui nomme la clé.
 - **Mode mock : pas d'exception.** Prism ne parle pas WebSocket. Le consommateur appelle quand même,
@@ -40,9 +42,13 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
 ## Périmètre (ce que fait CETTE PR)
 
 ### Contrat du BFF
-- `GET /ws` déclaré dans `api/openapi-bff.yaml` : 101, 401, 403. L'enveloppe et les messages client
-  sont décrits en `components` (sans générateur côté WebSocket, les schémas servent à la step-045 et
-  aux tests de sérialisation).
+- Les messages de la socket sont décrits dans `api/openapi-bff.yaml`, en `components` (`Realtime*`,
+  `TrafficSnapshot`, `SessionEvent`, `BillingAlert`). **`/ws` n'y est pas une opération** : les
+  cinq portes de `internal/bff` exigent que toute opération du contrat soit servie par le serveur
+  strict engendré, et une montée de protocole n'a pas de réponse qu'il saurait typer. La déclarer
+  sous `/api` l'aurait fait entrer dans ce moule, et un `servers` propre au chemin n'est pas lu par le
+  routeur `legacy` de kin-openapi. Les scénarios valident donc chaque refus contre `Error` et chaque
+  message reçu contre son schéma. *(Constaté en implémentation le 26/09/2026.)*
 - Serveur → client : `{topic, ts, data}` ; `{topic, status: "live"|"stale", since}` ;
   `{topic, error: {code, message}}`. Client → serveur : `{action: "subscribe"|"unsubscribe",
   topics: [...]}`. Lecture bornée à 4 Kio par message.
@@ -54,24 +60,28 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
 - **Hub** : registre des abonnements par sujet, diffusion non bloquante vers les files, une
   goroutine d'écriture par socket, tout arrêté par annulation de contexte (fermeture 1001). Le drain
   en déploiement roulant est la step-047.
-- **Upgrade** : session complète exigée (second facteur passé), sinon 401 JSON **avant** l'upgrade ;
-  `Origin` égale à `deps.Origin`, sinon 403 (`requireSameOrigin` laisse passer les GET) ; ni
+- **Upgrade** (`internal/bff/realtime.go`), refus en JSON **avant** la montée : origine jugée par
+  `comesFromDashboard` contre `deps.Origin`, sinon 403 `forbidden_origin` (`requireSameOrigin` laisse
+  passer les GET) ; sans session vivante, 401 ; sans second facteur, 403 `mfa_required` ; ni
   `withAPIDeadlines` ni `ReadTimeout` sur `/ws` (`internal/bff/durcissement.go:166-173` le demande).
   À l'abonnement : sujet permis → `status` courant, puis les trames.
 - Aucune écriture d'audit : s'abonner est une lecture, et l'invariant (c) ne vise que les mutations.
 
 ### Dépendance
-- `github.com/coder/websocket` : version et CVE relevées sur `proxy.golang.org` et `pkg.go.dev` au
-  début de la step, pas recopiées du plan (§2 y note v1.8.15).
+- `github.com/coder/websocket` v1.8.15 : dernière version sur `proxy.golang.org` (publiée le
+  15/06/2026), aucun avis sur OSV, relevé le 26/09/2026. C'est aussi celle de `go-gateway`.
 
 ## Tests (écrits dans la même PR)
-- **Faux amont** : un serveur `httptest` + `coder/websocket` qui émet des trames prises dans les
-  tests de `go-gateway`. C'est la seule exception au mock Prism, et elle est écrite à côté du
+- **Faux amont** : un serveur `httptest` + `coder/websocket` qui émet des trames écrites d'après
+  les structs de `go-gateway/internal/metricstream`, et qui exige un `Bearer`. C'est la seule exception au mock Prism, et elle est écrite à côté du
   `.feature` : Prism ne sert pas de WebSocket.
-- **godog** (`internal/hub/temps_reel.feature`) : un abonnement permis reçoit ses trames ; un sujet
+- **godog** (`cmd/dashboard/temps-reel.feature`, à côté des autres scénarios qui lancent le binaire :
+  session, origine et permissions demandent le serveur entier) : un abonnement permis reçoit ses trames ; un sujet
   non permis est refusé, et le refus nomme la clé ; la chute d'un flux rend son sujet `stale` pendant
   que les deux autres continuent (invariant e) ; la reprise le rend `live` ; un client lent est
   coupé ; une session révoquée ferme la socket ; une origine étrangère reçoit 403 ; sans session, 401.
+  Le client lent et la session révoquée sont prouvés en unitaire (`internal/hub`) : le premier ne se
+  fabrique pas contre un binaire, le second attendrait 30 s.
 - **Go** : décodage des trois trames et `v` inconnu ; sérialisation des DTO sortants ; file bornée ;
   **fuite** : 500 sockets ouvertes puis fermées, retour au `runtime.NumGoroutine()` initial.
 - **Mutations** : garde au sujet, contrôle d'origine, relecture de session, borne de file, `stale` à
