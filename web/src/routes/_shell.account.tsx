@@ -127,7 +127,7 @@ function AccountScreen() {
             <p>
               {factors.recoveryCodesRemaining === 0
                 ? 'Aucun'
-                : `${factors.recoveryCodesRemaining} restants`}
+                : `${factors.recoveryCodesRemaining} ${factors.recoveryCodesRemaining === 1 ? 'restant' : 'restants'}`}
             </p>
           </Panel>
 

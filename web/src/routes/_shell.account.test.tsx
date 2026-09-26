@@ -63,6 +63,12 @@ describe('l’inventaire des facteurs', () => {
     expect(await passkeysSection().findByRole('cell', { name: 'Clé 1' })).toBeVisible()
     expect(passkeysSection().getByRole('cell', { name: 'Clé 2' })).toBeVisible()
   })
+
+  it('accorde le compte des codes au singulier', async () => {
+    await visitAccount({ totp: true, recoveryCodesRemaining: 1, passkeys: 0 })
+
+    expect(section('Codes de récupération').getByText('1 restant', { exact: true })).toBeVisible()
+  })
 })
 
 describe('le retrait d’une clé d’accès', () => {
