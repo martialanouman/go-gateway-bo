@@ -19,14 +19,14 @@ const TABS = [
 ]
 
 describe('Tabs', () => {
-  it('rend une liste d’onglets et marque le sélectionné', () => {
+  it('renders a tab list and marks the selected one', () => {
     render(<Tabs tabs={TABS} defaultValue="sessions" />)
 
     expect(screen.getByRole('tablist')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /Sessions/ })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('déplace le focus aux flèches **sans** activer, puis active à Entrée', async () => {
+  it('moves focus with the arrows **without** activating, then activates on Enter', async () => {
     // Activation **manuelle**, et c'est un choix de produit : chaque onglet de ce tableau de bord
     // déclenche un appel à l'API Admin. En activation automatique, parcourir trois onglets au
     // clavier lancerait trois chargements dont deux que personne n'a demandés. La WAI-ARIA laisse
@@ -45,7 +45,7 @@ describe('Tabs', () => {
     expect(onValueChange).toHaveBeenCalledWith('binds', expect.anything())
   })
 
-  it('rend un panneau relié à son onglet, quand le contenu est local', () => {
+  it('renders a panel linked to its tab, when the content is local', () => {
     // **Sans panneau, `role="tablist"` est une promesse intenable** : aucun `aria-controls`, et la
     // tabulation — qui doit sauter au panneau — atterrit sur le premier élément focusable venu. Le
     // rôle serait annoncé sans être tenu, ce que la docstring du composant qualifie elle-même de
@@ -65,7 +65,7 @@ describe('Tabs', () => {
     expect(screen.getByRole('tab', { name: 'Sessions' })).toHaveAttribute('aria-controls', panel.id)
   })
 
-  it('rend la liste seule quand les onglets pilotent la route', () => {
+  it('renders the list alone when the tabs drive the route', () => {
     // Usage légitime : des onglets qui changent d'URL n'ont pas de panneau local. Le composant ne
     // doit pas en inventer un vide, qui annoncerait une zone de contenu inexistante.
     render(<Tabs tabs={TABS} defaultValue="sessions" />)
@@ -73,13 +73,13 @@ describe('Tabs', () => {
     expect(screen.queryByRole('tabpanel')).toBeNull()
   })
 
-  it('affiche le compteur quand il est connu', () => {
+  it('shows the counter when it is known', () => {
     render(<Tabs tabs={TABS} defaultValue="sessions" />)
 
     expect(screen.getByRole('tab', { name: /Binds/ })).toHaveTextContent('12')
   })
 
-  it('n’active jamais un onglet désactivé', async () => {
+  it('never activates a disabled tab', async () => {
     const onValueChange = vi.fn()
     const user = userEvent.setup()
     render(<Tabs tabs={TABS} defaultValue="binds" onValueChange={onValueChange} />)
@@ -91,7 +91,7 @@ describe('Tabs', () => {
 })
 
 describe('keepMounted', () => {
-  it('démonte le panneau caché par défaut', () => {
+  it('unmounts the hidden panel by default', () => {
     render(
       <Tabs
         defaultValue="a"
@@ -105,7 +105,7 @@ describe('keepMounted', () => {
     expect(screen.queryByText('Contenu B')).toBeNull()
   })
 
-  it('le garde monté quand l’écran le demande', () => {
+  it('keeps it mounted when the screen asks for it', () => {
     // **Ce que ce réglage protège.** Un panneau démonté perd son état local — une saisie en cours,
     // une cérémonie préparée. Aucun écran de ce dépôt n'est encore dans ce cas ; `step-028`, qui
     // enrôle le second facteur, sera le premier.

@@ -24,13 +24,13 @@ async function loadServedDocument() {
   document.body.innerHTML = body.replace(/<script[\s\S]*?<\/script>/g, '')
 }
 
-describe("l'entrée de l'application", () => {
+describe('the application entry point', () => {
   afterEach(() => {
     document.body.innerHTML = ''
     vi.resetModules()
   })
 
-  it('remplace le squelette peint par le document', async () => {
+  it('replaces the painted skeleton with the document', async () => {
     await loadServedDocument()
     expect(document.querySelector('[data-skeleton="rail"]')).not.toBeNull()
 
@@ -47,7 +47,7 @@ describe("l'entrée de l'application", () => {
     expect(document.querySelector('[data-skeleton="rail"]')).toBeNull()
   })
 
-  it('échoue bruyamment si le point de montage a disparu du document', async () => {
+  it('fails loudly if the mount point has vanished from the document', async () => {
     document.body.innerHTML = '<div id="autre-chose"></div>'
 
     await expect(import('./main')).rejects.toThrow(/#app/)

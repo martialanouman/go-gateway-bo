@@ -48,8 +48,8 @@ async function visitMfa(
 
 const code = () => screen.getByLabelText(/Code à six chiffres/)
 
-describe('le challenge TOTP', () => {
-  it('demande le code de l’application d’authentification', async () => {
+describe('the TOTP challenge', () => {
+  it('asks for the authenticator app code', async () => {
     await visitMfa({ totp: true, passkeys: 0 })
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Second facteur')
@@ -64,7 +64,7 @@ describe('le challenge TOTP', () => {
     expect(screen.queryByRole('navigation', { name: 'Navigation principale' })).toBeNull()
   })
 
-  it('élève la session et rejoue la destination demandée', async () => {
+  it('elevates the session and replays the requested destination', async () => {
     const { router, user } = await visitMfa(
       { totp: true, passkeys: 0 },
       { path: '/mfa?redirect=%2Fbilling' },
@@ -79,7 +79,7 @@ describe('le challenge TOTP', () => {
     expect(router.state.location.pathname).toBe('/billing')
   })
 
-  it('n’emporte pas le code dans le cache après le départ de l’écran', async () => {
+  it('does not carry the code into the cache after leaving the screen', async () => {
     const { router, user } = await visitMfa(
       { totp: true, passkeys: 0 },
       { path: '/mfa?redirect=%2Fbilling' },
@@ -100,7 +100,7 @@ describe('le challenge TOTP', () => {
     ).not.toContain('123456')
   })
 
-  it('reprend l’indice de dérive d’horloge, que le serveur ne peut plus donner', async () => {
+  it('keeps the clock drift hint, which the server can no longer give', async () => {
     const { user } = await visitMfa(
       { totp: true, passkeys: 0 },
       {
@@ -129,8 +129,8 @@ describe('le challenge TOTP', () => {
   })
 })
 
-describe('la clé d’accès', () => {
-  it('reste visible et expliquée sur un poste qui ne la connaît pas', async () => {
+describe('the passkey', () => {
+  it('stays visible and explained on a device that does not support it', async () => {
     // jsdom n'implémente pas WebAuthn : c'est le poste sans lecteur, sans rien de simulé.
     await visitMfa({ totp: true, passkeys: 2 })
 
@@ -145,7 +145,7 @@ describe('la clé d’accès', () => {
     expect(document.getElementById(explication ?? '')).toHaveTextContent(/ce navigateur/i)
   })
 
-  it('est ce que l’intro nomme quand le compte n’a qu’elle', async () => {
+  it('is what the intro names when the account has only that', async () => {
     await visitMfa({ totp: false, passkeys: 1 })
 
     expect(screen.getByText(/La clé d’accès termine la connexion/)).toBeVisible()
@@ -153,15 +153,15 @@ describe('la clé d’accès', () => {
     expect(screen.queryByLabelText(/Code à six chiffres/)).toBeNull()
   })
 
-  it('n’est pas proposée quand le compte n’en a aucune', async () => {
+  it('is not offered when the account has none', async () => {
     await visitMfa({ totp: true, passkeys: 0 })
 
     expect(screen.queryByRole('button', { name: /clé d’accès/i })).toBeNull()
   })
 })
 
-describe('un opérateur sans second facteur enrôlé', () => {
-  it('est conduit à l’enrôlement, et non à un challenge impossible', async () => {
+describe('an operator without an enrolled second factor', () => {
+  it('is sent to enrollment, not to an impossible challenge', async () => {
     const { router } = await visitMfa(
       { totp: false, passkeys: 0, recoveryCodesRemaining: 0 },
       { path: '/mfa?redirect=%2Fbilling' },
@@ -177,8 +177,8 @@ describe('un opérateur sans second facteur enrôlé', () => {
   })
 })
 
-describe('les refus du second facteur', () => {
-  it('annonce la durée du blocage plutôt que de laisser retenter', async () => {
+describe('second-factor refusals', () => {
+  it('announces the lockout duration rather than letting the user retry', async () => {
     const { user } = await visitMfa(
       { totp: true, passkeys: 0 },
       {
@@ -203,8 +203,8 @@ describe('les refus du second facteur', () => {
   })
 })
 
-describe('la cérémonie de clé d’accès', () => {
-  it('dit en français qu’elle n’a pas abouti, plutôt que de rendre le message de la bibliothèque', async () => {
+describe('the passkey ceremony', () => {
+  it('says in French that it did not succeed, rather than rendering the library message', async () => {
     // Le poste **connaît** les clés d'accès : c'est le crochet de test de `@simplewebauthn` qui le
     // déclare, et non un module du produit remplacé — la cérémonie elle-même reste celle de la
     // bibliothèque, et jsdom la fera échouer faute de `navigator.credentials`.
@@ -223,8 +223,8 @@ describe('la cérémonie de clé d’accès', () => {
   })
 })
 
-describe('la panne muette', () => {
-  it('nomme le statut quand le serveur n’a rédigé aucun refus', async () => {
+describe('the silent outage', () => {
+  it('names the status when the server wrote no refusal', async () => {
     const { user } = await visitMfa(
       { totp: true, passkeys: 0 },
       { replies: { verify: { status: 502 } } },
@@ -237,8 +237,8 @@ describe('la panne muette', () => {
   })
 })
 
-describe('la garde du second facteur', () => {
-  it('renvoie à la connexion quand aucune session ne vit', async () => {
+describe('the second-factor guard', () => {
+  it('sends back to login when no session is alive', async () => {
     rememberChallenge(CHALLENGE)
     stubSession({ status: 401 })
     const router = createAppRouter(
@@ -252,7 +252,7 @@ describe('la garde du second facteur', () => {
     expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
-  it('ne redemande pas un facteur déjà franchi, et rejoint la destination', async () => {
+  it('does not ask again for a factor already passed, and goes to the destination', async () => {
     // Le cas du retour en arrière : redemander un code à qui vient de le donner est la boucle que
     // la v1.0 a livrée.
     rememberChallenge(CHALLENGE)
@@ -269,8 +269,8 @@ describe('la garde du second facteur', () => {
   })
 })
 
-describe('l’indice d’horloge et la clé d’accès', () => {
-  it('ne suit pas le refus d’une cérémonie : c’est ce que step-035 a retiré du serveur', async () => {
+describe('the clock hint and the passkey', () => {
+  it('does not follow a ceremony refusal: that is what step-035 removed from the server', async () => {
     // Le refus vient du **serveur**, sur l'ouverture de la cérémonie, et passe donc par la même
     // rédaction que le refus d'un code TOTP. C'est là que l'indice se glisserait s'il était ajouté
     // sans regarder la méthode — et c'est ce chemin-là que le serveur servait à tort.
@@ -301,8 +301,8 @@ describe('l’indice d’horloge et la clé d’accès', () => {
   })
 })
 
-describe('quand le BFF ne rend pas la session', () => {
-  it('dit la panne et la réessaie, au lieu d’annoncer un compte sans second facteur', async () => {
+describe('when the BFF does not return the session', () => {
+  it('reports the outage and retries it, instead of announcing an account without a second factor', async () => {
     // La garde laisse passer une session illisible — une panne dégrade, elle ne déconnecte pas.
     // L'écran ne doit rien affirmer des facteurs qu'il n'a pas pu lire : annoncer « aucun facteur »
     // à un opérateur parfaitement enrôlé rend une **erreur** sous la forme d'un état **vide**, que
@@ -325,7 +325,7 @@ describe('quand le BFF ne rend pas la session', () => {
     expect(screen.getByRole('button', { name: 'Recommencer la connexion' })).toBeVisible()
   })
 
-  it('relit la session quand l’opérateur réessaie, et reprend le challenge', async () => {
+  it('rereads the session when the operator retries, and resumes the challenge', async () => {
     rememberChallenge(CHALLENGE)
     let enPanne = true
     vi.stubGlobal(
@@ -363,7 +363,7 @@ describe('quand le BFF ne rend pas la session', () => {
     expect(await screen.findByLabelText(/Code à six chiffres/)).toBeInTheDocument()
   })
 
-  it('rejoue la garde et non la seule requête : un compte nu part à l’enrôlement', async () => {
+  it('replays the guard and not just the query: a bare account goes to enrollment', async () => {
     // Ce que `router.invalidate()` tient et qu'un `me.refetch()` ne tiendrait pas. Les deux sont
     // indiscernables quand la session relue porte un facteur — c'est le cas du test au-dessus.
     // Ici elle n'en porte aucun : `beforeLoad` ne se rejoue pas de lui-même, et l'écran se
@@ -404,7 +404,7 @@ describe('quand le BFF ne rend pas la session', () => {
     expect(router.state.location.pathname).toBe('/enroll')
   })
 
-  it('ne déconnecte pas quand le challenge est perdu **et** la session illisible', async () => {
+  it('does not log out when the challenge is lost **and** the session is unreadable', async () => {
     // L'état exact d'un rechargement pendant une panne du BFF : le challenge ne vit qu'en mémoire
     // du document, donc il est perdu, et `/auth/me` ne répond pas. Renvoyer à la connexion y
     // enverrait l'opérateur rencontrer la même panne : une panne du tableau de bord **dégrade**,
@@ -418,8 +418,8 @@ describe('quand le BFF ne rend pas la session', () => {
   })
 })
 
-describe('l’indice d’horloge et la cause du refus', () => {
-  it('ne suit pas un verrouillage : l’horloge n’y est pour rien', async () => {
+describe('the clock hint and the cause of the refusal', () => {
+  it('does not follow a lockout: the clock has nothing to do with it', async () => {
     const { user } = await visitMfa(
       { totp: true, passkeys: 0 },
       {
@@ -446,7 +446,7 @@ describe('l’indice d’horloge et la cause du refus', () => {
     expect(refus).not.toHaveTextContent(/heure/i)
   })
 
-  it('ne suit pas une panne muette', async () => {
+  it('does not follow a silent outage', async () => {
     const { user } = await visitMfa(
       { totp: true, passkeys: 0 },
       { replies: { verify: { status: 502 } } },
@@ -461,8 +461,8 @@ describe('l’indice d’horloge et la cause du refus', () => {
   })
 })
 
-describe('la cérémonie de clé d’accès, une à la fois', () => {
-  it('s’annonce occupée, plutôt que d’en ouvrir une par clic', async () => {
+describe('the passkey ceremony, one at a time', () => {
+  it('announces itself busy, rather than opening one per click', async () => {
     // Chaque ouverture écrit un défi côté serveur, et la dernière périme les précédentes : une
     // cérémonie que l'opérateur validait échouerait alors sans qu'aucun écran ne le nomme.
     stubWebAuthnSupport(true)
@@ -489,8 +489,8 @@ describe('la cérémonie de clé d’accès, une à la fois', () => {
   })
 })
 
-describe('la réduction de la destination, à son point d’appel', () => {
-  it('ne suit pas une URL de schéma relatif collée dans le paramètre', async () => {
+describe('reducing the destination, at its call site', () => {
+  it('does not follow a scheme-relative URL pasted into the parameter', async () => {
     // Même raison que sur `/login` : ici le renvoi part en `href`, donc en URL brute. Sans la
     // réduction câblée, un opérateur déjà élevé qui ouvre ce lien quitte le site avec la connexion
     // encore en tête.
@@ -507,8 +507,8 @@ describe('la réduction de la destination, à son point d’appel', () => {
   })
 })
 
-describe('le code manquant', () => {
-  it('nomme ce qui manque et n’envoie rien au BFF', async () => {
+describe('the missing code', () => {
+  it('names what is missing and sends nothing to the BFF', async () => {
     const { user } = await visitMfa({ totp: true, passkeys: 0 })
     const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
 
@@ -523,7 +523,7 @@ describe('le code manquant', () => {
     expect(fetch.mock.calls.filter(([r]) => r.url.endsWith('/api/auth/mfa/verify'))).toEqual([])
   })
 
-  it('efface le refus dès que le code est saisi', async () => {
+  it('clears the refusal as soon as the code is entered', async () => {
     const { user } = await visitMfa({ totp: true, passkeys: 0 })
 
     await user.click(screen.getByRole('button', { name: 'Vérifier' }))
@@ -534,8 +534,8 @@ describe('le code manquant', () => {
   })
 })
 
-describe('le clavier, sur le second facteur', () => {
-  it('pose le focus sur le code et se valide sans souris', async () => {
+describe('the keyboard, on the second factor', () => {
+  it('puts focus on the code and submits without a mouse', async () => {
     const { router, user } = await visitMfa({ totp: true, passkeys: 0 })
 
     expect(code()).toHaveFocus()
@@ -549,8 +549,8 @@ describe('le clavier, sur le second facteur', () => {
   })
 })
 
-describe('ce que l’élévation et la sortie laissent derrière', () => {
-  it('oublie le challenge consommé', async () => {
+describe('what elevation and logout leave behind', () => {
+  it('forgets the consumed challenge', async () => {
     const { user } = await visitMfa({ totp: true, passkeys: 0 })
 
     await user.type(code(), '123456')
@@ -562,7 +562,7 @@ describe('ce que l’élévation et la sortie laissent derrière', () => {
     expect(peekChallenge()).toBeUndefined()
   })
 
-  it('oublie challenge et session quand l’opérateur reprend la connexion', async () => {
+  it('forgets challenge and session when the operator restarts login', async () => {
     const { user } = await visitMfa({ totp: true, passkeys: 0 })
     const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
     const lectures = () => fetch.mock.calls.filter(([r]) => r.url.endsWith('/api/auth/me')).length
@@ -575,7 +575,7 @@ describe('ce que l’élévation et la sortie laissent derrière', () => {
     expect(lectures()).toBeGreaterThan(avant)
   })
 
-  it('reste une sortie même quand la déconnexion échoue', async () => {
+  it('remains a way out even when logout fails', async () => {
     // `onSettled` et non `onSuccess` : rester bloqué ici parce que le serveur a tombé serait
     // exactement le cul-de-sac qu'on cherche à éviter.
     const { user } = await visitMfa(
@@ -589,8 +589,8 @@ describe('ce que l’élévation et la sortie laissent derrière', () => {
   })
 })
 
-describe('le refus serveur et ce qu’il décrit', () => {
-  it('disparaît quand la validation cliente prend la main, puis quand le code est corrigé', async () => {
+describe('the server refusal and what it describes', () => {
+  it('disappears when client validation takes over, then when the code is corrected', async () => {
     const { user } = await visitMfa(
       { totp: true, passkeys: 0 },
       {
@@ -621,8 +621,8 @@ describe('le refus serveur et ce qu’il décrit', () => {
   })
 })
 
-describe('un code qui n’est que des espaces', () => {
-  it('est refusé ici plutôt qu’envoyé au BFF, comme un champ vide', async () => {
+describe('a code made only of spaces', () => {
+  it('is refused here rather than sent to the BFF, like an empty field', async () => {
     // Sans le `.trim()` du schéma, une espace seule satisfait le `minLength: 1` du contrat et part
     // en vérification : le serveur la refuse en 401, et l'opérateur lit « ce second facteur n'a pas
     // été accepté » là où il fallait lire « saisissez le code ». C'est ce que step-027 tenait avec

@@ -32,7 +32,7 @@ const COLUMNS: DataColumn<Connector>[] = [
 ]
 
 describe('Table', () => {
-  it('est un vrai tableau, nommé pour qui ne le voit pas', () => {
+  it('is a real table, named for those who cannot see it', () => {
     render(
       <DataTable caption="Connecteurs" columns={COLUMNS} rows={ROWS} rowKey={(row) => row.id} />,
     )
@@ -40,7 +40,7 @@ describe('Table', () => {
     expect(screen.getByRole('table', { name: 'Connecteurs' })).toBeInTheDocument()
   })
 
-  it('associe chaque cellule à son en-tête de colonne', () => {
+  it('associates each cell with its column header', () => {
     render(
       <DataTable caption="Connecteurs" columns={COLUMNS} rows={ROWS} rowKey={(row) => row.id} />,
     )
@@ -51,7 +51,7 @@ describe('Table', () => {
     }
   })
 
-  it('n’annonce `aria-sort` que sur la colonne réellement triée', () => {
+  it('announces `aria-sort` only on the actually sorted column', () => {
     render(
       <DataTable
         caption="Connecteurs"
@@ -72,7 +72,7 @@ describe('Table', () => {
     expect(sorted[0]).toHaveTextContent('Débit')
   })
 
-  it('trie au clavier depuis l’en-tête, pas seulement à la souris', async () => {
+  it('sorts by keyboard from the header, not only by mouse', async () => {
     const onSortChange = vi.fn()
     const user = userEvent.setup()
     render(
@@ -94,7 +94,7 @@ describe('Table', () => {
     expect(onSortChange).toHaveBeenCalledWith('throughput')
   })
 
-  it('aligne les nombres à droite et rend les valeurs machine en mono', () => {
+  it('right-aligns numbers and renders machine values in mono', () => {
     const { container } = render(
       <DataTable caption="Connecteurs" columns={COLUMNS} rows={ROWS} rowKey={(row) => row.id} />,
     )
@@ -113,7 +113,7 @@ describe('Table', () => {
     expect(head?.querySelectorAll('.ui-table__cell--end')).toHaveLength(1)
   })
 
-  it('ne montre le sens du tri que sur la colonne réellement triée', () => {
+  it('shows the sort direction only on the actually sorted column', () => {
     // **Le glyphe était rendu sur chaque colonne triable, toujours vers le haut.** Une colonne non
     // triée affichait donc une flèche montante, qui se lit « trié ascendant » ; seule la couleur —
     // teal contre `--text-faint` — séparait la vraie de la fausse. Un signal porté par la seule
@@ -149,7 +149,7 @@ describe('Table', () => {
     expect(container.querySelectorAll('.ui-table__sort-glyph')).toHaveLength(1)
   })
 
-  it('ne rend aucune ligne quand il n’y en a pas — sans inventer de message', () => {
+  it('renders no row when there are none — without inventing a message', () => {
     // L'état vide est un composant à part : le tableau ne doit pas improviser sa copie, sinon chaque
     // écran finit avec sa propre version du vide.
     render(<DataTable caption="Connecteurs" columns={COLUMNS} rows={[]} rowKey={(row) => row.id} />)

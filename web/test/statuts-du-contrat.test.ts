@@ -49,8 +49,8 @@ function enumOf(name: string): string[] {
   return found[1].split(',').map((value) => value.trim())
 }
 
-describe('les statuts peints suivent le contrat', () => {
-  it('sait lire une énumération — sans quoi tout ce fichier serait vert et vide', () => {
+describe('painted statuses follow the contract', () => {
+  it('can read an enum — otherwise this whole file would be green and empty', () => {
     // Le méta-test. Si la forme du YAML change et que l'extraction cesse de trouver quoi que ce
     // soit, les comparaisons ci-dessous deviendraient des égalités de listes vides. Mesuré ici sur
     // une valeur qu'on sait présente, et sur un nom qu'on sait absent.
@@ -58,19 +58,19 @@ describe('les statuts peints suivent le contrat', () => {
     expect(() => enumOf('StatutQuiNExistePas')).toThrow()
   })
 
-  it('link_status : les mêmes valeurs, ni plus ni moins', () => {
+  it('link_status: the same values, no more, no less', () => {
     expect(Object.keys(LINK_TONES).sort()).toEqual(enumOf('LinkStatus').sort())
   })
 
-  it('breaker_state : les mêmes valeurs, ni plus ni moins', () => {
+  it('breaker_state: the same values, no more, no less', () => {
     expect([...BREAKER_STATES].sort()).toEqual(enumOf('BreakerState').sort())
   })
 
-  it('CdrStatus : les mêmes valeurs, ni plus ni moins', () => {
+  it('CdrStatus: the same values, no more, no less', () => {
     expect(Object.keys(DELIVERY_TONES).sort()).toEqual(enumOf('CdrStatus').sort())
   })
 
-  it('le statut d’un client ou d’un compte SMPP : les mêmes valeurs', () => {
+  it('a client or SMPP account status: the same values', () => {
     // `Customer.status` et `SmppAccount.status` n'ont pas de schéma nommé : ils déclarent leur
     // énumération sur place. On les ancre donc par **nom de schéma**, et le cardinal est fixé.
     //

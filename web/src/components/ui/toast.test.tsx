@@ -77,7 +77,7 @@ function titre(texte: string) {
 }
 
 describe('ToastStack', () => {
-  it('annonce la région en français, poliment', async () => {
+  it('announces the region in French, politely', async () => {
     // Base UI pose « Notifications » — de la copie produit, donc en français. Et `polite` parce
     // qu'un toast ne doit pas couper la phrase que le lecteur d'écran est en train de lire.
     await pousser([{ title: 'Route « MTN CI direct » enregistrée', severity: 'success' }])
@@ -86,7 +86,7 @@ describe('ToastStack', () => {
     expect(region).toHaveAttribute('aria-live', 'polite')
   })
 
-  it('rend le titre et le corps du toast', async () => {
+  it('renders the toast title and body', async () => {
     await pousser([
       {
         description: 'Évalué par Alertmanager, indépendamment du tableau de bord.',
@@ -103,7 +103,7 @@ describe('ToastStack', () => {
     ).toBeInTheDocument()
   })
 
-  it('donne à chaque sévérité sa classe, et à `info` celle du défaut', async () => {
+  it('gives each severity its class, and `info` the default one', async () => {
     await pousser([
       { severity: 'critical', title: 'Critique' },
       { severity: 'warning', title: 'Avertissement' },
@@ -122,7 +122,7 @@ describe('ToastStack', () => {
    * classes sont distinctes parce que les deux couleurs le sont ; les confondre reviendrait à dire
    * que les deux étages se réparent pareil.
    */
-  it('distingue les deux étages qui détectent', async () => {
+  it('distinguishes the two detecting tiers', async () => {
     await pousser([
       { severity: 'critical', source: 'alertmanager', title: 'Lien orange-sn-1 en panne' },
       { severity: 'warning', source: 'bff', title: 'Solde bas sur bulk-sms-ci' },
@@ -138,7 +138,7 @@ describe('ToastStack', () => {
     expect(infra?.querySelector('.ui-toast__source--bff')).toBeNull()
   })
 
-  it('n’affiche aucune source quand personne ne l’a nommée', async () => {
+  it('shows no source when nobody named it', async () => {
     // Une confirmation d'action n'a pas d'étage de détection. Inventer une source par défaut ferait
     // dire au toast quelque chose que personne n'a mesuré.
     await pousser([{ severity: 'success', title: 'Route enregistrée' }])
@@ -159,7 +159,7 @@ describe('ToastStack', () => {
    * La preuve manquante est donc dans le parcours Playwright, seul endroit où l'on lit ce qui est
    * peint. Les deux ensemble tiennent le plafond ; ni l'une ni l'autre ne suffit.
    */
-  it('marque comme excédentaire tout toast au-delà du troisième', async () => {
+  it('marks every toast beyond the third as overflow', async () => {
     await pousser([{ title: 'Un' }, { title: 'Deux' }, { title: 'Trois' }, { title: 'Quatre' }])
 
     const tous = screen.getAllByRole('dialog')
@@ -181,7 +181,7 @@ describe('ToastStack', () => {
    * C'est ce chemin-là qu'il faut tenir, et non la simple présence du bouton : un `Fermer` qu'on
    * n'atteint qu'à la souris ne rend pas un toast fermable pour tout le monde.
    */
-  it('expose son bouton Fermer dès que le focus entre, et se ferme par lui', async () => {
+  it('exposes its Close button as soon as focus enters, and closes through it', async () => {
     await pousser([{ title: 'Route enregistrée', severity: 'success' }])
 
     const toast = screen.getByRole('dialog')
@@ -198,7 +198,7 @@ describe('ToastStack', () => {
   })
 
   // Horloge simulée : relire `TOAST_TIMEOUT` ne dit pas si la durée est transmise à Base UI.
-  it('laisse une alerte critique trois secondes de plus que les autres', async () => {
+  it('keeps a critical alert three seconds longer than the others', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       render(
@@ -228,7 +228,7 @@ describe('ToastStack', () => {
     }
   })
 
-  it('annonce une alerte critique d’urgence, et le reste poliment', async () => {
+  it('announces a critical alert assertively, and the rest politely', async () => {
     // `priority: 'high'` : Base UI 1.6.0 rend alors le toast en `alertdialog` et répète son titre
     // dans une région `role="alert"` — lu dans `ToastRoot.mjs` et `ToastViewport.mjs`. `hidden` :
     // la pile repliée masque tout toast qui n'est pas au premier plan, et c'est le rôle posé qu'on

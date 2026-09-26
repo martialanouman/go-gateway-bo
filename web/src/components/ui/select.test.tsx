@@ -18,7 +18,7 @@ const SCOPES = [
 ]
 
 describe('Select', () => {
-  it('porte un nom accessible, et pas seulement sa valeur', () => {
+  it('carries an accessible name, not just its value', () => {
     // Le point le plus fragile de l'abandon du `<select>` natif : celui-là s'associait à un
     // `<label>` gratuitement. Sans nom, un lecteur d'écran annonce « Pool partagé, zone de liste »
     // sans jamais dire de quoi l'opérateur choisit la portée.
@@ -27,13 +27,13 @@ describe('Select', () => {
     expect(screen.getByRole('combobox', { name: 'balance_scope' })).toBeInTheDocument()
   })
 
-  it('annonce le choix courant, ou l’invite quand rien n’est choisi', () => {
+  it('announces the current choice, or the placeholder when nothing is chosen', () => {
     render(<Select label="balance_scope" options={SCOPES} placeholder="Choisir une portée" />)
 
     expect(screen.getByRole('combobox')).toHaveTextContent('Choisir une portée')
   })
 
-  it('s’ouvre et se choisit entièrement au clavier', async () => {
+  it('opens and is chosen entirely with the keyboard', async () => {
     const onValueChange = vi.fn()
     const user = userEvent.setup()
     render(<Select label="balance_scope" options={SCOPES} onValueChange={onValueChange} />)
@@ -49,7 +49,7 @@ describe('Select', () => {
     expect(onValueChange).toHaveBeenCalledWith('per_account', expect.anything())
   })
 
-  it('accepte la hauteur réduite et une classe d’écran', () => {
+  it('accepts the reduced height and a screen class', () => {
     // 28 px au lieu de 34 : la charte prévoit trois hauteurs de contrôle, et une barre de filtres
     // dense les utilise. Sans ce cas, la variante n'était rendue nulle part.
     render(<Select label="balance_scope" options={SCOPES} size="sm" className="filtre-compte" />)
@@ -59,7 +59,7 @@ describe('Select', () => {
     expect(trigger).toHaveClass('filtre-compte')
   })
 
-  it('rend la valeur choisie plutôt que l’invite', () => {
+  it('renders the chosen value rather than the placeholder', () => {
     render(<Select label="balance_scope" options={SCOPES} defaultValue="shared" />)
 
     expect(screen.getByRole('combobox')).toHaveTextContent('Pool partagé')

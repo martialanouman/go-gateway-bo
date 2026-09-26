@@ -17,8 +17,8 @@ import { Field, Input } from './field'
  *
  * Ces tests-là vérifient le lien **à travers la composition**, pas la présence des deux morceaux.
  */
-describe('Field et Input composés', () => {
-  it('relie le libellé au contrôle', async () => {
+describe('composed Field and Input', () => {
+  it('links the label to the control', async () => {
     const user = userEvent.setup()
     render(
       <Field label="Adresse e-mail">
@@ -32,7 +32,7 @@ describe('Field et Input composés', () => {
     expect(input).toHaveValue('operatrice@example.test')
   })
 
-  it('lie le message de refus au contrôle, et pas seulement une bordure rouge', () => {
+  it('links the refusal message to the control, not just a red border', () => {
     render(
       <Field label="Adresse e-mail" error="Cette adresse n’est pas reconnue.">
         <Input />
@@ -47,7 +47,7 @@ describe('Field et Input composés', () => {
     expect(input.getAttribute('aria-describedby') ?? '').toContain(message.id)
   })
 
-  it('lie aussi l’aide quand il n’y a pas de refus', () => {
+  it('also links the help when there is no refusal', () => {
     render(
       <Field label="max_sessions" hint="Baisser ce quota ne coupe pas les binds vivants.">
         <Input />
@@ -61,7 +61,7 @@ describe('Field et Input composés', () => {
     expect(input).not.toHaveAttribute('aria-invalid', 'true')
   })
 
-  it('montre le refus plutôt que l’aide quand les deux sont fournis', () => {
+  it('shows the refusal rather than the help when both are provided', () => {
     // Empiler le mode d'emploi sous la conséquence noierait la seconde au moment où elle compte.
     render(
       <Field label="Sender ID" hint="Onze caractères au plus." error="Ce sender ID est déjà pris.">
@@ -73,7 +73,7 @@ describe('Field et Input composés', () => {
     expect(screen.queryByText('Onze caractères au plus.')).toBeNull()
   })
 
-  it('ne tient pas une chaîne vide pour un refus', () => {
+  it('does not treat an empty string as a refusal', () => {
     // **Le geste le plus naturel du monde** : `error={apiError ?? ''}`, ou un champ d'erreur que le
     // serveur rend vide. Une comparaison à `undefined`/`null`/`false` laissait passer `''`, et
     // fabriquait un champ **invalide muet** — bordure rouge, `aria-invalid`, message vide relié, et
@@ -90,7 +90,7 @@ describe('Field et Input composés', () => {
     expect(screen.getByText('Celle du compte opérateur.')).toBeInTheDocument()
   })
 
-  it('annonce le refus qui arrive après coup, sans que le focus ait bougé', () => {
+  it('announces a refusal that arrives afterwards, without the focus having moved', () => {
     // Un refus vient du serveur : il apparaît **après** la soumission, alors que le focus n'a pas
     // bougé. Base UI ne pose ni rôle ni région live sur `Field.Error` — le message atterrit dans un
     // élément inerte que les lecteurs d'écran ne relisent pas. WCAG 2.1 AA, 4.1.3.
@@ -103,7 +103,7 @@ describe('Field et Input composés', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Ce sender ID est déjà pris.')
   })
 
-  it('porte le caractère obligatoire sur le contrôle, où il est annoncé', () => {
+  it('carries the required flag on the control, where it is announced', () => {
     // L'astérisque du libellé n'est pas une prop du `Field` : il découle de cet état-ci, par
     // `:has()` dans la feuille. Le déclarer deux fois laisserait la marque visuelle affirmer le
     // contraire de la sémantique. La marque elle-même n'est pas observable ici — jsdom n'applique
@@ -118,8 +118,8 @@ describe('Field et Input composés', () => {
   })
 })
 
-describe('Input seul', () => {
-  it('se saisit hors d’un Field — le cas de la barre de filtre', async () => {
+describe('standalone Input', () => {
+  it('accepts input outside a Field — the filter bar case', async () => {
     const user = userEvent.setup()
     render(<Input aria-label="Rechercher" icon="search" placeholder="Rechercher un MSISDN…" />)
 
@@ -129,7 +129,7 @@ describe('Input seul', () => {
     expect(input).toHaveValue('+225')
   })
 
-  it('passe en mono sur demande — la charte le réserve aux valeurs machine', () => {
+  it('switches to mono on request — the design charter reserves it for machine values', () => {
     // « Jamais pour du texte narratif » : identifiant, compteur, MSISDN, sender ID.
     render(<Input aria-label="MSISDN" mono />)
 

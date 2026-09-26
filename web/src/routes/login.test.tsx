@@ -35,8 +35,8 @@ async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
   await user.click(submit())
 }
 
-describe("l'écran de connexion", () => {
-  it('énonce ce qu’il demande, sans rail ni barre supérieure', async () => {
+describe('the sign-in screen', () => {
+  it('states what it asks for, without rail or top bar', async () => {
     await visitLogin()
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Connexion')
@@ -48,7 +48,7 @@ describe("l'écran de connexion", () => {
     expect(screen.queryByText('(optionnel)')).toBeNull()
   })
 
-  it('mène au second facteur et retient le challenge hors de l’URL', async () => {
+  it('leads to the second factor and keeps the challenge out of the URL', async () => {
     const { router, user } = await visitLogin('/login?redirect=%2Fbilling')
 
     await fillAndSubmit(user)
@@ -68,8 +68,8 @@ describe("l'écran de connexion", () => {
   })
 })
 
-describe('les refus du premier facteur', () => {
-  it('rend le refus du serveur mot pour mot, sans dire lequel des deux a manqué', async () => {
+describe('first-factor refusals', () => {
+  it('renders the server refusal verbatim, without saying which of the two failed', async () => {
     const { user } = await visitLogin('/login', {
       login: {
         status: 401,
@@ -92,7 +92,7 @@ describe('les refus du premier facteur', () => {
     expect(refus).not.toHaveTextContent(/adresse inconnue|compte désactivé|mot de passe faux/i)
   })
 
-  it('annonce la durée du verrouillage, qu’un refus muet ferait retenter', async () => {
+  it('announces the lockout duration, which a silent refusal would prompt retrying', async () => {
     const { user } = await visitLogin('/login', {
       login: {
         status: 429,
@@ -110,7 +110,7 @@ describe('les refus du premier facteur', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('réessayez dans 4 minutes')
   })
 
-  it('dit la panne et garde la saisie, plutôt que de vider l’écran', async () => {
+  it('reports the failure and keeps the input, rather than clearing the screen', async () => {
     const { user } = await visitLogin('/login', {
       login: { status: 503, body: { code: 'overloaded', message: 'Le serveur vérifie déjà…' } },
     })
@@ -124,8 +124,8 @@ describe('les refus du premier facteur', () => {
   })
 })
 
-describe('les erreurs champ par champ', () => {
-  it('nomme le champ qui manque, et le relie à son message', async () => {
+describe('field-by-field errors', () => {
+  it('names the missing field, and links it to its message', async () => {
     const { user } = await visitLogin()
 
     await user.click(submit())
@@ -137,7 +137,7 @@ describe('les erreurs champ par champ', () => {
     expect(password()).toHaveAttribute('aria-invalid', 'true')
   })
 
-  it('n’envoie rien au BFF tant qu’un champ manque', async () => {
+  it('sends nothing to the BFF while a field is missing', async () => {
     const { user } = await visitLogin()
     const fetch = globalThis.fetch as unknown as { mock: { calls: [Request][] } }
 
@@ -148,7 +148,7 @@ describe('les erreurs champ par champ', () => {
     expect(posts).toEqual([])
   })
 
-  it('efface le refus d’un champ dès qu’il est corrigé', async () => {
+  it('clears a field refusal as soon as it is corrected', async () => {
     const { user } = await visitLogin()
 
     await user.click(submit())
@@ -161,8 +161,8 @@ describe('les erreurs champ par champ', () => {
   })
 })
 
-describe('le clavier', () => {
-  it('traverse le formulaire dans l’ordre lu et se valide sans souris', async () => {
+describe('the keyboard', () => {
+  it('traverses the form in reading order and submits without a mouse', async () => {
     const { router, user } = await visitLogin()
 
     // L'écran n'a qu'une tâche, et le premier champ la porte : l'opérateur tape sans chercher.
@@ -182,8 +182,8 @@ describe('le clavier', () => {
   })
 })
 
-describe('ce que le client croit savoir de la session', () => {
-  it('relit /auth/me après la connexion, plutôt que de servir la copie d’avant', async () => {
+describe('what the client believes it knows about the session', () => {
+  it('rereads /auth/me after sign-in, rather than serving the previous copy', async () => {
     // Une session **ouverte et non élevée** : le formulaire reste servi — se reconnecter est la
     // seule remédiation d'un cookie qu'on croit compromis —, et surtout `/auth/me` a déjà répondu,
     // donc sa réponse est en cache et fraîche pour une minute.
@@ -206,8 +206,8 @@ describe('ce que le client croit savoir de la session', () => {
   })
 })
 
-describe('une session déjà élevée', () => {
-  it('ne reste pas sur le formulaire : elle rejoint la destination demandée', async () => {
+describe('an already elevated session', () => {
+  it('does not stay on the form: it goes to the requested destination', async () => {
     // Sans ce renvoi, un retour en arrière après la connexion déposerait l'opérateur sur un
     // formulaire qu'il vient de franchir — un cul-de-sac dont la seule sortie est l'URL.
     stubSession({ permissions: [] })
@@ -223,8 +223,8 @@ describe('une session déjà élevée', () => {
   })
 })
 
-describe('la réduction de la destination, à son point d’appel', () => {
-  it('ne suit pas une URL de schéma relatif collée dans le paramètre', async () => {
+describe('destination sanitization, at its call site', () => {
+  it('does not follow a protocol-relative URL pasted into the parameter', async () => {
     // `session.test.ts` tient `safeDestination` en tant que **fonction**. Ce test-ci tient son
     // **câblage** : la fonction gardée et la route non câblée passaient les mêmes assertions —
     // c'est la mesure sur un proxy. Ici la route est visitée pour de bon, avec une session élevée,
@@ -241,8 +241,8 @@ describe('la réduction de la destination, à son point d’appel', () => {
   })
 })
 
-describe('l’attente de la garde', () => {
-  it('peint un squelette du formulaire, et non un blanc', async () => {
+describe('waiting for the guard', () => {
+  it('paints a skeleton of the form, not a blank', async () => {
     // La garde s'exécute **avant** tout rendu : sans `pendingComponent`, l'écran reste vide le
     // temps d'un aller-retour, juste après le squelette peint par `index.html`. Les deux helpers
     // de ce fichier décrivent cet écran en commentaire et le contournaient sans jamais l'affirmer.
@@ -265,8 +265,8 @@ describe('l’attente de la garde', () => {
   })
 })
 
-describe('le refus serveur et ce qu’il décrit', () => {
-  it('disparaît quand la validation cliente prend la main', async () => {
+describe('the server refusal and what it describes', () => {
+  it('disappears when client-side validation takes over', async () => {
     // Le refus porte sur des identifiants **envoyés**. Dès qu'un champ manque, l'envoi n'a pas
     // lieu : le message décrirait alors une requête qui ne correspond plus à ce qui est à l'écran,
     // et l'opérateur lirait deux diagnostics contradictoires en même temps. Ce qui l'efface est la
@@ -288,7 +288,7 @@ describe('le refus serveur et ce qu’il décrit', () => {
     expect(email()).toHaveAttribute('aria-invalid', 'true')
   })
 
-  it('disparaît dès que les identifiants qu’il refusait sont corrigés', async () => {
+  it('disappears as soon as the credentials it refused are corrected', async () => {
     const { user } = await visitLogin('/login', {
       login: {
         status: 401,
@@ -307,8 +307,8 @@ describe('le refus serveur et ce qu’il décrit', () => {
   })
 })
 
-describe('le format de l’e-mail', () => {
-  it('nomme ce qui manque et montre un exemple, sans partir au serveur', async () => {
+describe('the email format', () => {
+  it('names what is missing and shows an example, without calling the server', async () => {
     // Sans ce contrôle, `admin@` part au BFF, y coûte un argon2id, et revient en 401 générique :
     // l'opérateur croit s'être trompé de mot de passe. Le format ne dit **rien** de l'existence du
     // compte — il ne rouvre donc pas l'oracle d'énumération que le serveur ferme.
@@ -326,7 +326,7 @@ describe('le format de l’e-mail', () => {
     expect(fetch.mock.calls.filter(([r]) => r.method === 'POST')).toEqual([])
   })
 
-  it('laisse passer une adresse complète', async () => {
+  it('accepts a complete address', async () => {
     const { router, user } = await visitLogin()
 
     await user.type(email(), 'a.kouadio@example.test')
@@ -340,8 +340,8 @@ describe('le format de l’e-mail', () => {
   })
 })
 
-describe('les bornes du contrat, à l’écran', () => {
-  it('refuse un mot de passe plus long que ce que le serveur accepte, sans partir au BFF', async () => {
+describe('the contract bounds, on screen', () => {
+  it('rejects a password longer than the server accepts, without calling the BFF', async () => {
     // La borne est celle du contrat — `password.maxLength: 4096` — et elle n'est écrite ni dans cet
     // écran ni dans ce test : elle arrive par `LoginRequest`, qu'engendre `cmd/zodgen`. Sans elle,
     // ce corps part au BFF, qui le refuse en 400 après l'avoir lu en entier.
@@ -364,7 +364,7 @@ describe('les bornes du contrat, à l’écran', () => {
     expect(fetch.mock.calls.filter(([r]) => r.method === 'POST')).toEqual([])
   })
 
-  it('laisse passer ce qui tient exactement dans la borne', async () => {
+  it('accepts what fits exactly within the bound', async () => {
     const { router, user } = await visitLogin()
 
     await user.type(email(), 'a.kouadio@example.test')
@@ -379,8 +379,8 @@ describe('les bornes du contrat, à l’écran', () => {
   })
 })
 
-describe('les quatre couches du formulaire', () => {
-  it('ne rend qu’un message par champ refusé, et non celui de chacune', async () => {
+describe('the four layers of the form', () => {
+  it('renders only one message per rejected field, not one from each layer', async () => {
     // React Hook Form tient l'état, Zod la forme, Base UI le rendu. Brancher en plus le moteur de
     // validité de Base UI — `required` est posé, donc `valueMissing` est vrai — ferait deux messages
     // dans le même champ, dont un en anglais et hors de la charte.
@@ -397,8 +397,8 @@ describe('les quatre couches du formulaire', () => {
   })
 })
 
-describe('ce que le formulaire envoie vraiment', () => {
-  it('poste l’adresse débarrassée des espaces qui l’entourent', async () => {
+describe('what the form actually sends', () => {
+  it('posts the address stripped of its surrounding whitespace', async () => {
     // Le décor tient l'état du serveur mais n'avait jamais lu un **corps** de requête : le contrôle
     // de format travaillait sur une adresse rognée quand l'envoi, lui, partait telle quelle. Une
     // adresse collée depuis un gestionnaire de mots de passe traîne régulièrement une espace.
@@ -419,8 +419,8 @@ describe('ce que le formulaire envoie vraiment', () => {
   })
 })
 
-describe('la borne de l’adresse, que rien ne tenait', () => {
-  it('refuse une adresse plus longue que ce que le serveur accepte, sans partir au BFF', async () => {
+describe('the address bound, which nothing enforced', () => {
+  it('rejects an address longer than the server accepts, without calling the BFF', async () => {
     // `email.maxLength: 320`, la borne symétrique de celle du mot de passe. Elle n'atteignait
     // l'écran que par un `.pipe` qu'aucune porte ne tenait : retiré, une adresse de 323 caractères
     // partait au BFF sans un mot. Le but même de la step était donc gardé pour un champ sur deux.
@@ -439,8 +439,8 @@ describe('la borne de l’adresse, que rien ne tenait', () => {
   })
 })
 
-describe('l’avis qui suit un lien d’accès', () => {
-  it('affiche l’avis quand `passwordSet=true` est présent', async () => {
+describe('the notice that follows an access link', () => {
+  it('displays the notice when `passwordSet=true` is present', async () => {
     await visitLogin('/login?passwordSet=true')
 
     expect(screen.getByRole('status')).toHaveTextContent(
@@ -448,21 +448,21 @@ describe('l’avis qui suit un lien d’accès', () => {
     )
   })
 
-  it('n’affiche rien sans le paramètre', async () => {
+  it('displays nothing without the parameter', async () => {
     await visitLogin()
 
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('n’affiche rien pour une valeur invalide', async () => {
+  it('displays nothing for an invalid value', async () => {
     await visitLogin('/login?passwordSet=nimportequoi')
 
     expect(screen.queryByRole('status')).toBeNull()
   })
 })
 
-describe('le refus du mot de passe vide, et sa rédaction', () => {
-  it('nomme le champ plutôt que de citer la borne du contrat', async () => {
+describe('the empty password refusal, and its wording', () => {
+  it('names the field rather than citing the contract bound', async () => {
     // L'ordre du `.pipe` est ce qui décide : les règles de l'écran **puis** celles du contrat. Le
     // contrat pose `minLength: 1` sur le mot de passe, et l'ordre inverse ferait lire « Cette saisie
     // est trop courte : 1 caractère au minimum. » — vrai, générique, et muet sur le champ.
@@ -476,8 +476,8 @@ describe('le refus du mot de passe vide, et sa rédaction', () => {
   })
 })
 
-describe('ce que le cache garde après coup', () => {
-  it('efface la mutation du cache après le départ de l’écran — mot de passe compris', async () => {
+describe('what the cache keeps afterwards', () => {
+  it('clears the mutation from the cache after leaving the screen — password included', async () => {
     const { router, user } = await visitLogin()
 
     await fillAndSubmit(user)

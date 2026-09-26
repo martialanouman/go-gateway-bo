@@ -14,13 +14,13 @@ import { Button } from './button'
  * d'accessibilité, au moment précis où l'opérateur attend une nouvelle.
  */
 describe('Button', () => {
-  it('rend un vrai bouton, avec son libellé', () => {
+  it('renders a real button, with its label', () => {
     render(<Button>Effectuer la rotation</Button>)
 
     expect(screen.getByRole('button', { name: 'Effectuer la rotation' })).toBeInTheDocument()
   })
 
-  it('est de type `button` par défaut', () => {
+  it('is of type `button` by default', () => {
     // Sans cela, un bouton dans un formulaire le soumet — un « Annuler » qui envoie la requête
     // qu'il prétend abandonner.
     render(<Button>Annuler</Button>)
@@ -28,7 +28,7 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toHaveAttribute('type', 'button')
   })
 
-  it('répond au clavier comme à la souris', async () => {
+  it('responds to the keyboard as to the mouse', async () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
     render(<Button onClick={onClick}>Réessayer</Button>)
@@ -41,13 +41,13 @@ describe('Button', () => {
     expect(onClick).toHaveBeenCalledTimes(2)
   })
 
-  it('porte la variante en classe — contour et teinte, jamais un aplat', () => {
+  it('carries the variant as a class — outline and tint, never a solid fill', () => {
     render(<Button variant="danger">Déconnecter la session</Button>)
 
     expect(screen.getByRole('button')).toHaveClass('ui-button--danger')
   })
 
-  it('n’appelle rien quand il est désactivé', async () => {
+  it('calls nothing when disabled', async () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
     render(
@@ -60,7 +60,7 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
-  it('occupé, il ne soumet pas le formulaire qui l’entoure', async () => {
+  it('when busy, does not submit the surrounding form', async () => {
     // Neutraliser `onClick` ne couvre que le chemin React : un `type="submit"` soumettait quand
     // même, par le clic comme par Entrée. Sur un écran de rotation de secret, cela valait une
     // seconde rotation et une seconde ligne d'audit.
@@ -78,7 +78,7 @@ describe('Button', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
-  it('soumet normalement quand il n’est pas occupé — la garde ne bloque pas tout', async () => {
+  it('submits normally when not busy — the guard does not block everything', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault())
     render(
@@ -91,7 +91,7 @@ describe('Button', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1)
   })
 
-  it('s’annonce indisponible pendant le chargement, sans quitter le clavier', async () => {
+  it('announces itself unavailable while loading, without leaving the keyboard', async () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
     render(
@@ -110,7 +110,7 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled()
   })
 
-  it('bloqué, il ne compile pas sans son explication', () => {
+  it('when blocked, does not compile without its explanation', () => {
     // La garde est le typecheck : sans l'union de `ButtonProps`, la directive ci-dessous devient
     // inutile et `tsc` rougit. Le rendu, lui, reste bloqué quoi qu'on en fasse.
     // @ts-expect-error — `blocked` exige `aria-describedby`.
@@ -119,7 +119,7 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true')
   })
 
-  it('interdit, il reste visible, atteignable et relié à son explication', async () => {
+  it('when forbidden, stays visible, reachable and linked to its explanation', async () => {
     // « Un contrôle interdit est désactivé **et expliqué**, jamais silencieusement masqué. » Le
     // masquer laisse l'opérateur chercher un bouton qui n'apparaît pas ; un `disabled` nu le retire
     // de l'arbre d'accessibilité, et celui qui écoute ne sait ni qu'il existe ni ce qui le
@@ -149,8 +149,8 @@ describe('Button', () => {
   })
 })
 
-describe('un bouton interdit par une raison', () => {
-  it('reste dans le parcours clavier, désactivé, et porte sa raison comme description', () => {
+describe('a button forbidden by a reason', () => {
+  it('stays in the keyboard path, disabled, and carries its reason as description', () => {
     render(
       <Button blockedReason="Le compte de la session ne se désactive pas ici.">Désactiver</Button>,
     )
@@ -160,7 +160,7 @@ describe('un bouton interdit par une raison', () => {
     expect(button).toHaveAccessibleDescription('Le compte de la session ne se désactive pas ici.')
   })
 
-  it('montre sa raison dans une infobulle au focus clavier, sans rien déclencher au clic', async () => {
+  it('shows its reason in a tooltip on keyboard focus, without triggering anything on click', async () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
     render(

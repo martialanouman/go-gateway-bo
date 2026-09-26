@@ -9,13 +9,13 @@ import {
   safeDestination,
 } from './session'
 
-describe('la destination rejouée après la connexion', () => {
-  it('garde une adresse de ce tableau de bord, chemin, filtres et ancre compris', () => {
+describe('the destination replayed after login', () => {
+  it('keeps an address of this dashboard, including path, filters and anchor', () => {
     expect(safeDestination('/billing')).toBe('/billing')
     expect(safeDestination('/cdr?statut=echec#ligne-12')).toBe('/cdr?statut=echec#ligne-12')
   })
 
-  it('refuse une URL de schéma relatif, sous ses deux écritures', () => {
+  it('refuses a scheme-relative URL, in both of its spellings', () => {
     // `//ailleurs.example` et `/\ailleurs.example` désignent le même hôte tiers, et les navigateurs
     // suivent les deux. Sans ce refus, le paramètre ferait du lien de connexion un hameçon : le
     // domaine affiché est celui du cockpit, la connexion est réelle, et la redirection dépose
@@ -24,7 +24,7 @@ describe('la destination rejouée après la connexion', () => {
     expect(safeDestination('/\\ailleurs.example/moisson')).toBeUndefined()
   })
 
-  it('refuse un blanc ou une contre-oblique glissés plus loin dans la valeur', () => {
+  it('refuses a blank or a backslash slipped further into the value', () => {
     // `/\n//ailleurs.example` ne commence ni par `//` ni par `/\` : il traversait les deux premiers
     // refus. Le routeur ne gardait alors que le chemin — mesuré — mais le plafond était chez lui.
     expect(safeDestination('/\n//ailleurs.example')).toBeUndefined()
@@ -32,7 +32,7 @@ describe('la destination rejouée après la connexion', () => {
     expect(safeDestination('/ bil ling')).toBeUndefined()
   })
 
-  it('refuse ce qui n’est pas un chemin absolu de ce site', () => {
+  it('refuses anything that is not an absolute path of this site', () => {
     expect(safeDestination('https://ailleurs.example')).toBeUndefined()
     expect(safeDestination('javascript:alert(1)')).toBeUndefined()
     expect(safeDestination('billing')).toBeUndefined()
@@ -42,8 +42,8 @@ describe('la destination rejouée après la connexion', () => {
   })
 })
 
-describe('le challenge de second facteur', () => {
-  it('se retient puis s’oublie, et ne laisse aucune trace ailleurs que dans le module', () => {
+describe('the second-factor challenge', () => {
+  it('is retained then forgotten, and leaves no trace anywhere but in the module', () => {
     rememberChallenge('un-challenge')
     expect(peekChallenge()).toBe('un-challenge')
 
@@ -58,8 +58,8 @@ describe('le challenge de second facteur', () => {
   })
 })
 
-describe('le jeton du lien d’accès', () => {
-  it('se retient puis s’oublie, et ne laisse aucune trace ailleurs que dans le module', () => {
+describe('the access link token', () => {
+  it('is retained then forgotten, and leaves no trace anywhere but in the module', () => {
     rememberAccessToken('un-jeton')
     expect(peekAccessToken()).toBe('un-jeton')
 

@@ -23,7 +23,7 @@ import { readTokens, resolveToken } from './test/tokens'
 // Vitest s'exécute.
 const projectRoot = resolve(process.cwd())
 
-describe('chargement à froid', () => {
+describe('cold load', () => {
   let outDir = ''
   let html = ''
   // Le document est aussi analysé comme un arbre : chercher une chaîne dans du texte ne dit ni où
@@ -68,7 +68,7 @@ describe('chargement à froid', () => {
     await rm(outDir, { recursive: true, force: true })
   })
 
-  it('peint la silhouette de la coquille : rail, barre supérieure et contenu', () => {
+  it('paints the shell silhouette: rail, top bar and content', () => {
     // Les trois régions sont cherchées **sous le point de montage**, et non dans le texte du
     // document : un squelette placé à côté de `#app` survivrait au montage de React et resterait
     // peint par-dessus l'application.
@@ -85,7 +85,7 @@ describe('chargement à froid', () => {
     }
   })
 
-  it('rend cette silhouette visible', () => {
+  it('makes this silhouette visible', () => {
     // `toBeVisible` remonte la chaîne des ancêtres : n'inspecter que `.skeleton` laissait passer un
     // `#app { display: none }`, qui produit exactement le blanc que §1.9 interdit.
     expect(painted.querySelector('.skeleton')).toBeVisible()
@@ -95,7 +95,7 @@ describe('chargement à froid', () => {
     expect(style.minHeight).not.toMatch(/^0/)
   })
 
-  it('lui donne un rail et une barre de dimensions non nulles', () => {
+  it('gives it a rail and a bar with non-zero dimensions', () => {
     const style = window.getComputedStyle(painted.querySelector('.skeleton') as Element)
 
     // jsdom ne résout pas les `var()`, il les rend littéralement — c'est ce qui permet d'asserter sur
@@ -112,7 +112,7 @@ describe('chargement à froid', () => {
     expect(declared('shell-topbar-height')).toMatch(/^[1-9]/)
   })
 
-  it('donne à ses blocs une hauteur, faute de quoi la silhouette est un cadre vide', () => {
+  it('gives its blocks a height, otherwise the silhouette is an empty frame', () => {
     // Compter les blocs ne suffisait pas : à hauteur nulle, le squelette redevient le « blanc décoré »
     // que la step refuse en propres termes.
     const blocks = painted.querySelectorAll('#app .skeleton__block')
@@ -123,7 +123,7 @@ describe('chargement à froid', () => {
     }
   })
 
-  it("masque son texte d'assistance sans le retirer du document", () => {
+  it('hides its assistive text without removing it from the document', () => {
     // La règle remplace un attribut `style=`, que la CSP à nonce de step-186 ferait tomber. Sans
     // elle, « Chargement du tableau de bord » s'affiche en clair au milieu du squelette.
     const style = window.getComputedStyle(painted.querySelector('.skeleton__sr-only') as Element)
@@ -133,7 +133,7 @@ describe('chargement à froid', () => {
     expect(style.overflow).toBe('hidden')
   })
 
-  it('recopie fidèlement, dans le document, les tokens que la coquille consomme', () => {
+  it('faithfully copies into the document the tokens the shell consumes', () => {
     // Le contrôle d'existence d'un token vit dans le build (`vite-plugin-tokens`), qui juge l'union du
     // document et du CSS émis. Ce qui reste ici est ce qu'il ne peut pas voir : le `<style>` inline
     // **duplique** des tokens de la charte, parce que la première peinture n'a aucune feuille à sa
@@ -175,7 +175,7 @@ describe('chargement à froid', () => {
     expect(consumed).toContain('--border-chrome')
   })
 
-  it("garde la feuille d'entrée assez petite pour que l'aller-retour reste le seul coût", async () => {
+  it('keeps the entry stylesheet small enough that the round trip remains the only cost', async () => {
     // **Deux bornes, parce qu'il y a deux coûts distincts :**
     //
     // - **Ce qui voyage** est l'octet *compressé* : c'est lui qui décide si la feuille tient dans la
@@ -204,7 +204,7 @@ describe('chargement à froid', () => {
     expect(sheet.byteLength, 'la feuille coûte trop cher à analyser').toBeLessThan(32_768)
   })
 
-  it("garde le script d'entrée exempt de ce qu'une seule route consomme", async () => {
+  it('keeps the entry script free of what a single route consumes', async () => {
     // Ce que la borne tient : sans `sideEffects` dans `package.json`, Rollup tient chaque module de
     // `src/` pour susceptible d'en avoir, et un import depuis la façade `components/ui` tire **tous**
     // ses modules — mesuré, 453,78 Ko bruts / 147,44 gzip sans la déclaration contre 290,60 / 93,03
@@ -230,12 +230,12 @@ describe('chargement à froid', () => {
     expect(bundle.byteLength, "le script d'entrée coûte trop cher à analyser").toBeLessThan(340_000)
   })
 
-  it("annonce le chargement aux technologies d'assistance", () => {
+  it('announces loading to assistive technologies', () => {
     expect(painted.querySelector('[aria-busy="true"]')).not.toBeNull()
     expect(painted.textContent).toContain('Chargement du tableau de bord')
   })
 
-  it("n'attend aucun script pour être peint", () => {
+  it('waits for no script to be painted', () => {
     // Ce qui compte n'est pas la position mais le mode d'exécution : un `type="module"` est différé
     // par définition, un script classique bloque le parseur — donc la peinture — le temps de son
     // téléchargement et de son exécution. `async` n'est **pas** accepté : il s'exécute dès qu'il est
@@ -251,7 +251,7 @@ describe('chargement à froid', () => {
     }
   })
 
-  it("n'emporte dans le bundle aucune adresse que le navigateur ne doit pas connaître", async () => {
+  it('ships no address in the bundle that the browser must not know', async () => {
     // **Invariant (d).** `internal/` met le jeton machine, le mTLS et la base hors de portée du
     // bundle par construction ; le risque résiduel est une adresse écrite en dur dans le client, et
     // `web/CLAUDE.md` présente ce test comme le dernier rempart.
@@ -330,7 +330,7 @@ describe('chargement à froid', () => {
     expect(new Set(unexpected)).toEqual(new Set())
   })
 
-  it("porte le style du squelette dans le document plutôt que dans la feuille de l'application", () => {
+  it('carries the skeleton style in the document rather than in the application stylesheet', () => {
     // Ce que cela achète : la silhouette garde sa forme si la feuille échoue, et elle est peinte sans
     // attendre le CSS en développement, où Vite l'injecte par JavaScript.
     //

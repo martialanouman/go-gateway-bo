@@ -19,8 +19,8 @@ function visit(path: string, session: SessionOutcome) {
 
 const rail = () => screen.findByRole('navigation', { name: 'Navigation principale' })
 
-describe('le rail', () => {
-  it('ne montre que ce que la session ouvre, et tait les groupes vidés', async () => {
+describe('the rail', () => {
+  it('shows only what the session grants, and hides emptied groups', async () => {
     visit('/', { permissions: ['routes:read'] })
     const nav = await rail()
     const labels = within(nav)
@@ -34,7 +34,7 @@ describe('le rail', () => {
     expect(within(nav).getByText('Routage')).toBeInTheDocument()
   })
 
-  it('marque l’entrée de l’écran affiché', async () => {
+  it('marks the entry of the displayed screen', async () => {
     visit('/routes', { permissions: ['routes:read'] })
     const nav = await rail()
 
@@ -47,7 +47,7 @@ describe('le rail', () => {
     )
   })
 
-  it('mène à l’état vide de l’entrée choisie', async () => {
+  it('leads to the empty state of the chosen entry', async () => {
     const user = userEvent.setup()
     visit('/', { permissions: ['billing:read'] })
 
@@ -61,8 +61,8 @@ describe('le rail', () => {
   })
 })
 
-describe('sans session', () => {
-  it('offre la connexion depuis une adresse inconnue, sans navigation', async () => {
+describe('without a session', () => {
+  it('offers sign-in from an unknown address, without navigation', async () => {
     // Une adresse inconnue, et non un écran : la garde de `_shell` renvoie les écrans à `/login`
     // avant tout rendu. Ce qui reste ici est le seul chemin qui rend la coquille **hors** de la
     // garde — le `notFoundComponent` de la racine.
@@ -76,8 +76,8 @@ describe('sans session', () => {
   })
 })
 
-describe('quand la session ne peut pas être lue', () => {
-  it('dit la réalité HTTP et relit sur demande', async () => {
+describe('when the session cannot be read', () => {
+  it('states the HTTP reality and rereads on demand', async () => {
     const user = userEvent.setup()
     const fetch = visit('/', { status: 503 })
 
@@ -89,7 +89,7 @@ describe('quand la session ne peut pas être lue', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('ne met pas l’API Admin en cause, et dit une panne réseau quand aucun statut n’est revenu', async () => {
+  it('does not blame the Admin API, and reports a network failure when no status came back', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
     render(
       <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))} />,
@@ -102,8 +102,8 @@ describe('quand la session ne peut pas être lue', () => {
   })
 })
 
-describe('pendant la lecture de la session', () => {
-  it('garde la silhouette de la coquille et annonce l’attente', async () => {
+describe('while the session is being read', () => {
+  it('keeps the shell silhouette and announces the wait', async () => {
     // La garde de route n'a pas encore décidé : c'est son `pendingComponent` qui peint, et il doit
     // reprendre la silhouette qu'`index.html` a servie. Sans lui, cet écran est **vide** le temps de
     // l'aller-retour.
@@ -114,14 +114,14 @@ describe('pendant la lecture de la session', () => {
   })
 })
 
-describe('la barre supérieure', () => {
-  it('nomme l’opérateur connecté', async () => {
+describe('the top bar', () => {
+  it('names the signed-in operator', async () => {
     visit('/', { permissions: [] })
     const banner = await screen.findByRole('banner')
     expect(await within(banner).findByText(OPERATOR_NAME)).toBeInTheDocument()
   })
 
-  it('ferme la session et revient à l’état qui l’explique', async () => {
+  it('closes the session and returns to the state that explains it', async () => {
     const user = userEvent.setup()
     const fetch = visit('/', { permissions: [] })
 
@@ -137,8 +137,8 @@ describe('la barre supérieure', () => {
   })
 })
 
-describe('le lien d’évitement', () => {
-  it('est le premier arrêt du clavier et porte le focus sur le contenu', async () => {
+describe('the skip link', () => {
+  it('is the first keyboard stop and moves focus to the content', async () => {
     const user = userEvent.setup()
     visit('/', { permissions: [] })
     await rail()

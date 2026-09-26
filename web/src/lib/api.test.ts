@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { stubSession } from '../../test/session'
 import { HttpError, isUnauthenticated, meQueryOptions, refusalMessage } from './api'
 
-describe('la lecture de la session', () => {
-  it('interroge le BFF sur l’origine qui a servi le document', async () => {
+describe('reading the session', () => {
+  it('queries the BFF on the origin that served the document', async () => {
     const fetch = stubSession({ permissions: ['routes:read'] })
 
     const me = await new QueryClient().fetchQuery(meQueryOptions)
@@ -14,7 +14,7 @@ describe('la lecture de la session', () => {
     expect(request.url).toBe(new URL('/api/auth/me', window.location.href).href)
   })
 
-  it('rend un 401 reconnaissable, sans réessayer une session morte', async () => {
+  it('returns a recognizable 401, without retrying a dead session', async () => {
     const fetch = stubSession({ status: 401 })
 
     const error = await new QueryClient().fetchQuery(meQueryOptions).catch((e: unknown) => e)
@@ -24,7 +24,7 @@ describe('la lecture de la session', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
-  it('ne confond pas une panne serveur avec une session absente', async () => {
+  it('does not mistake a server failure for a missing session', async () => {
     stubSession({ status: 500 })
 
     const error = await new QueryClient().fetchQuery(meQueryOptions).catch((e: unknown) => e)
@@ -34,18 +34,18 @@ describe('la lecture de la session', () => {
   })
 })
 
-describe('la rédaction d’un refus serveur', () => {
-  it('rend le repli de l’écran quand le serveur n’a rédigé aucun message', () => {
+describe('wording of a server refusal', () => {
+  it('returns the screen fallback when the server wrote no message', () => {
     expect(refusalMessage(undefined, 'le repli')).toBe('le repli')
   })
 
-  it('rend le repli plutôt qu’un refus vide', () => {
+  it('returns the fallback rather than an empty refusal', () => {
     // Le DTO `Error` déclare `message` **requis**, et rien n'y interdit la chaîne vide. Sans cette
     // clause, l'écran rendrait un `AuthRefusal` réduit à son icône : un refus qui ne refuse rien.
     expect(refusalMessage({ code: 'x', message: '' }, 'le repli')).toBe('le repli')
   })
 
-  it('préfère la phrase du serveur à celle de l’écran', () => {
+  it('prefers the server sentence over the screen one', () => {
     expect(refusalMessage({ code: 'x', message: 'Ce refus-ci.' }, 'le repli')).toBe('Ce refus-ci.')
   })
 })

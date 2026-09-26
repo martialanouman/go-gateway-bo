@@ -15,7 +15,7 @@ import { Modal } from './modal'
  * bouton extérieur n'ayant plus de rôle à interroger.
  */
 describe('Modal', () => {
-  it('prend son nom accessible de son titre', () => {
+  it('takes its accessible name from its title', () => {
     render(
       <Modal onClose={() => {}} open title="Déconnecter la session ?">
         Un unbind gracieux sera envoyé.
@@ -25,7 +25,7 @@ describe('Modal', () => {
     expect(screen.getByRole('dialog', { name: 'Déconnecter la session ?' })).toBeInTheDocument()
   })
 
-  it('ferme sur Échap', async () => {
+  it('closes on Escape', async () => {
     // Une modale dont on ne sort qu'au clic est un piège pour qui navigue au clavier. Aucun filtre
     // sur la raison de la fermeture n'est posé dans le composant, et c'est délibéré : en ajouter un
     // rouvrirait exactement ce défaut.
@@ -41,7 +41,7 @@ describe('Modal', () => {
     expect(close).toHaveBeenCalledOnce()
   })
 
-  it('ferme par la croix, qui reste dans la modale', async () => {
+  it('closes via the close button, which stays inside the modal', async () => {
     // Base UI l'exige en mode modal : « render `<Dialog.Close>` inside `<Dialog.Popup>` so touch
     // screen readers can escape the popup ». Hors du popup, un lecteur d'écran tactile ne l'atteint
     // jamais.
@@ -68,7 +68,7 @@ describe('Modal', () => {
    * modale paraîtrait fermée et la chaîne serait encore là, à portée d'un `Ctrl+F` comme d'une
    * extension. Le composant est monté sans, et ce test est ce qui le tient.
    */
-  it('ne laisse rien de son contenu dans le document une fois fermée', () => {
+  it('leaves none of its content in the document once closed', () => {
     const secret = 'sk_live_9f2ac4d1'
     const { rerender } = render(
       <Modal onClose={() => {}} open title="Rotation de la clé API">
@@ -98,7 +98,7 @@ describe('Modal', () => {
    * Les deux moitiés du test comptent. Sans la seconde — le même bouton retrouvé une fois la modale
    * fermée — la première passerait aussi sur un bouton qui n'aurait jamais existé.
    */
-  it('retire de l’arbre d’accessibilité ce qu’il y a derrière elle', () => {
+  it('removes what lies behind it from the accessibility tree', () => {
     const derriere = <button type="button">Derrière</button>
 
     const { rerender } = render(
@@ -122,7 +122,7 @@ describe('Modal', () => {
     expect(screen.getByRole('button', { name: 'Derrière' })).toBeInTheDocument()
   })
 
-  it('ne rend rien tant qu’elle est fermée', () => {
+  it('renders nothing while closed', () => {
     render(
       <Modal onClose={() => {}} open={false} title="Déconnecter la session ?">
         Corps
@@ -132,7 +132,7 @@ describe('Modal', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('porte ses actions et son en-tête quand l’écran les donne', () => {
+  it('carries its actions and header when the screen provides them', () => {
     render(
       <Modal
         footer={<button type="button">Déconnecter</button>}

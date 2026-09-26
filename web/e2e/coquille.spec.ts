@@ -16,7 +16,7 @@ import { expect, type Request, test } from '@playwright/test'
  * tenus par les scénarios `godog` ; ni l'égalité octet à octet entre ce que le binaire rend et la
  * sortie de Vite, tenue par le job « Build client et déployable ».
  */
-test("le binaire sert la coquille peinte, puis l'application la remplace", async ({
+test('the binary serves the painted shell, then the application replaces it', async ({
   page,
   request,
 }) => {
