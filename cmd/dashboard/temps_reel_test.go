@@ -149,13 +149,14 @@ const socketWait = 5 * time.Second
 const statusWait = 15 * time.Second
 
 type realtimeWorld struct {
-	process  *process
-	gateway  *fakeGateway
-	conn     *websocket.Conn
-	expected map[string]any
-	contract *openapi3.T
-	second   *process
-	redis    *redisRelay
+	process   *process
+	gateway   *fakeGateway
+	conn      *websocket.Conn
+	expected  map[string]any
+	contract  *openapi3.T
+	second    *process
+	redis     *redisRelay
+	sigtermAt time.Time
 }
 
 type socketMessage struct {
@@ -197,6 +198,13 @@ func (w *realtimeWorld) registerSteps(ctx *godog.ScenarioContext) {
 		return w.openSocketAt(w.second.addr)
 	})
 	ctx.Then(`^la passerelle compte (\d+) connexions? sur le flux des sessions$`, w.gatewayCounts)
+	ctx.When(`^la première instance reçoit SIGTERM$`, func() error {
+		w.sigtermAt = time.Now()
+
+		return w.process.signalTerm()
+	})
+	ctx.Then(`^la passerelle compte (\d+) connexions sur le flux des sessions en moins de (\d+) secondes$`,
+		w.gatewayCountsWithin)
 	ctx.When(`^la première instance est tuée$`, func() error {
 		w.process.kill()
 
@@ -589,4 +597,16 @@ func (r *redisRelay) cut() {
 	for _, conn := range r.conns {
 		_ = conn.Close()
 	}
+}
+
+func (w *realtimeWorld) gatewayCountsWithin(want, seconds int) error {
+	if err := w.awaitOpened(sessionsFeed, want); err != nil {
+		return err
+	}
+
+	if took := time.Since(w.sigtermAt); took > time.Duration(seconds)*time.Second {
+		return fmt.Errorf("reprise en %s : le bail n'a pas été rendu, il a expiré", took.Round(100*time.Millisecond))
+	}
+
+	return nil
 }

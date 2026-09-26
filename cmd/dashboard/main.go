@@ -183,7 +183,21 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		})
 
 	realtime := hub.New(logger)
-	go realtime.Run(ctx, dialStream(cfg.Gateway.BaseURL, streams), coordination, cfg.Redis.Namespace)
+	// Le hub rend son bail en s'arrêtant, et il lui faut Redis pour cela : run l'attend avant que le
+	// `defer` ne ferme le client. Sans cette attente, un successeur patientait jusqu'à l'expiration
+	// du bail. Le contexte propre au hub l'arrête aussi quand serve rend la main sur une erreur.
+	realtimeCtx, stopRealtime := context.WithCancel(ctx)
+	realtimeDone := make(chan struct{})
+
+	go func() {
+		defer close(realtimeDone)
+		realtime.Run(realtimeCtx, dialStream(cfg.Gateway.BaseURL, streams), coordination, cfg.Redis.Namespace)
+	}()
+
+	defer func() {
+		stopRealtime()
+		<-realtimeDone
+	}()
 
 	router := bff.NewRouter(bff.Dependencies{
 		Assets: assets,

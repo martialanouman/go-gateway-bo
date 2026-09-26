@@ -28,6 +28,11 @@ Fonctionnalité: Plusieurs instances, un seul consommateur de la passerelle
     Quand la passerelle émet un événement de session
     Alors la socket reçoit cet événement sur "sessions.events"
 
+  # Arrêt propre : le bail est rendu, et l'autre instance n'attend pas son expiration (6 à 8 s).
+  Scénario: le porteur du bail arrêté proprement, l'autre instance reprend aussitôt
+    Quand la première instance reçoit SIGTERM
+    Alors la passerelle compte 2 connexions sur le flux des sessions en moins de 4 secondes
+
   Scénario: Redis coupé, les sujets passent périmés
     Quand Redis devient injoignable
     Alors le sujet "sessions.events" est annoncé "stale"
