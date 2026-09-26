@@ -825,8 +825,8 @@ export interface components {
             accountId: string;
             systemId: string;
             /**
-             * @description `bound` ou `unbound` aujourd'hui. Relayé tel quel : la passerelle ne décrit pas ses trames
-             *     (dette 057), et une valeur nouvelle passerait sans être refusée.
+             * @description `bound` ou `unbound`, l'enum que le contrat Admin déclare depuis 6.9.0. Relayé tel quel : une
+             *     valeur que la passerelle ajouterait passerait sans être refusée.
              */
             state: string;
             sessions?: number;

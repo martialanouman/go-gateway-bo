@@ -49,11 +49,12 @@ func feedOf(topic Topic) (feed, bool) {
 	return feed{}, false
 }
 
-// upstreamVersion est le `SchemaVersion` de `go-gateway/internal/metricstream`. Le contrat ne décrit
-// pas les trames (dette 057) : ce numéro est le seul signal d'un changement de format.
+// upstreamVersion est le `StreamFrameVersion` du contrat (6.9.0). Un renommage de champ, lui, est
+// attrapé par `contract_test.go` ; ce numéro signale un changement de forme que la passerelle annonce.
 const upstreamVersion = 1
 
-// Les trois trames amont, d'après `go-gateway/internal/metricstream/metricstream.go`.
+// Les trois trames amont, d'après les schémas `MetricSnapshot`, `SessionEvent` et `BillingAlert` du
+// contrat Admin, confrontés à ces structs par `contract_test.go`.
 type (
 	upstreamSnapshot struct {
 		V         int              `json:"v"`
