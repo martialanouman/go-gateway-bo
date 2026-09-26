@@ -581,7 +581,7 @@ export interface components {
             method?: "totp" | "recovery_code";
             code?: string;
         };
-        /** @description Le code de l'application d'authentification qui vient d'être remplacée. */
+        /** @description Un code de l'application d'authentification en attente, remplaçante ou ajoutée. */
         TotpConfirmation: {
             code: string;
         };
@@ -1268,7 +1268,7 @@ export interface operations {
             /**
              * @description Deux causes, deux codes. `mfa_elevation_required` : la session n'a pas franchi le second
              *     facteur. `mfa_nothing_to_confirm` : aucun enrôlement n'attend — le message dit d'en
-             *     enrôler un d'abord.
+             *     enrôler une d'abord.
              */
             409: {
                 headers: {
@@ -1287,18 +1287,6 @@ export interface operations {
                 headers: {
                     /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
                     "Retry-After": number;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /**
-             * @description Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir. Ce n'est pas un refus :
-             *     l'essai compte tout de même dans le quota, posé avant la vérification.
-             */
-            503: {
-                headers: {
                     [name: string]: unknown;
                 };
                 content: {

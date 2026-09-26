@@ -392,7 +392,7 @@ paths:
           description: |
             Deux causes, deux codes. `mfa_elevation_required` : la session n'a pas franchi le second
             facteur. `mfa_nothing_to_confirm` : aucun enrôlement n'attend — le message dit d'en
-            enrôler un d'abord.
+            enrôler une d'abord.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -405,13 +405,6 @@ paths:
               description: Secondes restant à attendre. Un entier et jamais une date HTTP.
               required: true
               schema: { type: integer, minimum: 1 }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '503':
-          description: |
-            Le serveur vérifie déjà autant d'identifiants qu'il peut en tenir. Ce n'est pas un refus :
-            l'essai compte tout de même dans le quota, posé avant la vérification.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1177,7 +1170,7 @@ components:
 
     TotpConfirmation:
       type: object
-      description: Le code de l'application d'authentification qui vient d'être remplacée.
+      description: Un code de l'application d'authentification en attente, remplaçante ou ajoutée.
       additionalProperties: false
       properties:
         code:

@@ -346,7 +346,7 @@ type SecondFactors struct {
 	Totp                   bool `json:"totp"`
 }
 
-// TotpConfirmation Le code de l'application d'authentification qui vient d'être remplacée.
+// TotpConfirmation Un code de l'application d'authentification en attente, remplaçante ou ajoutée.
 type TotpConfirmation struct {
 	Code string `json:"code"`
 }
@@ -1748,20 +1748,6 @@ func (response ConfirmTotp429JSONResponse) VisitConfirmTotpResponse(w http.Respo
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
 	w.WriteHeader(429)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ConfirmTotp503JSONResponse Error
-
-func (response ConfirmTotp503JSONResponse) VisitConfirmTotpResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }

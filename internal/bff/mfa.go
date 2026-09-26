@@ -589,10 +589,6 @@ func (a API) ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) 
 			After:      store.NewFields().Text("method", "totp"),
 		}))
 	if err != nil {
-		if errors.Is(err, auth.ErrOverloaded) {
-			return ConfirmTotp503JSONResponse(overloaded()), nil
-		}
-
 		return nil, a.releaseUnjudgedAttempt(ctx, resolved.OperatorID, err)
 	}
 
