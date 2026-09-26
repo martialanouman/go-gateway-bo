@@ -123,6 +123,28 @@ func (s *Sessions) Resolve(ctx context.Context, tokenHash []byte, idle time.Dura
 	return session, true, nil
 }
 
+// Alive redit les gardes de `Resolve` sans toucher `last_seen_at` : une socket qui suit sa session ne
+// doit pas la garder ouverte au-delà de sa fenêtre d'inactivité.
+func (s *Sessions) Alive(ctx context.Context, id string, idle time.Duration) (bool, error) {
+	const query = `
+		SELECT EXISTS (
+			SELECT 1
+			FROM sessions AS s
+			JOIN operators AS o ON o.id = s.operator_id
+			WHERE s.id = $1
+			  AND o.status = $3
+			  AND now() < s.expires_at
+			  AND now() < s.last_seen_at + make_interval(secs => $2))`
+
+	var alive bool
+
+	if err := s.pool.QueryRow(ctx, query, id, idle.Seconds(), StatusActive).Scan(&alive); err != nil {
+		return false, fmt.Errorf("suivre la session : %w", err)
+	}
+
+	return alive, nil
+}
+
 // Elevate marque le second facteur vérifié **et régénère le jeton**, contre la fixation de session :
 // sans ça, un jeton obtenu avant le second facteur reste valable après.
 //

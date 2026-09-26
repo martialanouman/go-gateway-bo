@@ -444,3 +444,66 @@ func TestUnOperateurDesactiveNeResoutPlusSaSession(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, alive)
 }
+
+// Une socket ouverte vérifie sa session sans la repousser : sinon un onglet laissé ouvert garderait
+// la session vivante au-delà de sa fenêtre d'inactivité.
+func TestSuivreUneSessionNeRepoussePasSaFenetre(t *testing.T) {
+	t.Parallel()
+
+	sessions, dsn := sessionsOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	created, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
+	require.NoError(t, err)
+
+	idleFor(t, dsn, tokenHash("jeton"), testIdle-10*time.Minute)
+
+	alive, err := sessions.Alive(t.Context(), created.ID, testIdle)
+	require.NoError(t, err)
+	require.True(t, alive)
+
+	var seenMinutesAgo float64
+
+	conn, err := pgx.Connect(t.Context(), dsn)
+	require.NoError(t, err)
+
+	defer func() { _ = conn.Close(context.WithoutCancel(t.Context())) }()
+
+	require.NoError(t, conn.QueryRow(t.Context(),
+		`SELECT EXTRACT(EPOCH FROM (now() - last_seen_at)) / 60 FROM sessions WHERE id = $1`,
+		created.ID).Scan(&seenMinutesAgo))
+
+	assert.Greater(t, seenMinutesAgo, 100.0, "suivre la session a repoussé sa fenêtre")
+}
+
+func TestUneSessionOisiveNEstPlusSuivie(t *testing.T) {
+	t.Parallel()
+
+	sessions, dsn := sessionsOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	created, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
+	require.NoError(t, err)
+
+	idleFor(t, dsn, tokenHash("jeton"), testIdle+time.Minute)
+
+	alive, err := sessions.Alive(t.Context(), created.ID, testIdle)
+	require.NoError(t, err)
+	assert.False(t, alive)
+}
+
+func TestLaSessionDUnOperateurDesactiveNEstPlusSuivie(t *testing.T) {
+	t.Parallel()
+
+	sessions, dsn := sessionsOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	created, err := sessions.Create(t.Context(), operator, tokenHash("jeton"), testLifetime, store.Event{})
+	require.NoError(t, err)
+
+	execOn(t, dsn, `UPDATE operators SET status = 'disabled' WHERE id = $1`, operator)
+
+	alive, err := sessions.Alive(t.Context(), created.ID, testIdle)
+	require.NoError(t, err)
+	assert.False(t, alive)
+}
