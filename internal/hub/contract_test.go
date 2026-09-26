@@ -14,7 +14,7 @@ const adminContract = "../../web/node_modules/@martialanouman/gateway-api-contra
 
 // Les structs de décodage sont recopiés de la passerelle : un champ renommé en amont arriverait vide,
 // sans erreur. Ce test les confronte au contrat installé, qui décrit les trames depuis 6.9.0.
-func TestLesTramesDecodeesNeLisentQueDesChampsDuContrat(t *testing.T) {
+func TestDecodedFramesReadOnlyContractFields(t *testing.T) {
 	t.Parallel()
 
 	doc, err := openapi3.NewLoader().LoadFromFile(adminContract)
@@ -38,7 +38,7 @@ func TestLesTramesDecodeesNeLisentQueDesChampsDuContrat(t *testing.T) {
 	}
 }
 
-func TestChaqueFluxAnnonceLeSchemaQueSaTrameDecode(t *testing.T) {
+func TestEachStreamDeclaresTheSchemaItsFrameDecodes(t *testing.T) {
 	t.Parallel()
 
 	doc, err := openapi3.NewLoader().LoadFromFile(adminContract)
