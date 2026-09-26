@@ -6,9 +6,7 @@ const port = 3101
 
 // `localhost` et non `127.0.0.1` : le second facteur WebAuthn lie les passkeys à un domaine, et une
 // adresse IP n'en est pas un — le navigateur refuse la cérémonie, et la bibliothèque refuse de
-// démarrer. Aucun parcours n'exerce encore de passkey, mais déclarer une origine en `localhost`
-// pendant qu'on visite une IP ferait de la configuration ci-dessous un mensonge, et c'est step-027
-// qui le paierait.
+// démarrer. Le parcours enregistre puis présente une clé d'accès : il en dépend.
 const host = 'localhost'
 
 export default defineConfig({
@@ -81,8 +79,7 @@ export default defineConfig({
       DASHBOARD_SESSION_SECRET: 'une-cle-de-parcours-assez-longue-pour-passer-la-borne',
       DASHBOARD_TOTP_ENCRYPTION_KEY: 'une-cle-de-chiffrement-de-parcours-assez-longue',
       // Pas des secrets non plus : le navigateur les voit à chaque cérémonie. Elles doivent s'accorder
-      // au `baseURL` ci-dessus, sans quoi la première cérémonie de step-027 échouerait sur une
-      // configuration qu'aucun parcours d'aujourd'hui n'exerce.
+      // au `baseURL` ci-dessus, sans quoi la cérémonie du parcours échoue.
       DASHBOARD_WEBAUTHN_RP_ID: host,
       DASHBOARD_WEBAUTHN_ORIGIN: `http://${host}:${port}`,
       // Vide ne se distingue pas d'un oubli, et l'oubli fait compter toutes les tentatives sur

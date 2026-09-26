@@ -53,6 +53,10 @@ export const RoleUpdate = z.object({
   permissions: z.array(z.string()).max(100),
 })
 
+export const TotpConfirmation = z.object({
+  code: z.string().min(1).max(64),
+})
+
 export const TotpEnrollmentRequest = z.object({
   code: z.string().min(1).max(64).optional(),
   method: z.enum(['totp', 'recovery_code']).optional(),
@@ -60,4 +64,5 @@ export const TotpEnrollmentRequest = z.object({
 
 export const WebauthnRegistration = z.object({
   attestation: z.record(z.string(), z.unknown()),
+  name: z.string().min(1).max(64),
 })

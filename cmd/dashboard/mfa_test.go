@@ -36,6 +36,8 @@ type mfaWorld struct {
 	// presented est le dernier code envoyé, tel quel. Le rejeu le renvoie **à la lettre** plutôt que
 	// d'en recalculer un : recalculer ferait dépendre le scénario du rejeu d'une frontière de pas.
 	presented string
+	// sealed garde le chiffré mis de côté pendant qu'une panne est simulée, pour le reposer ensuite.
+	sealed string
 }
 
 // secondOperatorEmail est l'adresse du comparse. Il n'a ni rôle ni second facteur : ce que le
@@ -69,6 +71,21 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^l'opérateur représente le même code$`, w.presentTheSameCodeAgain)
 	ctx.When(`^l'opérateur remplace son authentificateur en présentant son code$`,
 		w.replaceProvingTheCurrentCode)
+	ctx.Given(`^l'opérateur remplace son authentificateur en présentant son code$`,
+		w.replaceProvingTheCurrentCode)
+	ctx.Given(`^l'opérateur remplace son authentificateur en présentant un code de récupération$`,
+		w.replaceProvingARecoveryCode)
+	ctx.Then(`^le refus dit qu'aucun enrôlement n'attend$`, w.refusalSaysNothingIsPending)
+	ctx.When(`^l'opérateur confirme sa nouvelle application d'authentification$`, w.confirmCurrentCode)
+	ctx.When(`^l'opérateur confirme sa nouvelle application d'authentification avec un code faux$`,
+		w.confirmWrongCode)
+	ctx.When(`^l'opérateur présente le code du pas suivant de l'ancien secret$`,
+		w.presentPreviousSecretNextCode)
+	ctx.When(`^l'opérateur présente (\d+) fois le code du pas courant$`, w.presentCurrentCodeTimes)
+	ctx.Given(`^le secret de l'application d'authentification devient illisible$`, w.sealSecretAway)
+	ctx.When(`^le secret de l'application d'authentification redevient lisible$`, w.restoreSecret)
+	ctx.Then(`^la session annonce une application d'authentification$`, w.announcesTOTP)
+	ctx.Then(`^le code de confirmation est refusé$`, w.confirmationIsRefused)
 	ctx.Given(`^l'opérateur tente (\d+) remplacements avec un code faux$`, w.replaceWithWrongCodes)
 	ctx.When(`^l'opérateur tente (\d+) remplacements avec un code faux$`, w.replaceWithWrongCodes)
 	ctx.When(`^l'opérateur tente un remplacement avec un code faux$`, w.replaceWithWrongCode)
@@ -93,6 +110,7 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^la réponse ne porte ni le secret ni aucun code de récupération$`, w.responseHidesTheSecret)
 	ctx.Then(`^la réponse annonce un second facteur enrôlé$`, w.announcesAnEnrolledFactor)
 	ctx.Then(`^la session n'annonce aucun second facteur$`, w.announcesNoFactor)
+	ctx.Given(`^la session n'annonce aucun second facteur$`, w.announcesNoFactor)
 }
 
 func (w *mfaWorld) enroll() error {
@@ -114,7 +132,7 @@ func (w *mfaWorld) enrollTimes(count int) error {
 }
 
 // enrollProving enrôle en présentant — ou non — une preuve du facteur en place. Le premier
-// enrôlement n'a rien à prouver ; le remplacement détruit ce qu'il remplace, donc il l'exige.
+// enrôlement n'a rien à prouver ; le remplacement détruira à sa confirmation ce qu'il remplace, donc il l'exige.
 func (w *mfaWorld) enrollProving(proof map[string]string) error {
 	w.previousSecret = w.enrolled.Secret
 
@@ -146,7 +164,7 @@ func (w *mfaWorld) enrollProving(proof map[string]string) error {
 }
 
 // replaceProvingTheCurrentCode remplace l'authentificateur en présentant un code de celui qui est en
-// place — la preuve que le remplacement exige, puisqu'il le détruit.
+// place — la preuve que le remplacement exige, puisqu'il le détruira.
 // Le code présenté est celui du pas **suivant** : la vérification qui précède vient de consommer le
 // pas courant, et l'anti-rejeu refuse à juste titre de le resservir. C'est ce que vit l'opérateur —
 // il rouvre son application et y lit un autre code.
@@ -661,4 +679,144 @@ func (w *mfaWorld) responseHidesTheSecret() error {
 	}
 
 	return nil
+}
+
+func (w *mfaWorld) confirm(code string) error {
+	body, err := json.Marshal(map[string]string{"code": code})
+	if err != nil {
+		return fmt.Errorf("composer le corps de la confirmation : %w", err)
+	}
+
+	return w.login.process.post("/api/auth/mfa/totp/confirm", string(body))
+}
+
+func (w *mfaWorld) confirmCurrentCode(ctx context.Context) error {
+	code, err := w.codeAtOffset(ctx, 0)
+	if err != nil {
+		return err
+	}
+
+	return w.confirm(code)
+}
+
+func (w *mfaWorld) confirmWrongCode(ctx context.Context) error {
+	code, err := w.wrongCode(ctx)
+	if err != nil {
+		return err
+	}
+
+	return w.confirm(code)
+}
+
+func (w *mfaWorld) presentPreviousSecretNextCode(ctx context.Context) error {
+	if w.previousSecret == "" {
+		return errors.New("aucun secret remplacé : le scénario n'a pas d'ancien code à présenter")
+	}
+
+	step, err := w.currentStep(ctx)
+	if err != nil {
+		return err
+	}
+
+	code, err := hotp.GenerateCodeCustom(w.previousSecret, uint64(step+1), hotp.ValidateOpts{
+		Digits:    otp.DigitsSix,
+		Algorithm: otp.AlgorithmSHA1,
+	})
+	if err != nil {
+		return fmt.Errorf("fabriquer le code de l'ancien secret : %w", err)
+	}
+
+	return w.verify("totp", code)
+}
+
+func (w *mfaWorld) presentCurrentCodeTimes(ctx context.Context, times int) error {
+	for range times {
+		if err := w.presentCodeAtOffset(0)(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// sealSecretAway met une vraie panne en base plutôt que de la simuler : le serveur relit une colonne
+// qu'il ne sait pas ouvrir, comme après un changement de clé de chiffrement.
+func (w *mfaWorld) sealSecretAway(ctx context.Context) error {
+	return w.withConnection(ctx, func(conn *pgx.Conn) error {
+		err := conn.QueryRow(ctx,
+			`UPDATE operators SET mfa_totp_secret = 'illisible'
+			 WHERE email = $1 AND mfa_totp_secret IS NOT NULL
+			 RETURNING old.mfa_totp_secret`,
+			scenarioEmail).Scan(&w.sealed)
+		if err != nil {
+			return fmt.Errorf("rendre le secret illisible : %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (w *mfaWorld) restoreSecret(ctx context.Context) error {
+	if w.sealed == "" {
+		return errors.New("aucun secret mis de côté : le scénario n'a rien à reposer")
+	}
+
+	return w.withConnection(ctx, func(conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, `UPDATE operators SET mfa_totp_secret = $2 WHERE email = $1`,
+			scenarioEmail, w.sealed)
+		if err != nil {
+			return fmt.Errorf("reposer le secret : %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (w *mfaWorld) withConnection(ctx context.Context, use func(*pgx.Conn) error) error {
+	conn, err := pgx.Connect(ctx, w.login.dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	return use(conn)
+}
+
+func (w *mfaWorld) announcesTOTP() error {
+	decoded, err := w.currentOperator()
+	if err != nil {
+		return err
+	}
+
+	if !decoded.SecondFactors.TOTP {
+		return errors.New("la session n'annonce aucune application d'authentification : la " +
+			"connexion suivante la réenrôlerait sans preuve")
+	}
+
+	return nil
+}
+
+func (w *mfaWorld) confirmationIsRefused() error {
+	if err := w.refusalIs(400, "mfa_code_refused"); err != nil {
+		return err
+	}
+
+	return w.messageMentions("n'a pas été accepté")
+}
+
+func (w *mfaWorld) replaceProvingARecoveryCode() error {
+	if len(w.enrolled.RecoveryCodes) == 0 {
+		return errors.New("aucun code de récupération : le scénario n'a rien à présenter")
+	}
+
+	return w.enrollProving(map[string]string{"method": "recovery_code", "code": w.enrolled.RecoveryCodes[0]})
+}
+
+func (w *mfaWorld) refusalSaysNothingIsPending() error {
+	if err := w.refusalIs(409, "mfa_nothing_to_confirm"); err != nil {
+		return err
+	}
+
+	return w.messageMentions("En enrôler une d'abord")
 }

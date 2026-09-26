@@ -39,6 +39,8 @@ type Passkey struct {
 	UserVerified   bool
 	BackupEligible bool
 	BackupState    bool
+	Name           string
+	CreatedAt      time.Time
 }
 
 // PasskeyOwner est ce qu'une cérémonie a besoin de savoir de l'opérateur : de quoi le nommer dans
@@ -113,14 +115,19 @@ func (w *Webauthn) OwnerOf(ctx context.Context, operatorID string) (PasskeyOwner
 	return owner, true, nil
 }
 
+// PasskeysOf rend les passkeys d'un opérateur, dans l'ordre de leur enregistrement.
+func (w *Webauthn) PasskeysOf(ctx context.Context, operatorID string) ([]Passkey, error) {
+	return w.passkeysOf(ctx, operatorID)
+}
+
 func (w *Webauthn) passkeysOf(ctx context.Context, operatorID string) ([]Passkey, error) {
 	const query = `
 		SELECT id::text, credential_id, public_key, sign_count, aaguid,
 		       transports, coalesce(attachment, ''), user_verified,
-		       backup_eligible, backup_state
+		       backup_eligible, backup_state, name, created_at
 		FROM webauthn_credentials
 		WHERE operator_id = $1
-		ORDER BY id`
+		ORDER BY created_at, id`
 
 	rows, err := w.pool.Query(ctx, query, operatorID)
 	if err != nil {
@@ -136,7 +143,8 @@ func (w *Webauthn) passkeysOf(ctx context.Context, operatorID string) ([]Passkey
 
 		err = rows.Scan(&passkey.ID, &passkey.CredentialID, &passkey.PublicKey,
 			&passkey.SignCount, &passkey.AAGUID, &passkey.Transports, &passkey.Attachment,
-			&passkey.UserVerified, &passkey.BackupEligible, &passkey.BackupState)
+			&passkey.UserVerified, &passkey.BackupEligible, &passkey.BackupState, &passkey.Name,
+			&passkey.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("lire une passkey : %w", err)
 		}
@@ -168,8 +176,8 @@ func (w *Webauthn) Register(ctx context.Context, operatorID string, passkey Pass
 	const query = `
 		INSERT INTO webauthn_credentials (
 			operator_id, credential_id, public_key, sign_count, aaguid, transports,
-			attachment, user_verified, backup_eligible, backup_state)
-		VALUES ($1, $2, $3, $4, $5, $6, nullif($7, ''), $8, $9, $10)
+			attachment, user_verified, backup_eligible, backup_state, name)
+		VALUES ($1, $2, $3, $4, $5, $6, nullif($7, ''), $8, $9, $10, $11)
 		RETURNING id::text`
 
 	var id string
@@ -177,7 +185,7 @@ func (w *Webauthn) Register(ctx context.Context, operatorID string, passkey Pass
 	err := inTx(ctx, w.pool, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, query, operatorID, passkey.CredentialID, passkey.PublicKey,
 			int64(passkey.SignCount), passkey.AAGUID, passkey.Transports, passkey.Attachment,
-			passkey.UserVerified, passkey.BackupEligible, passkey.BackupState).Scan(&id)
+			passkey.UserVerified, passkey.BackupEligible, passkey.BackupState, passkey.Name).Scan(&id)
 		if err != nil {
 			return fmt.Errorf("enregistrer la passkey : %w", err)
 		}

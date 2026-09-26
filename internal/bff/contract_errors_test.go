@@ -83,6 +83,17 @@ func (failingAPI) DeleteWebauthnPasskey(_ context.Context,
 	return nil, errors.New("appel de " + internalTopology + "/admin/v1/passkeys: connexion refusée")
 }
 
+func (failingAPI) ListWebauthnPasskeys(_ context.Context,
+	_ ListWebauthnPasskeysRequestObject,
+) (ListWebauthnPasskeysResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/passkeys: connexion refusée")
+}
+
+func (failingAPI) ConfirmTotp(_ context.Context, _ ConfirmTotpRequestObject,
+) (ConfirmTotpResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/mfa: connexion refusée")
+}
+
 // Une implémentation qui rend une erreur ne fait pas partir le message Go au navigateur.
 //
 // Le défaut que ce test rejoue est celui des défauts d'oapi-codegen (`bff.gen.go`,

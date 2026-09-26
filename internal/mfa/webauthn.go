@@ -340,7 +340,7 @@ func (p *PasskeyManager) BeginRegistration(ctx context.Context, sessionID,
 // l'est qu'au succès. La différence est réelle : un code TOTP mal tapé se retape, une réponse
 // d'authentificateur est signée pour un défi précis et ne se retente jamais sur le même. Le garder en
 // vie n'offrirait qu'une cible.
-func (p *PasskeyManager) FinishRegistration(ctx context.Context, sessionID, operatorID string,
+func (p *PasskeyManager) FinishRegistration(ctx context.Context, sessionID, operatorID, name string,
 	attestation []byte, event store.Event,
 ) (string, error) {
 	owner, found, err := p.credentials.OwnerOf(ctx, operatorID)
@@ -361,6 +361,8 @@ func (p *PasskeyManager) FinishRegistration(ctx context.Context, sessionID, oper
 	if err != nil {
 		return "", err
 	}
+
+	passkey.Name = name
 
 	// Une chaîne vide dit « cette clé est déjà enregistrée ». L'appelant en fait le même refus que
 	// pour une signature fausse — le distinguer dirait à qui détient l'authentificateur qu'il est
@@ -424,6 +426,11 @@ func (p *PasskeyManager) VerifyAssertion(ctx context.Context, sessionID, operato
 	}
 
 	return p.credentials.ConsumeSignCount(ctx, used.CredentialID, used.SignCount, used.UserVerified)
+}
+
+// List rend les passkeys d'un opérateur, dans l'ordre de leur enregistrement.
+func (p *PasskeyManager) List(ctx context.Context, operatorID string) ([]store.Passkey, error) {
+	return p.credentials.PasskeysOf(ctx, operatorID)
 }
 
 // Remove retire une passkey, et le store refuse d'emporter le dernier facteur.

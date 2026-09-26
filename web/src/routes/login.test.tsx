@@ -475,3 +475,16 @@ describe('le refus du mot de passe vide, et sa rédaction', () => {
     ).toHaveTextContent('Saisissez un mot de passe')
   })
 })
+
+describe('ce que le cache garde après coup', () => {
+  it('efface la mutation du cache après le départ de l’écran — mot de passe compris', async () => {
+    const { router, user } = await visitLogin()
+
+    await fillAndSubmit(user)
+    await screen.findByRole('heading', { level: 1, name: /Second facteur/ })
+    // Une macrotâche : la collecte d'une mutation à `gcTime: 0` s'exécute sur le `setTimeout` suivant.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(router.options.context.queryClient.getMutationCache().findAll()).toEqual([])
+  })
+})

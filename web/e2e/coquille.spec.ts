@@ -20,6 +20,20 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   page,
   request,
 }) => {
+  // L'anti-rejeu n'accepte qu'un code par pas de 30 s : le remplacement du TOTP en attend jusqu'à deux.
+  test.setTimeout(120_000)
+
+  let lastStep = -1
+  const totpNow = (secretBase32: string) => {
+    lastStep = currentStep()
+    return totpCode(secretBase32, lastStep)
+  }
+  const nextTotp = async (secretBase32: string) => {
+    const wait = (lastStep + 1) * 30_000 - Date.now()
+    if (wait > 0) await page.waitForTimeout(wait + 250)
+    return totpNow(secretBase32)
+  }
+
   // Les écouteurs sont posés **avant** le premier `goto`, sinon les requêtes du chargement initial —
   // celles qui portent justement la feuille et les polices — échapperaient à l'observation.
   const requested: string[] = []
@@ -165,7 +179,7 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   await expect(page.locator('.auth__codes')).toHaveCount(0)
 
   // Le premier code, saisi sur cet écran-ci : c'est lui qui confirme l'enrôlement.
-  await page.getByLabel(/Code à six chiffres/).fill(totpCode(secret))
+  await page.getByLabel(/Code à six chiffres/).fill(totpNow(secret))
   await page.getByRole('button', { name: 'Vérifier' }).click()
 
   // Alors seulement les dix codes paraissent, et la seule sortie est l'accusé de réception.
@@ -200,6 +214,72 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   expect(storage, 'le challenge a été déposé dans le stockage du navigateur').not.toContain(
     challenge,
   )
+
+  // ── Une clé d'accès, du premier enregistrement au retrait ───────────────────────────────────
+  //
+  // L'authentificateur virtuel est un appareil, pas un module du produit : Chromium répond pour de
+  // vrai à `navigator.credentials.create()` et `.get()`, et le BFF vérifie ce qu'il signe.
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('WebAuthn.enable')
+  await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: {
+      protocol: 'ctap2',
+      transport: 'internal',
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+    },
+  })
+
+  const openAccount = async () => {
+    await page
+      .getByRole('banner')
+      .getByRole('link', { name: fromEnv('DASHBOARD_E2E_OPERATOR_NAME') })
+      .click()
+    await expect(page).toHaveURL(/\/account$/)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mon compte')
+  }
+  const cle = page.getByRole('row', { name: /Clé de parcours/ })
+
+  await openAccount()
+  await page.getByRole('button', { name: 'Ajouter' }).click()
+  await page.getByLabel('Nom de la clé').fill('Clé de parcours')
+  await page.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(cle).toBeVisible()
+
+  await page.getByRole('banner').getByRole('button', { name: 'Se déconnecter' }).click()
+  await page.getByRole('link', { name: 'Se connecter' }).click()
+  await signIn()
+  await expect(page).toHaveURL(/\/mfa/)
+  await page.getByRole('button', { name: 'Utiliser une clé d’accès' }).click()
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible()
+
+  await openAccount()
+  await cle.getByRole('button', { name: 'Retirer' }).click()
+  await expect(cle).toHaveCount(0)
+  await expect(page.getByText('Aucune clé d’accès sur ce compte')).toBeVisible()
+
+  // ── Le remplacement de l'application d'authentification, jusqu'à la connexion suivante ──────
+  await page.getByRole('button', { name: 'Remplacer' }).click()
+  await page.getByLabel('Code', { exact: true }).fill(await nextTotp(secret))
+  await page.getByRole('button', { name: 'Continuer' }).click()
+
+  const nouveauSecret = (await page.locator('.auth__secret').innerText()).trim()
+  expect(nouveauSecret, 'le remplacement a rendu le secret en place').not.toBe(secret)
+  await page.getByLabel(/Code à six chiffres/).fill(totpNow(nouveauSecret))
+  await page.getByRole('button', { name: 'Vérifier' }).click()
+  await expect(page.getByRole('heading', { name: 'Codes de récupération' })).toBeVisible()
+  await page.getByRole('button', { name: 'J’ai enregistré ces codes' }).click()
+  await expect(page.getByRole('button', { name: 'Remplacer' })).toBeVisible()
+  await expect(page.getByText('10 restants')).toBeVisible()
+
+  await page.getByRole('banner').getByRole('button', { name: 'Se déconnecter' }).click()
+  await page.getByRole('link', { name: 'Se connecter' }).click()
+  await signIn()
+  await expect(page).toHaveURL(/\/mfa/)
+  await page.getByLabel(/Code à six chiffres/).fill(await nextTotp(nouveauSecret))
+  await page.getByRole('button', { name: 'Vérifier' }).click()
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible()
 
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
@@ -565,9 +645,9 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
  * Le serveur tolère un pas d'écart (`Skew: 1`), ce qui met ce calcul à l'abri d'une frontière de
  * période franchie entre la saisie et la vérification.
  */
-function totpCode(secretBase32: string) {
+function totpCode(secretBase32: string, step = currentStep()) {
   const counter = Buffer.alloc(8)
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 1000 / 30)))
+  counter.writeBigUInt64BE(BigInt(step))
 
   const mac = createHmac('sha1', decodeBase32(secretBase32)).update(counter).digest()
   // Troncature dynamique de la RFC 4226 §5.4 : les quatre bits de poids faible du dernier octet
@@ -576,6 +656,10 @@ function totpCode(secretBase32: string) {
   const truncated = mac.readUInt32BE(offset) & 0x7fff_ffff
 
   return String(truncated % 1_000_000).padStart(6, '0')
+}
+
+function currentStep() {
+  return Math.floor(Date.now() / 1000 / 30)
 }
 
 function decodeBase32(input: string) {

@@ -561,3 +561,90 @@ func TestLesFacteursRenduSontUnBooleenEtUnCompte(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, factors.RecoveryCodesRemaining)
 }
+
+func TestRendreUnEssaiLibereLeVerrouSansDescendreSousZero(t *testing.T) {
+	t.Parallel()
+
+	mfa, dsn := mfaOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	require.NoError(t, mfa.Release(t.Context(), operator), "rendre sans rien avoir réservé")
+
+	for range testMaxFailures {
+		_, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
+		require.NoError(t, err)
+		require.NoError(t, mfa.Release(t.Context(), operator))
+	}
+
+	for range testMaxFailures + 1 {
+		require.NoError(t, mfa.Release(t.Context(), operator))
+	}
+
+	for essai := 1; essai <= testMaxFailures; essai++ {
+		lock, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
+		require.NoError(t, err)
+		require.False(t, lock.Locked(), "le verrou mord au %d° essai : un essai rendu compte encore, "+
+			"ou le compteur est descendu sous zéro", essai)
+	}
+
+	lock, err := mfa.Reserve(t.Context(), operator, testWindow, testMaxFailures)
+	require.NoError(t, err)
+	assert.True(t, lock.Locked(), "le compteur est descendu sous zéro : le seuil recule d'autant")
+}
+
+// Un onglet resté ouvert sur un premier remplacement confirme un secret qu'un second a écrasé : sans
+// le prédicat sur le secret vérifié, l'ancien TOTP et ses codes partiraient pour un secret jamais vu.
+func TestUneConfirmationPerimeeNeConfirmePasLeRemplacementSuivant(t *testing.T) {
+	t.Parallel()
+
+	mfa, dsn := mfaOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	enroll(t, mfa, operator, "v1.actuel", []string{"actuel-1"})
+
+	for _, pending := range []string{"v1.premier", "v1.second"} {
+		written, err := mfa.EnrollPending(t.Context(), operator, pending, []string{pending + "-1"},
+			store.Event{})
+		require.NoError(t, err)
+		require.True(t, written)
+	}
+
+	confirmed, err := mfa.ConfirmPending(t.Context(), operator, "v1.premier", 1, store.Event{})
+	require.NoError(t, err)
+	assert.False(t, confirmed)
+
+	state, found, err := mfa.TOTPStateOf(t.Context(), operator, testPeriod)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "v1.actuel", state.SealedSecret)
+
+	codes, err := mfa.RecoveryCodesOf(t.Context(), operator)
+	require.NoError(t, err)
+	require.Len(t, codes, 1)
+	assert.Equal(t, "actuel-1", codes[0].Hash)
+}
+
+// Un compte vidé par le lien de réinitialisation n'a plus de facteur à remplacer : l'attente écrite
+// là serait confirmée plus tard sans qu'aucun facteur n'ait prouvé l'accès.
+func TestUnRemplacementSurUnCompteSansFacteurNEcritRien(t *testing.T) {
+	t.Parallel()
+
+	mfa, dsn := mfaOn(t)
+	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
+
+	written, err := mfa.EnrollPending(t.Context(), operator, "v1.attente", []string{"attente-1"},
+		store.Event{})
+	require.NoError(t, err)
+	assert.False(t, written)
+
+	var pending *string
+
+	queryOn(t, dsn, `SELECT mfa_totp_pending_secret FROM operators WHERE id = $1`, &pending, operator)
+	assert.Nil(t, pending)
+
+	var pendingCodes int
+
+	queryOn(t, dsn, `SELECT count(*) FROM mfa_recovery_codes WHERE operator_id = $1`, &pendingCodes,
+		operator)
+	assert.Zero(t, pendingCodes)
+}

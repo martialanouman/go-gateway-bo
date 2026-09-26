@@ -157,6 +157,11 @@ export interface paths {
          *     L'enrôlement n'élève pas la session : c'est `POST /auth/mfa/verify` qui le fait, avec le
          *     premier code. Tant qu'il n'a pas eu lieu, la session reste au premier facteur.
          *
+         *     **Sur un compte qu'un facteur confirmé garde déjà — TOTP confirmé ou passkey —,
+         *     l'enrôlement ne prend effet qu'à sa confirmation** (`POST /auth/mfa/totp/confirm`) :
+         *     jusque-là, le secret et les codes rendus attendent, et ce qui est en place reste seul
+         *     valide. Un nouvel enrôlement écrase l'attente.
+         *
          *     **Remplacer un authentificateur exige de présenter celui qu'on remplace.** Sans cette
          *     exigence, le geste qui détruit un facteur serait protégé moins que celui qui l'utilise : le
          *     seul rempart serait le bit d'élévation, qui vaut douze heures, donc un cookie capté suffirait
@@ -169,6 +174,36 @@ export interface paths {
          *     vérification, elle, rend le même 204 des deux côtés et reste une seule opération.
          */
         post: operations["enrollTotp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirmer une application d'authentification en attente, remplaçante ou ajoutée
+         * @description Un enrôlement sur un compte qu'un facteur confirmé garde déjà — TOTP confirmé ou passkey —
+         *     pose le secret neuf et ses dix codes **en attente**, à côté de ce qui est en place : ce
+         *     dernier reste seul valide, et le compte n'est jamais sans facteur confirmé. C'est un
+         *     remplacement quand un TOTP confirmé est en place, un ajout quand seule une passkey garde le
+         *     compte. Cette route confronte le code au secret en attente et, s'il colle, le fait passer
+         *     actif avec ses codes, en retirant les anciens s'il y en a, dans une seule transaction.
+         *     `POST /auth/mfa/verify` ne peut pas le faire : il exige un challenge de connexion, qu'une
+         *     session déjà élevée n'a plus.
+         *
+         *     Session **élevée** exigée, pas nécessairement celle qui a enrôlé. L'essai compte dans le seau
+         *     du second facteur, comme sur `verify`.
+         */
+        post: operations["confirmTotp"];
         delete?: never;
         options?: never;
         head?: never;
@@ -291,6 +326,27 @@ export interface paths {
          *     TOTP. Ouvrir une cérémonie ne prouve rien et n'élève rien.
          */
         post: operations["beginWebauthnAssertion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/webauthn/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Les passkeys de l'opérateur de la session
+         * @description Nom et date d'enregistrement de chaque passkey, dans l'ordre de leur enregistrement. Rien de
+         *     la clé : l'identifiant rendu est celui de la ligne, par lequel on la retire.
+         */
+        get: operations["listWebauthnPasskeys"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -507,8 +563,8 @@ export interface components {
          *     pour le remplacer.
          *
          *     Le premier enrôlement n'a rien à prouver — il n'y a pas encore de facteur, et la session de
-         *     premier facteur dit déjà de qui il s'agit. Le remplacement, lui, **détruit** l'authentificateur
-         *     en place et ses dix codes de récupération : il exige donc de présenter ce qu'on détruit.
+         *     premier facteur dit déjà de qui il s'agit. Le remplacement, lui, **détruira** à sa confirmation
+         *     l'authentificateur en place et ses dix codes : il exige donc de présenter ce qu'il détruira.
          *
          *     **Pourquoi un code et non un challenge frais**, alors que le challenge est ce que la
          *     vérification exige : se reconnecter pour en obtenir un ferme la session présentée et la
@@ -524,6 +580,10 @@ export interface components {
             /** @enum {string} */
             method?: "totp" | "recovery_code";
             code?: string;
+        };
+        /** @description Un code de l'application d'authentification en attente, remplaçante ou ajoutée. */
+        TotpConfirmation: {
+            code: string;
         };
         /**
          * @description Rendu **une seule fois**, à l'enrôlement. Aucune route ne le rend ensuite, et c'est la seule
@@ -625,6 +685,14 @@ export interface components {
             attestation: {
                 [key: string]: unknown;
             };
+            name: string;
+        };
+        /** @description Une passkey telle que l'inventaire la montre. Rien de la clé. */
+        PasskeySummary: {
+            id: string;
+            name: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         /**
          * @description La passkey qui vient d'être enregistrée. **Seul son identifiant**, et c'est ce dont le client a
@@ -1153,6 +1221,80 @@ export interface operations {
             };
         };
     };
+    confirmTotp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpConfirmation"];
+            };
+        };
+        responses: {
+            /** @description L'application d'authentification est confirmée. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /**
+             * @description Deux causes, deux codes. `bad_request` : la requête n'a pas la forme que la route attend.
+             *     `mfa_code_refused` : le code n'a pas été accepté. **400 et non 401**, pour la raison du
+             *     refus d'une cérémonie WebAuthn : la session est vivante, et un client qui lit tout 401
+             *     comme « session close » renverrait l'opérateur au login.
+             */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Aucune session vivante. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            403: components["responses"]["OrigineRefusee"];
+            /**
+             * @description Deux causes, deux codes. `mfa_elevation_required` : la session n'a pas franchi le second
+             *     facteur. `mfa_nothing_to_confirm` : aucun enrôlement n'attend — le message dit d'en
+             *     enrôler une d'abord.
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            415: components["responses"]["TypeDeContenuRefuse"];
+            /**
+             * @description Trop d'essais de second facteur sur ce compte — le même seau que `verify`. Le message
+             *     porte la durée restante.
+             */
+            429: {
+                headers: {
+                    /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     verifyMfa: {
         parameters: {
             query?: never;
@@ -1421,6 +1563,35 @@ export interface operations {
                 headers: {
                     /** @description Secondes restant à attendre. Un entier et jamais une date HTTP. */
                     "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listWebauthnPasskeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les passkeys de l'opérateur, éventuellement aucune. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeySummary"][];
+                };
+            };
+            /** @description Aucune session vivante. */
+            401: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {

@@ -113,8 +113,8 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 401
     Et il lui reste 9 codes de récupération
 
-  # **Le remplacement détruit ce qu'il remplace** — le secret en place et les dix codes de
-  # récupération partent ensemble. Il exige donc de présenter ce qu'on détruit, et ni le mot de passe
+  # **Le remplacement détruira à sa confirmation ce qu'il remplace** — le secret en place et les dix
+  # codes de récupération partent ensemble. Il exige donc de présenter ce qu'on détruit, et ni le mot de passe
   # ni un cookie de session élevée ne suffisent : sans cela, un cookie capté évincerait définitivement
   # l'opérateur.
   Scénario: remplacer son authentificateur sans le présenter est refusé
@@ -164,6 +164,101 @@ Fonctionnalité: Le second facteur TOTP
     Et le serveur répond 200
     Et le secret rendu diffère du précédent
 
+  # Un remplacement attend sa confirmation à côté du facteur en place : le compte n'est jamais sans
+  # facteur que quelqu'un détient. Le témoin des deux scénarios qui suivent.
+  Scénario: un remplacement abandonné laisse l'ancien code valide
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    # Un code de récupération et non un code TOTP : il laisse l'anti-rejeu de l'ancien secret au pas
+    # courant, et son pas suivant reste présentable.
+    Et l'opérateur remplace son authentificateur en présentant un code de récupération
+    Quand l'opérateur se connecte avec son mot de passe
+    Et l'opérateur présente le code du pas courant
+    Alors le serveur répond 401
+    # Les codes de récupération rendus par le remplacement attendent eux aussi.
+    Quand l'opérateur présente son premier code de récupération
+    Alors le serveur répond 401
+    Quand l'opérateur présente le code du pas suivant de l'ancien secret
+    Alors le serveur répond 204
+    Et la session annonce une application d'authentification
+    Et il lui reste 9 codes de récupération
+
+  Scénario: après confirmation, l'ancien code est refusé et le nouveau élève
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    Et l'opérateur remplace son authentificateur en présentant son code
+    Quand l'opérateur confirme sa nouvelle application d'authentification
+    Alors la réponse est conforme au contrat du BFF
+    Et le serveur répond 204
+    Et le journal porte 1 événement "mfa.confirm"
+    # Les dix codes du remplaçant, et eux seuls : les anciens partent avec l'ancien secret.
+    Et il lui reste 10 codes de récupération
+    Quand l'opérateur se connecte avec son mot de passe
+    # Le pas suivant et non le courant : la confirmation vient de consommer le courant, et
+    # l'anti-rejeu le refuserait quel que soit le secret.
+    Et l'opérateur présente le code du pas suivant de l'ancien secret
+    Alors le serveur répond 401
+    Quand l'opérateur présente le code du pas suivant
+    Alors le serveur répond 204
+    Et le second facteur est vérifié
+
+  Scénario: confirmer sans remplacement en cours est refusé
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    Quand l'opérateur confirme sa nouvelle application d'authentification
+    Alors la réponse est conforme au contrat du BFF
+    Et le refus dit qu'aucun enrôlement n'attend
+
+  Scénario: confirmer sans session élevée est refusé
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    Et l'opérateur remplace son authentificateur en présentant son code
+    Et l'opérateur se connecte avec son mot de passe
+    Quand l'opérateur confirme sa nouvelle application d'authentification
+    Alors la réponse est conforme au contrat du BFF
+    Et le refus dit comment franchir le second facteur
+
+  # 400 et non 401 : un client qui lit tout 401 comme une session close renverrait l'opérateur au
+  # login, élévation perdue, pour un chiffre de travers.
+  Scénario: un code de confirmation faux est refusé sans fermer la session
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et l'opérateur présente le code du pas courant
+    Et l'opérateur remplace son authentificateur en présentant son code
+    Quand l'opérateur confirme sa nouvelle application d'authentification avec un code faux
+    Alors la réponse est conforme au contrat du BFF
+    Et le code de confirmation est refusé
+    Et le second facteur est vérifié
+
+  # Une erreur interne ne dit rien du code essayé : la compter bloquait pour un quart
+  # d'heure l'opérateur qui réessayait, comme le message du 500 l'y invite.
+  Scénario: une panne pendant la vérification ne compte pas comme un essai
+    Étant donné une installation avec un opérateur
+    Et un serveur démarré
+    Et l'opérateur se connecte avec son mot de passe
+    Et l'opérateur enrôle une application d'authentification
+    Et le secret de l'application d'authentification devient illisible
+    Quand l'opérateur présente 5 fois le code du pas courant
+    Alors le serveur répond 500
+    Quand le secret de l'application d'authentification redevient lisible
+    Et l'opérateur présente le code du pas courant
+    Alors le serveur répond 204
+    Et le second facteur est vérifié
+
   # **Le verrou que step-028 a découvert en s'en servant.** L'enrôlement écrit le secret avant que
   # l'opérateur ait scanné quoi que ce soit — `Enrolled` vaut `mfa_totp_secret IS NOT NULL`. Qui
   # ferme l'onglet à cet instant portait donc un facteur que personne ne détient, pas même lui : sa
@@ -194,14 +289,11 @@ Fonctionnalité: Le second facteur TOTP
     Alors le serveur répond 200
     Et la session n'annonce aucun second facteur
 
-  # **Le témoin de la détente ci-dessus, et il tient la moitié qui compte.** Sans sa condition sur
-  # les clés d'accès, un compte gardé par une passkey qui marche et portant un TOTP abandonné
-  # laisserait quiconque détient le mot de passe remplacer ce TOTP sans élévation, puis s'en servir
-  # pour franchir le second facteur : la passkey ne garderait plus rien.
-  #
-  # La combinaison n'est pas théorique — c'est ce que produit un opérateur qui ajoute une
-  # application d'authentification depuis une session élevée par sa clé, et ne la confirme jamais.
-  Scénario: un authentificateur jamais confirmé ne se remplace pas quand une clé d'accès garde le compte
+  # **Le témoin de la détente ci-dessus, et il tient la moitié qui compte.** Une application ajoutée
+  # depuis une session élevée par la clé attend sa confirmation ; abandonnée, elle ne doit pas se
+  # laisser remplacer par qui ne détient que le mot de passe, sans quoi il s'en poserait une neuve
+  # et la passkey ne garderait plus rien. C'est l'élévation qui tient lieu de preuve.
+  Scénario: une application en attente ne se remplace pas sans élévation quand une clé d'accès garde le compte
     Étant donné une installation avec un opérateur
     Et un serveur démarré
     Et l'opérateur se connecte avec son mot de passe
@@ -212,7 +304,7 @@ Fonctionnalité: Le second facteur TOTP
     Et l'opérateur enrôle une application d'authentification
     Alors la réponse est conforme au contrat du BFF
     Et le serveur répond 409
-    Et le refus dit qu'aucune preuve n'a été présentée
+    Et le refus dit comment ajouter un facteur
 
   # Six chiffres de code, trois pas valables à la fois : sans compteur, la recherche exhaustive n'est
   # bornée par rien. Et le compteur du **premier** facteur n'y suffit pas — une connexion réussie

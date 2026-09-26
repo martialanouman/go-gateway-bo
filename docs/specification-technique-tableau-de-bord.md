@@ -367,6 +367,12 @@ DELETE /auth/mfa/webauthn/passkeys/{passkeyId} # (Amendement step-024) retire un
                                        # Elle n'est pas la seule à ÉCRIRE : register/finish pose un
                                        # second facteur, et cet événement-là doit être audité même
                                        # exempté de garde.
+GET    /auth/mfa/webauthn/passkeys     # (Amendement step-039) les passkeys de la session :
+                                       # { id, name, createdAt }. Lecture, sans audit.
+POST   /auth/mfa/totp/confirm          # (Amendement step-039) confirme un TOTP remplacé ou ajouté,
+                                       # en attente jusque-là : { code } -> 204, session élevée
+                                       # exigée, essai compté dans le seau du second facteur,
+                                       # audité mfa.confirm.
 POST   /auth/access-link               # (Amendement step-050) publique : { token, password } -> 204,
                                        # jeton à usage unique vérifié avant tout hachage. Invalide,
                                        # expiré, consommé ou remplacé reçoit le même refus, en 410,
@@ -595,6 +601,20 @@ Un enrôlement exige au minimum une session de premier facteur ; **remplacer** u
 - **Retirer le dernier facteur d'un opérateur est refusé**, et le refus nomme ce qui manque. Un contrôle interdit est désactivé et expliqué, jamais masqué (§1.9).
 
 Un opérateur peut détenir plusieurs passkeys, et TOTP **et** passkey à la fois : le serveur les accepte à parité, et laquelle proposer en premier est une décision d'écran. Ajouter un facteur à un opérateur qui en détient déjà un exige une session élevée, pour la même raison que le remplacement ci-dessus. **Supprimer** une passkey exige l'élévation mais non de la présenter — on retire une passkey précisément quand on ne l'a plus, et l'exiger rendrait le geste impossible dans le seul cas qui le motive.
+
+**(Amendement step-039) Confirmer un remplacement, et nommer une passkey.** Un TOTP remplacé ne
+prend pas la place de l'ancien : le secret neuf et ses dix codes **attendent**, à côté de ceux qui
+sont en place, et **l'ancien facteur reste seul en vigueur jusqu'à la confirmation** — le compte
+n'est jamais sans facteur que quelqu'un détient. `POST /auth/mfa/totp/confirm`, depuis n'importe
+quelle session élevée du compte, confronte un code au secret en attente, compte l'essai dans le même
+seau que la vérification, puis fait passer actifs le secret et ses codes en retirant les anciens, en
+une transaction. Un nouveau remplacement écrase l'attente ; le lien de réinitialisation l'efface. **La
+règle vaut pour tout enrôlement sur un compte qu'un facteur confirmé garde déjà** — TOTP confirmé ou
+passkey : un compte à clé d'accès qui ajoute une application passe lui aussi par l'attente et la
+confirmation. Seul un compte sans aucun facteur confirmé, au premier enrôlement, écrit directement le
+secret actif, confirmé ensuite par `verify`. Une passkey
+porte un **nom** de 1 à 64 caractères, choisi à l'enregistrement : c'est par lui qu'un opérateur
+reconnaît celle qu'il retire.
 
 Rien de ce qui est stocké pour une passkey n'est un secret : la clé est **publique**, et aucune lecture de la base ne permet de forger une assertion. C'est ce qui dispense cette table du chiffrement au repos qu'exige le secret TOTP.
 

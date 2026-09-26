@@ -47,13 +47,23 @@ type webauthnWorld struct {
 	// relyingPartyName est ce que la réponse d'ouverture a annoncé comme nom de partie de confiance.
 	// Il est retenu ici parce que le corps qui le portait est remplacé par celui de la clôture.
 	relyingPartyName string
+	// name est le nom que la prochaine finition d'enregistrement présentera.
+	name string
 }
+
+const defaultPasskeyName = "Clé de scénario"
 
 // registerSteps vit ici et non dans `initializeScenario`, comme celui de `mfaWorld` : c'est la
 // quatrième step d'authentification d'affilée, et le registre de `main_test.go` grossissait d'une
 // vingtaine de lignes à chaque fois.
 func (w *webauthnWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^une clé d'accès enregistrée$`, w.registerPasskey)
+	ctx.Given(`^une clé d'accès nommée "([^"]*)" enregistrée$`, w.registerPasskeyNamed)
+	ctx.When(`^l'opérateur enregistre une clé d'accès nommée "([^"]*)"$`, w.registerPasskeyNamed)
+	ctx.When(`^l'opérateur enregistre une clé d'accès dont le nom dépasse 64 caractères$`,
+		func() error { return w.registerPasskeyNamed(strings.Repeat("n", 65)) })
+	ctx.When(`^l'opérateur demande l'inventaire de ses clés d'accès$`, w.listPasskeys)
+	ctx.Then(`^l'inventaire nomme "([^"]*)" puis "([^"]*)", et rien d'autre$`, w.inventoryNames)
 	ctx.When(`^l'opérateur enregistre une clé d'accès$`, w.registerPasskey)
 	ctx.Given(`^une seconde clé d'accès enregistrée$`, w.registerPasskey)
 	ctx.When(`^l'opérateur enregistre une seconde clé d'accès$`, w.registerPasskey)
@@ -110,12 +120,45 @@ func (w *webauthnWorld) relyingParty(origin string) virtualwebauthn.RelyingParty
 // pourquoi les scénarios qui l'emploient en décor observent tous, plus loin, un effet que l'absence
 // d'enregistrement rendrait faux — un statut, un compte de clés, ou une élévation.
 func (w *webauthnWorld) registerPasskey() error {
+	return w.registerPasskeyNamed(defaultPasskeyName)
+}
+
+func (w *webauthnWorld) registerPasskeyNamed(name string) error {
+	w.name = name
+
 	return w.registerSignedFor(ceremonyOrigin)
+}
+
+func (w *webauthnWorld) listPasskeys() error {
+	return w.login.process.fetch("/api/auth/mfa/webauthn/passkeys")
+}
+
+func (w *webauthnWorld) inventoryNames(first, second string) error {
+	var listed []struct {
+		Name string `json:"name"`
+	}
+
+	if err := json.Unmarshal([]byte(w.login.process.received.body), &listed); err != nil {
+		return fmt.Errorf("relire l'inventaire : %w\n%s", err, w.login.process.received.body)
+	}
+
+	names := make([]string, 0, len(listed))
+	for _, passkey := range listed {
+		names = append(names, passkey.Name)
+	}
+
+	if strings.Join(names, "|") != first+"|"+second {
+		return fmt.Errorf("l'inventaire nomme %q et non [%q %q]", names, first, second)
+	}
+
+	return nil
 }
 
 // registerFromAnotherOrigin signe l'attestation pour une origine que le serveur n'attend pas. Le
 // défi est le bon, la clé est neuve : seule l'origine inscrite dans les données signées diffère.
 func (w *webauthnWorld) registerFromAnotherOrigin() error {
+	w.name = defaultPasskeyName
+
 	return w.registerSignedFor(phishingOrigin)
 }
 
@@ -224,7 +267,11 @@ func (w *webauthnWorld) closeOpenedRegistration() error {
 }
 
 func (w *webauthnWorld) finishRegistration(attestation string) error {
-	body, err := json.Marshal(map[string]json.RawMessage{"attestation": json.RawMessage(attestation)})
+	if w.name == "" {
+		w.name = defaultPasskeyName
+	}
+
+	body, err := json.Marshal(map[string]any{"attestation": json.RawMessage(attestation), "name": w.name})
 	if err != nil {
 		return fmt.Errorf("composer le corps de l'enregistrement : %w", err)
 	}

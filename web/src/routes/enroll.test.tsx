@@ -14,6 +14,7 @@ import {
   ENROLLMENT_SECRET,
   OTPAUTH_URI,
   RECOVERY_CODES,
+  stubAuthenticator,
   stubSession,
 } from '../../test/session'
 
@@ -69,6 +70,11 @@ async function confirmEnrollment(user: ReturnType<typeof userEvent.setup>) {
 
 const authenticator = () => screen.getByRole('button', { name: /application d’authentification/i })
 const passkey = () => screen.getByRole('button', { name: /clé d’accès/i })
+
+async function registerNamed(user: ReturnType<typeof userEvent.setup>, name = 'Portable') {
+  await user.type(screen.getByLabelText(/Nom de la clé/), name)
+  await user.click(passkey())
+}
 
 /** Le SVG que la bibliothèque a dessiné, atteint par le nom accessible que l'écran lui donne. */
 async function qrCode() {
@@ -197,9 +203,7 @@ describe('la garde de l’enrôlement', () => {
   })
 
   it('renvoie au second facteur quand ce compte en détient déjà un', async () => {
-    // Remplacer un facteur en place exige de présenter celui qu'on remplace (`TotpEnrollmentRequest`),
-    // et cette step ne présente jamais de preuve : elle n'enrôle que le premier facteur. Le
-    // remplacement n'a pas encore d'écran (dette 053).
+    // Cet écran n'enrôle que le premier facteur ; l'ajout et le remplacement vivent dans « Mon compte ».
     const { router } = await visitEnroll({
       factors: { totp: true },
       path: '/enroll?redirect=%2Fbilling',
@@ -374,6 +378,24 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(router.state.location.pathname).toBe('/billing')
   })
 
+  it('n’emporte ni la clé ni les codes dans le cache après le départ de l’écran', async () => {
+    const { router, user } = await visitEnroll({ path: '/enroll?redirect=%2Fbilling' })
+    await confirmEnrollment(user)
+    await user.click(screen.getByRole('button', { name: 'J’ai enregistré ces codes' }))
+    await screen.findByRole('heading', { level: 1, name: /Soldes & crédits/ })
+    // Une macrotâche : la collecte d'une mutation à `gcTime: 0` s'exécute sur le `setTimeout` suivant.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const cached = JSON.stringify(
+      router.options.context.queryClient
+        .getMutationCache()
+        .findAll()
+        .map(({ state }) => state),
+    )
+    expect(cached).not.toContain(ENROLLMENT_SECRET)
+    expect(cached).not.toContain(RECOVERY_CODES[1])
+  })
+
   it('refuse un premier code faux, et reprend l’indice de dérive d’horloge', async () => {
     // C'est **le premier** code, tapé juste après un scan : l'horloge du téléphone est la cause la
     // plus probable, et le serveur ne la nomme plus depuis step-035.
@@ -454,7 +476,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     stubWebAuthnSupport(true)
     const { user } = await visitEnroll()
 
-    await user.click(passkey())
+    await registerNamed(user)
     await screen.findByRole('alert')
 
     await user.click(authenticator())
@@ -517,7 +539,7 @@ describe('l’enregistrement d’une clé d’accès', () => {
       },
     })
 
-    await user.click(passkey())
+    await registerNamed(user)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('réessayez dans 5 minutes')
   })
@@ -528,10 +550,50 @@ describe('l’enregistrement d’une clé d’accès', () => {
     stubWebAuthnSupport(true)
     const { user } = await visitEnroll()
 
-    await user.click(passkey())
+    await registerNamed(user)
 
     const refus = await screen.findByRole('alert')
     expect(refus).toHaveTextContent('La clé d’accès n’a pas été enregistrée')
     expect(refus.textContent ?? '').not.toMatch(/[Ee]rror|not allowed|browser does/)
   })
+
+  it('enregistre la clé sous le nom saisi, puis mène à sa présentation', async () => {
+    stubWebAuthnSupport(true)
+    stubAuthenticator()
+    const { user } = await visitEnroll()
+
+    await registerNamed(user, '  YubiKey du bureau  ')
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Second facteur/ }),
+    ).toBeInTheDocument()
+    expect(await postedBody('/api/auth/mfa/webauthn/register/finish')).toMatchObject({
+      name: 'YubiKey du bureau',
+    })
+  })
+
+  it('refuse d’ouvrir la cérémonie sans nom, et dit pourquoi', async () => {
+    stubWebAuthnSupport(true)
+    const { user } = await visitEnroll()
+
+    await user.click(passkey())
+
+    expect(await screen.findByText(/Nommez la clé/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Nom de la clé/)).toHaveAttribute('aria-invalid', 'true')
+    const posts = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.filter(([request]) => (request as Request).method === 'POST')
+    expect(posts).toEqual([])
+  })
 })
+
+/** Le corps posté sur une route, lu sur l'appel que le décor a reçu. */
+async function postedBody(path: string) {
+  const call = vi
+    .mocked(globalThis.fetch)
+    .mock.calls.map(([request]) => request as Request)
+    .find((request) => request.method === 'POST' && request.url.endsWith(path))
+  if (call === undefined) throw new Error(`aucun POST sur ${path}`)
+
+  return call.clone().json()
+}

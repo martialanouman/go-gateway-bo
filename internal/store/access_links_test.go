@@ -270,8 +270,10 @@ func TestLeResetEffaceLesFacteursEtFermeLesSessions(t *testing.T) {
 	operator := insertOperator(t, dsn, "camille@exemple.test", "hash")
 	registerPasskey(t, store.NewWebauthn(pool), operator, "cle")
 	execOn(t, dsn, `
-		WITH secret AS (UPDATE operators SET mfa_totp_secret = 'scelle', mfa_totp_last_step = 1 WHERE id = $1),
-		     codes AS (INSERT INTO mfa_recovery_codes (operator_id, code_hash) VALUES ($1, 'h')),
+		WITH secret AS (UPDATE operators SET mfa_totp_secret = 'scelle', mfa_totp_last_step = 1,
+		                   mfa_totp_pending_secret = 'attente' WHERE id = $1),
+		     codes AS (INSERT INTO mfa_recovery_codes (operator_id, code_hash, pending)
+		               VALUES ($1, 'h', false), ($1, 'p', true)),
 		     session AS (INSERT INTO sessions (operator_id, token_hash, expires_at)
 		                 VALUES ($1, 'jeton', now() + interval '1 hour'))
 		INSERT INTO login_attempt_counters (scope, subject, failures, last_failure_at)
@@ -282,6 +284,7 @@ func TestLeResetEffaceLesFacteursEtFermeLesSessions(t *testing.T) {
 
 		queryOn(t, dsn, `
 			SELECT (SELECT count(*) FROM operators WHERE id = $1 AND mfa_totp_secret IS NOT NULL)
+			     + (SELECT count(*) FROM operators WHERE id = $1 AND mfa_totp_pending_secret IS NOT NULL)
 			     + (SELECT count(*) FROM mfa_recovery_codes WHERE operator_id = $1)
 			     + (SELECT count(*) FROM webauthn_credentials WHERE operator_id = $1)
 			     + (SELECT count(*) FROM login_attempt_counters WHERE scope = 'mfa' AND subject = $1::text)
@@ -292,7 +295,7 @@ func TestLeResetEffaceLesFacteursEtFermeLesSessions(t *testing.T) {
 
 	requestReset(t, pool, operator)
 	digest := digestOf(t, deliver(t, links))
-	require.Equal(t, 5, survivors(), "la demande a changé quelque chose avant l'usage du lien")
+	require.Equal(t, 7, survivors(), "la demande a changé quelque chose avant l'usage du lien")
 
 	require.NoError(t, links.Consume(t.Context(), digest, "neuf", store.Event{Action: "operator.password_set"}))
 	assert.Zero(t, survivors(), "le reset laisse un facteur, un verrou ou une session derrière lui")

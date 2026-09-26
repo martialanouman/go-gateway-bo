@@ -35,6 +35,7 @@ func samplePasskey(credentialID string) store.Passkey {
 		Attachment:     "platform",
 		BackupEligible: true,
 		BackupState:    false,
+		Name:           "Clé " + credentialID,
 	}
 }
 
@@ -114,6 +115,9 @@ func TestLesPasskeysEnregistreesSeRelisentTelesQuEcrites(t *testing.T) {
 	assert.Equal(t, "platform", relu.Attachment)
 	assert.True(t, relu.BackupEligible)
 	assert.False(t, relu.BackupState)
+	assert.Equal(t, "Clé premiere", relu.Name)
+	assert.False(t, relu.CreatedAt.IsZero())
+	assert.Equal(t, "Clé seconde", owner.Passkeys[1].Name)
 }
 
 func TestLesPasskeysDUnAutreOperateurNeSontPasRendues(t *testing.T) {

@@ -122,3 +122,14 @@ func (API) DeleteRole(_ context.Context, _ bff.DeleteRoleRequestObject) (bff.Del
 }
 
 var _ = bff.NewStrictHandler(API{}, nil)
+
+func (API) ListWebauthnPasskeys(_ context.Context,
+	_ bff.ListWebauthnPasskeysRequestObject,
+) (bff.ListWebauthnPasskeysResponseObject, error) {
+	return bff.ListWebauthnPasskeys200JSONResponse{}, nil
+}
+
+func (API) ConfirmTotp(_ context.Context, _ bff.ConfirmTotpRequestObject,
+) (bff.ConfirmTotpResponseObject, error) {
+	return bff.ConfirmTotp204Response{}, nil
+}

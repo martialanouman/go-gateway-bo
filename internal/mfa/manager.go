@@ -82,8 +82,9 @@ func (m *Manager) Factors(ctx context.Context, operatorID string) (store.SecondF
 
 // Enroll tire un authentificateur, l'écrit, et rend ce qui n'est montré qu'une fois. `false` dit
 // qu'un second facteur était déjà en place et que `replace` ne l'autorisait pas — la garde est
-// appliquée par l'écriture elle-même, voir `store.MFA.Enroll`.
-func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, replace bool,
+// appliquée par l'écriture elle-même, voir `store.MFA.Enroll`. `pending` le pose en attente à côté
+// du facteur confirmé — TOTP ou passkey —, qui reste seul valide jusqu'à `ConfirmTOTP`.
+func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, replace, pending bool,
 	event store.Event,
 ) (Enrollment, bool, error) {
 	enrollment, err := m.authenticator.Enroll(operatorID, accountName)
@@ -91,8 +92,19 @@ func (m *Manager) Enroll(ctx context.Context, operatorID, accountName string, re
 		return Enrollment{}, false, err
 	}
 
-	written, err := m.factors.Enroll(ctx, operatorID, enrollment.SealedSecret,
-		enrollment.RecoveryCodeHashes, replace, event)
+	write := func() (bool, error) {
+		return m.factors.Enroll(ctx, operatorID, enrollment.SealedSecret,
+			enrollment.RecoveryCodeHashes, replace, event)
+	}
+
+	if pending {
+		write = func() (bool, error) {
+			return m.factors.EnrollPending(ctx, operatorID, enrollment.SealedSecret,
+				enrollment.RecoveryCodeHashes, event)
+		}
+	}
+
+	written, err := write()
 	if err != nil || !written {
 		return Enrollment{}, false, err
 	}
@@ -117,6 +129,22 @@ func (m *Manager) VerifyTOTP(ctx context.Context, operatorID, code string) (bool
 	}
 
 	return m.factors.ConsumeStep(ctx, operatorID, step)
+}
+
+// ConfirmTOTP confronte le code au secret **en attente**, et le fait passer actif s'il colle.
+func (m *Manager) ConfirmTOTP(ctx context.Context, operatorID, code string, event store.Event,
+) (bool, error) {
+	state, found, err := m.State(ctx, operatorID)
+	if err != nil || !found || state.PendingSecret == "" {
+		return false, err
+	}
+
+	step, ok, err := m.authenticator.Verify(state.PendingSecret, operatorID, code, state.CurrentStep)
+	if err != nil || !ok {
+		return false, err
+	}
+
+	return m.factors.ConfirmPending(ctx, operatorID, state.PendingSecret, step, event)
 }
 
 // VerifyRecoveryCode confronte le code aux hachages restants **puis** détruit celui qui a servi.
@@ -172,6 +200,11 @@ func (m *Manager) ConsumeChallenge(ctx context.Context, id string) (bool, error)
 // envoyait de requêtes.
 func (m *Manager) Reserve(ctx context.Context, operatorID string) (store.Lock, error) {
 	return m.factors.Reserve(ctx, operatorID, LockWindow, MaxFailures)
+}
+
+// Release rend l'essai réservé quand la vérification a échoué sur une erreur interne.
+func (m *Manager) Release(ctx context.Context, operatorID string) error {
+	return m.factors.Release(ctx, operatorID)
 }
 
 // Succeed efface le compteur d'un opérateur qui vient de franchir son second facteur.

@@ -74,8 +74,8 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 	}
 
 	// **La garde de la step.** Le premier enrôlement est libre — il faut bien pouvoir entrer une
-	// première fois, et il n'y a rien à prouver. Le remplacement, lui, **détruit** l'authentificateur
-	// en place et ses dix codes de récupération : il exige donc de présenter ce qu'on détruit.
+	// première fois, et il n'y a rien à prouver. Le remplacement, lui, **détruira** à sa confirmation
+	// l'authentificateur en place et ses dix codes : il exige donc de présenter ce qu'il détruira.
 	//
 	// Une preuve du mot de passe n'y suffirait pas — un cookie de session élevée capté évincerait
 	// définitivement l'opérateur. Et un challenge frais serait **inatteignable** : se reconnecter pour
@@ -144,7 +144,7 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 				return EnrollTotp503JSONResponse(overloaded()), nil
 			}
 
-			return nil, err
+			return nil, a.releaseUnjudgedAttempt(ctx, resolved.OperatorID, err)
 		}
 
 		if !replace {
@@ -152,17 +152,22 @@ func (a API) EnrollTotp(ctx context.Context, request EnrollTotpRequestObject) (E
 		}
 	}
 
+	// Dès qu'un facteur confirmé garde le compte — TOTP confirmé ou passkey —, le nouveau secret attend
+	// sa confirmation à côté : le compte n'est jamais sans facteur que quelqu'un détient.
+	pending := (state.Enrolled && state.Proven) || held.Passkeys > 0
+
 	// L'état d'après ne porte que ce qu'une enquête doit savoir : un facteur a été posé, et il a
 	// remplacé ou non celui d'avant. Ni le secret, ni les codes — `Fields` n'a d'ailleurs pas de
 	// méthode pour les y mettre.
 	enrollment, written, err := a.SecondFactor.Enroll(ctx, resolved.OperatorID, state.Email, replace,
-		a.event(ctx, store.Event{
+		pending, a.event(ctx, store.Event{
 			OperatorID: resolved.OperatorID,
 			Action:     actionMFAEnroll,
 			TargetType: auditTargetOperator,
 			TargetID:   resolved.OperatorID,
 			After: store.NewFields().Text("method", "totp").
-				Flag("replaced", replace).Flag("proof_presented", replace && !unconfirmed),
+				Flag("replaced", replace).Flag("proof_presented", replace && !unconfirmed).
+				Flag("pending", pending),
 		}))
 	if err != nil {
 		return nil, err
@@ -251,7 +256,7 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 
 	challenge, live, err := a.SecondFactor.Challenge(ctx, request.Body.Challenge)
 	if err != nil {
-		return nil, err
+		return nil, a.releaseUnjudgedAttempt(ctx, resolved.OperatorID, err)
 	}
 
 	if !live || challenge.OperatorID != resolved.OperatorID {
@@ -264,7 +269,7 @@ func (a API) VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (Ver
 			return VerifyMfa503JSONResponse(overloaded()), nil
 		}
 
-		return nil, err
+		return nil, a.releaseUnjudgedAttempt(ctx, resolved.OperatorID, err)
 	}
 
 	if !verified {
@@ -417,7 +422,7 @@ func tooManyEnrollments(remaining time.Duration) EnrollTotp429JSONResponse {
 // Essayer les deux ferait payer les argon2id du chemin de récupération à chaque code TOTP faux,
 // et la durée de la réponse dirait alors laquelle des deux voies a répondu.
 //
-// Il sert les **deux** routes : la vérification qui élève, et le remplacement qui détruit. Le geste
+// Il sert les **deux** routes : la vérification qui élève, et le remplacement. Le geste
 // est le même — présenter le facteur en place — et l'écrire deux fois en ferait deux rédactions qui
 // divergeraient, dont l'une consommerait le pas de temps et l'autre non.
 func (a API) verifyPresentedFactor(ctx context.Context, operatorID string, method, code string,
@@ -528,4 +533,122 @@ func secondFactorsOf(ctx context.Context, factors *mfa.Manager, operatorID strin
 		RecoveryCodesRemaining: held.RecoveryCodesRemaining,
 		Passkeys:               held.Passkeys,
 	}, nil
+}
+
+// ConfirmTotp fait passer active l'application d'authentification en attente, remplacement ou ajout.
+// `VerifyMfa` ne le peut pas : il exige un challenge de connexion, que la session élevée n'a plus.
+func (a API) ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) (ConfirmTotpResponseObject,
+	error,
+) {
+	if request.Body == nil || request.Body.Code == "" ||
+		len([]rune(request.Body.Code)) > maximumCodeLength {
+		return ConfirmTotp400JSONResponse(badRequest()), nil
+	}
+
+	resolved, alive, err := sessionFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !alive {
+		return ConfirmTotp401JSONResponse(notAuthenticated()), nil
+	}
+
+	if !resolved.Elevated {
+		return ConfirmTotp409JSONResponse(elevationRequiredToConfirm()), nil
+	}
+
+	state, found, err := a.SecondFactor.State(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !found {
+		return ConfirmTotp401JSONResponse(notAuthenticated()), nil
+	}
+
+	if state.PendingSecret == "" {
+		return ConfirmTotp409JSONResponse(nothingToConfirm()), nil
+	}
+
+	lock, err := a.SecondFactor.Reserve(ctx, resolved.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	if lock.Locked() {
+		return confirmationLocked(lock.Remaining), nil
+	}
+
+	confirmed, err := a.SecondFactor.ConfirmTOTP(ctx, resolved.OperatorID, request.Body.Code,
+		a.event(ctx, store.Event{
+			OperatorID: resolved.OperatorID,
+			Action:     actionMFAConfirm,
+			TargetType: auditTargetOperator,
+			TargetID:   resolved.OperatorID,
+			After:      store.NewFields().Text("method", "totp"),
+		}))
+	if err != nil {
+		return nil, a.releaseUnjudgedAttempt(ctx, resolved.OperatorID, err)
+	}
+
+	if !confirmed {
+		if lock.Failures >= mfa.MaxFailures {
+			return confirmationLocked(mfa.LockWindow), nil
+		}
+
+		return ConfirmTotp400JSONResponse(refusedConfirmationCode()), nil
+	}
+
+	if err = a.SecondFactor.Succeed(ctx, resolved.OperatorID); err != nil {
+		return nil, err
+	}
+
+	return ConfirmTotp204Response{}, nil
+}
+
+// releaseUnjudgedAttempt rend l'essai réservé quand la vérification a échoué sans juger le code :
+// une erreur interne ne dit rien du code présenté. La saturation, elle, reste comptée.
+func (a API) releaseUnjudgedAttempt(ctx context.Context, operatorID string, cause error) error {
+	if err := a.SecondFactor.Release(ctx, operatorID); err != nil {
+		return errors.Join(cause, err)
+	}
+
+	return cause
+}
+
+func confirmationLocked(remaining time.Duration) ConfirmTotp429JSONResponse {
+	seconds := retryAfterSeconds(remaining)
+
+	return ConfirmTotp429JSONResponse{
+		Headers: ConfirmTotp429ResponseHeaders{RetryAfter: seconds},
+		Body:    secondFactorLocked(seconds),
+	}
+}
+
+func nothingToConfirm() Error {
+	return Error{
+		Code: "mfa_nothing_to_confirm",
+		Message: "Aucune application d'authentification n'attend de confirmation sur ce compte : rien " +
+			"n'a changé. En enrôler une d'abord ; elle attendra ici le premier code qu'elle affiche.",
+	}
+}
+
+func elevationRequiredToConfirm() Error {
+	return Error{
+		Code: "mfa_elevation_required",
+		Message: "Confirmer une application d'authentification demande d'avoir franchi le second " +
+			"facteur sur cette session. Le franchir, puis reprendre la confirmation.",
+	}
+}
+
+// refusedConfirmationCode part en 400 et non en 401 : la session est vivante, et un client qui lit
+// tout 401 comme « session close » renverrait l'opérateur au login.
+func refusedConfirmationCode() Error {
+	return Error{
+		Code: "mfa_code_refused",
+		Message: "Ce code n'a pas été accepté : la nouvelle application d'authentification n'est pas " +
+			"confirmée, et les facteurs déjà en place restent seuls en vigueur. Saisir le code qu'elle " +
+			"affiche maintenant.",
+	}
 }

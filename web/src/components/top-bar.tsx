@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { Button } from '~/components/ui'
 import { api, type Me, meQueryOptions } from '~/lib/api'
 
@@ -19,7 +20,9 @@ export function TopBar({ operator }: { readonly operator: Me['operator'] }) {
 
   return (
     <div className="topbar__end">
-      <span className="topbar__operator">{operator.displayName}</span>
+      <Link className="topbar__operator" to="/account">
+        {operator.displayName}
+      </Link>
       <Button loading={logout.isPending} onClick={() => logout.mutate()} size="sm">
         Se déconnecter
       </Button>

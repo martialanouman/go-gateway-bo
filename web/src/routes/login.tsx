@@ -103,6 +103,8 @@ function LoginScreen() {
   })
 
   const login = useMutation({
+    // Les variables portent le mot de passe en clair : sans `gcTime: 0`, il reste cinq minutes en cache.
+    gcTime: 0,
     mutationFn: async ({ email, password }: z.output<typeof credentials>) => {
       const { data, error, response } = await api.POST('/auth/login', {
         body: { email, password },

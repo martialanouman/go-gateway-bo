@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { onTestFinished, vi } from 'vitest'
 import type { components } from '~/lib/api.gen'
 import type { PermissionKey } from '~/lib/permissions.gen'
 
@@ -54,7 +54,12 @@ export type AuthReplies = {
   readonly enroll?: Reply | 'pending'
   readonly register?: Reply | 'pending'
   readonly registered?: Reply | 'pending'
+  readonly confirm?: Reply | 'pending'
+  readonly passkeys?: Reply | 'pending'
+  readonly unregister?: Reply | 'pending'
 }
+
+type PasskeySummary = components['schemas']['PasskeySummary']
 
 export const OPERATOR_NAME = 'Awa Kouadio'
 
@@ -96,6 +101,11 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
    * observable.
    */
   let granted: Partial<SecondFactors> = {}
+  let passkeys: PasskeySummary[] = Array.from({ length: heldPasskeys(outcome) }, (_, index) => ({
+    id: `passkey-${index + 1}`,
+    name: `Clé ${index + 1}`,
+    createdAt: '2026-09-01T09:00:00Z',
+  }))
 
   const fetch = vi.fn(async (request: Request) => {
     const { pathname } = new URL(request.url)
@@ -155,7 +165,17 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
         // Aucun `totp` ici : le serveur ne l'annonce qu'une fois un code consommé, et un décor qui
         // l'annonçait plus tôt a caché le défaut jusqu'à ce qu'il soit livré.
         if (reply !== 'pending' && reply.status === 200) {
-          granted = { ...granted, recoveryCodesRemaining: RECOVERY_CODES.length }
+          const { method } = (await request.clone().json()) as { method?: string }
+          const held =
+            typeof current === 'string' || 'status' in current ? {} : current.secondFactors
+          // Une preuve par code de récupération le consomme, comme le serveur.
+          granted = {
+            ...granted,
+            recoveryCodesRemaining:
+              method === 'recovery_code'
+                ? (granted.recoveryCodesRemaining ?? held?.recoveryCodesRemaining ?? 10) - 1
+                : RECOVERY_CODES.length,
+          }
         }
 
         return respond(reply)
@@ -183,7 +203,21 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
       case 'POST /api/auth/mfa/webauthn/register/finish': {
         const reply = replies.registered ?? { status: 200, body: { id: 'une-passkey' } }
         if (reply !== 'pending' && reply.status === 200) {
-          granted = { ...granted, passkeys: heldPasskeys(outcome) + 1 }
+          const { name } = (await request.clone().json()) as { name: string }
+          passkeys = [...passkeys, { id: 'une-passkey', name, createdAt: '2026-09-26T08:00:00Z' }]
+          granted = { ...granted, passkeys: passkeys.length }
+        }
+
+        return respond(reply)
+      }
+
+      case 'GET /api/auth/mfa/webauthn/passkeys':
+        return respond(replies.passkeys ?? { status: 200, body: passkeys })
+
+      case 'POST /api/auth/mfa/totp/confirm': {
+        const reply = replies.confirm ?? { status: 204 }
+        if (reply !== 'pending' && reply.status === 204) {
+          granted = { ...granted, totp: true, recoveryCodesRemaining: RECOVERY_CODES.length }
         }
 
         return respond(reply)
@@ -202,8 +236,18 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
           me({ ...current, secondFactors: { ...current.secondFactors, ...granted } }),
         )
 
-      default:
-        throw new Error(`appel réseau non déclaré : ${route}`)
+      default: {
+        const removed = /^DELETE \/api\/auth\/mfa\/webauthn\/passkeys\/(.+)$/.exec(route)?.[1]
+        if (removed === undefined) throw new Error(`appel réseau non déclaré : ${route}`)
+
+        const reply = replies.unregister ?? { status: 204 }
+        if (reply !== 'pending' && reply.status === 204) {
+          passkeys = passkeys.filter(({ id }) => id !== removed)
+          granted = { ...granted, passkeys: passkeys.length }
+        }
+
+        return respond(reply)
+      }
     }
   })
 
@@ -257,4 +301,27 @@ function me(outcome: {
     },
     absoluteExpiresAt: '2026-09-17T20:00:00Z',
   }
+}
+
+/**
+ * L'authentificateur de la plateforme, que jsdom n'a pas : `navigator.credentials.create` rend une
+ * attestation que le décor accepte telle quelle. C'est la plateforme qu'on déclare, pas le produit.
+ */
+export function stubAuthenticator() {
+  const bytes = () => new Uint8Array([1, 2, 3]).buffer
+  Object.defineProperty(navigator, 'credentials', {
+    configurable: true,
+    value: {
+      create: async () => ({
+        id: 'AQID',
+        rawId: bytes(),
+        type: 'public-key',
+        response: { clientDataJSON: bytes(), attestationObject: bytes() },
+        getClientExtensionResults: () => ({}),
+      }),
+    },
+  })
+  onTestFinished(() => {
+    Reflect.deleteProperty(navigator, 'credentials')
+  })
 }

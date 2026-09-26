@@ -9,7 +9,7 @@ import (
 // Les actions que le journal porte, en `domaine.verbe` — la convention du §3.1. Elles se grep dans le
 // journal, donc elles ne se traduisent pas et ne se composent pas à la volée.
 //
-// **Sept des neuf mutations de `/auth/` en portent une.** Les deux exemptées sont les ouvertures de
+// **Huit des dix mutations de `/auth/` en portent une.** Les deux exemptées sont les ouvertures de
 // cérémonie WebAuthn : elles n'ont aucun effet durable — un défi tiré, remplacé au prochain appel, et
 // consommé ou échu en cinq minutes. Les tracer produirait du bruit qu'une enquête devrait apprendre à
 // écarter, ce qui est le meilleur moyen de lui faire écarter autre chose.
@@ -18,6 +18,7 @@ const (
 	actionLogout          = "operator.logout"
 	actionMFAEnroll       = "mfa.enroll"
 	actionMFAVerify       = "mfa.verify"
+	actionMFAConfirm      = "mfa.confirm"
 	actionPasskeyRegister = "passkey.register"
 	actionPasskeyRemove   = "passkey.remove"
 	actionPasswordSet     = "operator.password_set"

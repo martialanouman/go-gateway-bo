@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { PendingScreen } from '~/components/pending-screen'
 import { createAppRouter } from '~/router'
 import { stubSession } from '../../test/session'
-import { NAV_ENTRIES, NAV_GROUPS, type NavPath, navEntry } from './navigation'
+import { NAV_ENTRIES, NAV_GROUPS, type NavPath, navEntry, OFF_RAIL } from './navigation'
 
 describe('la table de navigation', () => {
   it('reprend les cinq groupes de la charte, plus l’administration', () => {
@@ -29,11 +29,13 @@ describe('la table de navigation', () => {
     // ajoutée sans entrée serait un écran que personne ne trouve. Aucun des deux ne rougirait le test
     // qui parcourt la table.
     const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
-    // Enfant de `_shell`, et l'accueil mis à part : c'est ce qui fait un écran du rail. Retrancher
-    // une liste de chemins demanderait d'y penser à chaque route posée hors de la coquille, et
-    // l'oubli ajouterait une entrée au rail sans rien faire rougir.
+    // Enfant de `_shell` et absent d'`OFF_RAIL`, qui nomme les écrans atteints autrement : c'est ce
+    // qui fait un écran du rail.
     const screens = Object.entries(router.routesByPath)
-      .filter(([path, route]) => path !== '/' && route.id.startsWith('/_shell/'))
+      .filter(
+        ([path, route]) =>
+          !(OFF_RAIL as readonly string[]).includes(path) && route.id.startsWith('/_shell/'),
+      )
       .map(([path]) => path)
       .sort()
 

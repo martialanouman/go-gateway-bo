@@ -2,16 +2,15 @@ import type { FileRouteTypes } from '~/routeTree.gen'
 import type { PermissionKey } from './permissions.gen'
 
 /**
- * Les écrans de la coquille, **dérivés de l'arbre** plutôt qu'énumérés : un écran appartient au rail
- * s'il est enfant de `_shell`, et rien ne le dit mieux que son identifiant.
- *
- * L'ancienne rédaction retranchait `/` et `/_design` de tous les chemins. Elle demandait qu'on pense
- * à retrancher chaque route posée hors de la coquille — `/login` et `/mfa` l'ont montré en
- * s'invitant dans la table —, et l'oubli ne rougissait pas : il **ajoutait** une entrée au rail.
+ * Les écrans du rail, **dérivés de l'arbre** : les enfants de `_shell`, moins ceux d'`OFF_RAIL`.
+ * Une route posée hors de la coquille, `/login` par exemple, reste hors du rail sans rien retrancher.
  */
 type ShellScreen<Id> = Id extends `/_shell/${infer Path}` ? `/${Path}` : never
 
-export type NavPath = Exclude<ShellScreen<FileRouteTypes['id']>, '/'>
+/** `/account` est atteint par le nom de l'opérateur, dans la barre supérieure, et non par le rail. */
+export const OFF_RAIL = ['/', '/account'] as const
+
+export type NavPath = Exclude<ShellScreen<FileRouteTypes['id']>, (typeof OFF_RAIL)[number]>
 
 export type Milestone = 'M3' | 'M4' | 'M5' | 'M6' | 'M7' | 'M8' | 'M9'
 
