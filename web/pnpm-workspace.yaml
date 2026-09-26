@@ -71,15 +71,17 @@ auditConfig:
   # `@stoplight/prism-cli > @stoplight/prism-http > @stoplight/http-spec > postman-collection >
   # @faker-js/faker`. Rien de cette chaîne n'atteint le bundle servi.
   #
-  # **Non corrigeable, mesuré le 04/09/2026 plutôt que supposé.** L'avis annonce un correctif en
-  # `>=10.4.1` — version qui n'existe pas : la branche va de 10.4.0 à 10.5.0, et aucune 5.x ne porte
-  # le correctif. Forcer `postman-collection` sur la 10.6.0 a été essayé : faker 10 est ESM-only
-  # (`"type": "module"`) et `postman-collection` le charge en CJS, donc **Prism ne démarre plus du
-  # tout** — `postman-collection/lib/superstring/dynamic-variables.js:171`. Le mock est la condition
-  # de faisabilité du dépôt ; le prix de cet override est de le perdre.
+  # **Non corrigeable, remesuré le 26/09/2026.** Le correctif est en 10.5.0 ; toutes les versions
+  # antérieures, 5.x à 9.x comprises, sont touchées. Forcer le faker de `postman-collection` sur la
+  # 10.6.0 a été essayé : faker 10 est ESM-only (`"type": "module"`) et `postman-collection` le charge
+  # en CJS, donc **Prism ne démarre plus du tout** —
+  # `postman-collection/lib/superstring/dynamic-variables.js:171`. Le mock est la condition de
+  # faisabilité du dépôt ; le prix de cet override est de le perdre. Monter `postman-collection` en 5.x
+  # ne sert à rien : la 5.3.1 épingle encore `@faker-js/faker@5.5.3`.
   #
-  # À rouvrir dès que `@stoplight/http-spec` quitte `postman-collection@4.5.0` : c'est le seul
-  # porteur, et passé ce jour l'ignore couvrirait une chaîne qui n'existe plus.
+  # À rouvrir dès qu'une version de `postman-collection` accepte un faker ≥ 10.5.0, ou que
+  # `@stoplight/http-spec` cesse d'en dépendre : passé ce jour, l'ignore couvrirait une chaîne
+  # qui n'existe plus.
   ignoreGhsas:
     - GHSA-qxc2-j82w-r537
 
