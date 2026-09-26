@@ -216,7 +216,7 @@ Fonctionnalité: Le second facteur TOTP
     Et l'opérateur présente le code du pas courant
     Quand l'opérateur confirme sa nouvelle application d'authentification
     Alors la réponse est conforme au contrat du BFF
-    Et le refus dit qu'aucun remplacement n'attend
+    Et le refus dit qu'aucun enrôlement n'attend
 
   Scénario: confirmer sans session élevée est refusé
     Étant donné une installation avec un opérateur

@@ -190,16 +190,18 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirmer une application d'authentification qui vient d'être remplacée
+         * Confirmer une application d'authentification en attente, remplaçante ou ajoutée
          * @description Un enrôlement sur un compte qu'un facteur confirmé garde déjà — TOTP confirmé ou passkey —
          *     pose le secret neuf et ses dix codes **en attente**, à côté de ce qui est en place : ce
-         *     dernier reste seul valide, et le compte n'est jamais sans facteur confirmé. Cette route confronte le code au secret en attente et, s'il colle, le fait
-         *     passer actif avec ses codes, en retirant les anciens, dans une seule transaction.
-         *     `POST /auth/mfa/verify` ne peut pas le faire : il exige un challenge de connexion, que la
-         *     session élevée qui a remplacé n'a plus.
+         *     dernier reste seul valide, et le compte n'est jamais sans facteur confirmé. C'est un
+         *     remplacement quand un TOTP confirmé est en place, un ajout quand seule une passkey garde le
+         *     compte. Cette route confronte le code au secret en attente et, s'il colle, le fait passer
+         *     actif avec ses codes, en retirant les anciens s'il y en a, dans une seule transaction.
+         *     `POST /auth/mfa/verify` ne peut pas le faire : il exige un challenge de connexion, qu'une
+         *     session déjà élevée n'a plus.
          *
-         *     Session **élevée** exigée : c'est elle qui a remplacé. L'essai compte dans le seau du second
-         *     facteur, comme sur `verify`.
+         *     Session **élevée** exigée, pas nécessairement celle qui a enrôlé. L'essai compte dans le seau
+         *     du second facteur, comme sur `verify`.
          */
         post: operations["confirmTotp"];
         delete?: never;
@@ -1265,8 +1267,8 @@ export interface operations {
             403: components["responses"]["OrigineRefusee"];
             /**
              * @description Deux causes, deux codes. `mfa_elevation_required` : la session n'a pas franchi le second
-             *     facteur. `mfa_nothing_to_confirm` : aucun enrôlement n'attend — le message dit de
-             *     remplacer d'abord.
+             *     facteur. `mfa_nothing_to_confirm` : aucun enrôlement n'attend — le message dit d'en
+             *     enrôler un d'abord.
              */
             409: {
                 headers: {

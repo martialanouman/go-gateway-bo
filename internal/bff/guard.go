@@ -83,7 +83,7 @@ var authorization = map[string]rule{
 	"BeginWebauthnAssertion": exempt("ouvre une cérémonie sur son propre compte, sans effet durable"),
 	"ListWebauthnPasskeys": exempt("lire ses propres clés d'accès : aucune clé du catalogue ne " +
 		"désigne son propre compte, et la session vivante dit de qui il s'agit"),
-	"ConfirmTotp": exempt("confirmer son propre second facteur, remplacé depuis cette même session. " +
+	"ConfirmTotp": exempt("confirmer son propre second facteur en attente, remplacement ou ajout. " +
 		"La garde est l'élévation, plus le seau d'essais du second facteur"),
 	"DeleteWebauthnPasskey": exempt("retirer sa propre clé d'accès est du self-service, pas un acte " +
 		"sur autrui : aucune clé du catalogue n'y correspond, et en créer une qu'il faudrait donner " +

@@ -574,7 +574,7 @@ type ServerInterface interface {
 	// Me L'opérateur connecté et ce qu'il a le droit de faire
 	// (GET /auth/me)
 	Me(w http.ResponseWriter, r *http.Request)
-	// ConfirmTotp Confirmer une application d'authentification qui vient d'être remplacée
+	// ConfirmTotp Confirmer une application d'authentification en attente, remplaçante ou ajoutée
 	// (POST /auth/mfa/totp/confirm)
 	ConfirmTotp(w http.ResponseWriter, r *http.Request)
 	// EnrollTotp Enrôler une application d'authentification
@@ -658,7 +658,7 @@ func (_ Unimplemented) Me(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// ConfirmTotp Confirmer une application d'authentification qui vient d'être remplacée
+// ConfirmTotp Confirmer une application d'authentification en attente, remplaçante ou ajoutée
 // (POST /auth/mfa/totp/confirm)
 func (_ Unimplemented) ConfirmTotp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -3249,7 +3249,7 @@ type StrictServerInterface interface {
 	// Me L'opérateur connecté et ce qu'il a le droit de faire
 	// (GET /auth/me)
 	Me(ctx context.Context, request MeRequestObject) (MeResponseObject, error)
-	// ConfirmTotp Confirmer une application d'authentification qui vient d'être remplacée
+	// ConfirmTotp Confirmer une application d'authentification en attente, remplaçante ou ajoutée
 	// (POST /auth/mfa/totp/confirm)
 	ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) (ConfirmTotpResponseObject, error)
 	// EnrollTotp Enrôler une application d'authentification

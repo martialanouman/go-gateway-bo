@@ -535,7 +535,7 @@ func secondFactorsOf(ctx context.Context, factors *mfa.Manager, operatorID strin
 	}, nil
 }
 
-// ConfirmTotp fait passer active l'application d'authentification qui attend depuis un remplacement.
+// ConfirmTotp fait passer active l'application d'authentification en attente, remplacement ou ajout.
 // `VerifyMfa` ne le peut pas : il exige un challenge de connexion, que la session élevée n'a plus.
 func (a API) ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) (ConfirmTotpResponseObject,
 	error,
@@ -634,8 +634,7 @@ func nothingToConfirm() Error {
 	return Error{
 		Code: "mfa_nothing_to_confirm",
 		Message: "Aucune application d'authentification n'attend de confirmation sur ce compte : rien " +
-			"n'a changé. Pour en changer, la remplacer d'abord en présentant un code de celle qui est " +
-			"en place.",
+			"n'a changé. En enrôler une d'abord ; elle attendra ici le premier code qu'elle affiche.",
 	}
 }
 
@@ -653,7 +652,7 @@ func refusedConfirmationCode() Error {
 	return Error{
 		Code: "mfa_code_refused",
 		Message: "Ce code n'a pas été accepté : la nouvelle application d'authentification n'est pas " +
-			"confirmée, et l'ancienne reste en vigueur. Saisir le code que la nouvelle affiche " +
-			"maintenant.",
+			"confirmée, et les facteurs déjà en place restent seuls en vigueur. Saisir le code qu'elle " +
+			"affiche maintenant.",
 	}
 }

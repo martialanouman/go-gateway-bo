@@ -75,7 +75,7 @@ func (w *mfaWorld) registerSteps(ctx *godog.ScenarioContext) {
 		w.replaceProvingTheCurrentCode)
 	ctx.Given(`^l'opérateur remplace son authentificateur en présentant un code de récupération$`,
 		w.replaceProvingARecoveryCode)
-	ctx.Then(`^le refus dit qu'aucun remplacement n'attend$`, w.refusalSaysNothingIsPending)
+	ctx.Then(`^le refus dit qu'aucun enrôlement n'attend$`, w.refusalSaysNothingIsPending)
 	ctx.When(`^l'opérateur confirme sa nouvelle application d'authentification$`, w.confirmCurrentCode)
 	ctx.When(`^l'opérateur confirme sa nouvelle application d'authentification avec un code faux$`,
 		w.confirmWrongCode)
@@ -818,5 +818,5 @@ func (w *mfaWorld) refusalSaysNothingIsPending() error {
 		return err
 	}
 
-	return w.messageMentions("remplacer d'abord")
+	return w.messageMentions("En enrôler une d'abord")
 }
