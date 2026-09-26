@@ -166,7 +166,8 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
         // l'annonçait plus tôt a caché le défaut jusqu'à ce qu'il soit livré.
         if (reply !== 'pending' && reply.status === 200) {
           const { method } = (await request.clone().json()) as { method?: string }
-          const held = 'status' in current || current === 'pending' ? {} : current.secondFactors
+          const held =
+            typeof current === 'string' || 'status' in current ? {} : current.secondFactors
           // Une preuve par code de récupération le consomme, comme le serveur.
           granted = {
             ...granted,
