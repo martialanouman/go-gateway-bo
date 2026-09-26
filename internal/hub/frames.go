@@ -25,17 +25,23 @@ type feed struct {
 	topic      Topic
 	permission permissions.Key
 	relay      func(raw []byte) ([]byte, error)
+	// recheck relit une trame venue du canal Redis dans le DTO du sujet : ce qui atteint une socket
+	// est toujours sérialisé par lui, jamais recopié.
+	recheck func(published []byte) ([]byte, error)
 }
 
 var feeds = []feed{
-	{path: "/admin/stream/metrics", topic: TrafficTopic, relay: relay(TrafficTopic, upstreamSnapshot.outgoing)},
+	{
+		path: "/admin/stream/metrics", topic: TrafficTopic,
+		relay: relay(TrafficTopic, upstreamSnapshot.outgoing), recheck: recheck[TrafficSnapshot](TrafficTopic),
+	},
 	{
 		path: "/admin/stream/sessions", topic: SessionsTopic, permission: permissions.SessionsRead,
-		relay: relay(SessionsTopic, upstreamSessionEvent.outgoing),
+		relay: relay(SessionsTopic, upstreamSessionEvent.outgoing), recheck: recheck[SessionEvent](SessionsTopic),
 	},
 	{
 		path: "/admin/stream/billing-alerts", topic: BillingTopic, permission: permissions.BillingRead,
-		relay: relay(BillingTopic, upstreamBillingAlert.outgoing),
+		relay: relay(BillingTopic, upstreamBillingAlert.outgoing), recheck: recheck[BillingAlert](BillingTopic),
 	},
 }
 
@@ -152,6 +158,23 @@ func relay[U, D any](topic Topic, outgoing func(U) (int, time.Time, D)) func([]b
 		}
 
 		return json.Marshal(dataMessage[D]{Topic: topic, TS: emittedAt, Data: data})
+	}
+}
+
+func recheck[D any](topic Topic) func([]byte) ([]byte, error) {
+	return func(published []byte) ([]byte, error) {
+		// Pas de DisallowUnknownFields : la re-sérialisation suffit à retirer un champ non déclaré, et
+		// rejeter la trame figerait le sujet sur les instances d'une version plus ancienne.
+		var message dataMessage[D]
+		if err := json.Unmarshal(published, &message); err != nil {
+			return nil, fmt.Errorf("trame du canal hors du DTO de %s : %w", topic, err)
+		}
+
+		if message.Topic != topic {
+			return nil, fmt.Errorf("trame du canal annoncée sur %s, relue sur %s", message.Topic, topic)
+		}
+
+		return json.Marshal(message)
 	}
 }
 

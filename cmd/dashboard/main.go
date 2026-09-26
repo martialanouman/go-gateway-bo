@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
@@ -143,6 +144,19 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
+	// Seule la forme de l'adresse est jugée ici : un Redis injoignable ne doit pas empêcher le
+	// démarrage, puisque seul le temps réel en dépend (invariant e). `config.Load` a déjà analysé
+	// l'URL : l'erreur de `url.Parse`, qui la recopierait avec son mot de passe, ne peut pas sortir
+	// d'ici ; celles de go-redis v9.22.0 citent au plus le schéma, le chemin, le numéro de base ou un
+	// paramètre de requête — jamais l'hôte ni le mot de passe.
+	redisOptions, err := redis.ParseURL(cfg.Redis.URL)
+	if err != nil {
+		return fmt.Errorf("adresse de Redis : %w", err)
+	}
+
+	coordination := hub.RedisClient(redisOptions)
+	defer func() { _ = coordination.Close() }()
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", cfg.Addr, err)
@@ -166,7 +180,21 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		})
 
 	realtime := hub.New(logger)
-	go realtime.Run(ctx, dialStream(cfg.Gateway.BaseURL, streams))
+	// Le hub rend son bail en s'arrêtant, et il lui faut Redis pour cela : run l'attend avant que le
+	// `defer` ne ferme le client. Sans cette attente, un successeur patientait jusqu'à l'expiration
+	// du bail. Le contexte propre au hub l'arrête aussi quand serve rend la main sur une erreur.
+	realtimeCtx, stopRealtime := context.WithCancel(ctx)
+	realtimeDone := make(chan struct{})
+
+	go func() {
+		defer close(realtimeDone)
+		realtime.Run(realtimeCtx, dialStream(cfg.Gateway.BaseURL, streams), coordination, cfg.Redis.Namespace)
+	}()
+
+	defer func() {
+		stopRealtime()
+		<-realtimeDone
+	}()
 
 	router := bff.NewRouter(bff.Dependencies{
 		Assets: assets,
@@ -190,10 +218,17 @@ func run(ctx context.Context, logger *slog.Logger) error {
 }
 
 func dialStream(baseURL string, client *http.Client) hub.Dialer {
-	return func(ctx context.Context, path string) (*websocket.Conn, error) {
+	return func(ctx context.Context, path string, onPing func()) (*websocket.Conn, error) {
 		//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
 		conn, _, err := websocket.Dial(ctx, strings.TrimSuffix(baseURL, "/")+path,
-			&websocket.DialOptions{HTTPClient: client})
+			&websocket.DialOptions{
+				HTTPClient: client,
+				OnPingReceived: func(context.Context, []byte) bool {
+					onPing()
+
+					return true
+				},
+			})
 
 		return conn, err
 	}

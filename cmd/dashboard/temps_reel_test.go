@@ -5,8 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"maps"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -29,12 +34,14 @@ type fakeGateway struct {
 	mu        sync.Mutex
 	accepting map[string]bool
 	conns     map[string][]*websocket.Conn
+	opened    map[string]int
 }
 
 func newFakeGateway() *fakeGateway {
 	g := &fakeGateway{
 		accepting: map[string]bool{metricsFeed: true, sessionsFeed: true, billingFeed: true},
 		conns:     map[string][]*websocket.Conn{},
+		opened:    map[string]int{},
 	}
 	g.server = httptest.NewServer(http.HandlerFunc(g.serve))
 
@@ -71,9 +78,14 @@ func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
 
 	g.mu.Lock()
 	g.conns[r.URL.Path] = append(g.conns[r.URL.Path], conn)
+	g.opened[r.URL.Path]++
 	g.mu.Unlock()
 
 	<-conn.CloseRead(context.Background()).Done()
+
+	g.mu.Lock()
+	g.conns[r.URL.Path] = slices.DeleteFunc(g.conns[r.URL.Path], func(c *websocket.Conn) bool { return c == conn })
+	g.mu.Unlock()
 }
 
 // emit attend qu'un consommateur soit branché : le serveur ouvre ses flux au démarrage, et une trame
@@ -86,17 +98,19 @@ func (g *fakeGateway) emit(feed, frame string) error {
 		conns := append([]*websocket.Conn(nil), g.conns[feed]...)
 		g.mu.Unlock()
 
-		if len(conns) > 0 {
-			for _, conn := range conns {
-				ctx, cancel := context.WithTimeout(context.Background(), socketWait)
-				err := conn.Write(ctx, websocket.MessageText, []byte(frame))
-				cancel()
+		// Une connexion dont le consommateur est mort sans fermer (instance tuée) échoue à l'écriture
+		// avant d'avoir été retirée : elle ne compte pas.
+		delivered := 0
 
-				if err != nil {
-					return fmt.Errorf("émettre sur %s : %w", feed, err)
-				}
+		for _, conn := range conns {
+			ctx, cancel := context.WithTimeout(context.Background(), socketWait)
+			if conn.Write(ctx, websocket.MessageText, []byte(frame)) == nil {
+				delivered++
 			}
+			cancel()
+		}
 
+		if delivered > 0 {
 			return nil
 		}
 
@@ -130,12 +144,19 @@ func (g *fakeGateway) reopen(feed string) {
 // du backoff, une seconde.
 const socketWait = 5 * time.Second
 
+// statusWait couvre une bascule : trois battements manqués (6 s), relevés à la tick suivante (2 s),
+// et un bail repris au plus 8 s après la mort de son porteur.
+const statusWait = 15 * time.Second
+
 type realtimeWorld struct {
-	process  *process
-	gateway  *fakeGateway
-	conn     *websocket.Conn
-	expected map[string]any
-	contract *openapi3.T
+	process   *process
+	gateway   *fakeGateway
+	conn      *websocket.Conn
+	expected  map[string]any
+	contract  *openapi3.T
+	second    *process
+	redis     *redisRelay
+	sigtermAt time.Time
 }
 
 type socketMessage struct {
@@ -172,6 +193,28 @@ func (w *realtimeWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^la socket reçoit (?:cet événement|cet instantané) sur "([^"]*)"$`, w.receivesExpected)
 	ctx.Then(`^la socket refuse "([^"]*)" en nommant "([^"]*)"$`, w.refuses)
 	ctx.Then(`^aucune trame "([^"]*)" n'arrive$`, w.nothingArrives)
+	ctx.Given(`^deux instances démarrées, la première portant le bail$`, w.startTwoInstances)
+	ctx.Given(`^la socket est ouverte sur la seconde instance$`, func() error {
+		return w.openSocketAt(w.second.addr)
+	})
+	ctx.Then(`^la passerelle compte (\d+) connexions? sur le flux des sessions$`, w.gatewayCounts)
+	ctx.When(`^la première instance reçoit SIGTERM$`, func() error {
+		w.sigtermAt = time.Now()
+
+		return w.process.signalTerm()
+	})
+	ctx.Then(`^la passerelle compte (\d+) connexions sur le flux des sessions en moins de (\d+) secondes$`,
+		w.gatewayCountsWithin)
+	ctx.When(`^la première instance est tuée$`, func() error {
+		w.process.kill()
+
+		return nil
+	})
+	ctx.When(`^Redis devient injoignable$`, func() error {
+		w.redis.cut()
+
+		return nil
+	})
 	ctx.Then(`^le refus a la forme d'erreur du contrat$`, func() error {
 		return w.conformsTo("Error", []byte(w.process.received.body))
 	})
@@ -179,6 +222,14 @@ func (w *realtimeWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
 		if w.conn != nil {
 			_ = w.conn.CloseNow()
+		}
+
+		if w.second != nil {
+			w.second.kill()
+		}
+
+		if w.redis != nil {
+			w.redis.cut()
 		}
 
 		if w.gateway != nil {
@@ -220,6 +271,10 @@ func (w *realtimeWorld) requestUpgrade(origin string) error {
 }
 
 func (w *realtimeWorld) openSocket() error {
+	return w.openSocketAt(w.process.addr)
+}
+
+func (w *realtimeWorld) openSocketAt(addr string) error {
 	header := http.Header{"Origin": {configuredOrigin}}
 	for name, value := range w.process.cookies {
 		header.Add("Cookie", (&http.Cookie{Name: name, Value: value}).String())
@@ -229,7 +284,7 @@ func (w *realtimeWorld) openSocket() error {
 	defer cancel()
 
 	//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
-	conn, resp, err := websocket.Dial(ctx, "ws://"+w.process.addr+"/ws",
+	conn, resp, err := websocket.Dial(ctx, "ws://"+addr+"/ws",
 		&websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		status := 0
@@ -280,7 +335,7 @@ func (w *realtimeWorld) readUntil(within time.Duration, match func(socketMessage
 }
 
 func (w *realtimeWorld) statusIs(topic, status string) error {
-	_, err := w.readUntil(socketWait, func(m socketMessage) bool {
+	_, err := w.readUntil(statusWait, func(m socketMessage) bool {
 		return m.Topic == topic && m.Status == status
 	})
 	if err != nil {
@@ -397,6 +452,160 @@ func (w *realtimeWorld) conformsTo(schema string, raw []byte) error {
 
 	if err := ref.Value.VisitJSON(value); err != nil {
 		return fmt.Errorf("%s ne valide pas %s : %w", raw, schema, err)
+	}
+
+	return nil
+}
+
+// startTwoInstances démarre la première seule, et attend qu'elle ait ouvert les trois flux : c'est
+// elle qui porte le bail. Les deux joignent Redis à travers un relais que le harnais sait couper.
+func (w *realtimeWorld) startTwoInstances() error {
+	relay, err := newRedisRelay(suiteRedisURL)
+	if err != nil {
+		return err
+	}
+
+	w.redis = relay
+	w.process.env["DASHBOARD_REDIS_URL"] = relay.url
+
+	if err = w.process.startAndServe(); err != nil {
+		return err
+	}
+
+	for _, feed := range []string{metricsFeed, sessionsFeed, billingFeed} {
+		if err = w.awaitOpened(feed, 1); err != nil {
+			return fmt.Errorf("la première instance n'a pas pris le bail : %w", err)
+		}
+	}
+
+	w.second = &process{visited: w.process.visited, env: maps.Clone(w.process.env)}
+
+	return w.second.startAndServe()
+}
+
+func (w *realtimeWorld) awaitOpened(feed string, want int) error {
+	deadline := time.Now().Add(statusWait)
+
+	for {
+		w.gateway.mu.Lock()
+		opened := w.gateway.opened[feed]
+		w.gateway.mu.Unlock()
+
+		if opened == want {
+			return nil
+		}
+
+		if opened > want || time.Now().After(deadline) {
+			return fmt.Errorf("%d connexion(s) sur %s, %d attendue(s)", opened, feed, want)
+		}
+
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// gatewayCounts laisse passer un battement de bail avant de compter : une seconde connexion ouverte
+// par l'instance sans bail arriverait dans ce délai.
+func (w *realtimeWorld) gatewayCounts(want int) error {
+	if err := w.awaitOpened(sessionsFeed, want); err != nil {
+		return err
+	}
+
+	time.Sleep(3 * time.Second)
+
+	return w.awaitOpened(sessionsFeed, want)
+}
+
+// redisRelay relaie TCP vers le Redis de la suite. Le couper ferme les connexions ouvertes et refuse
+// les suivantes : c'est une panne de Redis vue des instances, sans toucher au Redis partagé.
+type redisRelay struct {
+	url      string
+	listener net.Listener
+	mu       sync.Mutex
+	conns    []net.Conn
+	closed   bool
+}
+
+func newRedisRelay(target string) (*redisRelay, error) {
+	parsed, err := url.Parse(target)
+	if err != nil {
+		return nil, fmt.Errorf("adresse du Redis de la suite : %w", err)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, fmt.Errorf("relais Redis : %w", err)
+	}
+
+	upstream := parsed.Host
+	parsed.Host = listener.Addr().String()
+	relay := &redisRelay{url: parsed.String(), listener: listener}
+
+	go func() {
+		for {
+			client, err := listener.Accept()
+			if err != nil {
+				return
+			}
+
+			server, err := net.Dial("tcp", upstream)
+			if err != nil {
+				_ = client.Close()
+
+				continue
+			}
+
+			if !relay.track(client, server) {
+				return
+			}
+
+			go func() { _, _ = io.Copy(server, client); _ = server.Close() }()
+			go func() { _, _ = io.Copy(client, server); _ = client.Close() }()
+		}
+	}()
+
+	return relay, nil
+}
+
+func (r *redisRelay) track(conns ...net.Conn) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.closed {
+		for _, conn := range conns {
+			_ = conn.Close()
+		}
+
+		return false
+	}
+
+	r.conns = append(r.conns, conns...)
+
+	return true
+}
+
+func (r *redisRelay) cut() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.closed {
+		return
+	}
+
+	r.closed = true
+	_ = r.listener.Close()
+
+	for _, conn := range r.conns {
+		_ = conn.Close()
+	}
+}
+
+func (w *realtimeWorld) gatewayCountsWithin(want, seconds int) error {
+	if err := w.awaitOpened(sessionsFeed, want); err != nil {
+		return err
+	}
+
+	if took := time.Since(w.sigtermAt); took > time.Duration(seconds)*time.Second {
+		return fmt.Errorf("reprise en %s : le bail n'a pas été rendu, il a expiré", took.Round(100*time.Millisecond))
 	}
 
 	return nil

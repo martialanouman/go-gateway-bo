@@ -100,20 +100,20 @@ qui tombe.
 
 | Mutation (le défaut réel qu'elle rejoue) | Ce qui tombe |
 |---|---|
-| Garde au sujet ouverte à tous | `TestUnePermissionRetireeDesabonneSonSujetEtLeDit` ; scénario « un sujet que les permissions n'ouvrent pas » |
+| Garde au sujet ouverte à tous | `TestARevokedPermissionUnsubscribesItsTopicAndSaysSo` ; scénario « un sujet que les permissions n'ouvrent pas » |
 | Contrôle d'origine retiré de `/ws` | scénario « une socket demandée depuis une autre origine » |
 | Second facteur non exigé | scénario « une session sans second facteur » |
-| Session morte ignorée à la revérification | `TestUneSessionQuiPrendFinFermeLaSocket`, `TestUneSessionInverifiableFermeLaSocket` |
-| `Alive` qui repousse la fenêtre (`UPDATE last_seen_at`) | `TestSuivreUneSessionNeRepoussePasSaFenetre` |
-| Client débordé fermé par l'annulation de la lecture (la première version livrée) | `TestUnClientDebordeParUneRafaleRecoitLeCodeDeLenteur` : -1 au lieu de 1008 |
-| Backoff remis à zéro dès qu'une montée réussit (la première version livrée) | `TestUnFluxQuiTombeAussitotOuvertNeRemetPasLeBackoffAZero` : 3 montées en 2,5 s |
+| Session morte ignorée à la revérification | `TestAnEndedSessionClosesTheSocket`, `TestAnUncheckableSessionClosesTheSocket` |
+| `Alive` qui repousse la fenêtre (`UPDATE last_seen_at`) | `TestTrackingASessionDoesNotExtendItsIdleWindow` |
+| Client débordé fermé par l'annulation de la lecture (la première version livrée) | `TestAClientOverflowedByABurstReceivesThePolicyViolationCode` : -1 au lieu de 1008 |
+| Backoff remis à zéro dès qu'une montée réussit (la première version livrée) | `TestAFeedThatDropsRightAfterOpeningDoesNotResetTheBackoff` : 3 montées en 2,5 s |
 | Pas d'annonce `stale` à la chute d'un flux | scénario « la chute d'un flux » |
-| Version amont non contrôlée | `TestUneTrameDUneVersionInconnueNEstPasRelayee` |
-| Désabonnement sans effet | `TestSeDesabonnerArreteLaDiffusion` |
-| Socket fermée restée abonnée | `TestAucuneGoroutineNeSurvitAuxSocketsFermees`, `TestUnClientLentEstCoupe` |
-| Champ de DTO renommé (`accountId` → `account_id`) | `TestLesTroisTramesAmontSontReemisesParLeurDTO` ; scénario « un sujet permis » (validation contre `SessionEvent`) |
-| Arrêt du hub sans fermeture des sockets | `TestLArretDuHubFermeLesSockets` |
-| Permission retirée non relue | `TestUnePermissionRetireeDesabonneSonSujetEtLeDit` |
+| Version amont non contrôlée | `TestAFrameOfAnUnknownVersionIsNotRelayed` |
+| Désabonnement sans effet | `TestUnsubscribingStopsTheBroadcast` |
+| Socket fermée restée abonnée | `TestNoGoroutineOutlivesClosedSockets`, `TestASlowClientIsCut` |
+| Champ de DTO renommé (`accountId` → `account_id`) | `TestUpstreamFramesAreRelayedThroughTheirDTO` ; scénario « un sujet permis » (validation contre `SessionEvent`) |
+| Arrêt du hub sans fermeture des sockets | `TestStoppingTheHubClosesTheSockets` |
+| Permission retirée non relue | `TestARevokedPermissionUnsubscribesItsTopicAndSaysSo` |
 | Jeton machine absent du dial amont | trois scénarios : le faux amont refuse sans `Bearer` |
 | `withAPIDeadlines` monté sur `/ws` | **rien** : aucun scénario ne tient la socket au-delà des 30 s d'`apiRequestDeadline`. Écrit dans `durcissement.go` (critère 4) |
 

@@ -117,7 +117,7 @@ func awaitSubscribers(t *testing.T, h *Hub, topic Topic, want int) {
 	require.Eventually(t, func() bool { return subscribers(h, topic) == want }, wait, 5*time.Millisecond)
 }
 
-func TestLesTroisTramesAmontSontReemisesParLeurDTO(t *testing.T) {
+func TestUpstreamFramesAreRelayedThroughTheirDTO(t *testing.T) {
 	t.Parallel()
 
 	for _, testCase := range []struct {
@@ -173,7 +173,7 @@ func feedAt(t *testing.T, path string) feed {
 }
 
 // Le seul rempart entre un changement de format amont et une lecture fausse en silence.
-func TestUneTrameDUneVersionInconnueNEstPasRelayee(t *testing.T) {
+func TestAFrameOfAnUnknownVersionIsNotRelayed(t *testing.T) {
 	t.Parallel()
 
 	for _, f := range feeds {
@@ -182,7 +182,7 @@ func TestUneTrameDUneVersionInconnueNEstPasRelayee(t *testing.T) {
 	}
 }
 
-func TestUnSujetInconnuEtUnMessageIllisibleSontRefusesSansFermerLaSocket(t *testing.T) {
+func TestUnknownTopicsAndUnreadableMessagesAreRefusedWithoutClosingTheSocket(t *testing.T) {
 	t.Parallel()
 
 	conn := dial(t, serveOn(t, quietHub(), grantAll))
@@ -202,7 +202,7 @@ func TestUnSujetInconnuEtUnMessageIllisibleSontRefusesSansFermerLaSocket(t *test
 	assert.Equal(t, "stale", next(t, conn).Status)
 }
 
-func TestSeDesabonnerArreteLaDiffusion(t *testing.T) {
+func TestUnsubscribingStopsTheBroadcast(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -217,7 +217,7 @@ func TestSeDesabonnerArreteLaDiffusion(t *testing.T) {
 
 // La file est bornée : un client qui ne lit plus est coupé, et la mémoire du serveur ne suit pas son
 // retard.
-func TestUnClientLentEstCoupe(t *testing.T) {
+func TestASlowClientIsCut(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -245,7 +245,7 @@ func TestUnClientLentEstCoupe(t *testing.T) {
 
 // Un client qui lit, débordé par une rafale, peut encore recevoir le 1008 : c'est ce qui lui permet
 // de distinguer « trop lent » d'une coupure réseau.
-func TestUnClientDebordeParUneRafaleRecoitLeCodeDeLenteur(t *testing.T) {
+func TestAClientOverflowedByABurstReceivesThePolicyViolationCode(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -261,7 +261,7 @@ func TestUnClientDebordeParUneRafaleRecoitLeCodeDeLenteur(t *testing.T) {
 	assert.Equal(t, websocket.StatusPolicyViolation, closeStatusOf(t, conn))
 }
 
-func TestUneSessionQuiPrendFinFermeLaSocket(t *testing.T) {
+func TestAnEndedSessionClosesTheSocket(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -276,7 +276,7 @@ func TestUneSessionQuiPrendFinFermeLaSocket(t *testing.T) {
 	assert.Equal(t, statusSessionEnded, closeStatusOf(t, conn))
 }
 
-func TestUneSessionInverifiableFermeLaSocket(t *testing.T) {
+func TestAnUncheckableSessionClosesTheSocket(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -295,7 +295,7 @@ func TestUneSessionInverifiableFermeLaSocket(t *testing.T) {
 	assert.Equal(t, websocket.StatusInternalError, closeStatusOf(t, conn))
 }
 
-func TestUnePermissionRetireeDesabonneSonSujetEtLeDit(t *testing.T) {
+func TestARevokedPermissionUnsubscribesItsTopicAndSaysSo(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -322,38 +322,30 @@ func TestUnePermissionRetireeDesabonneSonSujetEtLeDit(t *testing.T) {
 	awaitSubscribers(t, h, SessionsTopic, 0)
 }
 
-func TestLArretDuHubFermeLesSockets(t *testing.T) {
+func TestStoppingTheHubClosesTheSockets(t *testing.T) {
 	t.Parallel()
 
-	h := quietHub()
-	ctx, stop := context.WithCancel(t.Context())
+	rdb, namespace := redisFor(t)
+	h := fastHub()
+	stop := runHub(t, h, func(ctx context.Context, _ string, _ func()) (*websocket.Conn, error) {
+		<-ctx.Done()
 
-	done := make(chan struct{})
-	go func() {
-		h.Run(ctx, func(ctx context.Context, _ string) (*websocket.Conn, error) {
-			<-ctx.Done()
+		return nil, ctx.Err()
+	}, rdb, namespace)
 
-			return nil, ctx.Err()
-		})
-		close(done)
-	}()
-
-	conn := dial(t, serveOn(t, h, grantAll))
-	send(t, conn, `{"action":"subscribe","topics":["metrics.traffic"]}`)
-	awaitSubscribers(t, h, TrafficTopic, 1)
+	conn := subscribeTo(t, h, "metrics.traffic")
 
 	stop()
 
 	assert.Equal(t, websocket.StatusGoingAway, closeStatusOf(t, conn))
-	<-done
 }
 
 // Pas de t.Parallel : le compte de goroutines est celui du processus entier.
-func TestAucuneGoroutineNeSurvitAuxSocketsFermees(t *testing.T) {
+func TestNoGoroutineOutlivesClosedSockets(t *testing.T) {
 	h := quietHub()
 	url := serveOn(t, h, grantAll)
 
-	before := runtime.NumGoroutine()
+	before := goroutines()
 
 	conns := make([]*websocket.Conn, 0, 500)
 	for range 500 {
@@ -370,21 +362,12 @@ func TestAucuneGoroutineNeSurvitAuxSocketsFermees(t *testing.T) {
 
 	awaitSubscribers(t, h, TrafficTopic, 0)
 	awaitSubscribers(t, h, SessionsTopic, 0)
-	// Une boucle et non assert.Eventually, dont la goroutine de sondage entrerait dans le compte.
-	deadline := time.Now().Add(wait)
-	for runtime.NumGoroutine() > before && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
-
-	if after := runtime.NumGoroutine(); after > before {
-		dump := make([]byte, 1<<20)
-		t.Fatalf("%d goroutines avant, %d après\n%s", before, after, dump[:runtime.Stack(dump, true)])
-	}
+	awaitGoroutines(t, before)
 }
 
 // Un amont qui accepte la montée puis ferme aussitôt n'est pas rappelé chaque seconde : le sujet
 // clignoterait entre live et stale.
-func TestUnFluxQuiTombeAussitotOuvertNeRemetPasLeBackoffAZero(t *testing.T) {
+func TestAFeedThatDropsRightAfterOpeningDoesNotResetTheBackoff(t *testing.T) {
 	t.Parallel()
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -400,16 +383,34 @@ func TestUnFluxQuiTombeAussitotOuvertNeRemetPasLeBackoffAZero(t *testing.T) {
 	ctx, stop := context.WithTimeout(t.Context(), firstBackoff*5/2)
 	defer stop()
 
-	quietHub().Run(ctx, func(ctx context.Context, path string) (*websocket.Conn, error) {
-		if path == "/admin/stream/metrics" {
+	h := quietHub()
+	h.consume(ctx, feedAt(t, "/admin/stream/metrics"),
+		func(ctx context.Context, path string, _ func()) (*websocket.Conn, error) {
 			dials.Add(1)
-		}
 
-		//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
-		conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(upstream.URL, "http")+path, nil)
+			//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
+			conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(upstream.URL, "http")+path, nil)
 
-		return conn, err
-	})
+			return conn, err
+		}, newLeaderView(func([]byte) {}))
 
 	assert.LessOrEqual(t, dials.Load(), int32(2), "le flux a été rappelé à chaque seconde")
+}
+
+func goroutines() int { return runtime.NumGoroutine() }
+
+// awaitGoroutines attend le retour au compte initial. Une boucle et non assert.Eventually, dont la
+// goroutine de sondage entrerait dans le compte.
+func awaitGoroutines(t *testing.T, before int) {
+	t.Helper()
+
+	deadline := time.Now().Add(wait)
+	for runtime.NumGoroutine() > before && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if after := runtime.NumGoroutine(); after > before {
+		dump := make([]byte, 1<<20)
+		t.Fatalf("%d goroutines avant, %d après\n%s", before, after, dump[:runtime.Stack(dump, true)])
+	}
 }

@@ -4,6 +4,7 @@ package hub
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"log/slog"
 	"slices"
@@ -34,12 +35,24 @@ const (
 // Access dit si la session de la socket est encore vivante, et quelles permissions elle porte.
 type Access func(ctx context.Context) (alive bool, permissions []string, err error)
 
-// Dialer ouvre un flux de l'API Admin, désigné par son chemin.
-type Dialer func(ctx context.Context, path string) (*websocket.Conn, error)
+// Dialer ouvre un flux de l'API Admin, désigné par son chemin. onPing est appelé à chaque ping de la
+// passerelle : c'est ce qui prouve qu'un flux silencieux est encore vivant.
+type Dialer func(ctx context.Context, path string, onPing func()) (*websocket.Conn, error)
 
 type Hub struct {
 	logger          *slog.Logger
+	instance        string
 	revalidateEvery time.Duration
+
+	// Le bail vit 6 s et se renouvelle toutes les 2 s : un porteur tué est remplacé en 8 s au plus.
+	leaseTTL   time.Duration
+	leaseEvery time.Duration
+	// Trois battements manqués rendent les sujets `stale`.
+	heartbeatEvery   time.Duration
+	heartbeatTimeout time.Duration
+	// La passerelle pingue toutes les 20 s (`go-gateway/internal/adminapi/stream.go`) : 60 s, soit
+	// trois intervalles, tolèrent un ping en retard avec marge.
+	upstreamSilence time.Duration
 
 	mu          sync.Mutex
 	subscribers map[Topic]map[*client]struct{}
@@ -55,11 +68,17 @@ func New(logger *slog.Logger) *Hub {
 	}
 
 	return &Hub{
-		logger:          logger,
-		revalidateEvery: 30 * time.Second,
-		subscribers:     map[Topic]map[*client]struct{}{},
-		statuses:        statuses,
-		stopping:        make(chan struct{}),
+		logger:           logger,
+		instance:         rand.Text(),
+		revalidateEvery:  30 * time.Second,
+		leaseTTL:         6 * time.Second,
+		leaseEvery:       2 * time.Second,
+		heartbeatEvery:   2 * time.Second,
+		heartbeatTimeout: 6 * time.Second,
+		upstreamSilence:  60 * time.Second,
+		subscribers:      map[Topic]map[*client]struct{}{},
+		statuses:         statuses,
+		stopping:         make(chan struct{}),
 	}
 }
 
@@ -87,14 +106,29 @@ func (h *Hub) publish(topic Topic, frame []byte) {
 	}
 }
 
-func (h *Hub) setStatus(topic Topic, status string, since *time.Time) {
-	message := statusMessage{Topic: topic, Status: status, Since: since}
-
+// setStatus ne rediffuse qu'un changement : le battement de cœur republie tous les états toutes les
+// 2 s, et les clients n'ont pas à les recevoir à chaque fois.
+func (h *Hub) setStatus(message statusMessage) {
 	h.mu.Lock()
-	h.statuses[topic] = message
+	current, known := h.statuses[message.Topic]
+	unchanged := known && current.Status == message.Status && sameInstant(current.Since, message.Since)
+	h.statuses[message.Topic] = message
 	h.mu.Unlock()
 
-	h.publish(topic, mustMarshal(message))
+	if !unchanged {
+		h.publish(message.Topic, mustMarshal(message))
+	}
+}
+
+func (h *Hub) status(topic Topic) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	return h.statuses[topic].Status
+}
+
+func sameInstant(a, b *time.Time) bool {
+	return (a == nil && b == nil) || (a != nil && b != nil && a.Equal(*b))
 }
 
 // subscribe envoie l'état courant du sujet sous le verrou : aucune trame ne peut le précéder.
