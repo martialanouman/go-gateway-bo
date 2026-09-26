@@ -113,6 +113,7 @@ function FactorChallenge({
   }
 
   const verify = useMutation({
+    gcTime: 0,
     mutationFn: async (attempt: { method: 'totp'; code: string } | { method: 'webauthn' }) => {
       const challenge = peekChallenge()
       if (challenge === undefined) throw new Error(CHALLENGE_LOST)

@@ -378,6 +378,24 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(router.state.location.pathname).toBe('/billing')
   })
 
+  it('n’emporte ni la clé ni les codes dans le cache après le départ de l’écran', async () => {
+    const { router, user } = await visitEnroll({ path: '/enroll?redirect=%2Fbilling' })
+    await confirmEnrollment(user)
+    await user.click(screen.getByRole('button', { name: 'J’ai enregistré ces codes' }))
+    await screen.findByRole('heading', { level: 1, name: /Soldes & crédits/ })
+    // Une macrotâche : la collecte d'une mutation à `gcTime: 0` s'exécute sur le `setTimeout` suivant.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const cached = JSON.stringify(
+      router.options.context.queryClient
+        .getMutationCache()
+        .findAll()
+        .map(({ state }) => state),
+    )
+    expect(cached).not.toContain(ENROLLMENT_SECRET)
+    expect(cached).not.toContain(RECOVERY_CODES[1])
+  })
+
   it('refuse un premier code faux, et reprend l’indice de dérive d’horloge', async () => {
     // C'est **le premier** code, tapé juste après un scan : l'horloge du téléphone est la cause la
     // plus probable, et le serveur ne la nomme plus depuis step-035.

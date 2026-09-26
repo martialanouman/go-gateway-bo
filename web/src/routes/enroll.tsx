@@ -121,6 +121,8 @@ function EnrollmentScreen() {
    * restent valent pour l'écran entier, et le serveur les rédige lui-même.
    */
   const enroll = useMutation({
+    // `data` porte la clé et les dix codes : sans `gcTime: 0`, ils restent cinq minutes en cache.
+    gcTime: 0,
     mutationFn: async () => {
       const { data, error, response } = await api.POST('/auth/mfa/totp/enroll', { body: {} })
       if (data === undefined) throw new Error(enrollmentRefusal(error, response.status))

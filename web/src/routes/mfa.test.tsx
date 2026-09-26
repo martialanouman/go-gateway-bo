@@ -79,6 +79,27 @@ describe('le challenge TOTP', () => {
     expect(router.state.location.pathname).toBe('/billing')
   })
 
+  it('n’emporte pas le code dans le cache après le départ de l’écran', async () => {
+    const { router, user } = await visitMfa(
+      { totp: true, passkeys: 0 },
+      { path: '/mfa?redirect=%2Fbilling' },
+    )
+
+    await user.type(code(), '123456')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+    await screen.findByRole('heading', { level: 1, name: /Soldes & crédits/ })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(
+      JSON.stringify(
+        router.options.context.queryClient
+          .getMutationCache()
+          .findAll()
+          .map(({ state }) => state),
+      ),
+    ).not.toContain('123456')
+  })
+
   it('reprend l’indice de dérive d’horloge, que le serveur ne peut plus donner', async () => {
     const { user } = await visitMfa(
       { totp: true, passkeys: 0 },
