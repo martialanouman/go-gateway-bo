@@ -154,11 +154,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("adresse de Redis : %w", err)
 	}
 
-	// Sans lui, go-redis ignore l'échéance du contexte pendant la lecture d'une réponse, et un appel
-	// sur un Redis parti en trou noir tient jusqu'à ReadTimeout, relances comprises. Le hub borne
-	// chacun de ses appels par leur contexte.
-	redisOptions.ContextTimeoutEnabled = true
-	coordination := redis.NewClient(redisOptions)
+	coordination := hub.RedisClient(redisOptions)
 	defer func() { _ = coordination.Close() }()
 
 	ln, err := net.Listen("tcp", cfg.Addr)

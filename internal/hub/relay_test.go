@@ -375,7 +375,7 @@ func newFrozenRedis(t *testing.T) (*frozenRedis, *redis.Client) {
 	}()
 
 	options.Addr = listener.Addr().String()
-	client := redis.NewClient(options)
+	client := RedisClient(options)
 	t.Cleanup(func() { _ = client.Close() })
 
 	return relay, client
@@ -417,6 +417,22 @@ func TestUnPorteurCoupeDeRedisLacheLaPasserelleAvantLExpirationDuBail(t *testing
 	relay.frozen.Store(true)
 	frozenAt := time.Now()
 
+	// Des trames continuent d'arriver : le porteur est alors bloqué dans leur publication, et non dans
+	// la lecture de la passerelle.
+	go func() {
+		for time.Since(frozenAt) < h.leaseTTL {
+			gateway.mu.Lock()
+			conns := append([]*websocket.Conn(nil), gateway.conns["/admin/stream/sessions"]...)
+			gateway.mu.Unlock()
+
+			for _, c := range conns {
+				_ = c.Write(t.Context(), websocket.MessageText, []byte(sessionFrame))
+			}
+
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
 	require.Eventually(t, func() bool {
 		gateway.mu.Lock()
 		defer gateway.mu.Unlock()
@@ -432,6 +448,37 @@ func TestUnPorteurCoupeDeRedisLacheLaPasserelleAvantLExpirationDuBail(t *testing
 
 	assert.Less(t, time.Since(frozenAt), h.leaseTTL,
 		"les flux amont ont survécu à l'expiration du bail : un successeur les aurait doublés")
+}
+
+// Sans ContextTimeoutEnabled, go-redis ignore l'échéance des contextes pendant une lecture : sur un
+// Redis gelé, l'arrêt du hub attendrait ReadTimeout, relances comprises, et l'arrêt du binaire avec lui.
+func TestLArretDuHubNAttendPasUnRedisGele(t *testing.T) {
+	t.Parallel()
+
+	_, namespace := redisFor(t)
+	relay, rdb := newFrozenRedis(t)
+	gateway := newUpstream(t)
+	h := fastHub()
+
+	ctx, stop := context.WithCancel(t.Context())
+	done := make(chan struct{})
+
+	go func() {
+		h.Run(ctx, gateway.dial, rdb, namespace)
+		close(done)
+	}()
+
+	require.Eventually(t, func() bool { return gateway.openedOn("/admin/stream/sessions") == 1 },
+		wait, 20*time.Millisecond)
+
+	relay.frozen.Store(true)
+	time.Sleep(2 * h.leaseEvery)
+
+	stopping := time.Now()
+	stop()
+	<-done
+
+	assert.Less(t, time.Since(stopping), 2*time.Second, "l'arrêt du hub a attendu un appel Redis bloqué")
 }
 
 // Un état live reçu sans battement de cœur ensuite — au démarrage, ou quand Redis retombe avant le
@@ -463,8 +510,9 @@ func TestUnEtatLiveSansBattementFinitStale(t *testing.T) {
 
 // Le canal est partagé par tout ce qui publie sous l'espace de noms — une autre version pendant un
 // déploiement roulant, un déploiement mal configuré. Ce qui en sort vers les sockets repasse par le
-// DTO du sujet : un champ que le struct ne déclare pas ne part pas.
-func TestUneTrameDuCanalQuiNeTientPasDansSonDTONEstPasRediffusee(t *testing.T) {
+// DTO du sujet : un champ que le struct ne déclare pas ne part pas, et la trame, elle, part — une
+// version plus récente qui ajoute un champ ne doit pas figer le sujet sur les instances anciennes.
+func TestUneTrameDuCanalNeRediffuseQueSonDTO(t *testing.T) {
 	t.Parallel()
 
 	h := quietHub()
@@ -476,5 +524,6 @@ func TestUneTrameDuCanalQuiNeTientPasDansSonDTONEstPasRediffusee(t *testing.T) {
 	h.receive([]byte(`{"topic":"sessions.events","ts":"2026-09-26T10:00:00Z","data":{"accountId":"b",` +
 		`"systemId":"s","state":"bound"}}`))
 
+	assert.JSONEq(t, `{"accountId":"a","systemId":"s","state":"bound"}`, string(next(t, conn).Data))
 	assert.JSONEq(t, `{"accountId":"b","systemId":"s","state":"bound"}`, string(next(t, conn).Data))
 }

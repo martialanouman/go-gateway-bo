@@ -65,6 +65,11 @@ func (h *Hub) consume(ctx context.Context, f feed, dial Dialer, view *leaderView
 func (h *Hub) pump(ctx context.Context, conn *websocket.Conn, f feed, view *leaderView, alive <-chan struct{}) error {
 	defer func() { _ = conn.CloseNow() }()
 
+	// Fermée dès l'annulation, même si la boucle est bloquée dans une publication vers Redis : à
+	// l'échéance locale du bail, la passerelle doit être lâchée tout de suite.
+	stopClosing := context.AfterFunc(ctx, func() { _ = conn.CloseNow() })
+	defer stopClosing()
+
 	conn.SetReadLimit(maxUpstreamFrame)
 
 	readCtx, stopReading := context.WithCancel(ctx)

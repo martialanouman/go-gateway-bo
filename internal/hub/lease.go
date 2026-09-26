@@ -57,3 +57,12 @@ func (l lease) renew(ctx context.Context) (bool, error) {
 func (l lease) release(ctx context.Context) error {
 	return releaseScript.Run(ctx, l.rdb, []string{l.key}, l.holder).Err()
 }
+
+// RedisClient construit le client que le hub attend. Sans ContextTimeoutEnabled, go-redis ignore
+// l'échéance du contexte pendant la lecture d'une réponse : sur un Redis parti en trou noir, chaque
+// appel tiendrait jusqu'à ReadTimeout, relances comprises, et l'arrêt du binaire avec lui.
+func RedisClient(options *redis.Options) *redis.Client {
+	options.ContextTimeoutEnabled = true
+
+	return redis.NewClient(options)
+}

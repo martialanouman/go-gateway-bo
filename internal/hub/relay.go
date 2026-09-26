@@ -78,7 +78,10 @@ func (h *Hub) lead(ctx context.Context, dial Dialer, rdb *redis.Client, channel 
 		// prudent pour en calculer l'échéance.
 		asked := time.Now()
 
-		held, err := leader.acquire(ctx)
+		asking, cancel := context.WithTimeout(ctx, h.leaseEvery)
+		held, err := leader.acquire(asking)
+		cancel()
+
 		if err != nil && ctx.Err() == nil {
 			h.logger.Debug("bail temps réel injoignable", "error", err)
 		}
@@ -151,8 +154,9 @@ func (h *Hub) hold(ctx context.Context, dial Dialer, rdb *redis.Client, channel 
 	workers.Wait()
 
 	if ctx.Err() != nil {
-		// Rendu à l'arrêt propre, pour qu'un successeur n'attende pas son expiration.
-		releaseCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+		// Rendu à l'arrêt propre, pour qu'un successeur n'attende pas son expiration. Au mieux :
+		// sur un Redis injoignable, le bail expirera de lui-même, et l'arrêt n'a pas à l'attendre.
+		releaseCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), h.leaseEvery)
 		defer cancel()
 
 		if err := leader.release(releaseCtx); err != nil {
@@ -263,7 +267,7 @@ func (h *Hub) receive(payload []byte) bool {
 	}
 
 	if err := json.Unmarshal(payload, &message); err != nil {
-		h.logger.Warn("message temps réel illisible sur le canal", "error", err)
+		h.logger.Warn("message temps réel illisible sur le canal, écarté")
 
 		return false
 	}
@@ -283,16 +287,17 @@ func (h *Hub) receive(payload []byte) bool {
 		}
 
 	default:
+		// Les journaux ne citent rien de la trame : une erreur de décodage peut recopier une valeur.
 		f, known := feedOf(message.Topic)
 		if !known {
-			h.logger.Warn("trame du canal sur un sujet inconnu", "topic", message.Topic)
+			h.logger.Warn("trame du canal sur un sujet inconnu, écartée")
 
 			return false
 		}
 
 		frame, err := f.recheck(payload)
 		if err != nil {
-			h.logger.Warn("trame du canal écartée", "error", err)
+			h.logger.Warn("trame du canal illisible dans le DTO de son sujet, écartée", "topic", f.topic)
 
 			return false
 		}

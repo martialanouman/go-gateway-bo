@@ -1,7 +1,6 @@
 package hub
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -163,11 +162,10 @@ func relay[U, D any](topic Topic, outgoing func(U) (int, time.Time, D)) func([]b
 
 func recheck[D any](topic Topic) func([]byte) ([]byte, error) {
 	return func(published []byte) ([]byte, error) {
-		decoder := json.NewDecoder(bytes.NewReader(published))
-		decoder.DisallowUnknownFields()
-
+		// Pas de DisallowUnknownFields : la re-sérialisation suffit à retirer un champ non déclaré, et
+		// rejeter la trame figerait le sujet sur les instances d'une version plus ancienne.
 		var message dataMessage[D]
-		if err := decoder.Decode(&message); err != nil {
+		if err := json.Unmarshal(published, &message); err != nil {
 			return nil, fmt.Errorf("trame du canal hors du DTO de %s : %w", topic, err)
 		}
 
