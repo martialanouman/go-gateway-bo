@@ -81,6 +81,12 @@ describe('le retrait d’une clé d’accès', () => {
     expect(fetch.mock.calls.some(([request]) => request.method === 'DELETE')).toBe(false)
   })
 
+  it('laisse retirer une clé quand une autre reste, même sans application', async () => {
+    await visitAccount({ totp: false, passkeys: 2 })
+
+    expect(await removeButtonOf('Clé 1')).not.toHaveAttribute('aria-disabled')
+  })
+
   it('retire une clé quand l’application reste en place', async () => {
     const { fetch, user } = await visitAccount({ totp: true, passkeys: 1 })
 
