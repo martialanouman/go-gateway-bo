@@ -130,7 +130,7 @@ Aucune autre bibliothèque pour ces rôles sans décision d'équipe.
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat | `@martialanouman/gateway-api-contracts` | **4.0.2** |
+| Contrat | `@martialanouman/gateway-api-contracts` | **6.8.0** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests | `vitest` + `@playwright/test` | 4.1.10 / 1.62.0 |
 | Langage | `typescript` | 7.0.2 |
@@ -312,7 +312,8 @@ pas la compilation. Une contrainte de validation resserrée (`additionalProperti
 > Aucun de ces points n'aurait été vu en lisant seulement le numéro de version, et quatre sur six ne
 > font pas échouer la compilation.
 
-**Dette soldée le 08/08/2026 : le dépôt est en 4.0.2** (step-009). Les deux majeures qui le séparaient
+**Dette soldée le 08/08/2026 : le dépôt était alors en 4.0.2** (step-009) ; il est en **6.8.0**
+depuis le 26/09/2026 (bump dédié, avant step-044). Les deux majeures qui le séparaient
 de 2.5.0 ont été relues ligne à ligne, et ce qu'elles changent est inscrit dans
 `tasks/steps/done/step-009.md`. En résumé : 133 opérations avant et après, aucune ajoutée, retirée ni
 renommée, six touchées dont aucune que le BFF appelle — le bump s'est payé sur le seul
@@ -756,47 +757,24 @@ M3 → M4 → M5 → M9`.
 
 ## 16. Dépendance externe : l'état réel de la passerelle
 
-**C'était la contrainte de planification la plus importante de ce document. Elle s'est desserrée, et
-c'est la mesure qui le dit.** Le contrat décrit **133 opérations** — chiffre mesuré le 01/08/2026 sur
-le YAML, les documents hérités disaient 134. La passerelle en implémente **103 au 12/09/2026** ; les
-**30** restantes existent au contrat, sont servies par le mock, mais ne répondent pas encore en réel.
+**C'était la contrainte de planification la plus importante de ce document. Elle est levée, et c'est
+la mesure qui le dit.** Le contrat 6.8.0 décrit **134 opérations** : `list-audit-log` s'est ajoutée
+aux 133 que les versions 2.5.0 à 6.7.x décrivaient. La passerelle les sert **toutes**, relevé le
+26/09/2026 sur `go-gateway` au commit `7723f3d`. Aucune opération n'existe plus seulement au contrat.
 
-> ✅ **Relevé le 12/09/2026, à l'ouverture de M2 (step-041) — le ratio est passé de 71/133 à
-> 103/133.** Il datait du 27/07 et n'avait jamais été revérifié : l'implémentation amont avait avancé
-> de **32 opérations**, et quatre des six lignes du tableau ci-dessous étaient fausses. Le
-> dénominateur, lui, n'a pas bougé : **133 opérations** en 4.0.2 comme en 4.2.0, vérifié sur les
-> quatre versions publiées depuis (step-009 l'avait établi pour 2.5.0).
->
 > **Comment le chiffre a été obtenu**, pour qu'il soit refaisable et non recopié : le routage de
 > `go-gateway` est déclaratif — huma v2 sur chi, une opération = un `huma.Operation{OperationID}`
 > enregistré dans `internal/adminapi/`. Compter les `OperationID` des fichiers non-test et les
-> croiser avec les `operationId` du YAML **est** la mesure, pas une approximation. Aucun des 103
-> n'est une souche : ni `501`, ni « not implemented », ni `TODO` dans ces handlers.
+> croiser avec les `operationId` du YAML **est** la mesure, pas une approximation. Le 26/09/2026 :
+> 134 déclarées, 134 servies, aucune déclarée sans être servie.
 >
-> **Le relever à l'ouverture de chaque jalon**, et corriger le tableau ci-dessous plutôt que de le
-> croire — c'est exactement ce qui vient de se produire.
+> **Le relever à l'ouverture de chaque jalon.** Les relevés précédents (71/133 le 27/07, 103/133 le
+> 12/09) avaient chacun rendu faux le tableau qui les précédait.
 
-| Jalon | Opérations manquantes | n |
-|---|---|---|
-| **M3** — groupes de clients, webhooks de compte | `*-customer-group*` (6, dont `set-customer-group`), `list-group-customers`, `*-webhook*` (4) | 11 |
-| **M4** — trafic, sessions | `get-traffic-metrics`, `get-metrics-summary`, `list-sessions`, `list-account-sessions`, `disconnect-session` | 5 |
-| **M6** — routes, sender rewrite | `reorder-routes`, `*-sender-rewrite-rule*` (5) | 6 |
-| **M8** — politique de contenu | `*-platform-content-policy` (2), `*-customer-content-policy` (2) | 4 |
-| **M3/M4** — comptes SMPP | `suspend-smpp-account`, `set-account-sender-id-policy`, `set-account-smpp-ops`, `list-customer-accounts` | 4 |
-
-**Ce que le relevé a changé, ligne par ligne** — quatre des six lignes précédentes ont disparu ou
-fondu, et c'est le principal résultat de cette mesure :
-
-- **M2 n'est plus concerné du tout.** `stream-metrics`, `stream-sessions` et `stream-billing-alerts`
-  sont livrées (`internal/adminapi/stream.go`). Le hub WebSocket se développera contre du réel.
-- **M5 non plus.** `search-messages`, `get-message-trace` et `get-message-content` sont livrées : le
-  CDR Explorer n'est plus un jalon sur mock.
-- **M8 fond à 4 opérations.** Les **17** opérations de facturation — et non 13, le contrat en compte
-  17 — sont livrées, `gdpr-erase` aussi. Seule la politique de contenu manque.
-- **M4 perd `get-connector-status`**, livrée.
-
-*(Les quatre opérations de compte SMPP sont listées à part : elles touchent M3 et M4 sans appartenir
-en propre à l'un des deux.)*
+**Ce que ça change** : le mock Prism n'est plus la condition de faisabilité d'aucun jalon. Il reste la
+frontière des scénarios, parce qu'un test doit être rejouable sans la passerelle. Il ne sert pas les
+trois flux temps réel (WebSocket) : `internal/hub` se teste contre un faux amont, `cmd/dashboard`
+aussi.
 
 **Ce que ça implique**
 

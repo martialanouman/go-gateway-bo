@@ -103,8 +103,9 @@ protection couvre et où s'arrête la frontière d'accès. Les cinq états de co
 - **Unitaires Go** — les mécanismes aux limites : hachage, curseurs, mappings, sérialisation des DTO.
   La majorité des tests, en nombre. Côté client : `web/CLAUDE.md`.
 
-**Le mock-first n'est pas un confort mais la condition de faisabilité** : une large part des opérations
-du contrat n'existe qu'au contrat, **côté passerelle**. Décompte à jour dans `tasks/plan.md` §16.
+**Le mock-first rend les scénarios rejouables sans la passerelle.** Celle-ci sert toutes les
+opérations du contrat depuis le 26/09/2026, relevé dans `tasks/plan.md` §16. Prism ne sert pas les
+trois flux WebSocket : ceux-là se testent contre un faux amont.
 
 **Le mode d'échec est nommé** : un scénario par critère d'acceptation fabrique la suite qu'on n'ose
 plus croire, et Gherkin l'aggrave parce que ça se lit bien. Trois symptômes de dérive, valables autant

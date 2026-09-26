@@ -48,7 +48,7 @@
 
 ### 1.3 Contraintes
 
-- **BFF en Go** ; client **React** (Vite, TypeScript, TanStack Router + TanStack Query), gestionnaire **pnpm** pour la moitié client. Le navigateur consomme exclusivement l'API du BFF ; aucun accès DB direct, et jamais l'API Admin en direct — tout passe par le BFF (§4.1). *(Amendement 01/08/2026. La contrainte imposait TanStack Start avec « SSR + fonctions serveur ». Ni le rendu serveur ni les fonctions serveur n'ont jamais été employés, et la charge réelle de ce composant — un hub WebSocket longue durée, un évaluateur d'alertes en tâche de fond, 133 opérations proxifiées — est celle d'un serveur, pas d'une application rendue. L'arbitrage est refait en §7.)*
+- **BFF en Go** ; client **React** (Vite, TypeScript, TanStack Router + TanStack Query), gestionnaire **pnpm** pour la moitié client. Le navigateur consomme exclusivement l'API du BFF ; aucun accès DB direct, et jamais l'API Admin en direct — tout passe par le BFF (§4.1). *(Amendement 01/08/2026. La contrainte imposait TanStack Start avec « SSR + fonctions serveur ». Ni le rendu serveur ni les fonctions serveur n'ont jamais été employés, et la charge réelle de ce composant — un hub WebSocket longue durée, un évaluateur d'alertes en tâche de fond, 134 opérations proxifiées — est celle d'un serveur, pas d'une application rendue. L'arbitrage est refait en §7.)*
 - Ne doit jamais se trouver sur le chemin critique du plan de données — une panne du tableau de bord n'affecte jamais le débit de SMS.
 - Déployé indépendamment de la passerelle, comme serveur Node.js auto-hébergé (pas edge/serverless : il maintient des connexions WebSocket longue durée). « Auto-hébergé » implique **≥2 instances** derrière un load balancer pour la HA (§4.1).
 - L'UI de facturation est un proxy fin (aucune donnée propre) et se dégrade vers « fonctionnalité indisponible » quand le module de facturation est désactivé.
@@ -295,7 +295,7 @@ saved_views
 
 - **Un seul déployable** : un **binaire Go unique** embarque les assets de la SPA (`embed.FS`) et porte toute la logique BFF (session/auth, permissions, proxying, diffusion WS, évaluateur d'alertes). Rien à installer à côté, aucun runtime à patcher.
 - **Sécurité de type de bout en bout** : un **contrat OpenAPI unique** engendre les types serveur Go et les types client TypeScript. La frontière est typée des deux côtés et une divergence est un échec de compilation, pas une convention à respecter. *(Amendement 01/08/2026 : la formulation précédente — « les fonctions serveur sont appelées comme du RPC typé » — décrivait un mécanisme qui n'a jamais été implémenté ; le code appelait le BFF en `fetch` avec des types réécrits à la main.)*
-- **Sérialisation par DTO explicite** : une réponse est un struct déclaré. Un champ absent du struct ne peut pas être émis — l'**invariant (a)** cesse d'être une discipline à tenir sur 133 endpoints pour devenir une propriété du compilateur.
+- **Sérialisation par DTO explicite** : une réponse est un struct déclaré. Un champ absent du struct ne peut pas être émis — l'**invariant (a)** cesse d'être une discipline à tenir sur 134 endpoints pour devenir une propriété du compilateur.
 - **Centralisation** : application des permissions, journalisation d'audit, diffusion WebSocket (le navigateur ne parle jamais directement à la passerelle).
 - **Cible auto-hébergée** (pas edge/serverless) car le hub de diffusion WebSocket et l'évaluateur d'alertes ont besoin d'un processus longue durée.
 - **HA multi-instance** : ≥2 instances BFF derrière un load balancer (affinité WS), coordonnées par une **couche pub/sub partagée** (Redis Pub/Sub) sur laquelle les trois flux de la passerelle sont consommés une seule fois, republiés, puis re-diffusés par chaque instance. Plus de SPOF, déploiements sans coupure — et la passerelle ne voit pas son nombre d'abonnés WS croître avec le nombre d'instances BFF.
@@ -317,7 +317,7 @@ Le client parle uniquement à son propre **BFF Go**, qui parle à l'API Admin de
 
 ### 5.1 API BFF — `dashboard.gateway.example.com/api`
 
-> Surface du BFF, **pas** celle de la passerelle. Elle est alignée sur les 133 opérations d'
+> Surface du BFF, **pas** celle de la passerelle. Elle est alignée sur les 134 opérations d'
 > `api/openapi-admin.yaml` (préfixe `/admin`, consommé par le BFF via
 > `@martialanouman/gateway-api-contracts`) ; les commentaires signalent les endroits où la forme BFF
 > et la forme passerelle diffèrent. Toute évolution du contrat doit être répercutée ici.

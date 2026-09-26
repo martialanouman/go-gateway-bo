@@ -11,7 +11,7 @@ Everything here follows **`uploads/Design gp-gateway.pdf` — « Charte graphiqu
 | `uploads/Design gp-gateway.pdf` (v1.0, 5 pages, 10 sections) | The visual system: brand mark, palette with exact hexes, type scale, spacing/radii/layout, component specimens, status semantics, data-viz, content states, pagination, feedback. **Ground truth.** |
 | `uploads/specification-technique-tableau-de-bord.md` (v2.0, RESHADED) | The product: 30+ functional surfaces, permission catalogue, BFF API surface (§5.1), per-screen detail (§6), NFRs. French narrative, English code. |
 | `specification-technique-passerelle-sms.md` (companion, **not supplied**) | Cited ~20× by the spec (§6.x compagnon). Never provided. |
-| `@martialanouman/gateway-api-contracts`, `api/openapi-admin.yaml` (133 operations) | Mentioned; **no access**. Endpoint shapes come from §5.1 of the spec. |
+| `@martialanouman/gateway-api-contracts`, `api/openapi-admin.yaml` (134 operations) | Mentioned; **no access**. Endpoint shapes come from §5.1 of the spec. |
 
 No codebase and no Figma file were provided. The charter's rendered pages were read directly from the PDF (text + rendered pages) — not from memory.
 

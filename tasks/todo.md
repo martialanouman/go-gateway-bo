@@ -62,7 +62,7 @@ Versions Go relevées sur `proxy.golang.org` le 01/08/2026 ; versions JS telles 
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat API | `@martialanouman/gateway-api-contracts` | **4.0.2** |
+| Contrat API | `@martialanouman/gateway-api-contracts` | **6.8.0** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests client | Vitest + Playwright | 4.1.10 / 1.62.0 |
 | Langage client | TypeScript, `strict` | 7.0.2 |
@@ -137,7 +137,7 @@ livraison — **le bump n'a touché aucun appelant** : les six opérations que l
 ne sont appelées nulle part, `go build` est resté vert sur trois ruptures de type, et tout s'est payé
 sur le seul `internal/gateway/client.gen.go`.
 
-*(La version épinglée est **4.0.2** et non 4.0.0 : les trois `openapi-admin.yaml` de la série 4.0.x
+*(La version épinglée était alors **4.0.2** et non 4.0.0 : les trois `openapi-admin.yaml` de la série 4.0.x
 sont identiques au sha256, et 4.0.3 était en quarantaine. Voir `steps/done/step-009.md`, DN-1.)*
 
 *Jusqu'au 01/09/2026 cette ligne était écrite entre `003` et `004` — la place qu'elle **aurait dû**
@@ -345,10 +345,8 @@ observable que dans un run de CI : pousser tôt vaut mieux que relire.
 | Écart | Impact | Step concernée |
 |---|---|---|
 | §6.8 prévoit que le tableau de bord écrive la config Alertmanager « via l'API Admin », mais **aucune opération Alertmanager n'existe** au contrat. | Write-through et réconciliation non implémentables. | step-183 (bloquée), step-180 (dégradée) |
-| `suspend-smpp-account` est déclarée au contrat mais **non implémentée** ; la suspension passe par `update-smpp-account` (PATCH `status`). | L'UI utilise le PATCH tant que l'opération n'est pas livrée. | step-063, step-064 |
 | Pas de lecture unitaire de CDR : la fiche d'un message se **compose** côté BFF (`search-messages` filtré + `get-message-trace`). | Composition et cache à la charge du BFF. | step-101 |
 | L'API Admin s'authentifie en **OAuth2 client_credentials + mTLS** avec un jeton *machine* portant des scopes fixes, dont `content:read`. | Seul le BFF peut restreindre la lecture de corps par opérateur — d'où l'invariant (c). | step-003, step-025, step-103 |
-| **30 des 133 opérations du contrat ne sont pas encore implémentées** côté passerelle. | M3, M4, M6 et M8 se développent en partie contre le mock ; une passe d'intégration réelle par jalon. | `plan.md` §16 |
 
 
 ---
