@@ -212,18 +212,18 @@ confirment sur le livré.
 
 | Mutation appliquée | Ce qui est tombé |
 |---|---|
-| **compteur non monotone** (`$2::bigint >= 0`) | `TestLeCompteurDeSignatureNAvanceQue` |
-| **le zéro refusé** — garde rendue *plus stricte* | `TestUnCompteurToujoursAZeroEstAccepte` |
+| **compteur non monotone** (`$2::bigint >= 0`) | `TestTheSignCountOnlyMovesForward` |
+| **le zéro refusé** — garde rendue *plus stricte* | `TestACounterAlwaysAtZeroIsAccepted` |
 | **le verdict du compteur jeté** (`return true, err`) | « une clé d'accès dont le compteur a reculé est refusée » |
-| `user_verified` affecté au lieu d'être latché | `TestLaVerificationDeLUtilisateurNeRecuePas` |
-| `purpose` retiré du `WHERE` | `TestUnDefiDAssertionNeSeRelitPasCommeUnEnregistrement` |
-| session retirée du `WHERE` | `TestLeDefiDUneAutreSessionNeSeRelitPas` |
-| l'ouverture n'éteint plus le défi précédent | `TestOuvrirUneCeremonieEteintCelleQuElleRemplace` |
-| usage unique retiré du `WHERE` | `TestUnDefiDeCeremonieSeRelitEtNeSeConsommeQuUneFois` |
-| appartenance de la passkey (`!mine`) retirée | `TestRetirerLaPasskeyDUnAutreOperateurNeLaTrouvePas` |
-| **`FOR UPDATE` et inventaire dans la même instruction** | `TestUnRetraitConcurrentNEmportePasLaDernierePasskey` |
-| **retrait du dernier facteur autorisé** | `TestRetirerLaDernierePasskeySansTOTPEstRefuse` + le scénario |
-| **défi jamais consommé** | `TestUnDefiDeCeremonieSeRelitEtNeSeConsommeQuUneFois` |
+| `user_verified` affecté au lieu d'être latché | `TestUserVerificationNeverRegresses` |
+| `purpose` retiré du `WHERE` | `TestAnAssertionChallengeDoesNotReadBackAsARegistration` |
+| session retirée du `WHERE` | `TestAnotherSessionsChallengeDoesNotReadBack` |
+| l'ouverture n'éteint plus le défi précédent | `TestOpeningACeremonyExtinguishesTheOneItReplaces` |
+| usage unique retiré du `WHERE` | `TestACeremonyChallengeReadsBackAndIsConsumedOnlyOnce` |
+| appartenance de la passkey (`!mine`) retirée | `TestRemovingAnotherOperatorsPasskeyDoesNotFindIt` |
+| **`FOR UPDATE` et inventaire dans la même instruction** | `TestAConcurrentRemovalDoesNotTakeTheLastPasskey` |
+| **retrait du dernier facteur autorisé** | `TestRemovingTheLastPasskeyWithoutTOTPIsRefused` + le scénario |
+| **défi jamais consommé** | `TestACeremonyChallengeReadsBackAndIsConsumedOnlyOnce` |
 | origines élargies, **assertion toujours liée** | **rien — et c'est le témoin** |
 | origines élargies **et assertion déliée** | « une assertion signée pour une autre origine est refusée » |
 | origines élargies, **enregistrement toujours lié** | **rien — second témoin** |

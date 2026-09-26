@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { PERMISSIONS } from '~/lib/permissions.gen'
 import { PermissionPicker } from './permission-picker'
 
-describe('le choix des permissions d’un rôle', () => {
-  it('groupe les 44 clés du catalogue par catégorie, chacune dans son groupe nommé', () => {
+describe('choosing a role’s permissions', () => {
+  it('groups the 44 catalog keys by category, each in its named group', () => {
     render(<PermissionPicker onChange={() => undefined} selected={[]} />)
 
     const groups = screen.getAllByRole('group')
@@ -17,7 +17,7 @@ describe('le choix des permissions d’un rôle', () => {
     expect(within(admin).getByRole('checkbox', { name: /roles:manage/ })).toBeInTheDocument()
   })
 
-  it('dit ce que chaque clé accorde, à côté de son identifiant', () => {
+  it('says what each key grants, next to its identifier', () => {
     render(<PermissionPicker onChange={() => undefined} selected={[]} />)
 
     const first = PERMISSIONS[0]
@@ -27,7 +27,7 @@ describe('le choix des permissions d’un rôle', () => {
     )
   })
 
-  it('suit le clavier : Tab atteint la première clé, Espace l’accorde, un second Tab passe à la suivante', async () => {
+  it('follows the keyboard: Tab reaches the first key, Space grants it, a second Tab moves to the next', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
     render(<PermissionPicker onChange={onChange} selected={['routes:write']} />)

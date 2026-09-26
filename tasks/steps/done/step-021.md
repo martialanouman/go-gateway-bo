@@ -171,7 +171,7 @@ PostgreSQL relit après avoir pris son verrou de ligne.
 Avec deux colonnes calculées il faudrait redire le `CASE` de la remise à zéro, et la façon évidente de
 l'éviter — une CTE `SELECT … FOR UPDATE` puis `SET failures = excluded.failures` — **perd des
 échecs**, en restant verte sous test séquentiel. Mesuré : elle fait rougir
-`TestDesEchecsSimultanesNeSePerdentPas`.
+`TestSimultaneousFailuresAreNotLost`.
 
 La fenêtre d'oubli et la durée du verrou sont la **même** valeur, délibérément. Plus courte, un verrou
 qui vient d'expirer se refermerait au premier essai suivant et « verrou expiré → un nouvel essai est
@@ -207,25 +207,25 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| `Verify` lit `currentParams` au lieu des paramètres de l'encodage | `TestUnHachageProduitAvecDAnciensParametresResteVerifiableApresRelevement` |
-| `decode` ne valide plus les coûts | `TestDesCoutsNulsSontRefusesPlutotQueDeFairePaniquer` — panique `argon2: number of rounds too small` |
-| le sel cesse d'être tiré à chaque hachage | `TestDeuxHachagesDuMemeSecretDifferentParLeSel` |
+| `Verify` lit `currentParams` au lieu des paramètres de l'encodage | `TestAHashFromOldParametersStaysVerifiableAfterTheyAreRaised` |
+| `decode` ne valide plus les coûts | `TestZeroCostsAreRefusedRatherThanPanicking` — panique `argon2: number of rounds too small` |
+| le sel cesse d'être tiré à chaque hachage | `TestTwoHashesOfTheSameSecretDifferByTheirSalt` |
 | `subtle.ConstantTimeCompare` remplacé par `==` | **rien** — mesuré. Un test de durée est écarté par la fiche et le serait de toute façon sur un écart de l'ordre de la nanoseconde. Ce qui garde cette ligne est la revue. |
 
 ### Le compteur partagé
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| la requête réécrite en CTE `WITH previous … FOR UPDATE` + `excluded.failures` | `TestDesEchecsSimultanesNeSePerdentPas` — verte en séquentiel, rouge sous concurrence |
+| la requête réécrite en CTE `WITH previous … FOR UPDATE` + `excluded.failures` | `TestSimultaneousFailuresAreNotLost` — verte en séquentiel, rouge sous concurrence |
 | `RecordFailure` n'incrémente que le compteur d'adresse | `TestLeVerrouSAppliqueAussiALAdresseSource` |
-| `ClearFailures` efface aussi le compteur de source | `TestUneConnexionReussieEffaceLeCompteurDeLAdresseEtPasCeluiDeLaSource` |
+| `ClearFailures` efface aussi le compteur de source | `TestASuccessfulLoginClearsTheAddressCounterButNotTheSourceOne` |
 
 ### L'adresse source
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| `X-Forwarded-For` cru sans liste de confiance | `TestUnEnTeteForgeEstIgnoreQuandAucunProxyNEstDeConfiance` et `TestUnPairHorsDesReseauxDeConfianceNeFaitPasLireSonEnTete` |
-| `Unmap` retiré — un proxy déclaré cesse d'être reconnu sous sa forme mappée | `TestUneAdresseIpv4MappeeEnIpv6EstReconnueDansUnPrefixeIpv4` |
+| `X-Forwarded-For` cru sans liste de confiance | `TestAForgedHeaderIsIgnoredWhenNoProxyIsTrusted` et `TestAPeerOutsideTrustedNetworksDoesNotGetItsHeaderRead` |
+| `Unmap` retiré — un proxy déclaré cesse d'être reconnu sous sa forme mappée | `TestAnIpv4MappedIpv6AddressIsMatchedByAnIpv4Prefix` |
 
 ### La route
 
@@ -234,10 +234,10 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 | le verrou n'est plus consulté avant la vérification | le scénario « le verrou tient même quand le mot de passe est le bon » |
 | le refus nomme l'adresse (« aucun compte pour cette adresse ») | le pas « le refus ne nomme ni l'adresse ni le facteur en cause » |
 | le `400` retiré des statuts attendus côté client | `pnpm typecheck` sur `api.test-d.ts` |
-| `Header.Get` au lieu de `Header.Values` sur `X-Forwarded-For` | `TestUneSecondeLigneForwardedForNeMasquePasCelleDuProxy` |
-| la clé de source rendue à l'adresse nue (pas de /64) | `TestDeuxAdressesDuMemeReseauIpv6PartagentLeurCompteur` |
-| `itoa` inverse ses chiffres | `TestLaDureeAnnonceeArrondItToujoursAuSuperieur` |
-| le plancher à 1 de `retryAfterSeconds` retiré | `TestUneDureeNulleOuNegativeNAnnonceJamaisZero` |
+| `Header.Get` au lieu de `Header.Values` sur `X-Forwarded-For` | `TestASecondForwardedForLineDoesNotHideTheProxyOne` |
+| la clé de source rendue à l'adresse nue (pas de /64) | `TestTwoAddressesOfTheSameIpv6NetworkShareTheirCounter` |
+| `itoa` inverse ses chiffres | `TestTheAnnouncedDurationAlwaysRoundsUp` |
+| le plancher à 1 de `retryAfterSeconds` retiré | `TestAZeroOrNegativeDurationNeverAnnouncesZero` |
 | le serveur rend l'**empreinte** au lieu du jeton de challenge | le pas « un challenge est émis avec son échéance » — la panne n'aurait éclaté qu'en step-023 |
 | **retirer le hachage factice sur adresse inconnue** *(la DoD la nomme)* | **rien**, et c'est le constat qu'elle demande : le corps et le code sont identiques par construction, seule la durée diffère. *(Une rédaction précédente affirmait ici que la forme de `passwordMatches` rendait cette mutation visible en revue — la relecture l'a démentie : c'est une suppression d'une ligne dans une branche existante, et le test qui nomme `VerifyDummy` l'appelle directement, donc garde la fonction et jamais son site d'appel.)* |
 
@@ -245,10 +245,10 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| le rôle propriétaire n'est plus attaché au compte créé | `TestLeCompteProprietaireDetientLeRoleQuiAccordeTout` |
+| le rôle propriétaire n'est plus attaché au compte créé | `TestTheOwnerAccountHoldsTheRoleThatGrantsEverything` |
 | `WHERE NOT EXISTS` retiré **seul** | **rien** — le retour anticipé de `createOwner` arrête la commande avant |
 | le retour anticipé de `createOwner` retiré **seul** | **rien** — le `WHERE NOT EXISTS` tient |
-| **les deux ensemble** | `TestUnSecondPassageNeCreeAucunSecondOperateur` |
+| **les deux ensemble** | `TestASecondRunCreatesNoSecondOperator` |
 
 Les deux gardes méritent d'exister, et pas pour la même raison : l'une décide du **message** — il faut
 savoir s'il y a un opérateur avant d'exiger les variables — l'autre est la seule qui tienne quand deux
@@ -261,13 +261,13 @@ exécutions se croisent. Ce cas-là n'est exercé par rien, exactement comme le 
 |---|---|
 | la borne de `ClosePool` retirée | `TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack` — en 10 s et non en pendant, le verdict étant relevé sur un canal |
 | `defer store.ClosePool` retiré du binaire | **rien** : le processus s'arrête juste après et l'OS ferme ses sockets. Constat écrit au-dessus de la ligne |
-| le cap de `maxForwardedHops` retiré | `TestUneChaineDeSautsPlusLongueQueLaBorneNEstPasRemontee` et `TestLaBornePorteSurLesLignesReuniesEtNonSurChacune` |
-| le cap remis à zéro à chaque **ligne** de l'en-tête | `TestLaBornePorteSurLesLignesReuniesEtNonSurChacune` seul — chaque test garde bien une chose distincte |
-| `maximumPasswordLength` retirée | `TestUnMotDePasseDemesureNAtteintPasLeHachage`, qui bascule de 400 à 500 |
-| `maximumEmailLength` retirée | `TestUneAdresseDemesureeNeDevientPasUneCleDeCompteur` |
-| le compte passé en **octets** | `TestUneAdresseDAccentsSousLaBorneNEstPasRefusee` |
-| `middleware.RequestSize` retiré du routeur | `TestUnCorpsPlusGrandQueLaBorneNEstPasDecode` — **après correction du test**, qui était vert pour la mauvaise raison : son corps franchissait d'abord la borne du mot de passe. La mutation l'a dit |
-| l'erreur de l'authenticator traduite en 401 | `TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants` |
+| le cap de `maxForwardedHops` retiré | `TestAHopChainLongerThanTheBoundIsNotWalked` et `TestTheBoundAppliesToTheJoinedLinesNotToEachOne` |
+| le cap remis à zéro à chaque **ligne** de l'en-tête | `TestTheBoundAppliesToTheJoinedLinesNotToEachOne` seul — chaque test garde bien une chose distincte |
+| `maximumPasswordLength` retirée | `TestAnOversizedPasswordDoesNotReachTheHash`, qui bascule de 400 à 500 |
+| `maximumEmailLength` retirée | `TestAnOversizedAddressDoesNotBecomeACounterKey` |
+| le compte passé en **octets** | `TestAnAccentedAddressUnderTheBoundIsNotRefused` |
+| `middleware.RequestSize` retiré du routeur | `TestABodyLargerThanTheBoundIsNotDecoded` — **après correction du test**, qui était vert pour la mauvaise raison : son corps franchissait d'abord la borne du mot de passe. La mutation l'a dit |
+| l'erreur de l'authenticator traduite en 401 | `TestAnUnreachableDatabaseIsNotReadAsACredentialsRefusal` |
 
 ### Ce qui n'est gardé par rien, vérifié plutôt que supposé
 
@@ -276,7 +276,7 @@ restent écrites avec ce qui les referme — une ligne qu'on efface se réouvre 
 
 | Ligne | Constat |
 |---|---|
-| `subtle.ConstantTimeCompare` | ~~aucune porte~~ **refermé en step-031** : `TestUnHachageNeSeCompareQuEnTempsConstant` exige l'appel dans `Verify` **et** y refuse toute comparaison d'octets — la seconde moitié parce qu'un raccourci naïf posé devant l'appel le laisse en place sans qu'il décide |
+| `subtle.ConstantTimeCompare` | ~~aucune porte~~ **refermé en step-031** : `TestAHashIsOnlyComparedInConstantTime` exige l'appel dans `Verify` **et** y refuse toute comparaison d'octets — la seconde moitié parce qu'un raccourci naïf posé devant l'appel le laisse en place sans qu'il décide |
 | le hachage factice, en tant qu'**appel** | ~~aucune porte~~ — **doublon de la ligne « l'appel à `VerifyDummy` dans `passwordMatches` » ci-dessous**, qui la referme dans cette même livraison. Les deux ont coexisté, l'une barrée et l'autre non, et c'est ce qui a fait écrire au registre de `todo.md` que la dette restait ouverte ; relevé en revue de step-031. Sa paramétrisation, elle, suit `currentParams` par construction |
 | la cible de durée d'argon2id | ~~aucune porte~~ **resserré en step-031** : le plancher gardait 19 MiB et deux passes, le minimum d'OWASP, quand le profil retenu est 64 MiB et trois passes — il laissait donc tomber de 26,3 à 16,8 ms sans rougir. Il garde désormais la décision. La durée elle-même reste hors de portée d'un test — celle-ci est écrite avec sa date, sa machine et sa commande, et les dix profils mesurés sont au-dessus de `currentParams` |
 | le pool détaché du contexte d'arrêt | aucune porte, faute d'une requête assez lente pour traverser SIGTERM. **Sa fermeture non plus** : la retirer laisse tout vert, parce que le processus s'arrête juste après et que l'OS ferme ses sockets. Ce que la ligne change — une déconnexion annoncée plutôt que découverte — n'est visible d'aucun test de ce dépôt, et c'est écrit au-dessus d'elle. Ce qui **est** gardé est la **borne** de l'attente : `TestClosingThePoolGivesUpOnAConnectionThatNeverComesBack` |
@@ -284,7 +284,7 @@ restent écrites avec ce qui les referme — une ligne qu'on efface se réouvre 
 | l'**appel** à `VerifyDummy` dans `passwordMatches` | ~~aucune porte~~ **refermé** : `oracle_test.go` résout l'identifiant appelé en objet du type-checker et exige qu'il soit dans la branche « opérateur absent ». Trois mutations le font rougir — l'appel retiré, l'appel déplacé hors de la branche, la fonction renommée |
 | les trois `CHECK` et le `ON DELETE CASCADE` de la migration `00004` | ~~aucune porte~~ **refermé** : trois refus ajoutés à `constraints_test.go`, chacun vérifié en retirant **sa** contrainte isolément. Les deux inatteignables depuis le produit portent sur place ce qu'elles gardent |
 | les bornes d'entrée `maximumPasswordLength`, `maximumEmailLength` et `RequestSize` | ~~aucune porte~~ **refermé** : `bornes_test.go` monte le routeur entier sur un pool fermé, où 400 (refusé à la porte) se distingue de 500 (arrivé jusqu'à la base). Le compte en runes est gardé avec elles |
-| le chemin d'erreur base pendant un login | ~~aucune porte~~ **refermé** : `TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants`, qui vérifie le corps autant que le statut — faute de journal dans `internal/bff`, ce que le navigateur reçoit est tout ce qui existe |
+| le chemin d'erreur base pendant un login | ~~aucune porte~~ **refermé** : `TestAnUnreachableDatabaseIsNotReadAsACredentialsRefusal`, qui vérifie le corps autant que le statut — faute de journal dans `internal/bff`, ce que le navigateur reçoit est tout ce qui existe |
 | `request.Body == nil` dans `API.Login` | aucune porte, et **inatteignable par le routeur** : `strictHandler.Login` assigne le pointeur sans condition. Lui écrire un test demanderait d'appeler la méthode hors de son routeur — il prouverait la garde et rien du produit. Le constat est au-dessus de la ligne |
 
 ## Ses dettes ont un porteur depuis le 31/08/2026

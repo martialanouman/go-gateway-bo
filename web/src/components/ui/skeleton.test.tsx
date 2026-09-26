@@ -10,7 +10,7 @@ import { LoadingState, Skeleton } from './skeleton'
  * qu'elle se remplit.
  */
 describe('Skeleton', () => {
-  it('prend la géométrie que l’écran lui donne', () => {
+  it('takes the geometry the screen gives it', () => {
     // La primitive ne devine aucune mise en page : c'est l'écran qui connaît la sienne, et un
     // rectangle générique ne distingue plus le chargement de l'attente.
     const { container } = render(<Skeleton height={32} width={220} />)
@@ -21,7 +21,7 @@ describe('Skeleton', () => {
 })
 
 describe('LoadingState', () => {
-  it('s’annonce comme occupé, et dit poliment ce qui charge', () => {
+  it('announces itself as busy, and politely says what is loading', () => {
     render(
       <LoadingState>
         <Skeleton width={220} />
@@ -33,7 +33,7 @@ describe('LoadingState', () => {
     expect(region).toHaveAttribute('aria-live', 'polite')
   })
 
-  it('laisse l’écran nommer ce qu’il charge', () => {
+  it('lets the screen name what it is loading', () => {
     // « Chargement… » est un repli, pas une cible : un opérateur qui attend trois régions veut
     // savoir laquelle parle.
     render(
@@ -45,7 +45,7 @@ describe('LoadingState', () => {
     expect(screen.getByText('Chargement des connecteurs')).toBeInTheDocument()
   })
 
-  it('porte la silhouette que l’écran compose', () => {
+  it('carries the silhouette the screen composes', () => {
     const { container } = render(
       <LoadingState>
         <Skeleton width={150} />

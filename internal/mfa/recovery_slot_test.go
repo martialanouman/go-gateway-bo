@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestLaConfrontationDesCodesNeTientQuUneSeulePlace — dix hachages, une place.
+// TestCodeComparisonHoldsOnlyASingleSlot — dix hachages, une place.
 //
 // `auth.Verify` prend une place à chaque appel : appelée dans la boucle, elle ferait d'un seul essai
 // dix prises sur les dix que compte la borne, et l'amplificateur que cette step vient fermer
@@ -19,7 +19,7 @@ import (
 // La propriété se lit sur **l'appel**, et non sur une durée : occuper les places et chronométrer
 // donnerait un test qui passe sur une machine lente et rougit sur une rapide. Ce que la boucle
 // appelle est, lui, décidable — `VerifyHeld` s'exécute sous la place déjà prise par `Hold`.
-func TestLaConfrontationDesCodesNeTientQuUneSeulePlace(t *testing.T) {
+func TestCodeComparisonHoldsOnlyASingleSlot(t *testing.T) {
 	t.Parallel()
 
 	file, err := parser.ParseFile(token.NewFileSet(), "recovery.go", nil, 0)

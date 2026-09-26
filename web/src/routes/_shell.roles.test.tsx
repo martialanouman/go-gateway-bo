@@ -35,8 +35,8 @@ function expectBlockedAndExplained(button: HTMLElement, reason: RegExp) {
   expect(button).toHaveAccessibleDescription(reason)
 }
 
-describe('l’écran des rôles', () => {
-  it('désactive et explique la modification et la suppression d’un rôle par défaut', async () => {
+describe('the roles screen', () => {
+  it('disables and explains editing and deleting a default role', async () => {
     await visit()
 
     expectBlockedAndExplained(
@@ -49,7 +49,7 @@ describe('l’écran des rôles', () => {
     )
   })
 
-  it('désactive la suppression d’un rôle détenu, en nommant ses détenteurs', async () => {
+  it('disables deleting a held role, naming its holders', async () => {
     await visit()
 
     expectBlockedAndExplained(
@@ -58,7 +58,7 @@ describe('l’écran des rôles', () => {
     )
   })
 
-  it('montre les clés qu’un rôle par défaut accorde, à côté de sa description', async () => {
+  it('shows the keys a default role grants, next to its description', async () => {
     const user = userEvent.setup()
     await visit()
 
@@ -69,7 +69,7 @@ describe('l’écran des rôles', () => {
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
   })
 
-  it('compose un rôle personnalisé, qui apparaît dans la liste', async () => {
+  it('composes a custom role, which appears in the list', async () => {
     const user = userEvent.setup()
     await visit()
 
@@ -85,7 +85,7 @@ describe('l’écran des rôles', () => {
     )
   })
 
-  it('modifie un rôle personnalisé, dont la nouvelle clé se relit', async () => {
+  it('edits a custom role, whose new key reads back', async () => {
     const user = userEvent.setup()
     await visit()
 
@@ -112,7 +112,7 @@ describe('l’écran des rôles', () => {
     expect(view).toHaveTextContent('Alertes, lecture et acquittement.')
   })
 
-  it('supprime un rôle personnalisé que personne ne détient, après confirmation', async () => {
+  it('deletes a custom role nobody holds, after confirmation', async () => {
     const user = userEvent.setup()
     stubAdministration(
       { permissions: ['roles:manage'] },
@@ -137,7 +137,7 @@ describe('l’écran des rôles', () => {
     )
   })
 
-  it('rend une panne en état d’erreur, et relit la liste sur demande', async () => {
+  it('renders an outage as an error state, and reloads the list on request', async () => {
     const user = userEvent.setup()
     const fetch = stubAdministration(
       { permissions: ['roles:manage'] },
@@ -161,7 +161,7 @@ describe('l’écran des rôles', () => {
     )
   })
 
-  it('pose le focus sur le titre après une suppression, plutôt que de le perdre avec la ligne', async () => {
+  it('moves focus to the heading after a deletion, rather than losing it with the row', async () => {
     const user = userEvent.setup()
     stubAdministration(
       { permissions: ['roles:manage'] },
@@ -192,7 +192,7 @@ describe('l’écran des rôles', () => {
     )
   })
 
-  it('désactive et explique la création sans roles:manage', async () => {
+  it('disables and explains creation without roles:manage', async () => {
     stubAdministration(
       { permissions: [] },
       {},
@@ -212,7 +212,7 @@ describe('l’écran des rôles', () => {
     )
   })
 
-  it('rend dans l’éditeur le refus d’un nom déjà porté', async () => {
+  it('renders in the editor the refusal of a name already taken', async () => {
     const user = userEvent.setup()
     stubAdministration(
       { permissions: ['roles:manage'] },
@@ -238,7 +238,7 @@ describe('l’écran des rôles', () => {
     expect(await within(dialog).findByText('Nom déjà porté.')).toBeInTheDocument()
   })
 
-  it('rend dans la confirmation le refus d’une suppression devenue impossible', async () => {
+  it('renders in the confirmation the refusal of a deletion that became impossible', async () => {
     const user = userEvent.setup()
     stubAdministration(
       { permissions: ['roles:manage'] },

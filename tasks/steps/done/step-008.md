@@ -101,7 +101,7 @@ remesuré :
 |---|---|---|
 | `--n-300` : `#6b7684` → `#848f9e` — il porte `--text-faint`, donc `--text-data-sm` en **11 px**, du texte normal au sens WCAG | canvas **4,16** · carte **3,93** · ligne sélectionnée **3,24** | **5,85** · **5,53** · **4,56** |
 | `--red-400: #e85e62` ajouté, et l'alias `--text-danger-on-tint` — `--red-500` ne tient pas sur sa propre teinte, ce sont les pilules `failed`, `suspended`, `sev-critical` | canvas **4,33** · carte **4,05** | **5,02** · **4,69** |
-| `--qr-paper: #ffffff` ajouté — la seule surface claire du produit, le fond de la vignette QR d'enrôlement MFA | — | nommé « paper » et non « light », parce que la garde « ne promet pas de thème clair » cherche `light` dans les noms |
+| `--qr-paper: #ffffff` ajouté — la seule surface claire du produit, le fond de la vignette QR d'enrôlement MFA | — | nommé « paper » et non « light », parce que la garde « does not promise a light theme » cherche `light` dans les noms |
 
 « Les tokens sont portés **tels quels** » (périmètre) veut donc dire *ne rien redessiner*, pas
 *repartir du skill* : repartir du skill livrerait trois paires connues comme non conformes, et le

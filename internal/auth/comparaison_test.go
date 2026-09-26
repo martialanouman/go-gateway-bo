@@ -36,7 +36,7 @@ const (
 	constantTimeComparison = "crypto/subtle.ConstantTimeCompare"
 )
 
-func TestUnHachageNeSeCompareQuEnTempsConstant(t *testing.T) {
+func TestAHashIsOnlyComparedInConstantTime(t *testing.T) {
 	t.Parallel()
 
 	pkg := loadAuth(t)

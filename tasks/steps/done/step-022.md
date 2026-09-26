@@ -193,9 +193,9 @@ d'abord révélé un défaut du test plutôt que du produit.
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| borne **absolue** retirée du `WHERE` de `Resolve` | `TestUneSessionAuDelaDeSonEcheanceAbsolueNEstPlusVivante` — **après correction du test**, qui était vert pour la mauvaise borne : voir ci-dessous |
-| borne **glissante** neutralisée (paramètre conservé) | `TestUneSessionOisiveAuDelaDeLaFenetreNEstPlusVivante` et `TestUnRefusNeProlongeJamaisLaSession`, plus le scénario « deux heures sans requête » |
-| `Resolve` repousse **aussi** `expires_at` | `TestLEcheanceAbsolueNEstJamaisRepoussee` — **après correction du test**, voir ci-dessous |
+| borne **absolue** retirée du `WHERE` de `Resolve` | `TestASessionPastItsAbsoluteExpiryIsNoLongerAlive` — **après correction du test**, qui était vert pour la mauvaise borne : voir ci-dessous |
+| borne **glissante** neutralisée (paramètre conservé) | `TestASessionIdleBeyondTheWindowIsNoLongerAlive` et `TestARefusalNeverExtendsTheSession`, plus le scénario « deux heures sans requête » |
+| `Resolve` repousse **aussi** `expires_at` | `TestTheAbsoluteExpiryIsNeverPushedBack` — **après correction du test**, voir ci-dessous |
 
 **Les deux corrections que la mutation a provoquées.** Le premier helper reculait les trois horodatages
 ensemble : la fenêtre glissante refusait donc dans tous les cas, et retirer la borne absolue laissait la
@@ -208,23 +208,23 @@ naissance sans toucher la dernière vue.
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| `hmac.Equal` rendu toujours vrai | `TestUneSignatureAltereeEstRefusee`, `TestUnCookieScelleAvecUneAutreCleEstRefuse`, `TestUnCookieMalScelleNAtteintPasLaBase`, `TestLElevationNAtteintPasLaBaseSurUnCookieForge`, plus le scénario « un cookie que ce serveur n'a pas scellé » |
-| le cookie porte l'**empreinte** au lieu du jeton | `TestUnJetonScelleSeRelitEtRendLEmpreinteQuiSeraStockee` |
-| `HttpOnly` retiré · `Secure` retiré | `TestLeCookieDeSessionPorteSesCinqAttributs`, et le pas « le navigateur reçoit un cookie de session » |
-| `Cleared` avec un `MaxAge` nul | `TestLeCookieDeDeconnexionRecouvreCeluiDeLaSession` |
+| `hmac.Equal` rendu toujours vrai | `TestATamperedSignatureIsRefused`, `TestACookieSealedWithAnotherKeyIsRefused`, `TestABadlySealedCookieDoesNotReachTheDatabase`, `TestLElevationNAtteintPasLaBaseSurUnCookieForge`, plus le scénario « un cookie que ce serveur n'a pas scellé » |
+| le cookie porte l'**empreinte** au lieu du jeton | `TestASealedTokenReadsBackAndYieldsTheFingerprintToBeStored` |
+| `HttpOnly` retiré · `Secure` retiré | `TestTheSessionCookieCarriesItsFiveAttributes`, et le pas « le navigateur reçoit un cookie de session » |
+| `Cleared` avec un `MaxAge` nul | `TestTheLogoutCookieOverwritesTheSessionOne` |
 | **`hmac.Equal` remplacé par une comparaison ordinaire** | **rien** — mesuré. Un test de durée sur un écart de l'ordre de la nanoseconde ne prouverait rien. Le constat est écrit au-dessus de la ligne, comme pour `subtle.ConstantTimeCompare` en step-021 |
 
 ### La session en base
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| `Elevate` ne régénère pas le jeton | `TestLElevationInvalideLeJetonPrecedent` |
-| `DISTINCT` retiré de l'union | `TestLesPermissionsSontLUnionDesRolesDetenusSansDoublon` et le pas « aucune permission n'est rendue deux fois » |
-| `LEFT JOIN` durci en `JOIN` | `TestUnOperateurSansAucunRoleRendUnEnsembleVide` |
-| garde du statut élargie aux comptes désactivés | `TestUnOperateurDesactiveNeResoutPlusSaSession` |
-| `Delete` ne supprime rien | `TestFermerUneSessionEmpecheDeLaRejouer`, `TestDeuxPoolsDistinctsResolventLaMemeSession` |
-| `Elevate` : fenêtre glissante neutralisée | `TestUneSessionOisiveNeSEleveJamais` *(ajouté en revue)* |
-| `Elevate` : garde du statut élargie | `TestUnOperateurDesactiveNEleveJamaisSaSession` *(ajouté en revue)* |
+| `Elevate` ne régénère pas le jeton | `TestElevationInvalidatesThePreviousToken` |
+| `DISTINCT` retiré de l'union | `TestPermissionsAreTheUnionOfHeldRolesWithoutDuplicates` et le pas « aucune permission n'est rendue deux fois » |
+| `LEFT JOIN` durci en `JOIN` | `TestAnOperatorWithoutAnyRoleYieldsAnEmptySet` |
+| garde du statut élargie aux comptes désactivés | `TestADisabledOperatorNoLongerResolvesTheirSession` |
+| `Delete` ne supprime rien | `TestClosingASessionPreventsReplayingIt`, `TestTwoDistinctPoolsResolveTheSameSession` |
+| `Elevate` : fenêtre glissante neutralisée | `TestAnIdleSessionIsNeverElevated` *(ajouté en revue)* |
+| `Elevate` : garde du statut élargie | `TestADisabledOperatorNeverElevatesTheirSession` *(ajouté en revue)* |
 | `Manager.Elevate` rend le cookie présenté | **ne compile pas** — `rotate` n'a pas ce cookie en portée *(garde par construction, ajoutée en revue)* |
 | `GrantsOf` ne garde que le rôle le plus fourni | le scénario de l'union, qui ne le voyait pas avant la revue |
 
@@ -234,7 +234,7 @@ naissance sans toucher la dernière vue.
 |---|---|
 | le login ne pose plus le cookie | le pas « le navigateur reçoit un cookie de session » |
 | le middleware strict n'écrit pas le cookie déposé | le même pas |
-| le cookie est posé **même sur une erreur** | `TestUnHandlerEnEchecNePoseAucunCookie` — écrit **parce que** cette mutation ne faisait rougir personne |
+| le cookie est posé **même sur une erreur** | `TestAFailingHandlerSetsNoCookie` — écrit **parce que** cette mutation ne faisait rougir personne |
 | `/auth/me` rend 200 sans session | quatre scénarios de `session.feature` *(la première rédaction disait trois ; recompté en revue)* |
 | le DTO annonce le second facteur comme vérifié | le pas « le second facteur n'est pas vérifié » |
 | le middleware tient toute session pour vivante | quatre scénarios |
@@ -244,7 +244,7 @@ naissance sans toucher la dernière vue.
 | `401` retiré des statuts de `/auth/me` côté client | `pnpm typecheck` sur `api.test-d.ts` |
 | le re-login ne ferme plus la session présentée | le scénario « se reconnecter ferme la session que le navigateur présentait » *(ajouté en revue)* |
 | `withoutCaching` retiré du groupe `/api`, ou `Vary` sans `Cookie` | le pas « la réponse interdit toute mise en cache » *(ajouté en revue)* |
-| décodage du sceau rendu non strict | `TestUnSceauNonCanoniqueEstRefuse` *(ajouté en revue)* |
+| décodage du sceau rendu non strict | `TestANonCanonicalSealIsRefused` *(ajouté en revue)* |
 | `sessionFrom` tient toute requête pour authentifiée | le scénario « sans cookie, la route de session refuse » *(ajouté en revue)* |
 
 ### Ce que la mutation a corrigé dans les **tests**, pas dans le produit
@@ -259,8 +259,8 @@ naissance sans toucher la dernière vue.
 
 | Ligne | Constat |
 |---|---|
-| `hmac.Equal` | ~~aucune porte~~ **refermé en step-031** : `TestLeSceauNeSeCompareQuEnTempsConstant` exige l'appel dans `Unseal` **et** y refuse toute comparaison d'octets. Le constat au-dessus de la ligne a été réécrit avec elle |
-| le préfixe `__Host-` lui-même | ~~aucune porte du dépôt~~ **faux, corrigé en revue** : `TestLeCookieDeSessionPorteSesCinqAttributs` exige le préfixe, et le remplacer par `dashboard_session` fait rougir. Ce qui reste vrai est que les **scénarios** ne le voient pas — le harnais porte ses cookies à la main et accepterait n'importe quel nom |
+| `hmac.Equal` | ~~aucune porte~~ **refermé en step-031** : `TestTheSealIsOnlyComparedInConstantTime` exige l'appel dans `Unseal` **et** y refuse toute comparaison d'octets. Le constat au-dessus de la ligne a été réécrit avec elle |
+| le préfixe `__Host-` lui-même | ~~aucune porte du dépôt~~ **faux, corrigé en revue** : `TestTheSessionCookieCarriesItsFiveAttributes` exige le préfixe, et le remplacer par `dashboard_session` fait rougir. Ce qui reste vrai est que les **scénarios** ne le voient pas — le harnais porte ses cookies à la main et accepterait n'importe quel nom |
 | `Elevate`, en tant que geste **atteignable depuis une route** | aucune, et c'est DN-11 : il n'a pas d'appelant de production avant step-023. Ses gardes, elles, sont désormais tenues — voir la section suivante |
 | la valeur des durées (12 h, 2 h) | aucune porte : ce qui est gardé est que les **deux bornes existent et mordent**, pas leur valeur. Les changer laisse tout vert — c'est une décision, pas un invariant |
 
@@ -276,7 +276,7 @@ une fausse. Ce qui suit est ce qu'aucune n'aurait dû avoir à trouver.
 | **Le scénario de l'union ne prouvait pas l'union** : `billing_readonly` ⊂ `billing_admin`, donc un serveur qui ne garde que le rôle le plus fourni restait vert | rien | `billing_admin` + `account_manager` — six clés propres à chacun, six partagées |
 | **`/auth/me` sans aucun cookie** n'était exercé par rien : tous les scénarios passaient par une connexion | rien | un scénario dédié ; un `sessionFrom` qui tiendrait toute requête pour authentifiée fait rougir |
 | **Aucun en-tête de cache sur `/api`** alors que `/auth/me` rend l'identité et l'ensemble des permissions | rien | `no-store` + `Vary: Cookie` sur le groupe, avec leur pas de scénario |
-| **Quatre encodages acceptés pour un même sceau** — les bits de remplissage du dernier caractère base64 | rien, et c'est le piège déjà payé une fois par un pas de scénario | `RawURLEncoding.Strict()` + `TestUnSceauNonCanoniqueEstRefuse` |
+| **Quatre encodages acceptés pour un même sceau** — les bits de remplissage du dernier caractère base64 | rien, et c'est le piège déjà payé une fois par un pas de scénario | `RawURLEncoding.Strict()` + `TestANonCanonicalSealIsRefused` |
 | **`expiresAt` annonçait une échéance que la session n'atteint pas** dans le cas courant | le contrat le documentait, le nom disait le contraire | renommé `absoluteExpiresAt` avant que step-027 en fasse un décompte |
 
 **Quatre affirmations fausses**, toutes de la même famille — un texte qui décrit un mécanisme et que

@@ -15,7 +15,7 @@ import { BREAKER_STATES, DELIVERY_TONES, ENTITY_TONES, LINK_TONES, StatusPill } 
  * c'est cette devinette qu'on vérifie absente.
  */
 describe('StatusPill — link_status', () => {
-  it('rend un point et le libellé de l’API, en snake_case', () => {
+  it('renders a dot and the API label, in snake_case', () => {
     // C'est ce qu'un opérateur grep dans les logs : le traduire couperait le lien entre l'écran et
     // la trace.
     const { container } = render(<StatusPill kind="link" state="reconnecting" />)
@@ -24,7 +24,7 @@ describe('StatusPill — link_status', () => {
     expect(container.querySelector('.ui-status__dot')).not.toBeNull()
   })
 
-  it('donne sa tonalité à chacun des trois états du contrat', () => {
+  it('gives each of the three contract states its tone', () => {
     const cases = [
       { state: 'up', tone: 'up' },
       { state: 'reconnecting', tone: 'degraded' },
@@ -38,7 +38,7 @@ describe('StatusPill — link_status', () => {
     }
   })
 
-  it('n’anime le point que sur une valeur en direct', () => {
+  it('animates the dot only for a live value', () => {
     // Le pouls de 1,8 s est la seule animation en boucle qui porte un **état** : le spinner d'un
     // bouton et le scintillement du squelette tournent aussi, mais ils disent qu'on attend, pas ce
     // qui est vrai. Le poser sur un instantané ferait mentir le seul signal de fraîcheur du produit.
@@ -54,7 +54,7 @@ describe('StatusPill — link_status', () => {
     expect(live.container.querySelector('.ui-dot')).toHaveClass('ui-dot--live')
   })
 
-  it('n’est une région live que lorsqu’elle est réellement en direct', () => {
+  it('is a live region only when it is actually live', () => {
     // Un `role="status"` par défaut ferait de chaque pilule une région live : un tableau de 50
     // connecteurs à deux dimensions en compterait cent, et la première salve WebSocket les
     // annoncerait toutes. Le lecteur d'écran deviendrait inutilisable au moment de l'incident.
@@ -66,7 +66,7 @@ describe('StatusPill — link_status', () => {
     expect(live.getByRole('status')).toHaveTextContent('down')
   })
 
-  it('affiche la métadonnée quand elle est fournie', () => {
+  it('displays the metadata when provided', () => {
     render(<StatusPill kind="link" state="up" meta="3/4 binds" />)
 
     expect(screen.getByText('3/4 binds')).toBeInTheDocument()
@@ -74,7 +74,7 @@ describe('StatusPill — link_status', () => {
 })
 
 describe('StatusPill — breaker_state', () => {
-  it('rend une pilule teintée, jamais un point', () => {
+  it('renders a tinted pill, never a dot', () => {
     const { container } = render(<StatusPill kind="breaker" state="half_open" />)
 
     expect(screen.getByText('half_open')).toBeInTheDocument()
@@ -83,7 +83,7 @@ describe('StatusPill — breaker_state', () => {
     expect(container.querySelector('.ui-status__dot')).toBeNull()
   })
 
-  it('couvre les trois états du disjoncteur', () => {
+  it('covers the three circuit breaker states', () => {
     for (const state of ['closed', 'open', 'half_open'] as const) {
       const { container, unmount } = render(<StatusPill kind="breaker" state={state} />)
       expect(container.querySelector(`.ui-breaker--${state}`)).not.toBeNull()
@@ -91,7 +91,7 @@ describe('StatusPill — breaker_state', () => {
     }
   })
 
-  it('n’est jamais une région live — un disjoncteur n’est pas alimenté par la WebSocket', () => {
+  it('is never a live region — a circuit breaker is not fed by the WebSocket', () => {
     render(<StatusPill kind="breaker" state="open" />)
 
     expect(screen.queryByRole('status')).toBeNull()
@@ -104,14 +104,14 @@ describe('StatusPill — breaker_state', () => {
  * `closed` est un `BreakerState` **et** un statut de client ou de compte SMPP. Deviner la dimension
  * à partir de la valeur rendait donc un client résilié comme un disjoncteur sain.
  */
-describe('StatusPill — la dimension est déclarée, jamais devinée', () => {
-  it('rend `closed` en pilule quand c’est un disjoncteur', () => {
+describe('StatusPill — the dimension is declared, never guessed', () => {
+  it('renders `closed` as a pill for a circuit breaker', () => {
     const { container } = render(<StatusPill kind="breaker" state="closed" />)
 
     expect(container.querySelector('.ui-breaker--closed')).not.toBeNull()
   })
 
-  it('rend `closed` en point au repos quand c’est un client résilié', () => {
+  it('renders `closed` as an idle dot for a terminated client', () => {
     const { container } = render(<StatusPill kind="entity" state="closed" />)
 
     // Ni pilule de disjoncteur, ni rouge de panne : une fin de vie administrative n'appelle aucune
@@ -121,7 +121,7 @@ describe('StatusPill — la dimension est déclarée, jamais devinée', () => {
     expect(screen.getByText('closed')).toBeInTheDocument()
   })
 
-  it('ne laisse aucune valeur vivre dans deux dimensions à la fois', () => {
+  it('lets no value live in two dimensions at once', () => {
     // `closed` appartient à deux vocabulaires, et c'est la seule collision que le contrat porte
     // aujourd'hui. Ce test rougit le jour où une valeur en rejoint une autre dimension : la fusion
     // des tables, que la docstring déclare avoir rejetée, redeviendrait alors possible en silence.
@@ -144,7 +144,7 @@ describe('StatusPill — la dimension est déclarée, jamais devinée', () => {
     expect(collisions.sort()).toEqual(['closed (breaker)', 'closed (entity)'])
   })
 
-  it('couvre les huit valeurs de `CdrStatus`, sans en laisser tomber au gris', () => {
+  it('covers the eight `CdrStatus` values, without letting any fall back to gray', () => {
     // Une valeur omise retombe sur le repli au repos et disparaît de l'œil de l'opérateur qui balaie
     // la colonne à la recherche des rouges. `web/test/statuts-du-contrat.test.ts` garde
     // l'exhaustivité contre le YAML ; ce test-ci garde la tonalité de chacune.

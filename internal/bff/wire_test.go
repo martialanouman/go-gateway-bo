@@ -29,7 +29,7 @@ const sanctionedWriter = "writeJSON"
 // premier état d'une garde désactivée.
 var admittedSinks = map[string]string{
 	modulePath + "internal/bff." + sanctionedWriter: "l'écrivain sanctionné lui-même, dont ce qui " +
-		"entre est déjà gardé par TestLeSecondCheminVersLeFilNeSerialiseQueDesDTODeclares",
+		"entre est déjà gardé par TestTheSecondPathToTheWireSerializesOnlyDeclaredDTOs",
 	"(" + responseWriterType + ").Header": "un en-tête n'est pas un corps : `Content-Type`, " +
 		"`Cache-Control` et `Vary` ne peuvent porter aucun objet de domaine",
 	"net/http.SetCookie": "un en-tête lui aussi. Ce qu'il pose est le jeton scellé, dont la " +
@@ -71,7 +71,7 @@ var admittedSinks = map[string]string{
 //
 // Le paquet est chargé sans ses tests : un `httptest.ResponseRecorder` nourri à la main dans un
 // `_test.go` est le harnais, pas le produit.
-func TestUnCorpsDeReponseNeSEcritQuALEndroitPrevu(t *testing.T) {
+func TestAResponseBodyIsOnlyWrittenWhereIntended(t *testing.T) {
 	t.Parallel()
 
 	pkg := loadBFF(t)

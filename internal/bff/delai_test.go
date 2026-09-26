@@ -11,7 +11,7 @@ import (
 // les exerçait — 900 secondes, à travers un `strings.Contains` de scénario qui n'accepte que la
 // présence du mot « minute ». Une inversion de chiffres dans `itoa` aurait rendu « 51 minutes » sans
 // qu'aucune porte ne bouge. Ce sont les « mécanismes aux limites » que la charte range en unitaires.
-func TestLaDureeAnnonceeArrondItToujoursAuSuperieur(t *testing.T) {
+func TestTheAnnouncedDurationAlwaysRoundsUp(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
@@ -47,7 +47,7 @@ func TestLaDureeAnnonceeArrondItToujoursAuSuperieur(t *testing.T) {
 // suite » à l'instant même où l'on vient de refuser. La branche est **inatteignable** depuis `Login`
 // — `lockedResponse` n'est appelée que sur un verrou dont `Remaining` est strictement positif — et
 // c'est pourquoi elle est exercée ici directement plutôt que par un scénario.
-func TestUneDureeNulleOuNegativeNAnnonceJamaisZero(t *testing.T) {
+func TestAZeroOrNegativeDurationNeverAnnouncesZero(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, 1, retryAfterSeconds(0))
@@ -57,7 +57,7 @@ func TestUneDureeNulleOuNegativeNAnnonceJamaisZero(t *testing.T) {
 // La promesse écrite au-dessus de `lockedResponse` : l'en-tête et la phrase sortent du **même**
 // arrondi. Sans ce test, poser `RetryAfter: 1` en laissant « 15 minutes » dans le message laissait
 // tout vert — le scénario ne vérifie que la présence du mot « minute », et kin-openapi accepte 1.
-func TestLEnTeteEtLaPhraseAnnoncentLaMemeDuree(t *testing.T) {
+func TestTheHeaderAndTheSentenceAnnounceTheSameDuration(t *testing.T) {
 	t.Parallel()
 
 	response := lockedResponse(14*time.Minute + 30*time.Second)

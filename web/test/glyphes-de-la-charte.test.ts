@@ -54,15 +54,15 @@ function glyphesDeLaCharte(): string[] {
     .sort()
 }
 
-describe('le jeu de glyphes', () => {
-  it('sait lire le kit — sans quoi ce fichier serait vert et vide', () => {
+describe('the glyph set', () => {
+  it('can read the kit — otherwise this file would be green and empty', () => {
     // Le méta-test : si le kit change de forme et que l'extraction ne trouve plus rien, la
     // comparaison ci-dessous deviendrait une égalité de deux listes vides.
     expect(glyphesDeLaCharte().length).toBeGreaterThan(15)
     expect(glyphesDeLaCharte()).toContain('dot')
   })
 
-  it('porte exactement ceux que la charte dessine', () => {
+  it('carries exactly the ones the charter draws', () => {
     expect([...GLYPH_NAMES].sort()).toEqual(glyphesDeLaCharte())
   })
 })

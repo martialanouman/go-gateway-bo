@@ -17,7 +17,7 @@ import (
 //
 // **Pourquoi une porte structurelle et pas un test ordinaire.** Un test de durée est instable en CI,
 // et la fiche l'écarte. Un test qui appelle `VerifyDummy` directement — c'est ce que fait
-// `TestLeHachageFacticeSExecuteSurNImporteQuelSecret` — garde la **fonction**, jamais son **site
+// `TestTheDummyHashRunsOnAnySecret` — garde la **fonction**, jamais son **site
 // d'appel** : la supprimer de `passwordMatches` laissait toute la suite verte, mesuré le 09/08/2026.
 //
 // **Pourquoi le type-checker et pas une recherche de texte.** Ce dépôt a déjà été mordu par un
@@ -29,7 +29,7 @@ const (
 	guardedCall     = "VerifyDummy"
 )
 
-func TestLaBrancheDeLAdresseInconnueAppelleLeHachageFactice(t *testing.T) {
+func TestTheUnknownAddressBranchCallsTheDummyHash(t *testing.T) {
 	t.Parallel()
 
 	pkg := loadAuth(t)

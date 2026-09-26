@@ -64,7 +64,7 @@ func registerPasskey(t *testing.T, w *store.Webauthn, operatorID, credentialID s
 	return id
 }
 
-func TestUnOperateurSansPasskeyRendUneListeVideEtNonUneAbsence(t *testing.T) {
+func TestAnOperatorWithoutPasskeyYieldsAnEmptyListNotAnAbsence(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -80,7 +80,7 @@ func TestUnOperateurSansPasskeyRendUneListeVideEtNonUneAbsence(t *testing.T) {
 	assert.Equal(t, "camille@exemple.test", owner.Email)
 }
 
-func TestUnOperateurDesactiveNeRendAucunProprietaire(t *testing.T) {
+func TestADisabledOperatorYieldsNoOwner(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -94,7 +94,7 @@ func TestUnOperateurDesactiveNeRendAucunProprietaire(t *testing.T) {
 	assert.False(t, found, "un compte désactivé garde ses passkeys en base mais n'ouvre aucune cérémonie")
 }
 
-func TestLesPasskeysEnregistreesSeRelisentTelesQuEcrites(t *testing.T) {
+func TestRegisteredPasskeysReadBackAsWritten(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -120,7 +120,7 @@ func TestLesPasskeysEnregistreesSeRelisentTelesQuEcrites(t *testing.T) {
 	assert.Equal(t, "Clé seconde", owner.Passkeys[1].Name)
 }
 
-func TestLesPasskeysDUnAutreOperateurNeSontPasRendues(t *testing.T) {
+func TestAnotherOperatorsPasskeysAreNotReturned(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -135,7 +135,7 @@ func TestLesPasskeysDUnAutreOperateurNeSontPasRendues(t *testing.T) {
 	assert.Empty(t, owner.Passkeys)
 }
 
-func TestUneMemeCleNeSEnregistrePasDeuxFois(t *testing.T) {
+func TestTheSameKeyIsNotRegisteredTwice(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -158,7 +158,7 @@ func TestUneMemeCleNeSEnregistrePasDeuxFois(t *testing.T) {
 	assert.Empty(t, owner.Passkeys, "un refus ne doit rien écrire")
 }
 
-func TestLeCompteurDeSignatureNAvanceQue(t *testing.T) {
+func TestTheSignCountOnlyMovesForward(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -190,7 +190,7 @@ func TestLeCompteurDeSignatureNAvanceQue(t *testing.T) {
 // Le cas légitime que la garde doit laisser passer, et il est admis nommément : certains
 // authentificateurs ne comptent pas et rendent toujours zéro. Les refuser reviendrait à refuser du
 // matériel conforme, et une garde qui refuse du légitime finit retirée.
-func TestUnCompteurToujoursAZeroEstAccepte(t *testing.T) {
+func TestACounterAlwaysAtZeroIsAccepted(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -207,7 +207,7 @@ func TestUnCompteurToujoursAZeroEstAccepte(t *testing.T) {
 // `uvInitialized` de la spécification : une fois qu'une cérémonie a vérifié l'utilisateur, la
 // propriété est acquise. L'affecter au lieu de la latcher la ferait reculer à la première assertion
 // où l'appareil ne redemande rien.
-func TestLaVerificationDeLUtilisateurNeRecuePas(t *testing.T) {
+func TestUserVerificationNeverRegresses(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -227,7 +227,7 @@ func TestLaVerificationDeLUtilisateurNeRecuePas(t *testing.T) {
 	assert.True(t, verified)
 }
 
-func TestRetirerUnePasskeyQuandIlEnResteUneAutreReussit(t *testing.T) {
+func TestRemovingAPasskeyWhenAnotherRemainsSucceeds(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -244,7 +244,7 @@ func TestRetirerUnePasskeyQuandIlEnResteUneAutreReussit(t *testing.T) {
 	assert.Len(t, owner.Passkeys, 1)
 }
 
-func TestRetirerLaDernierePasskeySansTOTPEstRefuse(t *testing.T) {
+func TestRemovingTheLastPasskeyWithoutTOTPIsRefused(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -263,7 +263,7 @@ func TestRetirerLaDernierePasskeySansTOTPEstRefuse(t *testing.T) {
 
 // Le témoin du précédent : c'est bien l'absence de tout autre facteur qui refuse, et non la dernière
 // passkey en soi. Sans ce cas, une garde qui refuserait *toujours* le retrait resterait verte.
-func TestRetirerLaDernierePasskeyAvecUnTOTPReussit(t *testing.T) {
+func TestRemovingTheLastPasskeyWithATOTPSucceeds(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -277,7 +277,7 @@ func TestRetirerLaDernierePasskeyAvecUnTOTPReussit(t *testing.T) {
 	assert.Equal(t, store.PasskeyRemoved, outcome)
 }
 
-func TestRetirerLaPasskeyDUnAutreOperateurNeLaTrouvePas(t *testing.T) {
+func TestRemovingAnotherOperatorsPasskeyDoesNotFindIt(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -297,7 +297,7 @@ func TestRetirerLaPasskeyDUnAutreOperateurNeLaTrouvePas(t *testing.T) {
 	assert.Len(t, owner.Passkeys, 2)
 }
 
-func TestUnDefiDeCeremonieSeRelitEtNeSeConsommeQuUneFois(t *testing.T) {
+func TestACeremonyChallengeReadsBackAndIsConsumedOnlyOnce(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -329,7 +329,7 @@ func TestUnDefiDeCeremonieSeRelitEtNeSeConsommeQuUneFois(t *testing.T) {
 
 // L'objet du défi est une garde et non une étiquette : un défi d'assertion qui finirait un
 // enregistrement laisserait enrôler une passkey neuve sans rien prouver.
-func TestUnDefiDAssertionNeSeRelitPasCommeUnEnregistrement(t *testing.T) {
+func TestAnAssertionChallengeDoesNotReadBackAsARegistration(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -345,7 +345,7 @@ func TestUnDefiDAssertionNeSeRelitPasCommeUnEnregistrement(t *testing.T) {
 	assert.False(t, found)
 }
 
-func TestLeDefiDUneAutreSessionNeSeRelitPas(t *testing.T) {
+func TestAnotherSessionsChallengeDoesNotReadBack(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -365,7 +365,7 @@ func TestLeDefiDUneAutreSessionNeSeRelitPas(t *testing.T) {
 
 // Un seul défi vivant par session et par objet. Deux onglets rendraient sinon indécidable celui que
 // la finition doit relire, et le choisir par sa date ferait dépendre une garde d'un tri.
-func TestOuvrirUneCeremonieEteintCelleQuElleRemplace(t *testing.T) {
+func TestOpeningACeremonyExtinguishesTheOneItReplaces(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -390,7 +390,7 @@ func TestOuvrirUneCeremonieEteintCelleQuElleRemplace(t *testing.T) {
 	assert.False(t, consumed, "le défi remplacé est déjà éteint")
 }
 
-func TestUnDefiEchuNeSeRelitPas(t *testing.T) {
+func TestAnExpiredChallengeDoesNotReadBack(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -416,7 +416,7 @@ func TestUnDefiEchuNeSeRelitPas(t *testing.T) {
 	assert.False(t, consumed, "un défi échu ne se consomme pas non plus")
 }
 
-func TestFermerUneSessionEmporteSesDefis(t *testing.T) {
+func TestClosingASessionTakesItsChallengesWithIt(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)
@@ -444,7 +444,7 @@ func TestFermerUneSessionEmporteSesDefis(t *testing.T) {
 //
 // L'attente est observée dans `pg_locks` plutôt que temporisée : une temporisation rendrait le test
 // vert sur une machine lente sans que rien n'ait été exercé.
-func TestUnRetraitConcurrentNEmportePasLaDernierePasskey(t *testing.T) {
+func TestAConcurrentRemovalDoesNotTakeTheLastPasskey(t *testing.T) {
 	t.Parallel()
 
 	passkeys, dsn := webauthnOn(t)

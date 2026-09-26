@@ -61,7 +61,7 @@ func auditPartitionCount(t *testing.T, pool *pgxpool.Pool) int {
 	return count
 }
 
-func TestLesPartitionsDAuditSeRecreentQuandEllesManquent(t *testing.T) {
+func TestAuditPartitionsAreRecreatedWhenMissing(t *testing.T) {
 	t.Parallel()
 
 	pool, _ := migratedPool(t)
@@ -80,7 +80,7 @@ func TestLesPartitionsDAuditSeRecreentQuandEllesManquent(t *testing.T) {
 // L'intervalle est un argument et non une constante, pour que ce cas puisse l'exercer : le mesurer à
 // vingt-quatre heures demanderait d'attendre autant, et le figer rendrait la boucle intestable
 // autrement qu'en la relisant.
-func TestLeRenouvellementDesPartitionsRepasseEtSArreteAvecSonContexte(t *testing.T) {
+func TestPartitionRenewalRerunsAndStopsWithItsContext(t *testing.T) {
 	t.Parallel()
 
 	pool, _ := migratedPool(t)
@@ -119,7 +119,7 @@ func TestLeRenouvellementDesPartitionsRepasseEtSArreteAvecSonContexte(t *testing
 // **La panne est fabriquée en renommant la fonction SQL** plutôt qu'en coupant le serveur : elle est
 // locale à la base de ce cas, réversible à la milliseconde, et elle échoue là où
 // `EnsureAuditPartitions` appelle — pas dans le pool, qui pourrait avoir ses propres reprises.
-func TestUnEchecNArretePasLeRenouvellementDesPartitions(t *testing.T) {
+func TestAFailureDoesNotStopPartitionRenewal(t *testing.T) {
 	t.Parallel()
 
 	pool, _ := migratedPool(t)

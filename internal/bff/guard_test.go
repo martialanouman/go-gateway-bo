@@ -28,7 +28,7 @@ import (
 // La table est injectée : ces tests prouvent le mécanisme sur une opération exemptée en production,
 // sans base. Les scénarios de `operateurs.feature` l'exercent sur les vraies routes. La couture a son
 // propre risque — vérifier ce que la production ne
-// câble pas — et c'est `TestLaGardeEstCablee` qui le ferme.
+// câble pas — et c'est `TestTheGuardIsWired` qui le ferme.
 const guardedOperation = "Logout"
 
 // guardedTable exige une clé sur l'opération que ces tests exercent. `permissions.RolesManage` est
@@ -122,7 +122,7 @@ func noGrants(_ context.Context, _ string) ([]string, error) {
 // **Le défaut est fermé**, et ce test est ce qui le tient. Une entrée écrite dans le vocabulaire du
 // YAML — `"me"` là où le code engendré passe `"Me"` — devient inatteignable ; refuser la rend
 // visible au premier appel, quand laisser passer aurait ouvert la garde sans que rien ne le dise.
-func TestUneOperationQueLaTableNeDecidePasEstRefusee(t *testing.T) {
+func TestAnOperationTheTableDoesNotDecideIsRefused(t *testing.T) {
 	t.Parallel()
 
 	response := servedByGuard(t, map[string]rule{}, noGrants, withResolvedSession(true, true))
@@ -134,7 +134,7 @@ func TestUneOperationQueLaTableNeDecidePasEstRefusee(t *testing.T) {
 // Le témoin de tous les autres : une exemption laisse passer jusqu'au handler.
 //
 // Sans lui, une garde qui refuserait **tout** passerait chacun des tests de refus ci-dessous.
-func TestUneOperationExempteeAtteintSonHandler(t *testing.T) {
+func TestAnExemptOperationReachesItsHandler(t *testing.T) {
 	t.Parallel()
 
 	rules := map[string]rule{guardedOperation: exempt("le témoin de ces tests")}
@@ -149,7 +149,7 @@ func TestUneOperationExempteeAtteintSonHandler(t *testing.T) {
 
 // Une session fermée rend 401 et non 403 : le remède n'est pas le même, et le dire de travers
 // enverrait l'opérateur chercher un droit qui ne lui manque pas.
-func TestUneSessionFermeeEstRefuseeCommeTelle(t *testing.T) {
+func TestAClosedSessionIsRefusedAsSuch(t *testing.T) {
 	t.Parallel()
 
 	response := servedByGuard(t, guardedTable(), noGrants, withResolvedSession(true, false))
@@ -168,7 +168,7 @@ func TestUneSessionFermeeEstRefuseeCommeTelle(t *testing.T) {
 // La branche était **atteignable mais inexercée** jusqu'ici : `withResolvedSession` ne pose jamais
 // d'erreur, et en production aucune opération n'exige encore de clé — la mutation qui la faisait
 // répondre 401 laissait donc toutes les suites vertes. Mesuré le 16/09/2026.
-func TestUnePanneDeResolutionDeSessionNestPasUnRefus(t *testing.T) {
+func TestASessionResolutionFailureIsNotARefusal(t *testing.T) {
 	t.Parallel()
 
 	ctx := withFailedResolution(errors.New("la base ne répond pas"))
@@ -184,7 +184,7 @@ func TestUnePanneDeResolutionDeSessionNestPasUnRefus(t *testing.T) {
 //
 // L'ordre est observable ici et nulle part ailleurs : `noGrants` rend une erreur, donc un 500
 // dirait que la garde a lu les permissions d'une session qu'elle devait déjà avoir refusée.
-func TestUneSessionNonElevueEstRefuseeAvantTouteLecture(t *testing.T) {
+func TestANonElevatedSessionIsRefusedBeforeAnyRead(t *testing.T) {
 	t.Parallel()
 
 	response := servedByGuard(t, guardedTable(), noGrants, withResolvedSession(false, true))
@@ -194,7 +194,7 @@ func TestUneSessionNonElevueEstRefuseeAvantTouteLecture(t *testing.T) {
 	assert.Equal(t, "mfa_required", response.body.Code)
 }
 
-func TestUneSessionSansLaCleEstRefusee(t *testing.T) {
+func TestASessionWithoutTheKeyIsRefused(t *testing.T) {
 	t.Parallel()
 
 	held := func(_ context.Context, _ string) ([]string, error) {
@@ -214,7 +214,7 @@ func TestUneSessionSansLaCleEstRefusee(t *testing.T) {
 
 // Dette 001 : un refus de permission laisse une trace. L'écriture est bornée par les sessions élevées,
 // seules à atteindre cette branche, et c'est ce qu'une enquête cherche : qui a tenté quoi.
-func TestUnRefusDePermissionLaisseUneTrace(t *testing.T) {
+func TestAPermissionRefusalLeavesATrace(t *testing.T) {
 	t.Parallel()
 
 	held := func(_ context.Context, _ string) ([]string, error) { return nil, nil }
@@ -236,7 +236,7 @@ func TestUnRefusDePermissionLaisseUneTrace(t *testing.T) {
 
 // Une trace qui ne peut pas s'écrire n'est pas avalée : le refus devient une panne, comme toute
 // action dont l'audit échoue.
-func TestUnRefusDontLaTraceEchoueEstUnePanne(t *testing.T) {
+func TestARefusalWhoseTraceFailsIsAFailure(t *testing.T) {
 	t.Parallel()
 
 	held := func(_ context.Context, _ string) ([]string, error) { return nil, nil }
@@ -249,7 +249,7 @@ func TestUnRefusDontLaTraceEchoueEstUnePanne(t *testing.T) {
 }
 
 // La clé détenue laisse passer. C'est le second témoin, et il ferme la mutation « refuser toujours ».
-func TestUneSessionQuiDetientLaCleAtteintSonHandler(t *testing.T) {
+func TestASessionHoldingTheKeyReachesItsHandler(t *testing.T) {
 	t.Parallel()
 
 	held := func(_ context.Context, _ string) ([]string, error) {
@@ -266,7 +266,7 @@ func TestUneSessionQuiDetientLaCleAtteintSonHandler(t *testing.T) {
 //
 // Même distinction qu'au premier facteur : une base injoignable lue comme « vous n'avez pas le
 // droit » ferait chercher un problème de rôle pendant que la panne est ailleurs.
-func TestUnePanneDeLectureDesPermissionsNestPasUnRefus(t *testing.T) {
+func TestAPermissionReadFailureIsNotARefusal(t *testing.T) {
 	t.Parallel()
 
 	response := servedByGuard(t, guardedTable(), noGrants, withResolvedSession(true, true))
@@ -275,7 +275,7 @@ func TestUnePanneDeLectureDesPermissionsNestPasUnRefus(t *testing.T) {
 	assert.Equal(t, "internal_error", response.body.Code)
 }
 
-// TestLaGardeEstCablee ferme le risque propre à la couture `grantsOf`.
+// TestTheGuardIsWired ferme le risque propre à la couture `grantsOf`.
 //
 // Les tests ci-dessus injectent leur table et leur source de permissions ; ils prouvent le mécanisme
 // et **rien du produit**. Retirer la garde du slice ne fait rougir qu'**un** scénario — celui de
@@ -289,7 +289,7 @@ func TestUnePanneDeLectureDesPermissionsNestPasUnRefus(t *testing.T) {
 // L'appel est résolu par le **type-checker** et non cherché dans le texte : un détecteur qui grep un
 // nom est rendu vrai par le moindre commentaire qui le cite. Même patron que
 // `cmd/dashboard/partitions_test.go`.
-func TestLaGardeEstCablee(t *testing.T) {
+func TestTheGuardIsWired(t *testing.T) {
 	t.Parallel()
 
 	calls := callsByFunction(t, loadThisPackage(t))

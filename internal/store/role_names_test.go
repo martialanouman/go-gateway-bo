@@ -12,7 +12,7 @@ import (
 // Une base d'avant le renommage porte les neuf rôles par défaut sous leurs anciens identifiants. La
 // migration les renomme en place : les détenteurs gardent leurs rôles, et le seed qui suit retrouve
 // ses noms au lieu de créer neuf rôles vides à côté de neuf rôles orphelins.
-func TestLaMigrationRenommeLesRolesParDefautSansPerdreLeursDetenteurs(t *testing.T) {
+func TestTheMigrationRenamesDefaultRolesWithoutLosingTheirHolders(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)

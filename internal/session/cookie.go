@@ -70,7 +70,7 @@ func Unseal(secret []byte, value string) (tokenHash []byte, ok bool) {
 	}
 
 	// `hmac.Equal` plutôt qu'une comparaison ordinaire. Ce qui le garde est
-	// `TestLeSceauNeSeCompareQuEnTempsConstant`, qui exige cet appel **et** refuse toute comparaison
+	// `TestTheSealIsOnlyComparedInConstantTime`, qui exige cet appel **et** refuse toute comparaison
 	// d'octets dans ce corps — la seconde moitié parce qu'un raccourci naïf posé devant l'appel rendrait
 	// le refus en temps variable sans le faire disparaître.
 	if !hmac.Equal(sign(secret, text), provided) {

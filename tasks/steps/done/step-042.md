@@ -144,9 +144,9 @@ Feuille d'entrée : **27,37 Ko bruts / 5,89 Ko gzip**, contre 21,37 / 5,00 avant
 | Mutation | Résultat |
 |---|---|
 | `ModuleDisabled` rend `ErrorState` | Rouge, 1 test. Le test « nomme le module éteint » **reste vert** : le titre survit à la confusion, et c'est pourquoi les quatre assertions du même `it` étaient nécessaires. |
-| `onOpenChange` filtré sur `reason === 'close-press'` | Rouge, « ferme sur Échap ». |
+| `onOpenChange` filtré sur `reason === 'close-press'` | Rouge, « closes on Escape ». |
 | `<Dialog.Portal keepMounted>` | Rouge, « ne laisse rien de son contenu dans le document ». La seule preuve que la modale **démonte** — invariant (b), six steps avant l'écran qui en dépendra. |
-| `sideEffects` retiré de `package.json` | Rouge, « garde le script d'entrée exempt de ce qu'une seule route consomme » : 145 796 gzip pour une borne à 110 000. |
+| `sideEffects` retiré de `package.json` | Rouge, « keeps the entry script free of what a single route consumes » : 145 796 gzip pour une borne à 110 000. |
 | `"sideEffects": false` au lieu de `["**/*.css"]` | **Verte, et instructive** : la feuille émise est identique à l'empreinte près — Vite ne laisse pas secouer ses propres modules CSS. Le motif ne protège donc rien aujourd'hui ; il dit ce qui est vrai du graphe. Le premier message de commit lui prêtait la protection : corrigé sur la mesure. |
 | `modal={false}` | Rouge **deux fois** : en jsdom, l'extérieur reste dans l'arbre d'accessibilité ; en Chromium, le focus sort de la modale. |
 | `@media (prefers-reduced-motion: reduce)` retiré de `base.css` | Rouge sur le parcours seulement. |

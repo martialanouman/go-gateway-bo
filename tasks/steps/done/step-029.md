@@ -165,7 +165,7 @@ défaut modifiable (1), se désactiver permis (1), réinitialiser le sien permis
 montage (1), collision au seed (1 scénario de `seed.feature`).
 
 Ajoutées après revue : chacune des entrées d'administration de la garde passée en exemption
-(`TestLesRoutesDAdministrationExigentLeurCle`), chacun des trois nettoyages de la réinitialisation
+(`TestTheAdministrationRoutesRequireTheirKey`), chacun des trois nettoyages de la réinitialisation
 retiré (`TestLaReinitialisationNeLaisseAucunFacteurNiVerrou`), bornes comptées en octets, attribution
 concurrente d'un rôle supprimé (500 avant correctif). **Reste verte, et c'est écrit sur le code** : le
 verrou de ligne de `SetOperatorRoles`, dont la course ne se fabrique qu'en tenant une transaction

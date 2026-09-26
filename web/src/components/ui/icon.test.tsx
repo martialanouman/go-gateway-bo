@@ -12,7 +12,7 @@ import { Dot, GLYPH_NAMES, type GlyphName, Icon } from './icon'
  * fonctionnel, ce que la règle interdit précisément.
  */
 describe('Icon', () => {
-  it('dessine le glyphe demandé, sans dépendance ni police d’icônes', () => {
+  it('draws the requested glyph, with no dependency or icon font', () => {
     const { container } = render(<Icon name="search" />)
 
     const svg = container.querySelector('svg')
@@ -21,7 +21,7 @@ describe('Icon', () => {
     expect(container.querySelectorAll('svg circle, svg path').length).toBeGreaterThan(0)
   })
 
-  it('ne rend rien pour un nom hors du jeu, plutôt qu’une forme approchante', () => {
+  it('renders nothing for a name outside the set, rather than a lookalike shape', () => {
     // `key-round` est un nom Lucide : il n'appartient pas au jeu de la charte.
     //
     // **Le `as` est la démonstration, pas un contournement.** `name` est typé sur le jeu : ce test
@@ -34,7 +34,7 @@ describe('Icon', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('dessine chacun des glyphes du jeu', () => {
+  it('draws every glyph in the set', () => {
     // **Pas de nombre écrit ici** : un compte recopié dans le test et dans le composant vient de la
     // même main et ne fait que se confirmer lui-même. C'est `test/glyphes-de-la-charte.test.ts` qui
     // confronte le jeu à sa source ; ce test-ci vérifie seulement que chaque nom déclaré rend bien
@@ -48,7 +48,7 @@ describe('Icon', () => {
     }
   })
 
-  it('reste hors de l’arbre d’accessibilité tant qu’il n’a pas de libellé', () => {
+  it('stays out of the accessibility tree as long as it has no label', () => {
     // Un glyphe qui double un libellé texte l'annoncerait deux fois.
     const { container } = render(<Icon name="check" />)
 
@@ -56,7 +56,7 @@ describe('Icon', () => {
     expect(screen.queryByRole('img')).toBeNull()
   })
 
-  it('s’annonce comme une image dès qu’il porte seul le sens', () => {
+  it('announces itself as an image as soon as it alone carries the meaning', () => {
     render(<Icon name="ban" title="Action interdite" />)
 
     expect(screen.getByRole('img', { name: 'Action interdite' })).toBeInTheDocument()
@@ -64,7 +64,7 @@ describe('Icon', () => {
 })
 
 describe('Dot', () => {
-  it('porte sa tonalité par une classe, jamais par une couleur écrite dans le style', () => {
+  it('carries its tone through a class, never through a color written in the style', () => {
     // Une couleur composée en JavaScript échappe au plugin de tokens : il ne voit que le CSS émis.
     const { container } = render(<Dot tone="down" />)
 
@@ -74,7 +74,7 @@ describe('Dot', () => {
     expect(dot?.getAttribute('style')).toBeNull()
   })
 
-  it('ne bat que sur une valeur alimentée en direct', () => {
+  it('pulses only on a live-fed value', () => {
     // Le pouls est le seul signal de fraîcheur du produit : le poser sur un instantané le ferait
     // mentir. Le kit de la charte posait la classe sur le point alors que son CSS visait le parent,
     // si bien qu'un point isolé ne battait jamais — c'est ce défaut-là qui est fermé ici.

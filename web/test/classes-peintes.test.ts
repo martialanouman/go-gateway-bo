@@ -122,15 +122,15 @@ const HOOKS = new Set([
   'ui-status__dot',
 ])
 
-describe('les classes des primitives', () => {
-  it('sont toutes peintes par une feuille servie, ou nommées comme crochets', () => {
+describe('primitive classes', () => {
+  it('are all painted by a served stylesheet, or named as hooks', () => {
     const rules = painted()
     const orphelines = [...expanded()].filter((name) => !HOOKS.has(name) && !rules.has(name)).sort()
 
     expect(orphelines, 'classes émises que rien ne peint').toEqual([])
   })
 
-  it('ne laissent aucune règle sans émetteur', () => {
+  it('leave no rule without an emitter', () => {
     // L'autre sens : une règle dont plus personne ne porte la classe est du poids mort servi à tous,
     // et elle se lit comme une protection qui n'agit sur rien.
     const emitters = expanded()
@@ -139,7 +139,7 @@ describe('les classes des primitives', () => {
     expect(sansEmetteur, 'règles CSS que plus aucun composant n’émet').toEqual([])
   })
 
-  it('énumèrent chaque famille calculée, et seulement celles-là', () => {
+  it('enumerate every computed family, and only those', () => {
     // Un préfixe absent de `FAMILIES` ne s'étendrait en rien, et ses classes échapperaient aux deux
     // tests ci-dessus.
     const prefixes = [...emitted()].filter((name) => name.endsWith('--')).sort()
@@ -147,7 +147,7 @@ describe('les classes des primitives', () => {
     expect(Object.keys(FAMILIES).sort()).toEqual(prefixes)
   })
 
-  it('sont assez nombreuses pour que ce test garde quelque chose', () => {
+  it('are numerous enough for this test to guard something', () => {
     // Sans ce plancher, une expression régulière qui cesserait de reconnaître les classes rendrait
     // les tests ci-dessus verts et vides — la panne la plus discrète qu'un test puisse avoir.
     expect(emitted().size).toBeGreaterThan(20)

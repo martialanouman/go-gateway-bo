@@ -124,7 +124,7 @@ reste obligatoire, critère 3.
   `internal/permissions/catalog.go`, la garde serveur qui l'exige, les rôles par défaut de
   `internal/permissions/roles.go` (§6.10 de la spec), puis `make generate`, qui en dérive le
   TypeScript. Deux gardes tiennent les deux derniers : une clé qu'aucun rôle ne détient fait rougir
-  `TestAucuneCleOrphelineHorsDesTroisDeliberees`, et `check-generated` rougit sur un TS non régénéré.
+  `TestNoOrphanKeyBesidesTheThreeDeliberateOnes`, et `check-generated` rougit sur un TS non régénéré.
 
 ## La boucle de travail
 

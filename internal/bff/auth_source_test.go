@@ -15,7 +15,7 @@ import (
 // `option forwardfor` en écrit une seconde. Chez un tel proxy, lire `Get` rendrait la ligne écrite
 // par le client, avant la nôtre : la remontée de droite à gauche s'appliquerait alors à une chaîne
 // entièrement forgée, et l'attaquant choisirait sa clé de compteur — ou celle d'un tiers.
-func TestUneSecondeLigneForwardedForNeMasquePasCelleDuProxy(t *testing.T) {
+func TestASecondForwardedForLineDoesNotHideTheProxyOne(t *testing.T) {
 	t.Parallel()
 
 	var (

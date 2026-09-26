@@ -23,14 +23,14 @@ async function visitDesign() {
   return await screen.findByRole('heading', { level: 1 })
 }
 
-describe('la référence visuelle', () => {
-  it('est atteignable à /_design, et non avalée par une mise en page sans chemin', async () => {
+describe('the visual reference', () => {
+  it('is reachable at /_design, and not swallowed by a pathless layout', async () => {
     const heading = await visitDesign()
 
     expect(heading).toHaveTextContent('Référence visuelle')
   })
 
-  it('vit hors de la coquille, parce qu’elle ne s’adresse pas à un opérateur', async () => {
+  it('lives outside the shell, because it is not meant for an operator', async () => {
     await visitDesign()
 
     // Pas de navigation principale : la page n'est pas un écran du produit. C'est aussi ce qui la
@@ -38,7 +38,7 @@ describe('la référence visuelle', () => {
     expect(screen.queryByRole('navigation', { name: 'Navigation principale' })).toBeNull()
   })
 
-  it('rend les familles de tokens sous des titres de section', async () => {
+  it('renders the token families under section headings', async () => {
     await visitDesign()
 
     // **Les six, pas quatre.** Mesuré le 08/08/2026 : avec la liste amputée de « Rayons » et
@@ -67,7 +67,7 @@ describe('la référence visuelle', () => {
     expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(sections.length)
   })
 
-  it('rend un en-tête de tri réellement actionnable', async () => {
+  it('renders a truly actionable sort header', async () => {
     // **Ce que ce test ferme.** La page passait `sort` sans `onSortChange` : la table rendait alors
     // ses en-têtes triables en **texte inerte**, et posait un `aria-sort` sur une colonne que rien
     // ne rendait actionnable. La référence visuelle ne montrait donc jamais l'état le plus important
@@ -98,7 +98,7 @@ describe('la référence visuelle', () => {
     expect(tri.closest('th')).toHaveAttribute('aria-sort', 'descending')
   })
 
-  it('rend une paire de contraste par ligne de la table que le test de charte vérifie', async () => {
+  it('renders one contrast pair per row of the table the brand test checks', async () => {
     await visitDesign()
 
     const { CONTRAST_PAIRS } = await import('~/lib/design-tokens')
@@ -128,7 +128,7 @@ describe('la référence visuelle', () => {
    * Ce test exerce le geste **et** montre le mécanisme : le titre de la modale n'est pas là au
    * repos, il l'est une fois ouverte.
    */
-  it('ouvre la modale au clic, et son titre n’existe pas avant', async () => {
+  it('opens the modal on click, and its title does not exist before', async () => {
     const user = userEvent.setup()
     await visitDesign()
 
@@ -139,7 +139,7 @@ describe('la référence visuelle', () => {
     expect(screen.getByRole('dialog', { name: 'Déconnecter la session ?' })).toBeInTheDocument()
   })
 
-  it('referme la modale par son bouton Annuler', async () => {
+  it('closes the modal with its Annuler button', async () => {
     const user = userEvent.setup()
     await visitDesign()
 
@@ -149,7 +149,7 @@ describe('la référence visuelle', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('referme la modale par sa croix', async () => {
+  it('closes the modal with its close button', async () => {
     // Les deux sorties, parce que ce sont deux chemins distincts : `Annuler` est une action de
     // l'écran, la croix est celle de la primitive. Une page de référence où seule l'une des deux
     // marcherait laisserait croire que l'autre marche aussi.
@@ -162,7 +162,7 @@ describe('la référence visuelle', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('rend actionnables les deux issues que les états proposent', async () => {
+  it('makes the two ways out offered by the states actionable', async () => {
     // « Réinitialiser » et « Réessayer » sont la moitié utile de leur état : un `NoResults` qui ne
     // réinitialise rien et un `ErrorState` qui ne réessaie pas sont deux boutons décoratifs, et la
     // page de référence les montrerait comme s'ils agissaient.
@@ -184,7 +184,7 @@ describe('la référence visuelle', () => {
     expect(screen.getByText('Impossible de joindre l’API Admin')).toBeInTheDocument()
   })
 
-  it('pousse un toast par étage de détection, chacun avec sa source', async () => {
+  it('pushes one toast per detection stage, each with its source', async () => {
     const user = userEvent.setup()
     await visitDesign()
 
@@ -195,7 +195,7 @@ describe('la référence visuelle', () => {
     expect(screen.getByText('source · bff')).toBeInTheDocument()
   })
 
-  it('rend les cinq états de contenu, chacun avec sa copie', async () => {
+  it('renders the five content states, each with its copy', async () => {
     await visitDesign()
 
     // Les cinq, et surtout **cinq copies distinctes** : c'est la page où l'on vérifie qu'un module

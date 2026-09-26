@@ -153,22 +153,22 @@ Vingt et une mutations, jouées une par une sur un dépôt commité, avec `-coun
 | Mutation appliquée | Ce qui est tombé |
 |---|---|
 | **anti-rejeu retiré** (`WHERE` inconditionnel) | 2 unitaires + « le même code deux fois » et « le pas précédent » |
-| **anti-rejeu réduit à l'égalité** (`<>` au lieu de `<`) | `TestUnPasAnterieurAuDernierConsommeEstRefuse` + « le pas précédent ne se rejoue pas non plus » |
-| **fenêtre élargie à ±10 pas** | `TestUnCodeADeuxPasEstRefuse` + « le code à deux pas est refusé » |
-| **secret stocké en clair** (chiffrement **et** déchiffrement) | `TestCeQuiVaEnBaseNEstPasLeSecretEnClair` + 3 |
+| **anti-rejeu réduit à l'égalité** (`<>` au lieu de `<`) | `TestAStepBeforeTheLastConsumedOneIsRefused` + « le pas précédent ne se rejoue pas non plus » |
+| **fenêtre élargie à ±10 pas** | `TestACodeTwoStepsAwayIsRefused` + « le code à deux pas est refusé » |
+| **secret stocké en clair** (chiffrement **et** déchiffrement) | `TestWhatGoesToTheDatabaseIsNotThePlaintextSecret` + 3 |
 | **code de récupération marqué au lieu d'être détruit** | 2 unitaires + « un code de récupération ouvre une fois et une seule » |
-| **`ConsumeChallenge` rend vrai sans écrire** | `TestUnChallengeNeSeConsommeQuUneFois`, `TestUnChallengeConsommeResteEnBase` |
+| **`ConsumeChallenge` rend vrai sans écrire** | `TestAChallengeIsConsumedOnlyOnce`, `TestAConsumedChallengeStaysInTheDatabase` |
 | **le handler n'appelle plus `ConsumeChallenge`** | « un challenge déjà servi ne ressert pas » |
 | **contrôle d'appartenance du challenge retiré** | « le challenge d'un autre opérateur n'élève rien » |
-| **données associées retirées** (des deux côtés) | `TestUnSecretDeplaceSurUneAutreLigneNeSeDechiffrePas`, et rien d'autre |
+| **données associées retirées** (des deux côtés) | `TestASecretMovedToAnotherRowDoesNotDecrypt`, et rien d'autre |
 | **exigence de preuve retirée du remplacement** | « remplacer son authentificateur en présentant son code réussit » |
-| **jeton de session non régénéré à l'élévation** | `TestLElevationInvalideLeJetonPrecedent` + 6 scénarios |
-| **`.Strict()` retiré de `ChallengeDigest`** | `TestUnChallengeNonCanoniqueNEstPasLeMemeChallenge`, ses trois cas |
-| **nonce constant sous GCM** | `TestDeuxChiffrementsDuMemeSecretSousLaMemeCleDifferent` |
+| **jeton de session non régénéré à l'élévation** | `TestElevationInvalidatesThePreviousToken` + 6 scénarios |
+| **`.Strict()` retiré de `ChallengeDigest`** | `TestANonCanonicalChallengeIsNotTheSameChallenge`, ses trois cas |
+| **nonce constant sous GCM** | `TestTwoEncryptionsOfTheSameSecretUnderTheSameKeyDiffer` |
 | **`ConsumeChallenge` appelé *aussi* sur échec** | « une faute de frappe n'oblige pas à refaire la connexion » + 2 |
 | **`!state.Enrolled` retiré** | « présenter un code sans avoir enrôlé est refusé, pas une panne » |
 | **bornes de forme retirées** (`maximumCodeLength`, `Method.Valid()`) | « une requête de second facteur mal formée est refusée sur sa forme » |
-| **correspondance de Crockford altérée** (`I→7`, `O→9`) | `TestLesConfusionsDeCrockfordSontResolues`, ses trois cas |
+| **correspondance de Crockford altérée** (`I→7`, `O→9`) | `TestCrockfordConfusionsAreResolved`, ses trois cas |
 | **verrou d'essais non consulté** | « cinq codes faux verrouillent le second facteur » + « se reconnecter ne lève pas le verrou » |
 | **arrêt au premier code de récupération qui colle** | **rien — verte, et le constat est écrit au-dessus de la ligne** |
 
@@ -204,7 +204,7 @@ a trouvées nues. Les cinq qui comptent :
 ## Ce qui n'est pas testé, et pourquoi
 
 - ~~**L'arrêt au premier code de récupération** — le seul rouge manquant.~~ **Refermé en step-031**,
-  et pas par un test de durée : `TestLaBoucleDesCodesDeRecuperationNeCourtCircuitePas` observe l'effet
+  et pas par un test de durée : `TestTheRecoveryCodeLoopDoesNotShortCircuit` observe l'effet
   — toute sortie anticipée rend le premier rang qui colle, quand la boucle entière rend le dernier.
 - **Un journal.** Un secret illisible en base et un hachage de code abîmé sont silencieux : aucun
   journal n'atteint encore `internal/mfa` ni `internal/auth`.

@@ -19,7 +19,7 @@ func auditOn(t *testing.T) (*store.Audit, string) {
 	return store.NewAudit(pool), dsn
 }
 
-func TestUnEvenementSeRelitTelQuEcrit(t *testing.T) {
+func TestAnEventReadsBackAsWritten(t *testing.T) {
 	t.Parallel()
 
 	audit, dsn := auditOn(t)
@@ -57,7 +57,7 @@ func TestUnEvenementSeRelitTelQuEcrit(t *testing.T) {
 			"qu'un objet vide — « rien à dire » et « un objet sans champ » ne se lisent pas pareil")
 }
 
-func TestUnEvenementSansOperateurEstAccepte(t *testing.T) {
+func TestAnEventWithoutOperatorIsAccepted(t *testing.T) {
 	t.Parallel()
 
 	audit, dsn := auditOn(t)
@@ -70,7 +70,7 @@ func TestUnEvenementSansOperateurEstAccepte(t *testing.T) {
 	assert.EqualValues(t, 1, orphans, "un événement système n'a pas d'auteur, et la colonne l'admet")
 }
 
-func TestLeJournalNePerdJamaisSonAuteur(t *testing.T) {
+func TestTheLogNeverLosesItsAuthor(t *testing.T) {
 	t.Parallel()
 
 	audit, dsn := auditOn(t)
@@ -95,7 +95,7 @@ func TestLeJournalNePerdJamaisSonAuteur(t *testing.T) {
 // L'audit d'une action locale partage sa transaction : ou les deux, ou aucune. C'est ce qui rend la
 // trace non contournable — un chemin qui commiterait l'action et perdrait l'audit laisserait
 // exactement le trou qu'une enquête cherche.
-func TestUnAuditAnnuleAvecSaTransactionNeLaissePasDeTrace(t *testing.T) {
+func TestAnAuditRolledBackWithItsTransactionLeavesNoTrace(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -124,7 +124,7 @@ func TestUnAuditAnnuleAvecSaTransactionNeLaissePasDeTrace(t *testing.T) {
 	assert.Zero(t, survived, "l'action a été annulée : sa trace ne doit pas survivre")
 }
 
-func TestUnEtatVideNeLaissePasDObjetVide(t *testing.T) {
+func TestAnEmptyStateLeavesNoEmptyObject(t *testing.T) {
 	t.Parallel()
 
 	encoded, err := store.NewFields().JSON()

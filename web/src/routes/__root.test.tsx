@@ -18,8 +18,8 @@ async function visit(path: string) {
   return await screen.findByRole('navigation', { name: 'Navigation principale' })
 }
 
-describe('la coquille', () => {
-  it('expose une navigation nommée et une région de contenu', async () => {
+describe('the shell', () => {
+  it('exposes a named navigation and a content region', async () => {
     await visit('/')
 
     expect(screen.getByRole('navigation', { name: 'Navigation principale' })).toBeInTheDocument()
@@ -28,8 +28,8 @@ describe('la coquille', () => {
   })
 })
 
-describe('une adresse qui ne correspond à aucun écran', () => {
-  it('explique la situation en français plutôt que de rendre « Not Found »', async () => {
+describe('an address that matches no screen', () => {
+  it('explains the situation in French rather than rendering « Not Found »', async () => {
     await visit('/clients/01960000-0000-7000-8000-000000000000')
 
     const heading = await screen.findByRole('heading', { level: 1 })
@@ -38,7 +38,7 @@ describe('une adresse qui ne correspond à aucun écran', () => {
     expect(screen.queryByText('Not Found')).not.toBeInTheDocument()
   })
 
-  it('garde la coquille autour du message', async () => {
+  it('keeps the shell around the message', async () => {
     // Une adresse inconnue ne fait pas disparaître la navigation : l'opérateur doit pouvoir repartir
     // d'où il est, sans revenir en arrière ni retaper une URL.
     await visit('/inconnu')

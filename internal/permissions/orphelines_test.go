@@ -18,7 +18,7 @@ import (
 // type-checker, jamais au texte : `Key` est un nom trop court pour être cherché dans la source.
 const keyTypeName = "Key"
 
-// Le catalogue est gardé **contre les rôles** par `TestAucuneCleOrphelineHorsDesTroisDeliberees` :
+// Le catalogue est gardé **contre les rôles** par `TestNoOrphanKeyBesidesTheThreeDeliberateOnes` :
 // toute entrée qu'aucun rôle ne détient y est signalée. Le sens inverse n'est gardé que par cette
 // porte-ci : un `const FooBar Key = "foo:bar"` ajouté au bloc compile, laisse les deux suites vertes
 // et n'apparaît pas dans le TypeScript engendré, Go ne signalant pas une constante exportée
@@ -35,7 +35,7 @@ const keyTypeName = "Key"
 // jour où une step supprime des permissions. L'égalité avec le catalogue se met à jour toute seule, et
 // elle attrape un défaut que rien d'autre ne tient — deux constantes de la **même valeur**, dont une
 // seule est référencée : l'orpheline ne se voit pas par valeur, mais le décompte bouge.
-func TestAucuneConstanteNeManqueAuCatalogue(t *testing.T) {
+func TestNoConstantIsMissingFromTheCatalog(t *testing.T) {
 	t.Parallel()
 
 	catalogued := make(map[string]bool)
@@ -80,7 +80,7 @@ func TestAucuneConstanteNeManqueAuCatalogue(t *testing.T) {
 //
 // Omettre le type sur une ligne d'un bloc `const` est une écriture Go ordinaire, pas une bizarrerie :
 // c'est ce qui rend ce trou probable, et la porte voisine reste verte sur cette mutation.
-func TestToutLeBlocDesClesPorteSonType(t *testing.T) {
+func TestTheWholeKeyBlockCarriesItsType(t *testing.T) {
 	t.Parallel()
 
 	blocks := 0

@@ -31,7 +31,7 @@ const (
 	constantTimeEqual = "crypto/hmac.Equal"
 )
 
-func TestLeSceauNeSeCompareQuEnTempsConstant(t *testing.T) {
+func TestTheSealIsOnlyComparedInConstantTime(t *testing.T) {
 	t.Parallel()
 
 	pkg := loadSession(t)

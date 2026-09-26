@@ -17,7 +17,7 @@ import (
 // Ce qu'un nonce constant coûterait sous GCM n'est pas une faiblesse théorique : deux secrets chiffrés
 // sous la même clé et le même nonce se déchiffrent l'un par l'autre, et la clé d'authentification se
 // retrouve. C'est la faute la plus courte pour perdre à la fois la confidentialité et l'intégrité.
-func TestDeuxChiffrementsDuMemeSecretSousLaMemeCleDifferent(t *testing.T) {
+func TestTwoEncryptionsOfTheSameSecretUnderTheSameKeyDiffer(t *testing.T) {
 	t.Parallel()
 
 	authenticator, err := NewAuthenticator([]byte("une-cle-de-chiffrement-de-test-assez-longue"), "Cockpit de test")

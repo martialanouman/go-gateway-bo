@@ -28,7 +28,7 @@ const orphanPID = 1 << 30
 // d'un nom dont rien ne garantissait la forme : un nom illisible rendait zéro, que nul processus ne
 // porte, donc « fini », donc jetable. Mesuré plutôt que supposé — une base `storeXtestY_1` créée pour
 // l'occasion a bien été supprimée.
-func TestCeQueLeHarnaisSAutoriseAJeter(t *testing.T) {
+func TestWhatTheHarnessAllowsItselfToDiscard(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
@@ -98,7 +98,7 @@ const initPID = 1
 // Le cas vit à part de la table ci-dessus parce qu'il a une condition : sous root, le signal aboutit,
 // `EPERM` n'est pas observable, et un cas qui passerait quand même ne prouverait rien. Il s'écarte
 // alors plutôt que de se déclarer vert.
-func TestUneBaseDUnProcessusVivantMaisNonSignalableEstGardee(t *testing.T) {
+func TestADatabaseOfALiveButUnsignalableProcessIsKept(t *testing.T) {
 	t.Parallel()
 
 	process, err := os.FindProcess(initPID)
@@ -117,7 +117,7 @@ func TestUneBaseDUnProcessusVivantMaisNonSignalableEstGardee(t *testing.T) {
 // Les deux fonctions ne se parlent que par la **forme du nom**, et rien d'autre ne les relie : changer
 // celle que [bddtest.DatabaseName] distribue sans toucher à [bddtest.Discardable] rendrait le
 // nettoyage silencieusement inopérant, sur une suite qui resterait verte.
-func TestCeQueLeHarnaisNommeEstCeQuIlSaitReconnaitre(t *testing.T) {
+func TestWhatTheHarnessNamesIsWhatItCanRecognize(t *testing.T) {
 	t.Parallel()
 
 	mien := bddtest.DatabaseName("store")

@@ -18,7 +18,7 @@ import (
 
 // Une route qui dépose un cookie puis échoue ouvrirait une session que le client croit refusée : il
 // verrait un 500 et repartirait, en portant désormais une session vivante que personne ne fermera.
-func TestUnHandlerEnEchecNePoseAucunCookie(t *testing.T) {
+func TestAFailingHandlerSetsNoCookie(t *testing.T) {
 	t.Parallel()
 
 	recorder := serveThroughPendingCookie(t, func(ctx context.Context) (any, error) {
@@ -32,7 +32,7 @@ func TestUnHandlerEnEchecNePoseAucunCookie(t *testing.T) {
 }
 
 // Le témoin : sans lui, un middleware qui n'écrirait jamais rien passerait le cas ci-dessus.
-func TestUnHandlerQuiReussitPoseLeCookieQuIlADepose(t *testing.T) {
+func TestASucceedingHandlerSetsTheCookieItDeposited(t *testing.T) {
 	t.Parallel()
 
 	recorder := serveThroughPendingCookie(t, func(ctx context.Context) (any, error) {

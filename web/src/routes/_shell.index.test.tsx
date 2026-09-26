@@ -18,14 +18,14 @@ async function visitAndAwaitHeading(path: string) {
   return await screen.findByRole('heading', { level: 1 })
 }
 
-describe("l'écran d'accueil", () => {
-  it('annonce que le cockpit se construit, sous un titre de premier niveau', async () => {
+describe('the home screen', () => {
+  it('announces that the cockpit is under construction, under a top-level heading', async () => {
     const heading = await visitAndAwaitHeading('/')
 
     expect(heading).toHaveTextContent("Le cockpit d'exploitation se construit")
   })
 
-  it('nomme les jalons qui apporteront les écrans plutôt que de laisser un blanc', async () => {
+  it('names the milestones that will bring the screens rather than leaving a blank', async () => {
     await visitAndAwaitHeading('/')
 
     // §1.9 : une surface non encore livrée dit ce qui arrive et quand — jamais une page vide, jamais

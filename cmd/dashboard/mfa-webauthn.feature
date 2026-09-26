@@ -56,7 +56,7 @@ Fonctionnalité: Le second facteur par passkey
     # **Ce scénario est doublé**, et c'est mesuré : depuis qu'une clé déjà enregistrée est refusée au
     # lieu de violer bruyamment l'index, le rejeu bute sur cette garde-là avant l'anti-rejeu, et le
     # défi jamais consommé le laisse vert. Deux gardes dont l'une masque l'autre. L'anti-rejeu est
-    # tenu par `TestUnDefiDeCeremonieSeRelitEtNeSeConsommeQuUneFois`, qui rougit.
+    # tenu par `TestACeremonyChallengeReadsBackAndIsConsumedOnlyOnce`, qui rougit.
     Quand l'opérateur représente exactement la même attestation
     Alors la réponse est conforme au contrat du BFF
     Et la cérémonie est refusée
@@ -77,7 +77,7 @@ Fonctionnalité: Le second facteur par passkey
     # avançait — l'analyseur d'attestation n'est jamais atteint, puisque le défi d'enregistrement de
     # cette session a déjà été consommé par le décor. Ce que ce scénario observe est donc « aucun
     # défi d'enregistrement vivant », ce qui reste vrai sans le contrôle d'objet.
-    # Celui-ci est tenu par `TestUnDefiDAssertionNeSeRelitPasCommeUnEnregistrement`, qui rougit.
+    # Celui-ci est tenu par `TestAnAssertionChallengeDoesNotReadBackAsARegistration`, qui rougit.
     Quand l'opérateur ouvre une assertion puis finit un enregistrement avec ce défi
     Alors la réponse est conforme au contrat du BFF
     Et la cérémonie est refusée
@@ -92,7 +92,7 @@ Fonctionnalité: Le second facteur par passkey
     # **Ce scénario ne garde pas à lui seul le contrôle de session**, et c'est mesuré : la session
     # retirée du `WHERE`, il reste vert — parce que se reconnecter ferme la session précédente, et
     # que la clé étrangère emporte ses défis en cascade. Deux gardes là encore. Celle du `WHERE` est
-    # tenue par `TestLeDefiDUneAutreSessionNeSeRelitPas`.
+    # tenue par `TestAnotherSessionsChallengeDoesNotReadBack`.
     Quand l'opérateur ouvre une assertion puis se reconnecte avant de la finir
     Alors la réponse est conforme au contrat du BFF
     Et le second facteur est refusé

@@ -34,7 +34,7 @@ import (
 // chemin. Ce qu'il n'attrape pas : un serveur uniformément ralenti, où les deux branches enflent
 // ensemble. C'est le prix du rapport, et il est assumé — le mode d'échec visé est une régression de
 // route, pas une machine lente.
-func TestUneLectureDeSessionResteDansSonBudget(t *testing.T) {
+func TestASessionReadStaysWithinItsBudget(t *testing.T) {
 	world := &loginWorld{process: &process{}}
 
 	require.NoError(t, world.installationWithOneOperator(t.Context()))

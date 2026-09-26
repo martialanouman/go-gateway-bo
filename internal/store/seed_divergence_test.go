@@ -19,7 +19,7 @@ import (
 // la garde `EXISTS (… wanted …)` de la révocation, il le dépouillerait de toutes ses attributions en
 // silence : le rôle survivrait, vide, et les opérateurs qui le détiennent perdraient tout accès sans
 // qu'aucune ligne d'audit ne dise pourquoi.
-func TestUnRoleParDefautDisparuDuCodeEstSignaleSansEtreDepouille(t *testing.T) {
+func TestADefaultRoleGoneFromTheCodeIsReportedWithoutBeingStripped(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()

@@ -30,15 +30,15 @@ async function visit(path: string, outcome: SessionOutcome) {
   return router
 }
 
-describe('la garde de session de la coquille', () => {
-  it('renvoie à la connexion une adresse profonde ouverte sans session, et garde la destination', async () => {
+describe('the shell session guard', () => {
+  it('redirects a deep link opened without a session to sign-in, and keeps the destination', async () => {
     const router = await visit('/billing', { status: 401 })
 
     expect(router.state.location.pathname).toBe('/login')
     expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
-  it('renvoie au second facteur une session qui ne l’a pas franchi', async () => {
+  it('redirects a session that has not passed the second factor to it', async () => {
     // Le challenge est ce qu'un opérateur a en main à ce moment-là : il vient de franchir le premier
     // facteur, et tape une adresse profonde avant de présenter son code.
     rememberChallenge(CHALLENGE)
@@ -51,7 +51,7 @@ describe('la garde de session de la coquille', () => {
     expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
-  it('renvoie à la connexion une session non élevée dont le challenge est perdu', async () => {
+  it('redirects a non-elevated session whose challenge is lost to sign-in', async () => {
     // Sans challenge, le formulaire du second facteur essuierait un refus à chaque envoi. C'est ce
     // que produit un rechargement : reprendre la connexion est la seule issue, et elle ne se
     // découvre pas sur un refus.
@@ -61,14 +61,14 @@ describe('la garde de session de la coquille', () => {
     expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
-  it('ouvre l’écran demandé quand la session est élevée', async () => {
+  it('opens the requested screen when the session is elevated', async () => {
     const router = await visit('/billing', { permissions: [] })
 
     expect(router.state.location.pathname).toBe('/billing')
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Soldes & crédits')
   })
 
-  it('ne renvoie nulle part quand le BFF est en panne : la panne dégrade, elle ne déconnecte pas', async () => {
+  it('redirects nowhere when the BFF is down: the failure degrades, it does not sign out', async () => {
     // Un 500 lu comme « aucune session » enverrait l'opérateur se reconnecter pendant que son
     // cookie est intact, et la connexion échouerait sur la même panne. Invariant (e).
     const router = await visit('/billing', { status: 500 })
@@ -80,8 +80,8 @@ describe('la garde de session de la coquille', () => {
   })
 })
 
-describe('« Réessayer » après une panne de session', () => {
-  it('rejoue la garde, et ne peint pas la coquille pour une session non élevée', async () => {
+describe('« Réessayer » after a session failure', () => {
+  it('replays the guard, and does not paint the shell for a non-elevated session', async () => {
     // La garde a laissé passer parce que le BFF ne répondait pas — une panne dégrade, elle ne
     // déconnecte pas. Quand il répond de nouveau, la session s'avère **non élevée** : relire la
     // seule requête peindrait le rail et la barre, et chaque appel gardé rendrait alors 403. C'est

@@ -104,8 +104,8 @@ function modulesRenderedFor(element: ReactElement) {
   return modulesOf(svg)
 }
 
-describe('le choix de la voie', () => {
-  it('présente la clé d’accès en premier quand l’appareil la connaît', async () => {
+describe('choosing the path', () => {
+  it('presents the passkey first when the device supports it', async () => {
     stubWebAuthnSupport(true)
     await visitEnroll()
 
@@ -118,7 +118,7 @@ describe('le choix de la voie', () => {
     expect(boutons.indexOf(passkey())).toBeLessThan(boutons.indexOf(authenticator()))
   })
 
-  it('désigne la voie recommandée, et une seule', async () => {
+  it('marks the recommended path, and only one', async () => {
     stubWebAuthnSupport(true)
     await visitEnroll()
 
@@ -129,13 +129,13 @@ describe('le choix de la voie', () => {
     expect(authenticator()).not.toHaveClass('ui-button--primary')
   })
 
-  it('fait de l’application d’authentification la voie principale quand elle est la seule', async () => {
+  it('makes the authenticator app the main path when it is the only one', async () => {
     await visitEnroll()
 
     expect(authenticator()).toHaveClass('ui-button--primary')
   })
 
-  it('dit ce que l’écran demande et pourquoi', async () => {
+  it('says what the screen asks for and why', async () => {
     await visitEnroll()
 
     expect(
@@ -143,7 +143,7 @@ describe('le choix de la voie', () => {
     ).toBeVisible()
   })
 
-  it('garde l’application d’authentification offerte sur un poste sans clé d’accès', async () => {
+  it('keeps the authenticator app offered on a device without passkey support', async () => {
     // jsdom n'implémente pas WebAuthn : c'est le poste sans authentificateur, rien de simulé.
     await visitEnroll()
 
@@ -158,8 +158,8 @@ describe('le choix de la voie', () => {
   })
 })
 
-describe('la garde de l’enrôlement', () => {
-  it('renvoie à la connexion quand aucune session ne vit', async () => {
+describe('the enrollment guard', () => {
+  it('redirects to sign-in when no session is alive', async () => {
     rememberChallenge(CHALLENGE)
     stubSession({ status: 401 })
     const router = createAppRouter(
@@ -172,7 +172,7 @@ describe('la garde de l’enrôlement', () => {
     expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
-  it('ne suit pas une URL de schéma relatif collée dans le paramètre', async () => {
+  it('does not follow a scheme-relative URL pasted into the parameter', async () => {
     // Ici le renvoi part en `href`, donc en **URL brute** et non en chemin routeur : `//ailleurs`
     // déposerait l'opérateur ailleurs avec la connexion encore en tête. `/mfa` porte le même test,
     // et chaque copie de la garde veut sa propre mesure.
@@ -187,7 +187,7 @@ describe('la garde de l’enrôlement', () => {
     expect(router.state.location.href).not.toContain('ailleurs.example')
   })
 
-  it('renvoie à la connexion quand le challenge n’est plus en mémoire', async () => {
+  it('redirects to sign-in when the challenge is no longer in memory', async () => {
     // Sans challenge, la vérification du premier code serait refusée : l'écran enrôlerait un
     // facteur puis déposerait l'opérateur devant un refus certain. C'est ce que produit un
     // rechargement, puisque le challenge ne vit qu'en mémoire.
@@ -202,7 +202,7 @@ describe('la garde de l’enrôlement', () => {
     expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
-  it('renvoie au second facteur quand ce compte en détient déjà un', async () => {
+  it('redirects to the second factor when this account already holds one', async () => {
     // Cet écran n'enrôle que le premier facteur ; l'ajout et le remplacement vivent dans « Mon compte ».
     const { router } = await visitEnroll({
       factors: { totp: true },
@@ -216,7 +216,7 @@ describe('la garde de l’enrôlement', () => {
     expect(router.state.location.search).toEqual({ redirect: '/billing' })
   })
 
-  it('ne redemande rien à une session déjà élevée, et rejoint la destination', async () => {
+  it('asks nothing more of an already elevated session, and reaches the destination', async () => {
     rememberChallenge(CHALLENGE)
     stubSession({ permissions: [] })
     const router = createAppRouter(
@@ -230,7 +230,7 @@ describe('la garde de l’enrôlement', () => {
     expect(router.state.location.pathname).toBe('/billing')
   })
 
-  it('n’affirme rien des facteurs quand le BFF n’a pas rendu la session', async () => {
+  it('asserts nothing about factors when the BFF has not returned the session', async () => {
     // Une panne dégrade, elle ne déconnecte pas (invariant e) — mais elle ne dit pas non plus ce
     // que ce compte détient. Proposer un enrôlement à un opérateur parfaitement enrôlé rendrait
     // une **erreur** sous la forme d'un état vide, que le §1.9 sépare.
@@ -254,8 +254,8 @@ describe('la garde de l’enrôlement', () => {
   })
 })
 
-describe('l’enrôlement d’une application d’authentification', () => {
-  it('dessine le QR de l’URI que le serveur a rendue, et non d’une autre valeur', async () => {
+describe('enrolling an authenticator app', () => {
+  it('draws the QR of the URI the server returned, and not of another value', async () => {
     const { user } = await visitEnroll()
     await user.click(authenticator())
 
@@ -273,7 +273,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     )
   })
 
-  it('le dessine à une taille qu’une caméra atteint, et non à celle du défaut', async () => {
+  it('draws it at a size a camera can read, not the default one', async () => {
     const { user } = await visitEnroll()
     await user.click(authenticator())
 
@@ -285,7 +285,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(svg.getAttribute('height')).toBe('200')
   })
 
-  it('garde les deux couches du QR de couleurs distinctes', async () => {
+  it('keeps the two QR layers in distinct colors', async () => {
     const { user } = await visitEnroll()
     await user.click(authenticator())
 
@@ -298,7 +298,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(fond?.getAttribute('fill')).not.toBe(traits?.getAttribute('fill'))
   })
 
-  it('demande le premier code sous le QR, et ne montre encore aucun code de récupération', async () => {
+  it('asks for the first code below the QR, and shows no recovery code yet', async () => {
     const { user } = await visitEnroll()
     await user.click(authenticator())
 
@@ -312,7 +312,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(screen.queryByRole('button', { name: 'Copier les codes' })).toBeNull()
   })
 
-  it('montre la clé en clair pour un poste sans caméra, et la copie', async () => {
+  it('shows the plain-text key for a device without a camera, and copies it', async () => {
     const { user } = await visitEnroll()
     await user.click(authenticator())
 
@@ -328,7 +328,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(retour).toHaveAttribute('aria-live', 'polite')
   })
 
-  it('montre les dix codes de récupération, copiables et téléchargeables', async () => {
+  it('shows the ten recovery codes, copyable and downloadable', async () => {
     const { user } = await visitEnroll()
     await confirmEnrollment(user)
 
@@ -347,7 +347,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(decodeURIComponent(fichier.getAttribute('href') ?? '')).toContain(RECOVERY_CODES[9])
   })
 
-  it('dit comment faire quand le navigateur refuse le presse-papiers', async () => {
+  it('says what to do when the browser denies the clipboard', async () => {
     const { user } = await visitEnroll()
     await user.click(authenticator())
     await screen.findByText(ENROLLMENT_SECRET)
@@ -362,7 +362,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(await screen.findByText(/copiez-la à la main/)).toBeInTheDocument()
   })
 
-  it('conduit à la console une fois les codes reconnus enregistrés', async () => {
+  it('leads to the console once the codes are acknowledged as saved', async () => {
     const { router, user } = await visitEnroll({ path: '/enroll?redirect=%2Fbilling' })
     await confirmEnrollment(user)
 
@@ -378,7 +378,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(router.state.location.pathname).toBe('/billing')
   })
 
-  it('n’emporte ni la clé ni les codes dans le cache après le départ de l’écran', async () => {
+  it('keeps neither the key nor the codes in the cache after leaving the screen', async () => {
     const { router, user } = await visitEnroll({ path: '/enroll?redirect=%2Fbilling' })
     await confirmEnrollment(user)
     await user.click(screen.getByRole('button', { name: 'J’ai enregistré ces codes' }))
@@ -396,7 +396,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(cached).not.toContain(RECOVERY_CODES[1])
   })
 
-  it('refuse un premier code faux, et reprend l’indice de dérive d’horloge', async () => {
+  it('rejects a wrong first code, and relays the clock-drift hint', async () => {
     // C'est **le premier** code, tapé juste après un scan : l'horloge du téléphone est la cause la
     // plus probable, et le serveur ne la nomme plus depuis step-035.
     const { user } = await visitEnroll({
@@ -423,7 +423,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(screen.queryByText(RECOVERY_CODES[0] ?? '')).toBeNull()
   })
 
-  it('reprend l’enrôlement abandonné plutôt que de réclamer un code impossible', async () => {
+  it('resumes the abandoned enrollment rather than demanding an impossible code', async () => {
     const { user } = await visitEnroll()
     await user.click(authenticator())
     await screen.findByText(ENROLLMENT_SECRET)
@@ -440,7 +440,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(screen.queryByLabelText(/Code à six chiffres/)).toBeNull()
   })
 
-  it('ne réaffiche pas les codes après un rechargement', async () => {
+  it('does not redisplay the codes after a reload', async () => {
     const { user } = await visitEnroll()
     await confirmEnrollment(user)
     await screen.findByText(RECOVERY_CODES[0] ?? '')
@@ -468,7 +468,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(stockage).not.toContain(ENROLLMENT_SECRET)
   })
 
-  it('n’emporte pas sur l’écran des codes le refus d’une clé d’accès abandonnée', async () => {
+  it('does not carry an abandoned passkey’s refusal onto the codes screen', async () => {
     // Le cas courant, pas une panne : la fenêtre de la cérémonie se referme, l'opérateur prend la
     // seconde voie, et elle réussit. Le refus de la première n'a plus aucun objet — le laisser
     // surplomber l'écran des codes contredirait l'intro juste au-dessus, sur le seul écran qui ne
@@ -485,7 +485,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('dit en français que l’enrôlement n’a pas abouti quand le serveur n’a rien rédigé', async () => {
+  it('says in French that enrollment failed when the server wrote nothing', async () => {
     const { user } = await visitEnroll({ replies: { enroll: { status: 502 } } })
 
     await user.click(authenticator())
@@ -496,7 +496,7 @@ describe('l’enrôlement d’une application d’authentification', () => {
     expect(refus).toHaveTextContent(/n’a pas abouti/)
   })
 
-  it('rend le refus du serveur quand un facteur a été posé entre-temps', async () => {
+  it('renders the server’s refusal when a factor was set in the meantime', async () => {
     // La course : un second onglet a enrôlé pendant que celui-ci attendait. Le serveur rédige le
     // refus, et il vaut pour l'écran entier — cette step ne présente aucune preuve, donc aucun
     // champ ne peut le porter.
@@ -520,8 +520,8 @@ describe('l’enrôlement d’une application d’authentification', () => {
   })
 })
 
-describe('l’enregistrement d’une clé d’accès', () => {
-  it('annonce la durée du verrou plutôt que de laisser rouvrir une cérémonie', async () => {
+describe('registering a passkey', () => {
+  it('announces the lockout duration rather than letting a ceremony reopen', async () => {
     // Le compteur porte sur les **appels** et non sur les échecs : chaque ouverture écrit un défi
     // que rien ne purge, et le seuil est commun à l'enregistrement et à l'assertion. Le refus part
     // donc avant toute cérémonie, et c'est le serveur qui le rédige.
@@ -544,7 +544,7 @@ describe('l’enregistrement d’une clé d’accès', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('réessayez dans 5 minutes')
   })
 
-  it('dit en français que la cérémonie n’a pas abouti, plutôt que le message de la bibliothèque', async () => {
+  it('says in French that the ceremony failed, rather than the library’s message', async () => {
     // Le poste **connaît** les clés d'accès ; jsdom n'a pas `navigator.credentials`, donc la
     // cérémonie de la bibliothèque échoue pour de bon.
     stubWebAuthnSupport(true)
@@ -557,7 +557,7 @@ describe('l’enregistrement d’une clé d’accès', () => {
     expect(refus.textContent ?? '').not.toMatch(/[Ee]rror|not allowed|browser does/)
   })
 
-  it('enregistre la clé sous le nom saisi, puis mène à sa présentation', async () => {
+  it('registers the passkey under the entered name, then leads to its presentation', async () => {
     stubWebAuthnSupport(true)
     stubAuthenticator()
     const { user } = await visitEnroll()
@@ -572,7 +572,7 @@ describe('l’enregistrement d’une clé d’accès', () => {
     })
   })
 
-  it('refuse d’ouvrir la cérémonie sans nom, et dit pourquoi', async () => {
+  it('refuses to open the ceremony without a name, and says why', async () => {
     stubWebAuthnSupport(true)
     const { user } = await visitEnroll()
 

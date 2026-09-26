@@ -18,7 +18,7 @@ import (
 // la spécification de Crockford l'écarte.
 var recoveryCodeShape = regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$`)
 
-func TestDixCodesDeRecuperationSontRemisAlEnrolement(t *testing.T) {
+func TestTenRecoveryCodesAreIssuedAtEnrollment(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)
@@ -44,7 +44,7 @@ func TestDixCodesDeRecuperationSontRemisAlEnrolement(t *testing.T) {
 }
 
 // Ce qui va en base ne permet pas de reconstituer ce qui a été remis.
-func TestUnHachageDeCodeNeContientPasLeCode(t *testing.T) {
+func TestACodeHashDoesNotContainTheCode(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)
@@ -57,7 +57,7 @@ func TestUnHachageDeCodeNeContientPasLeCode(t *testing.T) {
 
 // Un opérateur recopie ce qu'il a sous les yeux, pas ce que le serveur a haché. Les six formes
 // ci-dessous sont celles qu'on obtient en recopiant à la main.
-func TestUnCodeEstAccepteQuelleQueSoitSaMiseEnForme(t *testing.T) {
+func TestACodeIsAcceptedWhateverItsFormatting(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)
@@ -83,7 +83,7 @@ func TestUnCodeEstAccepteQuelleQueSoitSaMiseEnForme(t *testing.T) {
 
 // Les trois confusions que l'alphabet existe pour absorber. Un opérateur qui lit `1` et tape `I` doit
 // entrer : c'est exactement ce que l'exclusion de ces lettres rend possible sans ambiguïté.
-func TestLesConfusionsDeCrockfordSontResolues(t *testing.T) {
+func TestCrockfordConfusionsAreResolved(t *testing.T) {
 	t.Parallel()
 
 	for name, cas := range map[string]struct{ presented, expected string }{
@@ -107,7 +107,7 @@ func TestLesConfusionsDeCrockfordSontResolues(t *testing.T) {
 // La normalisation est **la même** à l'écriture et à la lecture. Deux normalisations distinctes
 // feraient hacher une valeur et en chercher une autre, et le symptôme serait un code qui ne marche
 // jamais.
-func TestLaNormalisationEstIdempotente(t *testing.T) {
+func TestNormalizationIsIdempotent(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)
@@ -118,7 +118,7 @@ func TestLaNormalisationEstIdempotente(t *testing.T) {
 	}
 }
 
-func TestUnCodeInconnuNeMatcheAucunHachage(t *testing.T) {
+func TestAnUnknownCodeMatchesNoHash(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)
@@ -153,7 +153,7 @@ func TestUnCodeInconnuNeMatcheAucunHachage(t *testing.T) {
 // Ce que ce test ne distingue pas, et c'est assumé : une réécriture qui garderait le coût entier mais
 // rendrait le premier rang — `if matched < 0 { matched = index }`. Elle rougirait à tort. Aucune des
 // réécritures observées ne prend cette forme.
-func TestLaBoucleDesCodesDeRecuperationNeCourtCircuitePas(t *testing.T) {
+func TestTheRecoveryCodeLoopDoesNotShortCircuit(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)
@@ -174,7 +174,7 @@ func TestLaBoucleDesCodesDeRecuperationNeCourtCircuitePas(t *testing.T) {
 
 // Une ligne abîmée ne fait pas échouer la confrontation des neuf autres : un opérateur dont un code
 // est illisible en base doit pouvoir entrer avec les autres.
-func TestUnHachageIllisibleNEmpechePasLesAutresDeMatcher(t *testing.T) {
+func TestAnUnreadableHashDoesNotStopTheOthersFromMatching(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)

@@ -42,8 +42,8 @@ function expectBlockedAndExplained(button: HTMLElement, reason: RegExp) {
   expect(button).toHaveAccessibleDescription(reason)
 }
 
-describe('l’écran des opérateurs', () => {
-  it('liste les opérateurs avec leurs rôles et l’état de leur second facteur', async () => {
+describe('the operators screen', () => {
+  it('lists operators with their roles and the state of their second factor', async () => {
     await visit()
 
     expect(row(SELF.email).getByText('Propriétaire')).toBeInTheDocument()
@@ -51,7 +51,7 @@ describe('l’écran des opérateurs', () => {
     expect(row(COLLEAGUE.email).getByText('Aucun')).toBeInTheDocument()
   })
 
-  it('désactive et explique ce qui enfermerait l’opérateur de la session dehors', async () => {
+  it('disables and explains what would lock the session operator out', async () => {
     await visit()
 
     expectBlockedAndExplained(
@@ -60,7 +60,7 @@ describe('l’écran des opérateurs', () => {
     )
   })
 
-  it('désactive et explique l’attribution de rôles sans roles:manage, qui seule liste les rôles', async () => {
+  it('disables and explains role assignment without roles:manage, which alone lists the roles', async () => {
     await visit(['operators:manage'])
 
     expectBlockedAndExplained(
@@ -69,7 +69,7 @@ describe('l’écran des opérateurs', () => {
     )
   })
 
-  it('crée un opérateur, qui apparaît dans la liste', async () => {
+  it('creates an operator, who appears in the list', async () => {
     const user = userEvent.setup()
     await visit()
 
@@ -90,7 +90,7 @@ describe('l’écran des opérateurs', () => {
     )
   })
 
-  it('rend le refus du serveur tel qu’il le rédige', async () => {
+  it('renders the server refusal as the server writes it', async () => {
     const user = userEvent.setup()
     await visit(undefined, {
       'POST /api/operators': {
@@ -110,7 +110,7 @@ describe('l’écran des opérateurs', () => {
     ).toBeInTheDocument()
   })
 
-  it('attribue un rôle à un collègue', async () => {
+  it('assigns a role to a colleague', async () => {
     const user = userEvent.setup()
     await visit()
 
@@ -122,7 +122,7 @@ describe('l’écran des opérateurs', () => {
     expect(await row(COLLEAGUE.email).findByText('Audit')).toBeInTheDocument()
   })
 
-  it('confirme la désactivation en nommant sa conséquence, puis l’applique', async () => {
+  it('confirms the deactivation by naming its consequence, then applies it', async () => {
     const user = userEvent.setup()
     await visit()
 
@@ -138,7 +138,7 @@ describe('l’écran des opérateurs', () => {
     ).toBeInTheDocument()
   })
 
-  it('rend une panne en état d’erreur, avec le refus du serveur et Réessayer', async () => {
+  it('renders an outage as an error state, with the server refusal and Réessayer', async () => {
     stubAdministration(
       { permissions: ['operators:manage'] },
       {},
@@ -163,7 +163,7 @@ describe('l’écran des opérateurs', () => {
     expect(within(alert).getByRole('button', { name: 'Réessayer' })).toBeInTheDocument()
   })
 
-  it('réactive un collègue désactivé, sans confirmation', async () => {
+  it('reactivates a deactivated colleague, without confirmation', async () => {
     const user = userEvent.setup()
     await visit(undefined, {}, [SELF, { ...COLLEAGUE, status: 'disabled' }])
 
@@ -174,7 +174,7 @@ describe('l’écran des opérateurs', () => {
     ).toBeInTheDocument()
   })
 
-  it('retire un rôle à un collègue', async () => {
+  it('removes a role from a colleague', async () => {
     const user = userEvent.setup()
     await visit(undefined, {}, [
       SELF,
@@ -189,7 +189,7 @@ describe('l’écran des opérateurs', () => {
     expect(await row(COLLEAGUE.email).findByText('Aucun rôle')).toBeInTheDocument()
   })
 
-  it('rend en erreur, dans la fenêtre, une liste de rôles illisible, et la relit sur demande', async () => {
+  it('renders an unreadable role list as an error, in the dialog, and rereads it on request', async () => {
     const user = userEvent.setup()
     const fetch = await visit(undefined, {
       'GET /api/roles': {
@@ -211,7 +211,7 @@ describe('l’écran des opérateurs', () => {
     )
   })
 
-  it('relit la liste quand l’opérateur demande de réessayer après une panne', async () => {
+  it('rereads the list when the operator asks to retry after an outage', async () => {
     const user = userEvent.setup()
     const fetch = stubAdministration(
       { permissions: ['operators:manage'] },
@@ -237,7 +237,7 @@ describe('l’écran des opérateurs', () => {
     )
   })
 
-  it('rend l’échec d’une réactivation, sur la ligne qui l’a demandée', async () => {
+  it('renders a failed reactivation on the row that requested it', async () => {
     const user = userEvent.setup()
     await visit(
       undefined,
@@ -255,7 +255,7 @@ describe('l’écran des opérateurs', () => {
     expect(await screen.findByText('Aucun opérateur ne porte cet identifiant.')).toBeInTheDocument()
   })
 
-  it('désactive et explique la création sans operators:manage', async () => {
+  it('disables and explains creation without operators:manage', async () => {
     stubAdministration(
       { permissions: [] },
       {},
@@ -278,7 +278,7 @@ describe('l’écran des opérateurs', () => {
     )
   })
 
-  it('rend dans la fenêtre des rôles le refus d’auto-verrouillage que le serveur rédige', async () => {
+  it('renders in the roles dialog the self-lockout refusal that the server writes', async () => {
     const user = userEvent.setup()
     await visit(undefined, {
       [`POST /api/operators/${COLLEAGUE.id}/roles`]: {
@@ -295,7 +295,7 @@ describe('l’écran des opérateurs', () => {
     expect(await within(dialog).findByText('Rien n’a été changé.')).toBeInTheDocument()
   })
 
-  it('rend dans la confirmation le refus d’une désactivation', async () => {
+  it('renders the refusal of a deactivation in the confirmation', async () => {
     const user = userEvent.setup()
     await visit(undefined, {
       [`PATCH /api/operators/${COLLEAGUE.id}`]: {
@@ -313,7 +313,7 @@ describe('l’écran des opérateurs', () => {
     expect(await within(dialog).findByText('Le compte reste actif.')).toBeInTheDocument()
   })
 
-  it('n’enregistre pas des rôles que la fenêtre n’a pas su lire', async () => {
+  it('does not save roles that the dialog could not read', async () => {
     const user = userEvent.setup()
     const fetch = await visit(undefined, {
       'GET /api/roles': { status: 500, body: { code: 'internal_error', message: 'Panne.' } },
@@ -333,7 +333,7 @@ describe('l’écran des opérateurs', () => {
     ).toBe(false)
   })
 
-  it('écrit les rôles en français, en texte courant', async () => {
+  it('writes the roles in French, as running text', async () => {
     await visit()
 
     for (const text of ['Aucun rôle', 'Propriétaire']) {
@@ -342,13 +342,13 @@ describe('l’écran des opérateurs', () => {
     }
   })
 
-  it('montre « Configuré » pour un opérateur qui a un second facteur', async () => {
+  it('shows « Configuré » for an operator who has a second factor', async () => {
     await visit()
 
     expect(row(SELF.email).getByText('Configuré')).toBeInTheDocument()
   })
 
-  it('rend l’état de l’envoi du lien d’accès dans la colonne Statut', async () => {
+  it('renders the state of the access link delivery in the Statut column', async () => {
     const activating = {
       ...COLLEAGUE,
       accessLink: { kind: 'activation', state: 'queued' } as const,
@@ -379,7 +379,7 @@ describe('l’écran des opérateurs', () => {
     expect(row(resetting.email).getByText('Envoi en attente')).toBeInTheDocument()
   })
 
-  it('désactive et explique « Envoyer un lien » sur un compte désactivé', async () => {
+  it('disables and explains « Envoyer un lien » on a deactivated account', async () => {
     await visit(undefined, {}, [SELF, { ...COLLEAGUE, status: 'disabled' }])
 
     expectBlockedAndExplained(
@@ -388,7 +388,7 @@ describe('l’écran des opérateurs', () => {
     )
   })
 
-  it('laisse « Envoyer un lien » actif sur la ligne de la session, qui ouvre la confirmation', async () => {
+  it('keeps « Envoyer un lien » active on the session row, where it opens the confirmation', async () => {
     const user = userEvent.setup()
     await visit()
 
@@ -399,7 +399,7 @@ describe('l’écran des opérateurs', () => {
     ).toBeInTheDocument()
   })
 
-  it('envoie un lien de réinitialisation après une confirmation qui dit que rien ne change avant son usage', async () => {
+  it('sends a reset link after a confirmation saying nothing changes before it is used', async () => {
     const user = userEvent.setup()
     const fetch = await visit()
 
@@ -423,7 +423,7 @@ describe('l’écran des opérateurs', () => {
     expect(await row(COLLEAGUE.email).findByText('Lien envoyé')).toBeInTheDocument()
   })
 
-  it('confirme l’envoi d’un lien d’activation en disant sa durée', async () => {
+  it('confirms sending an activation link by stating its duration', async () => {
     const user = userEvent.setup()
     const pending = { ...COLLEAGUE, accessLink: { kind: 'activation', state: 'queued' } as const }
     await visit(undefined, {}, [SELF, pending])

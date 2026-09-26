@@ -25,30 +25,30 @@ function renderGate(permissions: readonly string[] | undefined) {
 }
 
 describe('PermissionGate', () => {
-  it('rend le repli quand la session ne détient pas la clé', () => {
+  it('renders the fallback when the session does not hold the key', () => {
     renderGate(['billing:read'])
     expect(screen.queryByText('Recharger')).toBeNull()
     expect(screen.getByText('Refusé')).toBeInTheDocument()
   })
 
-  it('rend son contenu quand la session détient la clé', () => {
+  it('renders its content when the session holds the key', () => {
     renderGate(['billing:read', 'billing:topup'])
     expect(screen.getByText('Recharger')).toBeInTheDocument()
   })
 
-  it('refuse tant que la session n’est pas connue', () => {
+  it('denies while the session is unknown', () => {
     renderGate(undefined)
     expect(screen.queryByText('Recharger')).toBeNull()
   })
 })
 
 describe('grants', () => {
-  it('n’exige rien d’une entrée sans clé, pourvu qu’une session existe', () => {
+  it('requires nothing of an entry without a key, provided a session exists', () => {
     expect(grants([], [])).toBe(true)
     expect(grants(undefined, [])).toBe(false)
   })
 
-  it('suffit d’une seule des clés demandées', () => {
+  it('is satisfied by any one of the requested keys', () => {
     expect(grants(['gdpr:erase'], ['content:read', 'gdpr:erase'])).toBe(true)
     expect(grants(['content:erase'], ['gdpr:erase'])).toBe(false)
   })

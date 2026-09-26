@@ -32,7 +32,7 @@ func closedPool(t *testing.T) *pgxpool.Pool {
 // aller-retour PostgreSQL par requête.
 //
 // Le témoin n'est pas décoratif : sans lui, un `Challenge` qui ne ferait jamais rien passerait.
-func TestUnChallengeMalFormeNAtteintPasLaBase(t *testing.T) {
+func TestAMalformedChallengeDoesNotReachTheDatabase(t *testing.T) {
 	t.Parallel()
 
 	manager, err := mfa.NewManager(store.NewMFA(closedPool(t)),

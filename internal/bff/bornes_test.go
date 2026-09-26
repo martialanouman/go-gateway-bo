@@ -79,7 +79,7 @@ func credentials(t *testing.T, email, password string) string {
 
 // La borne du mot de passe ne protège pas le temps d'argon2 — il tient à la mémoire et aux passes —
 // mais ce que le serveur copie et garde en vol pour une requête que personne n'a authentifiée.
-func TestUnMotDePasseDemesureNAtteintPasLeHachage(t *testing.T) {
+func TestAnOversizedPasswordDoesNotReachTheHash(t *testing.T) {
 	t.Parallel()
 
 	status, _ := post(t, "/api/auth/login",
@@ -91,7 +91,7 @@ func TestUnMotDePasseDemesureNAtteintPasLeHachage(t *testing.T) {
 
 // L'adresse soumise devient la clé `subject` de `login_attempt_counters`, la seule table qu'une
 // requête non authentifiée fait écrire.
-func TestUneAdresseDemesureeNeDevientPasUneCleDeCompteur(t *testing.T) {
+func TestAnOversizedAddressDoesNotBecomeACounterKey(t *testing.T) {
 	t.Parallel()
 
 	status, _ := post(t, "/api/auth/login",
@@ -103,7 +103,7 @@ func TestUneAdresseDemesureeNeDevientPasUneCleDeCompteur(t *testing.T) {
 
 // Le compte est en **runes**, comme la `maxLength` du contrat : en octets, une adresse d'accents que
 // le contrat autorise serait refusée.
-func TestUneAdresseDAccentsSousLaBorneNEstPasRefusee(t *testing.T) {
+func TestAnAccentedAddressUnderTheBoundIsNotRefused(t *testing.T) {
 	t.Parallel()
 
 	// Deux octets par rune : le double de la borne en octets, la borne exacte en runes.
@@ -120,7 +120,7 @@ func TestUneAdresseDAccentsSousLaBorneNEstPasRefusee(t *testing.T) {
 
 // La borne du **corps**, celle qui s'applique avant le décodage : les bornes de champ ne valent
 // qu'une fois le corps entier en mémoire.
-func TestUnCorpsPlusGrandQueLaBorneNEstPasDecode(t *testing.T) {
+func TestABodyLargerThanTheBoundIsNotDecoded(t *testing.T) {
 	t.Parallel()
 
 	// **Chaque champ reste sous sa propre borne**, sans quoi le 400 viendrait d'elle : des runes de deux
@@ -142,7 +142,7 @@ func TestUnCorpsPlusGrandQueLaBorneNEstPasDecode(t *testing.T) {
 //
 // Le corps est vérifié autant que le statut — `internal/bff` n'a pas de journal, donc ce que le
 // navigateur reçoit est tout ce qui existe.
-func TestUneBaseInjoignableNeSeLitPasCommeUnRefusDIdentifiants(t *testing.T) {
+func TestAnUnreachableDatabaseIsNotReadAsACredentialsRefusal(t *testing.T) {
 	t.Parallel()
 
 	status, served := post(t, "/api/auth/login", credentials(t, "camille@exemple.test", "un mot de passe"))
@@ -180,7 +180,7 @@ func postJSON(t *testing.T, path string, body any) int {
 // Le contrat ne sait pas exprimer deux champs qui s'excluent : `code` et `assertion` y sont tous deux
 // facultatifs, et c'est en Go que la règle vit. Sans exclusion, le champ de trop est ignoré en
 // silence et la faute de forme se lit comme un refus de facteur.
-func TestChaqueControleDeFormeDuSecondFacteurRefuseAvantToutEtat(t *testing.T) {
+func TestEverySecondFactorShapeCheckRefusesBeforeAnyState(t *testing.T) {
 	t.Parallel()
 
 	code := "123456"
@@ -247,7 +247,7 @@ func TestChaqueControleDeFormeDuSecondFacteurRefuseAvantToutEtat(t *testing.T) {
 // place » à un opérateur qui vient d'en présenter un. Un `code` sans `method` partirait sur le chemin
 // TOTP par le repli de `verifyPresentedFactor`, alors que l'opérateur a peut-être tapé un code de
 // récupération — et se verrait refuser un code juste.
-func TestLaPreuveDEnrolementExigeSesDeuxChampsOuAucun(t *testing.T) {
+func TestTheEnrollmentProofRequiresBothFieldsOrNeither(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
@@ -320,7 +320,7 @@ func sealedLikeProduction(secret []byte) string {
 }
 
 // **Une base injoignable ne ferme pas la session de l'opérateur**, et ce cas tient la moitié que
-// `TestUnePanneDeResolutionDeSessionNestPasUnRefus` ne tient pas.
+// `TestASessionResolutionFailureIsNotARefusal` ne tient pas.
 //
 // Celui-là pose lui-même l'erreur dans le contexte et prouve que la garde la propage. Il ne prouve
 // pas que quiconque la pose : `withSession` est le seul à le faire en production, en trois lignes que
@@ -330,7 +330,7 @@ func sealedLikeProduction(secret []byte) string {
 // Ce cas-ci traverse le routeur réel, le vrai `withSession` et un vrai `session.Manager` ; seule la
 // base est morte. Le 500 est ce qui distingue « le serveur est en panne » de « reconnectez-vous »,
 // dont le remède boucle puisque se reconnecter exige la même base.
-func TestUneBaseInjoignableNeFermePasLaSessionDeLOperateur(t *testing.T) {
+func TestAnUnreachableDatabaseDoesNotCloseTheOperatorSession(t *testing.T) {
 	t.Parallel()
 
 	pool, err := store.NewPool(context.Background(), "postgres://operateur:secret@127.0.0.1:1/tableau")

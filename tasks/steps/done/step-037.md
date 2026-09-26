@@ -94,7 +94,7 @@ Le filet bascule donc sur l'API vivante avant que les méthodes partent.
 
 | Mutation | Ce qui rougit |
 |---|---|
-| `count` ne rend jamais de verrou | `TestLeVerrouDeSourceTombeAuSeuilEtPasAvant` |
+| `count` ne rend jamais de verrou | `TestTheSourceLockFallsAtTheThresholdAndNotBefore` |
 | `lockFor` rend toujours le verrou nul | trois tests, dont l'accumulation inter-pools et concurrente |
 | `reserve` ne refuse jamais | cinq tests, dont les trois du second facteur repointés |
 
@@ -107,7 +107,7 @@ ici plutôt que repris du rapport.
 
 | # | Constat | Mesure refaite |
 |---|---|---|
-| 1 | `TestUnVerrouDeSecondFacteurEchuLaisseLeCompteurRepartirDeUn`, repointé de `count` vers `reserve`, ne prouvait plus son nom | Mutation confirmée : retirer la branche d'oubli de `reserve` laissait le test **vert**. `Locked()` seul ne distingue pas « reparti de 1 » de « collé au seuil », l'essai venant d'être admis. Corrigé par un second essai témoin — vert propre, **rouge sous la même mutation** |
+| 1 | `TestAnExpiredSecondFactorLockLetsTheCounterRestartFromOne`, repointé de `count` vers `reserve`, ne prouvait plus son nom | Mutation confirmée : retirer la branche d'oubli de `reserve` laissait le test **vert**. `Locked()` seul ne distingue pas « reparti de 1 » de « collé au seuil », l'essai venant d'être admis. Corrigé par un second essai témoin — vert propre, **rouge sous la même mutation** |
 | 2 | `internal/mfa/manager.go:14` affirmait qu'une connexion réussie n'incrémente aucun compteur d'adresse | Faux : `auth.Login` appelle `Reserve(emailKey)` à **chaque** essai (`authenticator.go:115`), succès compris. La conclusion tient, mais parce que `ClearFailures` efface ensuite |
 | 3 | `internal/bff/auth.go:216` citait encore `LockFor`, supprimé par cette PR | Dernière référence pendante de l'arbre |
 | 4 | `serialization_test.go` affirmait que `types.Unalias` empêche la porte de refuser huit sites | Mutation faite : `types.Unalias` retiré de `declarationFile` → **vert**. Il ne porte plus rien depuis le retrait de l'alias ; le commentaire le dit désormais |

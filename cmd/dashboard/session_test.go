@@ -86,7 +86,7 @@ func (w *sessionWorld) permissionsOfRoles(ctx context.Context, roles ...string) 
 //
 // Le premier caractère et non le dernier, pour que ce scénario éprouve la **comparaison du sceau** et
 // non le décodage : les deux bits de poids faible du dernier caractère sont du remplissage, et c'est
-// `Strict()` qui refuse les autres formes (`TestUnSceauNonCanoniqueEstRefuse`) — sans lui, viser le
+// `Strict()` qui refuse les autres formes (`TestANonCanonicalSealIsRefused`) — sans lui, viser le
 // dernier caractère laisse ce scénario vert contre un serveur correct, mesuré.
 func (w *sessionWorld) alterSessionSeal() error {
 	value, ok := w.login.process.cookies[session.CookieName]

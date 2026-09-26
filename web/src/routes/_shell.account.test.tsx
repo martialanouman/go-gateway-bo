@@ -44,8 +44,8 @@ function posted(fetch: ReturnType<typeof stubSession>, path: string) {
     .filter((request) => request.method === 'POST' && request.url.endsWith(path))
 }
 
-describe('l’inventaire des facteurs', () => {
-  it('dit ce que le compte détient, et est atteint par le nom de l’opérateur', async () => {
+describe('the factor inventory', () => {
+  it('says what the account holds, and is reached through the operator’s name', async () => {
     stubSession({
       permissions: [],
       secondFactors: { totp: true, recoveryCodesRemaining: 7, passkeys: 2 },
@@ -64,15 +64,15 @@ describe('l’inventaire des facteurs', () => {
     expect(passkeysSection().getByRole('cell', { name: 'Clé 2' })).toBeVisible()
   })
 
-  it('accorde le compte des codes au singulier', async () => {
+  it('uses the singular for a single code count', async () => {
     await visitAccount({ totp: true, recoveryCodesRemaining: 1, passkeys: 0 })
 
     expect(section('Codes de récupération').getByText('1 restant', { exact: true })).toBeVisible()
   })
 })
 
-describe('le retrait d’une clé d’accès', () => {
-  it('désactive et explique le retrait du dernier facteur', async () => {
+describe('removing a passkey', () => {
+  it('disables and explains removal of the last factor', async () => {
     const { fetch, user } = await visitAccount({
       totp: false,
       passkeys: 1,
@@ -87,13 +87,13 @@ describe('le retrait d’une clé d’accès', () => {
     expect(fetch.mock.calls.some(([request]) => request.method === 'DELETE')).toBe(false)
   })
 
-  it('laisse retirer une clé quand une autre reste, même sans application', async () => {
+  it('allows removing a passkey when another remains, even without an app', async () => {
     await visitAccount({ totp: false, passkeys: 2 })
 
     expect(await removeButtonOf('Clé 1')).not.toHaveAttribute('aria-disabled')
   })
 
-  it('retire une clé quand l’application reste en place', async () => {
+  it('removes a passkey when the app remains in place', async () => {
     const { fetch, user } = await visitAccount({ totp: true, passkeys: 1 })
 
     const retirer = await removeButtonOf('Clé 1')
@@ -107,7 +107,7 @@ describe('le retrait d’une clé d’accès', () => {
     expect(removal?.url).toMatch(/\/api\/auth\/mfa\/webauthn\/passkeys\/passkey-1$/)
   })
 
-  it('rend le refus du serveur tel qu’il l’a rédigé', async () => {
+  it('renders the server’s refusal as the server worded it', async () => {
     const { user } = await visitAccount(
       { totp: true, passkeys: 1 },
       {
@@ -128,8 +128,8 @@ describe('le retrait d’une clé d’accès', () => {
   })
 })
 
-describe('l’ajout d’une clé d’accès', () => {
-  it('l’enregistre sous le nom saisi, qui paraît dans la table', async () => {
+describe('adding a passkey', () => {
+  it('registers it under the entered name, which appears in the table', async () => {
     vi.spyOn(_browserSupportsWebAuthnInternals, 'stubThis').mockReturnValue(true)
     stubAuthenticator()
     const { fetch, user } = await visitAccount({ totp: true, passkeys: 0 })
@@ -142,7 +142,7 @@ describe('l’ajout d’une clé d’accès', () => {
     const finish = posted(fetch, '/api/auth/mfa/webauthn/register/finish')[0]
     expect(await finish?.clone().json()).toMatchObject({ name: 'Portable' })
   })
-  it('rend le refus de l’enregistrement, et se referme sans rien enregistrer', async () => {
+  it('renders the registration refusal, and closes without registering anything', async () => {
     vi.spyOn(_browserSupportsWebAuthnInternals, 'stubThis').mockReturnValue(true)
     stubAuthenticator()
     const { user } = await visitAccount(
@@ -167,8 +167,8 @@ describe('l’ajout d’une clé d’accès', () => {
   })
 })
 
-describe('l’inventaire des clés, quand le BFF ne le rend pas', () => {
-  it('dit l’échec et relit sur demande', async () => {
+describe('the passkey inventory, when the BFF does not return it', () => {
+  it('reports the failure and reloads on request', async () => {
     const { fetch, user } = await visitAccount(
       { totp: true, passkeys: 1 },
       {
@@ -187,8 +187,8 @@ describe('l’inventaire des clés, quand le BFF ne le rend pas', () => {
   })
 })
 
-describe('l’application d’authentification', () => {
-  it('remplace sur preuve, et confirme par la route de confirmation', async () => {
+describe('the authenticator app', () => {
+  it('replaces on proof, and confirms through the confirmation route', async () => {
     const { fetch, router, user } = await visitAccount({ totp: true, passkeys: 0 })
 
     await user.click(totpSection().getByRole('button', { name: 'Remplacer' }))
@@ -227,7 +227,7 @@ describe('l’application d’authentification', () => {
     expect(cached).not.toContain(ENROLLMENT_SECRET)
   })
 
-  it('décompte le code de récupération présenté en preuve, même si le remplacement est abandonné', async () => {
+  it('counts down the recovery code presented as proof, even if the replacement is abandoned', async () => {
     const { user } = await visitAccount({ totp: true, recoveryCodesRemaining: 7, passkeys: 0 })
 
     await user.click(totpSection().getByRole('button', { name: 'Remplacer' }))
@@ -240,7 +240,7 @@ describe('l’application d’authentification', () => {
     expect(await section('Codes de récupération').findByText('6 restants')).toBeVisible()
   })
 
-  it('rend le refus d’une preuve fausse, et ne montre aucun secret', async () => {
+  it('renders the refusal of a wrong proof, and shows no secret', async () => {
     const { user } = await visitAccount(
       { totp: true, passkeys: 0 },
       {
@@ -263,7 +263,7 @@ describe('l’application d’authentification', () => {
     expect(screen.queryByText(ENROLLMENT_SECRET)).toBeNull()
   })
 
-  it('rend le refus d’un code de confirmation faux, sans quitter l’écran', async () => {
+  it('renders the refusal of a wrong confirmation code, without leaving the screen', async () => {
     const { user } = await visitAccount(
       { totp: false, passkeys: 1 },
       {
@@ -287,7 +287,7 @@ describe('l’application d’authentification', () => {
     expect(screen.getByText(ENROLLMENT_SECRET)).toBeVisible()
   })
 
-  it('ajoute une application sans preuve à un compte gardé par une clé d’accès', async () => {
+  it('adds an app without proof to an account guarded by a passkey', async () => {
     const { fetch, user } = await visitAccount({ totp: false, passkeys: 1 })
 
     expect(totpSection().getByText('Absente')).toBeVisible()
@@ -303,8 +303,8 @@ describe('l’application d’authentification', () => {
   })
 })
 
-describe('le clavier', () => {
-  it('pose le focus sur chaque vue qui remplace la précédente, jusqu’au retour à l’inventaire', async () => {
+describe('the keyboard', () => {
+  it('moves focus to each view that replaces the previous one, until returning to the inventory', async () => {
     const { user } = await visitAccount({ totp: false, passkeys: 1 })
 
     await user.click(totpSection().getByRole('button', { name: 'Ajouter' }))
@@ -320,7 +320,7 @@ describe('le clavier', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Mon compte' })).toHaveFocus()
   })
 
-  it('rend le focus au titre quand le remplacement est abandonné', async () => {
+  it('returns focus to the heading when the replacement is abandoned', async () => {
     const { user } = await visitAccount({ totp: true, passkeys: 0 })
 
     await user.click(totpSection().getByRole('button', { name: 'Remplacer' }))
@@ -329,7 +329,7 @@ describe('le clavier', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Mon compte' })).toHaveFocus()
   })
 
-  it('rend le focus à « Ajouter » quand le nommage d’une clé est abandonné', async () => {
+  it('returns focus to "Ajouter" when naming a passkey is abandoned', async () => {
     vi.spyOn(_browserSupportsWebAuthnInternals, 'stubThis').mockReturnValue(true)
     const { user } = await visitAccount({ totp: true, passkeys: 0 })
 
@@ -339,7 +339,7 @@ describe('le clavier', () => {
     expect(passkeysSection().getByRole('button', { name: 'Ajouter' })).toHaveFocus()
   })
 
-  it('rend le focus à « Ajouter » une fois la clé enregistrée', async () => {
+  it('returns focus to "Ajouter" once the passkey is registered', async () => {
     vi.spyOn(_browserSupportsWebAuthnInternals, 'stubThis').mockReturnValue(true)
     stubAuthenticator()
     const { user } = await visitAccount({ totp: true, passkeys: 0 })
@@ -351,7 +351,7 @@ describe('le clavier', () => {
     expect(passkeysSection().getByRole('button', { name: 'Ajouter' })).toHaveFocus()
   })
 
-  it('garde le focus sur « Enregistrer » quand l’enregistrement est refusé', async () => {
+  it('keeps focus on "Enregistrer" when registration is refused', async () => {
     vi.spyOn(_browserSupportsWebAuthnInternals, 'stubThis').mockReturnValue(true)
     stubAuthenticator()
     const { user } = await visitAccount(
@@ -369,7 +369,7 @@ describe('le clavier', () => {
     expect(passkeysSection().getByRole('button', { name: 'Enregistrer' })).toHaveFocus()
   })
 
-  it('rend le focus à « Ajouter » quand la ligne de la clé retirée disparaît', async () => {
+  it('returns focus to "Ajouter" when the removed passkey’s row disappears', async () => {
     const { user } = await visitAccount({ totp: true, passkeys: 2 })
 
     await user.click(await removeButtonOf('Clé 1'))
@@ -380,7 +380,7 @@ describe('le clavier', () => {
     expect(passkeysSection().getByRole('button', { name: 'Ajouter' })).toHaveFocus()
   })
 
-  it('garde le focus sur « Retirer » quand le retrait est refusé', async () => {
+  it('keeps focus on "Retirer" when removal is refused', async () => {
     const { user } = await visitAccount(
       { totp: true, passkeys: 1 },
       { unregister: { status: 409, body: { code: 'mfa_last_factor', message: 'Refusé.' } } },
@@ -393,7 +393,7 @@ describe('le clavier', () => {
     expect(retirer).toHaveFocus()
   })
 
-  it('conduit le remplacement sans souris, du bouton à la preuve', async () => {
+  it('drives the replacement without a mouse, from the button to the proof', async () => {
     const { fetch, user } = await visitAccount({ totp: true, passkeys: 0 })
 
     totpSection().getByRole('button', { name: 'Remplacer' }).focus()

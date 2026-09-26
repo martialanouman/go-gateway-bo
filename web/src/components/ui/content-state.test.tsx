@@ -12,7 +12,7 @@ import { EmptyState, ErrorState, ModuleDisabled, NoResults } from './content-sta
  * même façon.
  */
 describe('EmptyState', () => {
-  it('dit pourquoi la région est vide, et par où commencer', () => {
+  it('says why the region is empty, and where to start', () => {
     render(
       <EmptyState
         action={<button type="button">Nouvelle règle</button>}
@@ -26,7 +26,7 @@ describe('EmptyState', () => {
     expect(screen.getByRole('button', { name: 'Nouvelle règle' })).toBeInTheDocument()
   })
 
-  it('rend son titre en paragraphe par défaut, et en titre quand l’écran le demande', () => {
+  it('renders its title as a paragraph by default, and as a heading when the screen asks for it', () => {
     // Le défaut compte autant que l'option : un état vide rendu dans une carte, au milieu d'un
     // écran qui a déjà son `h1`, n'a rien à faire dans la hiérarchie de titres. Mais quand il **est**
     // l'écran — l'accueil, l'adresse inconnue — il en est le titre, et un écran sans `h1` est une
@@ -41,7 +41,7 @@ describe('EmptyState', () => {
 })
 
 describe('NoResults', () => {
-  it('nomme les filtres et propose de les élargir — jamais un « aucun résultat » nu', () => {
+  it('names the filters and offers to widen them — never a bare "no results"', () => {
     render(<NoResults title="Aucun message trouvé" />)
 
     expect(screen.getByText('Aucun message trouvé')).toBeInTheDocument()
@@ -50,7 +50,7 @@ describe('NoResults', () => {
     ).toBeInTheDocument()
   })
 
-  it('n’offre le bouton de réinitialisation qu’à l’écran qui sait le faire', () => {
+  it('offers the reset button only to a screen that can reset', () => {
     const reset = vi.fn()
     const { unmount } = render(<NoResults title="Aucun message trouvé" />)
     expect(screen.queryByRole('button')).toBeNull()
@@ -60,7 +60,7 @@ describe('NoResults', () => {
     expect(screen.getByRole('button', { name: 'Réinitialiser' })).toBeInTheDocument()
   })
 
-  it('réinitialise les filtres au clic', async () => {
+  it('resets the filters on click', async () => {
     const reset = vi.fn()
     render(<NoResults onReset={reset} title="Aucun message trouvé" />)
 
@@ -71,7 +71,7 @@ describe('NoResults', () => {
 })
 
 describe('ModuleDisabled', () => {
-  it('nomme le module éteint et le déploiement qui l’éteint', () => {
+  it('names the disabled module and the deployment that disables it', () => {
     render(<ModuleDisabled module="Facturation" />)
 
     expect(screen.getByText('Facturation indisponible')).toBeInTheDocument()
@@ -87,7 +87,7 @@ describe('ModuleDisabled', () => {
    * rouge. Un `Réessayer` sur quelque chose qui ne reviendra pas envoie l'opérateur cliquer dans le
    * vide ; c'est précisément ce que `TestServiceUnavailableStaysAnError` refuse côté serveur.
    */
-  it('ne se lit jamais comme une erreur : ni alerte, ni action, ni panneau rouge', () => {
+  it('never reads as an error: no alert, no action, no red panel', () => {
     const { container } = render(<ModuleDisabled module="Facturation" />)
 
     expect(
@@ -103,7 +103,7 @@ describe('ModuleDisabled', () => {
 })
 
 describe('ErrorState', () => {
-  it('porte la réalité HTTP, promet les données locales, et propose de réessayer', () => {
+  it('carries the HTTP reality, promises local data, and offers to retry', () => {
     // La copie de la charte nomme jusqu'à la requête. Effacer l'écran pour afficher une erreur est
     // le contraire de ce que demande l'invariant (e) : la panne du tableau de bord dégrade la
     // visualisation, elle ne la supprime pas.
@@ -123,7 +123,7 @@ describe('ErrorState', () => {
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeInTheDocument()
   })
 
-  it('réessaie au clic', async () => {
+  it('retries on click', async () => {
     const retry = vi.fn()
     render(<ErrorState onRetry={retry} />)
 
@@ -132,7 +132,7 @@ describe('ErrorState', () => {
     expect(retry).toHaveBeenCalledOnce()
   })
 
-  it('se passe de ligne de requête et de réessai quand l’écran n’en a pas', () => {
+  it('omits the request line and retry when the screen has none', () => {
     // Un `ErrorState` sans `request` ne doit pas rendre une ligne mono vide, qui se lirait comme une
     // trace perdue.
     const { container } = render(<ErrorState />)

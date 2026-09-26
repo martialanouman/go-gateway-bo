@@ -54,8 +54,8 @@ async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>, password 
   await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
 }
 
-describe('le fragment du lien d’accès', () => {
-  it('efface le jeton de l’URL avant tout rendu, et le poste à l’envoi', async () => {
+describe('the access link fragment', () => {
+  it('erases the token from the URL before any render, and posts it on submit', async () => {
     const { fetch, router, user } = await visitAccess('/access#JETON')
 
     await screen.findByLabelText('Mot de passe')
@@ -72,8 +72,8 @@ describe('le fragment du lien d’accès', () => {
   })
 })
 
-describe('les règles de la saisie, avant le serveur', () => {
-  it('refuse deux saisies qui diffèrent, sans appel réseau', async () => {
+describe('input rules, before the server', () => {
+  it('refuses two entries that differ, without a network call', async () => {
     const { fetch, user } = await visitAccess('/access#JETON')
 
     await user.type(await screen.findByLabelText('Mot de passe'), VALID_PASSWORD)
@@ -84,7 +84,7 @@ describe('les règles de la saisie, avant le serveur', () => {
     expect(fetch.mock.calls.filter(([request]) => request.method === 'POST')).toEqual([])
   })
 
-  it('nomme ce qui manque à un mot de passe trop simple, sans appel réseau', async () => {
+  it('names what a too-simple password lacks, without a network call', async () => {
     const { fetch, user } = await visitAccess('/access#JETON')
 
     await fillAndSubmit(user, 'motdepasselong')
@@ -96,8 +96,8 @@ describe('les règles de la saisie, avant le serveur', () => {
   })
 })
 
-describe('un lien sans jeton', () => {
-  it('affiche le refus unique, sans formulaire', async () => {
+describe('a link without a token', () => {
+  it('shows the single refusal, without a form', async () => {
     await visitAccess('/access')
 
     expect(await screen.findByText(LINK_REFUSAL)).toBeInTheDocument()
@@ -105,8 +105,8 @@ describe('un lien sans jeton', () => {
   })
 })
 
-describe('ce que le serveur rend à l’envoi', () => {
-  it('un lien mort retire le formulaire et affiche le refus du serveur', async () => {
+describe('what the server returns on submit', () => {
+  it('a dead link removes the form and shows the server refusal', async () => {
     const { user } = await visitAccess('/access#JETON', {
       body: { code: 'access_link_invalid', message: LINK_REFUSAL },
       status: 410,
@@ -118,7 +118,7 @@ describe('ce que le serveur rend à l’envoi', () => {
     expect(screen.queryByLabelText('Mot de passe')).toBeNull()
   })
 
-  it('une panne dégrade sans retirer le formulaire, contrairement à un lien mort', async () => {
+  it('an outage degrades without removing the form, unlike a dead link', async () => {
     const { user } = await visitAccess('/access#JETON', {
       body: { code: 'overloaded', message: 'Le serveur vérifie déjà…' },
       status: 503,
@@ -131,7 +131,7 @@ describe('ce que le serveur rend à l’envoi', () => {
     expect(screen.getByLabelText('Mot de passe')).toHaveValue(VALID_PASSWORD)
   })
 
-  it('efface le refus du serveur dès la frappe, comme login.tsx', async () => {
+  it('clears the server refusal as soon as the user types, like login.tsx', async () => {
     const { user } = await visitAccess('/access#JETON', {
       body: { code: 'overloaded', message: 'Le serveur vérifie déjà…' },
       status: 503,
@@ -146,7 +146,7 @@ describe('ce que le serveur rend à l’envoi', () => {
     expect(screen.queryByText(/Le serveur vérifie déjà/)).toBeNull()
   })
 
-  it('un succès efface le jeton et mène à l’avis de connexion', async () => {
+  it('a success erases the token and leads to the login notice', async () => {
     const { router, user } = await visitAccess('/access#JETON')
 
     await fillAndSubmit(user)
@@ -161,8 +161,8 @@ describe('ce que le serveur rend à l’envoi', () => {
   })
 })
 
-describe('ce que le cache garde après coup', () => {
-  it('efface la mutation du cache après le départ de l’écran — jeton et mot de passe compris', async () => {
+describe('what the cache keeps afterwards', () => {
+  it('removes the mutation from the cache after leaving the screen — token and password included', async () => {
     const { fetch, router, user } = await visitAccess('/access#JETON')
 
     await fillAndSubmit(user)

@@ -100,7 +100,7 @@ var authorization = map[string]rule{
 // les tests unitaires de la garde injectent leur source.
 //
 // Le prix de toute couture est qu'un test peut vérifier un mécanisme que la production ne câble pas.
-// Ce qui le ferme ici est `TestLaGardeEstCablee`, qui exige que `newContractHandler` atteigne
+// Ce qui le ferme ici est `TestTheGuardIsWired`, qui exige que `newContractHandler` atteigne
 // `(*session.Manager).Grants` — la vraie source, pas n'importe quelle fonction du bon type.
 type grantsOf func(ctx context.Context, operatorID string) ([]string, error)
 

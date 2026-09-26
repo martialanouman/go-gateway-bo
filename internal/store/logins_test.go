@@ -52,7 +52,7 @@ func insertOperator(t *testing.T, dsn, email, hash string) string {
 	return id
 }
 
-func TestUneAdresseInconnueNeRendAucunOperateurSansEtreUneErreur(t *testing.T) {
+func TestAnUnknownAddressReturnsNoOperatorWithoutBeingAnError(t *testing.T) {
 	t.Parallel()
 
 	logins, _ := loginsOn(t)
@@ -64,7 +64,7 @@ func TestUneAdresseInconnueNeRendAucunOperateurSansEtreUneErreur(t *testing.T) {
 
 // L'index d'unicité de 00001 porte sur `lower(email)`. Si la requête ne l'empruntait pas, un
 // opérateur inscrit avec une majuscule deviendrait introuvable — et son compte, inaccessible.
-func TestUnOperateurSeRetrouveQuelleQueSoitLaCasseDeSonAdresse(t *testing.T) {
+func TestAnOperatorIsFoundWhateverTheCaseOfTheirAddress(t *testing.T) {
 	t.Parallel()
 
 	logins, dsn := loginsOn(t)
@@ -80,7 +80,7 @@ func TestUnOperateurSeRetrouveQuelleQueSoitLaCasseDeSonAdresse(t *testing.T) {
 // La dimension source est comptée seule, sur le chemin d'échec, et c'est elle qui rattrape une
 // machine qui balaie des adresses différentes : chaque adresse repart de zéro, donc le verrou par
 // compte ne la ralentirait jamais.
-func TestLeVerrouDeSourceTombeAuSeuilEtPasAvant(t *testing.T) {
+func TestTheSourceLockFallsAtTheThresholdAndNotBefore(t *testing.T) {
 	t.Parallel()
 
 	logins, _ := loginsOn(t)
@@ -101,7 +101,7 @@ func TestLeVerrouDeSourceTombeAuSeuilEtPasAvant(t *testing.T) {
 
 // La ligne de la fiche : « le compteur est bien partagé ». Deux pools distincts, c'est-à-dire deux
 // jeux de connexions indépendants, comme le sont deux instances derrière le load balancer.
-func TestDeuxPoolsDistinctsSurLaMemeBaseAdditionnentLeursEchecs(t *testing.T) {
+func TestTwoDistinctPoolsOnTheSameDatabaseAddUpTheirFailures(t *testing.T) {
 	t.Parallel()
 
 	dsn, err := createDatabase(t.Context())
@@ -139,7 +139,7 @@ func TestDeuxPoolsDistinctsSurLaMemeBaseAdditionnentLeursEchecs(t *testing.T) {
 // La course. Ce test est le seul que la forme « CTE + excluded.failures » fait rougir : elle lit sur
 // le snapshot de sa transaction et écrase la valeur fraîche, donc elle perd des échecs — en restant
 // verte sous test séquentiel.
-func TestDesEchecsSimultanesNeSePerdentPas(t *testing.T) {
+func TestSimultaneousFailuresAreNotLost(t *testing.T) {
 	t.Parallel()
 
 	logins, _ := loginsOn(t)
@@ -177,7 +177,7 @@ func TestDesEchecsSimultanesNeSePerdentPas(t *testing.T) {
 // L'égalité entre la fenêtre d'oubli et la durée du verrou, qui est ce qui rend vraie la phrase
 // « verrou expiré → un nouvel essai est possible ». Si l'oubli était plus long, le compteur serait
 // encore au-dessus du seuil quand le verrou tombe, et le premier essai suivant reverrouillerait.
-func TestUnVerrouEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
+func TestAnExpiredLockLetsTheCounterRestartFromOne(t *testing.T) {
 	t.Parallel()
 
 	logins, dsn := loginsOn(t)
@@ -201,7 +201,7 @@ func TestUnVerrouEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
 		"le premier échec après l'échéance reverrouille aussitôt : la fenêtre d'oubli est plus longue que le verrou")
 }
 
-func TestUneConnexionReussieEffaceLeCompteurDeLAdresseEtPasCeluiDeLaSource(t *testing.T) {
+func TestASuccessfulLoginClearsTheAddressCounterButNotTheSourceOne(t *testing.T) {
 	t.Parallel()
 
 	logins, _ := loginsOn(t)
@@ -235,7 +235,7 @@ func TestUneConnexionReussieEffaceLeCompteurDeLAdresseEtPasCeluiDeLaSource(t *te
 		"le compteur de source a été effacé par une connexion réussie : quiconque détient un compte peut le vider")
 }
 
-func TestUnChallengeEstEmisAvecUneEcheanceDansLeFutur(t *testing.T) {
+func TestAChallengeIsIssuedWithAFutureExpiry(t *testing.T) {
 	t.Parallel()
 
 	logins, dsn := loginsOn(t)
@@ -250,7 +250,7 @@ func TestUnChallengeEstEmisAvecUneEcheanceDansLeFutur(t *testing.T) {
 
 // L'unicité de `token_hash` n'est pas décorative : c'est elle qui ferait échouer bruyamment un
 // générateur qui répéterait une valeur, plutôt que de laisser deux opérateurs partager un challenge.
-func TestDeuxChallengesNePeuventPasPorterLaMemeEmpreinte(t *testing.T) {
+func TestTwoChallengesCannotCarryTheSameFingerprint(t *testing.T) {
 	t.Parallel()
 
 	logins, dsn := loginsOn(t)
@@ -266,12 +266,12 @@ func TestDeuxChallengesNePeuventPasPorterLaMemeEmpreinte(t *testing.T) {
 	require.Error(t, err, "deux challenges partagent la même empreinte sans que la base s'en plaigne")
 }
 
-// TestTrenteReservationsSimultaneesNEnAdmettentQueCinq — le plafond ne vaut rien s'il ne tient que
+// TestThirtySimultaneousReservationsAdmitOnlyFive — le plafond ne vaut rien s'il ne tient que
 // pour des essais qui arrivent l'un après l'autre.
 //
 // Ce que ce test ferme : `lockFor` puis `count` sont deux instructions, et trente requêtes entrées
 // ensemble lisaient toutes « pas de verrou » avant qu'aucune n'ait compté.
-func TestTrenteReservationsSimultaneesNEnAdmettentQueCinq(t *testing.T) {
+func TestThirtySimultaneousReservationsAdmitOnlyFive(t *testing.T) {
 	t.Parallel()
 
 	logins, _ := loginsOn(t)
@@ -317,9 +317,9 @@ func TestTrenteReservationsSimultaneesNEnAdmettentQueCinq(t *testing.T) {
 	assert.Equal(t, attempts-5, refused)
 }
 
-// TestUnEssaiPendantLeVerrouNeRepoussePasLEcheance — sinon un attaquant qui s'acharne garde le compte
+// TestAnAttemptDuringTheLockDoesNotPushBackTheExpiry — sinon un attaquant qui s'acharne garde le compte
 // de sa victime verrouillé indéfiniment.
-func TestUnEssaiPendantLeVerrouNeRepoussePasLEcheance(t *testing.T) {
+func TestAnAttemptDuringTheLockDoesNotPushBackTheExpiry(t *testing.T) {
 	t.Parallel()
 
 	logins, _ := loginsOn(t)

@@ -9,7 +9,7 @@ import (
 
 // La borne se compte en caractères et non en octets : douze lettres accentuées font vingt-quatre
 // octets, et onze en font vingt-deux — un compte en octets accepterait les deux.
-func TestLaPolitiqueCompteDesCaracteresEtNonDesOctets(t *testing.T) {
+func TestThePolicyCountsCharactersNotBytes(t *testing.T) {
 	const length = "douze caractères au moins"
 
 	assert.NotContains(t, CheckPassword(strings.Repeat("é", MinimumPasswordLength)), length)
