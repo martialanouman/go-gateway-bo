@@ -1630,8 +1630,8 @@ components:
         state:
           type: string
           description: |
-            `bound` ou `unbound` aujourd'hui. Relayé tel quel : la passerelle ne décrit pas ses trames
-            (dette 057), et une valeur nouvelle passerait sans être refusée.
+            `bound` ou `unbound`, l'enum que le contrat Admin déclare depuis 6.9.0. Relayé tel quel : une
+            valeur que la passerelle ajouterait passerait sans être refusée.
         sessions: { type: integer }
       required: [accountId, systemId, state]
     BillingAlert:

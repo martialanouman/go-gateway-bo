@@ -175,11 +175,11 @@ func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSou
 		//   - `msisdn:reveal` est catalogué et absent de cette liste. Voir les numéros d'abonnés en
 		//     clair là où le contrat les masque par défaut est une frontière qu'il a posée ; la
 		//     déplacer pour du code qui n'existe pas ne se justifie pas.
-		//   - `audit:read` (catalogué en 6.8.0) n'ouvre que `list-audit-log`, le journal des opérateurs
+		//   - `audit:read` (catalogué depuis 6.8.0) n'ouvre que `list-audit-log`, le journal des opérateurs
 		//     de la passerelle, qu'aucun écran ne lit.
 		//   - `cdr:export_bulk` est exigé par `security:` sur `create-message-export` et
 		//     `get-message-export` mais **n'est catalogué nulle part** — le bloc `scopes` du
-		//     `securitySchemes` ne le contient pas, en 6.8.0 encore. C'est un manque du contrat amont,
+		//     `securitySchemes` ne le contient pas, en 6.9.0 encore. C'est un manque du contrat amont,
 		//     à corriger par une PR dans `go-gateway/api/` plutôt qu'en le devinant ici.
 		//
 		// Aucune de ces opérations n'est appelée par ce dépôt : les ajouter élargirait le jeton
