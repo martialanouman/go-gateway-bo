@@ -88,6 +88,33 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
   la chute, contrôle de `v`, désabonnement qui libère la file. Toutes jouées en worktree, `-count=1`,
   avec le nom du test qui tombe.
 
+## Tableau des mutations
+
+Jouées le 26/09/2026 dans un worktree, `go test -count=1 -timeout 180s`. Chaque ligne nomme le test
+qui tombe.
+
+| Mutation (le défaut réel qu'elle rejoue) | Ce qui tombe |
+|---|---|
+| Garde au sujet ouverte à tous | `TestUnePermissionRetireeDesabonneSonSujetEtLeDit` ; scénario « un sujet que les permissions n'ouvrent pas » |
+| Contrôle d'origine retiré de `/ws` | scénario « une socket demandée depuis une autre origine » |
+| Second facteur non exigé | scénario « une session sans second facteur » |
+| Session morte ignorée à la revérification | `TestUneSessionQuiPrendFinFermeLaSocket`, `TestUneSessionInverifiableFermeLaSocket` |
+| `Alive` qui repousse la fenêtre (`UPDATE last_seen_at`) | `TestSuivreUneSessionNeRepoussePasSaFenetre` |
+| File débordée sans abandon de l'écriture en cours | `TestUnClientLentEstCoupe` |
+| Pas d'annonce `stale` à la chute d'un flux | scénario « la chute d'un flux » |
+| Version amont non contrôlée | `TestUneTrameDUneVersionInconnueNEstPasRelayee` |
+| Désabonnement sans effet | `TestSeDesabonnerArreteLaDiffusion` |
+| Socket fermée restée abonnée | `TestAucuneGoroutineNeSurvitAuxSocketsFermees`, `TestUnClientLentEstCoupe` |
+| Champ de DTO renommé (`accountId` → `account_id`) | `TestLesTroisTramesAmontSontReemisesParLeurDTO` ; scénario « un sujet permis » (validation contre `SessionEvent`) |
+| Arrêt du hub sans fermeture des sockets | `TestLArretDuHubFermeLesSockets` |
+| Permission retirée non relue | `TestUnePermissionRetireeDesabonneSonSujetEtLeDit` |
+| Jeton machine absent du dial amont | trois scénarios : le faux amont refuse sans `Bearer` |
+| `withAPIDeadlines` monté sur `/ws` | **rien** : aucun scénario ne tient la socket au-delà de 5 s. Écrit dans `durcissement.go` (critère 4) |
+
+La première passe de la mutation « origine retirée » a **suspendu** la suite au lieu de la faire
+rougir : le harnais lisait le corps d'un 101, c'est-à-dire la socket. Corrigé dans `exchange`
+(`main_test.go`) avant de rejouer le tableau.
+
 ## Definition of Done
 - [ ] `make check` vert
 - [ ] Aucune trame amont relayée brute : chaque émission passe par un struct déclaré, vérifié sur le
