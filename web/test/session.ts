@@ -54,7 +54,12 @@ export type AuthReplies = {
   readonly enroll?: Reply | 'pending'
   readonly register?: Reply | 'pending'
   readonly registered?: Reply | 'pending'
+  readonly confirm?: Reply | 'pending'
+  readonly passkeys?: Reply | 'pending'
+  readonly unregister?: Reply | 'pending'
 }
+
+type PasskeySummary = components['schemas']['PasskeySummary']
 
 export const OPERATOR_NAME = 'Awa Kouadio'
 
@@ -96,6 +101,11 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
    * observable.
    */
   let granted: Partial<SecondFactors> = {}
+  let passkeys: PasskeySummary[] = Array.from({ length: heldPasskeys(outcome) }, (_, index) => ({
+    id: `passkey-${index + 1}`,
+    name: `Clé ${index + 1}`,
+    createdAt: '2026-09-01T09:00:00Z',
+  }))
 
   const fetch = vi.fn(async (request: Request) => {
     const { pathname } = new URL(request.url)
@@ -183,7 +193,21 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
       case 'POST /api/auth/mfa/webauthn/register/finish': {
         const reply = replies.registered ?? { status: 200, body: { id: 'une-passkey' } }
         if (reply !== 'pending' && reply.status === 200) {
-          granted = { ...granted, passkeys: heldPasskeys(outcome) + 1 }
+          const { name } = (await request.clone().json()) as { name: string }
+          passkeys = [...passkeys, { id: 'une-passkey', name, createdAt: '2026-09-26T08:00:00Z' }]
+          granted = { ...granted, passkeys: passkeys.length }
+        }
+
+        return respond(reply)
+      }
+
+      case 'GET /api/auth/mfa/webauthn/passkeys':
+        return respond(replies.passkeys ?? { status: 200, body: passkeys })
+
+      case 'POST /api/auth/mfa/totp/confirm': {
+        const reply = replies.confirm ?? { status: 204 }
+        if (reply !== 'pending' && reply.status === 204) {
+          granted = { ...granted, totp: true, recoveryCodesRemaining: RECOVERY_CODES.length }
         }
 
         return respond(reply)
@@ -202,8 +226,18 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
           me({ ...current, secondFactors: { ...current.secondFactors, ...granted } }),
         )
 
-      default:
-        throw new Error(`appel réseau non déclaré : ${route}`)
+      default: {
+        const removed = /^DELETE \/api\/auth\/mfa\/webauthn\/passkeys\/(.+)$/.exec(route)?.[1]
+        if (removed === undefined) throw new Error(`appel réseau non déclaré : ${route}`)
+
+        const reply = replies.unregister ?? { status: 204 }
+        if (reply !== 'pending' && reply.status === 204) {
+          passkeys = passkeys.filter(({ id }) => id !== removed)
+          granted = { ...granted, passkeys: passkeys.length }
+        }
+
+        return respond(reply)
+      }
     }
   })
 

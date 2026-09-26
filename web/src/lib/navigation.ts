@@ -11,7 +11,10 @@ import type { PermissionKey } from './permissions.gen'
  */
 type ShellScreen<Id> = Id extends `/_shell/${infer Path}` ? `/${Path}` : never
 
-export type NavPath = Exclude<ShellScreen<FileRouteTypes['id']>, '/'>
+/** `/account` est atteint par le nom de l'opérateur, dans la barre supérieure, et non par le rail. */
+export const OFF_RAIL = ['/', '/account'] as const
+
+export type NavPath = Exclude<ShellScreen<FileRouteTypes['id']>, (typeof OFF_RAIL)[number]>
 
 export type Milestone = 'M3' | 'M4' | 'M5' | 'M6' | 'M7' | 'M8' | 'M9'
 

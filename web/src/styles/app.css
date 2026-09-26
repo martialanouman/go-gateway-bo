@@ -471,3 +471,21 @@
   color: var(--text-muted);
   font: var(--text-data);
 }
+
+.account__panel {
+  display: grid;
+  gap: var(--sp-7);
+  max-width: 60ch;
+  color: var(--text-muted);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.account__panel p {
+  margin: 0;
+}
+
+a.topbar__operator:hover,
+a.topbar__operator:focus-visible {
+  color: var(--text-primary);
+}
