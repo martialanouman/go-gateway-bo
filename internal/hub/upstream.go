@@ -30,9 +30,15 @@ func (h *Hub) consume(ctx context.Context, f feed, dial Dialer) {
 		conn, err := dial(ctx, f.path)
 		if err == nil {
 			h.setStatus(f.topic, "live", nil)
-			backoff = firstBackoff
 
+			connected := time.Now()
 			err = h.pump(ctx, conn, f)
+
+			// Seule une connexion qui a tenu remet le backoff à zéro : un amont qui ferme aussitôt
+			// ouvert serait sinon rappelé chaque seconde.
+			if time.Since(connected) >= maxBackoff {
+				backoff = firstBackoff
+			}
 
 			since := time.Now().UTC()
 			h.setStatus(f.topic, "stale", &since)

@@ -52,7 +52,7 @@ func dial(t *testing.T, url string) *websocket.Conn {
 	ctx, cancel := context.WithTimeout(t.Context(), wait)
 	defer cancel()
 
-	//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-172).
+	//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
 	conn, _, err := websocket.Dial(ctx, url, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.CloseNow() })
@@ -380,4 +380,36 @@ func TestAucuneGoroutineNeSurvitAuxSocketsFermees(t *testing.T) {
 		dump := make([]byte, 1<<20)
 		t.Fatalf("%d goroutines avant, %d après\n%s", before, after, dump[:runtime.Stack(dump, true)])
 	}
+}
+
+// Un amont qui accepte la montée puis ferme aussitôt n'est pas rappelé chaque seconde : le sujet
+// clignoterait entre live et stale.
+func TestUnFluxQuiTombeAussitotOuvertNeRemetPasLeBackoffAZero(t *testing.T) {
+	t.Parallel()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, nil)
+		if err == nil {
+			_ = conn.Close(websocket.StatusGoingAway, "")
+		}
+	}))
+	t.Cleanup(upstream.Close)
+
+	var dials atomic.Int32
+
+	ctx, stop := context.WithTimeout(t.Context(), firstBackoff*5/2)
+	defer stop()
+
+	quietHub().Run(ctx, func(ctx context.Context, path string) (*websocket.Conn, error) {
+		if path == "/admin/stream/metrics" {
+			dials.Add(1)
+		}
+
+		//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
+		conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(upstream.URL, "http")+path, nil)
+
+		return conn, err
+	})
+
+	assert.LessOrEqual(t, dials.Load(), int32(2), "le flux a été rappelé à chaque seconde")
 }

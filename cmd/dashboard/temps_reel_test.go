@@ -228,7 +228,7 @@ func (w *realtimeWorld) openSocket() error {
 	ctx, cancel := context.WithTimeout(context.Background(), socketWait)
 	defer cancel()
 
-	//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-172).
+	//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
 	conn, resp, err := websocket.Dial(ctx, "ws://"+w.process.addr+"/ws",
 		&websocket.DialOptions{HTTPHeader: header})
 	if err != nil {

@@ -191,7 +191,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 func dialStream(baseURL string, client *http.Client) hub.Dialer {
 	return func(ctx context.Context, path string) (*websocket.Conn, error) {
-		//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-172).
+		//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
 		conn, _, err := websocket.Dial(ctx, strings.TrimSuffix(baseURL, "/")+path,
 			&websocket.DialOptions{HTTPClient: client})
 
