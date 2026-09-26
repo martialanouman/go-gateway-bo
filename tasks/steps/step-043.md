@@ -12,12 +12,12 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
 ## Décisions (arbitrées, ne pas rouvrir)
 - **Trames amont décodées par des structs locaux.** Le contrat, y compris sa dernière version publiée
   (6.8.0 le 26/09/2026), ne décrit les trames qu'en une phrase de `description`. Le BFF déclare ses
-  trois structs d'après `go-gateway/internal/metricstream/metricstream.go` (source citée au-dessus de
-  chacun). Un `v` inconnu jette la trame et le journalise. **Dette 057** dans `debts/`, payée
+  trois structs d'après `go-gateway/internal/metricstream/metricstream.go` (source citée au-dessus du
+  groupe). Un `v` inconnu jette la trame et le journalise. **Dette 057** dans `debts/`, payée
   par une PR amont qui déclare les trois schémas en `components`, suivie d'un bump. *Arbitré le
   26/09/2026 avec l'utilisateur.*
 - **`metrics.traffic` relaie, il n'agrège pas.** Un Snapshot par réplica amont, relayé comme DTO
-  déclaré (`instance`, `emittedAt`, `samples`). La somme des compteurs et le max des jauges de groupe
+  déclaré (`instance`, `samples` ; l'instant d'émission est le `ts` de l'enveloppe). La somme des compteurs et le max des jauges de groupe
   arrivent avec leur premier consommateur (step-081). *Arbitré le 26/09/2026 avec l'utilisateur.*
 - **Trois sujets, trois gardes.** `metrics.traffic` : tout opérateur authentifié, la même règle que
   l'entrée « Trafic » du rail (`web/src/lib/navigation.ts`, le catalogue n'a aucune clé pour la
@@ -28,7 +28,10 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
   corps d'un message n'est dans aucun des trois flux, et le DTO rend impossible qu'il y entre sans
   modifier le struct.
 - **Un client lent est coupé, pas rattrapé.** File de 64 trames par socket. Quand elle est pleine, la
-  socket se ferme en 1008 : « Connexion trop lente : les messages en retard ont été abandonnés. » Si
+  socket se ferme en 1008 : « Connexion trop lente : les messages en retard ont été abandonnés. »
+  Le 1008 part quand la trame le peut encore ; un client qui ne lit plus voit la connexion tomber sans
+  code, au plus `writeTimeout` (5 s) après le débordement. Annuler plus tôt l'écriture en cours
+  fermait la connexion avant le 1008, y compris quand il aurait pu partir (relevé en revue). Si
   on jetait des trames une à une, on pourrait perdre en silence une trame d'état (`stale`/`live`).
   En reconnectant, le client reçoit l'état courant.
 - **La session est relue toutes les 30 s** sur chaque socket, **sans être prolongée**
@@ -63,7 +66,9 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
 - **Upgrade** (`internal/bff/realtime.go`), refus en JSON **avant** la montée : origine jugée par
   `comesFromDashboard` contre `deps.Origin`, sinon 403 `forbidden_origin` (`requireSameOrigin` laisse
   passer les GET) ; sans session vivante, 401 ; sans second facteur, 403 `mfa_required` ; ni
-  `withAPIDeadlines` ni `ReadTimeout` sur `/ws` (`internal/bff/durcissement.go:166-173` le demande).
+  `withAPIDeadlines` ni `ReadTimeout` sur `/ws` (`internal/bff/durcissement.go:166-178` l'explique :
+  c'est le contexte de 30 s d'`apiRequestDeadline` qui couperait la socket, l'échéance de lecture
+  étant effacée à la montée).
   À l'abonnement : sujet permis → `status` courant, puis les trames.
 - Aucune écriture d'audit : s'abonner est une lecture, et l'invariant (c) ne vise que les mutations.
 
@@ -100,7 +105,8 @@ qui tombe.
 | Second facteur non exigé | scénario « une session sans second facteur » |
 | Session morte ignorée à la revérification | `TestUneSessionQuiPrendFinFermeLaSocket`, `TestUneSessionInverifiableFermeLaSocket` |
 | `Alive` qui repousse la fenêtre (`UPDATE last_seen_at`) | `TestSuivreUneSessionNeRepoussePasSaFenetre` |
-| File débordée sans abandon de l'écriture en cours | `TestUnClientLentEstCoupe` |
+| Client débordé fermé par l'annulation de la lecture (la première version livrée) | `TestUnClientDebordeParUneRafaleRecoitLeCodeDeLenteur` : -1 au lieu de 1008 |
+| Backoff remis à zéro dès qu'une montée réussit (la première version livrée) | `TestUnFluxQuiTombeAussitotOuvertNeRemetPasLeBackoffAZero` : 3 montées en 2,5 s |
 | Pas d'annonce `stale` à la chute d'un flux | scénario « la chute d'un flux » |
 | Version amont non contrôlée | `TestUneTrameDUneVersionInconnueNEstPasRelayee` |
 | Désabonnement sans effet | `TestSeDesabonnerArreteLaDiffusion` |
@@ -109,7 +115,7 @@ qui tombe.
 | Arrêt du hub sans fermeture des sockets | `TestLArretDuHubFermeLesSockets` |
 | Permission retirée non relue | `TestUnePermissionRetireeDesabonneSonSujetEtLeDit` |
 | Jeton machine absent du dial amont | trois scénarios : le faux amont refuse sans `Bearer` |
-| `withAPIDeadlines` monté sur `/ws` | **rien** : aucun scénario ne tient la socket au-delà de 5 s. Écrit dans `durcissement.go` (critère 4) |
+| `withAPIDeadlines` monté sur `/ws` | **rien** : aucun scénario ne tient la socket au-delà des 30 s d'`apiRequestDeadline`. Écrit dans `durcissement.go` (critère 4) |
 
 La première passe de la mutation « origine retirée » a **suspendu** la suite au lieu de la faire
 rougir : le harnais lisait le corps d'un 101, c'est-à-dire la socket. Corrigé dans `exchange`
