@@ -37,8 +37,12 @@ func minimalEnv() map[string]string {
 		config.EnvSMTPAddr:          testSMTPAddr,
 		config.EnvSMTPFrom:          testSMTPFrom,
 		config.EnvPublicURL:         testPublicURL,
+		config.EnvRedisURL:          testRedisURL,
 	}
 }
+
+// testRedisURL est le Redis du `docker-compose.yml` : rien ici ne s'y connecte.
+const testRedisURL = "redis://127.0.0.1:6379/0"
 
 // Rien d'un secret d'installation : le worker les compose dans chaque lien, le navigateur et
 // Mailpit les voient tous les deux.
@@ -96,6 +100,7 @@ func realGatewayEnv() map[string]string {
 		config.EnvSMTPAddr:            testSMTPAddr,
 		config.EnvSMTPFrom:            testSMTPFrom,
 		config.EnvPublicURL:           testPublicURL,
+		config.EnvRedisURL:            testRedisURL,
 	}
 }
 
@@ -433,6 +438,55 @@ func TestLoadMail(t *testing.T) {
 	}
 }
 
+func TestLoadRedis(t *testing.T) {
+	t.Run("charge l'adresse de Redis et l'espace de noms par défaut", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(minimalEnv()))
+
+		require.NoError(t, err)
+		assert.Equal(t, testRedisURL, cfg.Redis.URL)
+		assert.Equal(t, "dashboard", cfg.Redis.Namespace)
+	})
+
+	t.Run("exige l'adresse de Redis", func(t *testing.T) {
+		t.Parallel()
+
+		env := minimalEnv()
+		delete(env, config.EnvRedisURL)
+
+		_, err := config.Load(lookupFrom(env))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), config.EnvRedisURL+" : variable obligatoire absente")
+	})
+
+	t.Run("tait le mot de passe d'une adresse refusée", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+			config.EnvRedisURL: "http://:mot-de-passe-redis@127.0.0.1:6379",
+		})))
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), config.EnvRedisURL)
+		assert.NotContains(t, err.Error(), "mot-de-passe-redis")
+	})
+
+	for _, namespace := range []string{"Dashboard", "dash board", "dash:board", "-dashboard"} {
+		t.Run("refuse l'espace de noms "+namespace, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
+				config.EnvRedisNamespace: namespace,
+			})))
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.EnvRedisNamespace)
+		})
+	}
+}
+
 func TestLoadRejectsMalformedValues(t *testing.T) {
 	t.Parallel()
 
@@ -614,6 +668,8 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvSMTPAddr,
 		config.EnvSMTPFrom,
 		config.EnvPublicURL,
+		config.EnvRedisURL,
+		config.EnvRedisNamespace,
 		config.EnvBootstrapOperatorEmail,
 		config.EnvBootstrapOperatorName,
 		config.EnvBootstrapOperatorPassword,

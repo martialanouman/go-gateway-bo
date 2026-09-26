@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
@@ -143,6 +144,18 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
+	// Seule la forme de l'adresse est jugée ici : un Redis injoignable ne doit pas empêcher le
+	// démarrage, puisque seul le temps réel en dépend (invariant e). `config.Load` a déjà analysé
+	// l'URL : l'erreur de `url.Parse`, qui la recopierait avec son mot de passe, ne peut pas sortir
+	// d'ici ; celles de go-redis v9.22.0 ne citent que le schéma, le chemin ou le numéro de base.
+	redisOptions, err := redis.ParseURL(cfg.Redis.URL)
+	if err != nil {
+		return fmt.Errorf("adresse de Redis : %w", err)
+	}
+
+	coordination := redis.NewClient(redisOptions)
+	defer func() { _ = coordination.Close() }()
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", cfg.Addr, err)
@@ -166,7 +179,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		})
 
 	realtime := hub.New(logger)
-	go realtime.Run(ctx, dialStream(cfg.Gateway.BaseURL, streams))
+	go realtime.Run(ctx, dialStream(cfg.Gateway.BaseURL, streams), coordination, cfg.Redis.Namespace)
 
 	router := bff.NewRouter(bff.Dependencies{
 		Assets: assets,
@@ -190,10 +203,17 @@ func run(ctx context.Context, logger *slog.Logger) error {
 }
 
 func dialStream(baseURL string, client *http.Client) hub.Dialer {
-	return func(ctx context.Context, path string) (*websocket.Conn, error) {
+	return func(ctx context.Context, path string, onPing func()) (*websocket.Conn, error) {
 		//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
 		conn, _, err := websocket.Dial(ctx, strings.TrimSuffix(baseURL, "/")+path,
-			&websocket.DialOptions{HTTPClient: client})
+			&websocket.DialOptions{
+				HTTPClient: client,
+				OnPingReceived: func(context.Context, []byte) bool {
+					onPing()
+
+					return true
+				},
+			})
 
 		return conn, err
 	}

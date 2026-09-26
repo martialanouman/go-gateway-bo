@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,6 +49,15 @@ func runTests(m *testing.M) (code int) {
 	// échouer sur un Docker absent avant d'avoir compilé rend la main plus vite.
 	terminatePostgres, err := startPostgres(context.Background())
 	defer terminatePostgres()
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+
+		return 1
+	}
+
+	terminateRedis, err := startRedis(context.Background())
+	defer terminateRedis()
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -335,6 +345,9 @@ func completeConfiguration() map[string]string {
 		"DASHBOARD_SMTP_ADDR":  "127.0.0.1:1",
 		"DASHBOARD_SMTP_FROM":  "cockpit@exemple.test",
 		"DASHBOARD_PUBLIC_URL": configuredOrigin,
+		"DASHBOARD_REDIS_URL":  suiteRedisURL,
+		// Un espace de noms par configuration : deux scénarios ne se disputent jamais le bail.
+		"DASHBOARD_REDIS_NAMESPACE": "scenario-" + strings.ToLower(rand.Text()),
 	}
 }
 

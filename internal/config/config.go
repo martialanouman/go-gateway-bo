@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -56,6 +57,9 @@ const (
 	EnvSMTPAddr  = "DASHBOARD_SMTP_ADDR"
 	EnvSMTPFrom  = "DASHBOARD_SMTP_FROM"
 	EnvPublicURL = "DASHBOARD_PUBLIC_URL"
+
+	EnvRedisURL       = "DASHBOARD_REDIS_URL"
+	EnvRedisNamespace = "DASHBOARD_REDIS_NAMESPACE"
 )
 
 // minimumBruteForceSaltLength borne le sel d'anti-brute-force. Trente-deux caractères : ce que rend
@@ -135,6 +139,17 @@ type Config struct {
 	Auth AuthConfig
 	// Mail porte ce dont l'envoi des liens d'accès a besoin au démarrage.
 	Mail MailConfig
+	// Redis coordonne les instances pour le temps réel.
+	Redis RedisConfig
+}
+
+// RedisConfig décrit le Redis qui porte le bail et le Pub/Sub du temps réel.
+type RedisConfig struct {
+	// URL peut porter un mot de passe : elle ne sort ni dans un message d'erreur, ni dans un journal.
+	URL string
+	// Namespace préfixe le bail et le canal. Le Pub/Sub de Redis ignore le numéro de base : deux
+	// déploiements sur le même Redis ne se séparent que par lui.
+	Namespace string
 }
 
 // MailConfig décrit l'envoi des liens d'accès par SMTP.
@@ -251,6 +266,10 @@ func Load(lookup Lookup) (Config, error) {
 			Addr:      r.requiredDialAddr(EnvSMTPAddr),
 			From:      r.requiredValue(EnvSMTPFrom),
 			PublicURL: r.requiredPublicURL(EnvPublicURL),
+		},
+		Redis: RedisConfig{
+			URL:       r.requiredAbsoluteURL(EnvRedisURL, "redis", "rediss"),
+			Namespace: r.redisNamespace(EnvRedisNamespace),
 		},
 	}
 
@@ -517,6 +536,24 @@ func (r *reader) requiredValue(name string) string {
 //
 // La borne haute existe parce que le QR est dessiné dans le navigateur : une URI trop longue dépasse
 // la capacité du code et l'écran d'enrôlement rendrait un carré illisible plutôt qu'une erreur.
+var redisNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+
+// redisNamespace refuse le deux-points, séparateur des clés que l'espace de noms préfixe.
+func (r *reader) redisNamespace(name string) string {
+	value := r.optional(name)
+	if value == "" {
+		return "dashboard"
+	}
+
+	if !redisNamespacePattern.MatchString(value) {
+		r.reject(name, "minuscules, chiffres et tirets attendus, reçu %q", value)
+
+		return ""
+	}
+
+	return value
+}
+
 func (r *reader) productName(name string) string {
 	value, ok := r.required(name)
 	if !ok {
