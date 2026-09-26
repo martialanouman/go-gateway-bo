@@ -1,6 +1,6 @@
 # step-039 — Les facteurs de son propre compte
 
-> **Jalon :** M1 (§6.9) · **Statut :** À FAIRE
+> **Jalon :** M1 (§6.9) · **Statut :** FAIT
 > **Dépend de :** step-028, step-030, step-050 · **Bloque :** — (clôt M1)
 
 ## But
@@ -39,8 +39,8 @@ le compte de la session, pas sur l'administration des autres.*
 - **Composants (Vitest)** : le retrait du dernier facteur est désactivé et expliqué.
 
 ## Definition of Done
-- [ ] `make check` vert et `make e2e` vert
-- [ ] **M1 est clos** : toutes ses fiches sont dans `tasks/steps/done/`, et le checkpoint du
+- [x] `make check` vert et `make e2e` vert
+- [x] **M1 est clos** : toutes ses fiches sont dans `tasks/steps/done/`, et le checkpoint du
       `plan.md` §6 est vérifié plutôt que déclaré.
 
 ## Hors périmètre
