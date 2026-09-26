@@ -227,7 +227,9 @@ func (h *Hub) follow(ctx context.Context, rdb *redis.Client, channel string) {
 	watchdog := time.NewTicker(h.heartbeatEvery)
 	defer watchdog.Stop()
 
-	var lastBeat time.Time
+	// Armé dès le départ et jamais désarmé : un état live reçu sans battement ensuite doit finir
+	// stale. markStale ne touche que les sujets live, le rappeler à chaque tick ne coûte rien.
+	lastBeat := time.Now()
 
 	for {
 		select {
@@ -244,10 +246,9 @@ func (h *Hub) follow(ctx context.Context, rdb *redis.Client, channel string) {
 			}
 
 		case <-watchdog.C:
-			if !lastBeat.IsZero() && time.Since(lastBeat) > h.heartbeatTimeout {
+			if time.Since(lastBeat) > h.heartbeatTimeout {
 				since := lastBeat.UTC()
 				h.markStale(&since)
-				lastBeat = time.Time{}
 			}
 		}
 	}

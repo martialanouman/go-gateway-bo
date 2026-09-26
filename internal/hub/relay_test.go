@@ -433,3 +433,30 @@ func TestUnPorteurCoupeDeRedisLacheLaPasserelleAvantLExpirationDuBail(t *testing
 	assert.Less(t, time.Since(frozenAt), h.leaseTTL,
 		"les flux amont ont survécu à l'expiration du bail : un successeur les aurait doublés")
 }
+
+// Un état live reçu sans battement de cœur ensuite — au démarrage, ou quand Redis retombe avant le
+// premier battement — doit finir stale : le chien de garde ne se désarme jamais.
+func TestUnEtatLiveSansBattementFinitStale(t *testing.T) {
+	t.Parallel()
+
+	rdb, namespace := redisFor(t)
+	require.NoError(t, rdb.Set(t.Context(), namespace+":realtime:leader", "ailleurs", time.Minute).Err())
+
+	h := fastHub()
+	runHub(t, h, func(context.Context, string, func()) (*websocket.Conn, error) {
+		return nil, context.Canceled
+	}, rdb, namespace)
+
+	conn := subscribeTo(t, h, "metrics.traffic")
+	assert.Equal(t, "stale", next(t, conn).Status)
+
+	require.Eventually(t, func() bool {
+		require.NoError(t, rdb.Publish(t.Context(), namespace+":realtime",
+			`{"topic":"metrics.traffic","status":"live"}`).Err())
+
+		return h.status(TrafficTopic) == "live"
+	}, wait, 50*time.Millisecond)
+
+	awaitStatus(t, conn, "metrics.traffic", "live")
+	awaitStatus(t, conn, "metrics.traffic", "stale")
+}
