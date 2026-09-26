@@ -19,15 +19,21 @@ relais sans intervention.
   démarrage (`redis://` ou `rediss://`), mais un Redis injoignable ne bloque pas le binaire : login et
   écrans restent servis, et seul le temps réel se dégrade (invariant e). C'est l'inverse de PostgreSQL,
   sans lequel rien ne fonctionne.
+- **Un espace de noms** (`DASHBOARD_REDIS_NAMESPACE`, `dashboard` par défaut, minuscules, chiffres
+  et tirets) préfixe le bail et le canal. Le Pub/Sub de Redis ignore le numéro de base : sans lui,
+  deux déploiements sur un même Redis (préproduction et production) se disputeraient le bail, et deux
+  suites de tests en parallèle aussi. *Constaté en implémentation le 26/09/2026.*
 - **Le bail** : clé `dashboard:realtime:leader`, valeur = identifiant aléatoire de l'instance,
   `SET NX PX 6000`. Le porteur le renouvelle toutes les 2 s, par un script Lua qui compare avant de
   prolonger. Les autres tentent de le prendre toutes les 2 s. Un renouvellement refusé ou en échec
   arrête aussitôt les consommateurs amont. À l'arrêt propre, le porteur rend le bail, par un script
   Lua qui compare avant de supprimer, et un autre le reprend dans les 2 s. Si le porteur est tué, la
   reprise prend au plus 6 s + 2 s.
-- **Le canal** : `dashboard:realtime`. Il transporte les messages déjà sérialisés par les DTO de
+- **Le canal** : `dashboard:realtime` (préfixe compris). Il transporte les messages déjà sérialisés par les DTO de
   step-043 (trames et états), et rien d'autre : aucun octet amont brut n'y passe.
-- **Battement de cœur** : le porteur publie `{"heartbeat":…}` toutes les 2 s. Une instance qui n'en a
+- **Battement de cœur** : le porteur publie toutes les 2 s `{"heartbeat":[…]}`, l'état de chaque
+  sujet ; une instance qui revient d'une coupure retrouve ainsi l'état courant, sans attendre qu'il
+  change. Une instance qui n'en a
   lu aucun depuis 6 s (porteur mort, Redis coupé, abonnement rompu) passe tous ses sujets `stale`.
   C'est ce qui rend visible le trou d'une bascule, au lieu d'afficher `live` sur des chiffres figés.
 - **Dette 058 payée ici.** Côté porteur, chaque flux amont a une échéance de 60 s, réarmée à chaque
@@ -55,8 +61,9 @@ relais sans intervention.
   (`internal/bddtest`).
 
 ## Tests (écrits dans la même PR)
-- **godog** (`cmd/dashboard/haute-disponibilite.feature`, deux binaires, un Redis, un PostgreSQL, le
-  faux amont de step-043) :
+- **godog** (`cmd/dashboard/haute-disponibilite.feature`, deux binaires, un PostgreSQL, le faux amont
+  de step-043, et Redis joint à travers un relais TCP du harnais, que « Redis coupé » ferme sans
+  toucher au Redis partagé) :
   - deux instances, **une seule** connexion par flux sur le faux amont ;
   - une socket ouverte sur l'instance qui ne porte pas le bail reçoit ce que la passerelle émet ;
   - le porteur est tué (SIGKILL) : les sujets passent `stale`, l'autre instance prend le bail, le faux
@@ -68,6 +75,24 @@ relais sans intervention.
   l'abonnement s'arrêtent à l'annulation.
 - **Mutations** : comparaison avant renouvellement, comparaison avant restitution, arrêt des
   consommateurs sur perte du bail, battement de cœur, réarmement par ping, `stale` sur Redis coupé.
+
+## Tableau des mutations
+
+Jouées le 26/09/2026 dans un worktree, `go test -count=1 -timeout 300s`, Redis partagé. Chaque ligne
+nomme le test qui tombe.
+
+| Mutation (le défaut réel qu'elle rejoue) | Ce qui tombe |
+|---|---|
+| Renouvellement sans comparer le porteur | `TestLeRenouvellementEchoueQuandLeBailAChangeDeMain`, `TestLaPerteDuBailFermeLesFluxAmont` |
+| Restitution sans comparer le porteur | `TestRendreLeBailNeSupprimePasCeluiDUnAutre` |
+| Bail perdu sans arrêt des consommateurs amont | `TestLaPerteDuBailFermeLesFluxAmont` |
+| Battement de cœur manqué ignoré | `TestUnBattementDeCoeurManqueRendLesSujetsStale` ; scénario « Redis coupé » |
+| Ping amont qui ne réarme pas l'échéance | `TestLesPingsAmontGardentLeFluxLive` (vert à la première passe : le test durait moins qu'un cycle silence + reconnexion, réécrit pour guetter le `stale`) |
+| Flux amont muet sans échéance | `TestUnFluxAmontMuetPasseStale` |
+| Bail pris sans exclusivité (`SET` au lieu de `SET NX`) | `TestDeuxCandidatsNObtiennentQuUnSeulBail`, `TestDeuxInstancesNOuvrentQuUneConnexionParFluxEtRediffusentToutes` ; scénarios « l'instance sans bail » et « le porteur tué » |
+| Bail non rendu à l'arrêt | `TestAucuneGoroutineNeSurvitALArretDuRelais` |
+| États rediffusés sans changement | `TestUnEtatInchangeNEstPasRediffuse` (vert à la première passe : aucun test ne le gardait, ajouté) |
+| Espace de noms non contrôlé | `TestLoadRedis` |
 
 ## Definition of Done
 - [ ] `make check` vert, et le scénario deux instances rejoué **en CI** (checkpoint M2).
