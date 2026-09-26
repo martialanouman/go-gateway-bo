@@ -202,7 +202,7 @@ func (m *Manager) Reserve(ctx context.Context, operatorID string) (store.Lock, e
 	return m.factors.Reserve(ctx, operatorID, LockWindow, MaxFailures)
 }
 
-// Release rend l'essai réservé quand la vérification a échoué sur une erreur interne (dette 055).
+// Release rend l'essai réservé quand la vérification a échoué sur une erreur interne.
 func (m *Manager) Release(ctx context.Context, operatorID string) error {
 	return m.factors.Release(ctx, operatorID)
 }

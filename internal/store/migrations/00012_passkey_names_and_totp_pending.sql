@@ -1,4 +1,4 @@
--- Le nom d'une passkey (dette 042) : c'est par lui qu'un opérateur reconnaît celle qu'il retire.
+-- Le nom d'une passkey : c'est par lui qu'un opérateur reconnaît celle qu'il retire.
 -- Le `DEFAULT` ne sert qu'à nommer les lignes existantes, puis il est retiré : un nom posé par le
 -- schéma à la place de l'opérateur ne distinguerait plus rien.
 --

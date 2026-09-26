@@ -244,7 +244,7 @@ Fonctionnalité: Le second facteur TOTP
     Et le code de confirmation est refusé
     Et le second facteur est vérifié
 
-  # Dette 055. Une erreur interne ne dit rien du code essayé : la compter bloquait pour un quart
+  # Une erreur interne ne dit rien du code essayé : la compter bloquait pour un quart
   # d'heure l'opérateur qui réessayait, comme le message du 500 l'y invite.
   Scénario: une panne pendant la vérification ne compte pas comme un essai
     Étant donné une installation avec un opérateur

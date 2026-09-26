@@ -611,8 +611,8 @@ func (a API) ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) 
 	return ConfirmTotp204Response{}, nil
 }
 
-// releaseUnjudgedAttempt rend l'essai réservé quand la vérification a échoué sans juger le code
-// (dette 055) : une erreur interne ne dit rien du code présenté. La saturation, elle, reste comptée.
+// releaseUnjudgedAttempt rend l'essai réservé quand la vérification a échoué sans juger le code :
+// une erreur interne ne dit rien du code présenté. La saturation, elle, reste comptée.
 func (a API) releaseUnjudgedAttempt(ctx context.Context, operatorID string, cause error) error {
 	if err := a.SecondFactor.Release(ctx, operatorID); err != nil {
 		return errors.Join(cause, err)

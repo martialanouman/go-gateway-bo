@@ -121,8 +121,8 @@ func (c *Counter) reset(ctx context.Context, subject string) error {
 	return nil
 }
 
-// release rend un essai réservé que rien n'a jugé : une erreur interne ne dit rien du code présenté
-// (dette 055). Jamais sous zéro, et sans toucher `last_failure_at`.
+// release rend un essai réservé que rien n'a jugé : une erreur interne ne dit rien du code présenté.
+// Jamais sous zéro, et sans toucher `last_failure_at`.
 func (c *Counter) release(ctx context.Context, subject string) error {
 	const query = `
 		UPDATE login_attempt_counters SET failures = greatest(failures - 1, 0)
