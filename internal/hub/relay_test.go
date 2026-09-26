@@ -2,10 +2,12 @@ package hub
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -328,4 +330,106 @@ func TestAucuneGoroutineNeSurvitALArretDuRelais(t *testing.T) {
 	assert.Zero(t, rdb.Exists(t.Context(), namespace+":realtime:leader").Val(),
 		"le bail n'a pas été rendu à l'arrêt : le successeur attendrait son expiration")
 	awaitGoroutines(t, before)
+}
+
+// frozenRedis relaie TCP vers le Redis de test et sait geler le chemin : les octets sont avalés et
+// rien n'est fermé, comme une partition ou une connexion à moitié morte. go-redis n'y voit alors
+// qu'un appel qui ne rend pas la main.
+type frozenRedis struct {
+	listener net.Listener
+	frozen   atomic.Bool
+}
+
+func newFrozenRedis(t *testing.T) (*frozenRedis, *redis.Client) {
+	t.Helper()
+
+	options, err := redis.ParseURL(redisURL)
+	require.NoError(t, err)
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = listener.Close() })
+
+	relay := &frozenRedis{listener: listener}
+	target := options.Addr
+
+	go func() {
+		for {
+			client, err := listener.Accept()
+			if err != nil {
+				return
+			}
+
+			server, err := net.Dial("tcp", target)
+			if err != nil {
+				_ = client.Close()
+
+				continue
+			}
+
+			t.Cleanup(func() { _ = client.Close(); _ = server.Close() })
+
+			go relay.pipe(server, client)
+			go relay.pipe(client, server)
+		}
+	}()
+
+	options.Addr = listener.Addr().String()
+	client := redis.NewClient(options)
+	t.Cleanup(func() { _ = client.Close() })
+
+	return relay, client
+}
+
+func (r *frozenRedis) pipe(dst, src net.Conn) {
+	buffer := make([]byte, 32<<10)
+
+	for {
+		n, err := src.Read(buffer)
+		if err != nil {
+			return
+		}
+
+		if r.frozen.Load() {
+			continue
+		}
+
+		if _, err = dst.Write(buffer[:n]); err != nil {
+			return
+		}
+	}
+}
+
+// Le bloquant de la revue : un porteur coupé de Redis sans que la connexion tombe restait bloqué
+// dans son renouvellement, pendant qu'un successeur prenait le bail et joignait la passerelle.
+func TestUnPorteurCoupeDeRedisLacheLaPasserelleAvantLExpirationDuBail(t *testing.T) {
+	t.Parallel()
+
+	_, namespace := redisFor(t)
+	relay, rdb := newFrozenRedis(t)
+	gateway := newUpstream(t)
+	h := fastHub()
+
+	runHub(t, h, gateway.dial, rdb, namespace)
+	require.Eventually(t, func() bool { return gateway.openedOn("/admin/stream/sessions") == 1 },
+		wait, 20*time.Millisecond)
+
+	relay.frozen.Store(true)
+	frozenAt := time.Now()
+
+	require.Eventually(t, func() bool {
+		gateway.mu.Lock()
+		defer gateway.mu.Unlock()
+
+		for _, c := range gateway.conns["/admin/stream/sessions"] {
+			if c.Ping(t.Context()) == nil {
+				return false
+			}
+		}
+
+		return true
+	}, wait, 20*time.Millisecond)
+
+	assert.Less(t, time.Since(frozenAt), h.leaseTTL,
+		"les flux amont ont survécu à l'expiration du bail : un successeur les aurait doublés")
 }

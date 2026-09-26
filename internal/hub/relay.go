@@ -74,13 +74,17 @@ func (h *Hub) lead(ctx context.Context, dial Dialer, rdb *redis.Client, channel 
 	defer attempt.Stop()
 
 	for {
+		// Relevé avant l'appel : c'est l'instant le plus tôt où le bail a pu être posé, donc le plus
+		// prudent pour en calculer l'échéance.
+		asked := time.Now()
+
 		held, err := leader.acquire(ctx)
 		if err != nil && ctx.Err() == nil {
 			h.logger.Debug("bail temps réel injoignable", "error", err)
 		}
 
 		if held {
-			h.hold(ctx, dial, rdb, channel, leader)
+			h.hold(ctx, dial, rdb, channel, leader, asked)
 		}
 
 		select {
@@ -91,50 +95,60 @@ func (h *Hub) lead(ctx context.Context, dial Dialer, rdb *redis.Client, channel 
 	}
 }
 
-// hold consomme la passerelle tant que le bail se renouvelle. Un renouvellement refusé ou en échec
-// arrête les consommateurs aussitôt : un successeur peut déjà être en train de joindre la passerelle.
-func (h *Hub) hold(ctx context.Context, dial Dialer, rdb *redis.Client, channel string, leader lease) {
-	holding, release := context.WithCancel(ctx)
+// hold consomme la passerelle tant que le bail est à coup sûr détenu. L'échéance est **locale** :
+// les consommateurs s'arrêtent un intervalle de renouvellement avant l'expiration du bail compté
+// depuis le dernier renouvellement réussi, que Redis réponde ou non. Un appel Redis bloqué — partition,
+// connexion à moitié morte — ne peut donc plus laisser deux instances sur la passerelle.
+func (h *Hub) hold(ctx context.Context, dial Dialer, rdb *redis.Client, channel string, leader lease, asked time.Time) {
+	holding, stopHolding := context.WithCancel(ctx)
+	defer stopHolding()
 
 	view := newLeaderView(func(message []byte) {
-		if err := rdb.Publish(holding, channel, message).Err(); err != nil && holding.Err() == nil {
+		publishing, cancel := context.WithTimeout(holding, h.leaseEvery)
+		defer cancel()
+
+		if err := rdb.Publish(publishing, channel, message).Err(); err != nil && holding.Err() == nil {
 			h.logger.Debug("republication temps réel perdue", "error", err)
 		}
 	})
 
-	var consumers sync.WaitGroup
+	lost := make(chan struct{})
+	renewed := make(chan time.Time, 1)
+
+	var workers sync.WaitGroup
+
+	workers.Go(func() { h.renew(holding, leader, renewed, lost) })
+	workers.Go(func() { h.beat(holding, view) })
 
 	for _, f := range feeds {
-		consumers.Go(func() { h.consume(holding, f, dial, view) })
+		workers.Go(func() { h.consume(holding, f, dial, view) })
 	}
 
-	renewal := time.NewTicker(h.leaseEvery)
-	defer renewal.Stop()
+	margin := h.leaseTTL - h.leaseEvery
 
-	heartbeat := time.NewTicker(h.heartbeatEvery)
-	defer heartbeat.Stop()
-
-	view.publish(view.heartbeat())
+	deadline := time.NewTimer(time.Until(asked.Add(margin)))
+	defer deadline.Stop()
 
 	for held := true; held; {
 		select {
 		case <-ctx.Done():
 			held = false
 
-		case <-heartbeat.C:
-			view.publish(view.heartbeat())
+		case <-lost:
+			h.logger.Warn("bail temps réel perdu : les flux amont s'arrêtent")
+			held = false
 
-		case <-renewal.C:
-			renewed, err := leader.renew(holding)
-			if err != nil || !renewed {
-				h.logger.Warn("bail temps réel perdu : les flux amont s'arrêtent", "error", err)
-				held = false
-			}
+		case at := <-renewed:
+			deadline.Reset(time.Until(at.Add(margin)))
+
+		case <-deadline.C:
+			h.logger.Warn("bail temps réel non renouvelé à temps : les flux amont s'arrêtent")
+			held = false
 		}
 	}
 
-	release()
-	consumers.Wait()
+	stopHolding()
+	workers.Wait()
 
 	if ctx.Err() != nil {
 		// Rendu à l'arrêt propre, pour qu'un successeur n'attende pas son expiration.
@@ -143,6 +157,60 @@ func (h *Hub) hold(ctx context.Context, dial Dialer, rdb *redis.Client, channel 
 
 		if err := leader.release(releaseCtx); err != nil {
 			h.logger.Debug("bail temps réel non rendu", "error", err)
+		}
+	}
+}
+
+// renew signale chaque renouvellement réussi, avec l'instant où il a été demandé. Une erreur n'est
+// pas une perte : l'échéance locale tranche. Seul un refus explicite — la valeur a changé — en est une.
+func (h *Hub) renew(ctx context.Context, leader lease, renewed chan time.Time, lost chan<- struct{}) {
+	ticker := time.NewTicker(h.leaseEvery)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+
+		asked := time.Now()
+
+		attempt, cancel := context.WithTimeout(ctx, h.leaseEvery)
+		ok, err := leader.renew(attempt)
+		cancel()
+
+		switch {
+		case err != nil:
+			if ctx.Err() == nil {
+				h.logger.Debug("bail temps réel non renouvelé", "error", err)
+			}
+		case !ok:
+			close(lost)
+
+			return
+		default:
+			select {
+			case <-renewed:
+			default:
+			}
+			renewed <- asked
+		}
+	}
+}
+
+// beat publie l'état des sujets dès la prise du bail, puis toutes les heartbeatEvery.
+func (h *Hub) beat(ctx context.Context, view *leaderView) {
+	ticker := time.NewTicker(h.heartbeatEvery)
+	defer ticker.Stop()
+
+	for {
+		view.publish(view.heartbeat())
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
 		}
 	}
 }
