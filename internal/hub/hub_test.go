@@ -325,27 +325,19 @@ func TestUnePermissionRetireeDesabonneSonSujetEtLeDit(t *testing.T) {
 func TestLArretDuHubFermeLesSockets(t *testing.T) {
 	t.Parallel()
 
-	h := quietHub()
-	ctx, stop := context.WithCancel(t.Context())
+	rdb, namespace := redisFor(t)
+	h := fastHub()
+	stop := runHub(t, h, func(ctx context.Context, _ string, _ func()) (*websocket.Conn, error) {
+		<-ctx.Done()
 
-	done := make(chan struct{})
-	go func() {
-		h.Run(ctx, func(ctx context.Context, _ string) (*websocket.Conn, error) {
-			<-ctx.Done()
+		return nil, ctx.Err()
+	}, rdb, namespace)
 
-			return nil, ctx.Err()
-		})
-		close(done)
-	}()
-
-	conn := dial(t, serveOn(t, h, grantAll))
-	send(t, conn, `{"action":"subscribe","topics":["metrics.traffic"]}`)
-	awaitSubscribers(t, h, TrafficTopic, 1)
+	conn := subscribeTo(t, h, "metrics.traffic")
 
 	stop()
 
 	assert.Equal(t, websocket.StatusGoingAway, closeStatusOf(t, conn))
-	<-done
 }
 
 // Pas de t.Parallel : le compte de goroutines est celui du processus entier.
@@ -353,7 +345,7 @@ func TestAucuneGoroutineNeSurvitAuxSocketsFermees(t *testing.T) {
 	h := quietHub()
 	url := serveOn(t, h, grantAll)
 
-	before := runtime.NumGoroutine()
+	before := goroutines()
 
 	conns := make([]*websocket.Conn, 0, 500)
 	for range 500 {
@@ -370,16 +362,7 @@ func TestAucuneGoroutineNeSurvitAuxSocketsFermees(t *testing.T) {
 
 	awaitSubscribers(t, h, TrafficTopic, 0)
 	awaitSubscribers(t, h, SessionsTopic, 0)
-	// Une boucle et non assert.Eventually, dont la goroutine de sondage entrerait dans le compte.
-	deadline := time.Now().Add(wait)
-	for runtime.NumGoroutine() > before && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
-
-	if after := runtime.NumGoroutine(); after > before {
-		dump := make([]byte, 1<<20)
-		t.Fatalf("%d goroutines avant, %d après\n%s", before, after, dump[:runtime.Stack(dump, true)])
-	}
+	awaitGoroutines(t, before)
 }
 
 // Un amont qui accepte la montée puis ferme aussitôt n'est pas rappelé chaque seconde : le sujet
@@ -400,16 +383,34 @@ func TestUnFluxQuiTombeAussitotOuvertNeRemetPasLeBackoffAZero(t *testing.T) {
 	ctx, stop := context.WithTimeout(t.Context(), firstBackoff*5/2)
 	defer stop()
 
-	quietHub().Run(ctx, func(ctx context.Context, path string) (*websocket.Conn, error) {
-		if path == "/admin/stream/metrics" {
+	h := quietHub()
+	h.consume(ctx, feedAt(t, "/admin/stream/metrics"),
+		func(ctx context.Context, path string, _ func()) (*websocket.Conn, error) {
 			dials.Add(1)
-		}
 
-		//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
-		conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(upstream.URL, "http")+path, nil)
+			//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
+			conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(upstream.URL, "http")+path, nil)
 
-		return conn, err
-	})
+			return conn, err
+		}, newLeaderView(func([]byte) {}))
 
 	assert.LessOrEqual(t, dials.Load(), int32(2), "le flux a été rappelé à chaque seconde")
+}
+
+func goroutines() int { return runtime.NumGoroutine() }
+
+// awaitGoroutines attend le retour au compte initial. Une boucle et non assert.Eventually, dont la
+// goroutine de sondage entrerait dans le compte.
+func awaitGoroutines(t *testing.T, before int) {
+	t.Helper()
+
+	deadline := time.Now().Add(wait)
+	for runtime.NumGoroutine() > before && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if after := runtime.NumGoroutine(); after > before {
+		dump := make([]byte, 1<<20)
+		t.Fatalf("%d goroutines avant, %d après\n%s", before, after, dump[:runtime.Stack(dump, true)])
+	}
 }
