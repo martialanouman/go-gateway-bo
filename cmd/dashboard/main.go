@@ -7,14 +7,20 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
+
+	"github.com/coder/websocket"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 	"github.com/martialanouman/go-gateway-bo/internal/bff"
 	"github.com/martialanouman/go-gateway-bo/internal/config"
+	"github.com/martialanouman/go-gateway-bo/internal/gateway"
+	"github.com/martialanouman/go-gateway-bo/internal/hub"
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
@@ -132,6 +138,11 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
+	streams, err := gateway.NewStreamClient(cfg.Gateway)
+	if err != nil {
+		return err
+	}
+
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return fmt.Errorf("écoute sur %s : %w", cfg.Addr, err)
@@ -154,6 +165,9 @@ func run(ctx context.Context, logger *slog.Logger) error {
 			logger.Error("un lien d'accès n'est pas parti", "error", err)
 		})
 
+	realtime := hub.New(logger)
+	go realtime.Run(ctx, dialStream(cfg.Gateway.BaseURL, streams))
+
 	router := bff.NewRouter(bff.Dependencies{
 		Assets: assets,
 		API: bff.API{
@@ -168,8 +182,19 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		TrustedProxies: cfg.Auth.TrustedProxies,
 		// La même valeur que l'origine des cérémonies WebAuthn, et c'est délibéré : un déploiement a
 		// une origine, pas deux.
-		Origin: cfg.Auth.WebauthnOrigin,
+		Origin:   cfg.Auth.WebauthnOrigin,
+		Realtime: realtime,
 	})
 
 	return serve(ctx, ln, router, cfg.ShutdownTimeout, logger)
+}
+
+func dialStream(baseURL string, client *http.Client) hub.Dialer {
+	return func(ctx context.Context, path string) (*websocket.Conn, error) {
+		//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
+		conn, _, err := websocket.Dial(ctx, strings.TrimSuffix(baseURL, "/")+path,
+			&websocket.DialOptions{HTTPClient: client})
+
+		return conn, err
+	}
 }

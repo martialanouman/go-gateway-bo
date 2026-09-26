@@ -106,6 +106,11 @@ func (m *Manager) Close(ctx context.Context, id string) error {
 	return m.sessions.Delete(ctx, id)
 }
 
+// Alive dit si la session vit encore, sans repousser sa fenêtre d'inactivité.
+func (m *Manager) Alive(ctx context.Context, id string) (bool, error) {
+	return m.sessions.Alive(ctx, id, IdleWindow)
+}
+
 // Grants rend de quoi nommer l'opérateur et l'union des permissions de ses rôles.
 func (m *Manager) Grants(ctx context.Context, operatorID string) (store.Grants, error) {
 	return m.sessions.GrantsOf(ctx, operatorID)

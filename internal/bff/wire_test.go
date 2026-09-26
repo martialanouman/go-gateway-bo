@@ -42,6 +42,10 @@ var admittedSinks = map[string]string{
 		"poser que des délais sur la connexion, et aucun objet de domaine ne peut y entrer",
 	"net/http.ServeFileFS": "la surface des assets : le contenu vient d'un `//go:embed` résolu à la " +
 		"compilation, donc du bundle SPA et de rien d'autre. Aucun objet de domaine ne peut y entrer",
+	"github.com/coder/websocket.Accept": "la montée en WebSocket de `/ws`. Après elle, ce qui part sur " +
+		"la socket est écrit par `internal/hub`, qui ne sérialise que ses DTO déclarés " +
+		"(`frames.go`) — et les scénarios de `temps-reel.feature` valident chaque message reçu contre " +
+		"les schémas `Realtime*` du contrat",
 	modulePath + "internal/bff.StrictHandlerFunc": "la chaîne des middlewares stricts. `next(ctx, w, " +
 		"r, request)` passe le writer au maillon suivant sans rien y écrire, et le dernier maillon est " +
 		"le handler engendré. C'est la même délégation que `ServeHTTP`, sous la forme que le mode " +

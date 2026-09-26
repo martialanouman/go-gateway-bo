@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/martialanouman/go-gateway-bo/internal/hub"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
@@ -42,6 +43,8 @@ type Dependencies struct {
 	// deux origines pour un seul déploiement divergeraient, et celle qui ne sert qu'à refuser
 	// divergerait en silence.
 	Origin string
+	// Realtime relaie les flux de la passerelle sur `/ws`.
+	Realtime *hub.Hub
 }
 
 // NewRouter assemble les routes du BFF et le service des assets de la SPA.
@@ -85,9 +88,10 @@ func NewRouter(deps Dependencies) http.Handler {
 		api.NotFound(handleUnknownAPIRoute)
 	})
 
-	// Déclarée avant d'exister (step-043) : sans elle, un client WebSocket tomberait dans le repli
-	// et recevrait du HTML en 200 au lieu d'un refus lisible.
-	r.HandleFunc("/ws", handleRealtimeNotImplemented)
+	// Hors de `/api` : ni `withAPIDeadlines`, dont le contexte de 30 s couperait la socket, ni la borne
+	// de corps. Le contrôle d'origine est dans le handler, puisque c'est un GET.
+	r.With(withoutCaching, withSession(deps.Sessions)).
+		Get("/ws", serveRealtime(deps.Realtime, deps.Sessions, deps.Origin))
 
 	asset := serveAsset(assets)
 	r.Get("/assets/*", asset)
@@ -193,22 +197,19 @@ func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
 }
 
 func reportFailedResponse(w http.ResponseWriter, _ *http.Request, _ error) {
-	writeJSON(w, http.StatusInternalServerError, Error{
+	writeJSON(w, http.StatusInternalServerError, unexpectedError())
+}
+
+func unexpectedError() Error {
+	return Error{
 		Code:    "internal_error",
 		Message: "La demande n'a pas abouti : le serveur a rencontré une erreur imprévue. Réessayez dans un instant ; si l'erreur revient, prévenez un administrateur du tableau de bord.",
-	})
+	}
 }
 
 func handleUnknownAPIRoute(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusNotFound, Error{
 		Code:    "not_found",
 		Message: "Cette route n'existe pas sur ce serveur.",
-	})
-}
-
-func handleRealtimeNotImplemented(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, Error{
-		Code:    "not_implemented",
-		Message: "Le canal temps réel n'est pas encore disponible.",
 	})
 }

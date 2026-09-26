@@ -31,6 +31,27 @@ const mockAccessToken = "jeton-factice-du-mock-prism"
 // Le client rendu vaut pour toute la vie du process : c'est lui qui porte le jeton en cache, et en
 // reconstruire un par requête relancerait une obtention de jeton à chaque appel.
 func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
+	httpClient, err := authenticatedClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewClientWithResponses(cfg.BaseURL, WithHTTPClient(httpClient))
+	if err != nil {
+		return nil, fmt.Errorf("client de l'API Admin : %w", err)
+	}
+
+	return client, nil
+}
+
+// NewStreamClient rend le client qui ouvre les flux temps réel, avec les gardes, le mTLS et le jeton de
+// NewAdminClient. `ForceAttemptHTTP2` ne le gêne pas : net/http passe en HTTP/1.1 toute demande de
+// montée en WebSocket (`Request.requiresHTTP1`, Go 1.26).
+func NewStreamClient(cfg config.GatewayConfig) (*http.Client, error) {
+	return authenticatedClient(cfg)
+}
+
+func authenticatedClient(cfg config.GatewayConfig) (*http.Client, error) {
 	if err := knownMode(cfg.Mode); err != nil {
 		return nil, err
 	}
@@ -66,15 +87,7 @@ func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
 		Timeout:   cfg.Timeout,
 	})
 
-	client, err := NewClientWithResponses(
-		cfg.BaseURL,
-		WithHTTPClient(oauth2.NewClient(ctx, machineToken(ctx, cfg))),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("client de l'API Admin : %w", err)
-	}
-
-	return client, nil
+	return oauth2.NewClient(ctx, machineToken(ctx, cfg)), nil
 }
 
 // knownMode refuse tout mode que ce package ne connaît pas, **la valeur zéro comprise**. La polarité

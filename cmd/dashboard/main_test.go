@@ -260,6 +260,7 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.Then(`^aucune sortie ne porte "([^"]*)"$`, p.outputHides)
 
 	(&hardeningWorld{process: p}).registerSteps(ctx)
+	(&realtimeWorld{process: p}).registerSteps(ctx)
 	ctx.Then(`^le serveur s'arrête sans erreur$`, p.exitsCleanly)
 	ctx.Then(`^le tableau de bord s'affiche$`, p.servesDashboard)
 	ctx.Then(`^le script est servi$`, p.servesScript)
@@ -567,6 +568,13 @@ func (p *process) sendFrom(method, path, origin, contentType, body string) error
 
 	browserHeaders(request, origin, contentType)
 
+	return p.exchange(request)
+}
+
+// exchange envoie une requête déjà composée avec les cookies du navigateur, et retient la réponse.
+func (p *process) exchange(request *http.Request) error {
+	path := request.URL.RequestURI()
+
 	for name, value := range p.cookies {
 		request.AddCookie(&http.Cookie{Name: name, Value: value})
 	}
@@ -577,15 +585,20 @@ func (p *process) sendFrom(method, path, origin, contentType, body string) error
 	}
 	defer resp.Body.Close()
 
-	received, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("lecture de la réponse de %s: %w", path, err)
+	// Le corps d'un 101 est la socket elle-même : le lire suspendrait le scénario au lieu de le faire
+	// rougir sur le statut, et le Timeout du client ne l'interrompt pas.
+	var received []byte
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		received, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("lecture de la réponse de %s: %w", path, err)
+		}
 	}
 
 	p.remember(resp.Cookies())
 
 	p.received = &response{
-		method: method,
+		method: request.Method,
 		path:   path,
 		status: resp.StatusCode,
 		header: resp.Header,

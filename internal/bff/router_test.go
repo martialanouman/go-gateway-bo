@@ -111,18 +111,6 @@ func TestUnknownAPIRouteIsNotFound(t *testing.T) {
 	assert.JSONEq(t, `{"code":"not_found","message":"Cette route n'existe pas sur ce serveur."}`, payload)
 }
 
-// `/ws` est déclarée avant d'exister (step-043) : sans elle, la requête tomberait dans le repli et
-// un client WebSocket recevrait 200 + du HTML au lieu d'un refus lisible.
-func TestWebSocketEndpointIsNotImplementedYet(t *testing.T) {
-	t.Parallel()
-
-	resp := call(t, http.MethodGet, "/ws")
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusNotImplemented, resp.StatusCode)
-	assert.NotContains(t, bodyOf(t, resp), "<!doctype html")
-}
-
 func TestHealthProbeRefusesOtherMethods(t *testing.T) {
 	t.Parallel()
 
