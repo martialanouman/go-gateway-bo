@@ -178,6 +178,9 @@ Fonctionnalité: Le second facteur TOTP
     Quand l'opérateur se connecte avec son mot de passe
     Et l'opérateur présente le code du pas courant
     Alors le serveur répond 401
+    # Les codes de récupération rendus par le remplacement attendent eux aussi.
+    Quand l'opérateur présente son premier code de récupération
+    Alors le serveur répond 401
     Quand l'opérateur présente le code du pas suivant de l'ancien secret
     Alors le serveur répond 204
     Et la session annonce une application d'authentification
