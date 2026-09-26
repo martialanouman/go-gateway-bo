@@ -1,7 +1,7 @@
 import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { type ReactNode, useId, useState } from 'react'
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { TotpEnrollment } from '~/components/totp-enrollment'
@@ -57,6 +57,7 @@ function AccountScreen() {
   const { data: me } = useQuery(meQueryOptions)
   const invalidateFactors = useInvalidateFactors()
   const [proving, setProving] = useState(false)
+  const title = useRef<HTMLHeadingElement>(null)
 
   const enroll = useMutation({
     gcTime: 0,
@@ -78,6 +79,8 @@ function AccountScreen() {
   function backToInventory() {
     enroll.reset()
     setProving(false)
+    // La vue qui portait le focus disparaît : sans ceci, il tombe sur `body`.
+    title.current?.focus()
   }
 
   if (me === undefined) return null
@@ -86,7 +89,9 @@ function AccountScreen() {
   return (
     <div className="page">
       <header className="page__head">
-        <h1 className="page__title">Mon compte</h1>
+        <h1 className="page__title" ref={title} tabIndex={-1}>
+          Mon compte
+        </h1>
       </header>
 
       {enroll.data !== undefined ? (
@@ -133,12 +138,30 @@ function AccountScreen() {
   )
 }
 
-function Panel({ title, children }: { readonly title: string; readonly children: ReactNode }) {
+function Panel({
+  title,
+  focusOnMount = false,
+  children,
+}: {
+  readonly title: string
+  readonly focusOnMount?: boolean
+  readonly children: ReactNode
+}) {
   const titleId = useId()
+  const heading = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    if (focusOnMount) heading.current?.focus()
+  }, [focusOnMount])
 
   return (
     <section aria-labelledby={titleId} className="account__panel">
-      <h2 className="auth__subtitle" id={titleId}>
+      <h2
+        className="auth__subtitle"
+        id={titleId}
+        ref={heading}
+        tabIndex={focusOnMount ? -1 : undefined}
+      >
         {title}
       </h2>
       {children}
@@ -162,7 +185,7 @@ function TotpFlow({
       confirm={confirm}
       enrollment={enrollment}
       frame={(phase, content) => (
-        <Panel title="Nouvelle application d’authentification">
+        <Panel focusOnMount title="Nouvelle application d’authentification">
           <p className="auth__intro">{INTRO[phase]}</p>
           {content}
           {phase === 'confirm' ? <Button onClick={onCancel}>Annuler</Button> : null}

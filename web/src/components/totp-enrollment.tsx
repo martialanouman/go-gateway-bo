@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { QRCodeSVG } from 'qrcode.react'
-import { type ReactNode, useId, useState } from 'react'
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { AuthRefusal } from '~/components/auth-layout'
 import { Button, Field, Input } from '~/components/ui'
@@ -117,10 +117,14 @@ export function RecoveryCodes({
 }) {
   const codesId = useId()
   const asText = codes.join('\n')
+  const heading = useRef<HTMLHeadingElement>(null)
+
+  // Le formulaire qui portait le focus vient de disparaître : sans ceci, il tombe sur `body`.
+  useEffect(() => heading.current?.focus(), [])
 
   return (
     <>
-      <h2 className="auth__subtitle" id={codesId}>
+      <h2 className="auth__subtitle" id={codesId} ref={heading} tabIndex={-1}>
         Codes de récupération
       </h2>
       <p className="auth__aside">

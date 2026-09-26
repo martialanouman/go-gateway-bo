@@ -285,6 +285,31 @@ describe('l’application d’authentification', () => {
 })
 
 describe('le clavier', () => {
+  it('pose le focus sur chaque vue qui remplace la précédente, jusqu’au retour à l’inventaire', async () => {
+    const { user } = await visitAccount({ totp: false, passkeys: 1 })
+
+    await user.click(totpSection().getByRole('button', { name: 'Ajouter' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Nouvelle application d’authentification' }),
+    ).toHaveFocus()
+
+    await user.type(screen.getByLabelText(/Code à six chiffres/), '123456')
+    await user.click(screen.getByRole('button', { name: 'Vérifier' }))
+    expect(await screen.findByRole('heading', { name: 'Codes de récupération' })).toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: 'J’ai enregistré ces codes' }))
+    expect(screen.getByRole('heading', { level: 1, name: 'Mon compte' })).toHaveFocus()
+  })
+
+  it('rend le focus au titre quand le remplacement est abandonné', async () => {
+    const { user } = await visitAccount({ totp: true, passkeys: 0 })
+
+    await user.click(totpSection().getByRole('button', { name: 'Remplacer' }))
+    await user.click(screen.getByRole('button', { name: 'Annuler' }))
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Mon compte' })).toHaveFocus()
+  })
+
   it('conduit le remplacement sans souris, du bouton à la preuve', async () => {
     const { fetch, user } = await visitAccount({ totp: true, passkeys: 0 })
 
