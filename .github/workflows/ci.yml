@@ -66,10 +66,22 @@ jobs:
     #
     # Sans la variable, l'`adminDSN` de chaque suite remonte un conteneur : un poste sans compose
     # garde le comportement d'avant, et rien ne se saute dans aucun des deux cas.
+    #
+    # Redis de même : les scénarios à deux instances (step-044) y prennent chacun leur espace de noms.
     env:
       DASHBOARD_TEST_DATABASE_URL: postgres://dashboard:dashboard@127.0.0.1:5432/dashboard?sslmode=disable
+      DASHBOARD_TEST_REDIS_URL: redis://127.0.0.1:6379/0
     # Image, identifiants et healthcheck de `docker-compose.yml`, comme les deux autres jobs.
     services:
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
       postgres:
         image: postgres:18-alpine
         env:
@@ -303,6 +315,7 @@ jobs:
           DASHBOARD_SMTP_ADDR=127.0.0.1:1025 \
           DASHBOARD_SMTP_FROM=cockpit@example.test \
           DASHBOARD_PUBLIC_URL=http://127.0.0.1:3001 \
+          DASHBOARD_REDIS_URL=redis://127.0.0.1:6379/0 \
             ./bin/dashboard &
           bff=$!
           # `|| true` : sous `bash -e`, un `kill` qui échoue **dans un trap EXIT** écrase le code de

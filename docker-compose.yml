@@ -6,8 +6,7 @@
 #
 # Un poste neuf : `docker compose up -d`, puis `make migrate`, puis `make bootstrap`.
 #
-# Redis n'est pas ici : step-044 le rétablira avec le Pub/Sub qui coordonne les instances. Déclaré
-# avant, il tournait sur chaque poste sans qu'une ligne de code le joigne.
+# `redis` porte le bail et le Pub/Sub qui coordonnent les instances pour le temps réel (step-044).
 
 services:
   postgres:
@@ -32,6 +31,17 @@ services:
       # `pg_isready` répond avant que la base accepte réellement les connexions applicatives ;
       # préciser l'utilisateur et la base évite un `make migrate` lancé une seconde trop tôt.
       test: ['CMD-SHELL', 'pg_isready -U dashboard -d dashboard']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    # Le bail et le Pub/Sub du temps réel entre instances (step-044). Même image que la CI.
+    image: redis:8-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 2s
       timeout: 3s
       retries: 15

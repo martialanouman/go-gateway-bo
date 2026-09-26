@@ -2,37 +2,33 @@ package hub
 
 import (
 	"context"
-	"sync"
+	"errors"
 	"time"
 
 	"github.com/coder/websocket"
 )
 
-// Run consomme les trois flux amont jusqu'à l'annulation de ctx, puis ferme toutes les sockets client.
-func (h *Hub) Run(ctx context.Context, dial Dialer) {
-	var consumers sync.WaitGroup
+var errUpstreamSilent = errors.New("flux amont muet au-delà de son échéance")
 
-	for _, f := range feeds {
-		consumers.Go(func() { h.consume(ctx, f, dial) })
-	}
-
-	<-ctx.Done()
-	close(h.stopping)
-	consumers.Wait()
-}
-
-// consume garde un flux ouvert. Invariant (e) : sa chute rend son seul sujet `stale`, horodaté, et
-// ne touche pas aux autres.
-func (h *Hub) consume(ctx context.Context, f feed, dial Dialer) {
+// consume garde un flux ouvert tant que l'instance porte le bail. Invariant (e) : sa chute rend son
+// seul sujet `stale`, horodaté, et ne touche pas aux autres.
+func (h *Hub) consume(ctx context.Context, f feed, dial Dialer, view *leaderView) {
 	backoff := firstBackoff
 
 	for {
-		conn, err := dial(ctx, f.path)
+		alive := make(chan struct{}, 1)
+
+		conn, err := dial(ctx, f.path, func() {
+			select {
+			case alive <- struct{}{}:
+			default:
+			}
+		})
 		if err == nil {
-			h.setStatus(f.topic, "live", nil)
+			view.set(f.topic, "live", nil)
 
 			connected := time.Now()
-			err = h.pump(ctx, conn, f)
+			err = h.pump(ctx, conn, f, view, alive)
 
 			// Seule une connexion qui a tenu remet le backoff à zéro : un amont qui ferme aussitôt
 			// ouvert serait sinon rappelé chaque seconde.
@@ -41,7 +37,7 @@ func (h *Hub) consume(ctx context.Context, f feed, dial Dialer) {
 			}
 
 			since := time.Now().UTC()
-			h.setStatus(f.topic, "stale", &since)
+			view.set(f.topic, "stale", &since)
 		}
 
 		if ctx.Err() != nil {
@@ -63,24 +59,77 @@ func (h *Hub) consume(ctx context.Context, f feed, dial Dialer) {
 	}
 }
 
-func (h *Hub) pump(ctx context.Context, conn *websocket.Conn, f feed) error {
+// pump relaie un flux jusqu'à sa chute. Une passerelle partie sans fermer la connexion
+// laisserait `Read` bloqué et le sujet `live` ; une trame valide ou un ping réarme l'échéance, rien
+// d'autre.
+func (h *Hub) pump(ctx context.Context, conn *websocket.Conn, f feed, view *leaderView, alive <-chan struct{}) error {
 	defer func() { _ = conn.CloseNow() }()
+
+	// Fermée dès l'annulation, même si la boucle est bloquée dans une publication vers Redis : à
+	// l'échéance locale du bail, la passerelle doit être lâchée tout de suite. **Aucun test ne rougit
+	// si ces deux lignes disparaissent**, mesuré le 26/09/2026 : la publication est bornée à
+	// leaseEvery, donc la fermeture arrive au plus tard à l'expiration du bail, et un test assez serré
+	// pour voir cet intervalle serait instable. Elles rendent sa marge au bail.
+	stopClosing := context.AfterFunc(ctx, func() { _ = conn.CloseNow() })
+	defer stopClosing()
 
 	conn.SetReadLimit(maxUpstreamFrame)
 
+	readCtx, stopReading := context.WithCancel(ctx)
+	defer stopReading()
+
+	frames := make(chan []byte)
+	failed := make(chan error, 1)
+
+	go func() {
+		for {
+			_, raw, err := conn.Read(readCtx)
+			if err != nil {
+				failed <- err
+
+				return
+			}
+
+			select {
+			case frames <- raw:
+			case <-readCtx.Done():
+				return
+			}
+		}
+	}()
+
+	silence := time.NewTimer(h.upstreamSilence)
+	defer silence.Stop()
+
+	warned := false
+
 	for {
-		_, raw, err := conn.Read(ctx)
-		if err != nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case err := <-failed:
 			return err
+
+		case <-silence.C:
+			return errUpstreamSilent
+
+		case <-alive:
+			silence.Reset(h.upstreamSilence)
+
+		case raw := <-frames:
+			frame, err := f.relay(raw)
+			if err != nil {
+				if !warned {
+					h.logger.Warn("trames amont écartées sur cette connexion", "path", f.path, "error", err)
+					warned = true
+				}
+
+				continue
+			}
+
+			silence.Reset(h.upstreamSilence)
+			view.publish(frame)
 		}
-
-		frame, err := f.relay(raw)
-		if err != nil {
-			h.logger.Warn("trame amont écartée", "path", f.path, "error", err)
-
-			continue
-		}
-
-		h.publish(f.topic, frame)
 	}
 }

@@ -447,7 +447,7 @@ func TestUnOperateurDesactiveNeResoutPlusSaSession(t *testing.T) {
 
 // Une socket ouverte vérifie sa session sans la repousser : sinon un onglet laissé ouvert garderait
 // la session vivante au-delà de sa fenêtre d'inactivité.
-func TestSuivreUneSessionNeRepoussePasSaFenetre(t *testing.T) {
+func TestTrackingASessionDoesNotExtendItsIdleWindow(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -476,7 +476,7 @@ func TestSuivreUneSessionNeRepoussePasSaFenetre(t *testing.T) {
 	assert.Greater(t, seenMinutesAgo, 100.0, "suivre la session a repoussé sa fenêtre")
 }
 
-func TestUneSessionOisiveNEstPlusSuivie(t *testing.T) {
+func TestAnIdleSessionIsNoLongerTracked(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -492,7 +492,7 @@ func TestUneSessionOisiveNEstPlusSuivie(t *testing.T) {
 	assert.False(t, alive)
 }
 
-func TestLaSessionDUnOperateurDesactiveNEstPlusSuivie(t *testing.T) {
+func TestADisabledOperatorsSessionIsNoLongerTracked(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
