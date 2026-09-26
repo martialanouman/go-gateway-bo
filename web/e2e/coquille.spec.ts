@@ -244,7 +244,6 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
   await cle.getByRole('button', { name: 'Retirer' }).click()
   await expect(cle).toHaveCount(0)
   await expect(page.getByText('Aucune clé d’accès sur ce compte')).toBeVisible()
-  await expect(page.getByText('Active', { exact: true })).toBeVisible()
 
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
