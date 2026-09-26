@@ -585,9 +585,14 @@ func (p *process) exchange(request *http.Request) error {
 	}
 	defer resp.Body.Close()
 
-	received, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("lecture de la réponse de %s: %w", path, err)
+	// Le corps d'un 101 est la socket elle-même : le lire suspendrait le scénario au lieu de le faire
+	// rougir sur le statut, et le Timeout du client ne l'interrompt pas.
+	var received []byte
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		received, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("lecture de la réponse de %s: %w", path, err)
+		}
 	}
 
 	p.remember(resp.Cookies())
