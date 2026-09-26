@@ -3,6 +3,7 @@ module github.com/martialanouman/go-gateway-bo
 go 1.26.6
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/cucumber/godog v0.16.0
 	github.com/descope/virtualwebauthn v1.0.5
 	github.com/getkin/kin-openapi v0.149.0

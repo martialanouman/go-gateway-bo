@@ -31,6 +31,27 @@ const mockAccessToken = "jeton-factice-du-mock-prism"
 // Le client rendu vaut pour toute la vie du process : c'est lui qui porte le jeton en cache, et en
 // reconstruire un par requête relancerait une obtention de jeton à chaque appel.
 func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
+	httpClient, err := authenticatedClient(cfg, true)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewClientWithResponses(cfg.BaseURL, WithHTTPClient(httpClient))
+	if err != nil {
+		return nil, fmt.Errorf("client de l'API Admin : %w", err)
+	}
+
+	return client, nil
+}
+
+// NewStreamClient rend le client qui ouvre les flux temps réel : mêmes gardes, même mTLS, même jeton
+// que NewAdminClient, mais en HTTP/1.1 — une réponse 101 n'existe pas en HTTP/2, et coder/websocket ne
+// parle pas RFC 8441.
+func NewStreamClient(cfg config.GatewayConfig) (*http.Client, error) {
+	return authenticatedClient(cfg, false)
+}
+
+func authenticatedClient(cfg config.GatewayConfig, http2 bool) (*http.Client, error) {
 	if err := knownMode(cfg.Mode); err != nil {
 		return nil, err
 	}
@@ -39,7 +60,7 @@ func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
 		return nil, err
 	}
 
-	transport, err := outboundTransport(cfg)
+	transport, err := outboundTransport(cfg, http2)
 	if err != nil {
 		return nil, err
 	}
@@ -66,15 +87,7 @@ func NewAdminClient(cfg config.GatewayConfig) (*ClientWithResponses, error) {
 		Timeout:   cfg.Timeout,
 	})
 
-	client, err := NewClientWithResponses(
-		cfg.BaseURL,
-		WithHTTPClient(oauth2.NewClient(ctx, machineToken(ctx, cfg))),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("client de l'API Admin : %w", err)
-	}
-
-	return client, nil
+	return oauth2.NewClient(ctx, machineToken(ctx, cfg)), nil
 }
 
 // knownMode refuse tout mode que ce package ne connaît pas, **la valeur zéro comprise**. La polarité
@@ -176,7 +189,7 @@ func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSou
 	return credentials.TokenSource(ctx)
 }
 
-func outboundTransport(cfg config.GatewayConfig) (http.RoundTripper, error) {
+func outboundTransport(cfg config.GatewayConfig, http2 bool) (http.RoundTripper, error) {
 	clientTLS, err := mutualTLS(cfg)
 	if err != nil {
 		return nil, err
@@ -184,7 +197,7 @@ func outboundTransport(cfg config.GatewayConfig) (http.RoundTripper, error) {
 
 	return replayReadsOnce{base: &http.Transport{
 		TLSClientConfig:     clientTLS,
-		ForceAttemptHTTP2:   true,
+		ForceAttemptHTTP2:   http2,
 		TLSHandshakeTimeout: 5 * time.Second,
 		IdleConnTimeout:     90 * time.Second,
 		// Le BFF ne parle qu'à un seul hôte, et le défaut de net/http (2) y ferait rouvrir une
