@@ -1,6 +1,6 @@
 # step-043 — Hub WebSocket Go : trois flux passerelle agrégés en une socket client
 
-> **Jalon :** M2 (§4.1, §4.2, §5.2) · **Statut :** À FAIRE
+> **Jalon :** M2 (§4.1, §4.2, §5.2) · **Statut :** FAIT
 > **Dépend de :** step-009, step-036, step-040 · **Bloque :** step-044, step-045
 
 ## But
@@ -122,10 +122,10 @@ rougir : le harnais lisait le corps d'un 101, c'est-à-dire la socket. Corrigé 
 (`main_test.go`) avant de rejouer le tableau.
 
 ## Definition of Done
-- [ ] `make check` vert
-- [ ] Aucune trame amont relayée brute : chaque émission passe par un struct déclaré, vérifié sur le
+- [x] `make check` vert — `rc=0` le 26/09/2026
+- [x] Aucune trame amont relayée brute : chaque émission passe par un struct déclaré, vérifié sur le
       livré.
-- [ ] Écart de contrat consigné dans la PR : 4.0.2 installé, 6.8.0 publié. Les trois opérations
+- [x] Écart de contrat consigné dans la PR : 4.0.2 installé, 6.8.0 publié. Les trois opérations
       `stream-*` ne diffèrent que par un 403 ajouté.
 
 ## Hors périmètre

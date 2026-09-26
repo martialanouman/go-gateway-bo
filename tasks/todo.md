@@ -240,7 +240,7 @@ navigation filtre ses entrées par permission dès qu'il existe. La `step-027` l
 la règle de la charte : un contrôle interdit est désactivé et expliqué, jamais masqué.
 
 ## M2 (temps réel) — Hub WebSocket, HA, notifications  (§5.2)
-- [ ] step-043 — Hub WebSocket Go : trois flux passerelle agrégés en une socket client
+- [x] step-043 — Hub WebSocket Go : trois flux passerelle agrégés en une socket client
 - [ ] step-044 — HA : bail Redis + Pub/Sub entre instances, bascule automatique
 - [ ] step-045 — Client WS React : abonnement par sujet, reconnexion, `isLive` / `isStale`
 - [ ] step-046 — Centre de notifications persisté
