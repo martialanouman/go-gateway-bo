@@ -1,6 +1,6 @@
 # step-044 — HA : bail Redis + Pub/Sub entre instances, bascule automatique
 
-> **Jalon :** M2 (§4.1, §4.2, §5.2) · **Statut :** À FAIRE
+> **Jalon :** M2 (§4.1, §4.2, §5.2) · **Statut :** FAIT
 > **Dépend de :** step-043 · **Bloque :** step-045
 
 ## But
@@ -115,8 +115,10 @@ le battement suivant corrige. À la bascule, le nouveau porteur annonce `stale` 
 perd « périmé depuis » le temps de la reprise.
 
 ## Definition of Done
-- [ ] `make check` vert, et le scénario deux instances rejoué **en CI** (checkpoint M2).
-- [ ] Aucun octet amont brut sur le canal Redis, vérifié sur le livré.
+- [x] `make check` vert (`rc=0` le 26/09/2026), et le scénario deux instances rejoué **en CI** : le job Go
+      a son service Redis (checkpoint M2).
+- [x] Aucun octet amont brut sur le canal Redis, vérifié sur le livré : `view.publish` ne reçoit que
+      la sortie de `relay`, un statut ou un battement, tous sérialisés par un struct.
 
 ## Hors périmètre
 - Drain des sockets et déploiement roulant → step-047. Client React → step-045. Notifications →
