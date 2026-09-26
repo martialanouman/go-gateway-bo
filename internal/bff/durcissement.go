@@ -166,11 +166,10 @@ const apiRequestDeadline = 30 * time.Second
 // withAPIDeadlines borne une requête `/api`, et elle seule : montée dans le groupe `/api`, elle
 // n'atteint pas `/ws`, dont c'est le métier de rester ouverte.
 //
-// **Ce montage n'est gardé par rien** : posée à la racine — donc sur `/ws` — le 19/09/2026, les 95
-// scénarios restent verts, et la raison n'est pas le handler mais qu'**aucun scénario ne demande
-// `/ws`**. Le contrôle d'origine ci-dessus manque à `/ws` pour la même raison de montage, sans
-// conséquence tant qu'elle refuse tout en 501. step-043 ouvrira une route qui porte le cookie de
-// session : elle doit y monter les deux, et porter le test.
+// **Ce montage n'est gardé par rien** : montée aussi sur `/ws` le 26/09/2026, les scénarios de
+// `temps-reel.feature` restent verts, parce qu'aucun ne tient la socket au-delà d'`apiBodyDeadline`.
+// Le contrôle d'origine, lui, est dans le handler de `/ws` (`realtime.go`), et son retrait fait
+// rougir le scénario de l'origine étrangère.
 //
 // **Ni `ReadTimeout` ni `http.TimeoutHandler`** : le premier vaut pour toute connexion du serveur,
 // WebSocket comprise ; le second met la réponse entière en mémoire tampon avant de l'écrire.
