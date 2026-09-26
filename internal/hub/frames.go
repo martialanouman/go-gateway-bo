@@ -120,7 +120,7 @@ type (
 func (f upstreamSnapshot) outgoing() (int, time.Time, TrafficSnapshot) {
 	samples := make([]TrafficSample, 0, len(f.Samples))
 	for _, s := range f.Samples {
-		samples = append(samples, TrafficSample{Kind: s.Kind, Labels: s.Labels, Value: s.Value})
+		samples = append(samples, TrafficSample(s))
 	}
 
 	return f.V, f.EmittedAt, TrafficSnapshot{Instance: f.Instance, Samples: samples}

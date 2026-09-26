@@ -52,6 +52,7 @@ func dial(t *testing.T, url string) *websocket.Conn {
 	ctx, cancel := context.WithTimeout(t.Context(), wait)
 	defer cancel()
 
+	//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-172).
 	conn, _, err := websocket.Dial(ctx, url, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.CloseNow() })

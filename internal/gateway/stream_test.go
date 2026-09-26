@@ -59,6 +59,7 @@ func TestStreamClientUpgradesOverMutualTLSWithTheMachineToken(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-172).
 	conn, _, err := websocket.Dial(t.Context(), apiServer.URL+"/admin/stream/metrics",
 		&websocket.DialOptions{HTTPClient: client})
 	require.NoError(t, err)

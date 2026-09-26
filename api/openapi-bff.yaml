@@ -1540,6 +1540,105 @@ components:
           items: { type: string }
       required: [description, permissions]
 
+    # Les messages de la socket temps réel, servie sur `/ws` à la racine et non sous `/api` : une
+    # montée de protocole n'a pas de réponse que le serveur strict saurait typer, et elle échappe ainsi
+    # à l'échéance de lecture du groupe `/api`. Ses refus avant la montée — 401 `unauthenticated`,
+    # 403 `forbidden_origin` ou `mfa_required` — ont la forme `Error`. Fermetures : 4401 quand la
+    # session a pris fin (revérifiée toutes les 30 s, sans être prolongée), 1008 quand le client a
+    # laissé déborder sa file, 1001 à l'arrêt du serveur, 1011 quand la session n'a pas pu être
+    # vérifiée. `internal/hub/frames.go` en porte les DTO, et les scénarios de `cmd/dashboard`
+    # valident chaque message reçu contre ces schémas.
+    RealtimeRequest:
+      type: object
+      description: Le seul message que le client envoie, 4 Kio au plus.
+      additionalProperties: false
+      properties:
+        action: { type: string, enum: [subscribe, unsubscribe] }
+        topics:
+          type: array
+          items: { type: string }
+      required: [action, topics]
+    RealtimeTopic:
+      type: string
+      enum: [metrics.traffic, sessions.events, billing.alerts]
+    RealtimeData:
+      type: object
+      description: |
+        Une trame de la passerelle, relayée sous le DTO de son sujet. `ts` est l'instant où la
+        passerelle l'a émise.
+      additionalProperties: false
+      properties:
+        topic: { $ref: '#/components/schemas/RealtimeTopic' }
+        ts: { type: string, format: date-time }
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/TrafficSnapshot'
+            - $ref: '#/components/schemas/SessionEvent'
+            - $ref: '#/components/schemas/BillingAlert'
+      required: [topic, ts, data]
+    RealtimeStatus:
+      type: object
+      description: |
+        L'état du flux d'un sujet, envoyé à l'abonnement puis à chaque changement. `stale` sans
+        `since` : le flux n'a jamais été joint depuis le démarrage de l'instance.
+      additionalProperties: false
+      properties:
+        topic: { $ref: '#/components/schemas/RealtimeTopic' }
+        status: { type: string, enum: [live, stale] }
+        since: { type: string, format: date-time }
+      required: [topic, status]
+    RealtimeRefusal:
+      type: object
+      description: |
+        Un message refusé. `topic` est absent quand c'est le message entier qui est illisible.
+        Codes : `invalid_message`, `unknown_topic`, `permission_denied` — ce dernier nomme la clé.
+      additionalProperties: false
+      properties:
+        topic: { type: string }
+        error: { $ref: '#/components/schemas/Error' }
+      required: [error]
+    TrafficSnapshot:
+      type: object
+      description: |
+        Un instantané d'une instance de la passerelle, non agrégé. Les compteurs sont des deltas
+        d'intervalle ; l'agrégation entre instances arrive avec l'écran de trafic (step-081).
+      additionalProperties: false
+      properties:
+        instance: { type: string }
+        samples:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              kind: { type: string }
+              labels:
+                type: object
+                additionalProperties: { type: string }
+              value: { type: number }
+            required: [kind, value]
+      required: [instance, samples]
+    SessionEvent:
+      type: object
+      description: "`sessions` est absent sur `unbound` : la passerelle ne connaît pas le reste."
+      additionalProperties: false
+      properties:
+        accountId: { type: string }
+        systemId: { type: string }
+        state: { type: string, enum: [bound, unbound] }
+        sessions: { type: integer }
+      required: [accountId, systemId, state]
+    BillingAlert:
+      type: object
+      additionalProperties: false
+      properties:
+        customerId: { type: string }
+        ownerType: { type: string }
+        ownerId: { type: string }
+        alert: { type: string }
+        balance: { type: integer, format: int64 }
+      required: [customerId, ownerType, ownerId, alert, balance]
+
     Error:
       type: object
       description: |

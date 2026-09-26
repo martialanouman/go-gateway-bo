@@ -769,6 +769,73 @@ export interface components {
             description: string;
             permissions: string[];
         };
+        /** @description Le seul message que le client envoie, 4 Kio au plus. */
+        RealtimeRequest: {
+            /** @enum {string} */
+            action: "subscribe" | "unsubscribe";
+            topics: string[];
+        };
+        /** @enum {string} */
+        RealtimeTopic: "metrics.traffic" | "sessions.events" | "billing.alerts";
+        /**
+         * @description Une trame de la passerelle, relayée sous le DTO de son sujet. `ts` est l'instant où la
+         *     passerelle l'a émise.
+         */
+        RealtimeData: {
+            topic: components["schemas"]["RealtimeTopic"];
+            /** Format: date-time */
+            ts: string;
+            data: components["schemas"]["TrafficSnapshot"] | components["schemas"]["SessionEvent"] | components["schemas"]["BillingAlert"];
+        };
+        /**
+         * @description L'état du flux d'un sujet, envoyé à l'abonnement puis à chaque changement. `stale` sans
+         *     `since` : le flux n'a jamais été joint depuis le démarrage de l'instance.
+         */
+        RealtimeStatus: {
+            topic: components["schemas"]["RealtimeTopic"];
+            /** @enum {string} */
+            status: "live" | "stale";
+            /** Format: date-time */
+            since?: string;
+        };
+        /**
+         * @description Un message refusé. `topic` est absent quand c'est le message entier qui est illisible.
+         *     Codes : `invalid_message`, `unknown_topic`, `permission_denied` — ce dernier nomme la clé.
+         */
+        RealtimeRefusal: {
+            topic?: string;
+            error: components["schemas"]["Error"];
+        };
+        /**
+         * @description Un instantané d'une instance de la passerelle, non agrégé. Les compteurs sont des deltas
+         *     d'intervalle ; l'agrégation entre instances arrive avec l'écran de trafic (step-081).
+         */
+        TrafficSnapshot: {
+            instance: string;
+            samples: {
+                kind: string;
+                labels?: {
+                    [key: string]: string;
+                };
+                value: number;
+            }[];
+        };
+        /** @description `sessions` est absent sur `unbound` : la passerelle ne connaît pas le reste. */
+        SessionEvent: {
+            accountId: string;
+            systemId: string;
+            /** @enum {string} */
+            state: "bound" | "unbound";
+            sessions?: number;
+        };
+        BillingAlert: {
+            customerId: string;
+            ownerType: string;
+            ownerId: string;
+            alert: string;
+            /** Format: int64 */
+            balance: number;
+        };
         /**
          * @description La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
          *     `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
