@@ -460,3 +460,21 @@ func TestUnEtatLiveSansBattementFinitStale(t *testing.T) {
 	awaitStatus(t, conn, "metrics.traffic", "live")
 	awaitStatus(t, conn, "metrics.traffic", "stale")
 }
+
+// Le canal est partagé par tout ce qui publie sous l'espace de noms — une autre version pendant un
+// déploiement roulant, un déploiement mal configuré. Ce qui en sort vers les sockets repasse par le
+// DTO du sujet : un champ que le struct ne déclare pas ne part pas.
+func TestUneTrameDuCanalQuiNeTientPasDansSonDTONEstPasRediffusee(t *testing.T) {
+	t.Parallel()
+
+	h := quietHub()
+	conn := subscribeTo(t, h, "sessions.events")
+	assert.Equal(t, "stale", next(t, conn).Status)
+
+	h.receive([]byte(`{"topic":"sessions.events","ts":"2026-09-26T10:00:00Z","data":{"accountId":"a",` +
+		`"systemId":"s","state":"bound","body":"corps du message"}}`))
+	h.receive([]byte(`{"topic":"sessions.events","ts":"2026-09-26T10:00:00Z","data":{"accountId":"b",` +
+		`"systemId":"s","state":"bound"}}`))
+
+	assert.JSONEq(t, `{"accountId":"b","systemId":"s","state":"bound"}`, string(next(t, conn).Data))
+}

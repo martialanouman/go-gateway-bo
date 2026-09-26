@@ -283,7 +283,21 @@ func (h *Hub) receive(payload []byte) bool {
 		}
 
 	default:
-		h.publish(message.Topic, payload)
+		f, known := feedOf(message.Topic)
+		if !known {
+			h.logger.Warn("trame du canal sur un sujet inconnu", "topic", message.Topic)
+
+			return false
+		}
+
+		frame, err := f.recheck(payload)
+		if err != nil {
+			h.logger.Warn("trame du canal écartée", "error", err)
+
+			return false
+		}
+
+		h.publish(f.topic, frame)
 	}
 
 	return false
