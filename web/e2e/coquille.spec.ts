@@ -201,6 +201,51 @@ test("le binaire sert la coquille peinte, puis l'application la remplace", async
     challenge,
   )
 
+  // ── Une clé d'accès, du premier enregistrement au retrait ───────────────────────────────────
+  //
+  // L'authentificateur virtuel est un appareil, pas un module du produit : Chromium répond pour de
+  // vrai à `navigator.credentials.create()` et `.get()`, et le BFF vérifie ce qu'il signe.
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('WebAuthn.enable')
+  await cdp.send('WebAuthn.addVirtualAuthenticator', {
+    options: {
+      protocol: 'ctap2',
+      transport: 'internal',
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+    },
+  })
+
+  const openAccount = async () => {
+    await page
+      .getByRole('banner')
+      .getByRole('link', { name: fromEnv('DASHBOARD_E2E_OPERATOR_NAME') })
+      .click()
+    await expect(page).toHaveURL(/\/account$/)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mon compte')
+  }
+  const cle = page.getByRole('row', { name: /Clé de parcours/ })
+
+  await openAccount()
+  await page.getByRole('button', { name: 'Ajouter' }).click()
+  await page.getByLabel('Nom de la clé').fill('Clé de parcours')
+  await page.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(cle).toBeVisible()
+
+  await page.getByRole('banner').getByRole('button', { name: 'Se déconnecter' }).click()
+  await page.getByRole('link', { name: 'Se connecter' }).click()
+  await signIn()
+  await expect(page).toHaveURL(/\/mfa/)
+  await page.getByRole('button', { name: 'Utiliser une clé d’accès' }).click()
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible()
+
+  await openAccount()
+  await cle.getByRole('button', { name: 'Retirer' }).click()
+  await expect(cle).toHaveCount(0)
+  await expect(page.getByText('Aucune clé d’accès sur ce compte')).toBeVisible()
+  await expect(page.getByText('Active', { exact: true })).toBeVisible()
+
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     "Le cockpit d'exploitation se construit",
