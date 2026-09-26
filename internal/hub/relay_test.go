@@ -273,9 +273,34 @@ func TestLesPingsAmontGardentLeFluxLive(t *testing.T) {
 	conn := subscribeTo(t, h, "billing.alerts")
 	awaitStatus(t, conn, "billing.alerts", "live")
 
-	time.Sleep(4 * h.upstreamSilence)
-	assert.Equal(t, 1, gateway.openedOn("/admin/stream/billing-alerts"),
-		"le flux a été rouvert : les pings n'ont pas réarmé l'échéance")
+	ctx, cancel := context.WithTimeout(t.Context(), 4*h.upstreamSilence)
+	defer cancel()
+
+	for {
+		_, raw, err := conn.Read(ctx)
+		if err != nil {
+			break
+		}
+
+		assert.NotContains(t, string(raw), `"stale"`, "les pings n'ont pas réarmé l'échéance")
+	}
+}
+
+// Le battement republie tous les états toutes les 2 s : un client ne doit recevoir qu'un changement.
+func TestUnEtatInchangeNEstPasRediffuse(t *testing.T) {
+	t.Parallel()
+
+	h := quietHub()
+	conn := subscribeTo(t, h, "metrics.traffic")
+	assert.Equal(t, "stale", next(t, conn).Status)
+
+	beat := []byte(`{"heartbeat":[{"topic":"metrics.traffic","status":"live"}]}`)
+	h.receive(beat)
+	h.receive(beat)
+	h.publish(TrafficTopic, []byte(`{"topic":"metrics.traffic","data":{}}`))
+
+	assert.Equal(t, "live", next(t, conn).Status)
+	assert.NotNil(t, next(t, conn).Data, "un état inchangé a été rediffusé")
 }
 
 // Pas de t.Parallel : le compte de goroutines est celui du processus entier.
