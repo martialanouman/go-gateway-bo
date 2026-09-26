@@ -369,9 +369,10 @@ DELETE /auth/mfa/webauthn/passkeys/{passkeyId} # (Amendement step-024) retire un
                                        # exempté de garde.
 GET    /auth/mfa/webauthn/passkeys     # (Amendement step-039) les passkeys de la session :
                                        # { id, name, createdAt }. Lecture, sans audit.
-POST   /auth/mfa/totp/confirm          # (Amendement step-039) confirme un TOTP remplacé, en attente
-                                       # jusque-là : { code } -> 204, session élevée exigée, essai
-                                       # compté dans le seau du second facteur, audité mfa.confirm.
+POST   /auth/mfa/totp/confirm          # (Amendement step-039) confirme un TOTP remplacé ou ajouté,
+                                       # en attente jusque-là : { code } -> 204, session élevée
+                                       # exigée, essai compté dans le seau du second facteur,
+                                       # audité mfa.confirm.
 POST   /auth/access-link               # (Amendement step-050) publique : { token, password } -> 204,
                                        # jeton à usage unique vérifié avant tout hachage. Invalide,
                                        # expiré, consommé ou remplacé reçoit le même refus, en 410,
@@ -604,10 +605,10 @@ Un opérateur peut détenir plusieurs passkeys, et TOTP **et** passkey à la foi
 **(Amendement step-039) Confirmer un remplacement, et nommer une passkey.** Un TOTP remplacé ne
 prend pas la place de l'ancien : le secret neuf et ses dix codes **attendent**, à côté de ceux qui
 sont en place, et **l'ancien facteur reste seul en vigueur jusqu'à la confirmation** — le compte
-n'est jamais sans facteur que quelqu'un détient. `POST /auth/mfa/totp/confirm`, depuis la session
-élevée qui a remplacé, confronte un code au secret en attente, compte l'essai dans le même seau que
-la vérification, puis fait passer actifs le secret et ses codes en retirant les anciens, en une
-transaction. Un nouveau remplacement écrase l'attente ; le lien de réinitialisation l'efface. **La
+n'est jamais sans facteur que quelqu'un détient. `POST /auth/mfa/totp/confirm`, depuis n'importe
+quelle session élevée du compte, confronte un code au secret en attente, compte l'essai dans le même
+seau que la vérification, puis fait passer actifs le secret et ses codes en retirant les anciens, en
+une transaction. Un nouveau remplacement écrase l'attente ; le lien de réinitialisation l'efface. **La
 règle vaut pour tout enrôlement sur un compte qu'un facteur confirmé garde déjà** — TOTP confirmé ou
 passkey : un compte à clé d'accès qui ajoute une application passe lui aussi par l'attente et la
 confirmation. Seul un compte sans aucun facteur confirmé, au premier enrôlement, écrit directement le
