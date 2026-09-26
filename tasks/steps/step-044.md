@@ -103,8 +103,11 @@ nomme le test qui tombe.
 | Porteur coupé de Redis qui attend le retour de son renouvellement (la première version livrée) | `TestUnPorteurCoupeDeRedisLacheLaPasserelleAvantLExpirationDuBail` : flux amont encore ouverts après 10 s de gel |
 | `acquire` qui refuse le bail déjà à soi (la première version livrée) | `TestUnPorteurReprendSonPropreBail` |
 | Chien de garde désarmé après un premier `stale` (la première version livrée) | `TestUnEtatLiveSansBattementFinitStale` |
-| Trame du canal rediffusée sans repasser par son DTO (la première version livrée) | `TestUneTrameDuCanalQuiNeTientPasDansSonDTONEstPasRediffusee` : le champ `body` arrivait au client |
+| Trame du canal rediffusée sans repasser par son DTO (la première version livrée) | `TestUneTrameDuCanalNeRediffuseQueSonDTO` : le champ `body` arrivait au client. La version intermédiaire rejetait la trame entière, ce qui aurait figé un sujet pendant un déploiement roulant ; elle re-sérialise désormais |
 | Arrêt qui ferme Redis sans attendre la restitution du bail (la première version livrée) | scénario « le porteur du bail arrêté proprement » : reprise en 6,1 s |
+| Client Redis sans `ContextTimeoutEnabled` | `TestLArretDuHubNAttendPasUnRedisGele` |
+| Restitution à l'arrêt bornée par `writeTimeout` au lieu de `leaseEvery` (la version intermédiaire) | `TestLArretDuHubNAttendPasUnRedisGele` : arrêt en 5,08 s |
+| Connexion amont non fermée sur annulation pendant une publication bloquée | **rien** : la publication est bornée à `leaseEvery`, la fermeture arrive au plus tard à l'expiration du bail ; l'intervalle n'est pas mesurable sans test instable. Écrit dans `upstream.go` (critère 4) |
 
 **Acceptés, relevés en revue.** Un battement parti juste avant un changement d'état peut arriver
 après lui (deux connexions du pool, sans ordre) : le sujet s'affiche `live` au plus 2 s de trop, et

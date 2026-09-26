@@ -66,7 +66,10 @@ func (h *Hub) pump(ctx context.Context, conn *websocket.Conn, f feed, view *lead
 	defer func() { _ = conn.CloseNow() }()
 
 	// Fermée dès l'annulation, même si la boucle est bloquée dans une publication vers Redis : à
-	// l'échéance locale du bail, la passerelle doit être lâchée tout de suite.
+	// l'échéance locale du bail, la passerelle doit être lâchée tout de suite. **Aucun test ne rougit
+	// si ces deux lignes disparaissent**, mesuré le 26/09/2026 : la publication est bornée à
+	// leaseEvery, donc la fermeture arrive au plus tard à l'expiration du bail, et un test assez serré
+	// pour voir cet intervalle serait instable. Elles rendent sa marge au bail.
 	stopClosing := context.AfterFunc(ctx, func() { _ = conn.CloseNow() })
 	defer stopClosing()
 
