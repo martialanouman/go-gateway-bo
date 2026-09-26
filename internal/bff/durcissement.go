@@ -166,13 +166,17 @@ const apiRequestDeadline = 30 * time.Second
 // withAPIDeadlines borne une requête `/api`, et elle seule : montée dans le groupe `/api`, elle
 // n'atteint pas `/ws`, dont c'est le métier de rester ouverte.
 //
-// **Ce montage n'est gardé par rien** : montée aussi sur `/ws` le 26/09/2026, les scénarios de
-// `temps-reel.feature` restent verts, parce qu'aucun ne tient la socket au-delà d'`apiBodyDeadline`.
+// Sur `/ws`, l'échéance de lecture serait sans effet, puisque `net/http` l'efface à la montée
+// (`hijackLocked`, `server.go:325` en Go 1.26.6). C'est `apiRequestDeadline` qui couperait la socket,
+// par le contexte de la requête que reçoit le hub. **Ce montage n'est gardé par rien** : montée aussi
+// sur `/ws` le 26/09/2026, les scénarios de `temps-reel.feature` restent verts, parce qu'aucun ne
+// tient la socket au-delà de ces 30 s.
 // Le contrôle d'origine, lui, est dans le handler de `/ws` (`realtime.go`), et son retrait fait
 // rougir le scénario de l'origine étrangère.
 //
-// **Ni `ReadTimeout` ni `http.TimeoutHandler`** : le premier vaut pour toute connexion du serveur,
-// WebSocket comprise ; le second met la réponse entière en mémoire tampon avant de l'écrire.
+// **Ni `ReadTimeout` ni `http.TimeoutHandler`** : le premier vaut pour toute requête du serveur et
+// non pour le seul groupe `/api` ; le second met la réponse entière en mémoire tampon avant de
+// l'écrire.
 func withAPIDeadlines(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Deux sources possibles : un `ResponseWriter` qui ne sait pas poser d'échéance, et une

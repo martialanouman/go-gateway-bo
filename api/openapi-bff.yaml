@@ -1542,11 +1542,13 @@ components:
 
     # Les messages de la socket temps réel, servie sur `/ws` à la racine et non sous `/api` : une
     # montée de protocole n'a pas de réponse que le serveur strict saurait typer, et elle échappe ainsi
-    # à l'échéance de lecture du groupe `/api`. Ses refus avant la montée — 401 `unauthenticated`,
-    # 403 `forbidden_origin` ou `mfa_required` — ont la forme `Error`. Fermetures : 4401 quand la
-    # session a pris fin (revérifiée toutes les 30 s, sans être prolongée), 1008 quand le client a
-    # laissé déborder sa file, 1001 à l'arrêt du serveur, 1011 quand la session n'a pas pu être
-    # vérifiée. `internal/hub/frames.go` en porte les DTO, et les scénarios de `cmd/dashboard`
+    # à l'échéance de 30 s du groupe `/api`. Ses refus avant la montée — 401 `unauthenticated`,
+    # 403 `forbidden_origin` ou `mfa_required`, 500 `internal_error` quand la session n'a pas pu être
+    # lue — ont la forme `Error`. Fermetures : 4401 quand la session a pris fin (revérifiée toutes les
+    # 30 s, sans être prolongée) ; 1008 quand le client a laissé déborder sa file, si la trame peut
+    # encore partir — un client qui ne lit plus voit la connexion tomber sans code ; 1011 quand la
+    # session n'a pas pu être vérifiée ; 1001 quand le hub s'arrête, que l'arrêt du binaire n'attend
+    # pas encore (le drain est la step-047). `internal/hub/frames.go` en porte les DTO, et les scénarios de `cmd/dashboard`
     # valident chaque message reçu contre ces schémas.
     RealtimeRequest:
       type: object
@@ -1625,7 +1627,11 @@ components:
       properties:
         accountId: { type: string }
         systemId: { type: string }
-        state: { type: string, enum: [bound, unbound] }
+        state:
+          type: string
+          description: |
+            `bound` ou `unbound` aujourd'hui. Relayé tel quel : la passerelle ne décrit pas ses trames
+            (dette 057), et une valeur nouvelle passerait sans être refusée.
         sessions: { type: integer }
       required: [accountId, systemId, state]
     BillingAlert:

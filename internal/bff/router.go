@@ -88,8 +88,8 @@ func NewRouter(deps Dependencies) http.Handler {
 		api.NotFound(handleUnknownAPIRoute)
 	})
 
-	// Hors de `/api` : ni `withAPIDeadlines`, qui poserait une échéance de lecture sur la socket, ni la
-	// borne de corps. Le contrôle d'origine est dans le handler, puisque c'est un GET.
+	// Hors de `/api` : ni `withAPIDeadlines`, dont le contexte de 30 s couperait la socket, ni la borne
+	// de corps. Le contrôle d'origine est dans le handler, puisque c'est un GET.
 	r.With(withoutCaching, withSession(deps.Sessions)).
 		Get("/ws", serveRealtime(deps.Realtime, deps.Sessions, deps.Origin))
 

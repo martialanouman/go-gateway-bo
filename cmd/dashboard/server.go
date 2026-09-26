@@ -13,9 +13,10 @@ import (
 // readHeaderTimeout borne le temps qu'une connexion peut passer à n'envoyer que des en-têtes. Sans
 // lui, quelques dizaines de connexions ouvertes et muettes suffisent à saturer le serveur.
 //
-// `ReadTimeout` et `WriteTimeout` restent délibérément à zéro : ils couperaient la WebSocket que le
-// hub ouvrira en M2, dont c'est le métier de rester ouverte. Le corps d'une requête `/api` est en
-// revanche borné par requête plutôt que par serveur — `internal/bff.withAPIDeadlines`, monté dans le
+// `ReadTimeout` et `WriteTimeout` restent délibérément à zéro, parce qu'ils vaudraient pour toute
+// requête du serveur. Ils ne couperaient pas la WebSocket de `/ws` : `net/http` efface les échéances
+// de la connexion à la montée (`hijackLocked`, `server.go:325` en Go 1.26.6). Le corps d'une requête
+// `/api` est borné par requête plutôt que par serveur — `internal/bff.withAPIDeadlines`, monté dans le
 // seul groupe `/api`, qu'un scénario à connexion brute exerce. Aucun test ne rougit si la constante
 // ci-dessus disparaît : le vérifier demanderait de tenir une connexion muette assez longtemps pour
 // que le test dure plus que la porte qu'il garde.

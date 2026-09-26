@@ -824,8 +824,11 @@ export interface components {
         SessionEvent: {
             accountId: string;
             systemId: string;
-            /** @enum {string} */
-            state: "bound" | "unbound";
+            /**
+             * @description `bound` ou `unbound` aujourd'hui. Relayé tel quel : la passerelle ne décrit pas ses trames
+             *     (dette 057), et une valeur nouvelle passerait sans être refusée.
+             */
+            state: string;
             sessions?: number;
         };
         BillingAlert: {
