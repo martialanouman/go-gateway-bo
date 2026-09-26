@@ -13,7 +13,7 @@ output: internal/gateway/client.gen.go
 # d'`embedded-spec` non plus — il embarquerait le contrat dans le binaire, c'est-à-dire une copie de
 # plus, figée à la date de la dernière génération.
 #
-# Les 133 opérations sont engendrées, aucune n'est exclue, y compris les trois `stream-*` hors
+# Les 134 opérations sont engendrées, aucune n'est exclue, y compris les trois `stream-*` hors
 # périmètre : une liste d'exclusion vivrait ici et divergerait en silence du contrat au fil des
 # bumps. Le contrat est la source de vérité, le client le reflète intégralement.
 generate:

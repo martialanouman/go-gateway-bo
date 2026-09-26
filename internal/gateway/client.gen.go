@@ -717,6 +717,90 @@ func (e DistributionStrategy) Valid() bool {
 	}
 }
 
+// Defines values for ErrorCode.
+const (
+	ErrorCodeAccountSuspended           ErrorCode = "account_suspended"
+	ErrorCodeCancelFailed               ErrorCode = "cancel_failed"
+	ErrorCodeChannelDisabled            ErrorCode = "channel_disabled"
+	ErrorCodeConflict                   ErrorCode = "conflict"
+	ErrorCodeContentBlocked             ErrorCode = "content_blocked"
+	ErrorCodeExternalBillingUnavailable ErrorCode = "external_billing_unavailable"
+	ErrorCodeForbiddenScope             ErrorCode = "forbidden_scope"
+	ErrorCodeIdempotencyConflict        ErrorCode = "idempotency_conflict"
+	ErrorCodeInsufficientCredit         ErrorCode = "insufficient_credit"
+	ErrorCodeInternalError              ErrorCode = "internal_error"
+	ErrorCodeInvalidDestination         ErrorCode = "invalid_destination"
+	ErrorCodeInvalidSource              ErrorCode = "invalid_source"
+	ErrorCodeMessageNotFound            ErrorCode = "message_not_found"
+	ErrorCodeNoRoute                    ErrorCode = "no_route"
+	ErrorCodeNotFound                   ErrorCode = "not_found"
+	ErrorCodeOperationNotSupported      ErrorCode = "operation_not_supported"
+	ErrorCodePayloadTooLarge            ErrorCode = "payload_too_large"
+	ErrorCodeQueueFull                  ErrorCode = "queue_full"
+	ErrorCodeRateLimited                ErrorCode = "rate_limited"
+	ErrorCodeRecipientOptedOut          ErrorCode = "recipient_opted_out"
+	ErrorCodeSenderIdNotAuthorized      ErrorCode = "sender_id_not_authorized"
+	ErrorCodeServiceUnavailable         ErrorCode = "service_unavailable"
+	ErrorCodeUnauthenticated            ErrorCode = "unauthenticated"
+	ErrorCodeValidationError            ErrorCode = "validation_error"
+)
+
+// Valid indicates whether the value is a known member of the ErrorCode enum.
+func (e ErrorCode) Valid() bool {
+	switch e {
+	case ErrorCodeAccountSuspended:
+		return true
+	case ErrorCodeCancelFailed:
+		return true
+	case ErrorCodeChannelDisabled:
+		return true
+	case ErrorCodeConflict:
+		return true
+	case ErrorCodeContentBlocked:
+		return true
+	case ErrorCodeExternalBillingUnavailable:
+		return true
+	case ErrorCodeForbiddenScope:
+		return true
+	case ErrorCodeIdempotencyConflict:
+		return true
+	case ErrorCodeInsufficientCredit:
+		return true
+	case ErrorCodeInternalError:
+		return true
+	case ErrorCodeInvalidDestination:
+		return true
+	case ErrorCodeInvalidSource:
+		return true
+	case ErrorCodeMessageNotFound:
+		return true
+	case ErrorCodeNoRoute:
+		return true
+	case ErrorCodeNotFound:
+		return true
+	case ErrorCodeOperationNotSupported:
+		return true
+	case ErrorCodePayloadTooLarge:
+		return true
+	case ErrorCodeQueueFull:
+		return true
+	case ErrorCodeRateLimited:
+		return true
+	case ErrorCodeRecipientOptedOut:
+		return true
+	case ErrorCodeSenderIdNotAuthorized:
+		return true
+	case ErrorCodeServiceUnavailable:
+		return true
+	case ErrorCodeUnauthenticated:
+		return true
+	case ErrorCodeValidationError:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ExactRouteSource.
 const (
 	ExactRouteSourceCarrierFeed ExactRouteSource = "carrier_feed"
@@ -2433,6 +2517,26 @@ type AsyncJob struct {
 // AsyncJobStatus defines model for AsyncJob.Status.
 type AsyncJobStatus string
 
+// AuditEntry defines model for AuditEntry.
+type AuditEntry struct {
+	At          time.Time          `json:"at"`
+	FinishedAt  *time.Time         `json:"finished_at,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	Method      string             `json:"method"`
+	OperationId string             `json:"operation_id"`
+	Operator    string             `json:"operator"`
+	RequestId   *string            `json:"request_id,omitempty"`
+	Status      *int               `json:"status,omitempty"`
+	Target      string             `json:"target"`
+}
+
+// AuditEntryPage defines model for AuditEntryPage.
+type AuditEntryPage struct {
+	Data       []AuditEntry `json:"data"`
+	HasMore    bool         `json:"has_more"`
+	NextCursor *string      `json:"next_cursor,omitempty"`
+}
+
 // Balance defines model for Balance.
 type Balance struct {
 	// Credits Integer SMS credit count (may be negative).
@@ -2550,7 +2654,7 @@ type ConnectorCreate struct {
 	InterfaceVersion     *int     `json:"interface_version,omitempty"`
 	Name                 string   `json:"name"`
 
-	// Password Write-only; stored hashed, never returned.
+	// Password Write-only; stored sealed, never returned.
 	Password              string                  `json:"password"`
 	Port                  int                     `json:"port"`
 	PriorityTier          *int                    `json:"priority_tier,omitempty"`
@@ -2734,9 +2838,11 @@ type CustomerGroupCreate struct {
 
 // CustomerGroupUpdate defines model for CustomerGroupUpdate.
 type CustomerGroupUpdate struct {
-	Description *string                    `json:"description,omitempty"`
-	Name        *string                    `json:"name,omitempty"`
-	Status      *CustomerGroupUpdateStatus `json:"status,omitempty"`
+	Description *string `json:"description,omitempty"`
+
+	// Name Omit to leave the name unchanged; the empty string is not a way to clear it.
+	Name   *string                    `json:"name,omitempty"`
+	Status *CustomerGroupUpdateStatus `json:"status,omitempty"`
 }
 
 // CustomerGroupUpdateStatus defines model for CustomerGroupUpdate.Status.
@@ -2782,16 +2888,26 @@ type DistributionStrategy string
 // is human-readable. `errors[]` carries per-field detail on validation failures. The numeric HTTP
 // status is on the status line, not duplicated in the body.
 type Error struct {
-	// Code Stable machine-readable error code.
+	// Code Stable machine-readable error code. The enum is every catalogue code with an HTTP
+	// surface (engineering guide §11.3); codes without one — max_sessions_exceeded (SMPP bind
+	// only) and the outbound outcomes recorded in a message's error_code — never appear here.
+	//
 	//
 	// Examples: forbidden_scope, conflict, validation_error, message_not_found, insufficient_credit
-	Code   string `json:"code"`
+	Code   ErrorCode `json:"code"`
 	Errors *[]struct {
 		Field   string `json:"field"`
 		Message string `json:"message"`
 	} `json:"errors,omitempty"`
 	Message string `json:"message"`
 }
+
+// ErrorCode Stable machine-readable error code. The enum is every catalogue code with an HTTP
+// surface (engineering guide §11.3); codes without one — max_sessions_exceeded (SMPP bind
+// only) and the outbound outcomes recorded in a message's error_code — never appear here.
+//
+// Examples: forbidden_scope, conflict, validation_error, message_not_found, insufficient_credit
+type ErrorCode string
 
 // ExactRoute defines model for ExactRoute.
 type ExactRoute struct {
@@ -3155,12 +3271,19 @@ type MessageTraceSpansStatus string
 
 // MetricsSummary defines model for MetricsSummary.
 type MetricsSummary struct {
-	ActiveSessions     *int     `json:"active_sessions,omitempty"`
-	Delivered          *int     `json:"delivered,omitempty"`
-	E2eLatencyMsP50    *float32 `json:"e2e_latency_ms_p50,omitempty"`
-	E2eLatencyMsP99    *float32 `json:"e2e_latency_ms_p99,omitempty"`
+	// ActiveSessions Absent while the session registry keeps no global count.
+	ActiveSessions  *int     `json:"active_sessions,omitempty"`
+	Delivered       *int     `json:"delivered,omitempty"`
+	E2eLatencyMsP50 *float32 `json:"e2e_latency_ms_p50,omitempty"`
+
+	// E2eLatencyMsP99 Per message, from submission to its delivery receipt.
+	E2eLatencyMsP99 *float32 `json:"e2e_latency_ms_p99,omitempty"`
+
+	// Failed Failed or expired.
 	Failed             *int     `json:"failed,omitempty"`
 	IngestLatencyMsP50 *float32 `json:"ingest_latency_ms_p50,omitempty"`
+
+	// IngestLatencyMsP99 Null while ingestion latency is measured nowhere.
 	IngestLatencyMsP99 *float32 `json:"ingest_latency_ms_p99,omitempty"`
 	MoReceived         *int     `json:"mo_received,omitempty"`
 	Rejected           *int     `json:"rejected,omitempty"`
@@ -3522,20 +3645,32 @@ type SenderRewriteRuleStatus string
 
 // SenderRewriteRuleCreate defines model for SenderRewriteRuleCreate.
 type SenderRewriteRuleCreate struct {
-	Direction          *Direction `json:"direction,omitempty"`
-	FallbackPoolJson   *[]string  `json:"fallback_pool_json,omitempty"`
-	MatchDestPattern   *string    `json:"match_dest_pattern,omitempty"`
-	MatchSenderPattern *string    `json:"match_sender_pattern,omitempty"`
-	MaxLength          *int       `json:"max_length,omitempty"`
-	Priority           *int       `json:"priority,omitempty"`
-	Reason             *string    `json:"reason,omitempty"`
+	Direction *Direction `json:"direction,omitempty"`
 
-	// RewriteTo Required when rewrite_type = static.
-	RewriteTo           *string                            `json:"rewrite_to,omitempty"`
-	RewriteType         SenderRewriteRuleCreateRewriteType `json:"rewrite_type"`
-	SanitizeCharsetJson *map[string]interface{}            `json:"sanitize_charset_json,omitempty"`
-	Scope               RewriteScope                       `json:"scope"`
-	ScopeId             *openapi_types.UUID                `json:"scope_id,omitempty"`
+	// FallbackPoolJson Required and non-empty when rewrite_type = fallback_pool; each entry at most 20 octets, the SMPP source_addr. The sender is picked by hashing the message id: every segment of a message gets the same one, and the spread over messages is statistical, not a strict rotation.
+	FallbackPoolJson *[]string `json:"fallback_pool_json,omitempty"`
+
+	// MatchDestPattern RE2 regex matched against the whole address (implicitly anchored) — the sender as the client submitted it, the destination as digits only with no +; null matches any. Unlike a route's match_dest_pattern, not a digit prefix.
+	MatchDestPattern *string `json:"match_dest_pattern,omitempty"`
+
+	// MatchSenderPattern RE2 regex matched against the whole address (implicitly anchored) — the sender as the client submitted it, the destination as digits only with no +; null matches any. Unlike a route's match_dest_pattern, not a digit prefix.
+	MatchSenderPattern *string `json:"match_sender_pattern,omitempty"`
+
+	// MaxLength Required when rewrite_type = truncate.
+	MaxLength *int `json:"max_length,omitempty"`
+
+	// Priority Lower is evaluated first within a scope; scopes are evaluated connector, smpp_account, customer, platform.
+	Priority *int    `json:"priority,omitempty"`
+	Reason   *string `json:"reason,omitempty"`
+
+	// RewriteTo Required when rewrite_type = static; at most 20 octets, the SMPP source_addr.
+	RewriteTo   *string                            `json:"rewrite_to,omitempty"`
+	RewriteType SenderRewriteRuleCreateRewriteType `json:"rewrite_type"`
+
+	// SanitizeCharsetJson Read when rewrite_type = sanitize: {"allowed": "<characters kept>"}, listed one by one (not ranges); every other character is removed. Null keeps ASCII letters and digits.
+	SanitizeCharsetJson *map[string]interface{} `json:"sanitize_charset_json,omitempty"`
+	Scope               RewriteScope            `json:"scope"`
+	ScopeId             *openapi_types.UUID     `json:"scope_id,omitempty"`
 }
 
 // SenderRewriteRuleCreateRewriteType defines model for SenderRewriteRuleCreate.RewriteType.
@@ -3543,16 +3678,22 @@ type SenderRewriteRuleCreateRewriteType string
 
 // SenderRewriteRuleUpdate defines model for SenderRewriteRuleUpdate.
 type SenderRewriteRuleUpdate struct {
-	FallbackPoolJson    *[]string                           `json:"fallback_pool_json,omitempty"`
-	MatchDestPattern    *string                             `json:"match_dest_pattern,omitempty"`
-	MatchSenderPattern  *string                             `json:"match_sender_pattern,omitempty"`
-	MaxLength           *int                                `json:"max_length,omitempty"`
-	Priority            *int                                `json:"priority,omitempty"`
-	Reason              *string                             `json:"reason,omitempty"`
-	RewriteTo           *string                             `json:"rewrite_to,omitempty"`
-	RewriteType         *SenderRewriteRuleUpdateRewriteType `json:"rewrite_type,omitempty"`
-	SanitizeCharsetJson *map[string]interface{}             `json:"sanitize_charset_json,omitempty"`
-	Status              *SenderRewriteRuleUpdateStatus      `json:"status,omitempty"`
+	FallbackPoolJson *[]string `json:"fallback_pool_json,omitempty"`
+
+	// MatchDestPattern RE2 regex matched against the whole address (implicitly anchored) — the sender as the client submitted it, the destination as digits only with no +; null matches any. Unlike a route's match_dest_pattern, not a digit prefix.
+	MatchDestPattern *string `json:"match_dest_pattern,omitempty"`
+
+	// MatchSenderPattern RE2 regex matched against the whole address (implicitly anchored) — the sender as the client submitted it, the destination as digits only with no +; null matches any. Unlike a route's match_dest_pattern, not a digit prefix.
+	MatchSenderPattern *string                             `json:"match_sender_pattern,omitempty"`
+	MaxLength          *int                                `json:"max_length,omitempty"`
+	Priority           *int                                `json:"priority,omitempty"`
+	Reason             *string                             `json:"reason,omitempty"`
+	RewriteTo          *string                             `json:"rewrite_to,omitempty"`
+	RewriteType        *SenderRewriteRuleUpdateRewriteType `json:"rewrite_type,omitempty"`
+
+	// SanitizeCharsetJson Read when rewrite_type = sanitize: {"allowed": "<characters kept>"}, listed one by one (not ranges); every other character is removed. Null keeps ASCII letters and digits.
+	SanitizeCharsetJson *map[string]interface{}        `json:"sanitize_charset_json,omitempty"`
+	Status              *SenderRewriteRuleUpdateStatus `json:"status,omitempty"`
 }
 
 // SenderRewriteRuleUpdateRewriteType defines model for SenderRewriteRuleUpdate.RewriteType.
@@ -3689,7 +3830,7 @@ type SuppressionSource string
 type TrafficMetrics struct {
 	GroupBy TrafficMetricsGroupBy `json:"group_by"`
 	Series  []struct {
-		// Key Dimension value (connector/customer/group id or name).
+		// Key Dimension value (connector/customer/group id), or the reserved keys other and ungrouped.
 		Key    string `json:"key"`
 		Points []struct {
 			Delivered *int      `json:"delivered,omitempty"`
@@ -3706,10 +3847,12 @@ type TrafficMetricsGroupBy string
 
 // Webhook Per-account MO/DLR webhook. `secret` is write-only and never returned.
 type Webhook struct {
-	AccountId       openapi_types.UUID      `json:"account_id"`
-	CreatedAt       *time.Time              `json:"created_at,omitempty"`
-	EventType       WebhookEventType        `json:"event_type"`
-	Id              openapi_types.UUID      `json:"id"`
+	AccountId openapi_types.UUID `json:"account_id"`
+	CreatedAt *time.Time         `json:"created_at,omitempty"`
+	EventType WebhookEventType   `json:"event_type"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// RetryPolicyJson Retry bounds. Only max_attempts applies to deferred retries; the back-off fields pace the in-band sender, which the deferred retry path replaces in production.
 	RetryPolicyJson *map[string]interface{} `json:"retry_policy_json,omitempty"`
 	Status          WebhookStatus           `json:"status"`
 	UpdatedAt       *time.Time              `json:"updated_at,omitempty"`
@@ -3724,7 +3867,9 @@ type WebhookStatus string
 
 // WebhookCreate defines model for WebhookCreate.
 type WebhookCreate struct {
-	EventType       WebhookCreateEventType  `json:"event_type"`
+	EventType WebhookCreateEventType `json:"event_type"`
+
+	// RetryPolicyJson Retry bounds. Only max_attempts applies to deferred retries; the back-off fields pace the in-band sender, which the deferred retry path replaces in production.
 	RetryPolicyJson *map[string]interface{} `json:"retry_policy_json,omitempty"`
 
 	// Secret Write-only HMAC-SHA256 signing secret.
@@ -3737,6 +3882,7 @@ type WebhookCreateEventType string
 
 // WebhookUpdate defines model for WebhookUpdate.
 type WebhookUpdate struct {
+	// RetryPolicyJson Retry bounds. Only max_attempts applies to deferred retries; the back-off fields pace the in-band sender, which the deferred retry path replaces in production.
 	RetryPolicyJson *map[string]interface{} `json:"retry_policy_json,omitempty"`
 
 	// Secret Write-only; rotates the signing secret.
@@ -3801,6 +3947,20 @@ type Unauthorized = Error
 // is human-readable. `errors[]` carries per-field detail on validation failures. The numeric HTTP
 // status is on the status line, not duplicated in the body.
 type ValidationError = Error
+
+// ListAuditLogParams defines parameters for ListAuditLog.
+type ListAuditLogParams struct {
+	// Operator Exact match on the recorded operator.
+	Operator *string `form:"operator,omitempty" json:"operator,omitempty"`
+
+	// FromDate Inclusive lower bound on at.
+	FromDate *time.Time `form:"from_date,omitempty" json:"from_date,omitempty"`
+
+	// ToDate Exclusive upper bound on at.
+	ToDate *time.Time `form:"to_date,omitempty" json:"to_date,omitempty"`
+	Cursor *Cursor    `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit     `form:"limit,omitempty" json:"limit,omitempty"`
+}
 
 // SetConnectorBindPoolJSONBody defines parameters for SetConnectorBindPool.
 type SetConnectorBindPoolJSONBody struct {
@@ -3925,13 +4085,16 @@ type SearchMessagesParams struct {
 
 // GetMetricsSummaryParams defines parameters for GetMetricsSummary.
 type GetMetricsSummaryParams struct {
+	// Window One of 5m, 15m, 30m, 1h.
 	Window *string `form:"window,omitempty" json:"window,omitempty"`
 }
 
 // GetTrafficMetricsParams defines parameters for GetTrafficMetrics.
 type GetTrafficMetricsParams struct {
 	GroupBy *GetTrafficMetricsParamsGroupBy `form:"groupBy,omitempty" json:"groupBy,omitempty"`
-	Window  *string                         `form:"window,omitempty" json:"window,omitempty"`
+
+	// Window One of 5m, 15m, 30m, 1h.
+	Window *string `form:"window,omitempty" json:"window,omitempty"`
 }
 
 // GetTrafficMetricsParamsGroupBy defines parameters for GetTrafficMetrics.
@@ -3968,7 +4131,13 @@ type ListSenderRewriteRulesParams struct {
 
 // TestSenderRewriteRuleJSONBody defines parameters for TestSenderRewriteRule.
 type TestSenderRewriteRuleJSONBody struct {
-	DestAddr   string `json:"dest_addr"`
+	// DestAddr The destination as the pool sees it: digits only, no +.
+	DestAddr string `json:"dest_addr"`
+
+	// MessageId A fallback_pool rule picks its sender from the message id; give a CDR's to reproduce its choice. Absent means the nil UUID.
+	MessageId *openapi_types.UUID `json:"message_id,omitempty"`
+
+	// SourceAddr The sender as the client submits it.
 	SourceAddr string `json:"source_addr"`
 }
 
@@ -4337,6 +4506,13 @@ type ClientInterface interface {
 	// Corresponds with PATCH /admin/antispam-rules/{id} (the `UpdateAntispamRule` operationId).
 	UpdateAntispamRule(ctx context.Context, id Id, body UpdateAntispamRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAuditLog List the operator audit trail
+	//
+	// One row per audited request — every Admin API write, the reads that reveal subscriber numbers — and per mt-replay run, newest first. Rows are immutable once their outcome is recorded. Not every row is an HTTP request: operator, operation_id, method and target are free strings (a replay writes method REPLAY and operator declared:<name>). A subscriber number in target is masked unless the caller holds msisdn:reveal. status null means the outcome was not recorded, not success.
+	//
+	// Corresponds with GET /admin/audit-log (the `ListAuditLog` operationId).
+	ListAuditLog(ctx context.Context, params *ListAuditLogParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListBillingProviders List external billing providers
 	//
 	// Corresponds with GET /admin/billing-providers (the `ListBillingProviders` operationId).
@@ -4625,10 +4801,14 @@ type ClientInterface interface {
 
 	// GetCustomerContentPolicy Get a customer's content policy
 	//
+	// The customer's own setting, `inherit` included — not the resolved policy. `content_retention_days` is stored but not yet applied: every body expires with the platform retention.
+	//
 	// Corresponds with GET /admin/customers/{id}/content-policy (the `GetCustomerContentPolicy` operationId).
 	GetCustomerContentPolicy(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCustomerContentPolicyWithBody Update a customer's content policy
+	//
+	// Writes the same columns as update-customer, but `content_storage` is required here. The change reaches the data plane on its next configuration reload, without a restart. `content_retention_days` is stored but not yet applied, and a `null` leaves it unchanged.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4636,6 +4816,8 @@ type ClientInterface interface {
 	UpdateCustomerContentPolicyWithBody(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCustomerContentPolicy Update a customer's content policy
+	//
+	// Writes the same columns as update-customer, but `content_storage` is required here. The change reaches the data plane on its next configuration reload, without a restart. `content_retention_days` is stored but not yet applied, and a `null` leaves it unchanged.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4705,6 +4887,8 @@ type ClientInterface interface {
 	UpdateSenderId(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, body UpdateSenderIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListCustomerAccounts List a customer's SMPP accounts
+	//
+	// At most 500 accounts, unpaginated.
 	//
 	// Corresponds with GET /admin/customers/{id}/smpp-accounts (the `ListCustomerAccounts` operationId).
 	ListCustomerAccounts(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4924,10 +5108,14 @@ type ClientInterface interface {
 
 	// GetMetricsSummary Rolling summary counters
 	//
+	// Counts the messages SUBMITTED within the window (a cohort on submitted_at), each with its status at the time of the read: on a short window, delivered undercounts what is still in flight. The window ends at the last completed bucket boundary of get-traffic-metrics; the bucket in progress is excluded. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422 (24h awaits a pre-aggregate). delivered and failed follow the same status precedence as search-messages.
+	//
 	// Corresponds with GET /admin/metrics/summary (the `GetMetricsSummary` operationId).
 	GetMetricsSummary(ctx context.Context, params *GetMetricsSummaryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetTrafficMetrics Traffic time series grouped by dimension
+	//
+	// MT messages submitted within the window, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most submissions get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, a message never dispatched has no connector and appears in no series. 503 when the window holds more rows than a read may return.
 	//
 	// Corresponds with GET /admin/metrics/traffic (the `GetTrafficMetrics` operationId).
 	GetTrafficMetrics(ctx context.Context, params *GetTrafficMetricsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4977,10 +5165,14 @@ type ClientInterface interface {
 
 	// GetPlatformContentPolicy Get platform default content policy
 	//
+	// The policy an `inherit` customer resolves to. `off` until changed. `content_retention_days` is the body retention the CDR applies (a ClickHouse column TTL, 30 days).
+	//
 	// Corresponds with GET /admin/platform/content-policy (the `GetPlatformContentPolicy` operationId).
 	GetPlatformContentPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdatePlatformContentPolicyWithBody Update platform default content policy
+	//
+	// `content_storage` is `off` or `stored_encrypted`; `inherit` and `stored_plaintext` are refused with 422 — storage in clear belongs to a named customer under contract, never to every customer that has not chosen. `content_retention_days` cannot be changed here (422 unless absent or equal to the current value): it is a ClickHouse column TTL, altered as an operations task. The new default reaches the data plane on its next configuration reload, without a restart.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4988,6 +5180,8 @@ type ClientInterface interface {
 	UpdatePlatformContentPolicyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdatePlatformContentPolicy Update platform default content policy
+	//
+	// `content_storage` is `off` or `stored_encrypted`; `inherit` and `stored_plaintext` are refused with 422 — storage in clear belongs to a named customer under contract, never to every customer that has not chosen. `content_retention_days` cannot be changed here (422 unless absent or equal to the current value): it is a ClickHouse column TTL, altered as an operations task. The new default reaches the data plane on its next configuration reload, without a restart.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5053,12 +5247,16 @@ type ClientInterface interface {
 
 	// ReorderRoutesWithBody Reorder route priorities
 	//
+	// ordered_ids must list every route exactly once; the first gets priority 10, the next 20, and so on. Applied in a single statement: a refused list changes no route.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /admin/routes/reorder (the `ReorderRoutes` operationId).
 	ReorderRoutesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReorderRoutes Reorder route priorities
+	//
+	// ordered_ids must list every route exactly once; the first gets priority 10, the next 20, and so on. Applied in a single statement: a refused list changes no route.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5177,6 +5375,8 @@ type ClientInterface interface {
 
 	// ListSenderRewriteRules List sender-ID rewrite rules
 	//
+	// In evaluation order — scope (connector, smpp_account, customer, platform), then priority.
+	//
 	// Corresponds with GET /admin/sender-rewrite-rules (the `ListSenderRewriteRules` operationId).
 	ListSenderRewriteRules(ctx context.Context, params *ListSenderRewriteRulesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -5201,12 +5401,16 @@ type ClientInterface interface {
 
 	// UpdateSenderRewriteRuleWithBody Update a rewrite rule
 	//
+	// Validated on the rule the patch leaves behind, since rewrite_type is mutable.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /admin/sender-rewrite-rules/{id} (the `UpdateSenderRewriteRule` operationId).
 	UpdateSenderRewriteRuleWithBody(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateSenderRewriteRule Update a rewrite rule
+	//
+	// Validated on the rule the patch leaves behind, since rewrite_type is mutable.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5215,12 +5419,16 @@ type ClientInterface interface {
 
 	// TestSenderRewriteRuleWithBody Test a rewrite rule against a sample
 	//
+	// Runs this rule alone — whatever its status, without the precedence of the others — through the code connector-pool applies before the submit_sm. Writes nothing.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /admin/sender-rewrite-rules/{id}/test (the `TestSenderRewriteRule` operationId).
 	TestSenderRewriteRuleWithBody(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TestSenderRewriteRule Test a rewrite rule against a sample
+	//
+	// Runs this rule alone — whatever its status, without the precedence of the others — through the code connector-pool applies before the submit_sm. Writes nothing.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5229,10 +5437,14 @@ type ClientInterface interface {
 
 	// ListSessions List live SMPP sessions
 	//
+	// Client (ESME) binds, in bind id order, read from the live session registry. The registry is volatile and gives no snapshot: a session closed between two pages is missing from both, and one opened below the cursor is not seen. A page can hold fewer than `limit` sessions while `has_more` is true. `connectorId` is refused with 422: outbound connector binds are not in the registry, read them with get-connector-status.
+	//
 	// Corresponds with GET /admin/sessions (the `ListSessions` operationId).
 	ListSessions(ctx context.Context, params *ListSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DisconnectSession Force-disconnect a session
+	//
+	// Orders the pod holding the bind to send an unbind and close the connection, with reason `operator_disconnect`. The close is asynchronous: 204 means the order was published, and the session leaves the list once its pod has closed it. An id that is not a live session is a 404.
 	//
 	// Corresponds with DELETE /admin/sessions/{id} (the `DisconnectSession` operationId).
 	DisconnectSession(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5350,12 +5562,16 @@ type ClientInterface interface {
 
 	// SetAccountSenderIdPolicyWithBody Set sender-ID authorization policy (§6.19)
 	//
+	// Takes effect on the next message, live sessions included; no rebind.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
 	SetAccountSenderIdPolicyWithBody(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetAccountSenderIdPolicy Set sender-ID authorization policy (§6.19)
+	//
+	// Takes effect on the next message, live sessions included; no rebind.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5378,10 +5594,14 @@ type ClientInterface interface {
 
 	// ListAccountSessions Live binds vs maxSessions for this account
 	//
+	// `active` counts the live binds as the max_sessions quota sees them, and can exceed `max_sessions`: lowering the limit cuts no live bind (§6.3). A bind admitted by a registry older than this operation counts in `active` and is listed from its next refresh.
+	//
 	// Corresponds with GET /admin/smpp-accounts/{id}/sessions (the `ListAccountSessions` operationId).
 	ListAccountSessions(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetAccountSmppOpsWithBody Toggle optional SMPP ops query_sm / cancel_sm (§6.22)
+	//
+	// The flags are read at bind, so every successful change disconnects the account's live binds (reason account_smpp_ops_changed); clients rebind under the new setting. At least one field is required.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -5390,12 +5610,16 @@ type ClientInterface interface {
 
 	// SetAccountSmppOps Toggle optional SMPP ops query_sm / cancel_sm (§6.22)
 	//
+	// The flags are read at bind, so every successful change disconnects the account's live binds (reason account_smpp_ops_changed); clients rebind under the new setting. At least one field is required.
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /admin/smpp-accounts/{id}/smpp-ops (the `SetAccountSmppOps` operationId).
 	SetAccountSmppOps(ctx context.Context, id Id, body SetAccountSmppOpsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SuspendSmppAccount Suspend an SMPP account
+	//
+	// Disconnects the account's live binds (reason account_suspended).
 	//
 	// Corresponds with POST /admin/smpp-accounts/{id}/suspend (the `SuspendSmppAccount` operationId).
 	SuspendSmppAccount(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5600,6 +5824,23 @@ func (c *Client) UpdateAntispamRuleWithBody(ctx context.Context, id Id, contentT
 // Corresponds with PATCH /admin/antispam-rules/{id} (the `UpdateAntispamRule` operationId).
 func (c *Client) UpdateAntispamRule(ctx context.Context, id Id, body UpdateAntispamRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAntispamRuleRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAuditLog List the operator audit trail
+//
+// One row per audited request — every Admin API write, the reads that reveal subscriber numbers — and per mt-replay run, newest first. Rows are immutable once their outcome is recorded. Not every row is an HTTP request: operator, operation_id, method and target are free strings (a replay writes method REPLAY and operator declared:<name>). A subscriber number in target is masked unless the caller holds msisdn:reveal. status null means the outcome was not recorded, not success.
+//
+// Corresponds with GET /admin/audit-log (the `ListAuditLog` operationId).
+func (c *Client) ListAuditLog(ctx context.Context, params *ListAuditLogParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAuditLogRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -6358,6 +6599,8 @@ func (c *Client) TransferBalance(ctx context.Context, id Id, body TransferBalanc
 
 // GetCustomerContentPolicy Get a customer's content policy
 //
+// The customer's own setting, `inherit` included — not the resolved policy. `content_retention_days` is stored but not yet applied: every body expires with the platform retention.
+//
 // Corresponds with GET /admin/customers/{id}/content-policy (the `GetCustomerContentPolicy` operationId).
 func (c *Client) GetCustomerContentPolicy(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetCustomerContentPolicyRequest(c.Server, id)
@@ -6372,6 +6615,8 @@ func (c *Client) GetCustomerContentPolicy(ctx context.Context, id Id, reqEditors
 }
 
 // UpdateCustomerContentPolicyWithBody Update a customer's content policy
+//
+// Writes the same columns as update-customer, but `content_storage` is required here. The change reaches the data plane on its next configuration reload, without a restart. `content_retention_days` is stored but not yet applied, and a `null` leaves it unchanged.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6389,6 +6634,8 @@ func (c *Client) UpdateCustomerContentPolicyWithBody(ctx context.Context, id Id,
 }
 
 // UpdateCustomerContentPolicy Update a customer's content policy
+//
+// Writes the same columns as update-customer, but `content_storage` is required here. The change reaches the data plane on its next configuration reload, without a restart. `content_retention_days` is stored but not yet applied, and a `null` leaves it unchanged.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6568,6 +6815,8 @@ func (c *Client) UpdateSenderId(ctx context.Context, id Id, senderIdPathParam Se
 }
 
 // ListCustomerAccounts List a customer's SMPP accounts
+//
+// At most 500 accounts, unpaginated.
 //
 // Corresponds with GET /admin/customers/{id}/smpp-accounts (the `ListCustomerAccounts` operationId).
 func (c *Client) ListCustomerAccounts(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7127,6 +7376,8 @@ func (c *Client) GetMessageTrace(ctx context.Context, id Id, reqEditors ...Reque
 
 // GetMetricsSummary Rolling summary counters
 //
+// Counts the messages SUBMITTED within the window (a cohort on submitted_at), each with its status at the time of the read: on a short window, delivered undercounts what is still in flight. The window ends at the last completed bucket boundary of get-traffic-metrics; the bucket in progress is excluded. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422 (24h awaits a pre-aggregate). delivered and failed follow the same status precedence as search-messages.
+//
 // Corresponds with GET /admin/metrics/summary (the `GetMetricsSummary` operationId).
 func (c *Client) GetMetricsSummary(ctx context.Context, params *GetMetricsSummaryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMetricsSummaryRequest(c.Server, params)
@@ -7141,6 +7392,8 @@ func (c *Client) GetMetricsSummary(ctx context.Context, params *GetMetricsSummar
 }
 
 // GetTrafficMetrics Traffic time series grouped by dimension
+//
+// MT messages submitted within the window, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most submissions get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, a message never dispatched has no connector and appears in no series. 503 when the window holds more rows than a read may return.
 //
 // Corresponds with GET /admin/metrics/traffic (the `GetTrafficMetrics` operationId).
 func (c *Client) GetTrafficMetrics(ctx context.Context, params *GetTrafficMetricsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7270,6 +7523,8 @@ func (c *Client) UpdateOptOutKeyword(ctx context.Context, id Id, body UpdateOptO
 
 // GetPlatformContentPolicy Get platform default content policy
 //
+// The policy an `inherit` customer resolves to. `off` until changed. `content_retention_days` is the body retention the CDR applies (a ClickHouse column TTL, 30 days).
+//
 // Corresponds with GET /admin/platform/content-policy (the `GetPlatformContentPolicy` operationId).
 func (c *Client) GetPlatformContentPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPlatformContentPolicyRequest(c.Server)
@@ -7284,6 +7539,8 @@ func (c *Client) GetPlatformContentPolicy(ctx context.Context, reqEditors ...Req
 }
 
 // UpdatePlatformContentPolicyWithBody Update platform default content policy
+//
+// `content_storage` is `off` or `stored_encrypted`; `inherit` and `stored_plaintext` are refused with 422 — storage in clear belongs to a named customer under contract, never to every customer that has not chosen. `content_retention_days` cannot be changed here (422 unless absent or equal to the current value): it is a ClickHouse column TTL, altered as an operations task. The new default reaches the data plane on its next configuration reload, without a restart.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7301,6 +7558,8 @@ func (c *Client) UpdatePlatformContentPolicyWithBody(ctx context.Context, conten
 }
 
 // UpdatePlatformContentPolicy Update platform default content policy
+//
+// `content_storage` is `off` or `stored_encrypted`; `inherit` and `stored_plaintext` are refused with 422 — storage in clear belongs to a named customer under contract, never to every customer that has not chosen. `content_retention_days` cannot be changed here (422 unless absent or equal to the current value): it is a ClickHouse column TTL, altered as an operations task. The new default reaches the data plane on its next configuration reload, without a restart.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7466,6 +7725,8 @@ func (c *Client) CreateRoute(ctx context.Context, body CreateRouteJSONRequestBod
 
 // ReorderRoutesWithBody Reorder route priorities
 //
+// ordered_ids must list every route exactly once; the first gets priority 10, the next 20, and so on. Applied in a single statement: a refused list changes no route.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /admin/routes/reorder (the `ReorderRoutes` operationId).
@@ -7482,6 +7743,8 @@ func (c *Client) ReorderRoutesWithBody(ctx context.Context, contentType string, 
 }
 
 // ReorderRoutes Reorder route priorities
+//
+// ordered_ids must list every route exactly once; the first gets priority 10, the next 20, and so on. Applied in a single statement: a refused list changes no route.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7790,6 +8053,8 @@ func (c *Client) ListRoutingScriptVersions(ctx context.Context, id Id, reqEditor
 
 // ListSenderRewriteRules List sender-ID rewrite rules
 //
+// In evaluation order — scope (connector, smpp_account, customer, platform), then priority.
+//
 // Corresponds with GET /admin/sender-rewrite-rules (the `ListSenderRewriteRules` operationId).
 func (c *Client) ListSenderRewriteRules(ctx context.Context, params *ListSenderRewriteRulesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListSenderRewriteRulesRequest(c.Server, params)
@@ -7854,6 +8119,8 @@ func (c *Client) DeleteSenderRewriteRule(ctx context.Context, id Id, reqEditors 
 
 // UpdateSenderRewriteRuleWithBody Update a rewrite rule
 //
+// Validated on the rule the patch leaves behind, since rewrite_type is mutable.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PATCH /admin/sender-rewrite-rules/{id} (the `UpdateSenderRewriteRule` operationId).
@@ -7870,6 +8137,8 @@ func (c *Client) UpdateSenderRewriteRuleWithBody(ctx context.Context, id Id, con
 }
 
 // UpdateSenderRewriteRule Update a rewrite rule
+//
+// Validated on the rule the patch leaves behind, since rewrite_type is mutable.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7888,6 +8157,8 @@ func (c *Client) UpdateSenderRewriteRule(ctx context.Context, id Id, body Update
 
 // TestSenderRewriteRuleWithBody Test a rewrite rule against a sample
 //
+// Runs this rule alone — whatever its status, without the precedence of the others — through the code connector-pool applies before the submit_sm. Writes nothing.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /admin/sender-rewrite-rules/{id}/test (the `TestSenderRewriteRule` operationId).
@@ -7904,6 +8175,8 @@ func (c *Client) TestSenderRewriteRuleWithBody(ctx context.Context, id Id, conte
 }
 
 // TestSenderRewriteRule Test a rewrite rule against a sample
+//
+// Runs this rule alone — whatever its status, without the precedence of the others — through the code connector-pool applies before the submit_sm. Writes nothing.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7922,6 +8195,8 @@ func (c *Client) TestSenderRewriteRule(ctx context.Context, id Id, body TestSend
 
 // ListSessions List live SMPP sessions
 //
+// Client (ESME) binds, in bind id order, read from the live session registry. The registry is volatile and gives no snapshot: a session closed between two pages is missing from both, and one opened below the cursor is not seen. A page can hold fewer than `limit` sessions while `has_more` is true. `connectorId` is refused with 422: outbound connector binds are not in the registry, read them with get-connector-status.
+//
 // Corresponds with GET /admin/sessions (the `ListSessions` operationId).
 func (c *Client) ListSessions(ctx context.Context, params *ListSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListSessionsRequest(c.Server, params)
@@ -7936,6 +8211,8 @@ func (c *Client) ListSessions(ctx context.Context, params *ListSessionsParams, r
 }
 
 // DisconnectSession Force-disconnect a session
+//
+// Orders the pod holding the bind to send an unbind and close the connection, with reason `operator_disconnect`. The close is asynchronous: 204 means the order was published, and the session leaves the list once its pod has closed it. An id that is not a live session is a 404.
 //
 // Corresponds with DELETE /admin/sessions/{id} (the `DisconnectSession` operationId).
 func (c *Client) DisconnectSession(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8233,6 +8510,8 @@ func (c *Client) RotateCredential(ctx context.Context, id Id, credId CredId, bod
 
 // SetAccountSenderIdPolicyWithBody Set sender-ID authorization policy (§6.19)
 //
+// Takes effect on the next message, live sessions included; no rebind.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
@@ -8249,6 +8528,8 @@ func (c *Client) SetAccountSenderIdPolicyWithBody(ctx context.Context, id Id, co
 }
 
 // SetAccountSenderIdPolicy Set sender-ID authorization policy (§6.19)
+//
+// Takes effect on the next message, live sessions included; no rebind.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8301,6 +8582,8 @@ func (c *Client) SetAccountSessionLimits(ctx context.Context, id Id, body SetAcc
 
 // ListAccountSessions Live binds vs maxSessions for this account
 //
+// `active` counts the live binds as the max_sessions quota sees them, and can exceed `max_sessions`: lowering the limit cuts no live bind (§6.3). A bind admitted by a registry older than this operation counts in `active` and is listed from its next refresh.
+//
 // Corresponds with GET /admin/smpp-accounts/{id}/sessions (the `ListAccountSessions` operationId).
 func (c *Client) ListAccountSessions(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListAccountSessionsRequest(c.Server, id)
@@ -8315,6 +8598,8 @@ func (c *Client) ListAccountSessions(ctx context.Context, id Id, reqEditors ...R
 }
 
 // SetAccountSmppOpsWithBody Toggle optional SMPP ops query_sm / cancel_sm (§6.22)
+//
+// The flags are read at bind, so every successful change disconnects the account's live binds (reason account_smpp_ops_changed); clients rebind under the new setting. At least one field is required.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8333,6 +8618,8 @@ func (c *Client) SetAccountSmppOpsWithBody(ctx context.Context, id Id, contentTy
 
 // SetAccountSmppOps Toggle optional SMPP ops query_sm / cancel_sm (§6.22)
 //
+// The flags are read at bind, so every successful change disconnects the account's live binds (reason account_smpp_ops_changed); clients rebind under the new setting. At least one field is required.
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PATCH /admin/smpp-accounts/{id}/smpp-ops (the `SetAccountSmppOps` operationId).
@@ -8349,6 +8636,8 @@ func (c *Client) SetAccountSmppOps(ctx context.Context, id Id, body SetAccountSm
 }
 
 // SuspendSmppAccount Suspend an SMPP account
+//
+// Disconnects the account's live binds (reason account_suspended).
 //
 // Corresponds with POST /admin/smpp-accounts/{id}/suspend (the `SuspendSmppAccount` operationId).
 func (c *Client) SuspendSmppAccount(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8788,6 +9077,108 @@ func NewUpdateAntispamRuleRequestWithBody(server string, id Id, contentType stri
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListAuditLogRequest constructs an http.Request for the ListAuditLog method
+func NewListAuditLogRequest(server string, params *ListAuditLogParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/admin/audit-log")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Operator != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "operator", *params.Operator, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.FromDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from_date", *params.FromDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ToDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to_date", *params.ToDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -14556,6 +14947,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /admin/antispam-rules/{id} (the `UpdateAntispamRule` operationId).
 	UpdateAntispamRuleWithResponse(ctx context.Context, id Id, body UpdateAntispamRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAntispamRuleResponse, error)
 
+	// ListAuditLogWithResponse List the operator audit trail
+	//
+	// One row per audited request — every Admin API write, the reads that reveal subscriber numbers — and per mt-replay run, newest first. Rows are immutable once their outcome is recorded. Not every row is an HTTP request: operator, operation_id, method and target are free strings (a replay writes method REPLAY and operator declared:<name>). A subscriber number in target is masked unless the caller holds msisdn:reveal. status null means the outcome was not recorded, not success.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /admin/audit-log (the `ListAuditLog` operationId).
+	ListAuditLogWithResponse(ctx context.Context, params *ListAuditLogParams, reqEditors ...RequestEditorFn) (*ListAuditLogResponse, error)
+
 	// ListBillingProvidersWithResponse List external billing providers
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -14880,6 +15280,8 @@ type ClientWithResponsesInterface interface {
 
 	// GetCustomerContentPolicyWithResponse Get a customer's content policy
 	//
+	// The customer's own setting, `inherit` included — not the resolved policy. `content_retention_days` is stored but not yet applied: every body expires with the platform retention.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /admin/customers/{id}/content-policy (the `GetCustomerContentPolicy` operationId).
@@ -14887,12 +15289,16 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateCustomerContentPolicyWithBodyWithResponse Update a customer's content policy
 	//
+	// Writes the same columns as update-customer, but `content_storage` is required here. The change reaches the data plane on its next configuration reload, without a restart. `content_retention_days` is stored but not yet applied, and a `null` leaves it unchanged.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/customers/{id}/content-policy (the `UpdateCustomerContentPolicy` operationId).
 	UpdateCustomerContentPolicyWithBodyWithResponse(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCustomerContentPolicyResponse, error)
 
 	// UpdateCustomerContentPolicyWithResponse Update a customer's content policy
+	//
+	// Writes the same columns as update-customer, but `content_storage` is required here. The change reaches the data plane on its next configuration reload, without a restart. `content_retention_days` is stored but not yet applied, and a `null` leaves it unchanged.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -14970,6 +15376,8 @@ type ClientWithResponsesInterface interface {
 	UpdateSenderIdWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, body UpdateSenderIdJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSenderIdResponse, error)
 
 	// ListCustomerAccountsWithResponse List a customer's SMPP accounts
+	//
+	// At most 500 accounts, unpaginated.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15217,12 +15625,16 @@ type ClientWithResponsesInterface interface {
 
 	// GetMetricsSummaryWithResponse Rolling summary counters
 	//
+	// Counts the messages SUBMITTED within the window (a cohort on submitted_at), each with its status at the time of the read: on a short window, delivered undercounts what is still in flight. The window ends at the last completed bucket boundary of get-traffic-metrics; the bucket in progress is excluded. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422 (24h awaits a pre-aggregate). delivered and failed follow the same status precedence as search-messages.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /admin/metrics/summary (the `GetMetricsSummary` operationId).
 	GetMetricsSummaryWithResponse(ctx context.Context, params *GetMetricsSummaryParams, reqEditors ...RequestEditorFn) (*GetMetricsSummaryResponse, error)
 
 	// GetTrafficMetricsWithResponse Traffic time series grouped by dimension
+	//
+	// MT messages submitted within the window, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most submissions get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, a message never dispatched has no connector and appears in no series. 503 when the window holds more rows than a read may return.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15280,6 +15692,8 @@ type ClientWithResponsesInterface interface {
 
 	// GetPlatformContentPolicyWithResponse Get platform default content policy
 	//
+	// The policy an `inherit` customer resolves to. `off` until changed. `content_retention_days` is the body retention the CDR applies (a ClickHouse column TTL, 30 days).
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /admin/platform/content-policy (the `GetPlatformContentPolicy` operationId).
@@ -15287,12 +15701,16 @@ type ClientWithResponsesInterface interface {
 
 	// UpdatePlatformContentPolicyWithBodyWithResponse Update platform default content policy
 	//
+	// `content_storage` is `off` or `stored_encrypted`; `inherit` and `stored_plaintext` are refused with 422 — storage in clear belongs to a named customer under contract, never to every customer that has not chosen. `content_retention_days` cannot be changed here (422 unless absent or equal to the current value): it is a ClickHouse column TTL, altered as an operations task. The new default reaches the data plane on its next configuration reload, without a restart.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/platform/content-policy (the `UpdatePlatformContentPolicy` operationId).
 	UpdatePlatformContentPolicyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePlatformContentPolicyResponse, error)
 
 	// UpdatePlatformContentPolicyWithResponse Update platform default content policy
+	//
+	// `content_storage` is `off` or `stored_encrypted`; `inherit` and `stored_plaintext` are refused with 422 — storage in clear belongs to a named customer under contract, never to every customer that has not chosen. `content_retention_days` cannot be changed here (422 unless absent or equal to the current value): it is a ClickHouse column TTL, altered as an operations task. The new default reaches the data plane on its next configuration reload, without a restart.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15364,12 +15782,16 @@ type ClientWithResponsesInterface interface {
 
 	// ReorderRoutesWithBodyWithResponse Reorder route priorities
 	//
+	// ordered_ids must list every route exactly once; the first gets priority 10, the next 20, and so on. Applied in a single statement: a refused list changes no route.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /admin/routes/reorder (the `ReorderRoutes` operationId).
 	ReorderRoutesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReorderRoutesResponse, error)
 
 	// ReorderRoutesWithResponse Reorder route priorities
+	//
+	// ordered_ids must list every route exactly once; the first gets priority 10, the next 20, and so on. Applied in a single statement: a refused list changes no route.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15504,6 +15926,8 @@ type ClientWithResponsesInterface interface {
 
 	// ListSenderRewriteRulesWithResponse List sender-ID rewrite rules
 	//
+	// In evaluation order — scope (connector, smpp_account, customer, platform), then priority.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /admin/sender-rewrite-rules (the `ListSenderRewriteRules` operationId).
@@ -15532,12 +15956,16 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateSenderRewriteRuleWithBodyWithResponse Update a rewrite rule
 	//
+	// Validated on the rule the patch leaves behind, since rewrite_type is mutable.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/sender-rewrite-rules/{id} (the `UpdateSenderRewriteRule` operationId).
 	UpdateSenderRewriteRuleWithBodyWithResponse(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSenderRewriteRuleResponse, error)
 
 	// UpdateSenderRewriteRuleWithResponse Update a rewrite rule
+	//
+	// Validated on the rule the patch leaves behind, since rewrite_type is mutable.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15546,12 +15974,16 @@ type ClientWithResponsesInterface interface {
 
 	// TestSenderRewriteRuleWithBodyWithResponse Test a rewrite rule against a sample
 	//
+	// Runs this rule alone — whatever its status, without the precedence of the others — through the code connector-pool applies before the submit_sm. Writes nothing.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /admin/sender-rewrite-rules/{id}/test (the `TestSenderRewriteRule` operationId).
 	TestSenderRewriteRuleWithBodyWithResponse(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TestSenderRewriteRuleResponse, error)
 
 	// TestSenderRewriteRuleWithResponse Test a rewrite rule against a sample
+	//
+	// Runs this rule alone — whatever its status, without the precedence of the others — through the code connector-pool applies before the submit_sm. Writes nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15560,12 +15992,16 @@ type ClientWithResponsesInterface interface {
 
 	// ListSessionsWithResponse List live SMPP sessions
 	//
+	// Client (ESME) binds, in bind id order, read from the live session registry. The registry is volatile and gives no snapshot: a session closed between two pages is missing from both, and one opened below the cursor is not seen. A page can hold fewer than `limit` sessions while `has_more` is true. `connectorId` is refused with 422: outbound connector binds are not in the registry, read them with get-connector-status.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /admin/sessions (the `ListSessions` operationId).
 	ListSessionsWithResponse(ctx context.Context, params *ListSessionsParams, reqEditors ...RequestEditorFn) (*ListSessionsResponse, error)
 
 	// DisconnectSessionWithResponse Force-disconnect a session
+	//
+	// Orders the pod holding the bind to send an unbind and close the connection, with reason `operator_disconnect`. The close is asynchronous: 204 means the order was published, and the session leaves the list once its pod has closed it. An id that is not a live session is a 404.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15695,12 +16131,16 @@ type ClientWithResponsesInterface interface {
 
 	// SetAccountSenderIdPolicyWithBodyWithResponse Set sender-ID authorization policy (§6.19)
 	//
+	// Takes effect on the next message, live sessions included; no rebind.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
 	SetAccountSenderIdPolicyWithBodyWithResponse(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAccountSenderIdPolicyResponse, error)
 
 	// SetAccountSenderIdPolicyWithResponse Set sender-ID authorization policy (§6.19)
+	//
+	// Takes effect on the next message, live sessions included; no rebind.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15723,12 +16163,16 @@ type ClientWithResponsesInterface interface {
 
 	// ListAccountSessionsWithResponse Live binds vs maxSessions for this account
 	//
+	// `active` counts the live binds as the max_sessions quota sees them, and can exceed `max_sessions`: lowering the limit cuts no live bind (§6.3). A bind admitted by a registry older than this operation counts in `active` and is listed from its next refresh.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /admin/smpp-accounts/{id}/sessions (the `ListAccountSessions` operationId).
 	ListAccountSessionsWithResponse(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*ListAccountSessionsResponse, error)
 
 	// SetAccountSmppOpsWithBodyWithResponse Toggle optional SMPP ops query_sm / cancel_sm (§6.22)
+	//
+	// The flags are read at bind, so every successful change disconnects the account's live binds (reason account_smpp_ops_changed); clients rebind under the new setting. At least one field is required.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15737,12 +16181,16 @@ type ClientWithResponsesInterface interface {
 
 	// SetAccountSmppOpsWithResponse Toggle optional SMPP ops query_sm / cancel_sm (§6.22)
 	//
+	// The flags are read at bind, so every successful change disconnects the account's live binds (reason account_smpp_ops_changed); clients rebind under the new setting. At least one field is required.
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/smpp-accounts/{id}/smpp-ops (the `SetAccountSmppOps` operationId).
 	SetAccountSmppOpsWithResponse(ctx context.Context, id Id, body SetAccountSmppOpsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAccountSmppOpsResponse, error)
 
 	// SuspendSmppAccountWithResponse Suspend an SMPP account
+	//
+	// Disconnects the account's live binds (reason account_suspended).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16110,6 +16558,68 @@ func (r UpdateAntispamRuleResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateAntispamRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListAuditLogResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuditEntryPage
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAuditLogResponse) GetJSON200() *AuditEntryPage {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListAuditLogResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListAuditLogResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListAuditLogResponse) GetJSON422() *ValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAuditLogResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAuditLogResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAuditLogResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAuditLogResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -17027,6 +17537,10 @@ type ListCustomerGroupsResponse struct {
 	JSON200 *[]CustomerGroup
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -17037,6 +17551,16 @@ func (r ListCustomerGroupsResponse) GetJSON200() *[]CustomerGroup {
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r ListCustomerGroupsResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListCustomerGroupsResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListCustomerGroupsResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -17075,6 +17599,8 @@ type CreateCustomerGroupResponse struct {
 	JSON201 *CustomerGroup
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON409 the response for an HTTP 409 `application/json` response
 	JSON409 *Conflict
 	// JSON422 the response for an HTTP 422 `application/json` response
@@ -17089,6 +17615,11 @@ func (r CreateCustomerGroupResponse) GetJSON201() *CustomerGroup {
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r CreateCustomerGroupResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r CreateCustomerGroupResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON409 returns the response for an HTTP 409 `application/json` response
@@ -17133,13 +17664,34 @@ func (r CreateCustomerGroupResponse) ContentType() string {
 type DeleteCustomerGroupResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteCustomerGroupResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteCustomerGroupResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r DeleteCustomerGroupResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r DeleteCustomerGroupResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -17176,8 +17728,14 @@ type GetCustomerGroupResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *CustomerGroup
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -17185,9 +17743,24 @@ func (r GetCustomerGroupResponse) GetJSON200() *CustomerGroup {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetCustomerGroupResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetCustomerGroupResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r GetCustomerGroupResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetCustomerGroupResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -17224,8 +17797,14 @@ type UpdateCustomerGroupResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *CustomerGroup
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *ValidationError
 }
@@ -17235,9 +17814,24 @@ func (r UpdateCustomerGroupResponse) GetJSON200() *CustomerGroup {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateCustomerGroupResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdateCustomerGroupResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r UpdateCustomerGroupResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r UpdateCustomerGroupResponse) GetJSON409() *Conflict {
+	return r.JSON409
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -17279,8 +17873,14 @@ type ListGroupCustomersResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *CustomerPage
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -17288,9 +17888,24 @@ func (r ListGroupCustomersResponse) GetJSON200() *CustomerPage {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListGroupCustomersResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListGroupCustomersResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r ListGroupCustomersResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListGroupCustomersResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -18162,6 +18777,10 @@ type GetCustomerContentPolicyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ContentPolicy
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
 }
@@ -18169,6 +18788,16 @@ type GetCustomerContentPolicyResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetCustomerContentPolicyResponse) GetJSON200() *ContentPolicy {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetCustomerContentPolicyResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetCustomerContentPolicyResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -18210,11 +18839,39 @@ type UpdateCustomerContentPolicyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ContentPolicy
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r UpdateCustomerContentPolicyResponse) GetJSON200() *ContentPolicy {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateCustomerContentPolicyResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdateCustomerContentPolicyResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r UpdateCustomerContentPolicyResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r UpdateCustomerContentPolicyResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -18382,8 +19039,14 @@ type SetCustomerGroupResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Customer
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -18391,9 +19054,24 @@ func (r SetCustomerGroupResponse) GetJSON200() *Customer {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r SetCustomerGroupResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r SetCustomerGroupResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r SetCustomerGroupResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r SetCustomerGroupResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -18699,8 +19377,14 @@ type ListCustomerAccountsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]SmppAccount
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -18708,9 +19392,24 @@ func (r ListCustomerAccountsResponse) GetJSON200() *[]SmppAccount {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListCustomerAccountsResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListCustomerAccountsResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r ListCustomerAccountsResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListCustomerAccountsResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -20117,11 +20816,39 @@ type GetMetricsSummaryResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *MetricsSummary
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetMetricsSummaryResponse) GetJSON200() *MetricsSummary {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetMetricsSummaryResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetMetricsSummaryResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetMetricsSummaryResponse) GetJSON422() *ValidationError {
+	return r.JSON422
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetMetricsSummaryResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -20158,11 +20885,39 @@ type GetTrafficMetricsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *TrafficMetrics
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetTrafficMetricsResponse) GetJSON200() *TrafficMetrics {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetTrafficMetricsResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetTrafficMetricsResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetTrafficMetricsResponse) GetJSON422() *ValidationError {
+	return r.JSON422
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetTrafficMetricsResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -20199,11 +20954,18 @@ type ListUnroutedMoResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *MessageSummaryPage
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListUnroutedMoResponse) GetJSON200() *MessageSummaryPage {
 	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListUnroutedMoResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -20488,11 +21250,25 @@ type GetPlatformContentPolicyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ContentPolicy
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetPlatformContentPolicyResponse) GetJSON200() *ContentPolicy {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetPlatformContentPolicyResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetPlatformContentPolicyResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetBody returns the raw response body bytes
@@ -20529,11 +21305,32 @@ type UpdatePlatformContentPolicyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ContentPolicy
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r UpdatePlatformContentPolicyResponse) GetJSON200() *ContentPolicy {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdatePlatformContentPolicyResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdatePlatformContentPolicyResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r UpdatePlatformContentPolicyResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -20935,6 +21732,10 @@ type ReorderRoutesResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]Route
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *ValidationError
 }
@@ -20942,6 +21743,16 @@ type ReorderRoutesResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ReorderRoutesResponse) GetJSON200() *[]Route {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ReorderRoutesResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ReorderRoutesResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -21845,11 +22656,32 @@ type ListSenderRewriteRulesResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]SenderRewriteRule
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListSenderRewriteRulesResponse) GetJSON200() *[]SenderRewriteRule {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListSenderRewriteRulesResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListSenderRewriteRulesResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListSenderRewriteRulesResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -21886,6 +22718,10 @@ type CreateSenderRewriteRuleResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *SenderRewriteRule
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *ValidationError
 }
@@ -21893,6 +22729,16 @@ type CreateSenderRewriteRuleResponse struct {
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
 func (r CreateSenderRewriteRuleResponse) GetJSON201() *SenderRewriteRule {
 	return r.JSON201
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CreateSenderRewriteRuleResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r CreateSenderRewriteRuleResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -21932,8 +22778,22 @@ func (r CreateSenderRewriteRuleResponse) ContentType() string {
 type DeleteSenderRewriteRuleResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteSenderRewriteRuleResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteSenderRewriteRuleResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -21975,8 +22835,14 @@ type UpdateSenderRewriteRuleResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *SenderRewriteRule
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -21984,9 +22850,24 @@ func (r UpdateSenderRewriteRuleResponse) GetJSON200() *SenderRewriteRule {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateSenderRewriteRuleResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdateSenderRewriteRuleResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r UpdateSenderRewriteRuleResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r UpdateSenderRewriteRuleResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -22023,17 +22904,49 @@ type TestSenderRewriteRuleResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *struct {
-		Matched         bool    `json:"matched"`
+		Matched bool `json:"matched"`
+
+		// RewrittenSource The sender the pool would submit, before the SMPP typing: a leading + is stripped on the wire and the number typed international.
 		RewrittenSource *string `json:"rewritten_source,omitempty"`
 	}
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r TestSenderRewriteRuleResponse) GetJSON200() *struct {
-	Matched         bool    `json:"matched"`
+	Matched bool `json:"matched"`
+
+	// RewrittenSource The sender the pool would submit, before the SMPP typing: a leading + is stripped on the wire and the number typed international.
 	RewrittenSource *string `json:"rewritten_source,omitempty"`
 } {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r TestSenderRewriteRuleResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r TestSenderRewriteRuleResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r TestSenderRewriteRuleResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r TestSenderRewriteRuleResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -22070,11 +22983,32 @@ type ListSessionsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *SessionPage
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListSessionsResponse) GetJSON200() *SessionPage {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListSessionsResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListSessionsResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListSessionsResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -22109,8 +23043,22 @@ func (r ListSessionsResponse) ContentType() string {
 type DisconnectSessionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DisconnectSessionResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DisconnectSessionResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -22890,11 +23838,39 @@ type SetAccountSenderIdPolicyResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *SmppAccount
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r SetAccountSenderIdPolicyResponse) GetJSON200() *SmppAccount {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r SetAccountSenderIdPolicyResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r SetAccountSenderIdPolicyResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SetAccountSenderIdPolicyResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r SetAccountSenderIdPolicyResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -23004,6 +23980,10 @@ type ListAccountSessionsResponse struct {
 		MaxSessions int       `json:"max_sessions"`
 		Sessions    []Session `json:"sessions"`
 	}
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
 }
@@ -23015,6 +23995,16 @@ func (r ListAccountSessionsResponse) GetJSON200() *struct {
 	Sessions    []Session `json:"sessions"`
 } {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListAccountSessionsResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListAccountSessionsResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
@@ -23056,11 +24046,39 @@ type SetAccountSmppOpsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *SmppAccount
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r SetAccountSmppOpsResponse) GetJSON200() *SmppAccount {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r SetAccountSmppOpsResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r SetAccountSmppOpsResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SetAccountSmppOpsResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r SetAccountSmppOpsResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -23097,8 +24115,14 @@ type SuspendSmppAccountResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *SmppAccount
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -23106,9 +24130,24 @@ func (r SuspendSmppAccountResponse) GetJSON200() *SmppAccount {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r SuspendSmppAccountResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r SuspendSmppAccountResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r SuspendSmppAccountResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r SuspendSmppAccountResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -23145,11 +24184,39 @@ type ListWebhooksResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]Webhook
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListWebhooksResponse) GetJSON200() *[]Webhook {
 	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListWebhooksResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListWebhooksResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ListWebhooksResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListWebhooksResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -23186,8 +24253,16 @@ type CreateWebhookResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *Webhook
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
 	// JSON409 the response for an HTTP 409 `application/json` response
 	JSON409 *Conflict
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -23195,9 +24270,29 @@ func (r CreateWebhookResponse) GetJSON201() *Webhook {
 	return r.JSON201
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r CreateWebhookResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r CreateWebhookResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r CreateWebhookResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
 // GetJSON409 returns the response for an HTTP 409 `application/json` response
 func (r CreateWebhookResponse) GetJSON409() *Conflict {
 	return r.JSON409
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r CreateWebhookResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -23232,13 +24327,34 @@ func (r CreateWebhookResponse) ContentType() string {
 type DeleteWebhookResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteWebhookResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteWebhookResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r DeleteWebhookResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r DeleteWebhookResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -23275,8 +24391,14 @@ type UpdateWebhookResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Webhook
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -23284,9 +24406,24 @@ func (r UpdateWebhookResponse) GetJSON200() *Webhook {
 	return r.JSON200
 }
 
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateWebhookResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdateWebhookResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r UpdateWebhookResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r UpdateWebhookResponse) GetJSON422() *ValidationError {
+	return r.JSON422
 }
 
 // GetBody returns the raw response body bytes
@@ -23323,11 +24460,18 @@ type StreamBillingAlertsResponse struct {
 	HTTPResponse *http.Response
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r StreamBillingAlertsResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r StreamBillingAlertsResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetBody returns the raw response body bytes
@@ -23364,11 +24508,18 @@ type StreamMetricsResponse struct {
 	HTTPResponse *http.Response
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r StreamMetricsResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r StreamMetricsResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetBody returns the raw response body bytes
@@ -23405,11 +24556,18 @@ type StreamSessionsResponse struct {
 	HTTPResponse *http.Response
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r StreamSessionsResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r StreamSessionsResponse) GetJSON403() *Forbidden {
+	return r.JSON403
 }
 
 // GetBody returns the raw response body bytes
@@ -23827,6 +24985,21 @@ func (c *ClientWithResponses) UpdateAntispamRuleWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseUpdateAntispamRuleResponse(rsp)
+}
+
+// ListAuditLogWithResponse List the operator audit trail
+//
+// One row per audited request — every Admin API write, the reads that reveal subscriber numbers — and per mt-replay run, newest first. Rows are immutable once their outcome is recorded. Not every row is an HTTP request: operator, operation_id, method and target are free strings (a replay writes method REPLAY and operator declared:<name>). A subscriber number in target is masked unless the caller holds msisdn:reveal. status null means the outcome was not recorded, not success.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /admin/audit-log (the `ListAuditLog` operationId).
+func (c *ClientWithResponses) ListAuditLogWithResponse(ctx context.Context, params *ListAuditLogParams, reqEditors ...RequestEditorFn) (*ListAuditLogResponse, error) {
+	rsp, err := c.ListAuditLog(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAuditLogResponse(rsp)
 }
 
 // ListBillingProvidersWithResponse List external billing providers
@@ -24429,6 +25602,8 @@ func (c *ClientWithResponses) TransferBalanceWithResponse(ctx context.Context, i
 
 // GetCustomerContentPolicyWithResponse Get a customer's content policy
 //
+// The customer's own setting, `inherit` included — not the resolved policy. `content_retention_days` is stored but not yet applied: every body expires with the platform retention.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /admin/customers/{id}/content-policy (the `GetCustomerContentPolicy` operationId).
@@ -24442,6 +25617,8 @@ func (c *ClientWithResponses) GetCustomerContentPolicyWithResponse(ctx context.C
 
 // UpdateCustomerContentPolicyWithBodyWithResponse Update a customer's content policy
 //
+// Writes the same columns as update-customer, but `content_storage` is required here. The change reaches the data plane on its next configuration reload, without a restart. `content_retention_days` is stored but not yet applied, and a `null` leaves it unchanged.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /admin/customers/{id}/content-policy (the `UpdateCustomerContentPolicy` operationId).
@@ -24454,6 +25631,8 @@ func (c *ClientWithResponses) UpdateCustomerContentPolicyWithBodyWithResponse(ct
 }
 
 // UpdateCustomerContentPolicyWithResponse Update a customer's content policy
+//
+// Writes the same columns as update-customer, but `content_storage` is required here. The change reaches the data plane on its next configuration reload, without a restart. `content_retention_days` is stored but not yet applied, and a `null` leaves it unchanged.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -24597,6 +25776,8 @@ func (c *ClientWithResponses) UpdateSenderIdWithResponse(ctx context.Context, id
 }
 
 // ListCustomerAccountsWithResponse List a customer's SMPP accounts
+//
+// At most 500 accounts, unpaginated.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -25048,6 +26229,8 @@ func (c *ClientWithResponses) GetMessageTraceWithResponse(ctx context.Context, i
 
 // GetMetricsSummaryWithResponse Rolling summary counters
 //
+// Counts the messages SUBMITTED within the window (a cohort on submitted_at), each with its status at the time of the read: on a short window, delivered undercounts what is still in flight. The window ends at the last completed bucket boundary of get-traffic-metrics; the bucket in progress is excluded. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422 (24h awaits a pre-aggregate). delivered and failed follow the same status precedence as search-messages.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /admin/metrics/summary (the `GetMetricsSummary` operationId).
@@ -25060,6 +26243,8 @@ func (c *ClientWithResponses) GetMetricsSummaryWithResponse(ctx context.Context,
 }
 
 // GetTrafficMetricsWithResponse Traffic time series grouped by dimension
+//
+// MT messages submitted within the window, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most submissions get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, a message never dispatched has no connector and appears in no series. 503 when the window holds more rows than a read may return.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -25165,6 +26350,8 @@ func (c *ClientWithResponses) UpdateOptOutKeywordWithResponse(ctx context.Contex
 
 // GetPlatformContentPolicyWithResponse Get platform default content policy
 //
+// The policy an `inherit` customer resolves to. `off` until changed. `content_retention_days` is the body retention the CDR applies (a ClickHouse column TTL, 30 days).
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /admin/platform/content-policy (the `GetPlatformContentPolicy` operationId).
@@ -25178,6 +26365,8 @@ func (c *ClientWithResponses) GetPlatformContentPolicyWithResponse(ctx context.C
 
 // UpdatePlatformContentPolicyWithBodyWithResponse Update platform default content policy
 //
+// `content_storage` is `off` or `stored_encrypted`; `inherit` and `stored_plaintext` are refused with 422 — storage in clear belongs to a named customer under contract, never to every customer that has not chosen. `content_retention_days` cannot be changed here (422 unless absent or equal to the current value): it is a ClickHouse column TTL, altered as an operations task. The new default reaches the data plane on its next configuration reload, without a restart.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /admin/platform/content-policy (the `UpdatePlatformContentPolicy` operationId).
@@ -25190,6 +26379,8 @@ func (c *ClientWithResponses) UpdatePlatformContentPolicyWithBodyWithResponse(ct
 }
 
 // UpdatePlatformContentPolicyWithResponse Update platform default content policy
+//
+// `content_storage` is `off` or `stored_encrypted`; `inherit` and `stored_plaintext` are refused with 422 — storage in clear belongs to a named customer under contract, never to every customer that has not chosen. `content_retention_days` cannot be changed here (422 unless absent or equal to the current value): it is a ClickHouse column TTL, altered as an operations task. The new default reaches the data plane on its next configuration reload, without a restart.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25321,6 +26512,8 @@ func (c *ClientWithResponses) CreateRouteWithResponse(ctx context.Context, body 
 
 // ReorderRoutesWithBodyWithResponse Reorder route priorities
 //
+// ordered_ids must list every route exactly once; the first gets priority 10, the next 20, and so on. Applied in a single statement: a refused list changes no route.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /admin/routes/reorder (the `ReorderRoutes` operationId).
@@ -25333,6 +26526,8 @@ func (c *ClientWithResponses) ReorderRoutesWithBodyWithResponse(ctx context.Cont
 }
 
 // ReorderRoutesWithResponse Reorder route priorities
+//
+// ordered_ids must list every route exactly once; the first gets priority 10, the next 20, and so on. Applied in a single statement: a refused list changes no route.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25581,6 +26776,8 @@ func (c *ClientWithResponses) ListRoutingScriptVersionsWithResponse(ctx context.
 
 // ListSenderRewriteRulesWithResponse List sender-ID rewrite rules
 //
+// In evaluation order — scope (connector, smpp_account, customer, platform), then priority.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /admin/sender-rewrite-rules (the `ListSenderRewriteRules` operationId).
@@ -25633,6 +26830,8 @@ func (c *ClientWithResponses) DeleteSenderRewriteRuleWithResponse(ctx context.Co
 
 // UpdateSenderRewriteRuleWithBodyWithResponse Update a rewrite rule
 //
+// Validated on the rule the patch leaves behind, since rewrite_type is mutable.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /admin/sender-rewrite-rules/{id} (the `UpdateSenderRewriteRule` operationId).
@@ -25645,6 +26844,8 @@ func (c *ClientWithResponses) UpdateSenderRewriteRuleWithBodyWithResponse(ctx co
 }
 
 // UpdateSenderRewriteRuleWithResponse Update a rewrite rule
+//
+// Validated on the rule the patch leaves behind, since rewrite_type is mutable.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25659,6 +26860,8 @@ func (c *ClientWithResponses) UpdateSenderRewriteRuleWithResponse(ctx context.Co
 
 // TestSenderRewriteRuleWithBodyWithResponse Test a rewrite rule against a sample
 //
+// Runs this rule alone — whatever its status, without the precedence of the others — through the code connector-pool applies before the submit_sm. Writes nothing.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /admin/sender-rewrite-rules/{id}/test (the `TestSenderRewriteRule` operationId).
@@ -25671,6 +26874,8 @@ func (c *ClientWithResponses) TestSenderRewriteRuleWithBodyWithResponse(ctx cont
 }
 
 // TestSenderRewriteRuleWithResponse Test a rewrite rule against a sample
+//
+// Runs this rule alone — whatever its status, without the precedence of the others — through the code connector-pool applies before the submit_sm. Writes nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25685,6 +26890,8 @@ func (c *ClientWithResponses) TestSenderRewriteRuleWithResponse(ctx context.Cont
 
 // ListSessionsWithResponse List live SMPP sessions
 //
+// Client (ESME) binds, in bind id order, read from the live session registry. The registry is volatile and gives no snapshot: a session closed between two pages is missing from both, and one opened below the cursor is not seen. A page can hold fewer than `limit` sessions while `has_more` is true. `connectorId` is refused with 422: outbound connector binds are not in the registry, read them with get-connector-status.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /admin/sessions (the `ListSessions` operationId).
@@ -25697,6 +26904,8 @@ func (c *ClientWithResponses) ListSessionsWithResponse(ctx context.Context, para
 }
 
 // DisconnectSessionWithResponse Force-disconnect a session
+//
+// Orders the pod holding the bind to send an unbind and close the connection, with reason `operator_disconnect`. The close is asynchronous: 204 means the order was published, and the session leaves the list once its pod has closed it. An id that is not a live session is a 404.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -25934,6 +27143,8 @@ func (c *ClientWithResponses) RotateCredentialWithResponse(ctx context.Context, 
 
 // SetAccountSenderIdPolicyWithBodyWithResponse Set sender-ID authorization policy (§6.19)
 //
+// Takes effect on the next message, live sessions included; no rebind.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
@@ -25946,6 +27157,8 @@ func (c *ClientWithResponses) SetAccountSenderIdPolicyWithBodyWithResponse(ctx c
 }
 
 // SetAccountSenderIdPolicyWithResponse Set sender-ID authorization policy (§6.19)
+//
+// Takes effect on the next message, live sessions included; no rebind.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25986,6 +27199,8 @@ func (c *ClientWithResponses) SetAccountSessionLimitsWithResponse(ctx context.Co
 
 // ListAccountSessionsWithResponse Live binds vs maxSessions for this account
 //
+// `active` counts the live binds as the max_sessions quota sees them, and can exceed `max_sessions`: lowering the limit cuts no live bind (§6.3). A bind admitted by a registry older than this operation counts in `active` and is listed from its next refresh.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /admin/smpp-accounts/{id}/sessions (the `ListAccountSessions` operationId).
@@ -25998,6 +27213,8 @@ func (c *ClientWithResponses) ListAccountSessionsWithResponse(ctx context.Contex
 }
 
 // SetAccountSmppOpsWithBodyWithResponse Toggle optional SMPP ops query_sm / cancel_sm (§6.22)
+//
+// The flags are read at bind, so every successful change disconnects the account's live binds (reason account_smpp_ops_changed); clients rebind under the new setting. At least one field is required.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26012,6 +27229,8 @@ func (c *ClientWithResponses) SetAccountSmppOpsWithBodyWithResponse(ctx context.
 
 // SetAccountSmppOpsWithResponse Toggle optional SMPP ops query_sm / cancel_sm (§6.22)
 //
+// The flags are read at bind, so every successful change disconnects the account's live binds (reason account_smpp_ops_changed); clients rebind under the new setting. At least one field is required.
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /admin/smpp-accounts/{id}/smpp-ops (the `SetAccountSmppOps` operationId).
@@ -26024,6 +27243,8 @@ func (c *ClientWithResponses) SetAccountSmppOpsWithResponse(ctx context.Context,
 }
 
 // SuspendSmppAccountWithResponse Suspend an SMPP account
+//
+// Disconnects the account's live binds (reason account_suspended).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -26434,6 +27655,53 @@ func ParseUpdateAntispamRuleResponse(rsp *http.Response) (*UpdateAntispamRuleRes
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAuditLogResponse parses an HTTP response from a ListAuditLogWithResponse call
+func ParseListAuditLogResponse(rsp *http.Response) (*ListAuditLogResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAuditLogResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuditEntryPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError
@@ -27171,6 +28439,20 @@ func ParseListCustomerGroupsResponse(rsp *http.Response) (*ListCustomerGroupsRes
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -27203,6 +28485,13 @@ func ParseCreateCustomerGroupResponse(rsp *http.Response) (*CreateCustomerGroupR
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Conflict
@@ -27240,12 +28529,33 @@ func ParseDeleteCustomerGroupResponse(rsp *http.Response) (*DeleteCustomerGroupR
 	case rsp.StatusCode == 204:
 		break // No content-type
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -27273,12 +28583,33 @@ func ParseGetCustomerGroupResponse(rsp *http.Response) (*GetCustomerGroupRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -27306,12 +28637,33 @@ func ParseUpdateCustomerGroupResponse(rsp *http.Response) (*UpdateCustomerGroupR
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError
@@ -27346,12 +28698,33 @@ func ParseListGroupCustomersResponse(rsp *http.Response) (*ListGroupCustomersRes
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -28037,6 +29410,20 @@ func ParseGetCustomerContentPolicyResponse(rsp *http.Response) (*GetCustomerCont
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -28069,6 +29456,34 @@ func ParseUpdateCustomerContentPolicyResponse(rsp *http.Response) (*UpdateCustom
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -28197,12 +29612,33 @@ func ParseSetCustomerGroupResponse(rsp *http.Response) (*SetCustomerGroupRespons
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -28442,12 +29878,33 @@ func ParseListCustomerAccountsResponse(rsp *http.Response) (*ListCustomerAccount
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -29509,6 +30966,34 @@ func ParseGetMetricsSummaryResponse(rsp *http.Response) (*GetMetricsSummaryRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
@@ -29535,6 +31020,34 @@ func ParseGetTrafficMetricsResponse(rsp *http.Response) (*GetTrafficMetricsRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
@@ -29560,6 +31073,13 @@ func ParseListUnroutedMoResponse(rsp *http.Response) (*ListUnroutedMoResponse, e
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -29778,6 +31298,20 @@ func ParseGetPlatformContentPolicyResponse(rsp *http.Response) (*GetPlatformCont
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	}
 
 	return response, nil
@@ -29803,6 +31337,27 @@ func ParseUpdatePlatformContentPolicyResponse(rsp *http.Response) (*UpdatePlatfo
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -30107,6 +31662,20 @@ func ParseReorderRoutesResponse(rsp *http.Response) (*ReorderRoutesResponse, err
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError
@@ -30814,6 +32383,27 @@ func ParseListSenderRewriteRulesResponse(rsp *http.Response) (*ListSenderRewrite
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -30839,6 +32429,20 @@ func ParseCreateSenderRewriteRuleResponse(rsp *http.Response) (*CreateSenderRewr
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError
@@ -30868,6 +32472,20 @@ func ParseDeleteSenderRewriteRuleResponse(rsp *http.Response) (*DeleteSenderRewr
 	switch {
 	case rsp.StatusCode == 204:
 		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
@@ -30902,12 +32520,33 @@ func ParseUpdateSenderRewriteRuleResponse(rsp *http.Response) (*UpdateSenderRewr
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -30930,13 +32569,43 @@ func ParseTestSenderRewriteRuleResponse(rsp *http.Response) (*TestSenderRewriteR
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Matched         bool    `json:"matched"`
+			Matched bool `json:"matched"`
+
+			// RewrittenSource The sender the pool would submit, before the SMPP typing: a leading + is stripped on the wire and the number typed international.
 			RewrittenSource *string `json:"rewritten_source,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -30964,6 +32633,27 @@ func ParseListSessionsResponse(rsp *http.Response) (*ListSessionsResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -30985,6 +32675,20 @@ func ParseDisconnectSessionResponse(rsp *http.Response) (*DisconnectSessionRespo
 	switch {
 	case rsp.StatusCode == 204:
 		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
@@ -31598,6 +33302,34 @@ func ParseSetAccountSenderIdPolicyResponse(rsp *http.Response) (*SetAccountSende
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -31682,6 +33414,20 @@ func ParseListAccountSessionsResponse(rsp *http.Response) (*ListAccountSessionsR
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -31715,6 +33461,34 @@ func ParseSetAccountSmppOpsResponse(rsp *http.Response) (*SetAccountSmppOpsRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -31741,12 +33515,33 @@ func ParseSuspendSmppAccountResponse(rsp *http.Response) (*SuspendSmppAccountRes
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -31774,6 +33569,34 @@ func ParseListWebhooksResponse(rsp *http.Response) (*ListWebhooksResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
 	}
 
 	return response, nil
@@ -31800,12 +33623,40 @@ func ParseCreateWebhookResponse(rsp *http.Response) (*CreateWebhookResponse, err
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Conflict
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -31829,12 +33680,33 @@ func ParseDeleteWebhookResponse(rsp *http.Response) (*DeleteWebhookResponse, err
 	case rsp.StatusCode == 204:
 		break // No content-type
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -31862,12 +33734,33 @@ func ParseUpdateWebhookResponse(rsp *http.Response) (*UpdateWebhookResponse, err
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest NotFound
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 
@@ -31898,6 +33791,13 @@ func ParseStreamBillingAlertsResponse(rsp *http.Response) (*StreamBillingAlertsR
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	}
 
 	return response, nil
@@ -31927,6 +33827,13 @@ func ParseStreamMetricsResponse(rsp *http.Response) (*StreamMetricsResponse, err
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	}
 
 	return response, nil
@@ -31955,6 +33862,13 @@ func ParseStreamSessionsResponse(rsp *http.Response) (*StreamSessionsResponse, e
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	}
 

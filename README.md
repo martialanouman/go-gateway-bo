@@ -103,8 +103,8 @@ ici. `oapi-codegen` en tire le client Go ; un second contrat, `api/openapi-bff.y
 frontière entre les deux moitiés de ce dépôt et engendre **les types Go et TypeScript des deux
 bouts** — une divergence ne compile pas.
 
-Le mock Prism sert ce contrat sans dépendre de la passerelle, ce qui est **nécessaire** : une large
-part des opérations n'existe encore qu'au contrat, côté passerelle — décompte à jour dans
+Le mock Prism sert ce contrat sans dépendre de la passerelle : c'est la frontière des scénarios, qui
+se rejouent sans elle. La passerelle sert aujourd'hui toutes les opérations du contrat, relevé dans
 `tasks/plan.md` §16. `DASHBOARD_GATEWAY_MODE` tranche entre le mock et la vraie passerelle, et **son
 absence vaut `real`** : la lecture la plus stricte, qui exige tout le matériel OAuth2 et mTLS. Le
 défaut inverse aurait servi des données inventées sans que rien ne le dise.

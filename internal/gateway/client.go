@@ -26,7 +26,7 @@ const mockAccessToken = "jeton-factice-du-mock-prism"
 
 // NewAdminClient rend le client engendré déjà gréé : mTLS, jeton machine mis en cache, timeout et
 // rejeu timide. Il n'y a pas de couche par-dessus — le client engendré *est* l'interface, et
-// réenvelopper ses 133 méthodes n'ajouterait qu'un endroit où elles peuvent diverger du contrat.
+// réenvelopper ses 134 méthodes n'ajouterait qu'un endroit où elles peuvent diverger du contrat.
 //
 // Le client rendu vaut pour toute la vie du process : c'est lui qui porte le jeton en cache, et en
 // reconstruire un par requête relancerait une obtention de jeton à chaque appel.
@@ -163,7 +163,7 @@ func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSou
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
 		TokenURL:     cfg.TokenURL,
-		// Ces scopes sont **cinq des six** que le contrat catalogue, codés ici et non configurables.
+		// Ces scopes sont **cinq des sept** que le contrat catalogue, codés ici et non configurables.
 		// Le jeton machine porte donc `content:read` en permanence : ce qu'un opérateur a le droit de
 		// voir est **entièrement** à la charge du BFF, et le rendre réglable ici laisserait croire
 		// qu'on peut restreindre par là ce qui doit l'être par `requirePermission` (`internal/bff`) —
@@ -175,12 +175,14 @@ func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSou
 		//   - `msisdn:reveal` est catalogué et absent de cette liste. Voir les numéros d'abonnés en
 		//     clair là où le contrat les masque par défaut est une frontière qu'il a posée ; la
 		//     déplacer pour du code qui n'existe pas ne se justifie pas.
+		//   - `audit:read` (catalogué en 6.8.0) n'ouvre que `list-audit-log`, le journal des opérateurs
+		//     de la passerelle, qu'aucun écran ne lit.
 		//   - `cdr:export_bulk` est exigé par `security:` sur `create-message-export` et
 		//     `get-message-export` mais **n'est catalogué nulle part** — le bloc `scopes` du
-		//     `securitySchemes` ne le contient pas. C'est un manque du contrat amont, à corriger par
-		//     une PR dans `go-gateway/api/` plutôt qu'en le devinant ici.
+		//     `securitySchemes` ne le contient pas, en 6.8.0 encore. C'est un manque du contrat amont,
+		//     à corriger par une PR dans `go-gateway/api/` plutôt qu'en le devinant ici.
 		//
-		// Aucune des deux opérations n'est appelée par ce dépôt : les ajouter élargirait le jeton
+		// Aucune de ces opérations n'est appelée par ce dépôt : les ajouter élargirait le jeton
 		// machine pour personne. C'est à la step qui livrera l'export de décider, sachant ce qu'elle
 		// sert — step-104, prévenue dans `tasks/todo.md`.
 		Scopes: []string{"admin:read", "admin:write", "content:read", "content:erase", "gdpr:erase"},

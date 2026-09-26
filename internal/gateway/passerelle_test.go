@@ -2,6 +2,7 @@ package gateway_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -219,7 +220,7 @@ func initializeScenario(ctx *godog.ScenarioContext, baseURL string) {
 	ctx.When(`^le BFF demande la liste des clients$`, calls.listCustomers)
 	ctx.When(`^la passerelle refuse la liste des clients en (\d+)$`, calls.refusedListing)
 	ctx.Then(`^il obtient une page de clients à afficher$`, calls.gotAPageOfCustomers)
-	ctx.Then(`^le BFF rend une erreur qui porte le motif "([^"]*)"$`, calls.gotErrorWithCode)
+	ctx.Then(`^le BFF rend une erreur qui porte le motif que la passerelle a servi$`, calls.gotErrorWithServedCode)
 }
 
 // callTimeout borne un appel au mock. Toute attente du harnais est bornée : sans limite, un mock qui
@@ -235,6 +236,7 @@ type adminCalls struct {
 	page        *gateway.CustomerPage
 	err         error
 	refusedWith int
+	servedBody  []byte
 }
 
 func (c *adminCalls) connect(baseURL string) error {
@@ -288,13 +290,16 @@ func (c *adminCalls) list(ctx context.Context, editors ...gateway.RequestEditorF
 	}
 
 	c.page = response.JSON200
+	c.servedBody = response.Body
 	c.err = gateway.ErrorFrom(response.StatusCode(), response.Body)
 
 	return response.StatusCode(), nil
 }
 
 // preferStatus demande à Prism la réponse d'un statut précis : sur `/admin/customers`,
-// `Prefer: code=422` rend le corps `forbidden_scope` que le contrat déclare, avec le statut 422.
+// `Prefer: code=422` rend le statut 422 et un corps `Error` que Prism compose. Depuis que le contrat
+// borne `code` par un `enum` (6.x), Prism y met la première valeur, `account_suspended`, et non plus
+// l'exemple : le scénario compare donc au corps servi plutôt qu'à un motif figé.
 // Sans ce levier, un scénario d'erreur devrait remplacer le serveur par un double,
 // c'est-à-dire ne plus rien exercer du contrat.
 func preferStatus(status int) gateway.RequestEditorFn {
@@ -329,11 +334,21 @@ func (c *adminCalls) gotAPageOfCustomers() error {
 	return nil
 }
 
-// gotErrorWithCode observe ce dont un écran a besoin pour dire *pourquoi* : une erreur reconnaissable
-// par `errors.As`, portant le code stable de la passerelle et le statut de son refus. Le message que
-// la passerelle a écrit n'est pas observé ici — c'est du texte amont, que l'invariant (a) tient hors
-// de tout rendu et que `errors_test.go` garde.
-func (c *adminCalls) gotErrorWithCode(code string) error {
+// gotErrorWithServedCode observe ce dont un écran a besoin pour dire *pourquoi* : une erreur
+// reconnaissable par `errors.As`, portant le code stable que la passerelle a servi et le statut de son
+// refus. Le message que la passerelle a écrit n'est pas observé ici — c'est du texte amont, que
+// l'invariant (a) tient hors de tout rendu et que `errors_test.go` garde.
+func (c *adminCalls) gotErrorWithServedCode() error {
+	var served struct {
+		Code string `json:"code"`
+	}
+
+	if err := json.Unmarshal(c.servedBody, &served); err != nil || served.Code == "" {
+		return fmt.Errorf("le mock n'a pas servi d'enveloppe d'erreur lisible : %s", c.servedBody)
+	}
+
+	code := served.Code
+
 	var apiErr *gateway.APIError
 
 	if !errors.As(c.err, &apiErr) {
