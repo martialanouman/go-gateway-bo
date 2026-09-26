@@ -3,7 +3,7 @@
 //
 // Il vit sous `testdata/`, donc `go list ./...` ne l'énumère pas et `go vet ./...` n'en signale rien
 // — c'est le patron de `testdata/divergent`. La suite normale ne le voit pas ; il n'est chargé que
-// par `TestLesPortesMordentSurLeTemoin`, qui **exige** que chacune le rapporte.
+// par `TestTheGatesBiteOnTheWitness`, qui **exige** que chacune le rapporte.
 //
 // Sans lui, la mordance des portes ne serait établie que par des mutations jouées à la main puis
 // retirées, dont rien ne resterait dans le dépôt.

@@ -60,7 +60,7 @@ func codeAt(t *testing.T, secret string, step int64) string {
 	return code
 }
 
-func TestUnCodeDuPasCourantEstAccepte(t *testing.T) {
+func TestACodeOfTheCurrentStepIsAccepted(t *testing.T) {
 	t.Parallel()
 
 	authenticator, enrollment := testEnrollment(t)
@@ -75,7 +75,7 @@ func TestUnCodeDuPasCourantEstAccepte(t *testing.T) {
 
 // La fenêtre existe pour le téléphone qui dérive de quelques secondes. Sans elle, un opérateur dont
 // l'horloge avance d'une seconde serait refusé une fois sur trente.
-func TestUnCodeDuPasVoisinEstAccepte(t *testing.T) {
+func TestACodeOfTheAdjacentStepIsAccepted(t *testing.T) {
 	t.Parallel()
 
 	authenticator, enrollment := testEnrollment(t)
@@ -101,7 +101,7 @@ func TestUnCodeDuPasVoisinEstAccepte(t *testing.T) {
 
 // La borne haute de la fenêtre. Deux pas doubleraient la durée pendant laquelle un code intercepté
 // vaut encore quelque chose.
-func TestUnCodeADeuxPasEstRefuse(t *testing.T) {
+func TestACodeTwoStepsAwayIsRefused(t *testing.T) {
 	t.Parallel()
 
 	authenticator, enrollment := testEnrollment(t)
@@ -125,7 +125,7 @@ func TestUnCodeADeuxPasEstRefuse(t *testing.T) {
 // Ce que la bibliothèque rend pour une longueur inattendue est une **erreur**, et la traiter comme
 // telle ferait rendre 500 à qui tape cinq chiffres — donc transformerait une faute de frappe en
 // incident.
-func TestUnCodeMalFormeEstUnRefusEtNonUnePanne(t *testing.T) {
+func TestAMalformedCodeIsARefusalNotAFailure(t *testing.T) {
 	t.Parallel()
 
 	authenticator, enrollment := testEnrollment(t)
@@ -147,7 +147,7 @@ func TestUnCodeMalFormeEstUnRefusEtNonUnePanne(t *testing.T) {
 	}
 }
 
-func TestDeuxEnrolementsNeProduisentPasLeMemeSecret(t *testing.T) {
+func TestTwoEnrollmentsDoNotProduceTheSameSecret(t *testing.T) {
 	t.Parallel()
 
 	authenticator := testAuthenticator(t)
@@ -165,7 +165,7 @@ func TestDeuxEnrolementsNeProduisentPasLeMemeSecret(t *testing.T) {
 // Les quatre paramètres sont **écrits** dans l'URI plutôt que laissés au défaut : beaucoup
 // d'applications les ignorent et supposent les mêmes valeurs, mais celles qui les lisent doivent lire
 // ce que le serveur vérifie.
-func TestLUriOtpauthPorteCeQueLApplicationAttend(t *testing.T) {
+func TestTheOtpauthUriCarriesWhatTheAppExpects(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)

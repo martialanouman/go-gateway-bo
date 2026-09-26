@@ -9,7 +9,7 @@ import (
 
 // Les bornes du contrat se comptent en caractères : cent lettres accentuées font deux cents octets,
 // et un compte en octets refuserait un nom que le client, qui compte en caractères, a laissé passer.
-func TestLesBornesSeComptentEnCaracteres(t *testing.T) {
+func TestTheBoundsAreCountedInCharacters(t *testing.T) {
 	t.Parallel()
 
 	assert.True(t, within(strings.Repeat("é", 100), 1, 100))

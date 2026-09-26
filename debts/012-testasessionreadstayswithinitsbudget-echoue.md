@@ -1,4 +1,4 @@
-# 012 — `TestUneLectureDeSessionResteDansSonBudget` échoue environ **une fois sur quatre**, sur `main` comme ailleurs
+# 012 — `TestASessionReadStaysWithinItsBudget` échoue environ **une fois sur quatre**, sur `main` comme ailleurs
 
 > **Porteur :** step-187
 

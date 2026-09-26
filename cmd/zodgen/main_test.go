@@ -51,7 +51,7 @@ func renderContract(t *testing.T, contract string) string {
 	return string(rendered)
 }
 
-func TestLesBornesDuContratTraversentDansLaSortie(t *testing.T) {
+func TestTheContractBoundsCarryThroughToTheOutput(t *testing.T) {
 	rendered := renderContract(t, miniContract)
 
 	require.Contains(t, rendered, "email: z.string().max(320),")
@@ -61,7 +61,7 @@ func TestLesBornesDuContratTraversentDansLaSortie(t *testing.T) {
 // Le test que la fiche réclame, et la seule forme qui prouve quelque chose : la contrainte est
 // **resserrée dans le YAML**, et c'est la sortie qu'on relit. Lire le générateur dirait seulement
 // qu'il contient le mot `maxLength`.
-func TestUneContrainteResserreeDansLeYamlChangeLaSortie(t *testing.T) {
+func TestAConstraintTightenedInTheYamlChangesTheOutput(t *testing.T) {
 	desserre := renderContract(t, miniContract)
 	resserre := renderContract(t, strings.Replace(miniContract, "maxLength: 4096", "maxLength: 40", 1))
 
@@ -72,13 +72,13 @@ func TestUneContrainteResserreeDansLeYamlChangeLaSortie(t *testing.T) {
 
 // Le champ facultatif du contrat reste facultatif dans le schéma : le rendre obligatoire ferait
 // refuser par le client une requête que le serveur accepte — un refus qui n'existe nulle part.
-func TestUnChampAbsentDeRequiredEstFacultatif(t *testing.T) {
+func TestAFieldMissingFromRequiredIsOptional(t *testing.T) {
 	rendered := renderContract(t, strings.Replace(miniContract, "required: [email, password]", "required: [email]", 1))
 
 	require.Contains(t, rendered, "password: z.string().min(1).max(4096).optional(),")
 }
 
-func TestUnEnumDevientUneUnionDeValeurs(t *testing.T) {
+func TestAnEnumBecomesAUnionOfValues(t *testing.T) {
 	rendered := renderContract(t, strings.Replace(
 		miniContract,
 		"          maxLength: 320",
@@ -91,7 +91,7 @@ func TestUnEnumDevientUneUnionDeValeurs(t *testing.T) {
 
 // Un objet libre — `assertion` et `attestation` du contrat réel — traverse sans que ses clés soient
 // décrites : leur forme appartient à la spécification WebAuthn.
-func TestUnObjetLibreTraverseSansEtreDecrit(t *testing.T) {
+func TestAFreeFormObjectPassesThroughWithoutBeingDescribed(t *testing.T) {
 	rendered := renderContract(t, strings.Replace(
 		miniContract,
 		"          type: string\n          maxLength: 320",
@@ -106,7 +106,7 @@ func TestUnObjetLibreTraverseSansEtreDecrit(t *testing.T) {
 // un objet imbriqué — sortirait sinon en `z.unknown()` : un schéma qui accepte tout, vert à
 // l'exécution, et qui ne garde plus rien. C'est le mode d'échec d'un générateur partiel, et
 // il est muet.
-func TestUnTypeQueLeGenerateurNeSaitPasRendreEstRefuse(t *testing.T) {
+func TestATypeTheGeneratorCannotRenderIsRefused(t *testing.T) {
 	doc, err := load([]byte(strings.Replace(miniContract, "type: string\n          maxLength: 320", "type: integer\n          maximum: 10", 1)))
 	require.NoError(t, err)
 
@@ -118,7 +118,7 @@ func TestUnTypeQueLeGenerateurNeSaitPasRendreEstRefuse(t *testing.T) {
 // La garde du littéral, et elle n'est pas théorique : sans elle, l'apostrophe referme la chaîne et
 // le fichier engendré n'est plus analysable — engendré **en silence**, puisque `make generate` rend
 // 0 et que c'est `typecheck-web`, une porte plus loin, qui le découvre.
-func TestUneApostropheDansUnEnumEstRefusee(t *testing.T) {
+func TestAnApostropheInAnEnumIsRefused(t *testing.T) {
 	doc, err := load([]byte(strings.Replace(
 		miniContract,
 		"          maxLength: 320",
@@ -133,7 +133,7 @@ func TestUneApostropheDansUnEnumEstRefusee(t *testing.T) {
 
 // `start` est la seule porte d'entrée que le Makefile emprunte, et une invocation sans ses deux
 // chemins indexerait hors bornes.
-func TestZodgenRefuseUneInvocationSansSesDeuxChemins(t *testing.T) {
+func TestZodgenRefusesAnInvocationWithoutItsTwoPaths(t *testing.T) {
 	require.ErrorContains(t, start([]string{"api/openapi-bff.yaml"}), "deux arguments")
 	require.ErrorContains(t, start(nil), "deux arguments")
 }
@@ -141,7 +141,7 @@ func TestZodgenRefuseUneInvocationSansSesDeuxChemins(t *testing.T) {
 // Ce que le générateur cherche est le corps de requête, pas l'inventaire de `components.schemas` :
 // engendrer les réponses ferait du code sans consommateur que `check-generated` forcerait à
 // maintenir à vie.
-func TestUnSchemaQuAucunCorpsDeRequeteNeReferenceEstIgnore(t *testing.T) {
+func TestASchemaNoRequestBodyReferencesIsIgnored(t *testing.T) {
 	rendered := renderContract(t, miniContract+`
     Me:
       type: object
@@ -158,7 +158,7 @@ func TestUnSchemaQuAucunCorpsDeRequeteNeReferenceEstIgnore(t *testing.T) {
 // **sans que rien ne change dans le contrat** : `check-generated` rougirait au hasard, en CI, sur
 // une PR qui n'a pas touché le YAML. Vingt rendus plutôt que deux : un seul tri retiré laisse encore
 // une chance sur vingt-quatre de tomber juste.
-func TestLaSortieNeDependPasDuParcoursDesMaps(t *testing.T) {
+func TestTheOutputDoesNotDependOnMapIterationOrder(t *testing.T) {
 	doc, err := loadFile("../../api/openapi-bff.yaml")
 	require.NoError(t, err)
 
@@ -174,7 +174,7 @@ func TestLaSortieNeDependPasDuParcoursDesMaps(t *testing.T) {
 
 // Le contrat réel, et non l'échantillon : c'est lui que `make generate` traverse, et lui seul qui
 // dit si les quatre corps de requête passent tous les cas que le générateur sait rendre.
-func TestLeContratDuDepotEstEngendrableEnEntier(t *testing.T) {
+func TestTheRepositoryContractCanBeGeneratedInFull(t *testing.T) {
 	doc, err := loadFile("../../api/openapi-bff.yaml")
 	require.NoError(t, err)
 
@@ -188,7 +188,7 @@ func TestLeContratDuDepotEstEngendrableEnEntier(t *testing.T) {
 	}
 }
 
-func TestUnTableauPorteSesElementsEtSaBorne(t *testing.T) {
+func TestAnArrayCarriesItsItemsAndItsBound(t *testing.T) {
 	contract := strings.Replace(miniContract, "      required: [email, password]",
 		"        roleIds:\n          type: array\n          maxItems: 100\n          items: { type: string, maxLength: 64 }\n      required: [email, password]", 1)
 

@@ -27,13 +27,13 @@ import (
 // le même espace d'identifiants : la même valeur ferait attendre un seed derrière une migration
 // concurrente, ou l'inverse. Les deux constantes sont comparées plutôt que recopiées — un nombre
 // recopié dans un commentaire n'est vérifié par personne.
-func TestLeVerrouDuSeedNEntrePasEnCollisionAvecCeluiDeGoose(t *testing.T) {
+func TestTheSeedLockDoesNotCollideWithTheGooseOne(t *testing.T) {
 	t.Parallel()
 
 	assert.NotEqual(t, lock.DefaultLockID, store.SeedLockKey)
 }
 
-func TestUnSecondSeedAttendLePremierPlutotQueDEchouer(t *testing.T) {
+func TestASecondSeedWaitsForTheFirstRatherThanFailing(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()

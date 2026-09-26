@@ -14,7 +14,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-func TestLeLienPartDeLAdressePubliqueEtJamaisDAilleurs(t *testing.T) {
+func TestTheLinkStartsFromThePublicAddressAndNowhereElse(t *testing.T) {
 	message := composeAccessLinkMail("Cockpit", "ops@exemple.test", "https://cockpit.exemple.test",
 		store.PendingLink{
 			Email: "nadia@exemple.test", DisplayName: "Nadia", Kind: store.LinkActivation,
@@ -29,7 +29,7 @@ func TestLeLienPartDeLAdressePubliqueEtJamaisDAilleurs(t *testing.T) {
 	assert.Contains(t, message, "Content-Type: text/plain; charset=utf-8")
 }
 
-func TestLeLienDeResetDitCeQueSonUsageChange(t *testing.T) {
+func TestTheResetLinkSaysWhatUsingItChanges(t *testing.T) {
 	message := composeAccessLinkMail("Cockpit", "ops@exemple.test", "https://cockpit.exemple.test",
 		store.PendingLink{
 			Email: "nadia@exemple.test", DisplayName: "Nadia", Kind: store.LinkReset,
@@ -49,7 +49,7 @@ func TestLeLienDeResetDitCeQueSonUsageChange(t *testing.T) {
 
 // Un message SMTP est délimité en CRLF (RFC 5321 §2.3.1) : un simple "\n" est ce qu'un client mail
 // tolérant masquerait, et Mailpit non.
-func TestLeMessageEstDelimiteEnCRLF(t *testing.T) {
+func TestTheMessageIsDelimitedWithCRLF(t *testing.T) {
 	message := composeAccessLinkMail("Cockpit", "ops@exemple.test", "https://cockpit.exemple.test",
 		store.PendingLink{
 			Email: "nadia@exemple.test", DisplayName: "Nadia", Kind: store.LinkActivation,
@@ -62,7 +62,7 @@ func TestLeMessageEstDelimiteEnCRLF(t *testing.T) {
 
 // Les en-têtes obligatoires d'un message SMTP minimal : sans eux, certains relais (Mailpit compris,
 // selon la RFC 5322 §3.6) refusent ou horodatent le message eux-mêmes.
-func TestLesEnTetesObligatoiresSontPresents(t *testing.T) {
+func TestTheMandatoryHeadersArePresent(t *testing.T) {
 	message := composeAccessLinkMail("Cockpit", "ops@exemple.test", "https://cockpit.exemple.test",
 		store.PendingLink{
 			Email: "nadia@exemple.test", DisplayName: "Nadia", Kind: store.LinkActivation,
@@ -109,7 +109,7 @@ func fakeSMTPServer(t *testing.T, rcptReply string) string {
 // Un refus RCPT réel cite couramment l'adresse rejetée dans son texte (RFC 5321 §4.2, exemple
 // classique du code 550) : ce test prouve que ce texte n'atteint jamais l'erreur rendue par
 // smtpSender, ni le jeton ni le corps du message qu'un serveur plus bavard pourrait aussi citer.
-func TestUnRefusRCPTNeCiteNiLAdresseNiLeJetonNiLeCorps(t *testing.T) {
+func TestARCPTRefusalCitesNeitherTheAddressNorTheTokenNorTheBody(t *testing.T) {
 	addr := fakeSMTPServer(t, "550 5.1.1 <nadia@exemple.test>: Recipient address rejected")
 
 	send := smtpSender(config.MailConfig{

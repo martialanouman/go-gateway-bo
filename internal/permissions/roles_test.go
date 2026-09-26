@@ -117,7 +117,7 @@ var deliberateOrphans = []permissions.Key{
 	permissions.RolesManage,
 }
 
-func TestChaqueRoleParDefautAccordeExactementCeQueLaSpecDit(t *testing.T) {
+func TestEveryDefaultRoleGrantsExactlyWhatTheSpecSays(t *testing.T) {
 	t.Parallel()
 
 	require.Len(t, specRoles, specRoleCount-1,
@@ -149,7 +149,7 @@ func TestChaqueRoleParDefautAccordeExactementCeQueLaSpecDit(t *testing.T) {
 // égalité est ce qui le tient. Une clé ajoutée au catalogue par une release future lui revient
 // d'office — sans quoi le propriétaire du produit perdrait l'accès à ce que la release ajoute, et
 // ne pourrait même pas se l'accorder, `roles:manage` étant une de ces clés.
-func TestSuperAdminEstExactementLeCatalogue(t *testing.T) {
+func TestSuperAdminIsExactlyTheCatalog(t *testing.T) {
 	t.Parallel()
 
 	granted := grantsByRole(t)
@@ -166,7 +166,7 @@ func TestSuperAdminEstExactementLeCatalogue(t *testing.T) {
 	assert.Empty(t, missing(actual, all), "Propriétaire accorde %v, hors catalogue", missing(actual, all))
 }
 
-func TestAucuneCleOrphelineHorsDesTroisDeliberees(t *testing.T) {
+func TestNoOrphanKeyBesidesTheThreeDeliberateOnes(t *testing.T) {
 	t.Parallel()
 
 	held := map[permissions.Key]bool{}
@@ -198,7 +198,7 @@ func TestAucuneCleOrphelineHorsDesTroisDeliberees(t *testing.T) {
 // Le sens inverse du catalogue : `Key` a `string` pour sous-jacent, donc `Key("routes:raed")` écrit
 // dans un rôle **compile**. La faute de frappe accorderait alors une permission que personne
 // n'exige, et retirerait en silence celle qu'on croyait donner.
-func TestAucunRoleNAccordeUneCleHorsCatalogue(t *testing.T) {
+func TestNoRoleGrantsAKeyOutsideTheCatalog(t *testing.T) {
 	t.Parallel()
 
 	catalogued := map[permissions.Key]bool{}
@@ -217,7 +217,7 @@ func TestAucunRoleNAccordeUneCleHorsCatalogue(t *testing.T) {
 // Une clé déclarée deux fois dans le même rôle échappe à la comparaison par ensembles ci-dessus, et
 // ne se manifeste qu'au seed : `role_permissions` a `(role_id, permission_key)` pour clé primaire,
 // donc l'insertion échouerait sur une violation d'unicité — loin d'ici, et au déploiement.
-func TestAucunRoleNAccordeDeuxFoisLaMemeCle(t *testing.T) {
+func TestNoRoleGrantsTheSameKeyTwice(t *testing.T) {
 	t.Parallel()
 
 	for _, role := range permissions.DefaultRoles() {
@@ -230,7 +230,7 @@ func TestAucunRoleNAccordeDeuxFoisLaMemeCle(t *testing.T) {
 	}
 }
 
-func TestChaqueRoleParDefautPorteUneDescription(t *testing.T) {
+func TestEveryDefaultRoleCarriesADescription(t *testing.T) {
 	t.Parallel()
 
 	require.Len(t, permissions.DefaultRoles(), specRoleCount)
@@ -247,7 +247,7 @@ func TestChaqueRoleParDefautPorteUneDescription(t *testing.T) {
 // appelant qui recevrait la structure elle-même pourrait réécrire la politique d'autorisation pour
 // tout le process — y compris pour les gardes. La tranche de clés est imbriquée : la cloner est ce
 // qui distingue une copie profonde d'une copie qui n'en est pas une.
-func TestDefaultRolesRendUneCopieEtNonLaPolitiqueElleMeme(t *testing.T) {
+func TestDefaultRolesReturnsACopyNotThePolicyItself(t *testing.T) {
 	t.Parallel()
 
 	first := permissions.DefaultRoles()

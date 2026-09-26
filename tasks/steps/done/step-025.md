@@ -237,7 +237,7 @@ La source des permissions passe par un type de fonction plutôt que par le `*ses
 `internal/bff` ne monte aucune base, et sans cette couture la branche « la clé manque » n'aurait
 aucun test avant step-029 — donc la mutation qui retire la comparaison resterait verte. Toute couture
 a son propre risque, celui de vérifier ce que la production ne câble pas ; il est fermé par
-`TestLaGardeEstCablee`, qui exige du type-checker que le montage atteigne `(*session.Manager).Grants`.
+`TestTheGuardIsWired`, qui exige du type-checker que le montage atteigne `(*session.Manager).Grants`.
 
 **Sa première rédaction était verte pour la mauvaise raison**, et c'est écrit dans le test : elle
 cherchait l'appel « quelque part dans le paquet », or `me.go` appelle déjà `Grants` pour rendre les
@@ -279,13 +279,13 @@ confrontait les deux. La porte l'a dit à sa première exécution.
 
 | Mutation | Ce qui rougit |
 |---|---|
-| la comparaison de permission retirée | `TestUneSessionSansLaCleEstRefusee` |
-| l'exigence d'élévation retirée | `TestUneSessionNonElevueEstRefuseeAvantTouteLecture` |
-| le défaut ouvert au lieu de fermé | `TestUneOperationQueLaTableNeDecidePasEstRefusee` |
-| `(nil, nil)` sans écrire → 200 vide | `TestUneSessionNonElevueEstRefuseeAvantTouteLecture` |
+| la comparaison de permission retirée | `TestASessionWithoutTheKeyIsRefused` |
+| l'exigence d'élévation retirée | `TestANonElevatedSessionIsRefusedBeforeAnyRead` |
+| le défaut ouvert au lieu de fermé | `TestAnOperationTheTableDoesNotDecideIsRefused` |
+| `(nil, nil)` sans écrire → 200 vide | `TestANonElevatedSessionIsRefusedBeforeAnyRead` |
 | la réponse typée d'une **autre** opération → 500 | idem |
-| la panne de lecture déguisée en refus | `TestUnePanneDeLectureDesPermissionsNestPasUnRefus` |
-| la garde retirée du montage | `TestLaGardeEstCablee` |
+| la panne de lecture déguisée en refus | `TestAPermissionReadFailureIsNotARefusal` |
+| la garde retirée du montage | `TestTheGuardIsWired` |
 | la source des permissions n'est plus la vraie | idem |
 | le montage sur une source de façade | idem |
 | une entrée retirée de la table — **en retirant** | porte, propriété 1 |
@@ -302,7 +302,7 @@ confrontait les deux. La porte l'a dit à sa première exécution.
 nulle » ne reproduisait rien — voir DN-8, où l'affirmation qu'elle devait vérifier se révèle fausse et
 se corrige.
 
-**Une porte a d'abord été verte pour la mauvaise raison** : `TestLaGardeEstCablee`, avant d'être
+**Une porte a d'abord été verte pour la mauvaise raison** : `TestTheGuardIsWired`, avant d'être
 resserrée sur le corps des fonctions — voir DN-11.
 
 ## Mutations mesurées — PR 1/2
@@ -312,7 +312,7 @@ Jouées une par une, `-count=1`, lues au code de sortie.
 | Mutation | Ce qui rougit |
 |---|---|
 | `EnsureAuditPartitions` retirée du démarrage | scénario des partitions |
-| le branchement du ticker retiré | `TestLeDemarrageEntretientLesPartitionsDAudit` |
+| le branchement du ticker retiré | `TestStartupMaintainsTheAuditPartitions` |
 | l'audit du login non écrit | « une connexion réussie laisse exactement une trace » |
 | l'audit du retrait de passkey retiré | « retirer une clé d'accès laisse une trace » |
 | l'adresse de l'appelant non transmise | « l'événement porte l'adresse de l'appelant » |
@@ -381,7 +381,7 @@ sur une écriture » n'ont **aucune route sur laquelle s'écrire** dans M1. `ste
 ## Definition of Done
 - [x] `make check` vert, `make e2e` vert
 - [x] **retirer une garde fait rougir** — mesuré sur les trois refus du middleware, et sur le
-      **câblage** séparément : la garde retirée du montage fait rougir `TestLaGardeEstCablee`, et
+      **câblage** séparément : la garde retirée du montage fait rougir `TestTheGuardIsWired`, et
       rien d'autre, ce qui est écrit plutôt que caché
 - [x] la mutation « retirer l'exigence de session élevée » fait rougir
 - [x] la mutation « retirer l'écriture d'audit d'une mutation » fait rougir — **le détecteur

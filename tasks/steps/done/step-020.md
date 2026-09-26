@@ -290,7 +290,7 @@ un aveu — à condition d'avoir été **vérifiée** et d'être écrite au-dess
 
 | Mutation appliquée | Ce qui tombe |
 |---|---|
-| `applied != embedded` au lieu de `applied <` | `TestUnSchemaEnAvanceLaisseDemarrer` — une instance en cours de remplacement refuserait de servir |
+| `applied != embedded` au lieu de `applied <` | `TestASchemaAheadAllowsStartup` — une instance en cours de remplacement refuserait de servir |
 | `Provider.GetVersions` à la place de `database.NewStore` *(import retiré pour que ça compile)* | `le contrôle de version a créé la table de version sur une base qu'il refuse` |
 | Le code 42P01 traité comme une panne | la base vierge n'est plus refusée pour la bonne raison (`ErrorAs` tombe) |
 | La version embarquée figée à **1**, puis à **9**, au lieu d'être lue sur les sources | les deux directions de dérive rougissent. Figée à sa valeur juste, elle reste verte — c'est le seul cas où elle est équivalente |

@@ -49,7 +49,7 @@ func mutation(contentType string, headers map[string]string) *http.Request {
 // Chaque cas est une **décision** distincte de la garde, pas une valeur de plus dans un mapping : le
 // navigateur qui annonce sa destination, celui qui ne l'annonce pas, le sous-domaine voisin, et le
 // client qui n'est ni l'un ni l'autre.
-func TestUneMutationNEstServieQueDepuisLeTableauDeBord(t *testing.T) {
+func TestAMutationIsOnlyServedFromTheDashboard(t *testing.T) {
 	t.Parallel()
 
 	for name, testCase := range map[string]struct {
@@ -106,7 +106,7 @@ func TestUneMutationNEstServieQueDepuisLeTableauDeBord(t *testing.T) {
 
 // Une lecture n'est jamais contrôlée : un onglet ouvert depuis un lien extérieur est légitime, et le
 // contrôler serait refuser la navigation elle-même.
-func TestUneLectureTraverseSansAnnoncerSonOrigine(t *testing.T) {
+func TestAReadPassesWithoutAnnouncingItsOrigin(t *testing.T) {
 	t.Parallel()
 
 	for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodOptions} {
@@ -123,7 +123,7 @@ func TestUneLectureTraverseSansAnnoncerSonOrigine(t *testing.T) {
 	}
 }
 
-func TestUnCorpsDeMutationEstAnnonceEnJSON(t *testing.T) {
+func TestAMutationBodyIsAnnouncedAsJSON(t *testing.T) {
 	t.Parallel()
 
 	for name, testCase := range map[string]struct {
@@ -174,7 +174,7 @@ func TestUnCorpsDeMutationEstAnnonceEnJSON(t *testing.T) {
 // débuts de cérémonie WebAuthn, et le retrait d'une clé d'accès — ce qu'il désigne est dans son
 // chemin. Sans cette branche, les quatre seraient refusées. Le `DELETE` les représente ici ; ce que
 // la branche lit est `ContentLength`, que la méthode ne change pas.
-func TestUneMutationSansCorpsNaRienAAnnoncer(t *testing.T) {
+func TestAMutationWithoutBodyHasNothingToAnnounce(t *testing.T) {
 	t.Parallel()
 
 	request := httptest.NewRequest(http.MethodDelete, "/api/auth/mfa/webauthn/passkeys/x", nil)
@@ -188,7 +188,7 @@ func TestUneMutationSansCorpsNaRienAAnnoncer(t *testing.T) {
 
 // Le refus nomme ce qui manque et par où passer, et ne fuit rien : c'est un DTO déclaré, pas un
 // `http.Error` en texte brut.
-func TestUnRefusDOrigineEstUnDTODeclare(t *testing.T) {
+func TestAnOriginRefusalIsADeclaredDTO(t *testing.T) {
 	t.Parallel()
 
 	recorder := httptest.NewRecorder()
@@ -205,7 +205,7 @@ func TestUnRefusDOrigineEstUnDTODeclare(t *testing.T) {
 // La valeur zéro de `Dependencies` ferme au lieu d'ouvrir. Elle est inatteignable depuis le binaire
 // — la configuration exige l'origine avant la liaison du port — mais une garde dont la valeur zéro
 // sert tout le monde est une garde qu'un câblage futur désactive sans un mot.
-func TestUneOrigineNonConfigureeNeSertAucuneMutation(t *testing.T) {
+func TestAnUnconfiguredOriginServesNoMutation(t *testing.T) {
 	t.Parallel()
 
 	reached := false

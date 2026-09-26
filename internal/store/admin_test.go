@@ -15,7 +15,7 @@ import (
 // Un rôle supprimé pendant qu'on l'attribue n'est pas une panne : l'attribution attend le verrou du
 // rôle, puis trouve la clé étrangère rompue — c'est « l'un des rôles désignés n'existe plus ». Le décor
 // tient la suppression ouverte, et l'attente est observée dans `pg_locks` plutôt que temporisée.
-func TestUnRoleSupprimePendantSonAttributionEstUneReferenceInconnue(t *testing.T) {
+func TestARoleDeletedDuringItsAssignmentIsAnUnknownReference(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)

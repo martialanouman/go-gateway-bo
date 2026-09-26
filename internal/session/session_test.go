@@ -21,7 +21,7 @@ import (
 // pas, pas qu'une clé est solide.
 var testSecret = []byte("une-cle-de-test-assez-longue-pour-la-borne")
 
-func TestUnJetonScelleSeRelitEtRendLEmpreinteQuiSeraStockee(t *testing.T) {
+func TestASealedTokenReadsBackAndYieldsTheFingerprintToBeStored(t *testing.T) {
 	t.Parallel()
 
 	value, stored, err := newSealedToken(testSecret)
@@ -43,7 +43,7 @@ func TestUnJetonScelleSeRelitEtRendLEmpreinteQuiSeraStockee(t *testing.T) {
 }
 
 // Sans cette vérification, n'importe qui compose un cookie sur l'empreinte de son choix.
-func TestUneSignatureAltereeEstRefusee(t *testing.T) {
+func TestATamperedSignatureIsRefused(t *testing.T) {
 	t.Parallel()
 
 	value, _, err := newSealedToken(testSecret)
@@ -53,7 +53,7 @@ func TestUneSignatureAltereeEstRefusee(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestUnCookieSansSeparateurEstRefuse(t *testing.T) {
+func TestACookieWithoutSeparatorIsRefused(t *testing.T) {
 	t.Parallel()
 
 	value, _, err := newSealedToken(testSecret)
@@ -65,7 +65,7 @@ func TestUnCookieSansSeparateurEstRefuse(t *testing.T) {
 
 // La clé fait toute la différence entre « ce cookie vient de ce serveur » et « ce cookie vient de
 // quelque part ». C'est aussi ce qui arrive quand deux instances ne portent pas la même.
-func TestUnCookieScelleAvecUneAutreCleEstRefuse(t *testing.T) {
+func TestACookieSealedWithAnotherKeyIsRefused(t *testing.T) {
 	t.Parallel()
 
 	value, _, err := newSealedToken([]byte("une-autre-cle-tout-aussi-longue-que-la-borne"))
@@ -89,7 +89,7 @@ const base64URLAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0
 // 2 ou 3 ; les trois autres fois, toutes les candidates décodent vers d'autres octets et tombent sur
 // la comparaison du HMAC, qui les refuse quoi qu'il arrive. Poser les bits de remplissage à `1`, `2`
 // puis `3` rend les trois autres écritures du même sceau, à coup sûr et à chaque exécution.
-func TestUnSceauNonCanoniqueEstRefuse(t *testing.T) {
+func TestANonCanonicalSealIsRefused(t *testing.T) {
 	t.Parallel()
 
 	value, _, err := newSealedToken(testSecret)
@@ -129,7 +129,7 @@ func TestUnSceauNonCanoniqueEstRefuse(t *testing.T) {
 	}
 }
 
-func TestDeuxSessionsNePartagentPasLeurJeton(t *testing.T) {
+func TestTwoSessionsDoNotShareTheirToken(t *testing.T) {
 	t.Parallel()
 
 	first, firstHash, err := newSealedToken(testSecret)
@@ -149,7 +149,7 @@ func TestDeuxSessionsNePartagentPasLeurJeton(t *testing.T) {
 // Le pool est fermé, donc toute requête échoue bruyamment : « refusé au sceau » rend `false, nil`,
 // « arrivé jusqu'à la base » rend une erreur. Le second cas est le **témoin** — sans lui, un
 // `Resolve` qui ne ferait jamais rien passerait ce test.
-func TestUnCookieMalScelleNAtteintPasLaBase(t *testing.T) {
+func TestABadlySealedCookieDoesNotReachTheDatabase(t *testing.T) {
 	t.Parallel()
 
 	authentic, _, err := newSealedToken(testSecret)
@@ -174,7 +174,7 @@ func TestUnCookieMalScelleNAtteintPasLaBase(t *testing.T) {
 // tient le cookie hors de portée d'un script, `Secure` hors d'un transport en clair, `SameSite` hors
 // d'une requête intersite qui écrit, `Path` et l'absence de `Domain` sont ce que le préfixe
 // `__Host-` exige du navigateur.
-func TestLeCookieDeSessionPorteSesCinqAttributs(t *testing.T) {
+func TestTheSessionCookieCarriesItsFiveAttributes(t *testing.T) {
 	t.Parallel()
 
 	cookie := Issued("une-valeur")
@@ -191,7 +191,7 @@ func TestLeCookieDeSessionPorteSesCinqAttributs(t *testing.T) {
 
 // Les attributs doivent coïncider avec ceux d'`Issued`, sinon le navigateur pose un second cookie au
 // lieu de remplacer le premier — et continue d'envoyer l'ancien.
-func TestLeCookieDeDeconnexionRecouvreCeluiDeLaSession(t *testing.T) {
+func TestTheLogoutCookieOverwritesTheSessionOne(t *testing.T) {
 	t.Parallel()
 
 	issued, cleared := Issued("une-valeur"), Cleared()

@@ -49,7 +49,7 @@ func issueChallenge(t *testing.T, dsn, operatorID, token string) {
 	require.EqualValues(t, 1, touched)
 }
 
-func TestUnOperateurSansEnrolementNaPasDeSecondFacteur(t *testing.T) {
+func TestAnOperatorWithoutEnrollmentHasNoSecondFactor(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -67,7 +67,7 @@ func TestUnOperateurSansEnrolementNaPasDeSecondFacteur(t *testing.T) {
 
 // Le pas vient du **serveur de base** et non du process : deux instances aux horloges décalées
 // accepteraient sinon un code que l'autre refuse.
-func TestLePasCourantEstCeluiDeLHorlogeDeLaBase(t *testing.T) {
+func TestTheCurrentStepIsTheDatabaseClockOne(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -88,7 +88,7 @@ func TestLePasCourantEstCeluiDeLHorlogeDeLaBase(t *testing.T) {
 // L'absence est **distincte** de « pas encore enrôlé », et pas par coquetterie : une session résolue
 // puis un compte désactivé dans l'intervalle se lirait sinon comme « il lui reste à enrôler un
 // authentificateur », et l'enrôlement d'un compte désactivé lui rouvrirait la porte.
-func TestUnOperateurDesactiveNaPlusDeSecondFacteurALire(t *testing.T) {
+func TestADisabledOperatorHasNoSecondFactorLeftToRead(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -109,7 +109,7 @@ func TestUnOperateurDesactiveNaPlusDeSecondFacteurALire(t *testing.T) {
 
 // Le compte de codes appartient à `internal/mfa`, qui les tire ; ce que ce cas observe est que ce
 // qu'on lui donne ressort intact et dans le même ordre.
-func TestLEnrolementPoseLeSecretEtSesCodes(t *testing.T) {
+func TestEnrollmentSetsTheSecretAndItsCodes(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -137,7 +137,7 @@ func TestLEnrolementPoseLeSecretEtSesCodes(t *testing.T) {
 
 // Un secret neuf avec les anciens codes laisserait entrer avec une liste que l'opérateur croit
 // périmée. Les deux écritures sont dans la même transaction pour cette raison.
-func TestUnReenrolementRemplaceLesCodesPrecedents(t *testing.T) {
+func TestAReenrollmentReplacesThePreviousCodes(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -155,7 +155,7 @@ func TestUnReenrolementRemplaceLesCodesPrecedents(t *testing.T) {
 // **La garde du remplacement, et elle vit dans l'écriture.** L'appelant sait déjà s'il y a un facteur
 // en place, mais entre sa lecture et celle-ci il y a le tirage du secret et le hachage des codes — un
 // quart de seconde dont l'appelant choisit le cadencement. Un booléen lu avant ne garde rien.
-func TestUnEnrolementSansRemplacementNEcrasePasUnFacteurEnPlace(t *testing.T) {
+func TestAnEnrollmentWithoutReplacementDoesNotOverwriteAnExistingFactor(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -184,7 +184,7 @@ func TestUnEnrolementSansRemplacementNEcrasePasUnFacteurEnPlace(t *testing.T) {
 // L'anti-rejeu porte sur les codes d'un secret. Le précédent vient de disparaître, donc son dernier
 // pas consommé n'a plus rien à refuser — et le garder pourrait bloquer une demi-minute le premier code
 // du secret neuf.
-func TestUnReenrolementRemetLAntiRejeuAZero(t *testing.T) {
+func TestAReenrollmentResetsTheAntiReplay(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -205,7 +205,7 @@ func TestUnReenrolementRemetLAntiRejeuAZero(t *testing.T) {
 
 // **Le test central de la step.** Sans l'anti-rejeu, un code intercepté se rejoue pendant toute la
 // fenêtre de dérive.
-func TestUnPasDejaConsommeEstRefuse(t *testing.T) {
+func TestAnAlreadyConsumedStepIsRefused(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -222,7 +222,7 @@ func TestUnPasDejaConsommeEstRefuse(t *testing.T) {
 
 // La garde est **monotone** et non « pas deux fois le même » : avec ±1 pas de dérive, refuser
 // seulement l'identique laisserait rejouer le code du pas précédent, encore dans la fenêtre.
-func TestUnPasAnterieurAuDernierConsommeEstRefuse(t *testing.T) {
+func TestAStepBeforeTheLastConsumedOneIsRefused(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -243,7 +243,7 @@ func TestUnPasAnterieurAuDernierConsommeEstRefuse(t *testing.T) {
 }
 
 // Deux opérateurs ne partagent pas leur compteur : la garde porte sur la ligne, pas sur la table.
-func TestLAntiRejeuEstProprementParOperateur(t *testing.T) {
+func TestTheAntiReplayIsStrictlyPerOperator(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -261,7 +261,7 @@ func TestLAntiRejeuEstProprementParOperateur(t *testing.T) {
 
 // **Le verrou qui borne la recherche exhaustive**, et qui manquait : le compteur par challenge ne
 // borne rien, puisqu'une connexion réussie n'incrémente aucun compteur du premier facteur.
-func TestLeVerrouDeSecondFacteurTombeAuSeuilEtPasAvant(t *testing.T) {
+func TestTheSecondFactorLockFallsAtTheThresholdAndNotBefore(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -280,7 +280,7 @@ func TestLeVerrouDeSecondFacteurTombeAuSeuilEtPasAvant(t *testing.T) {
 }
 
 // Le verrou porte sur **l'opérateur** : celui d'un compte ne ferme pas la porte d'un autre.
-func TestLeVerrouDeSecondFacteurEstProprementParOperateur(t *testing.T) {
+func TestTheSecondFactorLockIsStrictlyPerOperator(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -300,7 +300,7 @@ func TestLeVerrouDeSecondFacteurEstProprementParOperateur(t *testing.T) {
 // La dimension du second facteur est **distincte** de celles du premier : verrouiller le second ne
 // ferme pas la connexion, et le compteur d'adresse ne verrouille pas le second facteur. Les
 // confondre ferait qu'un opérateur qui se trompe de code perdrait aussi sa connexion.
-func TestLeVerrouDeSecondFacteurNeSeConfondPasAvecCeluiDeLaConnexion(t *testing.T) {
+func TestTheSecondFactorLockIsDistinctFromTheLoginLock(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -328,7 +328,7 @@ func TestLeVerrouDeSecondFacteurNeSeConfondPasAvecCeluiDeLaConnexion(t *testing.
 
 // Un silence plus long que la fenêtre remet le compteur à un — même arbitrage qu'au premier facteur :
 // plus court, un verrou qui vient d'expirer se refermerait au premier essai suivant.
-func TestUnVerrouDeSecondFacteurEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
+func TestAnExpiredSecondFactorLockLetsTheCounterRestartFromOne(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -363,7 +363,7 @@ func TestUnVerrouDeSecondFacteurEchuLaisseLeCompteurRepartirDeUn(t *testing.T) {
 // Franchir le second facteur efface le compteur — contrairement au premier, où seule la dimension de
 // l'adresse est effacée. Ici la dimension **est** l'opérateur, et celui qui vient de franchir son
 // second facteur est précisément celui à qui le compteur était destiné.
-func TestFranchirLeSecondFacteurEffaceSonCompteur(t *testing.T) {
+func TestPassingTheSecondFactorClearsItsCounter(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -385,7 +385,7 @@ func TestFranchirLeSecondFacteurEffaceSonCompteur(t *testing.T) {
 	assert.False(t, lock.Locked())
 }
 
-func TestUnChallengeVivantSeRetrouveAvecSonOperateur(t *testing.T) {
+func TestALiveChallengeIsFoundWithItsOperator(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -402,7 +402,7 @@ func TestUnChallengeVivantSeRetrouveAvecSonOperateur(t *testing.T) {
 // Deux façons de cesser d'être utilisable, et une troisième juste en dessous — « ce jeton n'existe
 // pas », qui n'a rien à abîmer. Toutes rendent la **même** absence : le refus qu'elles produisent ne
 // dit pas laquelle s'applique.
-func TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas(t *testing.T) {
+func TestAChallengeNoLongerUsableIsNotFound(t *testing.T) {
 	t.Parallel()
 
 	for name, breakIt := range map[string]string{
@@ -437,7 +437,7 @@ func TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas(t *testing.T) {
 			// du facteur — un déchiffrement AES-GCM pour un TOTP, un argon2id pour un code de
 			// récupération, jamais les deux. Un challenge qui échoit dans cet intervalle serait consommé
 			// et élèverait la session si le `WHERE` ne le refusait pas.
-			// C'est ce que son jumeau `ConsumeCeremony` vérifie déjà (`TestUnDefiEchuNeSeRelitPas`),
+			// C'est ce que son jumeau `ConsumeCeremony` vérifie déjà (`TestAnExpiredChallengeDoesNotReadBack`),
 			// et que rien ne tenait ici.
 			consumed, err := mfa.ConsumeChallenge(t.Context(), challenge.ID)
 			require.NoError(t, err)
@@ -448,7 +448,7 @@ func TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas(t *testing.T) {
 	}
 }
 
-func TestUnJetonQueLaBaseNePortePasNeRetrouveAucunChallenge(t *testing.T) {
+func TestATokenTheDatabaseDoesNotHoldFindsNoChallenge(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -463,7 +463,7 @@ func TestUnJetonQueLaBaseNePortePasNeRetrouveAucunChallenge(t *testing.T) {
 
 // La consommation est le point de sérialisation : deux requêtes concurrentes portant le même
 // challenge n'en élèvent qu'une.
-func TestUnChallengeNeSeConsommeQuUneFois(t *testing.T) {
+func TestAChallengeIsConsumedOnlyOnce(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -484,7 +484,7 @@ func TestUnChallengeNeSeConsommeQuUneFois(t *testing.T) {
 
 // Consommé et non détruit : « déjà servi » doit rester discernable de « n'a jamais existé » pour
 // l'audit.
-func TestUnChallengeConsommeResteEnBase(t *testing.T) {
+func TestAConsumedChallengeStaysInTheDatabase(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -505,7 +505,7 @@ func TestUnChallengeConsommeResteEnBase(t *testing.T) {
 
 // Détruit et non marqué : il n'y a rien à réafficher, donc rien à fuir, et un code détruit ne se
 // distingue pas d'un code qui n'a jamais existé.
-func TestUnCodeDeRecuperationConsommeDisparait(t *testing.T) {
+func TestAConsumedRecoveryCodeDisappears(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -532,7 +532,7 @@ func TestUnCodeDeRecuperationConsommeDisparait(t *testing.T) {
 }
 
 // Ce que `GET /auth/me` rend : un booléen et un compte, jamais un secret ni un code.
-func TestLesFacteursRenduSontUnBooleenEtUnCompte(t *testing.T) {
+func TestTheReturnedFactorsAreABooleanAndACount(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -562,7 +562,7 @@ func TestLesFacteursRenduSontUnBooleenEtUnCompte(t *testing.T) {
 	assert.Equal(t, 2, factors.RecoveryCodesRemaining)
 }
 
-func TestRendreUnEssaiLibereLeVerrouSansDescendreSousZero(t *testing.T) {
+func TestGivingBackAnAttemptReleasesTheLockWithoutGoingBelowZero(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -594,7 +594,7 @@ func TestRendreUnEssaiLibereLeVerrouSansDescendreSousZero(t *testing.T) {
 
 // Un onglet resté ouvert sur un premier remplacement confirme un secret qu'un second a écrasé : sans
 // le prédicat sur le secret vérifié, l'ancien TOTP et ses codes partiraient pour un secret jamais vu.
-func TestUneConfirmationPerimeeNeConfirmePasLeRemplacementSuivant(t *testing.T) {
+func TestAStaleConfirmationDoesNotConfirmTheNextReplacement(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)
@@ -626,7 +626,7 @@ func TestUneConfirmationPerimeeNeConfirmePasLeRemplacementSuivant(t *testing.T) 
 
 // Un compte vidé par le lien de réinitialisation n'a plus de facteur à remplacer : l'attente écrite
 // là serait confirmée plus tard sans qu'aucun facteur n'ait prouvé l'accès.
-func TestUnRemplacementSurUnCompteSansFacteurNEcritRien(t *testing.T) {
+func TestAReplacementOnAnAccountWithoutFactorWritesNothing(t *testing.T) {
 	t.Parallel()
 
 	mfa, dsn := mfaOn(t)

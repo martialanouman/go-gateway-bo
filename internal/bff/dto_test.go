@@ -85,7 +85,7 @@ var forbiddenFields = map[string]string{
 //
 // **Il ne voit que `internal/bff`, et ce n'est pas la porte entière** : un type de réponse déclaré
 // dans un autre paquet du module lui échappe, ce qui a été mesuré le 30/08/2026. C'est
-// `TestAucuneMethodeDeSerialisationNEstEcriteAilleurs` qui couvre le module, en chargeant `./...`.
+// `TestNoSerializationMethodIsWrittenElsewhere` qui couvre le module, en chargeant `./...`.
 func loadBFF(t *testing.T) *packages.Package {
 	t.Helper()
 
@@ -350,7 +350,7 @@ func declarationFile(pkg *packages.Package, carrier types.Type) string {
 // `…204Response` n'encodent rien.
 //
 // **Ce test ne voit que `internal/bff`.** Le module entier est couvert par
-// `TestAucuneMethodeDeSerialisationNEstEcriteAilleurs`, et les deux ensemble sont la porte : celui-ci
+// `TestNoSerializationMethodIsWrittenElsewhere`, et les deux ensemble sont la porte : celui-ci
 // seul se laisse contourner par un type déclaré ailleurs.
 //
 // La population n'est pas « les types dont le nom contient Response » mais « les types qui

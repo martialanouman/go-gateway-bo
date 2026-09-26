@@ -137,12 +137,12 @@ l'assertion d'une autre porte ne prouve rien.
 
 | Mutation | Rouge rendu par | Verte avant |
 |---|---|---|
-| `hmac.Equal` → `string(a) != string(b)` | `TestLeSceauNeSeCompareQuEnTempsConstant`, seul | oui |
-| `subtle.ConstantTimeCompare` → `==` | `TestUnHachageNeSeCompareQuEnTempsConstant`, seul | oui |
-| `matched = index` → `return index` | `TestLaBoucleDesCodesDeRecuperationNeCourtCircuitePas`, seul | oui |
-| `Inventee Key = "inventee:cle"` hors catalogue | `TestAucuneConstanteNeManqueAuCatalogue`, seul | oui |
-| borne de variété retirée de `requiredSecret` | `TestUnSecretSansVarieteEstRefuseSansEtreCite`, seul | oui |
-| profil argon2id → 19 MiB / t=2 | `TestLesParametresNeDescendentPasSousLePlancher`, seul | oui |
+| `hmac.Equal` → `string(a) != string(b)` | `TestTheSealIsOnlyComparedInConstantTime`, seul | oui |
+| `subtle.ConstantTimeCompare` → `==` | `TestAHashIsOnlyComparedInConstantTime`, seul | oui |
+| `matched = index` → `return index` | `TestTheRecoveryCodeLoopDoesNotShortCircuit`, seul | oui |
+| `Inventee Key = "inventee:cle"` hors catalogue | `TestNoConstantIsMissingFromTheCatalog`, seul | oui |
+| borne de variété retirée de `requiredSecret` | `TestALowVarietySecretIsRefusedWithoutBeingCited`, seul | oui |
+| profil argon2id → 19 MiB / t=2 | `TestTheParametersDoNotGoBelowTheFloor`, seul | oui |
 | `issuer` recodé en dur | le scénario d'enrôlement **et** l'unitaire de l'URI | oui |
 | `RPDisplayName` recodé en dur | le scénario d'enregistrement de passkey | **oui — mesuré vert dans cette PR** |
 
@@ -162,9 +162,9 @@ diagnostic commun est le même — ces portes cherchaient un **jeton** là où l
 | un raccourci naïf posé **devant** `hmac.Equal` ou `subtle.ConstantTimeCompare` | les deux portes refusent désormais toute comparaison d'octets dans le corps gardé, en plus d'exiger l'appel |
 | jeter le résultat de l'appel à temps constant | idem |
 | une méthode homonyme dans un fichier trié avant la cible | `functionBody` échoue sur l'ambiguïté, plus seulement sur l'absence |
-| une constante de permission écrite **sans son type** | `TestToutLeBlocDesClesPorteSonType` : untyped string reste assignable à `Key`, donc utilisable dans une garde |
+| une constante de permission écrite **sans son type** | `TestTheWholeKeyBlockCarriesItsType` : untyped string reste assignable à `Key`, donc utilisable dans une garde |
 | deux constantes de la **même valeur** | le plancher à quarante devient une **égalité** avec le catalogue |
-| une valeur de `.env.example` contenant un espace, non quotée | `TestAucuneValeurDuDotenvNEstDecoupeeParLeShell` — le défaut avait été livré |
+| une valeur de `.env.example` contenant un espace, non quotée | `TestNoDotenvValueIsSplitByTheShell` — le défaut avait été livré |
 
 Deux corrections de plus, qui ne sont pas des trous de porte : `Parallelism` revient à un — la RFC
 9106 le règle sur les cœurs, et une garde qui refuse du légitime finit retirée avec ses voisines —, et

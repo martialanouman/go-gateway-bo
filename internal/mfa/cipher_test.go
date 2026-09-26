@@ -11,7 +11,7 @@ import (
 )
 
 // Ce que la fiche exige de vérifier : la colonne lue en base n'est **pas** un secret utilisable.
-func TestCeQuiVaEnBaseNEstPasLeSecretEnClair(t *testing.T) {
+func TestWhatGoesToTheDatabaseIsNotThePlaintextSecret(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)
@@ -26,7 +26,7 @@ func TestCeQuiVaEnBaseNEstPasLeSecretEnClair(t *testing.T) {
 // **La garde des données associées.** Recopier la colonne d'une ligne sur une autre est un `UPDATE`
 // d'une ligne, et sans cette garde il donnerait à un opérateur le second facteur d'un autre — un
 // chiffré ne sait pas à qui il appartient.
-func TestUnSecretDeplaceSurUneAutreLigneNeSeDechiffrePas(t *testing.T) {
+func TestASecretMovedToAnotherRowDoesNotDecrypt(t *testing.T) {
 	t.Parallel()
 
 	authenticator, enrollment := testEnrollment(t)
@@ -43,7 +43,7 @@ func TestUnSecretDeplaceSurUneAutreLigneNeSeDechiffrePas(t *testing.T) {
 
 // Une colonne abîmée n'est pas un code mal tapé. Les confondre enverrait l'opérateur retenter
 // indéfiniment pendant que personne ne regarde la base — même arbitrage que `auth.MalformedHashError`.
-func TestUneValeurStockeeAbimeeEstUnePanneEtNonUnRefus(t *testing.T) {
+func TestACorruptedStoredValueIsAFailureNotARefusal(t *testing.T) {
 	t.Parallel()
 
 	authenticator, enrollment := testEnrollment(t)
@@ -75,7 +75,7 @@ func TestUneValeurStockeeAbimeeEstUnePanneEtNonUnRefus(t *testing.T) {
 //
 // La valeur est distinctive : sur une chaîne vide, `NotContains` serait vrai de n'importe quel
 // message et le test passerait sans rien exiger.
-func TestLeRefusNeRecopiePasLaValeurQuIlRefuse(t *testing.T) {
+func TestTheRefusalDoesNotEchoTheValueItRefuses(t *testing.T) {
 	t.Parallel()
 
 	authenticator := testAuthenticator(t)
@@ -91,7 +91,7 @@ func TestLeRefusNeRecopiePasLaValeurQuIlRefuse(t *testing.T) {
 
 // La passphrase est étirée par HKDF, donc la même passphrase doit rendre la même clé — sinon un
 // redémarrage suffirait à enfermer tout le monde dehors.
-func TestUneMemePassphraseRelitCeQuUneAutreInstanceAEcrit(t *testing.T) {
+func TestTheSamePassphraseReadsWhatAnotherInstanceWrote(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)
@@ -107,7 +107,7 @@ func TestUneMemePassphraseRelitCeQuUneAutreInstanceAEcrit(t *testing.T) {
 
 // Et l'inverse : changer la passphrase rend illisibles les secrets déjà en base. C'est le prix d'une
 // rotation de cette clé, vérifié plutôt qu'affirmé.
-func TestUneAutrePassphraseNeRelitRien(t *testing.T) {
+func TestADifferentPassphraseReadsNothing(t *testing.T) {
 	t.Parallel()
 
 	_, enrollment := testEnrollment(t)
@@ -125,11 +125,11 @@ func TestUneAutrePassphraseNeRelitRien(t *testing.T) {
 // Deux enrôlements ne produisent pas la même valeur stockée. **Ce test ne garde pas le nonce** — il
 // compare les chiffrés de deux secrets **différents**, ce qui est vrai quel que soit le nonce :
 // mesuré, douze zéros constants le laissent vert. Le nonce est gardé par
-// `TestDeuxChiffrementsDuMemeSecretSousLaMemeCleDifferent`, qui vit dans le paquet parce que `seal`
+// `TestTwoEncryptionsOfTheSameSecretUnderTheSameKeyDiffer`, qui vit dans le paquet parce que `seal`
 // n'est pas exporté.
 //
 // Ce qu'il garde, lui : que l'enrôlement tire bien un secret neuf à chaque fois.
-func TestDeuxEnrolementsNeStockentPasLaMemeValeur(t *testing.T) {
+func TestTwoEnrollmentsDoNotStoreTheSameValue(t *testing.T) {
 	t.Parallel()
 
 	authenticator := testAuthenticator(t)

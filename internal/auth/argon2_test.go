@@ -12,7 +12,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
 )
 
-func TestUnHachageSeVerifieAvecLeSecretQuiLAProduit(t *testing.T) {
+func TestAHashVerifiesWithTheSecretThatProducedIt(t *testing.T) {
 	t.Parallel()
 
 	encoded, err := auth.Hash("un mot de passe d'opérateur")
@@ -23,7 +23,7 @@ func TestUnHachageSeVerifieAvecLeSecretQuiLAProduit(t *testing.T) {
 	assert.True(t, ok, "le mot de passe qui a produit ce hachage ne le vérifie pas : personne ne peut plus entrer")
 }
 
-func TestUnSecretFauxNeVerifiePas(t *testing.T) {
+func TestAWrongSecretDoesNotVerify(t *testing.T) {
 	t.Parallel()
 
 	encoded, err := auth.Hash("le bon")
@@ -36,7 +36,7 @@ func TestUnSecretFauxNeVerifiePas(t *testing.T) {
 
 // Le sel est ce qui empêche deux opérateurs qui ont choisi le même mot de passe d'être visibles comme
 // tels dans la base — et une table précalculée de les retrouver tous les deux d'un coup.
-func TestDeuxHachagesDuMemeSecretDifferentParLeSel(t *testing.T) {
+func TestTwoHashesOfTheSameSecretDifferByTheirSalt(t *testing.T) {
 	t.Parallel()
 
 	first, err := auth.Hash("le même")
@@ -51,7 +51,7 @@ func TestDeuxHachagesDuMemeSecretDifferentParLeSel(t *testing.T) {
 // C'est la propriété que l'encodage PHC existe pour porter : les paramètres voyagent avec le hachage,
 // donc les relever n'invalide pas ce qui a été produit avant. Sans elle, un relèvement fermerait la
 // porte à tous les opérateurs déjà inscrits.
-func TestUnHachageProduitAvecDAnciensParametresResteVerifiableApresRelevement(t *testing.T) {
+func TestAHashFromOldParametersStaysVerifiableAfterTheyAreRaised(t *testing.T) {
 	t.Parallel()
 
 	faibles := auth.Params{Memory: 8 * 1024, Time: 1, Parallelism: 1}
@@ -66,7 +66,7 @@ func TestUnHachageProduitAvecDAnciensParametresResteVerifiableApresRelevement(t 
 		"tout relèvement fermerait la porte aux opérateurs déjà inscrits")
 }
 
-func TestUnEncodagePHCPorteLesParametresQuiLOntProduit(t *testing.T) {
+func TestAPHCEncodingCarriesTheParametersThatProducedIt(t *testing.T) {
 	t.Parallel()
 
 	params := auth.Params{Memory: 8 * 1024, Time: 2, Parallelism: 3}
@@ -84,7 +84,7 @@ func TestUnEncodagePHCPorteLesParametresQuiLOntProduit(t *testing.T) {
 // Une chaîne illisible n'est pas « un mot de passe faux » : c'est une ligne de base abîmée, et la
 // confondre avec un refus normal ferait qu'un `password_hash` tronqué se lirait comme une erreur de
 // frappe de l'opérateur — qui retenterait indéfiniment pendant que personne ne regarde la base.
-func TestUnEncodageIllisibleEstUneErreurEtNonUnRefus(t *testing.T) {
+func TestAnUnreadableEncodingIsAnErrorNotARefusal(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]string{
@@ -119,7 +119,7 @@ func TestUnEncodageIllisibleEstUneErreurEtNonUnRefus(t *testing.T) {
 // Les cas se fabriquent en abîmant un encodage **réel** plutôt qu'en en écrivant un à la main : un
 // littéral inventé serait refusé pour une autre raison que celle qu'on croit tester, et le test
 // resterait vert en ne prouvant rien.
-func TestDesCoutsNulsSontRefusesPlutotQueDeFairePaniquer(t *testing.T) {
+func TestZeroCostsAreRefusedRatherThanPanicking(t *testing.T) {
 	t.Parallel()
 
 	sain, err := auth.HashWith(auth.Params{Memory: 8 * 1024, Time: 2, Parallelism: 2}, "peu importe")
@@ -147,7 +147,7 @@ func TestDesCoutsNulsSontRefusesPlutotQueDeFairePaniquer(t *testing.T) {
 
 // Le pendant en écriture : produire avec des coûts nuls doit être refusé aussi, sinon la panique
 // arrive à la création du compte au lieu de la vérification.
-func TestHacherAvecDesCoutsNulsEstRefuse(t *testing.T) {
+func TestHashingWithZeroCostsIsRefused(t *testing.T) {
 	t.Parallel()
 
 	_, err := auth.HashWith(auth.Params{Memory: 8 * 1024, Time: 0, Parallelism: 1}, "peu importe")
@@ -175,7 +175,7 @@ func TestHacherAvecDesCoutsNulsEstRefuse(t *testing.T) {
 // `argon2.IDKey`. Une garde qui refuse du légitime finit retirée — et celui qui l'aurait
 // retirée aurait édité les trois lignes du même geste, emportant la borne mémoire, qui elle méritait
 // d'être tenue.
-func TestLesParametresNeDescendentPasSousLePlancher(t *testing.T) {
+func TestTheParametersDoNotGoBelowTheFloor(t *testing.T) {
 	t.Parallel()
 
 	params := auth.CurrentParams()
@@ -193,16 +193,16 @@ func TestLesParametresNeDescendentPasSousLePlancher(t *testing.T) {
 // `VerifyDummy` dans `argon2.go` ; le constat est dans le tableau des mutations de la fiche, section
 // « La route ». (`mesure_test.go` mesure `Verify`, jamais `VerifyDummy`.)
 // Ce test-ci ne garde qu'une chose : qu'il existe et qu'il ne panique pas sur un secret quelconque.
-func TestLeHachageFacticeSExecuteSurNImporteQuelSecret(t *testing.T) {
+func TestTheDummyHashRunsOnAnySecret(t *testing.T) {
 	t.Parallel()
 
 	assert.NotPanics(t, func() { _ = auth.VerifyDummy(context.Background(), "") })
 	assert.NotPanics(t, func() { _ = auth.VerifyDummy(context.Background(), "un mot de passe quelconque") })
 }
 
-// TestLaOnziemeVerificationAttendSaPlace — la borne se mesure par l'échéance, jamais par une durée
+// TestTheEleventhVerificationWaitsForASlot — la borne se mesure par l'échéance, jamais par une durée
 // observée : un test qui chronomètre passerait sur une machine lente et rougirait sur une rapide.
-func TestLaOnziemeVerificationAttendSaPlace(t *testing.T) {
+func TestTheEleventhVerificationWaitsForASlot(t *testing.T) {
 	t.Parallel()
 
 	release := make(chan struct{})
@@ -238,9 +238,9 @@ func TestLaOnziemeVerificationAttendSaPlace(t *testing.T) {
 // avant même de lire ce champ — `decode` ne s'exécute jamais tant que `Hold` n'a rien acquis.
 var hashForTest = "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHRzYWx0c2E$aGFjaGVoYWNoZWhhY2hlaGFjaGU"
 
-// TestLaDixiemeVerificationTientDansLesDixPlaces s'assure que la borne ne bloque pas la charge
+// TestTheTenthVerificationFitsInTheTenSlots s'assure que la borne ne bloque pas la charge
 // nominale : dix vérifications concurrentes, sans échéance qui expire, aboutissent toutes.
-func TestLaDixiemeVerificationTientDansLesDixPlaces(t *testing.T) {
+func TestTheTenthVerificationFitsInTheTenSlots(t *testing.T) {
 	t.Parallel()
 
 	encoded, err := auth.Hash("un mot de passe d'opérateur")

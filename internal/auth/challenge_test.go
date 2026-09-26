@@ -15,7 +15,7 @@ import (
 // base64url sans remplissage, donc quarante-trois caractères.
 const canonicalChallenge = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
-func TestUnChallengeCanoniqueRendLEmpreinteQueLaBasePorte(t *testing.T) {
+func TestACanonicalChallengeYieldsTheFingerprintTheDatabaseHolds(t *testing.T) {
 	t.Parallel()
 
 	digest, ok := auth.ChallengeDigest(canonicalChallenge)
@@ -35,7 +35,7 @@ func TestUnChallengeCanoniqueRendLEmpreinteQueLaBasePorte(t *testing.T) {
 // porte que quatre bits significatifs sur six**, les deux de poids faible étant du remplissage : sans
 // ce contrôle, quatre valeurs distinctes décodent vers les mêmes octets, donc quatre challenges
 // différents seraient acceptés pour une seule ligne.
-func TestUnChallengeNonCanoniqueNEstPasLeMemeChallenge(t *testing.T) {
+func TestANonCanonicalChallengeIsNotTheSameChallenge(t *testing.T) {
 	t.Parallel()
 
 	// Les trois autres encodages des mêmes octets. Le dernier caractère de `canonicalChallenge` est
@@ -66,7 +66,7 @@ func TestUnChallengeNonCanoniqueNEstPasLeMemeChallenge(t *testing.T) {
 // La longueur exacte est l'autre moitié : une valeur plus courte ou plus longue n'a pas la forme d'un
 // jeton émis ici, et l'empreinte qu'elle produirait ne correspondrait de toute façon à aucune ligne.
 // Ce que ce refus achète est de ne pas offrir un aller-retour PostgreSQL à qui envoie n'importe quoi.
-func TestUneValeurQuiNaPasLaFormeDUnChallengeEstRefusee(t *testing.T) {
+func TestAValueNotShapedLikeAChallengeIsRefused(t *testing.T) {
 	t.Parallel()
 
 	for name, presented := range map[string]string{

@@ -39,7 +39,7 @@ const writeJSONCallSites = 8
 // `types.Unalias` de `declarationFile` ne porte donc **rien** ici, aucun alias ne le motivant : il
 // reste par précaution, pour le jour où un alias reparaîtrait, et le retirer ne ferait aujourd'hui
 // rougir aucun test.
-func TestLeSecondCheminVersLeFilNeSerialiseQueDesDTODeclares(t *testing.T) {
+func TestTheSecondPathToTheWireSerializesOnlyDeclaredDTOs(t *testing.T) {
 	t.Parallel()
 
 	pkg := loadBFF(t)

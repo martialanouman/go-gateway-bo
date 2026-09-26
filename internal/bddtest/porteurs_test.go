@@ -111,7 +111,7 @@ func readPlanningDocument(t *testing.T) string {
 }
 
 // Une dette nomme qui la paiera, ou dit pourquoi personne ne le fera.
-func TestChaqueDetteNommeSonPorteurOuLaRaisonDeNePasEnAvoir(t *testing.T) {
+func TestEveryDebtNamesItsHolderOrTheReasonForHavingNone(t *testing.T) {
 	t.Parallel()
 
 	abandoned := 0
@@ -139,7 +139,7 @@ func TestChaqueDetteNommeSonPorteurOuLaRaisonDeNePasEnAvoir(t *testing.T) {
 // Une dette dont la step est **déjà cochée** a survécu à ce qui devait la payer, pendant que le
 // registre affirme encore que quelqu'un s'en occupe. Ou bien elle a été payée et son fichier devait
 // disparaître, ou bien son porteur n'est pas celui qu'on croyait.
-func TestAucuneDetteNeSurvitALaStepQuiDevaitLaPayer(t *testing.T) {
+func TestNoDebtOutlivesTheStepThatWasToPayIt(t *testing.T) {
 	t.Parallel()
 
 	done := map[string]bool{}

@@ -28,7 +28,7 @@ import (
 // **Pourquoi elle est gardée plutôt que réécrite.** DN-12 chiffre le repli à cent cinquante lignes
 // de crypto EC2 et CBOR à maintenir, sur un chemin de sécurité, pour remplacer huit appels et deux
 // cérémonies. Ce qui se payait n'était pas la dépendance, c'était son mode d'échec illisible.
-func TestLAuthentificateurDuHarnaisParleALaBibliothequeServeur(t *testing.T) {
+func TestTheHarnessAuthenticatorTalksToTheServerLibrary(t *testing.T) {
 	t.Parallel()
 
 	ceremonies, err := mfa.NewPasskeys(relyingPartyID, ceremonyOrigin, productName)

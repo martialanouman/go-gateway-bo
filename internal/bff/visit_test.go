@@ -44,7 +44,7 @@ const modulePackageCount = 14
 // La méthode est trouvée par le **type-checker**, dans `Defs`, et non cherchée dans le texte : un
 // détecteur qui grep un nom est rendu vrai par le moindre commentaire qui le cite — le dépôt s'est
 // déjà fait prendre.
-func TestAucuneMethodeDeSerialisationNEstEcriteAilleurs(t *testing.T) {
+func TestNoSerializationMethodIsWrittenElsewhere(t *testing.T) {
 	t.Parallel()
 
 	generated := generatedFile(t, loadBFF(t))
@@ -141,7 +141,7 @@ func loadModule(t *testing.T) []*packages.Package {
 // Le paquet témoin ne sert donc qu'à la porte du module. Les deux autres règles sont exercées sur des
 // types réels et sur un type fabriqué, parce qu'un paquet de `testdata/` est lui-même « du domaine »
 // pour le parcours : il y rougirait dès la racine, sans jamais éprouver la descente.
-func TestLesPortesMordentSurLeTemoin(t *testing.T) {
+func TestTheGatesBiteOnTheWitness(t *testing.T) {
 	t.Parallel()
 
 	bff := loadBFF(t)

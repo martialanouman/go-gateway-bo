@@ -17,7 +17,7 @@ const (
 	partitionRefreshCall = "KeepAuditPartitions"
 )
 
-// TestLeDemarrageEntretientLesPartitionsDAudit garde le **branchement**, pas la fonction.
+// TestStartupMaintainsTheAuditPartitions garde le **branchement**, pas la fonction.
 //
 // `internal/store` prouve déjà que `KeepAuditPartitions` repasse et s'arrête avec son contexte. Ce
 // qu'il ne prouve pas, c'est que `run` la lance : mesuré, retirer la goroutine de `main.go` laisse
@@ -27,7 +27,7 @@ const (
 // L'appel est résolu par le **type-checker** et non cherché dans le texte : un détecteur qui grep un
 // nom est rendu vrai par le moindre commentaire qui le cite — le dépôt s'est déjà fait prendre.
 // C'est le patron de `TestTheContractMountInstallsTheProductErrorHandler`, appliqué ici.
-func TestLeDemarrageEntretientLesPartitionsDAudit(t *testing.T) {
+func TestStartupMaintainsTheAuditPartitions(t *testing.T) {
 	t.Parallel()
 
 	loaded, err := packages.Load(&packages.Config{

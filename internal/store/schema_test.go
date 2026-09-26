@@ -28,7 +28,7 @@ import (
 // `return "en version 2"` — passeraient sur un seul. Et des nombres à deux chiffres, parce qu'un
 // `applied % 10` passerait sur des nombres à un chiffre : la chaîne vide n'est pas la seule façon de
 // ne rien nommer, une constante en est une autre, et une troncature aussi.
-func TestLeRefusNommeLesDeuxVersionsEnToutesLettres(t *testing.T) {
+func TestTheRefusalNamesBothVersionsInFull(t *testing.T) {
 	t.Parallel()
 
 	message := store.OutdatedSchemaError{Applied: 2, Embedded: 3}.Error()
@@ -50,7 +50,7 @@ func TestLeRefusNommeLesDeuxVersionsEnToutesLettres(t *testing.T) {
 	assert.Equal(t, "attend la version 12", store.ExpectedVersionPhrase(12))
 }
 
-func TestUnSchemaAJourLaisseDemarrer(t *testing.T) {
+func TestAnUpToDateSchemaAllowsStartup(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -60,7 +60,7 @@ func TestUnSchemaAJourLaisseDemarrer(t *testing.T) {
 		"le binaire refuse de servir sur le schéma qu'il embarque lui-même")
 }
 
-func TestUnSchemaEnRetardFaitRefuser(t *testing.T) {
+func TestAnOutdatedSchemaCausesRefusal(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -94,7 +94,7 @@ func TestUnSchemaEnRetardFaitRefuser(t *testing.T) {
 // `ensureVersionTable`, qui crée `goose_db_version` et y insère la version 0. Un contrôle de
 // démarrage qui pose du DDL sur la base qu'il vient de refuser est un effet de bord qu'on n'attend
 // pas, et il rend ce cas-ci indiscernable d'une base déjà initialisée à zéro.
-func TestUneBaseSansAucuneMigrationFaitRefuserSansRienEcrire(t *testing.T) {
+func TestADatabaseWithoutAnyMigrationCausesRefusalWithoutWriting(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -127,7 +127,7 @@ func TestUneBaseSansAucuneMigrationFaitRefuserSansRienEcrire(t *testing.T) {
 // déploiement roulant : pendant la bascule, l'ancienne version tourne sur le schéma que la nouvelle
 // vient de poser. Refuser là interdirait tout retour arrière, alors que les migrations sont
 // additives — un binaire plus ancien ignore une colonne qu'il ne lit pas.
-func TestUnSchemaEnAvanceLaisseDemarrer(t *testing.T) {
+func TestASchemaAheadAllowsStartup(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -154,7 +154,7 @@ func TestUnSchemaEnAvanceLaisseDemarrer(t *testing.T) {
 // **laisse passer**, ses deux expressions rationnelles étant ancrées sur `password='…'` et
 // `password=…`. Écrit en URL, ce test resterait vert même si l'erreur de la
 // bibliothèque était propagée telle quelle — il aurait alors prouvé le travail de pgx, pas le nôtre.
-func TestUnDSNIllisibleNeRecopieJamaisLeMotDePasse(t *testing.T) {
+func TestAnUnreadableDSNNeverEchoesThePassword(t *testing.T) {
 	t.Parallel()
 
 	const password = "tr3s-secret"
@@ -170,7 +170,7 @@ func TestUnDSNIllisibleNeRecopieJamaisLeMotDePasse(t *testing.T) {
 // Ce qu'il tient : le refus n'est pas confondu avec « schéma en retard ». Annoncer « version 0 »
 // pour une base qu'on n'a pas jointe enverrait l'exploitant jouer des migrations qui sont peut-être
 // déjà là, sur une base qui ne répond pas.
-func TestUneBaseInjoignableNEstPasPriseEnLenteurPourUnSchemaEnRetard(t *testing.T) {
+func TestAnUnreachableDatabaseIsNotMistakenForAnOutdatedSchema(t *testing.T) {
 	t.Parallel()
 
 	// Le port 1 n'écoute nulle part et refuse immédiatement, là où une adresse routée mais muette

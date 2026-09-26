@@ -28,7 +28,7 @@ type FirstOperatorOutcome struct {
 // deux moitiés de la commande, qui n'ont aucune raison de se croiser.
 //
 // **Ce que le `WHERE NOT EXISTS` couvre seul, aucun test ne le voit — mesuré.** Le retirer laisse
-// `TestUnSecondPassageNeCreeAucunSecondOperateur` **vert**, parce que le retour anticipé de
+// `TestASecondRunCreatesNoSecondOperator` **vert**, parce que le retour anticipé de
 // `createOwner` arrête la commande avant d'arriver ici ; retirer ce retour anticipé seul est vert
 // aussi, pour la raison symétrique. Il faut retirer **les deux** pour faire rougir.
 //

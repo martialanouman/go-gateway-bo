@@ -135,8 +135,8 @@ func goNameOf(candidates []string, operationID string) (string, bool) {
 	return "", false
 }
 
-// TestChaqueOperationDuContratEstDecidee — propriété 1, et celle qui force les steps à venir.
-func TestChaqueOperationDuContratEstDecidee(t *testing.T) {
+// TestEveryContractOperationIsDecided — propriété 1, et celle qui force les steps à venir.
+func TestEveryContractOperationIsDecided(t *testing.T) {
 	t.Parallel()
 
 	for _, declared := range contractOperations(t) {
@@ -152,7 +152,7 @@ func TestChaqueOperationDuContratEstDecidee(t *testing.T) {
 // `GET /operators` servirait adresses, rôles et état du second facteur à une session anonyme. Les
 // chemins viennent du contrat, la table n'y est que jugée — et seule `CreateOperator` a un scénario
 // qui rougirait sans elle, mesuré en revue de step-029.
-func TestLesRoutesDAdministrationExigentLeurCle(t *testing.T) {
+func TestTheAdministrationRoutesRequireTheirKey(t *testing.T) {
 	t.Parallel()
 
 	families := map[string]permissions.Key{
@@ -179,11 +179,11 @@ func TestLesRoutesDAdministrationExigentLeurCle(t *testing.T) {
 	assert.GreaterOrEqual(t, seen, 9, "le contrat ne porte plus les routes d'administration : ce test ne garde rien")
 }
 
-// TestLaTableNeDecidePasDOperationInconnue est le sens inverse, et il n'est pas redondant.
+// TestTheTableDecidesNoUnknownOperation est le sens inverse, et il n'est pas redondant.
 //
 // Sans lui, une entrée écrite dans le vocabulaire du YAML — `"login"` — passerait : la propriété 1
 // ne regarde que les opérations qui ont une entrée, jamais les entrées qui n'ont pas d'opération.
-func TestLaTableNeDecidePasDOperationInconnue(t *testing.T) {
+func TestTheTableDecidesNoUnknownOperation(t *testing.T) {
 	t.Parallel()
 
 	known := make([]string, 0, contractOperationCount)
@@ -198,11 +198,11 @@ func TestLaTableNeDecidePasDOperationInconnue(t *testing.T) {
 	}
 }
 
-// TestChaqueCleCiteeExisteAuCatalogue — propriété 2, et le **seul** endroit du dépôt qui tienne ce
+// TestEveryCitedKeyExistsInTheCatalog — propriété 2, et le **seul** endroit du dépôt qui tienne ce
 // sens. `internal/permissions/catalog.go` le documente : une constante déclarée mais absente du
 // catalogue compile, laisse les deux suites vertes, et `requires(permissions.FooBar)`
 // refuserait alors tout le monde en silence.
-func TestChaqueCleCiteeExisteAuCatalogue(t *testing.T) {
+func TestEveryCitedKeyExistsInTheCatalog(t *testing.T) {
 	t.Parallel()
 
 	cataloged := make([]permissions.Key, 0, len(permissions.All()))
@@ -223,9 +223,9 @@ func TestChaqueCleCiteeExisteAuCatalogue(t *testing.T) {
 	}
 }
 
-// TestChaqueExemptionPorteSaRaison — propriété 3. Une liste d'exemptions qui s'allonge sans motif
+// TestEveryExemptionCarriesItsReason — propriété 3. Une liste d'exemptions qui s'allonge sans motif
 // écrit est le premier état d'une garde désactivée.
-func TestChaqueExemptionPorteSaRaison(t *testing.T) {
+func TestEveryExemptionCarriesItsReason(t *testing.T) {
 	t.Parallel()
 
 	mutations := 0
@@ -251,15 +251,15 @@ func TestChaqueExemptionPorteSaRaison(t *testing.T) {
 			"opérations que l'invariant (c) vise", mutations, contractMutationCount)
 }
 
-// TestChaqueOperationGardeeDeclareSon403 — propriété 4.
+// TestEveryGuardedOperationDeclaresIts403 — propriété 4.
 //
 // Le refus de la garde est écrit **à la main** sur le `ResponseWriter`, donc il échappe au
 // `Visit…Response` engendré et à la conformité au contrat que les scénarios exercent. Ce qu'il porte
-// est gardé par `TestLeSecondCheminVersLeFilNeSerialiseQueDesDTODeclares` ; ce que le
+// est gardé par `TestTheSecondPathToTheWireSerializesOnlyDeclaredDTOs` ; ce que le
 // **contrat en dit**, c'est-à-dire le 403 déclaré, reste l'affaire de ce cas-ci. Sans cette
 // propriété, la première route gardée servirait un 403 que le YAML ne déclare pas, et c'est le
 // scénario de step-029 qui le découvrirait — une step trop tard.
-func TestChaqueOperationGardeeDeclareSon403(t *testing.T) {
+func TestEveryGuardedOperationDeclaresIts403(t *testing.T) {
 	t.Parallel()
 
 	for _, declared := range contractOperations(t) {
@@ -274,13 +274,13 @@ func TestChaqueOperationGardeeDeclareSon403(t *testing.T) {
 	}
 }
 
-// TestChaqueMutationLaisseUneTrace — propriété 5, et elle lit **le code** plutôt qu'une déclaration.
+// TestEveryMutationLeavesATrace — propriété 5, et elle lit **le code** plutôt qu'une déclaration.
 //
 // Une table « voici les opérations auditées » se déclare vraie sans preuve : une opération listée
 // dont le handler cesse d'écrire y resterait, verte. Ce qui est lu ici est l'appel réel, résolu par
 // le type-checker, avec un point fixe sur les appels intra-paquet — de sorte que la lecture reste
 // vraie le jour où une écriture passe par un helper extrait.
-func TestChaqueMutationLaisseUneTrace(t *testing.T) {
+func TestEveryMutationLeavesATrace(t *testing.T) {
 	t.Parallel()
 
 	writers := operationsThatAudit(t)

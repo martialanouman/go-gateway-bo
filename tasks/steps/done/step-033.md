@@ -20,7 +20,7 @@ n'existe. C'est la moitié « audit » de l'invariant (c).
 | `internal/bff/webauthn.go:216` puis `:229` | Une passkey est retirée sans trace si l'audit `passkey.remove` échoue. |
 | `mfa.go:269-286`, `me.go:76-80`, `auth.go:117-124` | Même forme, conséquence moindre : élévation, déconnexion et connexion. |
 | `internal/store/audit.go:105-116` | `RecordTx` existe et n'a **aucun appelant en production**. |
-| `internal/store/audit_test.go` | `TestUnAuditAnnuleAvecSaTransactionNeLaissePasDeTrace` n'a pas de témoin : `RecordTx` remplacé par `return nil` le laisse vert. |
+| `internal/store/audit_test.go` | `TestAnAuditRolledBackWithItsTransactionLeavesNoTrace` n'a pas de témoin : `RecordTx` remplacé par `return nil` le laisse vert. |
 | `internal/bff/audit.go:51` et `:57` | Deux commentaires démentis : « si un journal est branché » (un `Audit` nil panique) et « une action qui ne peut pas être tracée n'a pas eu lieu ». |
 | `me.go:80`, `webauthn.go:123` | Placer l'appel d'audit dans un `if false {}` laisse toute la suite verte : la porte d'énumération est textuelle, et aucun scénario ne compte `operator.logout` ni `passkey.register`. |
 | `cmd/dashboard/audit_test.go:71` | Le pas « l'événement porte l'adresse de l'appelant » ne vérifie que `ip_address IS NOT NULL` : une adresse forgée constante passe. |
@@ -30,7 +30,7 @@ n'existe. C'est la moitié « audit » de l'invariant (c).
   par `RecordTx`, **dans leur transaction**. L'échec de l'audit annule l'action.
 - `audited` sur le pool disparaît des chemins locaux ; il ne reste que pour ce qui n'a pas de
   transaction propre, s'il en reste, et c'est écrit.
-- Le témoin de `TestUnAuditAnnuleAvecSaTransactionNeLaissePasDeTrace` : la ligne est lue **avant** le
+- Le témoin de `TestAnAuditRolledBackWithItsTransactionLeavesNoTrace` : la ligne est lue **avant** le
   rollback.
 - Les scénarios comptent `operator.logout` et `passkey.register` après l'action, pas seulement leur
   absence après l'ouverture d'une cérémonie.

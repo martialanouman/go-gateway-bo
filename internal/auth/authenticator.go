@@ -141,7 +141,7 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 // passwordMatches est le **seul** endroit où un mot de passe est confronté à quoi que ce soit.
 //
 // **L'appel à `VerifyDummy` ci-dessous est gardé par `oracle_test.go`**, qui exige l'appel dans cette
-// branche-ci. Lui seul le tient : `TestLeHachageFacticeSExecuteSurNImporteQuelSecret` appelle la
+// branche-ci. Lui seul le tient : `TestTheDummyHashRunsOnAnySecret` appelle la
 // fonction directement, donc garde la fonction et jamais son site d'appel, et retirer l'appel laisse
 // un `if` idiomatique que la revue ne voit pas. La **durée**, elle, reste hors de portée d'un test —
 // la mesure est écrite au-dessus de `VerifyDummy`.

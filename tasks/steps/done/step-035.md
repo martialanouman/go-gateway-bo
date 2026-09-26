@@ -21,7 +21,7 @@ Chacune a été lancée le 16/09/2026 et a laissé la suite verte.
 | `internal/bff/guard.go:122` | la panne de résolution de session rend 401 | `withResolvedSession` (`guard_test.go:94`) ne pose jamais d'erreur, et aucune route n'est encore gardée par une clé |
 | `internal/store/partitions.go:59` | `return` après le premier passage | le test ne prouve qu'un passage ; « un échec n'arrête pas la boucle » n'est testé par rien |
 | `internal/store/mfa.go:323` | `AND now() < expires_at` retiré | son jumeau `ConsumeCeremony` est testé, pas lui |
-| `internal/session/cookie.go:67` | `Strict()` retiré | `TestUnSceauNonCanoniqueEstRefuse` ne rougit qu'une fois sur quatre : l'alphabet `A…P` ne produit une variante que si le dernier caractère est A, E, I ou M — **le « une fois sur douze » de l'audit était faux**, refait sur cent mille tirages le 19/09/2026 (24 827 rouges) |
+| `internal/session/cookie.go:67` | `Strict()` retiré | `TestANonCanonicalSealIsRefused` ne rougit qu'une fois sur quatre : l'alphabet `A…P` ne produit une variante que si le dernier caractère est A, E, I ou M — **le « une fois sur douze » de l'audit était faux**, refait sur cent mille tirages le 19/09/2026 (24 827 rouges) |
 
 ## Constats de l'audit — tests et affirmations
 - `internal/session/session_test.go:76` et `cmd/dashboard/session_test.go:88` : « deux bits
@@ -85,24 +85,24 @@ retenue : `-count=1` sur toute mesure de mutation, sans exception.
 |---|---|
 | `PasskeyUnknown` rend 204 | `retirer une clé d'accès qui n'est pas la sienne ne parle pas de la session` |
 | `PasskeyUnknown` rend 401 `notAuthenticated()` | le même |
-| `maximumChallengeLength` retiré | `TestChaqueControleDeFormeDuSecondFacteurRefuseAvantToutEtat/un challenge plus long que la borne` |
+| `maximumChallengeLength` retiré | `TestEverySecondFactorShapeCheckRefusesBeforeAnyState/un challenge plus long que la borne` |
 | exclusion `code` sur `webauthn` retirée | `…/une assertion accompagnée d'un code` |
 | exclusion `assertion` sur `totp` retirée | `…/un code accompagné d'une assertion` |
-| `presentedFactorIsWellFormed` rend `true` | `TestLaPreuveDEnrolementExigeSesDeuxChampsOuAucun`, 2 sous-cas |
-| `guard.go` : la panne de résolution rend 401 | `TestUnePanneDeResolutionDeSessionNestPasUnRefus` |
-| `KeepAuditPartitions` : `return` après le rapport | `TestUnEchecNArretePasLeRenouvellementDesPartitions` |
-| `ConsumeChallenge` : `now() < expires_at` retiré | `TestUnChallengeQuiNestPlusUtilisableNeSeRetrouvePas/il est échu` |
-| `Strict()` retiré du sceau | `TestUnSceauNonCanoniqueEstRefuse`, les 3 sous-cas |
-| `processAlive` : `EPERM` relu comme la mort | `TestUneBaseDUnProcessusVivantMaisNonSignalableEstGardee` |
+| `presentedFactorIsWellFormed` rend `true` | `TestTheEnrollmentProofRequiresBothFieldsOrNeither`, 2 sous-cas |
+| `guard.go` : la panne de résolution rend 401 | `TestASessionResolutionFailureIsNotARefusal` |
+| `KeepAuditPartitions` : `return` après le rapport | `TestAFailureDoesNotStopPartitionRenewal` |
+| `ConsumeChallenge` : `now() < expires_at` retiré | `TestAChallengeNoLongerUsableIsNotFound/il est échu` |
+| `Strict()` retiré du sceau | `TestANonCanonicalSealIsRefused`, les 3 sous-cas |
+| `processAlive` : `EPERM` relu comme la mort | `TestADatabaseOfALiveButUnsignalableProcessIsKept` |
 | cérémonie refusée : retour au 401 | 3 scénarios de `mfa-webauthn.feature` |
 | les deux corps du 409 d'enrôlement reconfondus | `remplacer son authentificateur avec un code faux…` |
 | `refusedSecondFactor` : retour à l'horloge TOTP | `le second facteur est refusé`, sur le chemin de la clé d'accès — 3 scénarios |
-| `withSession` cesse de porter l'erreur (`err:` retiré) | `TestUneBaseInjoignableNeFermePasLaSessionDeLOperateur` |
+| `withSession` cesse de porter l'erreur (`err:` retiré) | `TestAnUnreachableDatabaseDoesNotCloseTheOperatorSession` |
 | `request.Method.Valid()` retiré de `presentedFactorIsWellFormed` | `…ExigeSesDeuxChampsOuAucun/une méthode que seule la vérification déclare` |
 | `len(*request.Code) <= maximumCodeLength` retiré de la même | `…ExigeSesDeuxChampsOuAucun/un code plus long que la borne` |
 
 **Les deux chiffres de l'audit ont été refaits, et les deux étaient faux.**
-`TestUnSceauNonCanoniqueEstRefuse` ne rougissait pas « une fois sur douze » mais **une fois sur
+`TestANonCanonicalSealIsRefused` ne rougissait pas « une fois sur douze » mais **une fois sur
 quatre** — 24 827 rouges sur cent mille tirages, contre un `Unseal` privé de `Strict()`. Et le dernier
 caractère d'un base64 de trente-deux octets ne porte pas « deux bits significatifs sur six » mais
 **quatre** ; ce sont les deux de poids faible qui n'en portent pas. Les deux ont été mesurés ici
@@ -128,12 +128,12 @@ l'autre.
 - **Le second `Strict()` de `internal/session/cookie.go` est inmutable, et ce n'est pas un oubli.**
   Celui qui décode le **jeton** ne peut faire rougir aucun test : un `text` non canonique produit un
   autre HMAC, donc le refus tombe en amont sur `hmac.Equal`. Seul le premier — celui du sceau — est
-  observable, et c'est lui que `TestUnSceauNonCanoniqueEstRefuse` tient.
+  observable, et c'est lui que `TestANonCanonicalSealIsRefused` tient.
 - **La branche d'erreur de `requirePermission` est inatteignable en production jusqu'à step-029.** Les
   dix entrées d'`authorization` sont des `exempt`, donc `sessionFrom` n'y est jamais appelé. Les deux
-  cas qui la tiennent injectent leur table ; ce qu'ils prouvent est le mécanisme, et `TestLaGardeEstCablee`
+  cas qui la tiennent injectent leur table ; ce qu'ils prouvent est le mécanisme, et `TestTheGuardIsWired`
   ferme le risque propre à cette couture.
-- **La garde d'`EPERM` n'est pas tenue sous root.** `TestUneBaseDUnProcessusVivantMaisNonSignalableEstGardee`
+- **La garde d'`EPERM` n'est pas tenue sous root.** `TestADatabaseOfALiveButUnsignalableProcessIsKept`
   s'écarte quand le signal aboutit — le bon arbitrage, mais il faut le savoir : la CI ne pose aucun
   `container:`, donc le job tourne sous un utilisateur non privilégié et le cas s'exécute. Le jour où
   un job passerait en conteneur root, cette garde cesserait d'être tenue **sans aucun signal**.

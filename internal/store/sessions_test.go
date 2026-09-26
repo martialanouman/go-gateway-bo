@@ -130,7 +130,7 @@ func expire(t *testing.T, dsn string, hash []byte) {
 	require.EqualValues(t, 1, touched, "aucune session échue : le cas ne prouverait rien")
 }
 
-func TestUneSessionOuverteSeRetrouveParSonEmpreinte(t *testing.T) {
+func TestAnOpenSessionIsFoundByItsFingerprint(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -149,7 +149,7 @@ func TestUneSessionOuverteSeRetrouveParSonEmpreinte(t *testing.T) {
 	assert.WithinDuration(t, opened.ExpiresAt, resolved.ExpiresAt, time.Second)
 }
 
-func TestUneEmpreinteInconnueNeResoutRienSansEtreUneErreur(t *testing.T) {
+func TestAnUnknownFingerprintResolvesNothingWithoutBeingAnError(t *testing.T) {
 	t.Parallel()
 
 	sessions, _ := sessionsOn(t)
@@ -161,7 +161,7 @@ func TestUneEmpreinteInconnueNeResoutRienSansEtreUneErreur(t *testing.T) {
 
 // L'échéance absolue est ce qui borne ce qu'un cookie volé vaut au maximum. Sans elle, une session
 // qu'on utilise sans arrêt ne meurt jamais.
-func TestUneSessionAuDelaDeSonEcheanceAbsolueNEstPlusVivante(t *testing.T) {
+func TestASessionPastItsAbsoluteExpiryIsNoLongerAlive(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -179,7 +179,7 @@ func TestUneSessionAuDelaDeSonEcheanceAbsolueNEstPlusVivante(t *testing.T) {
 
 // La fenêtre glissante est ce qui ferme le poste qu'on a quitté. L'absolue ne le fait pas : elle
 // tiendrait encore neuf heures.
-func TestUneSessionOisiveAuDelaDeLaFenetreNEstPlusVivante(t *testing.T) {
+func TestASessionIdleBeyondTheWindowIsNoLongerAlive(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -197,7 +197,7 @@ func TestUneSessionOisiveAuDelaDeLaFenetreNEstPlusVivante(t *testing.T) {
 
 // Un refus ne touche pas la ligne : sans ça, chaque tentative sur une session oisive repousserait sa
 // fenêtre, et la session finirait par se rouvrir toute seule sous les tentatives d'un attaquant.
-func TestUnRefusNeProlongeJamaisLaSession(t *testing.T) {
+func TestARefusalNeverExtendsTheSession(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -231,7 +231,7 @@ func TestUnRefusNeProlongeJamaisLaSession(t *testing.T) {
 
 // L'activité repousse la glissante et **jamais** l'absolue. La confusion est facile à écrire et
 // invisible en exploitation : la session deviendrait éternelle tant qu'on s'en sert.
-func TestLEcheanceAbsolueNEstJamaisRepoussee(t *testing.T) {
+func TestTheAbsoluteExpiryIsNeverPushedBack(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -266,7 +266,7 @@ func TestLEcheanceAbsolueNEstJamaisRepoussee(t *testing.T) {
 
 // Sans cette garde, une session oisive depuis des jours s'élève encore — et l'élévation repousse
 // `last_seen_at`, donc la **ressuscite** au passage.
-func TestUneSessionOisiveNeSEleveJamais(t *testing.T) {
+func TestAnIdleSessionIsNeverElevated(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -288,7 +288,7 @@ func TestUneSessionOisiveNeSEleveJamais(t *testing.T) {
 
 // Le second facteur d'un compte désactivé ne doit rien ouvrir : la porte passive vaut pour les deux
 // méthodes, pas seulement pour `Resolve`.
-func TestUnOperateurDesactiveNEleveJamaisSaSession(t *testing.T) {
+func TestADisabledOperatorNeverElevatesTheirSession(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -306,7 +306,7 @@ func TestUnOperateurDesactiveNEleveJamaisSaSession(t *testing.T) {
 
 // Sans régénération, un jeton obtenu avant le second facteur reste valable après : celui qui l'a
 // intercepté hérite de l'élévation qu'un autre vient de franchir.
-func TestLElevationInvalideLeJetonPrecedent(t *testing.T) {
+func TestElevationInvalidatesThePreviousToken(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -333,7 +333,7 @@ func TestLElevationInvalideLeJetonPrecedent(t *testing.T) {
 		"l'élévation n'achète pas du temps, elle change ce que la session autorise")
 }
 
-func TestUneSessionMorteNeSEleveJamais(t *testing.T) {
+func TestADeadSessionIsNeverElevated(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -351,7 +351,7 @@ func TestUneSessionMorteNeSEleveJamais(t *testing.T) {
 
 // Fermer la session est ce que le logout fait vraiment : expirer le cookie ne protège rien, il
 // suffit de le rejouer.
-func TestFermerUneSessionEmpecheDeLaRejouer(t *testing.T) {
+func TestClosingASessionPreventsReplayingIt(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -369,7 +369,7 @@ func TestFermerUneSessionEmpecheDeLaRejouer(t *testing.T) {
 
 // Le produit tourne à ≥2 instances derrière un load balancer : une session ouverte par l'une doit
 // être résolue par l'autre. C'est la raison pour laquelle elle vit en base et non en mémoire.
-func TestDeuxPoolsDistinctsResolventLaMemeSession(t *testing.T) {
+func TestTwoDistinctPoolsResolveTheSameSession(t *testing.T) {
 	t.Parallel()
 
 	first, dsn := sessionsOn(t)
@@ -395,7 +395,7 @@ func TestDeuxPoolsDistinctsResolventLaMemeSession(t *testing.T) {
 	assert.False(t, alive, "une déconnexion servie par une instance doit fermer la session pour l'autre")
 }
 
-func TestLesPermissionsSontLUnionDesRolesDetenusSansDoublon(t *testing.T) {
+func TestPermissionsAreTheUnionOfHeldRolesWithoutDuplicates(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -415,7 +415,7 @@ func TestLesPermissionsSontLUnionDesRolesDetenusSansDoublon(t *testing.T) {
 
 // Un opérateur sans aucun rôle est un état atteignable. Rendre une absence plutôt qu'un ensemble vide
 // ferait dire « pas de session » là où le fait est « aucune permission ».
-func TestUnOperateurSansAucunRoleRendUnEnsembleVide(t *testing.T) {
+func TestAnOperatorWithoutAnyRoleYieldsAnEmptySet(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)
@@ -429,7 +429,7 @@ func TestUnOperateurSansAucunRoleRendUnEnsembleVide(t *testing.T) {
 // La révocation active au moment de la désactivation appartient à l'écran de gestion des opérateurs ;
 // ce que garde ce cas-ci est la porte passive : un compte désactivé ne résout plus, même avec un
 // cookie encore valide.
-func TestUnOperateurDesactiveNeResoutPlusSaSession(t *testing.T) {
+func TestADisabledOperatorNoLongerResolvesTheirSession(t *testing.T) {
 	t.Parallel()
 
 	sessions, dsn := sessionsOn(t)

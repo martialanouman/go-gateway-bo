@@ -61,7 +61,7 @@ type Params struct {
 // Le prix assumé, écrit plutôt que tu : une base volée s'attaque à 26 ms le candidat. C'est
 // exactement ce que le relèvement existe pour corriger, et il ne coûte que ces trois nombres — les
 // hachages déjà produits portent les leurs et restent vérifiables, ce que garde
-// `TestUnHachageProduitAvecDAnciensParametresResteVerifiableApresRelevement`.
+// `TestAHashFromOldParametersStaysVerifiableAfterTheyAreRaised`.
 var currentParams = Params{
 	Memory:      64 * 1024,
 	Time:        3,
@@ -167,7 +167,7 @@ func Verify(ctx context.Context, encoded, secret string) (bool, error) {
 // La comparaison passe par `crypto/subtle` : comparer deux hachages avec `==` rend un verdict en un
 // temps qui dépend du nombre d'octets de tête qui coïncident, ce qui se remonte octet par octet.
 //
-// Ce qui la garde est `TestUnHachageNeSeCompareQuEnTempsConstant`, qui exige cet appel **et** refuse
+// Ce qui la garde est `TestAHashIsOnlyComparedInConstantTime`, qui exige cet appel **et** refuse
 // toute comparaison d'octets dans ce corps — la seconde moitié parce que jeter le résultat de
 // l'appel, ou poser un raccourci naïf devant lui, le laisse en place sans qu'il décide. Le reste de
 // la suite ne le tient pas : `string(key) == string(expected)` la laisse verte.

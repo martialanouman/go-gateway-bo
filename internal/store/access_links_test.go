@@ -59,7 +59,7 @@ func failing(calls *atomic.Int32) store.SendLink {
 	}
 }
 
-func TestUneCreationMetUnLienDActivationEnFile(t *testing.T) {
+func TestACreationQueuesAnActivationLink(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -91,7 +91,7 @@ func backoffOf(t *testing.T, dsn, operatorID string) time.Duration {
 	return time.Duration(seconds * float64(time.Second))
 }
 
-func TestUnSMTPEnEchecLaisseLeJetonNulEtRepousse(t *testing.T) {
+func TestAFailingSMTPLeavesTheTokenNullAndPostpones(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -133,7 +133,7 @@ func TestUnSMTPEnEchecLaisseLeJetonNulEtRepousse(t *testing.T) {
 	assert.Zero(t, calls.Load(), "un envoi abandonné est encore retenté")
 }
 
-func TestLeBackoffEstPlafonneADixMinutes(t *testing.T) {
+func TestTheBackoffIsCappedAtTenMinutes(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -151,7 +151,7 @@ func TestLeBackoffEstPlafonneADixMinutes(t *testing.T) {
 
 // Deux instances tirent la même file : la seconde doit passer la ligne que la première tient, et non
 // l'attendre puis l'envoyer une seconde fois.
-func TestDeuxWorkersUneLigneUnEnvoi(t *testing.T) {
+func TestTwoWorkersOneRowOneSend(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -214,7 +214,7 @@ func TestDeuxWorkersUneLigneUnEnvoi(t *testing.T) {
 	assert.Equal(t, int32(1), calls.Load(), "une ligne, deux envois")
 }
 
-func TestUnJetonNeSertQuUneFois(t *testing.T) {
+func TestATokenIsUsableOnlyOnce(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -227,7 +227,7 @@ func TestUnJetonNeSertQuUneFois(t *testing.T) {
 		store.ErrLinkInvalid)
 }
 
-func TestUnJetonExpireEstRefuse(t *testing.T) {
+func TestAnExpiredTokenIsRefused(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -243,7 +243,7 @@ func TestUnJetonExpireEstRefuse(t *testing.T) {
 		store.ErrLinkInvalid)
 }
 
-func TestUnNouveauLienInvalideLePrecedent(t *testing.T) {
+func TestANewLinkInvalidatesThePreviousOne(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -262,7 +262,7 @@ func TestUnNouveauLienInvalideLePrecedent(t *testing.T) {
 // Le reset retire **tout** ce qui franchit le second facteur : un code de récupération ou une passkey
 // survivants suffiraient à celui qui a volé le téléphone et la feuille de codes. Rien ne change avant
 // l'usage : l'administrateur qui demande le lien ne prive personne de son accès.
-func TestLeResetEffaceLesFacteursEtFermeLesSessions(t *testing.T) {
+func TestTheResetErasesTheFactorsAndClosesTheSessions(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -301,7 +301,7 @@ func TestLeResetEffaceLesFacteursEtFermeLesSessions(t *testing.T) {
 	assert.Zero(t, survivors(), "le reset laisse un facteur, un verrou ou une session derrière lui")
 }
 
-func TestUnCompteSansMotDePasseNEstPasTrouveAuLogin(t *testing.T) {
+func TestAnAccountWithoutPasswordIsNotFoundAtLogin(t *testing.T) {
 	t.Parallel()
 
 	pool, _ := migratedPool(t)
@@ -315,7 +315,7 @@ func TestUnCompteSansMotDePasseNEstPasTrouveAuLogin(t *testing.T) {
 	assert.Nil(t, found, "un compte sans mot de passe échappe au hachage factice")
 }
 
-func TestUnLienSurUnCompteDesactiveEstRefuse(t *testing.T) {
+func TestALinkOnADisabledAccountIsRefused(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -352,7 +352,7 @@ func operatorView(t *testing.T, admin *store.Administration, id string) store.Op
 	return store.OperatorView{}
 }
 
-func TestUneReactivationNeRanimeAucunLien(t *testing.T) {
+func TestAReactivationRevivesNoLink(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)
@@ -404,7 +404,7 @@ func TestUneReactivationNeRanimeAucunLien(t *testing.T) {
 
 // Sans quoi le titulaire verrouillé par ses erreurs resterait refusé, jusqu'à la fin de la fenêtre,
 // avec le mot de passe qu'il vient de choisir.
-func TestLeResetLeveLeVerrouDeLAdresse(t *testing.T) {
+func TestTheResetLiftsTheAddressLock(t *testing.T) {
 	t.Parallel()
 
 	pool, dsn := migratedPool(t)

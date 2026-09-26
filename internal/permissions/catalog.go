@@ -80,7 +80,7 @@ const (
 // le diff de `permissions.gen.ts`, que `check-generated` force à régénérer. Ce qu'aucune porte ne
 // voit : une clé retirée **et** régénérée dans le même geste ne laisse qu'un diff à relire.
 //
-// Le sens inverse est tenu par `TestAucuneConstanteNeManqueAuCatalogue`, qui part de la portée du
+// Le sens inverse est tenu par `TestNoConstantIsMissingFromTheCatalog`, qui part de la portée du
 // paquet et non de `All()` — une constante déclarée plus haut qu'aucune entrée ne référence. Go ne
 // signale pas une constante exportée inutilisée, et `requires(permissions.FooBar)` refuserait alors
 // tout le monde en silence.

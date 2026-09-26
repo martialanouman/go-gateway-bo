@@ -10,13 +10,13 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// TestToutePorteuseDEvenementLEcrit — la seconde moitié de la garde d'audit.
+// TestEveryEventCarrierWritesIt — la seconde moitié de la garde d'audit.
 //
 // `internal/bff/enumeration_test.go` vérifie qu'une mutation **nomme** son événement ; rien ne
 // vérifiait qu'il est écrit. Une méthode qui reçoit un `Event` et le laisse tomber rendrait l'autre
 // porte verte sur une action sans trace. En retirer une seule ne fait rougir personne : il faut les
 // deux.
-func TestToutePorteuseDEvenementLEcrit(t *testing.T) {
+func TestEveryEventCarrierWritesIt(t *testing.T) {
 	t.Parallel()
 
 	pkg := loadStorePackage(t)

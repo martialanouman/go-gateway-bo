@@ -47,7 +47,7 @@ const (
 //
 // La ligne « Dépend de » rattrape ce cas-là, mais seulement pour une step qui a une fiche : pour une
 // step qui n'en a pas, l'ordre de la liste est la seule source.
-func TestAucuneStepNEstListeeAvantUneDontElleDepend(t *testing.T) {
+func TestNoStepIsListedBeforeOneItDependsOn(t *testing.T) {
 	t.Parallel()
 
 	rank := listedRanks(t, readPlanningDocument(t))

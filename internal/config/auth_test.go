@@ -16,7 +16,7 @@ import (
 // Le sel n'a **aucun repli**, et c'est ce que ce test tient : un défaut codé en dur serait public,
 // donc le HMAC des adresses sources serait devinable et la table des compteurs redeviendrait un
 // registre lisible de qui a tapé à la porte.
-func TestLeSelDAntiBruteForceEstObligatoire(t *testing.T) {
+func TestTheAntiBruteForceSaltIsMandatory(t *testing.T) {
 	t.Parallel()
 
 	env := minimalEnv()
@@ -29,7 +29,7 @@ func TestLeSelDAntiBruteForceEstObligatoire(t *testing.T) {
 }
 
 // Ce que la borne empêche vraiment est un sel posé « pour faire démarrer ».
-func TestUnSelTropCourtEstRefuseSansEtreCite(t *testing.T) {
+func TestATooShortSaltIsRefusedWithoutBeingCited(t *testing.T) {
 	t.Parallel()
 
 	env := minimalEnv()
@@ -43,7 +43,7 @@ func TestUnSelTropCourtEstRefuseSansEtreCite(t *testing.T) {
 
 // Sans repli : une clé par défaut serait publique, donc n'importe qui signerait une session et
 // entrerait sous n'importe quelle identité sans jamais présenter de mot de passe.
-func TestLaCleDeSignatureDeSessionEstObligatoire(t *testing.T) {
+func TestTheSessionSigningKeyIsMandatory(t *testing.T) {
 	t.Parallel()
 
 	env := minimalEnv()
@@ -55,7 +55,7 @@ func TestLaCleDeSignatureDeSessionEstObligatoire(t *testing.T) {
 		"le refus ne nomme pas la variable manquante : l'exploitant ne sait pas quoi poser")
 }
 
-func TestUneCleDeSessionTropCourteEstRefuseeSansEtreCitee(t *testing.T) {
+func TestATooShortSessionKeyIsRefusedWithoutBeingCited(t *testing.T) {
 	t.Parallel()
 
 	env := minimalEnv()
@@ -70,7 +70,7 @@ func TestUneCleDeSessionTropCourteEstRefuseeSansEtreCitee(t *testing.T) {
 // Sans repli non plus, et la conséquence est la plus lourde des trois : une clé publique rendrait
 // déchiffrable tout secret TOTP de la base, donc permettrait de produire les codes de n'importe quel
 // opérateur.
-func TestLaCleDeChiffrementTotpEstObligatoire(t *testing.T) {
+func TestTheTotpEncryptionKeyIsMandatory(t *testing.T) {
 	t.Parallel()
 
 	env := minimalEnv()
@@ -82,7 +82,7 @@ func TestLaCleDeChiffrementTotpEstObligatoire(t *testing.T) {
 		"le refus ne nomme pas la variable manquante : l'exploitant ne sait pas quoi poser")
 }
 
-func TestUneCleDeChiffrementTropCourteEstRefuseeSansEtreCitee(t *testing.T) {
+func TestATooShortEncryptionKeyIsRefusedWithoutBeingCited(t *testing.T) {
 	t.Parallel()
 
 	env := minimalEnv()
@@ -97,7 +97,7 @@ func TestUneCleDeChiffrementTropCourteEstRefuseeSansEtreCitee(t *testing.T) {
 // La borne se teste par ses deux côtés, sans quoi elle refuse tout ou n'importe quoi. Trente-deux
 // `a` font la longueur exigée sans avoir rien d'un secret — c'est ce que la borne de longueur
 // laissait passer, et ce que celle de variété ferme.
-func TestUnSecretSansVarieteEstRefuseSansEtreCite(t *testing.T) {
+func TestALowVarietySecretIsRefusedWithoutBeingCited(t *testing.T) {
 	t.Parallel()
 
 	uniform := strings.Repeat("a", 32)
@@ -114,7 +114,7 @@ func TestUnSecretSansVarieteEstRefuseSansEtreCite(t *testing.T) {
 // L'autre côté : une valeur réellement tirée passe. Le tirage est fait ici plutôt qu'écrit en dur —
 // une constante choisie à la main prouverait que cette constante passe, pas qu'un tirage de CSPRNG
 // passe.
-func TestUnSecretTireDUnCSPRNGPasse(t *testing.T) {
+func TestASecretDrawnFromACSPRNGPasses(t *testing.T) {
 	t.Parallel()
 
 	material := make([]byte, 48)
@@ -132,7 +132,7 @@ func TestUnSecretTireDUnCSPRNGPasse(t *testing.T) {
 // Les deux séparateurs que l'URI otpauth:// ne sait pas porter, et qui sont exactement ceux qu'on
 // écrit pour distinguer une préproduction. Un nom trop long est refusé pour une autre raison — le QR
 // de l'écran d'enrôlement.
-func TestUnNomDeProduitQueLUriNeSaitPasPorterEstRefuse(t *testing.T) {
+func TestAProductNameTheUriCannotCarryIsRefused(t *testing.T) {
 	t.Parallel()
 
 	for _, refused := range []struct {
@@ -156,7 +156,7 @@ func TestUnNomDeProduitQueLUriNeSaitPasPorterEstRefuse(t *testing.T) {
 	}
 }
 
-func TestUnNomDeProduitOrdinairePasse(t *testing.T) {
+func TestAnOrdinaryProductNamePasses(t *testing.T) {
 	t.Parallel()
 
 	env := minimalEnv()
@@ -174,7 +174,7 @@ func TestUnNomDeProduitOrdinairePasse(t *testing.T) {
 // L'enjeu reste celui-là : réutiliser un secret pour l'autre ferait qu'une fuite de la table des
 // compteurs — qui ne porte que des HMAC — livrerait de quoi signer des sessions. Ce qui l'empêche est
 // l'exploitant qui pose trois valeurs différentes, pas ce code.
-func TestChaqueSecretVientDeSaPropreVariable(t *testing.T) {
+func TestEverySecretComesFromItsOwnVariable(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := config.Load(lookupFrom(minimalEnv()))
@@ -185,7 +185,7 @@ func TestChaqueSecretVientDeSaPropreVariable(t *testing.T) {
 	assert.Equal(t, []byte(testTOTPEncryptionKey), cfg.Auth.TOTPEncryptionKey)
 }
 
-func TestLesProxysDeConfianceSeLisentEnCidr(t *testing.T) {
+func TestTrustedProxiesAreReadAsCidr(t *testing.T) {
 	t.Parallel()
 
 	env := minimalEnv()
@@ -202,7 +202,7 @@ func TestLesProxysDeConfianceSeLisentEnCidr(t *testing.T) {
 // Une adresse nue est refusée plutôt que promue en /32 : `10.0.0.1` et `10.0.0.1/32` se lisent pareil
 // pour un humain, et accepter les deux ferait passer `10.0.0.0` pour un hôte là où l'auteur pensait à
 // un réseau.
-func TestUneAdresseNueNEstPasUnReseauDeConfiance(t *testing.T) {
+func TestABareAddressIsNotATrustedNetwork(t *testing.T) {
 	t.Parallel()
 
 	env := minimalEnv()
@@ -215,7 +215,7 @@ func TestUneAdresseNueNEstPasUnReseauDeConfiance(t *testing.T) {
 
 // Vide est une valeur sûre : l'en-tête `X-Forwarded-For` est alors ignoré. Un défaut permissif ici
 // laisserait n'importe qui s'évader du compteur de source en forgeant un en-tête.
-func TestAucunProxyDeConfianceEstUneConfigurationValide(t *testing.T) {
+func TestNoTrustedProxyIsAValidConfiguration(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := config.Load(lookupFrom(minimalEnv()))
@@ -225,7 +225,7 @@ func TestAucunProxyDeConfianceEstUneConfigurationValide(t *testing.T) {
 
 // La raison d'être des deux chargeurs : un serveur qui tourne depuis six mois n'a plus les variables
 // du premier opérateur, et les exiger le ferait refuser de démarrer à la première mise à jour.
-func TestLeChargeurDuServeurNExigePasLesVariablesDuPremierOperateur(t *testing.T) {
+func TestTheServerLoaderDoesNotRequireTheFirstOperatorVariables(t *testing.T) {
 	t.Parallel()
 
 	_, err := config.Load(lookupFrom(minimalEnv()))
@@ -234,7 +234,7 @@ func TestLeChargeurDuServeurNExigePasLesVariablesDuPremierOperateur(t *testing.T
 
 // Le pendant : la commande ne les exige pas non plus au chargement, parce qu'elle est rejouable.
 // C'est `cmd/bootstrap` qui exige, et seulement quand la base ne porte aucun opérateur.
-func TestLeChargeurDuBootstrapAccepteUnEnvironnementVide(t *testing.T) {
+func TestTheBootstrapLoaderAcceptsAnEmptyEnvironment(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := config.LoadBootstrap(lookupFrom(map[string]string{}))
@@ -246,7 +246,7 @@ func TestLeChargeurDuBootstrapAccepteUnEnvironnementVide(t *testing.T) {
 	}, cfg.MissingNames())
 }
 
-func TestLesValeursDuPremierOperateurSontValideesQuandElleSontLa(t *testing.T) {
+func TestTheFirstOperatorValuesAreValidatedWhenPresent(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
@@ -292,7 +292,7 @@ func TestLesValeursDuPremierOperateurSontValideesQuandElleSontLa(t *testing.T) {
 
 // Une espace de bord fait partie d'un mot de passe. La retirer en silence produirait un compte dont
 // le mot de passe n'est pas celui qu'on croit avoir posé — et personne ne pourrait entrer.
-func TestUneEspaceDeBordDuMotDePasseEstConservee(t *testing.T) {
+func TestALeadingOrTrailingPasswordSpaceIsKept(t *testing.T) {
 	t.Parallel()
 
 	const withSpace = " Un mot de passe qui commence1 par une espace "
@@ -308,7 +308,7 @@ func TestUneEspaceDeBordDuMotDePasseEstConservee(t *testing.T) {
 
 // Le refus ne cite jamais l'adresse : c'est une donnée personnelle, et ce message part dans la sortie
 // d'erreur d'un déploiement.
-func TestLeRefusDUneAdresseNeLaRecopiePas(t *testing.T) {
+func TestAnAddressRefusalDoesNotEchoIt(t *testing.T) {
 	t.Parallel()
 
 	const address = "camille.durand.chez.exemple"

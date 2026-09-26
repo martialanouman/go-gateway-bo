@@ -54,7 +54,7 @@ d'ici, un champ de trop est un hachage de mot de passe, un secret TOTP ou une cl
 
 > **La première livraison n'a tenu que les trois premiers points**, et la revue du 30/08/2026 l'a dit :
 > les sondes avaient été jouées à la main puis retirées, donc rien dans le dépôt ne distinguait une
-> porte mordante d'une porte débranchée. `TestLesPortesMordentSurLeTemoin` tient le quatrième — un
+> porte mordante d'une porte débranchée. `TestTheGatesBiteOnTheWitness` tient le quatrième — un
 > témoin **par règle**, permanent. Voir DN-8.
 
 ## Definition of Done
@@ -143,7 +143,7 @@ elle, énumérait `packages.Load(".")`.
 Sondé le 30/08/2026 : un `internal/leak` rendant un `store.Operator` complet compile, `Health` le sert,
 `password_hash` part sur le fil — et les cinq règles rendent **rc=0**.
 
-`TestAucuneMethodeDeSerialisationNEstEcriteAilleurs` charge `./...` et porte sur la **méthode** et non
+`TestNoSerializationMethodIsWrittenElsewhere` charge `./...` et porte sur la **méthode** et non
 sur le type : implémenter une de ces interfaces exige d'écrire une méthode de ce nom et de cette
 signature, où qu'elle soit. Elle est donc strictement plus forte que la provenance, et attrape du même
 coup le troisième contournement — poser un `Visit…` sur un type **engendré qui n'en portait pas**
@@ -192,7 +192,7 @@ ne l'obligeait à le rester : `json.NewEncoder(w).Encode(resolved)` écrit dans 
 passe par aucun `Visit…` engendré, échappe à la conformité au contrat que les scénarios exercent, et
 aucune des portes précédentes ne le voit.
 
-`TestUnCorpsDeReponseNeSEcritQuALEndroitPrevu` suit le **type statique** de chaque expression et refuse
+`TestAResponseBodyIsOnlyWrittenWhereIntended` suit le **type statique** de chaque expression et refuse
 qu'un `http.ResponseWriter` atteigne autre chose qu'un puits nommé. Les fichiers exemptés — celui du
 code engendré et celui qui abrite `writeJSON` — sont repérés par la **position d'une déclaration**,
 jamais par leur nom.

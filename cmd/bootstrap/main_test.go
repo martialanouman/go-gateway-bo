@@ -19,7 +19,7 @@ import (
 
 // Le DSN porte le mot de passe de la base, et `ps aux` affiche la ligne de commande de tout
 // processus de la machine.
-func TestLeDSNSeLitSurLEntreeStandard(t *testing.T) {
+func TestTheDSNIsReadFromStandardInput(t *testing.T) {
 	t.Parallel()
 
 	const password = "tr0p-secret"
@@ -37,7 +37,7 @@ func TestLeDSNSeLitSurLEntreeStandard(t *testing.T) {
 // L'entrée standard porte un DSN elle aussi : sans cela, retirer la garde laisserait la commande se
 // plaindre d'une entrée vide — un refus qui parle bien de l'« entrée standard » et prouverait donc
 // n'importe quoi.
-func TestUnDSNPasseEnArgumentEstRefuse(t *testing.T) {
+func TestADSNPassedAsArgumentIsRefused(t *testing.T) {
 	t.Parallel()
 
 	err := start(strings.NewReader("host=localhost sslmode=zzz\n"), io.Discard, io.Discard,
@@ -48,7 +48,7 @@ func TestUnDSNPasseEnArgumentEstRefuse(t *testing.T) {
 	assert.Contains(t, err.Error(), "entrée standard", "le refus ne dit pas par où passer à la place")
 }
 
-func TestUneEntreeStandardVideDitCommentPasserLeDSN(t *testing.T) {
+func TestAnEmptyStandardInputSaysHowToPassTheDSN(t *testing.T) {
 	t.Parallel()
 
 	err := start(strings.NewReader("  \n"), io.Discard, io.Discard, nil, ownerEnv)
@@ -57,7 +57,7 @@ func TestUneEntreeStandardVideDitCommentPasserLeDSN(t *testing.T) {
 	assert.Contains(t, err.Error(), "entrée standard")
 }
 
-func TestUneBaseDejaSemeeNAnnonceAucunChangement(t *testing.T) {
+func TestAnAlreadySeededDatabaseAnnouncesNoChange(t *testing.T) {
 	t.Parallel()
 
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
@@ -68,7 +68,7 @@ func TestUneBaseDejaSemeeNAnnonceAucunChangement(t *testing.T) {
 	assert.Empty(t, errOut.String(), "une base sans divergence a fait écrire un avertissement")
 }
 
-func TestLaPremiereExecutionCompteCeQuElleAPose(t *testing.T) {
+func TestTheFirstRunCountsWhatItLaidDown(t *testing.T) {
 	t.Parallel()
 
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
@@ -93,7 +93,7 @@ func TestLaPremiereExecutionCompteCeQuElleAPose(t *testing.T) {
 // Une divergence part sur la sortie d'erreur et n'arrête pas le déploiement (DN-4) : ce qu'on refuse
 // est le silence, pas la livraison. Elle doit dire pourquoi la clé n'est pas supprimée, sinon la
 // prochaine session le fera à la main et se heurtera au RESTRICT sans comprendre.
-func TestUneDivergenceEstDiteSurLaSortieDErreurEtNArretePasLeDeploiement(t *testing.T) {
+func TestADivergenceIsReportedOnStderrAndDoesNotStopTheDeployment(t *testing.T) {
 	t.Parallel()
 
 	out, errOut := &bytes.Buffer{}, &bytes.Buffer{}

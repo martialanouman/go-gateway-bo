@@ -712,7 +712,7 @@ func TestUneOrigineEnClairNEstAcceptéeQueSurLePosteLocal(t *testing.T) {
 
 // Ce qui empêche `mock` d'atteindre la production, et la seule chose qui le puisse sans variable
 // supplémentaire : un mock est un processus lancé à côté, jamais un mode d'exploitation.
-func TestLeModeMockExigeUnePasserelleSurLePosteLocal(t *testing.T) {
+func TestMockModeRequiresAGatewayOnTheLocalMachine(t *testing.T) {
 	t.Parallel()
 
 	_, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
@@ -773,7 +773,7 @@ func TestUnReseauDeConfianceNonDeclaréEstRefuséEnNommantSaSortie(t *testing.T)
 	assert.Contains(t, err.Error(), config.NoTrustedProxy)
 }
 
-func TestAucunProxyDeConfianceSeDeclareEtNeFaitCroireAAucun(t *testing.T) {
+func TestNoTrustedProxyIsDeclaredAndTrustsNone(t *testing.T) {
 	t.Parallel()
 
 	cfg, err := config.Load(lookupFrom(envWith(minimalEnv(), map[string]string{
@@ -787,7 +787,7 @@ func TestAucunProxyDeConfianceSeDeclareEtNeFaitCroireAAucun(t *testing.T) {
 // Une liste qui ne porte que des séparateurs rendait `nil` sans un mot — c'est-à-dire exactement le
 // silence que l'obligation venait de fermer, atteignable depuis n'importe quel gabarit qui joint sur
 // des virgules.
-func TestUneListeDeProxysSansAucunReseauEstRefusee(t *testing.T) {
+func TestAProxyListWithoutAnyNetworkIsRefused(t *testing.T) {
 	t.Parallel()
 
 	for _, value := range []string{",", ",,", " , "} {
@@ -808,7 +808,7 @@ func TestUneListeDeProxysSansAucunReseauEstRefusee(t *testing.T) {
 // Une origine n'a **que** un schéma et un hôte. Un chemin y passait la configuration et ne cassait
 // qu'à moitié : les navigateurs modernes annoncent `Sec-Fetch-Site` et passaient, ceux qui ne
 // l'annoncent pas se faisaient refuser par une comparaison d'origine que le chemin faisait échouer.
-func TestUneOrigineNaNiCheminNiIdentifiants(t *testing.T) {
+func TestAnOriginHasNeitherPathNorCredentials(t *testing.T) {
 	t.Parallel()
 
 	for _, origin := range []string{
@@ -833,7 +833,7 @@ func TestUneOrigineNaNiCheminNiIdentifiants(t *testing.T) {
 // La barre oblique finale et la casse de l'hôte sont **normalisées**, pas refusées : les deux
 // désignent la même origine, et un refus ferait chercher une faute là où il n'y en a pas. La
 // normalisation vit ici, à l'entrée de la valeur, et non dans la garde qui la consomme.
-func TestUneOrigineEstRendueSousSaFormeCanonique(t *testing.T) {
+func TestAnOriginIsRenderedInItsCanonicalForm(t *testing.T) {
 	t.Parallel()
 
 	for raw, canonical := range map[string]string{

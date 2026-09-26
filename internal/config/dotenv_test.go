@@ -31,7 +31,7 @@ func TestDotenvExampleListsExactlyWhatLoadReads(t *testing.T) {
 // C'est arrivé à la première valeur du fichier à contenir un espace :
 // `DASHBOARD_PRODUCT_NAME=Passerelle SMS Admin` rend `dotenv: SMS: command not found`. La porte
 // voisine ne peut pas le voir — elle ne compare que des **noms**.
-func TestAucuneValeurDuDotenvNEstDecoupeeParLeShell(t *testing.T) {
+func TestNoDotenvValueIsSplitByTheShell(t *testing.T) {
 	t.Parallel()
 
 	file, err := os.Open(dotenvExample)

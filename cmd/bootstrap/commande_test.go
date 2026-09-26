@@ -20,7 +20,7 @@ import (
 // comparée, pas supposée ». Comparée ici, et sur la **commande** : l'empreinte inclut les
 // identifiants `uuidv7()` et les dates de création, donc un seed qui supprimerait et recréerait les
 // neuf rôles à l'identique se verrait.
-func TestDeuxExecutionsLaissentLaBaseIdentique(t *testing.T) {
+func TestTwoRunsLeaveTheDatabaseIdentical(t *testing.T) {
 	ctx := t.Context()
 	dsn := migratedDatabase(ctx, t)
 
@@ -46,7 +46,7 @@ func TestDeuxExecutionsLaissentLaBaseIdentique(t *testing.T) {
 // Le contrôle de schéma est dans la commande, et non seulement dans le serveur : sans lui, semer une
 // base non migrée échouerait sur « relation "permissions" does not exist » — vrai, et muet sur le
 // remède.
-func TestSemerUneBaseNonMigreeEstRefuseEnNommantLesDeuxVersions(t *testing.T) {
+func TestSeedingAnUnmigratedDatabaseIsRefusedNamingBothVersions(t *testing.T) {
 	ctx := t.Context()
 	dsn := freshDatabase(ctx, t)
 
@@ -64,7 +64,7 @@ func TestSemerUneBaseNonMigreeEstRefuseEnNommantLesDeuxVersions(t *testing.T) {
 // La divergence part sur la **sortie d'erreur** et n'arrête pas le déploiement. Le cas voisin de
 // `main_test.go` appelle `report` directement : intervertir les deux écrivains dans `start` lui
 // échappait entièrement.
-func TestUneDivergenceNArretePasLaCommandeEtNeSaliPasLeCompteRendu(t *testing.T) {
+func TestADivergenceDoesNotStopTheCommandNorSoilTheReport(t *testing.T) {
 	ctx := t.Context()
 	dsn := migratedDatabase(ctx, t)
 
@@ -131,7 +131,7 @@ func vocabularyFingerprint(ctx context.Context, t *testing.T, dsn string) string
 // qui ne se rejoue pas. Le mode d'échec que le « refuse » d'origine visait — un second compte
 // propriétaire créé en douce par quelqu'un qui relance avec d'autres variables — est couvert à
 // l'identique, sans casser la rejouabilité.
-func TestUnSecondPassageNeCreeAucunSecondOperateur(t *testing.T) {
+func TestASecondRunCreatesNoSecondOperator(t *testing.T) {
 	t.Parallel()
 
 	dsn := migratedDatabase(t.Context(), t)
@@ -150,7 +150,7 @@ func TestUnSecondPassageNeCreeAucunSecondOperateur(t *testing.T) {
 
 // Sans les variables, une installation neuve doit **refuser** en les nommant : la laisser passer
 // livrerait un vocabulaire complet et personne pour l'exercer, ce qui a l'air d'une réussite.
-func TestUneInstallationNeuveSansVariablesRefuseEnLesNommant(t *testing.T) {
+func TestAFreshInstallWithoutVariablesRefusesNamingThem(t *testing.T) {
 	t.Parallel()
 
 	dsn := migratedDatabase(t.Context(), t)
@@ -171,7 +171,7 @@ func TestUneInstallationNeuveSansVariablesRefuseEnLesNommant(t *testing.T) {
 
 // Le compte propriétaire détient le rôle qui accorde tout. Sans lui il pourrait se connecter et ne
 // rien faire — une installation qui a l'air bonne et dans laquelle personne ne peut travailler.
-func TestLeCompteProprietaireDetientLeRoleQuiAccordeTout(t *testing.T) {
+func TestTheOwnerAccountHoldsTheRoleThatGrantsEverything(t *testing.T) {
 	t.Parallel()
 
 	dsn := migratedDatabase(t.Context(), t)

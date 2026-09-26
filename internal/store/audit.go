@@ -108,7 +108,7 @@ func (a *Audit) Record(ctx context.Context, event Event) error {
 // **Aucun appelant en production** : les cinq écritures en transaction vivent dans ce paquet
 // (`Sessions.Create`, `Sessions.Elevate`, `MFA.Enroll`, `Webauthn.Register`, `Webauthn.Remove`) et
 // appellent `record` en direct. Ce qu'elle porte est l'observabilité de la propriété depuis dehors —
-// `TestUnAuditAnnuleAvecSaTransactionNeLaissePasDeTrace` est dans le paquet de test externe et ne
+// `TestAnAuditRolledBackWithItsTransactionLeavesNoTrace` est dans le paquet de test externe et ne
 // peut pas atteindre `record`.
 func (a *Audit) RecordTx(ctx context.Context, tx pgx.Tx, event Event) error {
 	return record(ctx, tx, event)
