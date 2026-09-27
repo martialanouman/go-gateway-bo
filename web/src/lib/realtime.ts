@@ -1,3 +1,16 @@
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  createContext,
+  createElement,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
+import { meQueryOptions } from './api'
 import type { components } from './api.gen'
 
 type Schemas = components['schemas']
@@ -228,4 +241,77 @@ export class RealtimeConnection {
     this.#summary = null
     for (const watcher of this.#watchers) watcher()
   }
+}
+
+const IDLE_SUMMARY: Summary = Object.freeze({ phase: 'closed', topics: Object.freeze([]) })
+const noop = () => {}
+
+// `undefined` hors fournisseur, `null` sans session : un fournisseur absent doit rougir, pas se taire.
+const RealtimeContext = createContext<RealtimeConnection | null | undefined>(undefined)
+
+function useConnection(hook: string) {
+  const connection = useContext(RealtimeContext)
+  if (connection === undefined) {
+    throw new Error(`${hook} est appelé hors du RealtimeProvider que monte la coquille`)
+  }
+  return connection
+}
+
+function useWatch(connection: RealtimeConnection | null) {
+  return useCallback((notify: () => void) => connection?.watch(notify) ?? noop, [connection])
+}
+
+export function RealtimeProvider({
+  enabled,
+  children,
+}: {
+  readonly enabled: boolean
+  readonly children: ReactNode
+}) {
+  const queryClient = useQueryClient()
+  const [connection, setConnection] = useState<RealtimeConnection | null>(null)
+
+  useEffect(() => {
+    if (!enabled) return
+    const created = new RealtimeConnection(
+      realtimeURL(window.location),
+      () => void queryClient.invalidateQueries({ queryKey: meQueryOptions.queryKey }),
+    )
+    created.start()
+    setConnection(created)
+    return () => {
+      created.stop()
+      setConnection(null)
+    }
+  }, [enabled, queryClient])
+
+  return createElement(RealtimeContext.Provider, { value: connection }, children)
+}
+
+export function useTopic<T extends Topic>(
+  topic: T | null,
+  onMessage?: (data: TopicData[T], ts: string) => void,
+): TopicState<T> {
+  const connection = useConnection('useTopic')
+  // Le dernier rappel, lu à la trame : une nouvelle identité de rappel ne réabonne pas le sujet.
+  const latest = useRef(onMessage)
+  useEffect(() => {
+    latest.current = onMessage
+  })
+
+  useEffect(() => {
+    if (connection === null || topic === null) return
+    return connection.subscribe(topic, (data, ts) => latest.current?.(data, ts))
+  }, [connection, topic])
+
+  return useSyncExternalStore(useWatch(connection), () =>
+    connection === null || topic === null
+      ? (UNSUBSCRIBED as TopicState<T>)
+      : connection.topic(topic),
+  )
+}
+
+export function useRealtimeSummary(): Summary {
+  const connection = useConnection('useRealtimeSummary')
+  return useSyncExternalStore(useWatch(connection), () => connection?.summary() ?? IDLE_SUMMARY)
 }

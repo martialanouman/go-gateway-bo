@@ -1,3 +1,4 @@
+import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../../test/websocket'
 import {
@@ -6,6 +7,8 @@ import {
   RealtimeConnection,
   realtimeURL,
   STALE_AFTER_MS,
+  useRealtimeSummary,
+  useTopic,
 } from './realtime'
 
 const alert = {
@@ -371,5 +374,12 @@ describe('RealtimeConnection', () => {
     vi.advanceTimersByTime(60_000)
     expect(FakeWebSocket.instances).toHaveLength(2)
     expect(onSessionEnded).not.toHaveBeenCalled()
+  })
+})
+
+describe('the realtime hooks', () => {
+  it('refuse to run outside the provider the shell mounts', () => {
+    expect(() => renderHook(() => useTopic('billing.alerts'))).toThrow(/RealtimeProvider/)
+    expect(() => renderHook(() => useRealtimeSummary())).toThrow(/RealtimeProvider/)
   })
 })
