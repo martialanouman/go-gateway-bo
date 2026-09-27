@@ -35,65 +35,77 @@ export default defineConfig({
   // multiplier les moteurs multiplierait le temps de CI sans décrire un risque qu'il court.
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
-  webServer: {
-    // **Le binaire**, jamais `vite dev`. L'ordonnancement `/api` avant le fallback SPA, les en-têtes de
-    // cache et l'embarquement des assets n'existent que dans le déployable ; c'est `make e2e` qui le
-    // construit avant d'arriver ici.
-    command: '../bin/dashboard',
-    url: `http://${host}:${port}/`,
-    // Ce que ce `false` tient exactement : `_startProcess` (`playwright/lib/runner/index.js` en
-    // 1.62.0) sonde l'URL et, si elle répond déjà, **jette** au lieu de s'y raccrocher — les parcours
-    // n'exerceront jamais un serveur qu'ils n'ont pas lancé. Le port dédié ci-dessus rend ce refus
-    // tenable en local.
-    //
-    // Ce qu'il ne tient pas : la fraîcheur du binaire. `command` lance `../bin/dashboard` tel qu'il
-    // est sur le disque, donc un `pnpm e2e` direct exercerait un déployable périmé sans le dire. La
-    // garantie appartient à `make e2e`, qui dépend de `build`.
-    reuseExistingServer: false,
-    stdout: 'pipe',
-    stderr: 'pipe',
-    // Toutes les variables ci-dessous sont **obligatoires et sans repli** : le binaire refuse de
-    // démarrer sans elles, et ce refus arrive avant qu'il ne lie son port — un parcours démarrerait
-    // donc sur un serveur qui n'écoute pas.
-    env: {
-      DASHBOARD_ADDR: `${host}:${port}`,
-      // Le nom sous lequel ce déploiement se présente à l'opérateur, dans son application
-      // d'authentification et dans la cérémonie WebAuthn. La valeur diffère du nom de production,
-      // comme les décors de test — un nom recodé en dur passerait tout parcours qui le lirait.
-      DASHBOARD_PRODUCT_NAME: 'Cockpit de parcours',
-      // Aucun mock n'est lancé : le client sortant n'est appelé par aucun écran, et la configuration
-      // ne fait qu'exiger son adresse au démarrage.
-      //
-      // La base, elle, **doit répondre et porter les migrations** : le binaire contrôle la version du
-      // schéma avant de lier son port. Celle-ci n'appartient qu'aux parcours, et `make e2e` la
-      // recrée, la migre et y sème le compte avant d'arriver ici — un poste sans `docker compose up
-      // -d` échoue donc plus tôt, sur une erreur de connexion, plutôt qu'ici sur un écran blanc.
-      // `?sslmode=disable` parce que ni le conteneur local ni le service de la CI ne présentent de
-      // certificat.
-      DASHBOARD_GATEWAY_MODE: 'mock',
-      DASHBOARD_GATEWAY_BASE_URL: 'http://127.0.0.1:4010',
-      DASHBOARD_DATABASE_URL:
-        'postgres://dashboard:dashboard@127.0.0.1:5432/dashboard_e2e?sslmode=disable',
-      // Rien d'un secret : aucun parcours ne relit un HMAC.
-      DASHBOARD_BRUTEFORCE_SALT: 'un-sel-de-parcours-assez-long-pour-passer-la-borne',
-      DASHBOARD_SESSION_SECRET: 'une-cle-de-parcours-assez-longue-pour-passer-la-borne',
-      DASHBOARD_TOTP_ENCRYPTION_KEY: 'une-cle-de-chiffrement-de-parcours-assez-longue',
-      // Pas des secrets non plus : le navigateur les voit à chaque cérémonie. Elles doivent s'accorder
-      // au `baseURL` ci-dessus, sans quoi la cérémonie du parcours échoue.
-      DASHBOARD_WEBAUTHN_RP_ID: host,
-      DASHBOARD_WEBAUTHN_ORIGIN: `http://${host}:${port}`,
-      // Vide ne se distingue pas d'un oubli, et l'oubli fait compter toutes les tentatives sur
-      // l'adresse du load balancer. Aucun proxy ne s'interpose ici.
-      DASHBOARD_TRUSTED_PROXIES: 'none',
-      // Mailpit (`docker compose up -d`) : les parcours qui lisent un lien d'accès l'y lisent par son
-      // API, jamais reçu pour de vrai. L'URL publique est l'origine de ce serveur, seule source de la
-      // base des liens — le worker qui les envoie ne porte aucune requête HTTP.
-      DASHBOARD_SMTP_ADDR: '127.0.0.1:1025',
-      DASHBOARD_SMTP_FROM: 'cockpit@example.test',
-      DASHBOARD_PUBLIC_URL: `http://${host}:${port}`,
-      // Le Redis de `docker compose`. Injoignable, il ne bloque pas le démarrage : aucun parcours
-      // n'ouvre encore la socket temps réel.
-      DASHBOARD_REDIS_URL: 'redis://127.0.0.1:6379/0',
+  webServer: [
+    {
+      // Le faux amont de step-045 (`internal/fakegateway`, servi par `scripts/fakegateway`) : les
+      // trois flux temps réel de l'API Admin, plus le point de contrôle HTTP que Playwright appelle
+      // pour émettre une trame ou couper un flux. `make e2e` construit le binaire avant d'arriver ici.
+      command: '../bin/fakegateway -addr 127.0.0.1:4011',
+      url: 'http://127.0.0.1:4011/control/ready',
+      reuseExistingServer: false,
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
-  },
+    {
+      // **Le binaire**, jamais `vite dev`. L'ordonnancement `/api` avant le fallback SPA, les en-têtes de
+      // cache et l'embarquement des assets n'existent que dans le déployable ; c'est `make e2e` qui le
+      // construit avant d'arriver ici.
+      command: '../bin/dashboard',
+      url: `http://${host}:${port}/`,
+      // Ce que ce `false` tient exactement : `_startProcess` (`playwright/lib/runner/index.js` en
+      // 1.62.0) sonde l'URL et, si elle répond déjà, **jette** au lieu de s'y raccrocher — les parcours
+      // n'exerceront jamais un serveur qu'ils n'ont pas lancé. Le port dédié ci-dessus rend ce refus
+      // tenable en local.
+      //
+      // Ce qu'il ne tient pas : la fraîcheur du binaire. `command` lance `../bin/dashboard` tel qu'il
+      // est sur le disque, donc un `pnpm e2e` direct exercerait un déployable périmé sans le dire. La
+      // garantie appartient à `make e2e`, qui dépend de `build`.
+      reuseExistingServer: false,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      // Toutes les variables ci-dessous sont **obligatoires et sans repli** : le binaire refuse de
+      // démarrer sans elles, et ce refus arrive avant qu'il ne lie son port — un parcours démarrerait
+      // donc sur un serveur qui n'écoute pas.
+      env: {
+        DASHBOARD_ADDR: `${host}:${port}`,
+        // Le nom sous lequel ce déploiement se présente à l'opérateur, dans son application
+        // d'authentification et dans la cérémonie WebAuthn. La valeur diffère du nom de production,
+        // comme les décors de test — un nom recodé en dur passerait tout parcours qui le lirait.
+        DASHBOARD_PRODUCT_NAME: 'Cockpit de parcours',
+        // La base, elle, **doit répondre et porter les migrations** : le binaire contrôle la version du
+        // schéma avant de lier son port. Celle-ci n'appartient qu'aux parcours, et `make e2e` la
+        // recrée, la migre et y sème le compte avant d'arriver ici — un poste sans `docker compose up
+        // -d` échoue donc plus tôt, sur une erreur de connexion, plutôt qu'ici sur un écran blanc.
+        // `?sslmode=disable` parce que ni le conteneur local ni le service de la CI ne présentent de
+        // certificat.
+        DASHBOARD_GATEWAY_MODE: 'mock',
+        // Le faux amont ci-dessus, pas Prism : aucun écran ne l'appelle encore (step-046 le premier),
+        // mais c'est déjà lui qui porte les trois flux temps réel qu'un parcours viendra ouvrir.
+        DASHBOARD_GATEWAY_BASE_URL: 'http://127.0.0.1:4011',
+        DASHBOARD_DATABASE_URL:
+          'postgres://dashboard:dashboard@127.0.0.1:5432/dashboard_e2e?sslmode=disable',
+        // Rien d'un secret : aucun parcours ne relit un HMAC.
+        DASHBOARD_BRUTEFORCE_SALT: 'un-sel-de-parcours-assez-long-pour-passer-la-borne',
+        DASHBOARD_SESSION_SECRET: 'une-cle-de-parcours-assez-longue-pour-passer-la-borne',
+        DASHBOARD_TOTP_ENCRYPTION_KEY: 'une-cle-de-chiffrement-de-parcours-assez-longue',
+        // Pas des secrets non plus : le navigateur les voit à chaque cérémonie. Elles doivent s'accorder
+        // au `baseURL` ci-dessus, sans quoi la cérémonie du parcours échoue.
+        DASHBOARD_WEBAUTHN_RP_ID: host,
+        DASHBOARD_WEBAUTHN_ORIGIN: `http://${host}:${port}`,
+        // Vide ne se distingue pas d'un oubli, et l'oubli fait compter toutes les tentatives sur
+        // l'adresse du load balancer. Aucun proxy ne s'interpose ici.
+        DASHBOARD_TRUSTED_PROXIES: 'none',
+        // Mailpit (`docker compose up -d`) : les parcours qui lisent un lien d'accès l'y lisent par son
+        // API, jamais reçu pour de vrai. L'URL publique est l'origine de ce serveur, seule source de la
+        // base des liens — le worker qui les envoie ne porte aucune requête HTTP.
+        DASHBOARD_SMTP_ADDR: '127.0.0.1:1025',
+        DASHBOARD_SMTP_FROM: 'cockpit@example.test',
+        DASHBOARD_PUBLIC_URL: `http://${host}:${port}`,
+        // Le Redis de `docker compose` : le hub temps réel ne va en ligne qu'à travers lui. Aucun
+        // parcours n'ouvre encore la socket (`/ws`) — step-045 pose le client, step-046 le premier
+        // consommateur — mais le binaire le joint dès le démarrage pour le Pub/Sub inter-instances.
+        DASHBOARD_REDIS_URL: 'redis://127.0.0.1:6379/0',
+      },
+    },
+  ],
 })
