@@ -148,8 +148,8 @@ func (a API) MarkNotificationRead(ctx context.Context, request MarkNotificationR
 	if errors.Is(err, store.ErrNotificationUnknown) {
 		return MarkNotificationRead404JSONResponse{NotificationInconnueJSONResponse(Error{
 			Code: "notification_unknown",
-			Message: "Cette notification n'est pas dans votre centre : elle n'existe pas, ou sa " +
-				"source demande une permission que votre compte n'a pas.",
+			Message: "Rien n'est marqué : aucune notification visible de ce compte ne porte cet " +
+				"identifiant — elle n'existe pas, ou sa source demande une permission que ce compte n'a pas.",
 		})}, nil
 	}
 
