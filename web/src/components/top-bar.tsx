@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Button } from '~/components/ui'
 import { api, type Me, meQueryOptions } from '~/lib/api'
+import { RealtimeStatus } from './realtime-status'
 
 /**
  * Le nom d'affichage, **sans rôle**, contrairement au `TopBar` de la charte. Le contrat de
@@ -20,6 +21,7 @@ export function TopBar({ operator }: { readonly operator: Me['operator'] }) {
 
   return (
     <div className="topbar__end">
+      <RealtimeStatus />
       <Link className="topbar__operator" to="/account">
         {operator.displayName}
       </Link>
