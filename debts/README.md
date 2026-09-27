@@ -4,7 +4,7 @@
 et nulle part ailleurs — pas dans un commentaire, pas dans une fiche archivée, pas dans un tableau.
 Le dépôt écrit lui-même pourquoi : *« une fiche archivée n'est ouverte par personne »*.
 
-`internal/bddtest/porteurs_test.go` tient ce dossier. Il est **fermé par défaut** : un fichier sans
+`internal/bddtest/debt_owners_test.go` tient ce dossier. Il est **fermé par défaut** : un fichier sans
 porteur fait rougir la suite en le nommant.
 
 ## La forme

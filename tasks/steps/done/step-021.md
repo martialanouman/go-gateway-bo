@@ -189,7 +189,7 @@ n'a rien à acheter ici, et coûterait ses dizaines de millisecondes sur le chem
 fermerait le pool **au début** du délai de grâce, et les requêtes que ce délai existe pour laisser
 finir tomberaient sur un pool fermé. `cmd/dashboard` lui passe un contexte détaché.
 
-Aucune porte ne le garde — `arret-propre.feature` n'a aucune requête assez lente pour ouvrir la
+Aucune porte ne le garde — `graceful-shutdown.feature` n'a aucune requête assez lente pour ouvrir la
 fenêtre. Le constat est écrit au-dessus de la ligne.
 
 ### DN-9 — La consommation d'un challenge n'est pas livrée
@@ -283,7 +283,7 @@ restent écrites avec ce qui les referme — une ligne qu'on efface se réouvre 
 | `pg_advisory_xact_lock` en tête de `CreateFirstOperator` | aucune porte — deux exécutions concurrentes se croisent trop rarement pour qu'un test qui les lance prouve quoi que ce soit |
 | l'**appel** à `VerifyDummy` dans `passwordMatches` | ~~aucune porte~~ **refermé** : `oracle_test.go` résout l'identifiant appelé en objet du type-checker et exige qu'il soit dans la branche « opérateur absent ». Trois mutations le font rougir — l'appel retiré, l'appel déplacé hors de la branche, la fonction renommée |
 | les trois `CHECK` et le `ON DELETE CASCADE` de la migration `00004` | ~~aucune porte~~ **refermé** : trois refus ajoutés à `constraints_test.go`, chacun vérifié en retirant **sa** contrainte isolément. Les deux inatteignables depuis le produit portent sur place ce qu'elles gardent |
-| les bornes d'entrée `maximumPasswordLength`, `maximumEmailLength` et `RequestSize` | ~~aucune porte~~ **refermé** : `bornes_test.go` monte le routeur entier sur un pool fermé, où 400 (refusé à la porte) se distingue de 500 (arrivé jusqu'à la base). Le compte en runes est gardé avec elles |
+| les bornes d'entrée `maximumPasswordLength`, `maximumEmailLength` et `RequestSize` | ~~aucune porte~~ **refermé** : `bounds_test.go` monte le routeur entier sur un pool fermé, où 400 (refusé à la porte) se distingue de 500 (arrivé jusqu'à la base). Le compte en runes est gardé avec elles |
 | le chemin d'erreur base pendant un login | ~~aucune porte~~ **refermé** : `TestAnUnreachableDatabaseIsNotReadAsACredentialsRefusal`, qui vérifie le corps autant que le statut — faute de journal dans `internal/bff`, ce que le navigateur reçoit est tout ce qui existe |
 | `request.Body == nil` dans `API.Login` | aucune porte, et **inatteignable par le routeur** : `strictHandler.Login` assigne le pointeur sans condition. Lui écrire un test demanderait d'appeler la méthode hors de son routeur — il prouverait la garde et rien du produit. Le constat est au-dessus de la ligne |
 

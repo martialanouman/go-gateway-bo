@@ -44,7 +44,7 @@ var admittedSinks = map[string]string{
 		"compilation, donc du bundle SPA et de rien d'autre. Aucun objet de domaine ne peut y entrer",
 	"github.com/coder/websocket.Accept": "la montée en WebSocket de `/ws`. Après elle, ce qui part sur " +
 		"la socket est écrit par `internal/hub`, qui ne sérialise que ses DTO déclarés " +
-		"(`frames.go`) — et les scénarios de `temps-reel.feature` valident chaque message reçu contre " +
+		"(`frames.go`) — et les scénarios de `realtime.feature` valident chaque message reçu contre " +
 		"les schémas `Realtime*` du contrat",
 	modulePath + "internal/bff.StrictHandlerFunc": "la chaîne des middlewares stricts. `next(ctx, w, " +
 		"r, request)` passe le writer au maillon suivant sans rien y écrire, et le dernier maillon est " +

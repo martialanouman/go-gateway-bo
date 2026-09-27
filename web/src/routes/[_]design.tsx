@@ -47,7 +47,7 @@ import '~/styles/design-reference.css'
  *
  * Elle est un **frère** de `_shell`, donc hors de la coquille, et sans garde de session — elle
  * n'affiche aucune donnée. Ce qu'elle rend vient entièrement de `~/lib/design-tokens`, que
- * `test/charte.test.ts` lit aussi : « chaque paire utilisée par cette page atteint AA » est donc
+ * `test/charter.test.ts` lit aussi : « chaque paire utilisée par cette page atteint AA » est donc
  * littéralement vrai, plutôt que maintenu à la main de deux côtés.
  *
  * **Elle est servie en production comme ailleurs.** Aucune donnée réelle, aucune API jointe : rien à
@@ -173,8 +173,8 @@ function DesignReference() {
       <section className="design__section">
         <h2 id="contraste">Contraste</h2>
         <p className="design__lede">
-          Chaque ligne est vérifiée à 4,5:1 par <code>test/charte.test.ts</code>, qui lit cette même
-          table. Une paire ajoutée ici est donc testée sans autre geste.
+          Chaque ligne est vérifiée à 4,5:1 par <code>test/charter.test.ts</code>, qui lit cette
+          même table. Une paire ajoutée ici est donc testée sans autre geste.
         </p>
         <table className="design__table">
           <thead>

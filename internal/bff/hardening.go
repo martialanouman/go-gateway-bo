@@ -169,7 +169,7 @@ const apiRequestDeadline = 30 * time.Second
 // Sur `/ws`, l'échéance de lecture serait sans effet, puisque `net/http` l'efface à la montée
 // (`hijackLocked`, `server.go:325` en Go 1.26.6). C'est `apiRequestDeadline` qui couperait la socket,
 // par le contexte de la requête que reçoit le hub. **Ce montage n'est gardé par rien** : montée aussi
-// sur `/ws` le 26/09/2026, les scénarios de `temps-reel.feature` restent verts, parce qu'aucun ne
+// sur `/ws` le 26/09/2026, les scénarios de `realtime.feature` restent verts, parce qu'aucun ne
 // tient la socket au-delà de ces 30 s.
 // Le contrôle d'origine, lui, est dans le handler de `/ws` (`realtime.go`), et son retrait fait
 // rougir le scénario de l'origine étrangère.

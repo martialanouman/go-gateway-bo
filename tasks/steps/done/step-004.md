@@ -75,7 +75,7 @@ décrivait un RPC typé que le code n'a jamais implémenté.
 ### Les quatre critères transverses de `CLAUDE.md`
 
 1. **Le chemin qu'un humain traverse est traversé pour de bon.** Ici, c'est le load balancer — ou
-   le load balancer qui sonde `/api/health` : `cmd/dashboard/contrat.feature` lance le **binaire
+   le load balancer qui sonde `/api/health` : `cmd/dashboard/contract.feature` lance le **binaire
    compilé**, l'interroge par HTTP, et confronte les octets rendus au YAML du dépôt. Rien de simulé.
    **Ce qui n'est pas traversé et doit se dire** : la moitié TypeScript n'a aucun consommateur
    produit — seul un fichier d'assertions de typage lit les types engendrés.
@@ -155,7 +155,7 @@ Un correctif est du code comme un autre : il repasse par le rouge et par la muta
 | La carte `visited` retirée | débordement de pile, qui emporte le binaire de test — couverte par un test plutôt que par une annotation |
 | Les gestionnaires d'erreur laissés à leur défaut | « le message Go brut atteint le navigateur » : `text/plain` au lieu du DTO, et l'URL interne de la passerelle dans le corps |
 | Le message d'erreur recopié dans le DTO | idem — la fuite sous la bonne forme |
-| `contrat.feature` désactivé | `TestScenarios`, une fois le plancher relevé de 5 à 7 |
+| `contract.feature` désactivé | `TestScenarios`, une fois le plancher relevé de 5 à 7 |
 | La restauration atomique de `check-generated` remise *(constat manuel)* | une sortie désindexée + une génération en échec laissent l'arbre non compilable, sans un mot — **aucun test n'exerce `check-generated`**, cette ligne se lit à la main |
 | Le montage repasse par `HandlerFromMux` (le défaut d'oapi-codegen) | la porte de montage : « laisse le défaut répondre en `text/plain` avec le message Go brut » |
 | `HandlerWithOptions` gardé mais son `ErrorHandlerFunc` retiré | idem |
@@ -278,7 +278,7 @@ Le test compile deux fixtures et **asserte le message**, pas seulement l'échec 
 
 - `testdata/divergent` doit échouer sur `does not implement … (wrong type for method …)` — mesuré
   verbatim ;
-- `testdata/conforme` doit **compiler** — mesuré.
+- `testdata/compliant` doit **compiler** — mesuré.
 
 Le témoin positif n'est pas décoratif : sans lui, un harnais cassé où tout échoue resterait vert.
 L'assertion sur le message ne l'est pas non plus — la première version de ce fixture, écrite pendant

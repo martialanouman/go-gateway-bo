@@ -12,7 +12,7 @@ import type { ReactElement } from 'react'
  * absent, la réponse est son libellé texte. Substituer une forme voisine ferait passer une icône
  * décorative pour un glyphe fonctionnel.
  *
- * Les **vingt-deux** de la charte, tenus égaux au kit par `test/glyphes-de-la-charte.test.ts`, qui
+ * Les **vingt-deux** de la charte, tenus égaux au kit par `test/charter-glyphs.test.ts`, qui
  * les confronte à leur source plutôt que de recopier un compte.
  *
  * Ce qui n'est **pas** porté : la trentaine d'alias du kit (`x`, `close`, `lock`, `trash-2`…), qui

@@ -63,7 +63,7 @@ export type AdministrationReplies = Partial<Record<string, Reply>>
 /**
  * Les routes d'administration, **à l'état près** : créer ajoute à la liste, désactiver change le
  * statut, attribuer change les rôles. Les refus structurels du serveur (auto-verrouillage, rôle par
- * défaut) ne sont pas rejoués ici — c'est `cmd/dashboard/operateurs.feature` qui les tient ; un test
+ * défaut) ne sont pas rejoués ici — c'est `cmd/dashboard/operators.feature` qui les tient ; un test
  * d'écran qui veut en voir un le déclare dans `replies`, clé `« MÉTHODE /chemin »`.
  */
 export function stubAdministration(

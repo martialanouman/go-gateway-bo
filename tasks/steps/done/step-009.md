@@ -12,7 +12,7 @@ Le relever fait partie du travail : la compilation ne montre que la moitié des 
 - `web/package.json` : `2.5.0` → **`4.0.2`**, lockfile à jour, `make generate` rejoué.
 - Le diff du YAML relu **ligne à ligne**, et ses ruptures inscrites ici — celles que la compilation
   montre comme celles qu'elle ne montre pas.
-- `internal/gateway/contrat_test.go` : l'échantillon de la porte anti-copie re-mesuré sur le nouveau
+- `internal/gateway/contract_copy_test.go` : l'échantillon de la porte anti-copie re-mesuré sur le nouveau
   contrat, comme son propre commentaire l'exige à chaque majeure.
 - Les textes que le bump périme, corrigés — **deux classes distinctes**, voir DN-4 — et une garde sur
   celle des deux qui est mécanisable.
@@ -113,7 +113,7 @@ contrainte JSON Schema : ni le générateur ni le typage ne les verront jamais, 
 - **Les mesures que le diff périme, re-mesurées** — à commencer par « 3 de ses 133 opérations
   déclarent un 503 » (`errors.go:153`), qui en compte **4** en 4.0.2. Pas de test : c'est la relecture,
   et DN-4 dit pourquoi elle ne se mécanise pas.
-- `passerelle.feature` rejoué contre Prism, qui lit le même YAML et suit le bump seul.
+- `gateway.feature` rejoué contre Prism, qui lit le même YAML et suit le bump seul.
 
 ## Definition of Done
 - [x] **`make check` vert** (08/08, onze portes)
@@ -296,7 +296,7 @@ que recopié du constat, parce qu'un correctif bâti sur un constat non revérif
 | « treize jours » | **Faux d'un jour** : 12 j 10 h 36 entre 1.0.0 et 4.0.3 | « douze jours », aux trois endroits |
 | Le piège des scopes n'est pas là où step-104 regardera | **Juste**, et aggravé : `cdr:export_bulk` est **aussi** une permission BFF (§6.10), donc le réflexe sera de chercher `RequirePermission()` | renvoi ◊ sous step-104 dans `todo.md`, qui nomme les deux couches |
 | Numéros de ligne du tableau R non datés | **Juste** : exacts sur 2.5.0, faux sur la branche | « sur 2.5.0 » ajouté |
-| Le même fait écrit deux fois dans `contrat_test.go` | **Juste** | dédupliqué |
+| Le même fait écrit deux fois dans `contract_copy_test.go` | **Juste** | dédupliqué |
 | `versionsAnnouncedIn` ne trim pas sa capture | **Juste** : `** 4.0.2 **` rendait un message illisible | `strings.TrimSpace` |
 
 **Mutations rejouées après les correctifs** — la porte renforcée, quatre fois :
@@ -319,7 +319,7 @@ que recopié du constat, parce qu'un correctif bâti sur un constat non revérif
 - **`version_test.go` teste de la documentation depuis le package du client HTTP.** Un package dédié
   serait plus pur ; le dépôt a des précédents (`internal/bddtest/imports_test.go`,
   `internal/store/permissions_catalog_test.go` juge `internal/permissions`), et la cohésion avec
-  `contrat_test.go` — même contrat, même échantillon, même paquet npm — est réelle. **Différent, pas
+  `contract_copy_test.go` — même contrat, même échantillon, même paquet npm — est réelle. **Différent, pas
   meilleur** : laissé où il est.
 - **Le volume de commentaire de cette step est élevé.** Assumé sur les deux tests, dont tout l'intérêt
   est de dire ce qu'ils ne gardent pas ; le changelog d'`errors.go` a en revanche été gardé court.

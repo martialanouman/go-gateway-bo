@@ -7,7 +7,7 @@
  * la page rend » est littéralement ce que le test lit.
  *
  * Ce module ne contient que des **données** : pas de JSX, pas de React. C'est ce qui permet à
- * `test/charte.test.ts` de tourner en `@vitest-environment node` sans charger le routeur.
+ * `test/charter.test.ts` de tourner en `@vitest-environment node` sans charger le routeur.
  *
  * Les valeurs ne sont pas répétées ici — seulement les **noms de tokens**. Une valeur recopiée serait
  * une seconde source de vérité, et c'est exactement ce que la charte interdit.

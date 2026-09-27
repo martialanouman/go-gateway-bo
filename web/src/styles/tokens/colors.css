@@ -87,7 +87,7 @@
    * bibliothèque pose elle-même : les peindre par CSS a coûté un carré uni, `qrcode.react` émettant
    * deux chemins qu'un même sélecteur prenait tous les deux — voir `.auth__qr` dans `app.css`.
    *
-   * « papier » plutôt que « clair » : la garde « aucun thème clair » de `charte.test.ts` cherche
+   * « papier » plutôt que « clair » : la garde « aucun thème clair » de `charter.test.ts` cherche
    * `light` dans les noms de tokens, et elle a raison de le faire. Un `--qr-light` l'aurait fait
    * rougir pour une bonne raison sur un cas qui n'en est pas un ; le nom juste évite d'avoir à
    * assouplir la garde.

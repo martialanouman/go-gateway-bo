@@ -36,7 +36,7 @@ describe('Icon', () => {
 
   it('draws every glyph in the set', () => {
     // **Pas de nombre écrit ici** : un compte recopié dans le test et dans le composant vient de la
-    // même main et ne fait que se confirmer lui-même. C'est `test/glyphes-de-la-charte.test.ts` qui
+    // même main et ne fait que se confirmer lui-même. C'est `test/charter-glyphs.test.ts` qui
     // confronte le jeu à sa source ; ce test-ci vérifie seulement que chaque nom déclaré rend bien
     // quelque chose.
     expect(GLYPH_NAMES.length).toBeGreaterThan(0)

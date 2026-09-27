@@ -17,7 +17,7 @@ import { Dot } from './icon'
  * **Le libellé reste en `snake_case`** : ce sont les valeurs du contrat, qu'un opérateur grep dans
  * les logs. Les traduire couperait le lien entre l'écran et la trace.
  *
- * Les quatre énumérations sont tenues égales au contrat par `test/statuts-du-contrat.test.ts`.
+ * Les quatre énumérations sont tenues égales au contrat par `test/contract-statuses.test.ts`.
  */
 
 import type { DotTone } from './icon'

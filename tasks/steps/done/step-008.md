@@ -113,7 +113,7 @@ reformater 43 déclarations par `make lint-web`, ce qui aurait démenti la phras
 
 ### DN-1 — La garde « consommé ⊆ déclaré » déménage dans le build
 
-`web/chargement-a-froid.test.ts:136-152` exige que **tout** `var()` de la feuille émise soit déclaré
+`web/cold-load.test.ts:136-152` exige que **tout** `var()` de la feuille émise soit déclaré
 dans le `<style>` d'`index.html`. Un seul `var(--text-primary)` la fait tomber — elle a été écrite
 pour quatre variables de géométrie, pas pour 236 tokens.
 
@@ -123,7 +123,7 @@ voyait que quatre.
 
 Écarté : **inliner les tokens dans `index.html`** — 9 Ko dupliqués dans un document `no-cache`,
 renvoyés à chaque navigation, et deux sources de vérité pour 236 tokens au lieu de quatre. Écarté
-aussi : **restreindre la garde à une liste nommée** — c'est le mode d'échec que `charte.test.ts`
+aussi : **restreindre la garde à une liste nommée** — c'est le mode d'échec que `charter.test.ts`
 documente en toutes lettres (« une liste ne voit jamais le token qu'on vient d'inventer »).
 
 ### DN-2 — Le squelette s'aligne sur la charte, valeurs et unités
@@ -137,7 +137,7 @@ documente en toutes lettres (« une liste ne voit jamais le token qu'on vient d'
 
 Non alignés, le rail se déplace de 4 px et le canvas change de luminance entre la première peinture
 et le montage de React. Les **noms restent distincts** : ils désignent « ce que le squelette peint »,
-et `chargement-a-froid.test.ts:98-113` relit ces valeurs **dans le texte d'`index.html`** — elles
+et `cold-load.test.ts:98-113` relit ces valeurs **dans le texte d'`index.html`** — elles
 doivent y rester déclarées. Ce qui devient testable, c'est que la copie soit fidèle : quatre paires.
 
 ### DN-3 — `/_design` sort de la coquille par une mise en page sans chemin
@@ -220,7 +220,7 @@ binaire. Les deux moitiés sont nécessaires, et aucune ne remplace l'autre.
   `url(/assets/…woff2)` extrait **des octets servis**, avec vérification de la signature `wOF2` et du
   `content_type`, et refus de toute origine absolue dans la feuille servie. Ce qu'elle prouve et que
   rien d'autre ne prouve : le **déployable** sert la feuille et la police, avec le bon type.
-- **Playwright, en étendant `e2e/coquille.spec.ts`** (critère 1 : étendre, ne pas ajouter) :
+- **Playwright, en étendant `e2e/shell.spec.ts`** (critère 1 : étendre, ne pas ajouter) :
   `page.on('request'|'requestfailed'|'console'|'pageerror')` posés **avant** le premier `goto`. Plus un
   **plancher** « au moins une requête `.woff2` » — sans lui, « aucune police tierce » serait vrai en
   n'ayant chargé aucune police.
@@ -232,7 +232,7 @@ binaire. Les deux moitiés sont nécessaires, et aucune ne remplace l'autre.
    déterministe. Filtré par extension dans cette step.
 2. **Un `web/test/*.ts` serait exécuté sans être typechecké.** `tsconfig.include` vaut
    `["src", "e2e", "*.config.ts", "*.test.ts"]` : pas de `test/`, et le glob racine ne prend pas
-   `.tsx`. Le lecteur de tokens va donc à la **racine de `web/`**, comme `chargement-a-froid.test.ts`.
+   `.tsx`. Le lecteur de tokens va donc à la **racine de `web/`**, comme `cold-load.test.ts`.
 3. **La page `/_design` de la v1.0 n'est pas portable.** Elle importe neuf primitives et cinq états de
    contenu qui n'existent pas ici (step-041/042), et déclare son CSS par `head: () => ({ links })` —
    une API **TanStack Start**, que ce dépôt n'utilise pas. Ce qui est porté d'elle, c'est le **nom du
@@ -249,7 +249,7 @@ révélé faux à la première mesure, puis vrai à la seconde, et c'est instruc
 ### Deux bloquants, tous deux réels
 
 **Le juge n'était pas branché.** `[_]design.tsx` écrit à l'écran, en français : « Chaque ligne est
-vérifiée à 4,5:1 par `test/charte.test.ts`, qui lit cette même table. » **C'était faux.** Le test
+vérifiée à 4,5:1 par `test/charter.test.ts`, qui lit cette même table. » **C'était faux.** Le test
 importait bien `CONTRAST_PAIRS`, mais seulement pour vérifier que les *tokens existent* ; les
 assertions de ratio portaient sur trois listes écrites à la main. Mesuré : une paire à 2,53:1 ajoutée
 à la table laissait les 108 tests verts, et la page l'affichait comme vérifiée. DN-5 tout entière

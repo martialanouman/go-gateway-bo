@@ -66,7 +66,7 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
 - **Upgrade** (`internal/bff/realtime.go`), refus en JSON **avant** la montée : origine jugée par
   `comesFromDashboard` contre `deps.Origin`, sinon 403 `forbidden_origin` (`requireSameOrigin` laisse
   passer les GET) ; sans session vivante, 401 ; sans second facteur, 403 `mfa_required` ; ni
-  `withAPIDeadlines` ni `ReadTimeout` sur `/ws` (`internal/bff/durcissement.go:166-178` l'explique :
+  `withAPIDeadlines` ni `ReadTimeout` sur `/ws` (`internal/bff/hardening.go:166-178` l'explique :
   c'est le contexte de 30 s d'`apiRequestDeadline` qui couperait la socket, l'échéance de lecture
   étant effacée à la montée).
   À l'abonnement : sujet permis → `status` courant, puis les trames.
@@ -80,7 +80,7 @@ instance, un consommateur par flux : la HA (bail Redis, Pub/Sub) est la step-044
 - **Faux amont** : un serveur `httptest` + `coder/websocket` qui émet des trames écrites d'après
   les structs de `go-gateway/internal/metricstream`, et qui exige un `Bearer`. C'est la seule exception au mock Prism, et elle est écrite à côté du
   `.feature` : Prism ne sert pas de WebSocket.
-- **godog** (`cmd/dashboard/temps-reel.feature`, à côté des autres scénarios qui lancent le binaire :
+- **godog** (`cmd/dashboard/realtime.feature`, à côté des autres scénarios qui lancent le binaire :
   session, origine et permissions demandent le serveur entier) : un abonnement permis reçoit ses trames ; un sujet
   non permis est refusé, et le refus nomme la clé ; la chute d'un flux rend son sujet `stale` pendant
   que les deux autres continuent (invariant e) ; la reprise le rend `live` ; un client lent est
@@ -115,7 +115,7 @@ qui tombe.
 | Arrêt du hub sans fermeture des sockets | `TestStoppingTheHubClosesTheSockets` |
 | Permission retirée non relue | `TestARevokedPermissionUnsubscribesItsTopicAndSaysSo` |
 | Jeton machine absent du dial amont | trois scénarios : le faux amont refuse sans `Bearer` |
-| `withAPIDeadlines` monté sur `/ws` | **rien** : aucun scénario ne tient la socket au-delà des 30 s d'`apiRequestDeadline`. Écrit dans `durcissement.go` (critère 4) |
+| `withAPIDeadlines` monté sur `/ws` | **rien** : aucun scénario ne tient la socket au-delà des 30 s d'`apiRequestDeadline`. Écrit dans `hardening.go` (critère 4) |
 
 La première passe de la mutation « origine retirée » a **suspendu** la suite au lieu de la faire
 rougir : le harnais lisait le corps d'un 101, c'est-à-dire la socket. Corrigé dans `exchange`

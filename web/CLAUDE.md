@@ -8,7 +8,7 @@ d'ouvrir le client n'a rien à faire ici.
 
 - **Aucun secret, aucune URL de l'API Admin codée en dur.** Le navigateur ne parle qu'au BFF, en
   relatif, à l'origine qui l'a servi. Côté serveur, l'invariant (d) est une propriété du compilateur ;
-  ici, c'est une porte de `make check` — `web/chargement-a-froid.test.ts` construit le bundle par la
+  ici, c'est une porte de `make check` — `web/cold-load.test.ts` construit le bundle par la
   commande de production, lit tout ce qu'il en émet de textuel et refuse **toute** origine absolue
   hors liste blanche. Le résiduel est cette liste : l'élargir n'est gardé que par la revue.
 - Le rendu conditionnel d'un contrôle reste un confort : la garde est côté serveur, invariant (c),

@@ -146,7 +146,7 @@ describe('StatusPill — the dimension is declared, never guessed', () => {
 
   it('covers the eight `CdrStatus` values, without letting any fall back to gray', () => {
     // Une valeur omise retombe sur le repli au repos et disparaît de l'œil de l'opérateur qui balaie
-    // la colonne à la recherche des rouges. `web/test/statuts-du-contrat.test.ts` garde
+    // la colonne à la recherche des rouges. `web/test/contract-statuses.test.ts` garde
     // l'exhaustivité contre le YAML ; ce test-ci garde la tonalité de chacune.
     const cases = [
       { state: 'delivered', tone: 'up' },

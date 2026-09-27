@@ -163,7 +163,7 @@ func TestHashingWithZeroCostsIsRefused(t *testing.T) {
 // symptôme, il est juste moins cher pour tout le monde, l'attaquant compris.
 //
 // **Le plancher est le profil retenu, et non le minimum d'OWASP.** Ce dernier laisse descendre de
-// 64 MiB / t=3 à 19 MiB / t=2 — de 26,3 ms à 16,8 ms au tableau de `mesure_test.go` — sans faire
+// 64 MiB / t=3 à 19 MiB / t=2 — de 26,3 ms à 16,8 ms au tableau de `measure_test.go` — sans faire
 // rougir quoi que ce soit : il borne ce qu'argon2id doit rester, pas ce que ce déploiement a décidé.
 // Ce qui est gardé ici est la décision, et la changer demande une mesure neuve plutôt qu'un chiffre
 // plus commode. Le minimum d'OWASP n'est pas asséré à part : il est subsumé, et le redire ferait deux
@@ -191,7 +191,7 @@ func TestTheParametersDoNotGoBelowTheFloor(t *testing.T) {
 // VerifyDummy n'a aucun effet observable : ce qu'il achète est du **temps**, et c'est ce que ce test
 // ne peut pas prouver. La mesure est **manuelle, contre le binaire**, et vit au-dessus de
 // `VerifyDummy` dans `argon2.go` ; le constat est dans le tableau des mutations de la fiche, section
-// « La route ». (`mesure_test.go` mesure `Verify`, jamais `VerifyDummy`.)
+// « La route ». (`measure_test.go` mesure `Verify`, jamais `VerifyDummy`.)
 // Ce test-ci ne garde qu'une chose : qu'il existe et qu'il ne panique pas sur un secret quelconque.
 func TestTheDummyHashRunsOnAnySecret(t *testing.T) {
 	t.Parallel()

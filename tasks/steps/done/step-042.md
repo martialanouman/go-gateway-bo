@@ -62,7 +62,7 @@ module désactivé et l'erreur. Le chargement n'a pas de copie par nature, c'est
   valeur sans transition, et `prefers-reduced-motion` désactive l'ensemble.
 - **Le squelette reproduit la vraie mise en page**, pas un rectangle générique — c'est ce qui
   distingue le chargement de l'attente. Le dépôt en a déjà un, celui du chargement à froid, écrit en
-  ligne dans `web/index.html` et tenu par `web/chargement-a-froid.test.ts` ; celui-ci est son
+  ligne dans `web/index.html` et tenu par `web/cold-load.test.ts` ; celui-ci est son
   équivalent à l'intérieur d'un écran, et les deux ne doivent pas diverger de géométrie.
 - **Les cinq copies sont distinctes**, et c'est le point : « Empty ≠ error ≠ disabled ». Deux états
   qui se ressemblent à l'écran sont un défaut, pas une économie.
@@ -133,7 +133,7 @@ sinon de la bascule réelle, quand la pile de toasts montera dans la coquille.
 
 Ce qui a permis à 163 Ko de s'y loger sans un rouge : le script d'entrée n'avait **aucune borne**,
 là où la feuille en a deux depuis step-041. Il en a deux maintenant, 340 Ko bruts / 110 Ko gzip,
-dans `chargement-a-froid.test.ts`. Marge ~15 %, dimensionnée pour que la bascule de step-040 se
+dans `cold-load.test.ts`. Marge ~15 %, dimensionnée pour que la bascule de step-040 se
 présente comme une question et non comme un rouge à faire taire.
 
 Feuille d'entrée : **27,37 Ko bruts / 5,89 Ko gzip**, contre 21,37 / 5,00 avant la step. Bornes
@@ -153,7 +153,7 @@ Feuille d'entrée : **27,37 Ko bruts / 5,89 Ko gzip**, contre 21,37 / 5,00 avant
 | `.ui-toast[data-limited]` en opacité plutôt qu'en `display: none` | **Verte en Vitest**, rouge sur le parcours (5 toasts visibles sur 3). Voir ci-dessous. |
 | `backdrop-filter: var(--scrim-blur)` sur le voile | Rouge sur le parcours. |
 | Les deux sources peintes de la même couleur | Rouge sur le parcours. |
-| `--skeleton-duration` à 1600ms | Rouge, la cinquième paire de `chargement-a-froid`. |
+| `--skeleton-duration` à 1600ms | Rouge, la cinquième paire de `cold-load`. |
 | Le correctif local `tabular-nums` de `.ui-table` retiré | Rouge : la nouvelle garde le rattrape, il n'est plus le seul porteur. |
 | Une règle `.ui-orpheline` dans `app.css` | Rouge — et **verte avant** le premier commit, ce qui mesure le trou que `STYLED_FILES` partagé referme. |
 
@@ -170,7 +170,7 @@ elle ne l'aurait pas trouvé si le plan n'avait pas exigé de la jouer.*
 ### Deux gardes ont mordu pendant l'écriture
 
 Le plugin de tokens sur un `--text-body-medium` que j'avais inventé pour le titre d'un toast, et la
-bijection de `classes-peintes` sur une classe composée dans un template dont le préfixe échappait au
+bijection de `painted-classes` sur une classe composée dans un template dont le préfixe échappait au
 détecteur. Aucune des deux n'aurait été vue en revue.
 
 ### Ce qui n'est pas testé, et pourquoi

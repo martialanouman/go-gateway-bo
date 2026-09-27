@@ -18,7 +18,7 @@ celui de sa voisine.
 - `Icon` et `Dot` : le jeu de glyphes de la charte, **dessiné une seule fois**. Elle n'admet ni
   bibliothèque d'icônes, ni police d'icônes, ni CDN, et *« A name outside the set renders nothing »*.
 - La couche `components.css`, importée par `app.css` et **inscrite dans `STYLED_FILES`**
-  (`web/test/charte.test.ts`) : cette liste est écrite à la main, pas construite par motif, donc
+  (`web/test/charter.test.ts`) : cette liste est écrite à la main, pas construite par motif, donc
   une feuille qui n'y figure pas n'est gardée par rien.
 - Les primitives **rendues sur `/_design`**, qui n'affiche aujourd'hui que des tokens et l'écrit :
   « les primitives habillées (boutons, tables, pilules) […] arrivent en step-041 et step-042 ».
@@ -141,7 +141,7 @@ Aucune primitive ne touche une opération, et `CLAUDE.md` interdit de bumper au 
 
 - **`CdrStatus` n'a pas six valeurs mais huit.** La v1.0 omettait `accepted` et `cancelled`, qui
   retombaient donc sur le repli gris et disparaissaient de l'œil de l'opérateur balayant la colonne à
-  la recherche des rouges. `test/statuts-du-contrat.test.ts` lit désormais le YAML installé : une
+  la recherche des rouges. `test/contract-statuses.test.ts` lit désormais le YAML installé : une
   valeur qui apparaît, disparaît ou se renomme en amont fait rougir.
 - **Le plafond de la feuille d'entrée mesurait le brut pour protéger le transfert.** Son commentaire
   annonçait lui-même que `components.css` mangerait sa marge. Plutôt qu'un cran arbitraire, il mesure

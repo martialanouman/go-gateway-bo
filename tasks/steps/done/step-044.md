@@ -68,7 +68,7 @@ relais sans intervention.
   (`internal/bddtest`).
 
 ## Tests (écrits dans la même PR)
-- **godog** (`cmd/dashboard/haute-disponibilite.feature`, deux binaires, un PostgreSQL, le faux amont
+- **godog** (`cmd/dashboard/high-availability.feature`, deux binaires, un PostgreSQL, le faux amont
   de step-043, et Redis joint à travers un relais TCP du harnais, que « Redis coupé » ferme sans
   toucher au Redis partagé) :
   - deux instances, **une seule** connexion par flux sur le faux amont ;

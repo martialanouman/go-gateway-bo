@@ -170,7 +170,7 @@ d'ailleurs. C'est écrit dans le fichier de la dette.
 
 **Elle n'étend aucun parcours de bout en bout, et c'est délibéré.** Le critère 1 vise « toute step
 qui **livre** un chemin d'écran » ; celle-ci n'en livre aucun, elle remplace le mécanisme derrière
-deux chemins que `e2e/coquille.spec.ts` traverse déjà contre le binaire. Le parcours les traverse
+deux chemins que `e2e/shell.spec.ts` traverse déjà contre le binaire. Le parcours les traverse
 toujours, en `rc=0`. Ce qu'il ne traverse pas est la borne de 4 096 caractères, que seuls les tests
 de composant exercent : la faire refuser dans le navigateur mesurerait le même schéma, une fois de
 plus, au prix d'un parcours qui dure plus longtemps.

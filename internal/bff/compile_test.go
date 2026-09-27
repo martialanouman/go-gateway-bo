@@ -44,7 +44,7 @@ func TestDivergentHandlerSignatureFailsToCompile(t *testing.T) {
 	t.Run("le témoin conforme compile, preuve que le harnais mesure quelque chose", func(t *testing.T) {
 		t.Parallel()
 
-		output, err := buildFixture(t, "conforme")
+		output, err := buildFixture(t, "compliant")
 
 		require.NoError(t, err, "le témoin positif ne compile pas : %s", output)
 		assert.Empty(t, output)

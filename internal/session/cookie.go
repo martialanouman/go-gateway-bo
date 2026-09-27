@@ -113,7 +113,7 @@ func Issued(value string) *http.Cookie {
 		//
 		// **Ce n'est pas la défense contre le CSRF, et ça ne l'a jamais été** : `Lax` raisonne par
 		// *site*, donc il laisse passer le `POST` d'un sous-domaine voisin — le même site — avec ce
-		// cookie. C'est le contrôle d'origine de `internal/bff/durcissement.go` qui refuse celui-là ;
+		// cookie. C'est le contrôle d'origine de `internal/bff/hardening.go` qui refuse celui-là ;
 		// cet attribut n'est que la première des deux barrières.
 		SameSite: http.SameSiteLaxMode,
 	}

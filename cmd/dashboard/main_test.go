@@ -218,7 +218,7 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.When(`^la session dépasse son échéance absolue$`, sessions.expireAbsolutely)
 	ctx.When(`^la table des sessions devient illisible$`, sessions.breakSessionsTable)
 	ctx.When(`^le navigateur se déconnecte$`, sessions.signOut)
-	// Même geste que ci-dessus, vu côté personne plutôt que côté navigateur : `autorisation.feature`
+	// Même geste que ci-dessus, vu côté personne plutôt que côté navigateur : `authorization.feature`
 	// nomme systématiquement l'opérateur, jamais le navigateur qui le porte.
 	ctx.When(`^l'opérateur se déconnecte$`, sessions.signOut)
 	ctx.Given(`^le navigateur retient son cookie de session$`, sessions.rememberCookie)

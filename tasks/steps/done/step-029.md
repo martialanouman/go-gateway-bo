@@ -103,7 +103,7 @@ personne. Les huit ont leur fiche dans `debts/`.*
   Décider **avant** d'écrire, pas au moment de pousser.
 
 ## Tests (écrits dans la même PR)
-- **Scénario** `operateurs.feature` : sans `operators:manage`, la création est refusée et la raison
+- **Scénario** `operators.feature` : sans `operators:manage`, la création est refusée et la raison
   est dite ; avec, elle réussit et laisse une ligne d'audit.
 - Se retirer `operators:manage` est refusé ; se désactiver aussi.
 - Désactiver un opérateur invalide ses sessions : la requête suivante avec son cookie est refusée.

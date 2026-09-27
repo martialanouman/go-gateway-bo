@@ -26,7 +26,7 @@ import (
 // **200 vide**, et seule une traversée complète le montre.
 //
 // La table est injectée : ces tests prouvent le mécanisme sur une opération exemptée en production,
-// sans base. Les scénarios de `operateurs.feature` l'exercent sur les vraies routes. La couture a son
+// sans base. Les scénarios de `operators.feature` l'exercent sur les vraies routes. La couture a son
 // propre risque — vérifier ce que la production ne
 // câble pas — et c'est `TestTheGuardIsWired` qui le ferme.
 const guardedOperation = "Logout"
