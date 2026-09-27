@@ -286,6 +286,16 @@ func (h *Hub) receive(payload []byte) bool {
 			h.setStatus(status)
 		}
 
+	case message.Topic == NotificationsTopic:
+		var notification dataMessage[Notification]
+		if err := json.Unmarshal(payload, &notification); err != nil {
+			h.logger.Warn("notification du canal illisible, écartée")
+
+			return false
+		}
+
+		h.publishNotification(mustMarshal(notification), notification.Data.Source)
+
 	default:
 		// Les journaux ne citent rien de la trame : une erreur de décodage peut recopier une valeur.
 		f, known := feedOf(message.Topic)

@@ -938,6 +938,52 @@ paths:
         '409': { $ref: '#/components/responses/RoleIntouchable' }
         '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
 
+  /notifications:
+    get:
+      operationId: listNotifications
+      summary: Les notifications visibles, plus récentes d'abord
+      description: |
+        Une notification n'est visible qu'avec la permission de sa source : `billing_alert_stream`
+        demande `billing:read`, `alertmanager` et `bff_evaluator` demandent `alerts:read`. Le filtre
+        vaut pour la liste comme pour `unreadCount`.
+
+        C'est un historique d'affichage, au mieux une fois : une bascule ou une base en panne peut y
+        laisser un trou.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: L'`id` de la dernière notification de la page précédente.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Une page de 20 notifications au plus.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPage' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+
+  /notifications/{notificationId}/read:
+    post:
+      operationId: markNotificationRead
+      summary: Marque une notification lue pour l'opérateur de la session
+      description: |
+        Idempotent : déjà lue, rien ne change et rien n'est écrit au journal.
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: La notification est lue.
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/NotificationInconnue' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+
 components:
   parameters:
     OperatorId:
@@ -1002,6 +1048,13 @@ components:
         déploiement ; une édition serait défaite. `role_held` : le rôle est détenu, et le message
         nomme ses détenteurs. `self_lockout` : l'édition retirerait à son auteur `operators:manage`
         ou `roles:manage`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotificationInconnue:
+      description: |
+        Aucune notification visible ne porte cet identifiant — le même corps qu'elle n'existe pas ou
+        que sa source demande une permission que la session n'a pas.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -1562,7 +1615,7 @@ components:
       required: [action, topics]
     RealtimeTopic:
       type: string
-      enum: [metrics.traffic, sessions.events, billing.alerts]
+      enum: [metrics.traffic, sessions.events, billing.alerts, notifications]
     RealtimeData:
       type: object
       description: |
@@ -1577,6 +1630,7 @@ components:
             - $ref: '#/components/schemas/TrafficSnapshot'
             - $ref: '#/components/schemas/SessionEvent'
             - $ref: '#/components/schemas/BillingAlert'
+            - $ref: '#/components/schemas/Notification'
       required: [topic, ts, data]
     RealtimeStatus:
       type: object
@@ -1644,6 +1698,45 @@ components:
         alert: { type: string }
         balance: { type: integer, format: int64 }
       required: [customerId, ownerType, ownerId, alert, balance]
+    Notification:
+      type: object
+      description: |
+        Une notification telle que le sujet `notifications` la diffuse. `details` porte les faits
+        d'un `kind` connu, `message` le texte d'une source en texte libre ; l'un des deux au moins.
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        source: { type: string, enum: [alertmanager, bff_evaluator, billing_alert_stream] }
+        severity: { type: string, enum: [info, warning, critical] }
+        kind: { type: string, enum: [billing_alert, message] }
+        message: { type: string }
+        details: { $ref: '#/components/schemas/BillingAlert' }
+        createdAt: { type: string, format: date-time }
+      required: [id, source, severity, kind, createdAt]
+    NotificationEntry:
+      type: object
+      description: Une notification de la liste, et si l'opérateur de la session l'a lue.
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        source: { type: string, enum: [alertmanager, bff_evaluator, billing_alert_stream] }
+        severity: { type: string, enum: [info, warning, critical] }
+        kind: { type: string, enum: [billing_alert, message] }
+        message: { type: string }
+        details: { $ref: '#/components/schemas/BillingAlert' }
+        createdAt: { type: string, format: date-time }
+        read: { type: boolean }
+      required: [id, source, severity, kind, createdAt, read]
+    NotificationPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/NotificationEntry' }
+        nextCursor: { type: string }
+        unreadCount: { type: integer }
+      required: [items, unreadCount]
 
     Error:
       type: object

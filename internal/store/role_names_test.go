@@ -37,6 +37,9 @@ func TestTheMigrationRenamesDefaultRolesWithoutLosingTheirHolders(t *testing.T) 
 	_, err = pool.Exec(ctx, `DROP TABLE access_links; ALTER TABLE webauthn_credentials DROP COLUMN name;
 		ALTER TABLE operators DROP COLUMN mfa_totp_pending_secret;
 		ALTER TABLE mfa_recovery_codes DROP COLUMN pending;
+		ALTER TABLE notifications DROP CONSTRAINT notifications_has_content, DROP COLUMN details,
+			DROP COLUMN kind;
+		ALTER TABLE notifications ALTER COLUMN message SET NOT NULL;
 		DELETE FROM goose_db_version WHERE version_id >= 10`)
 	require.NoError(t, err)
 

@@ -23,6 +23,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/gateway"
 	"github.com/martialanouman/go-gateway-bo/internal/hub"
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
+	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 	"github.com/martialanouman/go-gateway-bo/internal/webassets"
@@ -179,7 +180,8 @@ func run(ctx context.Context, logger *slog.Logger) error {
 			logger.Error("un lien d'accès n'est pas parti", "error", err)
 		})
 
-	realtime := hub.New(logger)
+	notifications := store.NewNotifications(pool)
+	realtime := hub.New(logger, recordBillingAlert(notifications))
 	// Le hub rend son bail en s'arrêtant, et il lui faut Redis pour cela : run l'attend avant que le
 	// `defer` ne ferme le client. Sans cette attente, un successeur patientait jusqu'à l'expiration
 	// du bail. Le contexte propre au hub l'arrête aussi quand serve rend la main sur une erreur.
@@ -206,6 +208,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 			Audit:          store.NewAudit(pool),
 			Administration: store.NewAdministration(pool),
 			AccessLinks:    links,
+			Notifications:  notifications,
 		},
 		TrustedProxies: cfg.Auth.TrustedProxies,
 		// La même valeur que l'origine des cérémonies WebAuthn, et c'est délibéré : un déploiement a
@@ -215,6 +218,27 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	})
 
 	return serve(ctx, ln, router, cfg.ShutdownTimeout, logger)
+}
+
+// recordBillingAlert traduit une alerte de facturation en ligne de `notifications`. `warning` pour
+// toute valeur : la seule émise ne bloque rien, et une inconnue doit rester visible (dette 060).
+func recordBillingAlert(notifications *store.Notifications) hub.Recorder {
+	return func(ctx context.Context, alert hub.BillingAlert) (hub.Notification, error) {
+		written, err := notifications.Record(ctx, store.NewNotification{
+			Source:   permissions.NotificationSourceBilling,
+			Severity: "warning",
+			Kind:     "billing_alert",
+			Details:  alert,
+		})
+		if err != nil {
+			return hub.Notification{}, err
+		}
+
+		return hub.Notification{
+			ID: written.ID, Source: written.Source, Severity: written.Severity, Kind: written.Kind,
+			Details: &alert, CreatedAt: written.CreatedAt,
+		}, nil
+	}
 }
 
 func dialStream(baseURL string, client *http.Client) hub.Dialer {

@@ -2,16 +2,15 @@ import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { act, render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { components } from '~/lib/api.gen'
-import type { PermissionKey } from '~/lib/permissions.gen'
 import { createAppRouter } from '~/router'
 import { stubSession } from '../../test/session'
 import { FakeWebSocket } from '../../test/websocket'
 
 type RealtimeStatus = components['schemas']['RealtimeStatus']
 
-// L'indicateur agrège les sujets abonnés : `billing:read` en fait abonner un par le produit lui-même.
-async function openShell(permissions: readonly PermissionKey[] = ['billing:read']) {
-  stubSession({ permissions })
+// L'indicateur agrège les sujets abonnés : la coquille abonne `notifications` pour tout opérateur.
+async function openShell() {
+  stubSession({ permissions: [] })
   render(
     <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))} />,
   )
@@ -22,7 +21,7 @@ async function openShell(permissions: readonly PermissionKey[] = ['billing:read'
 }
 
 function status(socket: FakeWebSocket, message: Omit<RealtimeStatus, 'topic'>) {
-  act(() => socket.receive({ topic: 'billing.alerts', ...message } satisfies RealtimeStatus))
+  act(() => socket.receive({ topic: 'notifications', ...message } satisfies RealtimeStatus))
 }
 
 const INDICATOR = /En direct|Connexion en cours|Données périmées|Session terminée/
@@ -40,7 +39,7 @@ describe('the realtime indicator', () => {
   })
 
   it('says it is connecting before the socket first opens', async () => {
-    stubSession({ permissions: ['billing:read'] })
+    stubSession({ permissions: [] })
     render(
       <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))} />,
     )
@@ -108,16 +107,10 @@ describe('the realtime indicator', () => {
 
     act(() =>
       socket.receive({
-        topic: 'billing.alerts',
-        error: { code: 'permission_denied', message: 'Permission billing:read requise.' },
+        topic: 'notifications',
+        error: { code: 'permission_denied', message: 'Refus de test.' },
       } satisfies components['schemas']['RealtimeRefusal']),
     )
-
-    expect(within(banner).queryByText(INDICATOR)).toBeNull()
-  })
-
-  it('shows nothing while no topic is subscribed', async () => {
-    const { banner } = await openShell([])
 
     expect(within(banner).queryByText(INDICATOR)).toBeNull()
   })

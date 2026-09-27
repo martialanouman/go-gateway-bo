@@ -512,6 +512,51 @@ export interface paths {
         patch: operations["updateRole"];
         trace?: never;
     };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Les notifications visibles, plus récentes d'abord
+         * @description Une notification n'est visible qu'avec la permission de sa source : `billing_alert_stream`
+         *     demande `billing:read`, `alertmanager` et `bff_evaluator` demandent `alerts:read`. Le filtre
+         *     vaut pour la liste comme pour `unreadCount`.
+         *
+         *     C'est un historique d'affichage, au mieux une fois : une bascule ou une base en panne peut y
+         *     laisser un trou.
+         */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notificationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Marque une notification lue pour l'opérateur de la session
+         * @description Idempotent : déjà lue, rien ne change et rien n'est écrit au journal.
+         */
+        post: operations["markNotificationRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -776,7 +821,7 @@ export interface components {
             topics: string[];
         };
         /** @enum {string} */
-        RealtimeTopic: "metrics.traffic" | "sessions.events" | "billing.alerts";
+        RealtimeTopic: "metrics.traffic" | "sessions.events" | "billing.alerts" | "notifications";
         /**
          * @description Une trame de la passerelle, relayée sous le DTO de son sujet. `ts` est l'instant où la
          *     passerelle l'a émise.
@@ -785,7 +830,7 @@ export interface components {
             topic: components["schemas"]["RealtimeTopic"];
             /** Format: date-time */
             ts: string;
-            data: components["schemas"]["TrafficSnapshot"] | components["schemas"]["SessionEvent"] | components["schemas"]["BillingAlert"];
+            data: components["schemas"]["TrafficSnapshot"] | components["schemas"]["SessionEvent"] | components["schemas"]["BillingAlert"] | components["schemas"]["Notification"];
         };
         /**
          * @description L'état du flux d'un sujet, envoyé à l'abonnement puis à chaque changement. `stale` sans
@@ -838,6 +883,43 @@ export interface components {
             alert: string;
             /** Format: int64 */
             balance: number;
+        };
+        /**
+         * @description Une notification telle que le sujet `notifications` la diffuse. `details` porte les faits
+         *     d'un `kind` connu, `message` le texte d'une source en texte libre ; l'un des deux au moins.
+         */
+        Notification: {
+            id: string;
+            /** @enum {string} */
+            source: "alertmanager" | "bff_evaluator" | "billing_alert_stream";
+            /** @enum {string} */
+            severity: "info" | "warning" | "critical";
+            /** @enum {string} */
+            kind: "billing_alert" | "message";
+            message?: string;
+            details?: components["schemas"]["BillingAlert"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description Une notification de la liste, et si l'opérateur de la session l'a lue. */
+        NotificationEntry: {
+            id: string;
+            /** @enum {string} */
+            source: "alertmanager" | "bff_evaluator" | "billing_alert_stream";
+            /** @enum {string} */
+            severity: "info" | "warning" | "critical";
+            /** @enum {string} */
+            kind: "billing_alert" | "message";
+            message?: string;
+            details?: components["schemas"]["BillingAlert"];
+            /** Format: date-time */
+            createdAt: string;
+            read: boolean;
+        };
+        NotificationPage: {
+            items: components["schemas"]["NotificationEntry"][];
+            nextCursor?: string;
+            unreadCount: number;
         };
         /**
          * @description La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
@@ -926,6 +1008,18 @@ export interface components {
          *     ou `roles:manage`.
          */
         RoleIntouchable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
+         * @description Aucune notification visible ne porte cet identifiant — le même corps qu'elle n'existe pas ou
+         *     que sa source demande une permission que la session n'a pas.
+         */
+        NotificationInconnue: {
             headers: {
                 [name: string]: unknown;
             };
@@ -2001,6 +2095,56 @@ export interface operations {
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["RoleInconnu"];
             409: components["responses"]["RoleIntouchable"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: {
+                /** @description L'`id` de la dernière notification de la page précédente. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Une page de 20 notifications au plus. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPage"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+        };
+    };
+    markNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La notification est lue. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["NotificationInconnue"];
             415: components["responses"]["TypeDeContenuRefuse"];
         };
     };

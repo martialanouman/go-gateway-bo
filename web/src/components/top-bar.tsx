@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Button } from '~/components/ui'
 import { api, type Me, meQueryOptions } from '~/lib/api'
+import { NotificationCenter } from './notification-center'
 import { RealtimeStatus } from './realtime-status'
 
 /**
@@ -22,6 +23,7 @@ export function TopBar({ operator }: { readonly operator: Me['operator'] }) {
   return (
     <div className="topbar__end">
       <RealtimeStatus />
+      <NotificationCenter />
       <Link className="topbar__operator" to="/account">
         {operator.displayName}
       </Link>

@@ -128,9 +128,10 @@ var initialMigrations = []string{
 	"00010_default_role_names.sql",
 	"00011_access_links.sql",
 	"00012_passkey_names_and_totp_pending.sql",
+	"00013_notification_facts.sql",
 }
 
-const latestSchemaVersion = 12
+const latestSchemaVersion = 13
 
 func (w *schemaWorld) everyMigrationWasReported() error {
 	if !slices.Equal(w.lastOutcome.Applied, initialMigrations) {

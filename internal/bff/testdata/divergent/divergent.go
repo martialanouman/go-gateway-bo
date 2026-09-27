@@ -121,6 +121,14 @@ func (API) DeleteRole(_ context.Context, _ bff.DeleteRoleRequestObject) (bff.Del
 	return nil, nil
 }
 
+func (API) ListNotifications(_ context.Context, _ bff.ListNotificationsRequestObject) (bff.ListNotificationsResponseObject, error) {
+	return nil, nil
+}
+
+func (API) MarkNotificationRead(_ context.Context, _ bff.MarkNotificationReadRequestObject) (bff.MarkNotificationReadResponseObject, error) {
+	return nil, nil
+}
+
 var _ = bff.NewStrictHandler(API{}, nil)
 
 func (API) ListWebauthnPasskeys(_ context.Context,

@@ -22,7 +22,7 @@ import (
 const wait = 5 * time.Second
 
 func quietHub() *Hub {
-	return New(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
 }
 
 func grantAll(context.Context) (bool, []string, error) {
@@ -187,9 +187,9 @@ func TestUnknownTopicsAndUnreadableMessagesAreRefusedWithoutClosingTheSocket(t *
 
 	conn := dial(t, serveOn(t, quietHub(), grantAll))
 
-	send(t, conn, `{"action":"subscribe","topics":["notifications"]}`)
+	send(t, conn, `{"action":"subscribe","topics":["audit.events"]}`)
 	refusal := next(t, conn)
-	assert.Equal(t, "notifications", refusal.Topic)
+	assert.Equal(t, "audit.events", refusal.Topic)
 	require.NotNil(t, refusal.Error)
 	assert.Equal(t, "unknown_topic", refusal.Error.Code)
 

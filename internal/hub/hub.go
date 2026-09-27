@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 )
 
 const (
@@ -41,6 +43,7 @@ type Dialer func(ctx context.Context, path string, onPing func()) (*websocket.Co
 
 type Hub struct {
 	logger          *slog.Logger
+	record          Recorder
 	instance        string
 	revalidateEvery time.Duration
 
@@ -61,14 +64,16 @@ type Hub struct {
 	stopping chan struct{}
 }
 
-func New(logger *slog.Logger) *Hub {
+// New prend un record nil dans les tests seulement : aucune notification n'est alors écrite.
+func New(logger *slog.Logger, record Recorder) *Hub {
 	statuses := map[Topic]statusMessage{}
-	for _, f := range feeds {
-		statuses[f.topic] = statusMessage{Topic: f.topic, Status: "stale"}
+	for _, s := range subjects {
+		statuses[s.topic] = statusMessage{Topic: s.topic, Status: "stale"}
 	}
 
 	return &Hub{
 		logger:           logger,
+		record:           record,
 		instance:         rand.Text(),
 		revalidateEvery:  30 * time.Second,
 		leaseTTL:         6 * time.Second,
@@ -86,6 +91,7 @@ type client struct {
 	queue       chan []byte
 	lagging     chan struct{}
 	markLagging sync.Once
+	granted     []string
 }
 
 // offer n'attend jamais : un client en retard ne ralentit ni le flux amont, ni les autres sockets.
@@ -106,9 +112,31 @@ func (h *Hub) publish(topic Topic, frame []byte) {
 	}
 }
 
-// setStatus ne rediffuse qu'un changement : le battement de cœur republie tous les états toutes les
-// 2 s, et les clients n'ont pas à les recevoir à chaque fois.
+func (h *Hub) publishNotification(frame []byte, source string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for c := range h.subscribers[NotificationsTopic] {
+		if permissions.NotificationSourceAllowed(source, c.granted) {
+			c.offer(frame)
+		}
+	}
+}
+
+// setStatus reporte l'état de `billing.alerts` sur `notifications`, qui n'a pas d'autre source. Le
+// report se fait ici, et non chez le porteur, pour que les instances qui suivent le fassent aussi.
 func (h *Hub) setStatus(message statusMessage) {
+	h.applyStatus(message)
+
+	if message.Topic == BillingTopic {
+		message.Topic = NotificationsTopic
+		h.applyStatus(message)
+	}
+}
+
+// applyStatus ne rediffuse qu'un changement : le battement de cœur republie tous les états toutes les
+// 2 s, et les clients n'ont pas à les recevoir à chaque fois.
+func (h *Hub) applyStatus(message statusMessage) {
 	h.mu.Lock()
 	current, known := h.statuses[message.Topic]
 	unchanged := known && current.Status == message.Status && sameInstant(current.Since, message.Since)
@@ -156,9 +184,16 @@ func (h *Hub) unsubscribe(c *client, topic Topic) {
 }
 
 func (h *Hub) unsubscribeAll(c *client) {
-	for _, f := range feeds {
-		h.unsubscribe(c, f.topic)
+	for _, s := range subjects {
+		h.unsubscribe(c, s.topic)
 	}
+}
+
+func (h *Hub) setGranted(c *client, granted []string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	c.granted = granted
 }
 
 // Serve tient une socket client jusqu'à sa fermeture, l'annulation de ctx ou l'arrêt du hub. Toutes
@@ -179,6 +214,7 @@ func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, access Access) {
 	defer stopReading()
 
 	c := &client{queue: make(chan []byte, queueSize), lagging: make(chan struct{})}
+	h.setGranted(c, granted)
 	defer h.unsubscribeAll(c)
 
 	requests := make(chan []byte)
@@ -232,6 +268,7 @@ func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, access Access) {
 				return
 			}
 
+			h.setGranted(c, granted)
 			h.dropForbidden(c, granted)
 		}
 	}
@@ -280,7 +317,7 @@ func (h *Hub) handle(c *client, raw []byte, granted []string) {
 	}
 
 	for _, name := range request.Topics {
-		f, known := feedOf(Topic(name))
+		s, known := subjectOf(Topic(name))
 		if !known {
 			c.offer(mustMarshal(errorMessage{Topic: name, Error: Error{
 				Code:    "unknown_topic",
@@ -292,40 +329,40 @@ func (h *Hub) handle(c *client, raw []byte, granted []string) {
 
 		switch {
 		case request.Action == "unsubscribe":
-			h.unsubscribe(c, f.topic)
-		case allowed(f, granted):
-			h.subscribe(c, f.topic)
+			h.unsubscribe(c, s.topic)
+		case allowed(s, granted):
+			h.subscribe(c, s.topic)
 		default:
-			c.offer(mustMarshal(forbidden(f)))
+			c.offer(mustMarshal(forbidden(s)))
 		}
 	}
 }
 
 func (h *Hub) dropForbidden(c *client, granted []string) {
-	for _, f := range feeds {
-		if allowed(f, granted) {
+	for _, s := range subjects {
+		if allowed(s, granted) {
 			continue
 		}
 
 		h.mu.Lock()
-		_, subscribed := h.subscribers[f.topic][c]
-		delete(h.subscribers[f.topic], c)
+		_, subscribed := h.subscribers[s.topic][c]
+		delete(h.subscribers[s.topic], c)
 		h.mu.Unlock()
 
 		if subscribed {
-			c.offer(mustMarshal(forbidden(f)))
+			c.offer(mustMarshal(forbidden(s)))
 		}
 	}
 }
 
-func allowed(f feed, granted []string) bool {
-	return f.permission == "" || slices.Contains(granted, string(f.permission))
+func allowed(s subject, granted []string) bool {
+	return s.permission == "" || slices.Contains(granted, string(s.permission))
 }
 
-func forbidden(f feed) errorMessage {
-	return errorMessage{Topic: string(f.topic), Error: Error{
+func forbidden(s subject) errorMessage {
+	return errorMessage{Topic: string(s.topic), Error: Error{
 		Code: "permission_denied",
 		Message: "Ce sujet n'est pas diffusé à votre compte : il demande la permission « " +
-			string(f.permission) + " ». Un administrateur peut vous l'accorder.",
+			string(s.permission) + " ». Un administrateur peut vous l'accorder.",
 	}}
 }

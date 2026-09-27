@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -84,6 +85,66 @@ func (e MfaVerificationMethod) Valid() bool {
 	case MfaVerificationMethodTotp:
 		return true
 	case MfaVerificationMethodWebauthn:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationEntryKind.
+const (
+	NotificationEntryKindBillingAlert NotificationEntryKind = "billing_alert"
+	NotificationEntryKindMessage      NotificationEntryKind = "message"
+)
+
+// Valid indicates whether the value is a known member of the NotificationEntryKind enum.
+func (e NotificationEntryKind) Valid() bool {
+	switch e {
+	case NotificationEntryKindBillingAlert:
+		return true
+	case NotificationEntryKindMessage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationEntrySeverity.
+const (
+	NotificationEntrySeverityCritical NotificationEntrySeverity = "critical"
+	NotificationEntrySeverityInfo     NotificationEntrySeverity = "info"
+	NotificationEntrySeverityWarning  NotificationEntrySeverity = "warning"
+)
+
+// Valid indicates whether the value is a known member of the NotificationEntrySeverity enum.
+func (e NotificationEntrySeverity) Valid() bool {
+	switch e {
+	case NotificationEntrySeverityCritical:
+		return true
+	case NotificationEntrySeverityInfo:
+		return true
+	case NotificationEntrySeverityWarning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationEntrySource.
+const (
+	NotificationEntrySourceAlertmanager       NotificationEntrySource = "alertmanager"
+	NotificationEntrySourceBffEvaluator       NotificationEntrySource = "bff_evaluator"
+	NotificationEntrySourceBillingAlertStream NotificationEntrySource = "billing_alert_stream"
+)
+
+// Valid indicates whether the value is a known member of the NotificationEntrySource enum.
+func (e NotificationEntrySource) Valid() bool {
+	switch e {
+	case NotificationEntrySourceAlertmanager:
+		return true
+	case NotificationEntrySourceBffEvaluator:
+		return true
+	case NotificationEntrySourceBillingAlertStream:
 		return true
 	default:
 		return false
@@ -192,6 +253,15 @@ type AccessLinkUse struct {
 	Token    string `json:"token"`
 }
 
+// BillingAlert defines model for BillingAlert.
+type BillingAlert struct {
+	Alert      string `json:"alert"`
+	Balance    int64  `json:"balance"`
+	CustomerId string `json:"customerId"`
+	OwnerId    string `json:"ownerId"`
+	OwnerType  string `json:"ownerType"`
+}
+
 // CurrentOperator De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
 // `mfa_totp_secret`, ni les identifiants WebAuthn : le type de domaine du store ne traverse pas
 // cette frontière (§1.11), et `additionalProperties: false` fait refuser tout champ qu'un
@@ -264,6 +334,34 @@ type MfaVerification struct {
 
 // MfaVerificationMethod defines model for MfaVerification.Method.
 type MfaVerificationMethod string
+
+// NotificationEntry Une notification de la liste, et si l'opérateur de la session l'a lue.
+type NotificationEntry struct {
+	CreatedAt time.Time                 `json:"createdAt"`
+	Details   *BillingAlert             `json:"details,omitempty"`
+	Id        string                    `json:"id"`
+	Kind      NotificationEntryKind     `json:"kind"`
+	Message   *string                   `json:"message,omitempty"`
+	Read      bool                      `json:"read"`
+	Severity  NotificationEntrySeverity `json:"severity"`
+	Source    NotificationEntrySource   `json:"source"`
+}
+
+// NotificationEntryKind defines model for NotificationEntry.Kind.
+type NotificationEntryKind string
+
+// NotificationEntrySeverity defines model for NotificationEntry.Severity.
+type NotificationEntrySeverity string
+
+// NotificationEntrySource defines model for NotificationEntry.Source.
+type NotificationEntrySource string
+
+// NotificationPage defines model for NotificationPage.
+type NotificationPage struct {
+	Items       []NotificationEntry `json:"items"`
+	NextCursor  *string             `json:"nextCursor,omitempty"`
+	UnreadCount int                 `json:"unreadCount"`
+}
 
 // Operator Un opérateur tel que l'écran d'administration le montre. Aucun secret, aucun hachage.
 type Operator struct {
@@ -487,6 +585,11 @@ type AutoVerrouillage = Error
 // première route qui relaie la passerelle (step-060).
 type CompteDesactive = Error
 
+// NotificationInconnue La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
+// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
+// première route qui relaie la passerelle (step-060).
+type NotificationInconnue = Error
+
 // OperateurInconnu La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
 // première route qui relaie la passerelle (step-060).
@@ -526,6 +629,12 @@ type SessionAbsente = Error
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
 // première route qui relaie la passerelle (step-060).
 type TypeDeContenuRefuse = Error
+
+// ListNotificationsParams defines parameters for ListNotifications.
+type ListNotificationsParams struct {
+	// Cursor L'`id` de la dernière notification de la page précédente.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
 
 // SetPasswordFromAccessLinkJSONRequestBody defines body for SetPasswordFromAccessLink for application/json ContentType.
 type SetPasswordFromAccessLinkJSONRequestBody = AccessLinkUse
@@ -601,6 +710,12 @@ type ServerInterface interface {
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
+	// ListNotifications Les notifications visibles, plus récentes d'abord
+	// (GET /notifications)
+	ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams)
+	// MarkNotificationRead Marque une notification lue pour l'opérateur de la session
+	// (POST /notifications/{notificationId}/read)
+	MarkNotificationRead(w http.ResponseWriter, r *http.Request, notificationId string)
 	// ListOperators Les opérateurs, leurs rôles et l'état de leur second facteur
 	// (GET /operators)
 	ListOperators(w http.ResponseWriter, r *http.Request)
@@ -709,6 +824,18 @@ func (_ Unimplemented) FinishWebauthnRegistration(w http.ResponseWriter, r *http
 // Health Sonde de vivacité
 // (GET /health)
 func (_ Unimplemented) Health(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListNotifications Les notifications visibles, plus récentes d'abord
+// (GET /notifications)
+func (_ Unimplemented) ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// MarkNotificationRead Marque une notification lue pour l'opérateur de la session
+// (POST /notifications/{notificationId}/read)
+func (_ Unimplemented) MarkNotificationRead(w http.ResponseWriter, r *http.Request, notificationId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -960,6 +1087,65 @@ func (siw *ServerInterfaceWrapper) Health(w http.ResponseWriter, r *http.Request
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Health(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListNotifications operation middleware
+func (siw *ServerInterfaceWrapper) ListNotifications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListNotificationsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListNotifications(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkNotificationRead operation middleware
+func (siw *ServerInterfaceWrapper) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "notificationId" -------------
+	var notificationId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "notificationId", chi.URLParam(r, "notificationId"), &notificationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "notificationId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkNotificationRead(w, r, notificationId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1334,6 +1520,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/roles/{roleId}", wrapper.UpdateRole)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/notifications", wrapper.ListNotifications)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/notifications/{notificationId}/read", wrapper.MarkNotificationRead)
+	})
 
 	return r
 }
@@ -1341,6 +1533,8 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 type AutoVerrouillageJSONResponse Error
 
 type CompteDesactiveJSONResponse Error
+
+type NotificationInconnueJSONResponse Error
 
 type OperateurInconnuJSONResponse Error
 
@@ -2432,6 +2626,146 @@ func (response Health200JSONResponse) VisitHealthResponse(w http.ResponseWriter)
 	return err
 }
 
+type ListNotificationsRequestObject struct {
+	Params ListNotificationsParams
+}
+
+type ListNotificationsResponseObject interface {
+	VisitListNotificationsResponse(w http.ResponseWriter) error
+}
+
+type ListNotifications200JSONResponse NotificationPage
+
+func (response ListNotifications200JSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotifications400JSONResponse struct{ RequeteInvalideJSONResponse }
+
+func (response ListNotifications400JSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotifications401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response ListNotifications401JSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotifications403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response ListNotifications403JSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkNotificationReadRequestObject struct {
+	NotificationId string `json:"notificationId"`
+}
+
+type MarkNotificationReadResponseObject interface {
+	VisitMarkNotificationReadResponse(w http.ResponseWriter) error
+}
+
+type MarkNotificationRead204Response struct {
+}
+
+func (response MarkNotificationRead204Response) VisitMarkNotificationReadResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type MarkNotificationRead401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response MarkNotificationRead401JSONResponse) VisitMarkNotificationReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkNotificationRead403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response MarkNotificationRead403JSONResponse) VisitMarkNotificationReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkNotificationRead404JSONResponse struct {
+	NotificationInconnueJSONResponse
+}
+
+func (response MarkNotificationRead404JSONResponse) VisitMarkNotificationReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkNotificationRead415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response MarkNotificationRead415JSONResponse) VisitMarkNotificationReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListOperatorsRequestObject struct {
 }
 
@@ -3262,6 +3596,12 @@ type StrictServerInterface interface {
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
+	// ListNotifications Les notifications visibles, plus récentes d'abord
+	// (GET /notifications)
+	ListNotifications(ctx context.Context, request ListNotificationsRequestObject) (ListNotificationsResponseObject, error)
+	// MarkNotificationRead Marque une notification lue pour l'opérateur de la session
+	// (POST /notifications/{notificationId}/read)
+	MarkNotificationRead(ctx context.Context, request MarkNotificationReadRequestObject) (MarkNotificationReadResponseObject, error)
 	// ListOperators Les opérateurs, leurs rôles et l'état de leur second facteur
 	// (GET /operators)
 	ListOperators(ctx context.Context, request ListOperatorsRequestObject) (ListOperatorsResponseObject, error)
@@ -3679,6 +4019,58 @@ func (sh *strictHandler) Health(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(HealthResponseObject); ok {
 		if err := validResponse.VisitHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListNotifications operation middleware
+func (sh *strictHandler) ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams) {
+	var request ListNotificationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListNotifications(ctx, request.(ListNotificationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListNotifications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListNotificationsResponseObject); ok {
+		if err := validResponse.VisitListNotificationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkNotificationRead operation middleware
+func (sh *strictHandler) MarkNotificationRead(w http.ResponseWriter, r *http.Request, notificationId string) {
+	var request MarkNotificationReadRequestObject
+
+	request.NotificationId = notificationId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkNotificationRead(ctx, request.(MarkNotificationReadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkNotificationRead")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkNotificationReadResponseObject); ok {
+		if err := validResponse.VisitMarkNotificationReadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

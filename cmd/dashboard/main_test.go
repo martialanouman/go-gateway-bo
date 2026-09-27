@@ -270,7 +270,9 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	ctx.Then(`^aucune sortie ne porte "([^"]*)"$`, p.outputHides)
 
 	(&hardeningWorld{process: p}).registerSteps(ctx)
-	(&realtimeWorld{process: p}).registerSteps(ctx)
+	realtime := &realtimeWorld{process: p}
+	realtime.registerSteps(ctx)
+	(&notificationsWorld{operators: operators, realtime: realtime}).registerSteps(ctx)
 	ctx.Then(`^le serveur s'arrête sans erreur$`, p.exitsCleanly)
 	ctx.Then(`^le tableau de bord s'affiche$`, p.servesDashboard)
 	ctx.Then(`^le script est servi$`, p.servesScript)

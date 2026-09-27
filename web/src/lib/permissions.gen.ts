@@ -203,7 +203,8 @@ export const PERMISSIONS: readonly Permission[] = [
   {
     key: 'billing:read',
     category: 'billing',
-    description: 'Consulter les soldes, le grand livre et les plans tarifaires',
+    description:
+      'Consulter les soldes, le grand livre et les plans tarifaires, et recevoir les alertes de facturation',
   },
   {
     key: 'billing:write',
@@ -285,7 +286,8 @@ export const PERMISSIONS: readonly Permission[] = [
   {
     key: 'alerts:read',
     category: 'alerts',
-    description: 'Consulter les règles d’alerte métier et les notifications déclenchées',
+    description:
+      'Consulter les règles d’alerte métier et les notifications qu’elles ou Alertmanager déclenchent',
   },
   {
     key: 'alerts:write',
