@@ -257,6 +257,19 @@ describe('RealtimeConnection', () => {
     })
   })
 
+  it('does not go stale when the socket reopens within the tolerance', () => {
+    const { connection, socket } = openConnection()
+    connection.subscribe('metrics.traffic')
+    socket.receive({ topic: 'metrics.traffic', status: 'live' })
+
+    socket.close(1006)
+    vi.advanceTimersByTime(FIRST_BACKOFF_MS)
+    FakeWebSocket.latest().open()
+    vi.advanceTimersByTime(STALE_AFTER_MS)
+
+    expect(connection.topic('metrics.traffic')).toMatchObject({ isLive: false, isStale: false })
+  })
+
   it('caps the backoff at 30 s and resets it after an open', () => {
     const random = () => 0.999
     openConnection(() => {}, random)
