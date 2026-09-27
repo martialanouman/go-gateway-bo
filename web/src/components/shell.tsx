@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { EmptyState, ErrorState, LoadingState, Skeleton, ToastStack } from '~/components/ui'
 import { HttpError, isUnauthenticated, meQueryOptions } from '~/lib/api'
 import { RealtimeProvider } from '~/lib/realtime'
+import { BillingAlertToasts } from './billing-alert-toasts'
 import { Rail } from './rail'
 import { TopBar } from './top-bar'
 
@@ -75,6 +76,7 @@ export function Shell({ children }: { readonly children: ReactNode }) {
     return (
       <Frame live rail={<Rail />} topbar={<TopBar operator={me.data.operator} />}>
         {children}
+        <BillingAlertToasts />
       </Frame>
     )
   }
