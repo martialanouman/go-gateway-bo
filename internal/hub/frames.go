@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -15,6 +16,8 @@ const (
 	TrafficTopic  Topic = "metrics.traffic"
 	SessionsTopic Topic = "sessions.events"
 	BillingTopic  Topic = "billing.alerts"
+
+	NotificationsTopic Topic = "notifications"
 )
 
 // feed relie un flux de l'API Admin au sujet qui le diffuse. Une permission vide ouvre le sujet à tout
@@ -43,6 +46,34 @@ var feeds = []feed{
 		path: "/admin/stream/billing-alerts", topic: BillingTopic, permission: permissions.BillingRead,
 		relay: relay(BillingTopic, upstreamBillingAlert.outgoing), recheck: recheck[BillingAlert](BillingTopic),
 	},
+}
+
+// subject est ce qu'un client peut demander. `notifications` n'a pas de flux amont : le hub l'écrit
+// lui-même depuis `billing.alerts`, et filtre chaque trame selon la source qu'elle porte.
+type subject struct {
+	topic      Topic
+	permission permissions.Key
+}
+
+var subjects = append(feedSubjects(), subject{topic: NotificationsTopic})
+
+func feedSubjects() []subject {
+	out := make([]subject, 0, len(feeds))
+	for _, f := range feeds {
+		out = append(out, subject{topic: f.topic, permission: f.permission})
+	}
+
+	return out
+}
+
+func subjectOf(topic Topic) (subject, bool) {
+	for _, s := range subjects {
+		if s.topic == topic {
+			return s, true
+		}
+	}
+
+	return subject{}, false
 }
 
 func feedOf(topic Topic) (feed, bool) {
@@ -122,7 +153,20 @@ type (
 		Alert      string `json:"alert"`
 		Balance    int64  `json:"balance"`
 	}
+
+	Notification struct {
+		ID        string        `json:"id"`
+		Source    string        `json:"source"`
+		Severity  string        `json:"severity"`
+		Kind      string        `json:"kind"`
+		Message   *string       `json:"message,omitempty"`
+		Details   *BillingAlert `json:"details,omitempty"`
+		CreatedAt time.Time     `json:"createdAt"`
+	}
 )
+
+// Recorder écrit une alerte de facturation et rend la notification écrite.
+type Recorder func(ctx context.Context, alert BillingAlert) (Notification, error)
 
 func (f upstreamSnapshot) outgoing() (int, time.Time, TrafficSnapshot) {
 	samples := make([]TrafficSample, 0, len(f.Samples))

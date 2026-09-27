@@ -2,6 +2,7 @@ package hub
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -130,6 +131,35 @@ func (h *Hub) pump(ctx context.Context, conn *websocket.Conn, f feed, view *lead
 
 			silence.Reset(h.upstreamSilence)
 			view.publish(frame)
+
+			if f.topic == BillingTopic {
+				h.notify(ctx, frame, view)
+			}
 		}
 	}
+}
+
+// notify écrit l'alerte avant de publier sa notification : la trame porte l'id de la ligne. Une base
+// en échec perd la notification, jamais l'alerte, déjà publiée (invariant e).
+func (h *Hub) notify(ctx context.Context, frame []byte, view *leaderView) {
+	if h.record == nil {
+		return
+	}
+
+	var alert dataMessage[BillingAlert]
+	if err := json.Unmarshal(frame, &alert); err != nil {
+		return
+	}
+
+	writing, cancel := context.WithTimeout(ctx, h.leaseEvery)
+	defer cancel()
+
+	written, err := h.record(writing, alert.Data)
+	if err != nil {
+		h.logger.Warn("notification de facturation non écrite", "error", err)
+
+		return
+	}
+
+	view.publish(mustMarshal(dataMessage[Notification]{Topic: NotificationsTopic, TS: written.CreatedAt, Data: written}))
 }

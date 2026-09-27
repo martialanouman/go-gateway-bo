@@ -179,7 +179,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 			logger.Error("un lien d'accès n'est pas parti", "error", err)
 		})
 
-	realtime := hub.New(logger)
+	realtime := hub.New(logger, nil)
 	// Le hub rend son bail en s'arrêtant, et il lui faut Redis pour cela : run l'attend avant que le
 	// `defer` ne ferme le client. Sans cette attente, un successeur patientait jusqu'à l'expiration
 	// du bail. Le contexte propre au hub l'arrête aussi quand serve rend la main sur une erreur.
