@@ -215,6 +215,32 @@ test('the binary serves the painted shell, then the application replaces it', as
     challenge,
   )
 
+  // ── Le temps réel, de la passerelle à l'écran ───────────────────────────────────────────────
+  //
+  // Le compte semé porte `Propriétaire`, donc `billing:read` : l'indicateur ne paraît qu'une fois
+  // un sujet accepté, et `billing.alerts` est le seul que la coquille abonne à ce jour.
+  await expect(page.getByRole('banner').getByText('En direct')).toBeVisible({ timeout: 15_000 })
+
+  const emitted = await request.post(
+    'http://127.0.0.1:4011/control/emit?feed=/admin/stream/billing-alerts',
+    {
+      headers: { 'content-type': 'application/json' },
+      data: '{"v":1,"feed":"billing-alerts","service":"billing","instance":"billing-0","emitted_at":"2026-09-27T10:00:00Z","customer_id":"cust-e2e","owner_type":"customer","owner_id":"cust-e2e","alert":"mo_floor_reached","balance":5000}',
+    },
+  )
+  expect(emitted.status()).toBe(204)
+
+  const toast = page.getByRole('dialog').filter({ hasText: 'Plancher de facturation MO atteint' })
+  await expect(toast).toBeVisible()
+  await expect(toast).toContainText(/Le solde du client cust-e2e est à 5\s*000 crédits\./)
+
+  // Le hub republie `stale` dès l'échec de lecture sur le flux amont coupé, sans attendre les 60 s
+  // de silence tolérées : mesuré à 4-6 ms sur le binaire livré (deux mesures), marge large ici.
+  await request.post('http://127.0.0.1:4011/control/cut?feed=/admin/stream/billing-alerts')
+  await expect(page.getByRole('banner').getByText('Données périmées')).toBeVisible({
+    timeout: 5_000,
+  })
+
   // ── Une clé d'accès, du premier enregistrement au retrait ───────────────────────────────────
   //
   // L'authentificateur virtuel est un appareil, pas un module du produit : Chromium répond pour de
