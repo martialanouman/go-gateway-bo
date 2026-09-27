@@ -1,6 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../../test/websocket'
-import { RealtimeConnection, realtimeURL } from './realtime'
+import {
+  FIRST_BACKOFF_MS,
+  MAX_BACKOFF_MS,
+  RealtimeConnection,
+  realtimeURL,
+  STALE_AFTER_MS,
+} from './realtime'
 
 const alert = {
   customerId: 'c1',
@@ -10,8 +16,8 @@ const alert = {
   balance: 12,
 }
 
-function openConnection() {
-  const connection = new RealtimeConnection('wss://bo.example/ws')
+function openConnection(onSessionEnded = () => {}, random = () => 0.5) {
+  const connection = new RealtimeConnection('wss://bo.example/ws', onSessionEnded, random)
   connection.start()
   const socket = FakeWebSocket.latest()
   socket.open()
@@ -28,6 +34,13 @@ describe('realtimeURL', () => {
 })
 
 describe('RealtimeConnection', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('sends a single subscribe for two subscribers of one topic', () => {
     const { connection, socket } = openConnection()
 
@@ -52,7 +65,7 @@ describe('RealtimeConnection', () => {
   })
 
   it('subscribes pending topics in one message once the socket opens', () => {
-    const connection = new RealtimeConnection('wss://bo.example/ws')
+    const connection = new RealtimeConnection('wss://bo.example/ws', () => {})
     connection.start()
     const socket = FakeWebSocket.latest()
     connection.subscribe('billing.alerts')
@@ -116,7 +129,7 @@ describe('RealtimeConnection', () => {
 
     socket.receive({ topic: 'billing.alerts', error: refusal })
     socket.close(1008)
-    connection.start()
+    vi.advanceTimersByTime(FIRST_BACKOFF_MS)
     const next = FakeWebSocket.latest()
     next.open()
 
@@ -173,5 +186,114 @@ describe('RealtimeConnection', () => {
     expect(socket.readyState).toBe(FakeWebSocket.CLOSED)
     expect(connection.summary().phase).toBe('closed')
     expect(connection.topic('billing.alerts').data).toBeUndefined()
+  })
+
+  it('reconnects after an abnormal close and resubscribes live topics only', () => {
+    const { connection, socket } = openConnection()
+    connection.subscribe('metrics.traffic')
+    connection.subscribe('billing.alerts')
+    connection.subscribe('sessions.events')()
+    socket.receive({
+      topic: 'billing.alerts',
+      error: { code: 'permission_denied', message: 'La permission billing:read manque.' },
+    })
+
+    socket.close(1006)
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    vi.advanceTimersByTime(FIRST_BACKOFF_MS)
+    expect(FakeWebSocket.instances).toHaveLength(2)
+    const next = FakeWebSocket.latest()
+    next.open()
+
+    expect(connection.summary().phase).toBe('open')
+    expect(next.sent).toEqual([{ action: 'subscribe', topics: ['metrics.traffic'] }])
+  })
+
+  it('never reconnects after 4401 and reports the session ended', () => {
+    const onSessionEnded = vi.fn()
+    const { connection, socket } = openConnection(onSessionEnded)
+    connection.subscribe('metrics.traffic')
+
+    socket.close(4401)
+    vi.advanceTimersByTime(60_000)
+
+    expect(onSessionEnded).toHaveBeenCalledTimes(1)
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(connection.summary().phase).toBe('ended')
+  })
+
+  it('reconnects after 1008', () => {
+    const onSessionEnded = vi.fn()
+    const { socket } = openConnection(onSessionEnded)
+
+    socket.close(1008)
+    vi.advanceTimersByTime(FIRST_BACKOFF_MS)
+
+    expect(FakeWebSocket.instances).toHaveLength(2)
+    expect(onSessionEnded).not.toHaveBeenCalled()
+  })
+
+  it('is not stale 2999 ms after a close, and stale at 3000 ms, keeping its data', () => {
+    const closedAt = new Date('2026-09-27T10:00:00Z')
+    const { connection, socket } = openConnection()
+    connection.subscribe('billing.alerts')
+    socket.receive({ topic: 'billing.alerts', status: 'live' })
+    socket.receive({ topic: 'billing.alerts', ts: '2026-09-27T09:59:00Z', data: alert })
+
+    vi.setSystemTime(closedAt)
+    socket.close(1006)
+    expect(connection.topic('billing.alerts')).toMatchObject({ isLive: false, isStale: false })
+
+    vi.advanceTimersByTime(STALE_AFTER_MS - 1)
+    expect(connection.topic('billing.alerts').isStale).toBe(false)
+
+    vi.advanceTimersByTime(1)
+    expect(connection.topic('billing.alerts')).toMatchObject({
+      isLive: false,
+      isStale: true,
+      since: closedAt,
+      data: alert,
+      ts: '2026-09-27T09:59:00Z',
+    })
+  })
+
+  it('caps the backoff at 30 s and resets it after an open', () => {
+    const random = () => 0.999
+    openConnection(() => {}, random)
+
+    function expectReconnectAfter(delay: number) {
+      const before = FakeWebSocket.instances.length
+      FakeWebSocket.latest().close(1006)
+      vi.advanceTimersByTime(Math.ceil(delay) - 1)
+      expect(FakeWebSocket.instances).toHaveLength(before)
+      vi.advanceTimersByTime(1)
+      expect(FakeWebSocket.instances).toHaveLength(before + 1)
+    }
+
+    for (let attempt = 0; attempt < 8; attempt++) {
+      expectReconnectAfter(random() * Math.min(MAX_BACKOFF_MS, FIRST_BACKOFF_MS * 2 ** attempt))
+    }
+    expectReconnectAfter(random() * MAX_BACKOFF_MS)
+
+    FakeWebSocket.latest().open()
+    expectReconnectAfter(random() * FIRST_BACKOFF_MS)
+  })
+
+  it('leaves no timer behind and never reconnects once stopped', () => {
+    const onSessionEnded = vi.fn()
+    const { connection, socket } = openConnection(onSessionEnded)
+    connection.subscribe('metrics.traffic')
+    socket.close(1006)
+    connection.start()
+    const next = FakeWebSocket.latest()
+    next.open()
+    next.close(1011)
+
+    connection.stop()
+
+    expect(vi.getTimerCount()).toBe(0)
+    vi.advanceTimersByTime(60_000)
+    expect(FakeWebSocket.instances).toHaveLength(2)
+    expect(onSessionEnded).not.toHaveBeenCalled()
   })
 })
