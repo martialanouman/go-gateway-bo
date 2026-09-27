@@ -34,7 +34,7 @@ type Entry = {
   data?: TopicData[Topic]
   ts?: string
   error?: Schemas['Error']
-  // Un sujet refusé pour de bon n'est pas renvoyé au serveur : il le refuserait à chaque ouverture.
+  // Un sujet refusé pour de bon n'est pas réabonné à l'ouverture : le serveur le refuserait à chaque fois.
   denied: boolean
   snapshot?: TopicState<Topic>
 }
@@ -98,7 +98,7 @@ export class RealtimeConnection {
       if (listener) entry.listeners.delete(listener)
       entry.count -= 1
       if (entry.count > 0) return
-      if (!entry.denied) this.#send('unsubscribe', [topic])
+      this.#send('unsubscribe', [topic])
       this.#entries.delete(topic)
       this.#changed([])
     }
