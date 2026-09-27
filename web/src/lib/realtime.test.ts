@@ -220,6 +220,7 @@ describe('RealtimeConnection', () => {
     expect(onSessionEnded).toHaveBeenCalledTimes(1)
     expect(FakeWebSocket.instances).toHaveLength(1)
     expect(connection.summary().phase).toBe('ended')
+    expect(connection.topic('metrics.traffic').isStale).toBe(false)
   })
 
   it('reconnects after 1008', () => {
@@ -268,6 +269,63 @@ describe('RealtimeConnection', () => {
     vi.advanceTimersByTime(STALE_AFTER_MS)
 
     expect(connection.topic('metrics.traffic')).toMatchObject({ isLive: false, isStale: false })
+  })
+
+  it('keeps the original cut while reconnect attempts fail', () => {
+    const cutAt = new Date('2026-09-27T10:00:00Z')
+    const { connection, socket } = openConnection()
+    connection.subscribe('metrics.traffic')
+    socket.receive({ topic: 'metrics.traffic', status: 'live' })
+
+    vi.setSystemTime(cutAt)
+    socket.close(1006)
+    vi.advanceTimersByTime(STALE_AFTER_MS)
+    for (let failure = 0; failure < 2; failure++) {
+      FakeWebSocket.latest().close(1006)
+      expect(connection.topic('metrics.traffic')).toMatchObject({ isStale: true, since: cutAt })
+      vi.advanceTimersByTime(MAX_BACKOFF_MS)
+    }
+
+    expect(FakeWebSocket.instances).toHaveLength(4)
+    expect(connection.topic('metrics.traffic')).toMatchObject({ isStale: true, since: cutAt })
+  })
+
+  it('never marks a refused topic stale', () => {
+    const { connection, socket } = openConnection()
+    connection.subscribe('billing.alerts')
+    socket.receive({
+      topic: 'billing.alerts',
+      error: { code: 'permission_denied', message: 'La permission billing:read manque.' },
+    })
+
+    socket.close(1006)
+    vi.advanceTimersByTime(STALE_AFTER_MS)
+
+    expect(connection.topic('billing.alerts').isStale).toBe(false)
+  })
+
+  it('keeps the earlier since of a topic the server already reported stale', () => {
+    const staleSince = new Date('2026-09-27T09:58:00Z')
+    const { connection, socket } = openConnection()
+    connection.subscribe('metrics.traffic')
+    socket.receive({ topic: 'metrics.traffic', status: 'stale', since: staleSince.toISOString() })
+
+    vi.setSystemTime(new Date('2026-09-27T10:00:00Z'))
+    socket.close(1006)
+    expect(connection.topic('metrics.traffic')).toMatchObject({ isStale: true, since: staleSince })
+
+    vi.advanceTimersByTime(STALE_AFTER_MS)
+    expect(connection.topic('metrics.traffic')).toMatchObject({ isStale: true, since: staleSince })
+  })
+
+  it('exposes no since once a live status is forgotten', () => {
+    const { connection, socket } = openConnection()
+    connection.subscribe('metrics.traffic')
+    socket.receive({ topic: 'metrics.traffic', status: 'live', since: '2026-09-27T09:00:00Z' })
+
+    socket.close(1006)
+
+    expect(connection.topic('metrics.traffic')).toMatchObject({ isStale: false, since: undefined })
   })
 
   it('caps the backoff at 30 s and resets it after an open', () => {

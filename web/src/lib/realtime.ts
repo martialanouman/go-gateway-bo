@@ -156,14 +156,18 @@ export class RealtimeConnection {
 
   #onClose(code: number) {
     this.#socket = null
-    const closedAt = new Date()
-    this.#forgetStatuses()
-    clearTimeout(this.#staleTimer)
-    this.#staleTimer = setTimeout(() => this.#markStale(closedAt), STALE_AFTER_MS)
+    // Seule la perte d'une socket ouverte date la coupure : une tentative de reconnexion qui échoue
+    // ne la fait pas recommencer.
+    const wasOpen = this.#phase === 'open'
+    if (wasOpen) this.#forgetStatuses()
     if (code === SESSION_ENDED) {
       this.#setPhase('ended')
       this.#onSessionEnded()
       return
+    }
+    if (wasOpen) {
+      const closedAt = new Date()
+      this.#staleTimer = setTimeout(() => this.#markStale(closedAt), STALE_AFTER_MS)
     }
     this.#setPhase('closed')
     // Gigue pleine : des navigateurs coupés ensemble ne reviennent pas ensemble.
@@ -172,12 +176,19 @@ export class RealtimeConnection {
     this.#reconnectTimer = setTimeout(() => this.start(), delay)
   }
 
+  // Un sujet déjà périmé garde son `since` : « périmé depuis » ne doit jamais rajeunir la donnée.
   #forgetStatuses() {
-    for (const entry of this.#entries.values()) entry.status = undefined
+    for (const entry of this.#entries.values()) {
+      if (entry.status === 'stale') continue
+      entry.status = undefined
+      entry.since = undefined
+    }
   }
 
   #markStale(closedAt: Date) {
-    const unknown = [...this.#entries.values()].filter((entry) => entry.status === undefined)
+    const unknown = [...this.#entries.values()].filter(
+      (entry) => entry.status === undefined && !entry.denied,
+    )
     for (const entry of unknown) {
       entry.status = 'stale'
       entry.since = closedAt
