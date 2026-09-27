@@ -235,8 +235,27 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(toast).toBeVisible()
   await expect(toast).toContainText(/Le solde du client cust-e2e est à 5\s*000 crédits\./)
 
+  // Le centre persiste l'alerte au-delà du toast : elle survit à un rechargement, et perd son
+  // bouton « Marquer comme lue » une fois relue comme lue depuis le serveur.
+  await page.getByRole('button', { name: '1 non lue' }).click()
+  const panel = page.getByRole('dialog', { name: 'Notifications' })
+  await expect(panel.getByText('Plancher de facturation MO atteint')).toBeVisible()
+  await panel.getByRole('button', { name: 'Marquer comme lue' }).click()
+  await expect(page.getByRole('button', { name: '1 non lue' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'aucune non lue' })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Soldes & crédits')
+  await page.getByRole('button', { name: 'aucune non lue' }).click()
+  const panelAfterReload = page.getByRole('dialog', { name: 'Notifications' })
+  await expect(panelAfterReload.getByText('Plancher de facturation MO atteint')).toBeVisible()
+  await expect(panelAfterReload.getByRole('button', { name: 'Marquer comme lue' })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+
   // Le hub republie `stale` dès l'échec de lecture sur le flux amont coupé, sans attendre les 60 s
   // de silence tolérées : mesuré à 4-6 ms sur le binaire livré (deux mesures), marge large ici.
+  await expect(page.getByRole('banner').getByText('En direct')).toBeVisible({ timeout: 15_000 })
   await request.post('http://127.0.0.1:4011/control/cut?feed=/admin/stream/billing-alerts')
   await expect(page.getByRole('banner').getByText('Données périmées')).toBeVisible({
     timeout: 5_000,
