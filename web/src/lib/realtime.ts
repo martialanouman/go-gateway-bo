@@ -48,13 +48,12 @@ type Entry = {
   data?: TopicData[Topic]
   ts?: string
   error?: Schemas['Error']
-  // Un sujet refusé pour de bon n'est pas réabonné à l'ouverture : le serveur le refuserait à chaque fois.
+  // Un sujet refusé n'est pas réabonné à l'ouverture : le serveur le refuserait à chaque fois.
   denied: boolean
   snapshot?: TopicState<Topic>
 }
 
 const UNSUBSCRIBED: TopicState<Topic> = Object.freeze({ isLive: false, isStale: false })
-const DEFINITIVE_REFUSALS = new Set(['permission_denied', 'unknown_topic'])
 
 export function realtimeURL(location: Pick<Location, 'protocol' | 'host'>) {
   return `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`
@@ -80,8 +79,6 @@ export class RealtimeConnection {
   }
 
   start() {
-    if (this.#socket) return
-    clearTimeout(this.#reconnectTimer)
     const socket = new WebSocket(this.#url)
     socket.onopen = () => this.#onOpen()
     socket.onmessage = (event: MessageEvent<string>) =>
@@ -117,10 +114,7 @@ export class RealtimeConnection {
       this.#changed([entry])
     }
 
-    let left = false
     return () => {
-      if (left) return
-      left = true
       if (listener) entry.listeners.delete(listener)
       entry.count -= 1
       if (entry.count > 0) return
@@ -213,8 +207,11 @@ export class RealtimeConnection {
     const entry = message.topic ? this.#entries.get(message.topic as Topic) : undefined
     if (!entry) return
     if ('error' in message) {
+      // Seuls `permission_denied` et `unknown_topic` portent un sujet : `invalid_message` n'en a pas.
       entry.error = message.error
-      entry.denied ||= DEFINITIVE_REFUSALS.has(message.error.code)
+      entry.denied = true
+      entry.status = undefined
+      entry.since = undefined
     } else if ('status' in message) {
       entry.status = message.status
       entry.since = message.since ? new Date(message.since) : undefined

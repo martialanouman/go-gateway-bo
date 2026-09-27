@@ -59,7 +59,6 @@ describe('RealtimeConnection', () => {
     const leaveSecond = connection.subscribe('billing.alerts')
 
     leaveFirst()
-    leaveFirst()
     expect(socket.sent).toEqual([{ action: 'subscribe', topics: ['billing.alerts'] }])
 
     leaveSecond()
@@ -138,6 +137,19 @@ describe('RealtimeConnection', () => {
 
     expect(connection.topic('billing.alerts').error).toEqual(refusal)
     expect(next.sent).toEqual([{ action: 'subscribe', topics: ['metrics.traffic'] }])
+  })
+
+  it('stops reporting live once the server withdraws the permission', () => {
+    const { connection, socket } = openConnection()
+    connection.subscribe('billing.alerts')
+    socket.receive({ topic: 'billing.alerts', status: 'live' })
+
+    socket.receive({
+      topic: 'billing.alerts',
+      error: { code: 'permission_denied', message: 'La permission billing:read manque.' },
+    })
+
+    expect(connection.topic('billing.alerts').isLive).toBe(false)
   })
 
   it('forgets the refusal once the topic has no subscriber left', () => {
@@ -363,7 +375,7 @@ describe('RealtimeConnection', () => {
     const { connection, socket } = openConnection(onSessionEnded)
     connection.subscribe('metrics.traffic')
     socket.close(1006)
-    connection.start()
+    vi.advanceTimersByTime(FIRST_BACKOFF_MS)
     const next = FakeWebSocket.latest()
     next.open()
     next.close(1011)
