@@ -220,6 +220,8 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	return serve(ctx, ln, router, cfg.ShutdownTimeout, logger)
 }
 
+// recordBillingAlert traduit une alerte de facturation en ligne de `notifications`. `warning` pour
+// toute valeur : la seule émise ne bloque rien, et une inconnue doit rester visible (dette 060).
 func recordBillingAlert(notifications *store.Notifications) hub.Recorder {
 	return func(ctx context.Context, alert hub.BillingAlert) (hub.Notification, error) {
 		written, err := notifications.Record(ctx, store.NewNotification{
