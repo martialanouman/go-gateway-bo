@@ -25,7 +25,8 @@ function Indicator() {
 
   const stale = topics.filter((topic) => topic.isStale)
   if (stale.length > 0) {
-    // `stale` sans `since` : le flux n'a jamais été joint, il n'y a pas d'heure à donner.
+    // `stale` sans `since` : le flux n'a jamais été joint, il n'y a pas d'heure à donner. Le plus
+    // ancien fait foi ; avec un seul sujet abonné, `Math.max` resterait vert (vérifié, critère 4).
     const since = stale.flatMap((topic) => (topic.since ? [topic.since.getTime()] : []))
     return (
       <StatusPill
