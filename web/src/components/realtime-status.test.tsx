@@ -25,7 +25,7 @@ function status(socket: FakeWebSocket, message: Omit<RealtimeStatus, 'topic'>) {
   act(() => socket.receive({ topic: 'billing.alerts', ...message } satisfies RealtimeStatus))
 }
 
-const INDICATOR = /En direct|Reconnexion|Données périmées|Session terminée/
+const INDICATOR = /En direct|Connexion en cours|Données périmées|Session terminée/
 
 describe('the realtime indicator', () => {
   it('says the data is live, with a pulse', async () => {
@@ -36,13 +36,24 @@ describe('the realtime indicator', () => {
     expect(within(banner).getByRole('status')).toHaveTextContent('En direct')
   })
 
-  it('says it is reconnecting once the socket drops, without a pulse', async () => {
+  it('says it is connecting before the socket first opens', async () => {
+    stubSession({ permissions: ['billing:read'] })
+    render(
+      <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))} />,
+    )
+    const banner = await screen.findByRole('banner')
+
+    expect(await within(banner).findByText('Connexion en cours')).toBeInTheDocument()
+    expect(within(banner).queryByRole('status')).toBeNull()
+  })
+
+  it('says it is connecting again once the socket drops, without a pulse', async () => {
     const { socket, banner } = await openShell()
     status(socket, { status: 'live' })
 
     act(() => socket.close(1006))
 
-    expect(within(banner).getByText('Reconnexion')).toBeInTheDocument()
+    expect(within(banner).getByText('Connexion en cours')).toBeInTheDocument()
     expect(within(banner).queryByRole('status')).toBeNull()
   })
 

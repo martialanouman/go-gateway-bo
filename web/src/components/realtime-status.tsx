@@ -28,5 +28,6 @@ export function RealtimeStatus() {
   if (topics.every((topic) => topic.isLive)) {
     return <StatusPill kind="link" label="En direct" live state="up" />
   }
-  return <StatusPill kind="link" label="Reconnexion" state="reconnecting" />
+  // Première ouverture ou reprise dans la tolérance : les deux sont une connexion en cours.
+  return <StatusPill kind="link" label="Connexion en cours" state="reconnecting" />
 }
