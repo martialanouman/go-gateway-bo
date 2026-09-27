@@ -421,6 +421,10 @@ func startPrism(t *testing.T) *prismMock {
 
 	output := &bddtest.SyncBuffer{}
 	prism := exec.Command(binary, "mock", "--port", "0", "--host", "127.0.0.1", contract)
+	// Un environnement construit de zéro : un `FORCE_COLOR` hérité du shell faisait colorer ses
+	// annonces à Prism, et les regex qui les lisent ne trouvaient plus aucune route.
+	//nolint:forbidigo // PATH n'est pas une configuration du produit : il sert à trouver `node`.
+	prism.Env = []string{"PATH=" + os.Getenv("PATH")}
 	prism.Stdout = output
 	prism.Stderr = output
 
