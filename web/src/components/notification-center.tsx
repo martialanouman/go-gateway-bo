@@ -9,6 +9,7 @@ import {
   Popover,
   Skeleton,
 } from '~/components/ui'
+import { Refusal } from '~/lib/administration'
 import { HttpError } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
 import {
@@ -41,7 +42,7 @@ export function NotificationCenter() {
 
   return (
     <Popover
-      hint="Le centre garde les alertes reçues pendant que le tableau de bord tournait ; une coupure peut en laisser passer."
+      hint="Le centre garde les alertes reçues par le serveur ; une bascule ou une panne peut en laisser passer."
       label={unread === undefined ? 'Notifications' : unreadLabel(unread)}
       title="Notifications"
       trigger={
@@ -104,6 +105,7 @@ function NotificationList() {
   return (
     <>
       {failure}
+      <Refusal error={mark.error} />
       {entries.length === 0 ? (
         <EmptyState inline title="Aucune notification pour l’instant." />
       ) : (

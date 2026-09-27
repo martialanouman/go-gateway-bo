@@ -39,10 +39,12 @@ function openShell({
   permissions = ['billing:read'],
   entries = [],
   failing = false,
+  markFailure,
 }: {
   readonly permissions?: readonly PermissionKey[]
   readonly entries?: readonly NotificationEntry[]
   readonly failing?: boolean
+  readonly markFailure?: { readonly status: number; readonly body?: unknown }
 } = {}) {
   const session = stubSession({ permissions })
   const held = entries.map((notification) => ({ ...notification }))
@@ -67,6 +69,11 @@ function openShell({
 
     const marked = /^\/api\/notifications\/([^/]+)\/read$/.exec(url.pathname)?.[1]
     if (request.method === 'POST' && marked !== undefined) {
+      if (markFailure !== undefined) {
+        return markFailure.body === undefined
+          ? new Response(null, { status: markFailure.status })
+          : Response.json(markFailure.body, { status: markFailure.status })
+      }
       const notification = held.find(({ id }) => id === marked)
       if (notification === undefined) {
         return Response.json({ code: 'notification_unknown', message: 'Test.' }, { status: 404 })
@@ -165,6 +172,34 @@ describe('the notification center', () => {
     ).toBe(true)
   })
 
+  it('shows the server’s refusal when marking a notification fails', async () => {
+    const user = userEvent.setup()
+    openShell({
+      entries: [entry(1)],
+      markFailure: { status: 503, body: { code: 'internal', message: 'Erreur de test.' } },
+    })
+    const center = await openCenter(user)
+
+    await user.click(within(center).getByRole('button', { name: 'Marquer comme lue' }))
+
+    expect(await within(center).findByText('Erreur de test.')).toBeInTheDocument()
+  })
+
+  it('falls back to a fixed refusal when the server says nothing', async () => {
+    const user = userEvent.setup()
+    openShell({ entries: [entry(1)], markFailure: { status: 503 } })
+    const center = await openCenter(user)
+
+    await user.click(within(center).getByRole('button', { name: 'Marquer comme lue' }))
+
+    expect(
+      await within(center).findByText(
+        "La notification n'a pas été marquée comme lue : le serveur n'a pas répondu. Elle reste " +
+          'non lue ; réessayer la marque. (HTTP 503).',
+      ),
+    ).toBeInTheDocument()
+  })
+
   it('loads the next page on demand', async () => {
     const user = userEvent.setup()
     openShell({ entries: Array.from({ length: PAGE_SIZE + 1 }, (_, index) => entry(index + 1)) })
@@ -211,7 +246,7 @@ describe('the notification center', () => {
     const user = userEvent.setup()
     openShell()
     const hint =
-      'Le centre garde les alertes reçues pendant que le tableau de bord tournait ; une coupure peut en laisser passer.'
+      'Le centre garde les alertes reçues par le serveur ; une bascule ou une panne peut en laisser passer.'
 
     const center = await openCenter(user)
     expect(center).toHaveAccessibleDescription(hint)

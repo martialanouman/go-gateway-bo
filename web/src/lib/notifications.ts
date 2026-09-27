@@ -2,6 +2,7 @@ import { infiniteQueryOptions } from '@tanstack/react-query'
 import type { ToastSource } from '~/components/ui'
 import { api, HttpError } from './api'
 import type { components } from './api.gen'
+import { orRefusal } from './administration'
 
 type Notification = components['schemas']['Notification']
 type NotificationEntry = components['schemas']['NotificationEntry']
@@ -59,8 +60,9 @@ export const notificationsQueryOptions = infiniteQueryOptions({
 })
 
 export async function markNotificationRead(notificationId: string) {
-  const { response } = await api.POST('/notifications/{notificationId}/read', {
-    params: { path: { notificationId } },
-  })
-  if (response.status !== 204) throw new HttpError(response.status)
+  await orRefusal(
+    api.POST('/notifications/{notificationId}/read', { params: { path: { notificationId } } }),
+    "La notification n'a pas été marquée comme lue : le serveur n'a pas répondu. Elle reste non " +
+      'lue ; réessayer la marque.',
+  )
 }
