@@ -142,14 +142,14 @@ describe('RealtimeConnection', () => {
   it('stops reporting live once the server withdraws the permission', () => {
     const { connection, socket } = openConnection()
     connection.subscribe('billing.alerts')
-    socket.receive({ topic: 'billing.alerts', status: 'live' })
+    socket.receive({ topic: 'billing.alerts', status: 'live', since: '2026-09-27T09:58:00Z' })
 
     socket.receive({
       topic: 'billing.alerts',
       error: { code: 'permission_denied', message: 'La permission billing:read manque.' },
     })
 
-    expect(connection.topic('billing.alerts').isLive).toBe(false)
+    expect(connection.topic('billing.alerts')).toMatchObject({ isLive: false, since: undefined })
   })
 
   it('forgets the refusal once the topic has no subscriber left', () => {
