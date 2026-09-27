@@ -5,13 +5,17 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/martialanouman/go-gateway-bo/internal/fakegateway"
 )
+
+var knownFeeds = []string{fakegateway.MetricsFeed, fakegateway.SessionsFeed, fakegateway.BillingFeed}
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:4011", "adresse d'écoute")
@@ -24,9 +28,16 @@ func main() {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("POST /control/emit", func(w http.ResponseWriter, r *http.Request) {
+		feed := r.URL.Query().Get("feed")
+		if !slices.Contains(knownFeeds, feed) {
+			http.Error(w, fmt.Sprintf("flux inconnu : %q", feed), http.StatusBadRequest)
+
+			return
+		}
+
 		frame, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 		if err == nil {
-			err = gateway.Emit(r.URL.Query().Get("feed"), string(frame), 10*time.Second)
+			err = gateway.Emit(feed, string(frame), 10*time.Second)
 		}
 
 		if err != nil {
@@ -38,7 +49,14 @@ func main() {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("POST /control/cut", func(w http.ResponseWriter, r *http.Request) {
-		gateway.Cut(r.URL.Query().Get("feed"))
+		feed := r.URL.Query().Get("feed")
+		if !slices.Contains(knownFeeds, feed) {
+			http.Error(w, fmt.Sprintf("flux inconnu : %q", feed), http.StatusBadRequest)
+
+			return
+		}
+
+		gateway.Cut(feed)
 		w.WriteHeader(http.StatusNoContent)
 	})
 

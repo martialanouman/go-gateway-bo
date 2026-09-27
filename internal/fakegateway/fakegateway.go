@@ -1,5 +1,5 @@
-// Package fakegateway simule les trois flux temps réel de l'API Admin pour les scénarios godog et,
-// servi comme processus par `scripts/fakegateway`, pour les parcours Playwright.
+// Package fakegateway simule les trois flux temps réel de l'API Admin pour les scénarios godog.
+// `scripts/fakegateway` le sert aussi comme processus, pour les parcours Playwright.
 package fakegateway
 
 import (
