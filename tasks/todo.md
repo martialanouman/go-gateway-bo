@@ -242,7 +242,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 ## M2 (temps réel) — Hub WebSocket, HA, notifications  (§5.2)
 - [x] step-043 — Hub WebSocket Go : trois flux passerelle agrégés en une socket client
 - [x] step-044 — HA : bail Redis + Pub/Sub entre instances, bascule automatique
-- [ ] step-045 — Client WS React : abonnement par sujet, reconnexion, `isLive` / `isStale`
+- [x] step-045 — Client WS React : abonnement par sujet, reconnexion, `isLive` / `isStale`
 - [ ] step-046 — Centre de notifications persisté
 - [ ] step-047 — Arrêt propre : drain des sockets, déploiement roulant sans session perdue
 

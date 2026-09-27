@@ -1,6 +1,6 @@
 # step-045 — Client WS React : abonnement par sujet, reconnexion, `isLive` / `isStale`
 
-> **Jalon :** M2 (§1.6, §5.2) · **Statut :** À FAIRE
+> **Jalon :** M2 (§1.6, §5.2) · **Statut :** FAIT
 > **Dépend de :** step-043, step-044 · **Bloque :** step-046
 
 ## But
@@ -71,9 +71,10 @@ dans la barre supérieure, et les alertes de facturation dans la pile de toasts 
   Les commentaires de `DASHBOARD_REDIS_URL` et `DASHBOARD_GATEWAY_BASE_URL` corrigés.
 - **CI** : le job e2e reçoit un service Redis. Le binaire démarre sans lui, mais aucun sujet ne passe
   alors « En direct », et le parcours l'attendrait en vain.
-- **Dette 059 payée** : l'exception de quarantaine de `web/pnpm-workspace.yaml` est retirée. Elle ne
-  peut l'être qu'après le **27/09/2026 21:37 UTC**, quand la 6.9.0 a 24 h : avant, `pnpm install`
-  refuse le contrat. Le commit qui la retire attend cette heure.
+- **Dette 059 non payée ici, portée par step-046.** Son retrait ne peut venir qu'après le
+  **27/09/2026 21:37 UTC**, quand la 6.9.0 a 24 h : mesuré le 27/09 à 12:32 UTC, `pnpm install
+  --frozen-lockfile` sans l'exception rend `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`. Clore la step
+  n'attend pas cette heure. *Arbitré le 27/09/2026 avec l'utilisateur.*
 
 ## Tests (écrits dans la même PR)
 - **Vitest** (faux `WebSocket` global : une API du navigateur, pas un module du produit) :
@@ -142,11 +143,11 @@ nomme le test qui tombe.
   garde « En direct » jusqu'au délai du système. Hors périmètre.
 
 ## Definition of Done
-- [x] `make check` vert, `make e2e` vert (`rc=0` tous deux le 27/09/2026, avant le retrait de la
-      dette 059, qui les rejoue).
-- [ ] Aucune donnée de trame dans une URL, un journal ou un cache persisté (invariant a) : le magasin
-      vit en mémoire de l'onglet, vérifié sur le livré.
-- [ ] Clavier et libellés : l'indicateur est un texte lisible, pas une couleur seule (WCAG 2.1 AA).
+- [x] `make check` vert, `make e2e` vert (`rc=0` tous deux le 27/09/2026 ; CI verte sur la PR #117).
+- [x] Aucune donnée de trame dans une URL, un journal ou un cache persisté (invariant a) : le magasin
+      vit en mémoire de l'onglet, vérifié sur le livré — aucun `console.`, stockage du navigateur ni
+      écriture d'URL dans `realtime.ts`, `realtime-status.tsx`, `billing-alert-toasts.tsx`.
+- [x] Clavier et libellés : l'indicateur est un texte lisible, pas une couleur seule (WCAG 2.1 AA).
       Les états dégradés sont annoncés (4.1.3) : une région `role="status"` enveloppe l'indicateur en
       permanence, vide sans sujet, et la pilule « En direct » n'en ouvre pas une seconde
       (`announce={false}`) ; les pilules des tableaux restent sans région live.
@@ -157,3 +158,4 @@ nomme le test qui tombe.
   → M4. `metrics.connectors` : le hub ne le sert pas.
 - Rejouer ce qui a été perdu pendant une coupure : au mieux une fois, par décision (step-044).
 - Battement de cœur côté client pour détecter une socket à demi ouverte.
+- Retrait de l'exception de quarantaine pnpm (dette 059) → step-046.

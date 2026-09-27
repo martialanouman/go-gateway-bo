@@ -126,7 +126,7 @@ export function StatusPill(props: StatusPillProps) {
       // seconde classe que rien ne cible serait une classe morte sur chaque ligne de chaque tableau.
       // Les tests de tonalité visent donc le point, qui peint, plutôt qu'une étiquette décorative.
       className={['ui-status', className].filter(Boolean).join(' ')}
-      // `role="status"` **seulement** sur une valeur en direct, et jamais par défaut. Un `role`
+      // `role="status"` par défaut **seulement** sur une valeur en direct (`announce` le règle). Un `role`
       // inconditionnel ferait de chaque pilule une région live : un tableau de 50 connecteurs à deux
       // dimensions en compterait cent, et la première salve WebSocket les annoncerait toutes, en
       // file d'attente polie et sans contexte.
