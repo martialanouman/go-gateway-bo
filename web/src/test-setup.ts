@@ -3,6 +3,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
+import { FakeWebSocket } from '../test/websocket'
 
 // Testing Library n'installe son nettoyage automatique que lorsque les globales de test existent, et
 // la configuration les refuse (`globals: false`, pour que chaque fichier déclare ce qu'il utilise).
@@ -23,6 +24,8 @@ beforeEach(() => {
       throw new Error(`appel réseau non déclaré : ${request.method} ${request.url}`)
     }),
   )
+  FakeWebSocket.instances = []
+  vi.stubGlobal('WebSocket', FakeWebSocket)
 })
 afterEach(() => {
   vi.unstubAllGlobals()
