@@ -184,8 +184,10 @@ func TestAFailedRecordStillRelaysTheBillingAlert(t *testing.T) {
 	rdb, namespace := redisFor(t)
 	gateway := newUpstream(t)
 	h := fastHub()
+	// Une notification visible rendue avec l'erreur : seul le contrôle de l'erreur la retient, pas le
+	// filtre par source.
 	h.record = func(context.Context, BillingAlert) (Notification, error) {
-		return Notification{}, errors.New("base injoignable")
+		return Notification{ID: "n-1", Source: "billing_alert_stream"}, errors.New("base injoignable")
 	}
 
 	runHub(t, h, gateway.dial, rdb, namespace)
