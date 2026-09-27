@@ -136,6 +136,7 @@ describe('the top bar', () => {
       .map(([request]) => request as Request)
       .find((request) => request.method === 'POST')
     expect(new URL(logout?.url ?? '').pathname).toBe('/api/auth/logout')
+    expect(FakeWebSocket.latest().readyState).toBe(FakeWebSocket.CLOSED)
   })
 })
 
