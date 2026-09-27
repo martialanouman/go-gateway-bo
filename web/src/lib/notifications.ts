@@ -1,8 +1,8 @@
 import { infiniteQueryOptions } from '@tanstack/react-query'
 import type { ToastSource } from '~/components/ui'
+import { orRefusal } from './administration'
 import { api, HttpError } from './api'
 import type { components } from './api.gen'
-import { orRefusal } from './administration'
 
 type Notification = components['schemas']['Notification']
 type NotificationEntry = components['schemas']['NotificationEntry']
