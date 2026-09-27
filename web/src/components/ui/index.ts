@@ -34,6 +34,7 @@ export {
   type IconProps,
 } from './icon'
 export { Modal, type ModalProps } from './modal'
+export { Popover, type PopoverProps } from './popover'
 export { Select, type SelectOption, type SelectProps } from './select'
 export { LoadingState, type LoadingStateProps, Skeleton, type SkeletonProps } from './skeleton'
 export {

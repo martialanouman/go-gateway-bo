@@ -398,12 +398,15 @@
  * les libellés qu'elle sert à choisir. `--anchor-width` est mesurée par Base UI à l'ouverture, et
  * son repli est déclaré en tête de ce fichier.
  */
-.ui-select__positioner {
+.ui-select__positioner,
+.ui-popover__positioner,
+.ui-popover__tooltip {
   z-index: var(--z-popover);
   min-width: var(--anchor-width);
 }
 
-.ui-select__popup {
+.ui-select__popup,
+.ui-popover__popup {
   overflow: auto;
   max-height: 18rem;
   padding: var(--sp-2);
@@ -411,6 +414,28 @@
   border-radius: var(--r-card);
   background: var(--surface-card);
   box-shadow: var(--elevation-popover);
+}
+
+.ui-popover__popup {
+  width: 24rem;
+  max-height: 28rem;
+}
+
+.ui-popover__header {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+}
+
+.ui-popover__title {
+  margin: 0;
+  font-size: var(--fs-13);
+}
+
+.ui-popover__hint {
+  border: 0;
+  background: none;
+  color: var(--text-muted);
 }
 
 .ui-select__item {
