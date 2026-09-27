@@ -111,7 +111,7 @@ var defaultRoles = []DefaultRole{
 	},
 	{
 		Name:        "Reporting",
-		Description: "Consulte les soldes, le grand livre et les plans tarifaires, et rien d'autre",
+		Description: "Consulte les soldes, le grand livre et les plans tarifaires, et reçoit les alertes de facturation — rien d'autre",
 		Keys: []Key{
 			BillingRead,
 		},

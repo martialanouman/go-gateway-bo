@@ -214,7 +214,7 @@ var catalog = []Entry{
 	{
 		Key:         BillingRead,
 		Category:    "billing",
-		Description: "Consulter les soldes, le grand livre et les plans tarifaires",
+		Description: "Consulter les soldes, le grand livre et les plans tarifaires, et recevoir les alertes de facturation",
 	},
 	{
 		Key:         BillingWrite,
@@ -292,7 +292,7 @@ var catalog = []Entry{
 	{
 		Key:         AlertsRead,
 		Category:    "alerts",
-		Description: "Consulter les règles d’alerte métier et les notifications déclenchées",
+		Description: "Consulter les règles d’alerte métier et les notifications qu’elles ou Alertmanager déclenchent",
 	},
 	{
 		Key:         AlertsWrite,
