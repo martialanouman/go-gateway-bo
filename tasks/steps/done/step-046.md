@@ -86,7 +86,8 @@ de la barre supérieure en garde l'historique, avec l'état lu ou non lu de chaq
 - **Client** : panneau dans `web/src/components/top-bar.tsx`, toasts réalimentés par `notifications`,
   copie partagée.
 - **Dette 059 payée** : `minimumReleaseAgeExclude` retiré de `web/pnpm-workspace.yaml`, fichier
-  supprimé. Possible **après le 27/09/2026 21:37 UTC** seulement, quand la 6.9.0 a 24 h.
+  supprimé, le 27/09/2026 à 21:57 UTC — `pnpm install --frozen-lockfile` sans l'exception : rc=0,
+  « Lockfile passes supply-chain policies ».
 - **Dettes ouvertes** : 060 (la sévérité d'une alerte de facturation est devinée par le BFF — le
   contrat devrait la porter ; porteur step-182) et 061 (en M9, la même alerte arrivera par
   `billing_alert_stream` et `bff_evaluator` ; porteur step-182, qui tranche entre dédoublonner et

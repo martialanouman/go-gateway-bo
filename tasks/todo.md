@@ -243,7 +243,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [x] step-043 — Hub WebSocket Go : trois flux passerelle agrégés en une socket client
 - [x] step-044 — HA : bail Redis + Pub/Sub entre instances, bascule automatique
 - [x] step-045 — Client WS React : abonnement par sujet, reconnexion, `isLive` / `isStale`
-- [ ] step-046 — Centre de notifications persisté
+- [x] step-046 — Centre de notifications persisté
 - [ ] step-047 — Arrêt propre : drain des sockets, déploiement roulant sans session perdue
 
 ## M3 — Clients, comptes SMPP & identifiants  (§6.14, §6.15)
