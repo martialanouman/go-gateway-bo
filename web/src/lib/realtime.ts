@@ -20,6 +20,7 @@ export type TopicData = {
   'metrics.traffic': Schemas['TrafficSnapshot']
   'sessions.events': Schemas['SessionEvent']
   'billing.alerts': Schemas['BillingAlert']
+  notifications: Schemas['Notification']
 }
 export type TopicState<T extends Topic> = {
   readonly data?: TopicData[T]

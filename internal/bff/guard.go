@@ -92,6 +92,11 @@ var authorization = map[string]rule{
 	"SetPasswordFromAccessLink": exempt("la porte de qui n'a pas encore de mot de passe : aucune " +
 		"session ne peut exister. Ce qui la garde est le jeton, 256 bits à usage unique, vérifié " +
 		"avant tout hachage"),
+	"ListNotifications": exempt("la visibilité dépend de la source de chaque notification, pas d'une " +
+		"clé à l'entrée : le handler vérifie session et élévation, puis filtre en SQL par " +
+		"`permissions.NotificationSourceKeys`"),
+	"MarkNotificationRead": exempt("même raison que `ListNotifications` ; une notification invisible " +
+		"rend 404 comme une absente, et le marquage est audité"),
 }
 
 // grantsOf rend l'union des permissions d'un opérateur.

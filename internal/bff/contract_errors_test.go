@@ -218,3 +218,13 @@ func (failingAPI) UpdateRole(_ context.Context, _ UpdateRoleRequestObject) (Upda
 func (failingAPI) DeleteRole(_ context.Context, _ DeleteRoleRequestObject) (DeleteRoleResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }
+
+func (failingAPI) ListNotifications(_ context.Context, _ ListNotificationsRequestObject,
+) (ListNotificationsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) MarkNotificationRead(_ context.Context, _ MarkNotificationReadRequestObject,
+) (MarkNotificationReadResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}

@@ -45,6 +45,8 @@ type API struct {
 	Administration *store.Administration
 	// AccessLinks consomme le lien d'accès, sur une route publique.
 	AccessLinks *store.AccessLinks
+	// Notifications lit et marque le centre de chaque opérateur.
+	Notifications *store.Notifications
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le

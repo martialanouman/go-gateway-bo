@@ -206,6 +206,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 			Audit:          store.NewAudit(pool),
 			Administration: store.NewAdministration(pool),
 			AccessLinks:    links,
+			Notifications:  store.NewNotifications(pool),
 		},
 		TrustedProxies: cfg.Auth.TrustedProxies,
 		// La même valeur que l'origine des cérémonies WebAuthn, et c'est délibéré : un déploiement a
