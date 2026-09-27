@@ -1,6 +1,6 @@
 # 059 — Une exception de quarantaine pnpm à retirer
 
-> **Porteur :** step-045
+> **Porteur :** step-046
 
 ## Ce qu'elle coûte si elle dure
 

@@ -3,6 +3,8 @@ import { Link, useRouter } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { EmptyState, ErrorState, LoadingState, Skeleton, ToastStack } from '~/components/ui'
 import { HttpError, isUnauthenticated, meQueryOptions } from '~/lib/api'
+import { RealtimeProvider } from '~/lib/realtime'
+import { BillingAlertToasts } from './billing-alert-toasts'
 import { Rail } from './rail'
 import { TopBar } from './top-bar'
 
@@ -16,7 +18,7 @@ import { TopBar } from './top-bar'
  */
 export function ShellPending() {
   return (
-    <Frame>
+    <Frame live={false}>
       <LoadingState label="Ouverture de la session">
         <Skeleton width={240} />
         <Skeleton width={180} />
@@ -43,7 +45,7 @@ export function Shell({ children }: { readonly children: ReactNode }) {
 
   if (isUnauthenticated(me.error)) {
     return (
-      <Frame>
+      <Frame live={false}>
         <EmptyState
           description={
             <>
@@ -72,8 +74,9 @@ export function Shell({ children }: { readonly children: ReactNode }) {
   // l'écran (invariant e).
   if (me.data !== undefined) {
     return (
-      <Frame rail={<Rail />} topbar={<TopBar operator={me.data.operator} />}>
+      <Frame live rail={<Rail />} topbar={<TopBar operator={me.data.operator} />}>
         {children}
+        <BillingAlertToasts />
       </Frame>
     )
   }
@@ -81,7 +84,7 @@ export function Shell({ children }: { readonly children: ReactNode }) {
   if (me.error !== null) {
     const status = me.error instanceof HttpError ? String(me.error.status) : 'réseau'
     return (
-      <Frame>
+      <Frame live={false}>
         <ErrorState
           description="Le tableau de bord n’a pas pu vérifier la session ; aucun écran ne s’ouvre sans elle."
           // `router.invalidate()` et non `me.refetch()` : ce qu'il faut rejouer est la **garde**,
@@ -109,40 +112,44 @@ export function Shell({ children }: { readonly children: ReactNode }) {
  * mènerait à un refus serait un lien mort.
  */
 function Frame({
+  live,
   rail,
   topbar,
   children,
 }: {
+  readonly live: boolean
   readonly rail?: ReactNode
   readonly topbar?: ReactNode
   readonly children: ReactNode
 }) {
   return (
-    // La pile de toasts enveloppe **tous** les états : montée dans la seule branche de session, elle
-    // change la forme de l'arbre à l'arrivée de la session, et React remonte le cadre entier.
+    // La pile de toasts et le fournisseur temps réel enveloppent **tous** les états : montés dans la
+    // seule branche de session, ils changeraient la forme de l'arbre, et React remonterait le cadre.
     <ToastStack>
-      <div className="shell">
-        {/* biome-ignore lint/a11y/useValidAnchor: `#contenu` est une vraie destination ; le clic ne fait qu'y porter le focus. */}
-        <a
-          className="shell__skip"
-          href="#contenu"
-          onClick={(event) => {
-            // Le fragment seul ne déplace pas le focus : `main` ne le prend que si on le lui donne, et le
-            // test du lien d'évitement rougit sans `focus()`. `preventDefault` garde `#contenu` hors de
-            // l'adresse ; aucun test ne rougit s'il disparaît — l'historique en mémoire du test ne voit
-            // pas le fragment.
-            event.preventDefault()
-            document.getElementById('contenu')?.focus()
-          }}
-        >
-          Aller au contenu
-        </a>
-        {rail ?? <div className="shell__rail" />}
-        <header className="shell__topbar">{topbar}</header>
-        <main className="shell__content" id="contenu" tabIndex={-1}>
-          {children}
-        </main>
-      </div>
+      <RealtimeProvider enabled={live}>
+        <div className="shell">
+          {/* biome-ignore lint/a11y/useValidAnchor: `#contenu` est une vraie destination ; le clic ne fait qu'y porter le focus. */}
+          <a
+            className="shell__skip"
+            href="#contenu"
+            onClick={(event) => {
+              // Le fragment seul ne déplace pas le focus : `main` ne le prend que si on le lui donne, et le
+              // test du lien d'évitement rougit sans `focus()`. `preventDefault` garde `#contenu` hors de
+              // l'adresse ; aucun test ne rougit s'il disparaît — l'historique en mémoire du test ne voit
+              // pas le fragment.
+              event.preventDefault()
+              document.getElementById('contenu')?.focus()
+            }}
+          >
+            Aller au contenu
+          </a>
+          {rail ?? <div className="shell__rail" />}
+          <header className="shell__topbar">{topbar}</header>
+          <main className="shell__content" id="contenu" tabIndex={-1}>
+            {children}
+          </main>
+        </div>
+      </RealtimeProvider>
     </ToastStack>
   )
 }

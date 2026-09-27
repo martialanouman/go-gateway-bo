@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -19,126 +18,9 @@ import (
 	"github.com/coder/websocket"
 	"github.com/cucumber/godog"
 	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/martialanouman/go-gateway-bo/internal/fakegateway"
 )
-
-const (
-	metricsFeed  = "/admin/stream/metrics"
-	sessionsFeed = "/admin/stream/sessions"
-	billingFeed  = "/admin/stream/billing-alerts"
-)
-
-// fakeGateway sert les trois flux de l'API Admin. Les trames sont celles de
-// `go-gateway/internal/metricstream`, écrites à la main comme la passerelle les sérialise.
-type fakeGateway struct {
-	server    *httptest.Server
-	mu        sync.Mutex
-	accepting map[string]bool
-	conns     map[string][]*websocket.Conn
-	opened    map[string]int
-}
-
-func newFakeGateway() *fakeGateway {
-	g := &fakeGateway{
-		accepting: map[string]bool{metricsFeed: true, sessionsFeed: true, billingFeed: true},
-		conns:     map[string][]*websocket.Conn{},
-		opened:    map[string]int{},
-	}
-	g.server = httptest.NewServer(http.HandlerFunc(g.serve))
-
-	return g
-}
-
-func (g *fakeGateway) serve(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
-		http.Error(w, "jeton machine absent", http.StatusUnauthorized)
-
-		return
-	}
-
-	g.mu.Lock()
-	accepting, known := g.accepting[r.URL.Path]
-	g.mu.Unlock()
-
-	if !known {
-		http.NotFound(w, r)
-
-		return
-	}
-
-	if !accepting {
-		http.Error(w, "flux coupé par le scénario", http.StatusServiceUnavailable)
-
-		return
-	}
-
-	conn, err := websocket.Accept(w, r, nil)
-	if err != nil {
-		return
-	}
-
-	g.mu.Lock()
-	g.conns[r.URL.Path] = append(g.conns[r.URL.Path], conn)
-	g.opened[r.URL.Path]++
-	g.mu.Unlock()
-
-	<-conn.CloseRead(context.Background()).Done()
-
-	g.mu.Lock()
-	g.conns[r.URL.Path] = slices.DeleteFunc(g.conns[r.URL.Path], func(c *websocket.Conn) bool { return c == conn })
-	g.mu.Unlock()
-}
-
-// emit attend qu'un consommateur soit branché : le serveur ouvre ses flux au démarrage, et une trame
-// émise avant n'atteindrait personne.
-func (g *fakeGateway) emit(feed, frame string) error {
-	deadline := time.Now().Add(socketWait)
-
-	for {
-		g.mu.Lock()
-		conns := append([]*websocket.Conn(nil), g.conns[feed]...)
-		g.mu.Unlock()
-
-		// Une connexion dont le consommateur est mort sans fermer (instance tuée) échoue à l'écriture
-		// avant d'avoir été retirée : elle ne compte pas.
-		delivered := 0
-
-		for _, conn := range conns {
-			ctx, cancel := context.WithTimeout(context.Background(), socketWait)
-			if conn.Write(ctx, websocket.MessageText, []byte(frame)) == nil {
-				delivered++
-			}
-			cancel()
-		}
-
-		if delivered > 0 {
-			return nil
-		}
-
-		if time.Now().After(deadline) {
-			return fmt.Errorf("aucun consommateur branché sur %s", feed)
-		}
-
-		time.Sleep(20 * time.Millisecond)
-	}
-}
-
-func (g *fakeGateway) cut(feed string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.accepting[feed] = false
-	for _, conn := range g.conns[feed] {
-		_ = conn.Close(websocket.StatusGoingAway, "coupure du scénario")
-	}
-	g.conns[feed] = nil
-}
-
-func (g *fakeGateway) reopen(feed string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.accepting[feed] = true
-}
 
 // socketWait borne chaque attente sur la socket. La reprise d'un flux coupé attend le premier palier
 // du backoff, une seconde.
@@ -149,14 +31,15 @@ const socketWait = 5 * time.Second
 const statusWait = 15 * time.Second
 
 type realtimeWorld struct {
-	process   *process
-	gateway   *fakeGateway
-	conn      *websocket.Conn
-	expected  map[string]any
-	contract  *openapi3.T
-	second    *process
-	redis     *redisRelay
-	sigtermAt time.Time
+	process       *process
+	gateway       *fakegateway.Gateway
+	gatewayServer *httptest.Server
+	conn          *websocket.Conn
+	expected      map[string]any
+	contract      *openapi3.T
+	second        *process
+	redis         *redisRelay
+	sigtermAt     time.Time
 }
 
 type socketMessage struct {
@@ -181,12 +64,12 @@ func (w *realtimeWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^la passerelle émet une alerte de facturation$`, w.emitBillingAlert)
 	ctx.When(`^la passerelle émet un instantané de métriques$`, w.emitSnapshot)
 	ctx.When(`^la passerelle coupe le flux des sessions$`, func() error {
-		w.gateway.cut(sessionsFeed)
+		w.gateway.Cut(fakegateway.SessionsFeed)
 
 		return nil
 	})
 	ctx.When(`^la passerelle rouvre le flux des sessions$`, func() error {
-		w.gateway.reopen(sessionsFeed)
+		w.gateway.Reopen(fakegateway.SessionsFeed)
 
 		return nil
 	})
@@ -232,9 +115,9 @@ func (w *realtimeWorld) registerSteps(ctx *godog.ScenarioContext) {
 			w.redis.cut()
 		}
 
-		if w.gateway != nil {
-			w.gateway.server.CloseClientConnections()
-			w.gateway.server.Close()
+		if w.gatewayServer != nil {
+			w.gatewayServer.CloseClientConnections()
+			w.gatewayServer.Close()
 		}
 
 		return ctx, err
@@ -242,12 +125,13 @@ func (w *realtimeWorld) registerSteps(ctx *godog.ScenarioContext) {
 }
 
 func (w *realtimeWorld) startGateway() error {
-	w.gateway = newFakeGateway()
+	w.gateway = fakegateway.New()
+	w.gatewayServer = httptest.NewServer(w.gateway)
 
 	if w.process.env == nil {
 		w.process.env = completeConfiguration()
 	}
-	w.process.env["DASHBOARD_GATEWAY_BASE_URL"] = w.gateway.server.URL
+	w.process.env["DASHBOARD_GATEWAY_BASE_URL"] = w.gatewayServer.URL
 
 	return nil
 }
@@ -350,23 +234,23 @@ func (w *realtimeWorld) emitSessionEvent() error {
 		"accountId": "acct-7", "systemId": "orange-ci-1", "state": "bound", "sessions": float64(3),
 	}
 
-	return w.gateway.emit(sessionsFeed, `{"v":1,"feed":"sessions","service":"smpp-server",`+
+	return w.gateway.Emit(fakegateway.SessionsFeed, `{"v":1,"feed":"sessions","service":"smpp-server",`+
 		`"instance":"smpp-0","emitted_at":"2026-09-26T10:00:00Z","account_id":"acct-7",`+
-		`"system_id":"orange-ci-1","state":"bound","sessions":3}`)
+		`"system_id":"orange-ci-1","state":"bound","sessions":3}`, socketWait)
 }
 
 func (w *realtimeWorld) emitBillingAlert() error {
-	return w.gateway.emit(billingFeed, `{"v":1,"feed":"billing-alerts","service":"billing",`+
+	return w.gateway.Emit(fakegateway.BillingFeed, `{"v":1,"feed":"billing-alerts","service":"billing",`+
 		`"instance":"billing-0","emitted_at":"2026-09-26T10:00:00Z","customer_id":"cust-1",`+
-		`"owner_type":"customer","owner_id":"cust-1","alert":"mo_floor_reached","balance":5000}`)
+		`"owner_type":"customer","owner_id":"cust-1","alert":"mo_floor_reached","balance":5000}`, socketWait)
 }
 
 func (w *realtimeWorld) emitSnapshot() error {
 	w.expected = map[string]any{"instance": "router-1"}
 
-	return w.gateway.emit(metricsFeed, `{"v":1,"feed":"metrics","service":"router",`+
+	return w.gateway.Emit(fakegateway.MetricsFeed, `{"v":1,"feed":"metrics","service":"router",`+
 		`"instance":"router-1","emitted_at":"2026-09-26T10:00:00Z",`+
-		`"samples":[{"kind":"messages_routed_total","labels":{"connector":"orange-ci"},"value":120}]}`)
+		`"samples":[{"kind":"messages_routed_total","labels":{"connector":"orange-ci"},"value":120}]}`, socketWait)
 }
 
 func (w *realtimeWorld) receivesExpected(topic string) error {
@@ -472,7 +356,7 @@ func (w *realtimeWorld) startTwoInstances() error {
 		return err
 	}
 
-	for _, feed := range []string{metricsFeed, sessionsFeed, billingFeed} {
+	for _, feed := range []string{fakegateway.MetricsFeed, fakegateway.SessionsFeed, fakegateway.BillingFeed} {
 		if err = w.awaitOpened(feed, 1); err != nil {
 			return fmt.Errorf("la première instance n'a pas pris le bail : %w", err)
 		}
@@ -487,9 +371,7 @@ func (w *realtimeWorld) awaitOpened(feed string, want int) error {
 	deadline := time.Now().Add(statusWait)
 
 	for {
-		w.gateway.mu.Lock()
-		opened := w.gateway.opened[feed]
-		w.gateway.mu.Unlock()
+		opened := w.gateway.Opened(feed)
 
 		if opened == want {
 			return nil
@@ -506,13 +388,13 @@ func (w *realtimeWorld) awaitOpened(feed string, want int) error {
 // gatewayCounts laisse passer un battement de bail avant de compter : une seconde connexion ouverte
 // par l'instance sans bail arriverait dans ce délai.
 func (w *realtimeWorld) gatewayCounts(want int) error {
-	if err := w.awaitOpened(sessionsFeed, want); err != nil {
+	if err := w.awaitOpened(fakegateway.SessionsFeed, want); err != nil {
 		return err
 	}
 
 	time.Sleep(3 * time.Second)
 
-	return w.awaitOpened(sessionsFeed, want)
+	return w.awaitOpened(fakegateway.SessionsFeed, want)
 }
 
 // redisRelay relaie TCP vers le Redis de la suite. Le couper ferme les connexions ouvertes et refuse
@@ -600,7 +482,7 @@ func (r *redisRelay) cut() {
 }
 
 func (w *realtimeWorld) gatewayCountsWithin(want, seconds int) error {
-	if err := w.awaitOpened(sessionsFeed, want); err != nil {
+	if err := w.awaitOpened(fakegateway.SessionsFeed, want); err != nil {
 		return err
 	}
 

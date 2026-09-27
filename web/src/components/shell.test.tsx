@@ -1,9 +1,11 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { StrictMode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { createAppRouter } from '~/router'
 import { OPERATOR_NAME, type SessionOutcome, stubSession } from '../../test/session'
+import { FakeWebSocket } from '../../test/websocket'
 
 /**
  * La coquille telle que l'application la monte : vrai routeur, vrai `QueryClient`, vrai client HTTP.
@@ -134,6 +136,7 @@ describe('the top bar', () => {
       .map(([request]) => request as Request)
       .find((request) => request.method === 'POST')
     expect(new URL(logout?.url ?? '').pathname).toBe('/api/auth/logout')
+    expect(FakeWebSocket.latest().readyState).toBe(FakeWebSocket.CLOSED)
   })
 })
 
@@ -149,5 +152,50 @@ describe('the skip link', () => {
 
     await user.keyboard('{Enter}')
     expect(screen.getByRole('main')).toHaveFocus()
+  })
+})
+
+describe('the realtime socket', () => {
+  it('opens the realtime socket only once a session is known', async () => {
+    visit('/cette-adresse-nexiste-pas', { status: 401 })
+    await screen.findByRole('heading', { name: 'Aucune session ouverte' })
+    expect(FakeWebSocket.instances).toHaveLength(0)
+
+    visit('/', { permissions: [] })
+    await rail()
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(FakeWebSocket.latest().url).toBe(`ws://${window.location.host}/ws`)
+  })
+
+  it('keeps a single live socket under StrictMode', async () => {
+    // `main.tsx` monte l'application sous `StrictMode`, qui joue chaque effet deux fois.
+    stubSession({ permissions: [] })
+    render(
+      <StrictMode>
+        <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))} />
+      </StrictMode>,
+    )
+    await rail()
+
+    const live = FakeWebSocket.instances.filter(
+      (socket) => socket.readyState !== FakeWebSocket.CLOSED,
+    )
+    expect(live).toHaveLength(1)
+  })
+
+  it('a 4401 close brings the no-session screen', async () => {
+    visit('/', { permissions: [] })
+    await rail()
+    const socket = FakeWebSocket.latest()
+    act(() => socket.open())
+
+    // Le serveur a fermé la session : la relecture de `me` qui suit la fermeture rend 401.
+    stubSession({ status: 401 })
+    act(() => socket.close(4401))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Aucune session ouverte' }),
+    ).toBeInTheDocument()
+    expect(FakeWebSocket.instances).toHaveLength(1)
   })
 })
