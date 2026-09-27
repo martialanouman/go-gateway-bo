@@ -159,7 +159,7 @@ export class RealtimeConnection {
     // Seule la perte d'une socket ouverte date la coupure : une tentative de reconnexion qui échoue
     // ne la fait pas recommencer.
     const wasOpen = this.#phase === 'open'
-    if (wasOpen) this.#forgetStatuses()
+    this.#forgetStatuses()
     if (code === SESSION_ENDED) {
       this.#setPhase('ended')
       this.#onSessionEnded()

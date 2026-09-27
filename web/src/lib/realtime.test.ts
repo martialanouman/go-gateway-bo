@@ -258,12 +258,14 @@ describe('RealtimeConnection', () => {
     })
   })
 
-  it('does not go stale when the socket reopens within the tolerance', () => {
+  it('does not go stale when the socket reopens within the tolerance, after a failed retry', () => {
     const { connection, socket } = openConnection()
     connection.subscribe('metrics.traffic')
     socket.receive({ topic: 'metrics.traffic', status: 'live' })
 
     socket.close(1006)
+    vi.advanceTimersByTime(FIRST_BACKOFF_MS)
+    FakeWebSocket.latest().close(1006)
     vi.advanceTimersByTime(FIRST_BACKOFF_MS)
     FakeWebSocket.latest().open()
     vi.advanceTimersByTime(STALE_AFTER_MS)
@@ -279,14 +281,17 @@ describe('RealtimeConnection', () => {
 
     vi.setSystemTime(cutAt)
     socket.close(1006)
-    vi.advanceTimersByTime(STALE_AFTER_MS)
+    vi.advanceTimersByTime(FIRST_BACKOFF_MS)
+    FakeWebSocket.latest().close(1006)
+    vi.advanceTimersByTime(STALE_AFTER_MS - FIRST_BACKOFF_MS)
+    expect(connection.topic('metrics.traffic')).toMatchObject({ isStale: true, since: cutAt })
     for (let failure = 0; failure < 2; failure++) {
       FakeWebSocket.latest().close(1006)
       expect(connection.topic('metrics.traffic')).toMatchObject({ isStale: true, since: cutAt })
       vi.advanceTimersByTime(MAX_BACKOFF_MS)
     }
 
-    expect(FakeWebSocket.instances).toHaveLength(4)
+    expect(FakeWebSocket.instances).toHaveLength(5)
     expect(connection.topic('metrics.traffic')).toMatchObject({ isStale: true, since: cutAt })
   })
 
