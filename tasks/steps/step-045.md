@@ -142,7 +142,8 @@ nomme le test qui tombe.
   garde « En direct » jusqu'au délai du système. Hors périmètre.
 
 ## Definition of Done
-- [ ] `make check` vert, `make e2e` vert.
+- [x] `make check` vert, `make e2e` vert (`rc=0` tous deux le 27/09/2026, avant le retrait de la
+      dette 059, qui les rejoue).
 - [ ] Aucune donnée de trame dans une URL, un journal ou un cache persisté (invariant a) : le magasin
       vit en mémoire de l'onglet, vérifié sur le livré.
 - [ ] Clavier et libellés : l'indicateur est un texte lisible, pas une couleur seule (WCAG 2.1 AA).
