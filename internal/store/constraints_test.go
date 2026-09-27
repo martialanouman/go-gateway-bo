@@ -65,8 +65,8 @@ const seedSQL = `
 	VALUES ('` + seedAlertRule + `', 'sms.throughput', 'connector', 'cnx-42', 'bff',
 		'{"below": 10}'::jsonb, 'active', '` + seedOperator + `');
 
-	INSERT INTO notifications (alert_rule_id, source, severity, message)
-	VALUES ('` + seedAlertRule + `', 'bff_evaluator', 'warning', 'Le débit du connecteur a chuté');
+	INSERT INTO notifications (alert_rule_id, source, severity, kind, message)
+	VALUES ('` + seedAlertRule + `', 'bff_evaluator', 'warning', 'message', 'Le débit du connecteur a chuté');
 
 	INSERT INTO saved_views (operator_id, view_type, filters_json, name)
 	VALUES ('` + seedOperator + `', 'cdr_search', '{"status": "failed"}'::jsonb, 'Échecs du jour');
@@ -182,14 +182,14 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 		},
 		{
 			name: "une notification vient d'une des trois sources",
-			act: `INSERT INTO notifications (source, severity, message)
-				VALUES ('cron', 'info', 'msg')`,
+			act: `INSERT INTO notifications (source, severity, kind, message)
+				VALUES ('cron', 'info', 'message', 'msg')`,
 			sqlstate: checkViolation,
 		},
 		{
 			name: "une notification porte une des trois sévérités",
-			act: `INSERT INTO notifications (source, severity, message)
-				VALUES ('alertmanager', 'fatal', 'msg')`,
+			act: `INSERT INTO notifications (source, severity, kind, message)
+				VALUES ('alertmanager', 'fatal', 'message', 'msg')`,
 			sqlstate: checkViolation,
 		},
 		{
