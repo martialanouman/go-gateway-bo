@@ -57,3 +57,8 @@ Fonctionnalité: Le centre de notifications
     Quand le navigateur demande "/api/notifications"
     Alors le serveur répond 403
     Et la réponse est conforme au contrat du BFF
+
+  Scénario: sans session, le centre est refusé
+    Quand le navigateur demande "/api/notifications"
+    Alors le serveur répond 401
+    Et la réponse est conforme au contrat du BFF
