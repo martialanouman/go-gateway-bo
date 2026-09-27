@@ -386,8 +386,8 @@ jobs:
     # connecte par `E2E_ADMIN_URL`, y recrée la base des parcours, la migre et y sème leur compte. Ce
     # DSN d'administration doit donc coïncider avec les identifiants du service.
     services:
-      # Le hub temps réel de step-045 ne va en ligne qu'à travers Redis : sans lui ici, le binaire
-      # refuse le démarrage que Playwright attend sur `/`.
+      # Le hub temps réel ne va en ligne qu'à travers Redis : sans lui, le binaire démarre, mais aucun
+      # sujet ne passe « En direct » et le parcours de la coquille l'attendrait en vain.
       redis:
         image: redis:8-alpine
         ports:

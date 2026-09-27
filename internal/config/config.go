@@ -397,8 +397,9 @@ func (r *reader) requireEncryptedGatewayBaseURL(mode GatewayMode, baseURL string
 // inventées à des opérateurs qui les croient.
 //
 // Ce qu'elle laisse passer, délibérément : les décors du dépôt désignent tous une adresse de
-// bouclage — `.env.example`, la CI et les scénarios `127.0.0.1:4010`, l'adresse de Prism ; les
-// parcours Playwright `127.0.0.1:4011`, celle du faux amont de step-045.
+// bouclage — `.env.example` et la CI `127.0.0.1:4010`, l'adresse de Prism ; les scénarios une adresse
+// de bouclage (Prism :4010, ou un httptest pour les flux temps réel) ; les parcours Playwright
+// `127.0.0.1:4011`, celle du faux amont de step-045.
 func (r *reader) requireLocalMockGateway(mode GatewayMode, baseURL string) {
 	if mode != GatewayModeMock || baseURL == "" {
 		return

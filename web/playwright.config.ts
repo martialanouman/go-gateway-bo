@@ -79,8 +79,8 @@ export default defineConfig({
         // `?sslmode=disable` parce que ni le conteneur local ni le service de la CI ne présentent de
         // certificat.
         DASHBOARD_GATEWAY_MODE: 'mock',
-        // Le faux amont ci-dessus, pas Prism : aucun écran ne l'appelle encore (step-046 le premier),
-        // mais c'est déjà lui qui porte les trois flux temps réel qu'un parcours viendra ouvrir.
+        // Le faux amont ci-dessus, pas Prism : il porte les trois flux temps réel, et le parcours de la
+        // coquille traverse celui de la facturation.
         DASHBOARD_GATEWAY_BASE_URL: 'http://127.0.0.1:4011',
         DASHBOARD_DATABASE_URL:
           'postgres://dashboard:dashboard@127.0.0.1:5432/dashboard_e2e?sslmode=disable',
@@ -101,9 +101,8 @@ export default defineConfig({
         DASHBOARD_SMTP_ADDR: '127.0.0.1:1025',
         DASHBOARD_SMTP_FROM: 'cockpit@example.test',
         DASHBOARD_PUBLIC_URL: `http://${host}:${port}`,
-        // Le Redis de `docker compose` : le hub temps réel ne va en ligne qu'à travers lui. Aucun
-        // parcours n'ouvre encore la socket (`/ws`) — step-045 pose le client, step-046 le premier
-        // consommateur — mais le binaire le joint dès le démarrage pour le Pub/Sub inter-instances.
+        // Le Redis de `docker compose` : il porte le bail et le Pub/Sub du hub, sans lesquels aucun sujet
+        // ne passe « En direct » sur la socket (`/ws`) que le parcours de la coquille ouvre.
         DASHBOARD_REDIS_URL: 'redis://127.0.0.1:6379/0',
       },
     },
