@@ -1,6 +1,7 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { act, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { meQueryOptions } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
 import type { PermissionKey } from '~/lib/permissions.gen'
 import { createAppRouter } from '~/router'
@@ -43,7 +44,7 @@ describe('billing alert toasts', () => {
 
     emit(socket, {
       customerId: 'cus-42',
-      ownerType: 'account',
+      ownerType: 'smpp_account',
       ownerId: 'acc-7',
       alert: 'mo_floor_reached',
       balance: 1250000,
@@ -52,10 +53,44 @@ describe('billing alert toasts', () => {
     expect(await screen.findByText('Plancher de facturation MO atteint')).toBeInTheDocument()
     // Espace fine insécable en fr-FR : l'expression tolère l'espace de groupement quel qu'il soit.
     expect(
-      screen.getByText(/^Le solde account acc-7 du client cus-42 est à 1\s250\s000 crédits\.$/),
+      screen.getByText(
+        /^Le solde du compte SMPP acc-7 du client cus-42 est à 1\s250\s000 crédits\.$/,
+      ),
     ).toBeInTheDocument()
     expect(screen.getByText('source · bff')).toBeInTheDocument()
     expect(document.querySelector('.ui-toast--warning')).not.toBeNull()
+  })
+
+  it('names the customer alone when the balance is the customer own', async () => {
+    const socket = await openShell(['billing:read'])
+
+    emit(socket, {
+      customerId: 'cus-42',
+      ownerType: 'customer',
+      ownerId: 'cus-42',
+      alert: 'mo_floor_reached',
+      balance: 12,
+    })
+
+    expect(
+      await screen.findByText('Le solde du client cus-42 est à 12 crédits.'),
+    ).toBeInTheDocument()
+  })
+
+  it('keeps the raw owner type for a scope the contract does not list', async () => {
+    const socket = await openShell(['billing:read'])
+
+    emit(socket, {
+      customerId: 'cus-42',
+      ownerType: 'reseller',
+      ownerId: 'res-3',
+      alert: 'mo_floor_reached',
+      balance: 12,
+    })
+
+    expect(
+      await screen.findByText('Le solde reseller res-3 du client cus-42 est à 12 crédits.'),
+    ).toBeInTheDocument()
   })
 
   it('names an unknown alert without inventing its meaning', async () => {
@@ -63,7 +98,7 @@ describe('billing alert toasts', () => {
 
     emit(socket, {
       customerId: 'cus-42',
-      ownerType: 'account',
+      ownerType: 'smpp_account',
       ownerId: 'acc-7',
       alert: 'credit_limit_near',
       balance: 3,
@@ -71,7 +106,9 @@ describe('billing alert toasts', () => {
 
     expect(await screen.findByText('Alerte de facturation')).toBeInTheDocument()
     expect(
-      screen.getByText('Alerte « credit_limit_near » sur le solde account acc-7 du client cus-42.'),
+      screen.getByText(
+        'Alerte « credit_limit_near » sur le solde du compte SMPP acc-7 du client cus-42.',
+      ),
     ).toBeInTheDocument()
   })
 
@@ -85,7 +122,7 @@ describe('billing alert toasts', () => {
     const socket = await openShell(['billing:read'])
     const alert = {
       customerId: 'cus-42',
-      ownerType: 'account',
+      ownerType: 'smpp_account',
       ownerId: 'acc-7',
       alert: 'mo_floor_reached',
       balance: 12,
@@ -106,7 +143,7 @@ describe('billing alert toasts', () => {
     stubSession({ permissions: [] })
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
-      vi.setSystemTime(Date.now() + 61_000)
+      vi.setSystemTime(Date.now() + Number(meQueryOptions.staleTime) + 1000)
       act(() => window.dispatchEvent(new Event('visibilitychange')))
       // La relecture part après une microtâche de Query : l'horloge reste avancée jusque-là.
       await vi.waitFor(() =>

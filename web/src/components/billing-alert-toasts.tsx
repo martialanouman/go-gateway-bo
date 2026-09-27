@@ -14,7 +14,7 @@ export function BillingAlertToasts() {
 
 // Le contrat ne décrit aucune conséquence d'une alerte : la copie nomme le fait, rien de plus.
 export function billingAlertToast(alert: BillingAlert) {
-  const owner = `${alert.ownerType} ${alert.ownerId} du client ${alert.customerId}`
+  const owner = balanceOwner(alert)
   return {
     ...(alert.alert === 'mo_floor_reached'
       ? {
@@ -28,4 +28,11 @@ export function billingAlertToast(alert: BillingAlert) {
     severity: 'warning',
     source: 'bff',
   } as const
+}
+
+// `BalanceScope` de l'API Admin ; le BFF le type en chaîne libre, d'où le repli brut.
+function balanceOwner({ ownerType, ownerId, customerId }: BillingAlert) {
+  if (ownerType === 'customer') return `du client ${customerId}`
+  if (ownerType === 'smpp_account') return `du compte SMPP ${ownerId} du client ${customerId}`
+  return `${ownerType} ${ownerId} du client ${customerId}`
 }

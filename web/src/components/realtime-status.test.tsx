@@ -89,6 +89,19 @@ describe('the realtime indicator', () => {
     expect(within(banner).queryByRole('status')).toBeNull()
   })
 
+  it('leaves out a topic the server refused', async () => {
+    const { socket, banner } = await openShell()
+
+    act(() =>
+      socket.receive({
+        topic: 'billing.alerts',
+        error: { code: 'permission_denied', message: 'Permission billing:read requise.' },
+      } satisfies components['schemas']['RealtimeRefusal']),
+    )
+
+    expect(within(banner).queryByText(INDICATOR)).toBeNull()
+  })
+
   it('shows nothing while no topic is subscribed', async () => {
     const { banner } = await openShell([])
 

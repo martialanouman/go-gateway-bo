@@ -6,7 +6,9 @@ const clock = (date: Date) =>
 
 // Un seul sujet périmé suffit : l'écran qui le lit montre une donnée ancienne, quel que soit le reste.
 export function RealtimeStatus() {
-  const { phase, topics } = useRealtimeSummary()
+  const { phase, topics: subscribed } = useRealtimeSummary()
+  // Un sujet refusé ne recevra jamais de statut : le compter figerait l'indicateur.
+  const topics = subscribed.filter((topic) => topic.error === undefined)
 
   if (topics.length === 0) return null
   if (phase === 'ended') return <StatusPill kind="link" label="Session terminée" state="down" />
