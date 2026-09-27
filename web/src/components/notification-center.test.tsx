@@ -112,6 +112,18 @@ describe('the notification center trigger', () => {
     expect(await trigger('Notifications, 1 non lue')).toBeInTheDocument()
   })
 
+  it('claims no count while the list cannot be read', async () => {
+    const user = userEvent.setup()
+    openShell({ entries: [entry(1)], failing: true })
+
+    const center = await openCenter(user)
+    await within(center).findByRole('alert')
+
+    const button = screen.getByRole('button', { name: /^Notifications/ })
+    expect(button).toHaveAccessibleName('Notifications')
+    expect(button).toHaveTextContent(/^Notifications$/)
+  })
+
   it('shows no count once everything is read', async () => {
     openShell({ entries: [entry(1, { read: true })] })
 
@@ -180,9 +192,10 @@ describe('the notification center', () => {
 
     const center = await openCenter(user)
 
-    expect(
-      within(center).getByText(/^Les alertes de facturation exigent la permission/),
-    ).toHaveTextContent('Les alertes de facturation exigent la permission billing:read.')
+    expect(within(center).getByText(/^Les alertes de facturation/)).toHaveTextContent(
+      'Les alertes de facturation n’apparaissent pas ici : elles exigent la permission billing:read.',
+    )
+    expect(within(center).getByText('billing:read', { selector: 'code' })).toBeInTheDocument()
   })
 
   it('does not explain what the operator already holds', async () => {
@@ -191,7 +204,7 @@ describe('the notification center', () => {
 
     const center = await openCenter(user)
 
-    expect(within(center).queryByText(/exigent la permission/)).toBeNull()
+    expect(within(center).queryByText(/n’apparaissent pas ici/)).toBeNull()
   })
 
   it('does not claim to keep everything', async () => {

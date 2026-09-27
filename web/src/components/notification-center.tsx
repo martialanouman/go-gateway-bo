@@ -37,17 +37,19 @@ function unreadLabel(count: number) {
 
 export function NotificationCenter() {
   const notifications = useInfiniteQuery(notificationsQueryOptions)
-  const unread = notifications.data?.pages[0]?.unreadCount ?? 0
+  const unread = notifications.data?.pages[0]?.unreadCount
 
   return (
     <Popover
       hint="Le centre garde les alertes reçues pendant que le tableau de bord tournait ; une coupure peut en laisser passer."
-      label={unreadLabel(unread)}
+      label={unread === undefined ? 'Notifications' : unreadLabel(unread)}
       title="Notifications"
       trigger={
         <>
           Notifications
-          {unread > 0 ? <span className="notifications__count">{unread}</span> : null}
+          {unread !== undefined && unread > 0 ? (
+            <span className="notifications__count">{unread}</span>
+          ) : null}
         </>
       }
     >
@@ -62,7 +64,8 @@ function BillingNotice() {
 
   return (
     <p className="notifications__notice">
-      Les alertes de facturation exigent la permission <code>billing:read</code>.
+      Les alertes de facturation n’apparaissent pas ici : elles exigent la permission{' '}
+      <code>billing:read</code>.
     </p>
   )
 }
