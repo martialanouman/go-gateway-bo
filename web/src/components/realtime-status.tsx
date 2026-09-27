@@ -4,8 +4,18 @@ import { useRealtimeSummary } from '~/lib/realtime'
 const clock = (date: Date) =>
   date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
-// Un seul sujet périmé suffit : l'écran qui le lit montre une donnée ancienne, quel que soit le reste.
+// La région live existe avant l'état qu'elle annonce : un lecteur d'écran n'annonce que le changement
+// d'une région déjà présente, et la pilule interne n'en ouvre pas une seconde.
 export function RealtimeStatus() {
+  return (
+    <span role="status">
+      <Indicator />
+    </span>
+  )
+}
+
+// Un seul sujet périmé suffit : l'écran qui le lit montre une donnée ancienne, quel que soit le reste.
+function Indicator() {
   const { phase, topics: subscribed } = useRealtimeSummary()
   // Un sujet refusé ne recevra jamais de statut : le compter figerait l'indicateur.
   const topics = subscribed.filter((topic) => topic.error === undefined)
@@ -28,7 +38,7 @@ export function RealtimeStatus() {
   }
 
   if (topics.every((topic) => topic.isLive)) {
-    return <StatusPill kind="link" label="En direct" live state="up" />
+    return <StatusPill announce={false} kind="link" label="En direct" live state="up" />
   }
   // Première ouverture ou reprise dans la tolérance : les deux sont une connexion en cours.
   return <StatusPill kind="link" label="Connexion en cours" state="reconnecting" />

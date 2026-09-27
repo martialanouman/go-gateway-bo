@@ -89,7 +89,13 @@ export type StatusPillProps =
    * `link_status` — point + libellé. `live` n'existe que sur cette dimension : c'est la seule que la
    * WebSocket alimente, et le pouls est le seul signal de fraîcheur du produit.
    */
-  | (CommonProps & { readonly kind: 'link'; readonly state: LinkStatus; readonly live?: boolean })
+  | (CommonProps & {
+      readonly kind: 'link'
+      readonly state: LinkStatus
+      readonly live?: boolean
+      /** Région live propre, par défaut `live` ; `false` quand un parent annonce déjà la pilule. */
+      readonly announce?: boolean
+    })
   | (CommonProps & { readonly kind: 'entity'; readonly state: EntityStatus })
   | (CommonProps & { readonly kind: 'delivery'; readonly state: DeliveryStatus })
 
@@ -112,6 +118,7 @@ export function StatusPill(props: StatusPillProps) {
         : DELIVERY_TONES[state]
 
   const live = kind === 'link' && props.live === true
+  const announce = kind === 'link' && (props.announce ?? live)
 
   return (
     <span
@@ -123,7 +130,7 @@ export function StatusPill(props: StatusPillProps) {
       // inconditionnel ferait de chaque pilule une région live : un tableau de 50 connecteurs à deux
       // dimensions en compterait cent, et la première salve WebSocket les annoncerait toutes, en
       // file d'attente polie et sans contexte.
-      role={live ? 'status' : undefined}
+      role={announce ? 'status' : undefined}
     >
       <Dot tone={tone} live={live} className="ui-status__dot" />
       <span className="ui-status__label">{label ?? state}</span>

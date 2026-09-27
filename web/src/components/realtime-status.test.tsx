@@ -27,6 +27,8 @@ function status(socket: FakeWebSocket, message: Omit<RealtimeStatus, 'topic'>) {
 
 const INDICATOR = /En direct|Connexion en cours|Données périmées|Session terminée/
 
+const pulse = (banner: HTMLElement) => banner.querySelector('.ui-dot--live')
+
 describe('the realtime indicator', () => {
   it('says the data is live, with a pulse', async () => {
     const { socket, banner } = await openShell()
@@ -34,6 +36,7 @@ describe('the realtime indicator', () => {
     status(socket, { status: 'live' })
 
     expect(within(banner).getByRole('status')).toHaveTextContent('En direct')
+    expect(pulse(banner)).not.toBeNull()
   })
 
   it('says it is connecting before the socket first opens', async () => {
@@ -44,7 +47,7 @@ describe('the realtime indicator', () => {
     const banner = await screen.findByRole('banner')
 
     expect(await within(banner).findByText('Connexion en cours')).toBeInTheDocument()
-    expect(within(banner).queryByRole('status')).toBeNull()
+    expect(pulse(banner)).toBeNull()
   })
 
   it('says it is connecting again once the socket drops, without a pulse', async () => {
@@ -54,7 +57,7 @@ describe('the realtime indicator', () => {
     act(() => socket.close(1006))
 
     expect(within(banner).getByText('Connexion en cours')).toBeInTheDocument()
-    expect(within(banner).queryByRole('status')).toBeNull()
+    expect(pulse(banner)).toBeNull()
   })
 
   it('says since when the data is stale', async () => {
@@ -65,7 +68,18 @@ describe('the realtime indicator', () => {
 
     expect(within(banner).getByText('Données périmées')).toBeInTheDocument()
     expect(within(banner).getByText('depuis 08:05')).toBeInTheDocument()
-    expect(within(banner).queryByRole('status')).toBeNull()
+    expect(pulse(banner)).toBeNull()
+  })
+
+  // Un état dégradé change le texte d'une région live qui existait déjà : c'est ce que le lecteur
+  // d'écran annonce, pas une région qui naîtrait avec lui.
+  it('announces a degraded state to screen readers', async () => {
+    const { socket, banner } = await openShell()
+    status(socket, { status: 'live' })
+
+    status(socket, { status: 'stale' })
+
+    expect(within(banner).getByRole('status')).toHaveTextContent('Données périmées')
   })
 
   it('gives no time for a stream never joined', async () => {
@@ -86,7 +100,7 @@ describe('the realtime indicator', () => {
     act(() => socket.close(4401))
 
     expect(within(banner).getByText('Session terminée')).toBeInTheDocument()
-    expect(within(banner).queryByRole('status')).toBeNull()
+    expect(pulse(banner)).toBeNull()
   })
 
   it('leaves out a topic the server refused', async () => {
