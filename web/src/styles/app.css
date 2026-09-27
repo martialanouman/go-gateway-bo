@@ -489,3 +489,40 @@ a.topbar__operator:hover,
 a.topbar__operator:focus-visible {
   color: var(--text-primary);
 }
+
+.notifications__count {
+  color: var(--amber-500);
+}
+
+.notifications__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notifications__item {
+  display: flex;
+  gap: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.notifications__item--read,
+.notifications__notice {
+  color: var(--text-muted);
+}
+
+.notifications__body {
+  flex: 1;
+}
+
+.notifications__body p,
+.notifications__notice {
+  margin: 0 0 var(--sp-2);
+}
+
+.notifications__meta {
+  display: flex;
+  gap: var(--sp-4);
+  font: var(--text-data-sm);
+}

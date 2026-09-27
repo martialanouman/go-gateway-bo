@@ -217,9 +217,9 @@ test('the binary serves the painted shell, then the application replaces it', as
 
   // ── Le temps réel, de la passerelle à l'écran ───────────────────────────────────────────────
   //
-  // Le compte semé porte `Propriétaire`, donc `billing:read` : l'indicateur paraît dès que la
-  // coquille abonne `billing.alerts`, son seul sujet à ce jour ; « En direct » attend que le serveur,
-  // le sujet accepté, le dise en direct.
+  // La coquille abonne `notifications`, son seul sujet à ce jour, qui reprend l'état de
+  // `billing.alerts` ; « En direct » attend que le serveur le dise. Le compte semé porte
+  // `Propriétaire`, donc `billing:read` : l'alerte de facturation lui parvient.
   await expect(page.getByRole('banner').getByText('En direct')).toBeVisible({ timeout: 15_000 })
 
   const emitted = await request.post(

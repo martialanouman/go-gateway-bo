@@ -57,6 +57,8 @@ export type AuthReplies = {
   readonly confirm?: Reply | 'pending'
   readonly passkeys?: Reply | 'pending'
   readonly unregister?: Reply | 'pending'
+  /** La coquille lit le centre de notifications à chaque ouverture : vide par défaut. */
+  readonly notifications?: Reply | 'pending'
 }
 
 type PasskeySummary = components['schemas']['PasskeySummary']
@@ -222,6 +224,11 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
 
         return respond(reply)
       }
+
+      case 'GET /api/notifications':
+        return respond(
+          replies.notifications ?? { status: 200, body: { items: [], unreadCount: 0 } },
+        )
 
       case 'GET /api/auth/me':
         if (current === 'pending') return new Promise<Response>(() => undefined)
