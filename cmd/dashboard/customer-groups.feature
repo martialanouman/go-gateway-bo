@@ -45,6 +45,7 @@ Fonctionnalité: Les groupes de clients relayés depuis la passerelle
     Alors le serveur répond 503
     Et la réponse est conforme au contrat du BFF
     Et la sortie du serveur porte "list-customer-groups"
+    Et la réponse ne porte pas "trace interne de la passerelle"
     Et aucune sortie ne porte "trace interne de la passerelle"
 
   Scénario: un statut que le contrat ne connaît pas est refusé avant d'atteindre la passerelle

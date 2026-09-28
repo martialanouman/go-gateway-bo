@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 
 	"github.com/cucumber/godog"
@@ -30,6 +31,7 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	})
 	ctx.Then(`^la passerelle n'a reçu aucune requête$`, w.receivedNothing)
 	ctx.Given(`^une passerelle injoignable$`, w.unreachable)
+	ctx.Then(`^la réponse ne porte pas "([^"]*)"$`, w.responseOmits)
 	ctx.Then(`^la réponse liste au moins un groupe$`, w.listsAtLeastOneGroup)
 	ctx.Then(`^le refus place une erreur sous le champ "([^"]*)"$`, w.refusalPlacesAnErrorUnder)
 	ctx.Then(`^la sortie du serveur porte "([^"]*)"$`, w.process.messageNames)
@@ -127,6 +129,14 @@ func (w *customerGroupsWorld) unreachable() error {
 	closed := httptest.NewServer(http.NotFoundHandler())
 	closed.Close()
 	w.process.env["DASHBOARD_GATEWAY_BASE_URL"] = closed.URL
+
+	return nil
+}
+
+func (w *customerGroupsWorld) responseOmits(fragment string) error {
+	if strings.Contains(w.process.received.body, fragment) {
+		return fmt.Errorf("la réponse porte %q :\n%s", fragment, w.process.received.body)
+	}
 
 	return nil
 }
