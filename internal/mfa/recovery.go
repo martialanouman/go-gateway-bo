@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
@@ -112,22 +113,25 @@ func NormalizeRecoveryCode(presented string) string {
 // l'effet plutôt que la forme : toute sortie anticipée rend le premier rang qui colle, quand la
 // boucle entière rend le dernier.
 //
-// **Un hachage illisible ne matche pas et n'est pas rapporté**, et c'est un manque assumé plutôt
-// qu'un oubli : aucun journal n'atteint encore ce paquet, comme dans `auth.passwordMatches`. Une
-// ligne abîmée est donc silencieuse, et son symptôme est un code de récupération légitime qui échoue.
-// Le premier journal du BFF devra la remonter.
+// **Un hachage illisible ne matche pas**, et seul le journal l'apprend, par son rang : son symptôme
+// serait sinon un code de récupération légitime qui échoue.
 //
 // **Une seule place de `auth.Hold` pour les dix hachages**, prise autour de la boucle et non dedans :
 // une place par candidat ferait d'un seul essai de récupération dix places, et la borne protégerait
 // dix fois moins que le chemin qu'elle protège. `auth.VerifyHeld` porte donc le calcul sans en
 // redemander une.
-func MatchRecoveryCode(ctx context.Context, hashes []string, presented string) (int, error) {
+func MatchRecoveryCode(ctx context.Context, logger *slog.Logger, hashes []string, presented string,
+) (int, error) {
 	normalized := NormalizeRecoveryCode(presented)
 	matched := -1
 
 	err := auth.Hold(ctx, func() error {
 		for index, hash := range hashes {
 			ok, err := auth.VerifyHeld(hash, normalized)
+			if err != nil {
+				logger.WarnContext(ctx, "un code de secours est illisible en base", "rank", index, "error", err)
+			}
+
 			if err == nil && ok {
 				matched = index
 			}

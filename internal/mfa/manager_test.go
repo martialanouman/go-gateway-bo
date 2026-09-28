@@ -36,7 +36,7 @@ func TestAMalformedChallengeDoesNotReachTheDatabase(t *testing.T) {
 	t.Parallel()
 
 	manager, err := mfa.NewManager(store.NewMFA(closedPool(t)),
-		store.NewCounter(closedPool(t), store.ScopeTOTPEnroll), []byte(testPassphrase), testIssuer)
+		store.NewCounter(closedPool(t), store.ScopeTOTPEnroll), []byte(testPassphrase), testIssuer, discard)
 	require.NoError(t, err)
 
 	_, live, err := manager.Challenge(context.Background(), "ceci n'est pas un challenge")

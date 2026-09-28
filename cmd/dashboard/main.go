@@ -107,14 +107,14 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	// plutôt que découverte — n'est visible d'aucun test d'ici.
 	defer store.ClosePool(pool, poolCloseGrace)
 
-	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt)
+	authenticator := auth.NewAuthenticator(store.NewLogins(pool), cfg.Auth.BruteForceSalt, logger)
 	sessions := session.NewManager(store.NewSessions(pool), cfg.Auth.SessionSecret)
 
 	// Avant la liaison du port : dériver la clé de chiffrement est la dernière chose qui puisse
 	// échouer sur la configuration, et un serveur qui écoute déjà refuserait alors chaque enrôlement
 	// sans que rien n'ait dit pourquoi au démarrage.
 	secondFactor, err := mfa.NewManager(store.NewMFA(pool),
-		store.NewCounter(pool, store.ScopeTOTPEnroll), cfg.Auth.TOTPEncryptionKey, cfg.ProductName)
+		store.NewCounter(pool, store.ScopeTOTPEnroll), cfg.Auth.TOTPEncryptionKey, cfg.ProductName, logger)
 	if err != nil {
 		return err
 	}

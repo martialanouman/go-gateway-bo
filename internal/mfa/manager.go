@@ -2,6 +2,7 @@ package mfa
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
@@ -51,17 +52,18 @@ type Manager struct {
 	// enrollments borne les appels à l'enrôlement. Il est distinct du compteur d'échecs porté par
 	// `factors` : celui-ci compte des refus de second facteur, celui-là des appels qui réussissent.
 	enrollments *store.Counter
+	logger      *slog.Logger
 }
 
 func NewManager(factors *store.MFA, enrollments *store.Counter, passphrase []byte,
-	issuer string,
+	issuer string, logger *slog.Logger,
 ) (*Manager, error) {
 	authenticator, err := NewAuthenticator(passphrase, issuer)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Manager{authenticator: authenticator, factors: factors, enrollments: enrollments}, nil
+	return &Manager{authenticator: authenticator, factors: factors, enrollments: enrollments, logger: logger}, nil
 }
 
 // AdmitEnrollment consulte le verrou d'enrôlement puis compte l'appel. Un verrou non nul veut dire
@@ -162,7 +164,7 @@ func (m *Manager) VerifyRecoveryCode(ctx context.Context, operatorID, presented 
 		hashes[index] = code.Hash
 	}
 
-	matched, err := MatchRecoveryCode(ctx, hashes, presented)
+	matched, err := MatchRecoveryCode(ctx, m.logger.With("operator", operatorID), hashes, presented)
 	if err != nil {
 		return false, err
 	}

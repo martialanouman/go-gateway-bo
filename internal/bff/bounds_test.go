@@ -38,7 +38,8 @@ func apiRouter(t *testing.T) http.Handler {
 	return NewRouter(Dependencies{
 		Assets: fstest.MapFS{},
 		API: API{
-			Authenticator: auth.NewAuthenticator(store.NewLogins(pool), []byte("un sel de test assez long")),
+			Authenticator: auth.NewAuthenticator(store.NewLogins(pool), []byte("un sel de test assez long"),
+				slog.New(slog.DiscardHandler)),
 		},
 		// Ce que la configuration fournit en production. Sans elle, le contrôle d'origine refuserait
 		// en 403 **avant** les bornes que ce fichier mesure, et chaque cas se lirait « refusée à la
