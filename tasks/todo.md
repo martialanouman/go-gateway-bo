@@ -244,7 +244,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [x] step-044 — HA : bail Redis + Pub/Sub entre instances, bascule automatique
 - [x] step-045 — Client WS React : abonnement par sujet, reconnexion, `isLive` / `isStale`
 - [x] step-046 — Centre de notifications persisté
-- [ ] step-047 — Arrêt propre : drain des sockets, déploiement roulant sans session perdue
+- [x] step-047 — Arrêt propre : drain des sockets, déploiement roulant sans session perdue
 
 ## M3 — Clients, comptes SMPP & identifiants  (§6.14, §6.15)
 - [ ] step-060 — Groupes de clients : CRUD + filtre transverse ← **première route du BFF qui appelle
