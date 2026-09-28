@@ -1,6 +1,6 @@
 # 031 — Le **trou d'audit du proxy** : pour une action proxyfiée vers la passerelle, `Record` écrit **après** le succès, hors transaction commune
 
-> **Porteur :** step-060
+> **Porteur :** step-059
 
 ## Ce qu'elle coûte si elle dure
 

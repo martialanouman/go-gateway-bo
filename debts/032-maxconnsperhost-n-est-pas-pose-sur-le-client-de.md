@@ -1,6 +1,6 @@
 # 032 — `MaxConnsPerHost` n'est pas posé sur le client de la passerelle
 
-> **Porteur :** step-060
+> **Porteur :** step-059
 
 ## Ce qu'elle coûte si elle dure
 

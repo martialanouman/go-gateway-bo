@@ -274,7 +274,7 @@ type CurrentOperator struct {
 
 // Error La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type Error struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
@@ -577,57 +577,57 @@ type RoleId = string
 
 // AutoVerrouillage La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type AutoVerrouillage = Error
 
 // CompteDesactive La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type CompteDesactive = Error
 
 // NotificationInconnue La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type NotificationInconnue = Error
 
 // OperateurInconnu La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type OperateurInconnu = Error
 
 // OrigineRefusee La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type OrigineRefusee = Error
 
 // PermissionRefusee La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type PermissionRefusee = Error
 
 // RequeteInvalide La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type RequeteInvalide = Error
 
 // RoleInconnu La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type RoleInconnu = Error
 
 // RoleIntouchable La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type RoleIntouchable = Error
 
 // SessionAbsente La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type SessionAbsente = Error
 
 // TypeDeContenuRefuse La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
 // `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-060).
+// première route qui relaie la passerelle (step-059).
 type TypeDeContenuRefuse = Error
 
 // ListNotificationsParams defines parameters for ListNotifications.

@@ -153,7 +153,7 @@ func mountContract(api chi.Router, impl StrictServerInterface, sessions *session
 // journal n'atteint ce paquet, la `Dependencies` de `NewRouter` ne portant pas de `*slog.Logger`, qui
 // s'arrête à `cmd/dashboard`. Un 500 servi ici ne laisse donc **aucune trace côté serveur**, y
 // compris sur une route qui travaille : un `password_hash` corrompu en base fait refuser la connexion
-// sans que rien ne le dise. Le premier appel réel à la passerelle (step-060) devra apporter les deux
+// sans que rien ne le dise. Le premier appel réel à la passerelle (step-059) devra apporter les deux
 // à la fois.
 //
 // **L'ordre du slice compte.** La boucle du wrapper engendré enveloppe successivement, donc le

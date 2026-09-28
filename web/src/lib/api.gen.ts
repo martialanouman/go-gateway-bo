@@ -924,7 +924,7 @@ export interface components {
         /**
          * @description La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
          *     `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-         *     première route qui relaie la passerelle (step-060).
+         *     première route qui relaie la passerelle (step-059).
          */
         Error: {
             code: string;
