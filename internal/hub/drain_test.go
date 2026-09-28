@@ -16,7 +16,6 @@ func idleUpstream(ctx context.Context, _ string, _ func()) (*websocket.Conn, err
 	return nil, ctx.Err()
 }
 
-// startHub lance Run et rend l'annulation et le signal de retour de Run.
 func startHub(t *testing.T, h *Hub, grace time.Duration) (context.CancelFunc, <-chan struct{}) {
 	t.Helper()
 
@@ -96,7 +95,8 @@ func TestADeafClientDoesNotHoldRunBeyondTheGrace(t *testing.T) {
 }
 
 // Sans la porte fermée avant l'attente, une montée qui part de zéro socket pendant le drain rejoint un
-// WaitGroup déjà attendu : `go test -race` le voit, sur une passe sur quatre environ, d'où les dix arrêts.
+// WaitGroup déjà attendu : sous `-race`, un arrêt seul le voit trois fois sur quatre (15/20), d'où les
+// dix arrêts ; sans `-race`, une fois sur cinq.
 func TestUpgradesRacingTheDrainDoNotJoinIt(t *testing.T) {
 	t.Parallel()
 

@@ -7,7 +7,8 @@ Fonctionnalité: Arrêt sur SIGTERM
   Ce que ce scénario n'observe pas : le délai de grâce. L'exercer contre le binaire demanderait une
   requête lente, donc une route que le produit n'a pas. Les requêtes en vol terminées et le refus des
   connexions pendant l'arrêt sont prouvés par les tests de `serve`, sur le même code. Le drain des
-  sockets, lui, est prouvé par `internal/hub/drain_test.go` et par `high-availability.feature`.
+  sockets est prouvé par `internal/hub/drain_test.go` ; `high-availability.feature` montre le 1001 et
+  la reprise sur l'autre instance, sans voir le drain.
 
   Scénario: le serveur s'arrête de lui-même sur SIGTERM
     Étant donné un serveur démarré

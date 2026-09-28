@@ -10,8 +10,9 @@ import (
 )
 
 // Run tient l'instance dans le groupe jusqu'à l'annulation de ctx : elle brigue le bail, consomme la
-// passerelle quand elle le porte, et rediffuse ce qu'elle lit sur Redis — le porteur compris. Un seul
-// chemin : Redis injoignable, les sujets passent `stale`, sans repli sur une consommation directe.
+// passerelle quand elle le porte, et rediffuse ce qu'elle lit sur Redis — le porteur compris. À
+// l'annulation, elle attend aussi le drain des sockets, borné à grace. Un seul chemin : Redis
+// injoignable, les sujets passent `stale`, sans repli sur une consommation directe.
 func (h *Hub) Run(ctx context.Context, dial Dialer, rdb *redis.Client, namespace string, grace time.Duration) {
 	channel := namespace + ":realtime"
 	leader := lease{rdb: rdb, key: namespace + ":realtime:leader", holder: h.instance, ttl: h.leaseTTL}

@@ -208,6 +208,7 @@ func (h *Hub) setGranted(c *client, granted []string) {
 func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, access Access) {
 	defer func() { _ = conn.CloseNow() }()
 
+	// (critère 4) montée tardive non comptée : l'arrêt n'attend ni sa réponse, ni qu'elle traîne.
 	if !h.enter() {
 		_ = conn.Close(websocket.StatusGoingAway, goingAway)
 
