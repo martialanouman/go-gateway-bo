@@ -46,7 +46,6 @@ type Dependencies struct {
 	Origin string
 	// Realtime relaie les flux de la passerelle sur `/ws`.
 	Realtime *hub.Hub
-	Logger   *slog.Logger
 }
 
 // NewRouter assemble les routes du BFF et le service des assets de la SPA.

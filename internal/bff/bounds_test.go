@@ -40,12 +40,12 @@ func apiRouter(t *testing.T) http.Handler {
 		API: API{
 			Authenticator: auth.NewAuthenticator(store.NewLogins(pool), []byte("un sel de test assez long"),
 				slog.New(slog.DiscardHandler)),
+			Logger: slog.New(slog.DiscardHandler),
 		},
 		// Ce que la configuration fournit en production. Sans elle, le contrôle d'origine refuserait
 		// en 403 **avant** les bornes que ce fichier mesure, et chaque cas se lirait « refusée à la
 		// porte » pour la mauvaise porte.
 		Origin: dashboardOrigin,
-		Logger: slog.New(slog.DiscardHandler),
 	})
 }
 
@@ -344,8 +344,10 @@ func TestAnUnreachableDatabaseDoesNotCloseTheOperatorSession(t *testing.T) {
 	secret := []byte("une-cle-de-session-assez-longue-pour-la-borne")
 	handler := NewRouter(Dependencies{
 		Assets: fstest.MapFS{},
-		API:    API{Sessions: session.NewManager(store.NewSessions(pool), secret)},
-		Logger: slog.New(slog.DiscardHandler),
+		API: API{
+			Sessions: session.NewManager(store.NewSessions(pool), secret),
+			Logger:   slog.New(slog.DiscardHandler),
+		},
 	})
 
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)

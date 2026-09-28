@@ -984,6 +984,32 @@ paths:
         '404': { $ref: '#/components/responses/NotificationInconnue' }
         '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
 
+  /customer-groups:
+    get:
+      operationId: listCustomerGroups
+      summary: Les groupes de clients de la passerelle
+      description: |
+        Relayée vers `list-customer-groups` de l'API Admin. Un groupe est organisationnel : il ne
+        porte ni solde, ni quota, ni règle de configuration.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/CustomerGroupStatus' }
+      responses:
+        '200':
+          description: Tous les groupes, ou ceux du statut demandé.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CustomerGroup' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
 components:
   parameters:
     OperatorId:
@@ -1001,6 +1027,19 @@ components:
     # Les réponses partagées par les routes d'administration. `PermissionRefusee` couvre les trois
     # refus possibles en 403 : l'origine (`forbidden_origin`), le second facteur non franchi
     # (`mfa_required`) et la permission manquante (`permission_denied`), qui la nomme.
+    RefusDeLaPasserelle:
+      description: |
+        La passerelle a refusé la demande ; `errors[]` nomme les champs en cause quand elle les donne.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PasserelleIndisponible:
+      description: |
+        La passerelle n'a pas répondu, ou a répondu en erreur : réessayer quand elle se rétablit.
+        Ce n'est jamais un module désactivé.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     SessionAbsente:
       description: Aucune session vivante.
       content:
@@ -1754,6 +1793,22 @@ components:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
       required: [code, message]
+
+    CustomerGroupStatus:
+      type: string
+      enum: [active, archived]
+
+    CustomerGroup:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        status: { $ref: '#/components/schemas/CustomerGroupStatus' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, name, status, createdAt, updatedAt]
 
     FieldError:
       type: object

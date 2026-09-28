@@ -55,6 +55,24 @@ func (e AccessLinkState) Valid() bool {
 	}
 }
 
+// Defines values for CustomerGroupStatus.
+const (
+	CustomerGroupStatusActive   CustomerGroupStatus = "active"
+	CustomerGroupStatusArchived CustomerGroupStatus = "archived"
+)
+
+// Valid indicates whether the value is a known member of the CustomerGroupStatus enum.
+func (e CustomerGroupStatus) Valid() bool {
+	switch e {
+	case CustomerGroupStatusActive:
+		return true
+	case CustomerGroupStatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	HealthStatusOk HealthStatus = "ok"
@@ -271,6 +289,19 @@ type CurrentOperator struct {
 	Email       string `json:"email"`
 	Id          string `json:"id"`
 }
+
+// CustomerGroup defines model for CustomerGroup.
+type CustomerGroup struct {
+	CreatedAt   time.Time           `json:"createdAt"`
+	Description *string             `json:"description,omitempty"`
+	Id          string              `json:"id"`
+	Name        string              `json:"name"`
+	Status      CustomerGroupStatus `json:"status"`
+	UpdatedAt   time.Time           `json:"updatedAt"`
+}
+
+// CustomerGroupStatus defines model for CustomerGroupStatus.
+type CustomerGroupStatus string
 
 // Error La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
 // et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
@@ -607,10 +638,20 @@ type OperateurInconnu = Error
 // place chaque refus sous le champ qu'il nomme.
 type OrigineRefusee = Error
 
+// PasserelleIndisponible La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
+type PasserelleIndisponible = Error
+
 // PermissionRefusee La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
 // et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
 // place chaque refus sous le champ qu'il nomme.
 type PermissionRefusee = Error
+
+// RefusDeLaPasserelle La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
+type RefusDeLaPasserelle = Error
 
 // RequeteInvalide La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
 // et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
@@ -636,6 +677,11 @@ type SessionAbsente = Error
 // et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
 // place chaque refus sous le champ qu'il nomme.
 type TypeDeContenuRefuse = Error
+
+// ListCustomerGroupsParams defines parameters for ListCustomerGroups.
+type ListCustomerGroupsParams struct {
+	Status *CustomerGroupStatus `form:"status,omitempty" json:"status,omitempty"`
+}
 
 // ListNotificationsParams defines parameters for ListNotifications.
 type ListNotificationsParams struct {
@@ -714,6 +760,9 @@ type ServerInterface interface {
 	// FinishWebauthnRegistration Enregistre la passkey que l'appareil vient de produire
 	// (POST /auth/mfa/webauthn/register/finish)
 	FinishWebauthnRegistration(w http.ResponseWriter, r *http.Request)
+	// ListCustomerGroups Les groupes de clients de la passerelle
+	// (GET /customer-groups)
+	ListCustomerGroups(w http.ResponseWriter, r *http.Request, params ListCustomerGroupsParams)
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
@@ -825,6 +874,12 @@ func (_ Unimplemented) BeginWebauthnRegistration(w http.ResponseWriter, r *http.
 // FinishWebauthnRegistration Enregistre la passkey que l'appareil vient de produire
 // (POST /auth/mfa/webauthn/register/finish)
 func (_ Unimplemented) FinishWebauthnRegistration(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListCustomerGroups Les groupes de clients de la passerelle
+// (GET /customer-groups)
+func (_ Unimplemented) ListCustomerGroups(w http.ResponseWriter, r *http.Request, params ListCustomerGroupsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1080,6 +1135,39 @@ func (siw *ServerInterfaceWrapper) FinishWebauthnRegistration(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.FinishWebauthnRegistration(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCustomerGroups operation middleware
+func (siw *ServerInterfaceWrapper) ListCustomerGroups(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCustomerGroupsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCustomerGroups(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1533,6 +1621,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/notifications/{notificationId}/read", wrapper.MarkNotificationRead)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/customer-groups", wrapper.ListCustomerGroups)
+	})
 
 	return r
 }
@@ -1547,7 +1638,11 @@ type OperateurInconnuJSONResponse Error
 
 type OrigineRefuseeJSONResponse Error
 
+type PasserelleIndisponibleJSONResponse Error
+
 type PermissionRefuseeJSONResponse Error
+
+type RefusDeLaPasserelleJSONResponse Error
 
 type RequeteInvalideJSONResponse Error
 
@@ -2612,6 +2707,102 @@ func (response FinishWebauthnRegistration415JSONResponse) VisitFinishWebauthnReg
 	return err
 }
 
+type ListCustomerGroupsRequestObject struct {
+	Params ListCustomerGroupsParams
+}
+
+type ListCustomerGroupsResponseObject interface {
+	VisitListCustomerGroupsResponse(w http.ResponseWriter) error
+}
+
+type ListCustomerGroups200JSONResponse []CustomerGroup
+
+func (response ListCustomerGroups200JSONResponse) VisitListCustomerGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCustomerGroups400JSONResponse struct{ RequeteInvalideJSONResponse }
+
+func (response ListCustomerGroups400JSONResponse) VisitListCustomerGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCustomerGroups401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response ListCustomerGroups401JSONResponse) VisitListCustomerGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCustomerGroups403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response ListCustomerGroups403JSONResponse) VisitListCustomerGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCustomerGroups422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response ListCustomerGroups422JSONResponse) VisitListCustomerGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCustomerGroups503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response ListCustomerGroups503JSONResponse) VisitListCustomerGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type HealthRequestObject struct {
 }
 
@@ -3600,6 +3791,9 @@ type StrictServerInterface interface {
 	// FinishWebauthnRegistration Enregistre la passkey que l'appareil vient de produire
 	// (POST /auth/mfa/webauthn/register/finish)
 	FinishWebauthnRegistration(ctx context.Context, request FinishWebauthnRegistrationRequestObject) (FinishWebauthnRegistrationResponseObject, error)
+	// ListCustomerGroups Les groupes de clients de la passerelle
+	// (GET /customer-groups)
+	ListCustomerGroups(ctx context.Context, request ListCustomerGroupsRequestObject) (ListCustomerGroupsResponseObject, error)
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -4002,6 +4196,32 @@ func (sh *strictHandler) FinishWebauthnRegistration(w http.ResponseWriter, r *ht
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(FinishWebauthnRegistrationResponseObject); ok {
 		if err := validResponse.VisitFinishWebauthnRegistrationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCustomerGroups operation middleware
+func (sh *strictHandler) ListCustomerGroups(w http.ResponseWriter, r *http.Request, params ListCustomerGroupsParams) {
+	var request ListCustomerGroupsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCustomerGroups(ctx, request.(ListCustomerGroupsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCustomerGroups")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCustomerGroupsResponseObject); ok {
+		if err := validResponse.VisitListCustomerGroupsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

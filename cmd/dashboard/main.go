@@ -140,6 +140,11 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
+	admin, err := gateway.NewAdminClient(cfg.Gateway)
+	if err != nil {
+		return err
+	}
+
 	streams, err := gateway.NewStreamClient(cfg.Gateway)
 	if err != nil {
 		return err
@@ -210,13 +215,14 @@ func run(ctx context.Context, logger *slog.Logger) error {
 			Administration: store.NewAdministration(pool),
 			AccessLinks:    links,
 			Notifications:  notifications,
+			Gateway:        admin,
+			Logger:         logger,
 		},
 		TrustedProxies: cfg.Auth.TrustedProxies,
 		// La même valeur que l'origine des cérémonies WebAuthn, et c'est délibéré : un déploiement a
 		// une origine, pas deux.
 		Origin:   cfg.Auth.WebauthnOrigin,
 		Realtime: realtime,
-		Logger:   logger,
 	})
 
 	return serve(ctx, ln, router, cfg.ShutdownTimeout, logger)

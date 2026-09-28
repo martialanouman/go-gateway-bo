@@ -244,3 +244,8 @@ func (failingAPI) MarkNotificationRead(_ context.Context, _ MarkNotificationRead
 ) (MarkNotificationReadResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }
+
+func (failingAPI) ListCustomerGroups(_ context.Context, _ ListCustomerGroupsRequestObject,
+) (ListCustomerGroupsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}

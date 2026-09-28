@@ -2,8 +2,10 @@ package bff
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/martialanouman/go-gateway-bo/internal/auth"
+	"github.com/martialanouman/go-gateway-bo/internal/gateway"
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
@@ -47,6 +49,9 @@ type API struct {
 	AccessLinks *store.AccessLinks
 	// Notifications lit et marque le centre de chaque opérateur.
 	Notifications *store.Notifications
+	// Gateway est le seul chemin vers l'API Admin : le jeton machine et le mTLS vivent dessous.
+	Gateway *gateway.ClientWithResponses
+	Logger  *slog.Logger
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le
