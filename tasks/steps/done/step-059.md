@@ -1,6 +1,6 @@
 # step-059 — Socle du relais vers la passerelle : première route, `errors[]`, journal, audit du proxy
 
-> **Jalon :** M3 (§1.4, §1.11 ; spec §6.15) · **Statut :** À FAIRE
+> **Jalon :** M3 (§1.4, §1.11 ; spec §6.15) · **Statut :** FAIT
 > **Dépend de :** step-047 · **Bloque :** step-060
 
 ## But
@@ -59,8 +59,9 @@ de lecture, `GET /customer-groups`, les exerce. Le CRUD complet et l'écran vien
   déclaré) ; `Error.errors[]` ; la phrase « arrive avec la première route qui relaie la passerelle
   (step-060) » devient vraie de l'état livré. Régénération Go et TypeScript.
 - **Serveur** : `NewAdminClient` câblé dans `cmd/dashboard` et passé à `Dependencies` ; handler
-  `listCustomerGroups` et sa garde ; traduction `gateway.APIError` → `Error` (statut conservé pour
-  les 4xx amont ; un 503 amont reste une erreur avec « Réessayer », jamais « module désactivé », §1.4) ; logger ;
+  `listCustomerGroups` et sa garde ; traduction vers `Error` (un 422 amont relayé avec ses champs ;
+  429, 5xx et passerelle injoignable en 503 avec « Réessayer », jamais « module désactivé », §1.4 ;
+  tout autre statut amont en 500 journalisé) ; logger ;
   validation des requêtes ; `RoundTripper` du jeton ; transport ; `auditRelayed`.
 - **Les huit dettes payées, fichiers supprimés** : 002, 003, 015, 016, 031, 032, 033, 054.
 - **Renvois** : les fiches archivées qui désignent step-060 comme « première route qui appelle la
@@ -69,8 +70,26 @@ de lecture, `GET /customer-groups`, les exerce. Le CRUD complet et l'écran vien
   `tasks/todo.md` porte le renvoi. Les renvois vivants du code (`router.go`,
   `login.tsx`, `openapi-bff.yaml`) sont corrigés dans la PR des fiches.
 
+## Mesure de `MaxConnsPerHost`
+
+Relevée le 28/09/2026 sur un M4 Pro : un serveur HTTP/1.1 local, dont chaque réponse prend 20 ms,
+reçoit 300 appels concurrents (le pic : 300 opérateurs sur une seule instance).
+
+| `MaxConnsPerHost` | 300 appels | Pire latence |
+|---|---|---|
+| sans borne | 39 ms | 38 ms |
+| 128 | 69 ms | 69 ms |
+| **64** | **111 ms** | **111 ms** |
+| 32 | 218 ms | 218 ms |
+
+La passerelle impose HTTP/1.1 (`go-gateway`, `cmd/admin-api-svc/wiring.go:450`,
+`NextProtos: ["http/1.1"]`) : une connexion porte une requête, donc la borne est celle des requêtes
+en vol. **64 par instance** : au pic, une rafale n'ajoute qu'une centaine de millisecondes, et deux
+instances ne tiennent jamais plus de 128 requêtes ouvertes chez la passerelle (invariant e).
+
 ## Tests (écrits dans la même PR)
-- **godog (`internal/bff`, contre Prism)** : un opérateur `groups:read` voit la liste ; un opérateur
+- **godog (`cmd/dashboard/customer-groups.feature`, le succès contre Prism, les refus contre un
+  faux amont)** : un opérateur `groups:read` voit la liste ; un opérateur
   sans `groups:read` reçoit 403 et une ligne `permission.denied` ; un `status` hors enum est refusé
   en 400 avec `errors[]` nommant `status`, **sans appel amont** ; une réponse d'erreur amont est
   réexposée dans la forme du produit, `errors[]` compris (faux amont qui rend un 422 à `errors[]` :
@@ -88,17 +107,77 @@ de lecture, `GET /customer-groups`, les exerce. Le CRUD complet et l'écran vien
   `attempted` déplacée après l'appel ; sémaphore pris sans `select` sur le contexte ; `Proxy` retiré ;
   middleware de validation démonté ; `errors[]` écarté à la traduction ; logger réduit à `io.Discard`.
 
+## Écarts à la rédaction, arbitrés pendant l'implémentation
+- **Un 401 ou un 403 amont n'est pas relayé** : il refuse le jeton machine du BFF, pas l'opérateur,
+  et le relayer renverrait l'écran à la connexion. Il devient un 500 journalisé. 429 et 5xx amont
+  deviennent un 503 à réessayer, journalisé en `Warn` avec l'opération.
+- **Le champ en cause se lit dans un texte.** Le contrat BFF est en OpenAPI 3.1, et `openapi3filter`
+  valide alors par JSON Schema 2020, qui ne rend l'emplacement et la règle qu'en texte. Le présenter
+  en 3.0 au validateur est impossible : le contrat emploie `type: "null"` dans un `oneOf`. Les formes
+  lues sont figées par `internal/bff/validation_test.go` ; un bump de kin-openapi qui les change fait
+  rougir.
+- **Une passerelle injoignable ou qui expire rend 503** (`bff_upstream_unreachable`), comme la copie
+  de `PasserelleIndisponible` le promet : la première rédaction la laissait en 500 « erreur
+  imprévue ». *Relevé en revue le 28/09/2026.*
+- **La validation passe avant la garde.** Une requête mal formée est refusée en 400 avant qu'on
+  sache si l'opérateur pouvait l'envoyer, et sans ligne `permission.denied` — comme l'était déjà un
+  corps JSON illisible, que le handler engendré décode avant la garde. Le contrat est public pour la
+  SPA : ce 400 n'apprend rien à personne.
+- **Le logger vit dans `API`**, embarqué dans `Dependencies`, puisque les handlers journalisent aussi.
+- **Le lanceur Prism est partagé** (`internal/bddtest/prism.go`) : les scénarios du binaire montent
+  le même mock que ceux d'`internal/gateway`.
+
+## Tableau des mutations
+
+Jouées le 28/09/2026, après un commit, fichier restauré par `cp`, `go test -count=1`. Deux premières
+rédactions ne compilaient pas ; elles ont été réécrites jusqu'à nommer un test qui tombe.
+
+| Mutation (le défaut réel qu'elle rejoue) | Ce qui tombe |
+|---|---|
+| Intention écrite **après** l'appel relayé | `TestARelayedActionIsAuditedBeforeTheCall`, `TestARelayedActionIsNotCalledWhenItCannotBeAudited` |
+| Appel relayé malgré un audit en panne | `TestARelayedActionIsNotCalledWhenItCannotBeAudited` |
+| Place du jeton prise sans `select` sur le contexte | `TestACallerWaitingForTheTokenCanGiveUp` |
+| `Proxy` retiré du transport | `TestTheTransportHonorsTheEnvironmentProxy` |
+| `MaxConnsPerHost` retiré | `TestConcurrentCallsNeverOpenMoreConnectionsThanTheBound` (80 connexions pour 64) |
+| Middleware de validation démonté | les cinq tests de `validation_test.go` |
+| `errors[]` écarté par `relayError` | `TestAnUpstreamValidationErrorKeepsItsFields` |
+| Journal d'un 500 retiré | `TestAFailingOperationLeavesATraceInTheServerLog` |
+| Journal du `password_hash` illisible retiré | `TestAMalformedPasswordHashIsLoggedWithoutTheHash` |
+| Journal du code de secours illisible retiré | `TestAnUnreadableHashDoesNotStopTheOthersFromMatching` |
+| Garde sur `customers:read` au lieu de `groups:read` | scénario « sans groups:read, la liste est refusée… » |
+| Journal du 503 relayé retiré | scénario « une passerelle en panne… laisse une trace au journal du serveur » |
+| Erreur de transport rendue telle quelle (500) | scénario « une passerelle injoignable se dit indisponible… » |
+| URL non réduite au chemin avant validation (forme absolue) | `TestAnAbsoluteFormRequestIsValidatedAllTheSame` — le défaut, relevé en revue, a d'abord été reproduit par ce test |
+| Corps non rendu au handler après validation | `TestAnUnreachableDatabaseIsNotReadAsACredentialsRefusal`, `TestAnAccentedAddressUnderTheBoundIsNotRefused` et deux tests de forme du second facteur |
+| Message amont servi dans le 503 | scénario « une passerelle en panne… » par « la réponse ne porte pas » — **vert avant qu'on l'ajoute** : le scénario ne lisait que la sortie du serveur |
+
 ## Critère 4 — ce qu'aucun test ne garde
-À écrire à la clôture, là où il vit. Déjà attendu : la valeur de `MaxConnsPerHost`, qu'un test peut
-lire mais pas justifier ; sa mesure est dans cette fiche.
+- **La valeur 64 de `MaxConnsPerHost`.** Le test vérifie que la borne tient, pas qu'elle est juste ;
+  la justification est la mesure ci-dessus.
+- **`HTTPS_PROXY` et `NO_PROXY` eux-mêmes.** Le test exige `http.ProxyFromEnvironment` sur le
+  transport ; la lecture de l'environnement est celle de `net/http`, qui la met en cache au premier
+  appel, donc un test en processus ne la rejoue pas.
+- **`auditRelayed` n'a pas encore d'appelant de production** : les mutations de step-060 seront les
+  premières. Ses trois tests la gardent seule.
+- **L'issue d'une action relayée s'écrit hors de l'annulation de la requête**
+  (`context.WithoutCancel`, `relay.go`) : aucun test n'annule la requête entre l'appel et la seconde
+  écriture. Sans cette ligne, un onglet fermé laisse `attempted` seul, ce qui reste honnête.
+- **Un 422 relayé sert le `message` de la passerelle tel quel**, en anglais le plus souvent : c'est
+  la forme unique du §1.4, et la traduction des refus amont n'est pas de cette step.
+- **Un tokenUrl qui répond en erreur** voit son corps recopié au journal par `RetrieveError.Error()`
+  d'oauth2 v0.36.0 (`token.go:212`). Ce n'est pas du contenu de message (invariant a), mais c'est du
+  texte amont ; relevé en revue, laissé tel quel.
 
 ## Definition of Done
-- [ ] `make check` vert, `make e2e` vert.
-- [ ] Invariant (a) : aucun message amont dans le journal ; (c) : garde `groups:read`, et le mécanisme
-      d'audit fermé par défaut ; (d) inchangé ; (e) : `MaxConnsPerHost` borné et mesuré.
-- [ ] Critère 2 : `openapi-bff.yaml`, doc de `newContractHandler`, `client.go` et `login.tsx` relus
-      contre le livré.
-- [ ] Critère 4 écrit.
+- [x] `make check` vert, `make e2e` vert (28/09/2026).
+- [x] Invariant (a) : `APIError` se journalise rédigée, et le corps d'une réponse amont illisible
+      n'atteint ni le navigateur ni le journal (scénario « une passerelle en panne ») ; (c) : garde
+      `groups:read`, audit d'une action relayée fermé par défaut ; (d) inchangé ; (e) :
+      `MaxConnsPerHost` borné et mesuré.
+- [x] Critère 2 : `openapi-bff.yaml`, `oapi-codegen-bff.yaml`, doc de `newContractHandler`,
+      `client.go`, `login.tsx`, `recovery.go`, `authenticator.go`, `contract.feature` et `cmd/zodgen`
+      relus contre le livré.
+- [x] Critère 4 écrit ci-dessus et là où il vit.
 
 ## Hors périmètre
 - Création, modification, archivage et suppression de groupes, et l'écran : step-060.

@@ -247,7 +247,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [x] step-047 — Arrêt propre : drain des sockets, déploiement roulant sans session perdue
 
 ## M3 — Clients, comptes SMPP & identifiants  (§6.14, §6.15)
-- [ ] step-059 — Socle du relais vers la passerelle : `GET /customer-groups`, `errors[]`, journal,
+- [x] step-059 — Socle du relais vers la passerelle : `GET /customer-groups`, `errors[]`, journal,
       audit du proxy ← **première route du BFF qui appelle la passerelle**. Les fiches archivées
       qui désignent step-060 pour ce rôle (extension d'`errors[]`, journal serveur, dettes du
       transport) se lisent step-059 : découpage arbitré le 28/09/2026

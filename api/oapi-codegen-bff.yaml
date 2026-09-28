@@ -15,11 +15,13 @@ output: internal/bff/bff.gen.go
 # tenue par le compilateur plutôt que par la discipline, et c'est l'objet de cette step.
 #
 # Mesuré : les deux ensemble n'ajoutent aucune dépendance, `chi/v5` et `oapi-codegen/runtime` étant
-# déjà directes. Pas d'`embedded-spec` : il figerait une copie du contrat dans le binaire.
+# déjà directes. `embedded-spec` fige le contrat dans le binaire pour valider les requêtes à
+# l'exécution : c'est la même copie que le code engendré, et `check-generated` la tient à jour.
 generate:
   chi-server: true
   strict-server: true
   models: true
+  embedded-spec: true
 
 compatibility:
   # Sans cette option, `status: {enum: [ok]}` engendre une constante exportée nommée `Ok` — deux

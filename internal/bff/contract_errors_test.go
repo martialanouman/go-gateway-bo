@@ -1,9 +1,11 @@
 package bff
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -107,7 +109,7 @@ func TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser(t *testing.T) {
 	// Aucun gestionnaire de session : `Health` est exempté par la table d'autorisation, donc la garde
 	// laisse passer sans jamais lire de permissions. Un `nil` qui serait déréférencé ferait paniquer
 	// ce test plutôt que le laisser vert.
-	mountContract(router, failingAPI{}, nil, nil)
+	mountContract(router, failingAPI{}, nil, nil, slog.New(slog.DiscardHandler))
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
@@ -127,6 +129,20 @@ func TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser(t *testing.T) {
 		`{"code":"internal_error","message":"La demande n'a pas abouti : le serveur a rencontré une erreur imprévue. `+
 			`Réessayez dans un instant ; si l'erreur revient, prévenez un administrateur du tableau de bord."}`,
 		string(payload))
+}
+
+func TestAFailingOperationLeavesATraceInTheServerLog(t *testing.T) {
+	t.Parallel()
+
+	var journal bytes.Buffer
+
+	router := chi.NewRouter()
+	mountContract(router, failingAPI{}, nil, nil, slog.New(slog.NewJSONHandler(&journal, nil)))
+
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/health", nil))
+
+	assert.Contains(t, journal.String(), `"route":"GET /health"`)
+	assert.Contains(t, journal.String(), "connexion refusée")
 }
 
 // La liaison n'a aujourd'hui aucun chemin d'échec atteignable : `GET /health` n'a ni paramètre de
@@ -226,5 +242,10 @@ func (failingAPI) ListNotifications(_ context.Context, _ ListNotificationsReques
 
 func (failingAPI) MarkNotificationRead(_ context.Context, _ MarkNotificationReadRequestObject,
 ) (MarkNotificationReadResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) ListCustomerGroups(_ context.Context, _ ListCustomerGroupsRequestObject,
+) (ListCustomerGroupsResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }

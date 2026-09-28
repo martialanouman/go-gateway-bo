@@ -9,6 +9,7 @@ package bff
 import (
 	"context"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/netip"
 
@@ -77,7 +78,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		// fait que sur une requête déjà bornée et porteuse d'un cookie scellé.
 		api.Use(withSession(deps.Sessions))
 
-		mountContract(api, deps.API, deps.Sessions, deps.Audit)
+		mountContract(api, deps.API, deps.Sessions, deps.Audit, deps.Logger)
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
@@ -119,16 +120,27 @@ func NewRouter(deps Dependencies) http.Handler {
 // (`chi-middleware.tmpl` d'oapi-codegen v2.8.0, 14 sites d'appel). `HandlerFromMux` ne permet pas de
 // le poser : il délègue à `HandlerWithOptions` sans l'option, donc avec le défaut.
 //
-// Le contrat n'a aujourd'hui qu'un seul paramètre lié de la sorte — le `passkeyId` du retrait d'une
-// clé d'accès, une chaîne requise qu'une requête assez bien formée pour atteindre la route ne peut
-// pas faire échouer. Aucune requête n'exerce donc ce gestionnaire, et c'est
+// Aucune requête n'exerce ce gestionnaire : le validateur du contrat, monté devant le wrapper, refuse
+// en 400 toute requête dont un paramètre ne se lierait pas. C'est
 // `TestTheContractMountInstallsTheProductErrorHandler` qui garde le montage. Sans l'option,
 // `HandlerFromMux` rendrait le message Go en `text/plain` — mesuré le 02/08/2026 sur un contrat muté
 // avec un paramètre de requête requis, puis restauré.
-func mountContract(api chi.Router, impl StrictServerInterface, sessions *session.Manager, audit *store.Audit) {
-	HandlerWithOptions(newContractHandler(impl, sessions, audit), ChiServerOptions{
-		BaseRouter:       api,
-		ErrorHandlerFunc: rejectRequest,
+func mountContract(api chi.Router, impl StrictServerInterface, sessions *session.Manager, audit *store.Audit,
+	logger *slog.Logger,
+) {
+	// Une panique et non une erreur : le contrat embarqué est engendré, et `check-generated` refuse
+	// qu'il diverge du YAML — un échec ici est un binaire mal construit, pas une configuration.
+	validate, err := validateAgainstTheContract()
+	if err != nil {
+		panic(err)
+	}
+
+	api.Group(func(contract chi.Router) {
+		contract.Use(validate)
+		HandlerWithOptions(newContractHandler(impl, sessions, audit, logger), ChiServerOptions{
+			BaseRouter:       contract,
+			ErrorHandlerFunc: rejectRequest,
+		})
 	})
 }
 
@@ -139,34 +151,29 @@ func mountContract(api chi.Router, impl StrictServerInterface, sessions *session
 // Ce que ces deux-là couvrent exactement, lu dans le gabarit plutôt que supposé
 // (`strict-http.tmpl` d'oapi-codegen v2.8.0) : `RequestErrorHandlerFunc` n'a que huit sites d'appel,
 // **tous** dans le décodage du **corps** de la requête — JSON, formdata, multipart, texte brut. Il ne
-// voit ni paramètre, ni en-tête, ni cookie. Une opération qui porte un corps de requête l'atteint
-// donc, et `POST /auth/login` est la première du contrat dans ce cas — un JSON illisible envoyé sur
-// cette route rend son 400. C'est pourquoi le contrat déclare ce statut : sans lui, le scénario qui
-// valide la réponse échouerait sur un statut que le YAML ne connaît pas.
+// voit ni paramètre, ni en-tête, ni cookie. Le validateur du contrat décode le corps avant lui
+// (kin-openapi v0.149.0, `validate_request.go:329-336`) : un JSON illisible est refusé là, en 400, et
+// ce gestionnaire reste un filet.
 // `ResponseErrorHandlerFunc`, lui, est atteint dès
 // qu'une implémentation rend une erreur — le seul des trois qu'une requête exerce pour de bon ici,
 // par `TestAFailingOperationDoesNotLeakTheGoErrorToTheBrowser`. Une route future qui enveloppe son
 // erreur — `fmt.Errorf("appel de %s: %w", cfg.Gateway.BaseURL, err)` — servirait sans lui l'adresse
 // interne de l'API Admin au navigateur.
 //
-// L'erreur n'est ni journalisée ni propagée, et c'est un manque assumé plutôt qu'un oubli : aucun
-// journal n'atteint ce paquet, la `Dependencies` de `NewRouter` ne portant pas de `*slog.Logger`, qui
-// s'arrête à `cmd/dashboard`. Un 500 servi ici ne laisse donc **aucune trace côté serveur**, y
-// compris sur une route qui travaille : un `password_hash` corrompu en base fait refuser la connexion
-// sans que rien ne le dise. Le premier appel réel à la passerelle (step-059) devra apporter les deux
-// à la fois.
+// L'erreur part au journal du serveur et jamais au navigateur : elle peut nommer la topologie interne.
 //
 // **L'ordre du slice compte.** La boucle du wrapper engendré enveloppe successivement, donc le
-// **dernier** élément est le plus extérieur : la garde s'exécute avant tout le reste, et son refus
-// court-circuite la machinerie de cookie — qui ne pose rien, ne posant que sur
+// **dernier** élément est le plus extérieur : la garde s'exécute avant l'autre middleware strict, et
+// son refus court-circuite la machinerie de cookie — qui ne pose rien, ne posant que sur
 // `err == nil && pending.cookie != nil`.
 func newContractHandler(impl StrictServerInterface, sessions *session.Manager, audit *store.Audit,
+	logger *slog.Logger,
 ) ServerInterface {
 	return NewStrictHandlerWithOptions(impl,
 		[]StrictMiddlewareFunc{writePendingCookie(), requirePermission(authorization, grantsFrom(sessions), audit.Record)},
 		StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  rejectRequest,
-			ResponseErrorHandlerFunc: reportFailedResponse,
+			ResponseErrorHandlerFunc: reportFailedResponse(logger),
 		})
 }
 
@@ -187,8 +194,7 @@ func grantsFrom(sessions *session.Manager) grantsOf {
 // requête que le handler strict n'a pas su décoder (`newContractHandler`).
 //
 // Le message d'origine est écarté plutôt que rendu : il nomme des champs internes — `Query argument
-// depuis is required, but not found`, `strconv.ParseInt: parsing "pasunentier"` — et il part avec,
-// faute de journal ici (voir `newContractHandler`).
+// depuis is required, but not found`, `strconv.ParseInt: parsing "pasunentier"`.
 func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
 	writeJSON(w, http.StatusBadRequest, Error{
 		Code:    "bad_request",
@@ -196,8 +202,20 @@ func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
 	})
 }
 
-func reportFailedResponse(w http.ResponseWriter, _ *http.Request, _ error) {
-	writeJSON(w, http.StatusInternalServerError, unexpectedError())
+func reportFailedResponse(logger *slog.Logger) func(http.ResponseWriter, *http.Request, error) {
+	return func(w http.ResponseWriter, r *http.Request, err error) {
+		logger.ErrorContext(r.Context(), "une requête a échoué", "route", routeOf(r), "error", err)
+		writeJSON(w, http.StatusInternalServerError, unexpectedError())
+	}
+}
+
+// routeOf rend le motif et non le chemin : un identifiant dans l'URL n'a rien à faire au journal.
+func routeOf(r *http.Request) string {
+	if route := chi.RouteContext(r.Context()); route != nil && route.RoutePattern() != "" {
+		return r.Method + " " + route.RoutePattern()
+	}
+
+	return r.Method
 }
 
 func unexpectedError() Error {

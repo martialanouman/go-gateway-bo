@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,6 +27,16 @@ import (
 // « arrivée jusqu'à la base ». Une borne retirée bascule de l'un à l'autre.
 //
 // Aucun conteneur, aucun réseau : le pool est paresseux (DN-5) et fermé avant tout usage.
+
+// Les bornes que `api/openapi-bff.yaml` déclare, redites ici pour que le test ne se juge pas lui-même
+// en lisant la valeur qu'il vérifie.
+const (
+	contractPasswordMaxLength  = 4096
+	contractEmailMaxLength     = 320
+	contractChallengeMaxLength = 64
+	contractCodeMaxLength      = 64
+)
+
 func apiRouter(t *testing.T) http.Handler {
 	t.Helper()
 
@@ -37,7 +48,9 @@ func apiRouter(t *testing.T) http.Handler {
 	return NewRouter(Dependencies{
 		Assets: fstest.MapFS{},
 		API: API{
-			Authenticator: auth.NewAuthenticator(store.NewLogins(pool), []byte("un sel de test assez long")),
+			Authenticator: auth.NewAuthenticator(store.NewLogins(pool), []byte("un sel de test assez long"),
+				slog.New(slog.DiscardHandler)),
+			Logger: slog.New(slog.DiscardHandler),
 		},
 		// Ce que la configuration fournit en production. Sans elle, le contrôle d'origine refuserait
 		// en 403 **avant** les bornes que ce fichier mesure, et chaque cas se lirait « refusée à la
@@ -83,7 +96,7 @@ func TestAnOversizedPasswordDoesNotReachTheHash(t *testing.T) {
 	t.Parallel()
 
 	status, _ := post(t, "/api/auth/login",
-		credentials(t, "camille@exemple.test", strings.Repeat("a", maximumPasswordLength+1)))
+		credentials(t, "camille@exemple.test", strings.Repeat("a", contractPasswordMaxLength+1)))
 
 	assert.Equal(t, http.StatusBadRequest, status,
 		"le mot de passe démesuré a traversé jusqu'à la base : la borne ne mord plus")
@@ -95,7 +108,7 @@ func TestAnOversizedAddressDoesNotBecomeACounterKey(t *testing.T) {
 	t.Parallel()
 
 	status, _ := post(t, "/api/auth/login",
-		credentials(t, strings.Repeat("a", maximumEmailLength+1)+"@exemple.test", "un mot de passe"))
+		credentials(t, strings.Repeat("a", contractEmailMaxLength+1)+"@exemple.test", "un mot de passe"))
 
 	assert.Equal(t, http.StatusBadRequest, status,
 		"l'adresse démesurée a traversé jusqu'à la base : elle y serait devenue une clé de compteur")
@@ -107,9 +120,9 @@ func TestAnAccentedAddressUnderTheBoundIsNotRefused(t *testing.T) {
 	t.Parallel()
 
 	// Deux octets par rune : le double de la borne en octets, la borne exacte en runes.
-	accented := strings.Repeat("é", maximumEmailLength)
-	require.Len(t, []rune(accented), maximumEmailLength)
-	require.Greater(t, len(accented), maximumEmailLength, "ces runes tiennent sur un octet")
+	accented := strings.Repeat("é", contractEmailMaxLength)
+	require.Len(t, []rune(accented), contractEmailMaxLength)
+	require.Greater(t, len(accented), contractEmailMaxLength, "ces runes tiennent sur un octet")
 
 	status, _ := post(t, "/api/auth/login", credentials(t, accented, "un mot de passe"))
 
@@ -126,7 +139,7 @@ func TestABodyLargerThanTheBoundIsNotDecoded(t *testing.T) {
 	// **Chaque champ reste sous sa propre borne**, sans quoi le 400 viendrait d'elle : des runes de deux
 	// octets font tenir 4 096 caractères — la borne exacte du mot de passe — dans 8 192 octets, que
 	// l'adresse et la syntaxe JSON portent au-delà de la borne du corps.
-	oversized := credentials(t, "camille@exemple.test", strings.Repeat("é", maximumPasswordLength))
+	oversized := credentials(t, "camille@exemple.test", strings.Repeat("é", contractPasswordMaxLength))
 	require.Greater(t, len(oversized), maximumLoginBodyBytes,
 		"ce corps tient sous la borne : la mutation qui retire RequestSize resterait verte")
 
@@ -140,8 +153,7 @@ func TestABodyLargerThanTheBoundIsNotDecoded(t *testing.T) {
 // La plus grave des lignes que ces tests gardent : une base injoignable lue comme un refus
 // d'identifiants ferait retaper son mot de passe à un opérateur dont le mot de passe est bon.
 //
-// Le corps est vérifié autant que le statut — `internal/bff` n'a pas de journal, donc ce que le
-// navigateur reçoit est tout ce qui existe.
+// Le corps est vérifié autant que le statut : c'est lui que l'opérateur lit.
 func TestAnUnreachableDatabaseIsNotReadAsACredentialsRefusal(t *testing.T) {
 	t.Parallel()
 
@@ -199,7 +211,7 @@ func TestEverySecondFactorShapeCheckRefusesBeforeAnyState(t *testing.T) {
 		},
 		"un challenge plus long que la borne": {
 			body: map[string]any{
-				"challenge": strings.Repeat("a", maximumChallengeLength+1),
+				"challenge": strings.Repeat("a", contractChallengeMaxLength+1),
 				"method":    "totp",
 				"code":      code,
 			},
@@ -287,7 +299,7 @@ func TestTheEnrollmentProofRequiresBothFieldsOrNeither(t *testing.T) {
 		"un code plus long que la borne": {
 			body: map[string]any{
 				"method": "totp",
-				"code":   strings.Repeat("1", maximumCodeLength+1),
+				"code":   strings.Repeat("1", contractCodeMaxLength+1),
 			},
 			want: http.StatusBadRequest,
 		},
@@ -341,7 +353,10 @@ func TestAnUnreachableDatabaseDoesNotCloseTheOperatorSession(t *testing.T) {
 	secret := []byte("une-cle-de-session-assez-longue-pour-la-borne")
 	handler := NewRouter(Dependencies{
 		Assets: fstest.MapFS{},
-		API:    API{Sessions: session.NewManager(store.NewSessions(pool), secret)},
+		API: API{
+			Sessions: session.NewManager(store.NewSessions(pool), secret),
+			Logger:   slog.New(slog.DiscardHandler),
+		},
 	})
 
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)

@@ -1,6 +1,7 @@
 package gateway_test
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -286,4 +287,47 @@ func TestMachineTokenAlwaysRequestsContentRead(t *testing.T) {
 	assert.Equal(t, "admin:read admin:write content:read content:erase gdpr:erase", requested[0].scope,
 		"les cinq scopes du contrat sont demandés à l'émission, content:read compris et en "+
 			"permanence : c'est le BFF qui décide ensuite ce qu'un opérateur voit")
+}
+
+// Un tokenUrl en trou noir retient celui qui obtient le jeton jusqu'au Timeout ; les appelants qui
+// attendent derrière lui, eux, doivent pouvoir renoncer — sans quoi un opérateur qui ferme l'onglet
+// garde sa place dans la file jusqu'au plafond.
+func TestACallerWaitingForTheTokenCanGiveUp(t *testing.T) {
+	t.Parallel()
+
+	pki := newTestPKI(t)
+
+	mute := make(chan struct{})
+	defer close(mute)
+
+	apiServer := pki.serveTLS(t, ok)
+	tokenServer := pki.serveTLS(t, func(_ http.ResponseWriter, _ *http.Request) { <-mute })
+
+	client, err := gateway.NewAdminClient(config.GatewayConfig{
+		Mode:         config.GatewayModeReal,
+		BaseURL:      apiServer.URL,
+		TokenURL:     tokenServer.URL,
+		ClientID:     "tableau-de-bord",
+		ClientSecret: "secret-de-test",
+		ClientCert:   pki.clientCertFile,
+		ClientKey:    pki.clientKeyFile,
+		CACert:       pki.caFile,
+		Timeout:      5 * time.Second,
+	})
+	require.NoError(t, err)
+
+	holder := make(chan error, 1)
+	go func() { holder <- listCustomers(t.Context(), client) }()
+
+	time.Sleep(100 * time.Millisecond)
+
+	waiting, giveUp := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer giveUp()
+
+	started := time.Now()
+	err = listCustomers(waiting, client)
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(started), time.Second,
+		"l'appelant a attendu que l'obtention en cours expire au lieu de suivre son propre contexte")
 }

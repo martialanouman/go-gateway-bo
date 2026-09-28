@@ -259,8 +259,8 @@ func TestTheSchemaRefusesWhatItMustRefuse(t *testing.T) {
 // contrainte à trois dimensions le laisserait **vert**. Ce test tient l'autre moitié.
 //
 // Il n'est pas dans la table voisine parce que celle-ci exige un refus de chaque cas. Et le symptôme
-// qu'il garde serait muet : `internal/bff` ne reçoit aucun journal, donc `POST /auth/mfa/totp/enroll`
-// rendrait 500 sans que la violation de contrainte soit écrite nulle part.
+// qu'il garde serait un 500 sur `POST /auth/mfa/totp/enroll`, que seul le journal du serveur
+// expliquerait.
 func TestLesCinqDimensionsComptéesSontAcceptées(t *testing.T) {
 	t.Parallel()
 

@@ -24,7 +24,7 @@ export const LoginRequest = z.object({
 
 export const MfaVerification = z.object({
   assertion: z.record(z.string(), z.unknown()).optional(),
-  challenge: z.string().min(43),
+  challenge: z.string().min(43).max(64),
   code: z.string().min(1).max(64).optional(),
   method: z.enum(['totp', 'recovery_code', 'webauthn']),
 })

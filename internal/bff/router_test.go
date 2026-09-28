@@ -275,10 +275,10 @@ func setsOption(call *ast.CallExpr, option string) bool {
 // Ce qu'il couvre, et pourquoi une porte structurelle plutôt qu'une requête. Le gestionnaire visé est
 // celui du **wrapper** engendré (`bff.gen.go`, `ServerInterfaceWrapper.ErrorHandlerFunc`) : c'est lui
 // qui reçoit les erreurs de liaison des paramètres de requête, de chemin, des en-têtes et des cookies
-// (`chi-middleware.tmpl`, 14 sites d'appel). Le contrat ne lie aujourd'hui qu'un seul paramètre de la
-// sorte — le `passkeyId` du retrait d'une clé d'accès, une chaîne requise qu'une requête assez bien
-// formée pour atteindre la route ne peut pas faire échouer — donc **aucune requête ne l'atteint** :
-// c'est ce qui rend le défaut invisible, et c'est pourquoi la preuve est ici structurelle.
+// (`chi-middleware.tmpl`, 14 sites d'appel). Le validateur du contrat, monté devant le wrapper,
+// refuse en 400 toute requête dont un paramètre ne se lierait pas — donc **aucune requête ne
+// l'atteint** : c'est ce qui rend le défaut invisible, et c'est pourquoi la preuve est ici
+// structurelle.
 //
 // Mesuré le 02/08/2026, contrat muté avec un `depuis` requis de type entier, régénéré, requête réelle
 // à travers `NewRouter` : avec `HandlerFromMux`, `GET /api/health` rend

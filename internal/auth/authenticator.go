@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -71,10 +72,11 @@ type Verdict struct {
 type Authenticator struct {
 	logins *store.Logins
 	salt   []byte
+	logger *slog.Logger
 }
 
-func NewAuthenticator(logins *store.Logins, bruteForceSalt []byte) *Authenticator {
-	return &Authenticator{logins: logins, salt: bruteForceSalt}
+func NewAuthenticator(logins *store.Logins, bruteForceSalt []byte, logger *slog.Logger) *Authenticator {
+	return &Authenticator{logins: logins, salt: bruteForceSalt, logger: logger}
 }
 
 // Login vérifie l'adresse et le mot de passe présentés.
@@ -146,10 +148,8 @@ func (a *Authenticator) Login(ctx context.Context, email, password, clientAddres
 // un `if` idiomatique que la revue ne voit pas. La **durée**, elle, reste hors de portée d'un test —
 // la mesure est écrite au-dessus de `VerifyDummy`.
 //
-// Un `password_hash` illisible est traité comme un refus et non comme une panne : la ligne est
-// abîmée, mais le dire au navigateur distinguerait ce compte des autres. L'erreur est écartée ici et
-// c'est un manque assumé — aucun journal n'atteint encore ce paquet (voir `internal/bff/router.go`),
-// donc une ligne corrompue est silencieuse. Le premier journal du BFF devra la remonter.
+// Un `password_hash` illisible est traité comme un refus et non comme une panne : le dire au
+// navigateur distinguerait ce compte des autres. Seul le journal du serveur l'apprend.
 //
 // **`ErrOverloaded` seul remonte.** Il ne dit rien d'un compte : les dix places de `Hold` manquaient,
 // et `internal/bff` le sert en 503, jamais en 401 — le confondre avec un hachage illisible ferait
@@ -164,6 +164,11 @@ func (a *Authenticator) passwordMatches(ctx context.Context, operator *store.Ope
 	ok, err := Verify(ctx, operator.PasswordHash, password)
 	if errors.Is(err, ErrOverloaded) {
 		return false, err
+	}
+
+	if err != nil {
+		a.logger.WarnContext(ctx, "le hachage du mot de passe est illisible", "operator", operator.ID,
+			"error", err)
 	}
 
 	return ok && operator.Status == store.StatusActive, nil

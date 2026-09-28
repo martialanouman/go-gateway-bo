@@ -65,29 +65,24 @@ func authenticatedClient(cfg config.GatewayConfig) (*http.Client, error) {
 		return nil, err
 	}
 
-	// Le contexte porte le client sortant : `clientcredentials` obtient le jeton par lui, et
-	// oauth2.NewClient en reprend le transport pour joindre l'API. Un seul client mTLS couvre donc
-	// les deux appels — lu dans oauth2@v0.36.0. Deux clients configurés séparément laisseraient le
-	// jeton s'obtenir hors mTLS, c'est-à-dire une authentification sortante à moitié protégée que rien
-	// ne signalerait.
-	//
-	// Le Timeout est posé ici et nulle part ailleurs, et c'est ce qui le fait borner **aussi**
-	// l'obtention du jeton : oauth2.NewClient recopie le Timeout du client du contexte dans celui
-	// qu'il rend.
-	//
-	// Ce qu'il ne fait pas : l'attente est bornée, elle n'est pas **annulable**. Le contexte de
-	// l'appelant n'atteint pas l'obtention du jeton, parce que `oauth2.Transport.RoundTrip` appelle
-	// `Source.Token()` sans lui en passer aucun et que la source porte celui construit ici, sur
-	// context.Background. Comme `reuseTokenSource.Token()` garde son mutex pendant l'appel réseau, un
-	// tokenUrl parti en trou noir sérialise les appels concurrents, chacun pour la durée du Timeout,
-	// et un appelant qui a renoncé n'en libère aucun. La première route qui appellera la passerelle
-	// dira si ce plafond se voit.
-	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, &http.Client{
-		Transport: transport,
-		Timeout:   cfg.Timeout,
-	})
+	// Un seul transport mTLS pour l'API et le tokenUrl : deux clients configurés séparément
+	// laisseraient le jeton s'obtenir hors mTLS, une authentification sortante à moitié protégée que
+	// rien ne signalerait. Le Timeout borne l'appel à l'API comme l'obtention du jeton.
+	outbound := &http.Client{Transport: transport, Timeout: cfg.Timeout}
 
-	return oauth2.NewClient(ctx, machineToken(ctx, cfg)), nil
+	if cfg.Mode == config.GatewayModeMock {
+		return &http.Client{
+			Transport: &oauth2.Transport{Source: mockToken(), Base: transport},
+			Timeout:   cfg.Timeout,
+		}, nil
+	}
+
+	credentials := machineCredentials(cfg)
+	fetch := func(ctx context.Context) (*oauth2.Token, error) {
+		return credentials.Token(context.WithValue(ctx, oauth2.HTTPClient, outbound))
+	}
+
+	return &http.Client{Transport: newTokenTransport(transport, fetch), Timeout: cfg.Timeout}, nil
 }
 
 // knownMode refuse tout mode que ce package ne connaît pas, **la valeur zéro comprise**. La polarité
@@ -143,23 +138,14 @@ func encryptedEndpoints(cfg config.GatewayConfig) error {
 	return nil
 }
 
-// machineToken rend la source du jeton machine.
-//
-// En mode `real`, c'est `clientcredentials` qui la porte, et c'est lui qui tient les deux exigences
-// de la step — source lue dans oauth2@v0.36.0 : `Config.TokenSource` rend
-// `oauth2.ReuseTokenSource(nil, source)` (clientcredentials.go:79-85), dont le `Token()` prend un
-// `sync.Mutex` sur tout le corps, appel réseau compris (oauth2.go:308-321) ; deux appels concurrents
-// trouvant le jeton expiré ne déclenchent donc qu'une seule requête. Et `defaultExpiryDelta =
-// 10 * time.Second` (token.go:22) fait renouveler dix secondes avant l'expiration annoncée.
-func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSource {
-	if cfg.Mode == config.GatewayModeMock {
-		return oauth2.StaticTokenSource(&oauth2.Token{
-			AccessToken: mockAccessToken,
-			TokenType:   "Bearer",
-		})
-	}
+func mockToken() oauth2.TokenSource {
+	return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: mockAccessToken, TokenType: "Bearer"})
+}
 
-	credentials := clientcredentials.Config{
+// machineCredentials décrit le jeton machine. `defaultExpiryDelta` d'oauth2 v0.36.0 (token.go:22) le
+// fait tenir pour expiré dix secondes avant l'échéance annoncée ; tokenTransport le renouvelle alors.
+func machineCredentials(cfg config.GatewayConfig) clientcredentials.Config {
+	return clientcredentials.Config{
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
 		TokenURL:     cfg.TokenURL,
@@ -187,9 +173,12 @@ func machineToken(ctx context.Context, cfg config.GatewayConfig) oauth2.TokenSou
 		// sert — step-104, prévenue dans `tasks/todo.md`.
 		Scopes: []string{"admin:read", "admin:write", "content:read", "content:erase", "gdpr:erase"},
 	}
-
-	return credentials.TokenSource(ctx)
 }
+
+// maxConnsPerHost borne la pression d'une instance sur l'API Admin (invariant e). La passerelle ne
+// parle que HTTP/1.1 (`go-gateway`, cmd/admin-api-svc/wiring.go:450) : une connexion porte une requête,
+// donc la borne est celle des requêtes en vol. Mesure dans tasks/steps/done/step-059.md.
+const maxConnsPerHost = 64
 
 func outboundTransport(cfg config.GatewayConfig) (http.RoundTripper, error) {
 	clientTLS, err := mutualTLS(cfg)
@@ -205,16 +194,8 @@ func outboundTransport(cfg config.GatewayConfig) (http.RoundTripper, error) {
 		// Le BFF ne parle qu'à un seul hôte, et le défaut de net/http (2) y ferait rouvrir une
 		// connexion sur trois requêtes concurrentes — poignée de main TLS comprise.
 		MaxIdleConnsPerHost: 32,
-
-		// `MaxConnsPerHost` n'est pas posé, et c'est le seul cadran qui bornerait les connexions
-		// **ouvertes** : celui du dessus ne borne que les inactives. C'est par lui que passerait la
-		// pression du tableau de bord sur la passerelle, donc l'invariant (e). Il se règle sur une
-		// concurrence réelle, et aucune route n'appelle encore la passerelle.
-		//
-		// `Proxy` n'est pas posé non plus, là où http.DefaultTransport pose `ProxyFromEnvironment`
-		// ($GOROOT/src/net/http/transport.go:47) : ce transport-ci ignore donc HTTPS_PROXY et
-		// NO_PROXY, en silence et à rebours du défaut de net/http. À trancher quand un déploiement
-		// dira s'il passe par un proxy d'egress.
+		MaxConnsPerHost:     maxConnsPerHost,
+		Proxy:               http.ProxyFromEnvironment,
 	}}, nil
 }
 

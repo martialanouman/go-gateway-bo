@@ -141,3 +141,8 @@ func (API) ConfirmTotp(_ context.Context, _ bff.ConfirmTotpRequestObject,
 ) (bff.ConfirmTotpResponseObject, error) {
 	return bff.ConfirmTotp204Response{}, nil
 }
+
+func (API) ListCustomerGroups(_ context.Context, _ bff.ListCustomerGroupsRequestObject,
+) (bff.ListCustomerGroupsResponseObject, error) {
+	return bff.ListCustomerGroups200JSONResponse{}, nil
+}

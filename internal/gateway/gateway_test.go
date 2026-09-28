@@ -8,9 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -34,26 +32,13 @@ import (
 // fait rouge et nomme la sortie de secours. C'est ce qui range ce package du côté à deux toolchains —
 // le contrat ne vit que sous `web/node_modules/`, et le job « Tests Go » de la CI reçoit donc l'action
 // de setup du versant client.
-const (
-	prismBinary   = "web/node_modules/.bin/prism"
-	adminContract = "web/node_modules/@martialanouman/gateway-api-contracts/openapi-admin.yaml"
-)
-
-// envMockBaseURL signale un mock déjà lancé — c'est ce que `make mock` affiche. Le harnais s'y
-// raccorde au lieu d'en démarrer un second : une boucle locale ne repaie alors pas le démarrage à
-// chaque lancement de la suite.
-const envMockBaseURL = "PRISM_MOCK_BASE_URL"
-
-// prismStartup est large parce qu'elle vise un démarrage parti en vrille, pas une machine lente :
-// mesuré à ~1,0 s ici, et le runner de CI paie en plus le premier chargement de Node.
-const prismStartup = 30 * time.Second
 
 // `godog` ne pose aucun plancher : `Paths` qui ne trouve rien rend une suite **vide et réussie**, et
 // `Strict` ne couvre que les steps non définies d'un scénario lu. Vérifié en renommant
 // `gateway.feature` — la suite rend `ok` sans avoir joint le mock une seule fois. Le registre qui
 // ferme ces deux trous vit dans `internal/bddtest`, avec ses propres tests unitaires.
 func TestScenarios(t *testing.T) {
-	baseURL := adminMock(t)
+	baseURL := bddtest.AdminMock(t)
 	ran := &bddtest.Ledger{}
 
 	suite := godog.TestSuite{
@@ -93,23 +78,23 @@ func TestScenarios(t *testing.T) {
 func TestTheMockServesEveryOperationTheContractDeclares(t *testing.T) {
 	// Une instance à soi : les routes annoncées se lisent au démarrage, qu'un mock signalé par
 	// `make mock` n'a pas laissé voir. Ce test-ci ne réutilise donc jamais.
-	mock := startPrism(t)
+	mock := bddtest.StartPrism(t)
 	declared := declaredOperations(t)
 
-	t.Logf("%d opérations déclarées au contrat, %d routes annoncées par le mock", declared, len(mock.routes))
+	t.Logf("%d opérations déclarées au contrat, %d routes annoncées par le mock", declared, len(mock.Routes))
 
-	require.Lenf(t, mock.routes, declared,
+	require.Lenf(t, mock.Routes, declared,
 		"le mock annonce %d routes pour %d opérations déclarées au contrat : `make mock` ne sert pas ce "+
 			"que le contrat décrit, et les scénarios n'exercent qu'une partie de la passerelle",
-		len(mock.routes), declared)
+		len(mock.Routes), declared)
 
-	unserved := unservedRoutes(t, mock.routes)
+	unserved := unservedRoutes(t, mock.Routes)
 
 	// Les premières suffisent à orienter : une sonde qui se trompe de cible les fait toutes tomber, et
 	// cent trente lignes dans un rapport de CI cachent le reste de la suite.
 	assert.Emptyf(t, firstFew(unserved),
 		"%d opération(s) annoncée(s) sur %d ne sont pas routées : le mock est en désaccord avec lui-même",
-		len(unserved), len(mock.routes))
+		len(unserved), len(mock.Routes))
 }
 
 // declaredOperations compte ce que le contrat déclare, sur la ligne qui le déclare : une clé
@@ -119,7 +104,7 @@ func TestTheMockServesEveryOperationTheContractDeclares(t *testing.T) {
 func declaredOperations(t *testing.T) int {
 	t.Helper()
 
-	contract, err := os.ReadFile(filepath.Join(bddtest.RepositoryRoot(t), adminContract))
+	contract, err := os.ReadFile(filepath.Join(bddtest.RepositoryRoot(t), bddtest.AdminContract))
 	require.NoError(t, err, "lecture du contrat de l'API Admin")
 
 	declared := 0
@@ -154,7 +139,7 @@ func firstFew(routes []string) []string {
 }
 
 // unservedRoutes interroge chaque route annoncée et rend celles que le mock ne route pas, nommées.
-func unservedRoutes(t *testing.T, routes []announcedRoute) []string {
+func unservedRoutes(t *testing.T, routes []bddtest.AnnouncedRoute) []string {
 	t.Helper()
 
 	probe := &http.Client{Timeout: callTimeout}
@@ -175,10 +160,10 @@ func unservedRoutes(t *testing.T, routes []announcedRoute) []string {
 // flux. Les deux refus de **routage**, eux, se nomment dans le corps : `NO_PATH_MATCHED_ERROR` en 404
 // sur un chemin inconnu, `NO_METHOD_MATCHED_ERROR` en 405 sur une méthode que le chemin ne déclare
 // pas.
-func probeRoute(t *testing.T, probe *http.Client, route announcedRoute) string {
+func probeRoute(t *testing.T, probe *http.Client, route bddtest.AnnouncedRoute) string {
 	t.Helper()
 
-	request, err := http.NewRequestWithContext(t.Context(), route.method, route.url, nil)
+	request, err := http.NewRequestWithContext(t.Context(), route.Method, route.URL, nil)
 	require.NoErrorf(t, err, "sonde de %s", route)
 
 	request.Header.Set("Authorization", probeToken)
@@ -365,113 +350,4 @@ func (c *adminCalls) gotErrorWithServedCode() error {
 	}
 
 	return nil
-}
-
-// adminMock rend l'URL du mock que les scénarios interrogent : celui qu'on nous signale, ou le nôtre.
-func adminMock(t *testing.T) string {
-	t.Helper()
-
-	//nolint:forbidigo // Ce n'est pas une configuration du produit mais le signalement d'un mock déjà
-	// lancé par `make mock`, qui n'existe que pour le harnais. L'exemption est nommée ici plutôt que
-	// posée sur le fichier, qui laisserait un test lire la vraie configuration depuis l'environnement.
-	if signaled := os.Getenv(envMockBaseURL); signaled != "" {
-		t.Logf("mock déjà lancé, réutilisé : %s (%s)", signaled, envMockBaseURL)
-
-		return signaled
-	}
-
-	return startPrism(t).baseURL
-}
-
-// prismMock est un mock lancé par le harnais : son URL, et les routes qu'il a annoncées au démarrage.
-type prismMock struct {
-	baseURL string
-	routes  []announcedRoute
-}
-
-// announcedRoute est une opération que Prism dit servir. Il en imprime une ligne par opération du
-// document au démarrage, l'URL portant déjà les exemples de ses paramètres de chemin.
-type announcedRoute struct {
-	method string
-	url    string
-}
-
-func (r announcedRoute) String() string {
-	return r.method + " " + r.url
-}
-
-// startPrism lance un mock sur un port libre et rend la main quand il écoute.
-//
-// Le port est **choisi par le système** (`--port 0`, l'adresse effective se lit dans le journal de
-// démarrage) et non fixé : le port 4010 de `make mock` est souvent déjà pris sur le poste, et Prism
-// n'échoue pas discrètement dans ce cas — il imprime son mode d'emploi entier suivi d'un
-// `listen EADDRINUSE`, ce qui donne un rouge que personne ne relie à un port occupé.
-func startPrism(t *testing.T) *prismMock {
-	t.Helper()
-
-	root := bddtest.RepositoryRoot(t)
-	binary := filepath.Join(root, prismBinary)
-	contract := filepath.Join(root, adminContract)
-
-	for _, required := range []string{binary, contract} {
-		_, err := os.Stat(required)
-		require.NoErrorf(t, err, "%s est absent — le mock et le contrat viennent de GitHub Packages : "+
-			"pnpm -C web install", required)
-	}
-
-	output := &bddtest.SyncBuffer{}
-	prism := exec.Command(binary, "mock", "--port", "0", "--host", "127.0.0.1", contract)
-	// Un environnement construit de zéro : un `FORCE_COLOR` hérité du shell faisait colorer ses
-	// annonces à Prism, et les regex qui les lisent ne trouvaient plus aucune route.
-	//nolint:forbidigo // PATH n'est pas une configuration du produit : il sert à trouver `node`.
-	prism.Env = []string{"PATH=" + os.Getenv("PATH")}
-	prism.Stdout = output
-	prism.Stderr = output
-
-	require.NoError(t, prism.Start(), "lancement du mock Prism")
-
-	// Un mock laissé vivant tient un port et fait échouer la suite suivante. Le hook s'exécute aussi
-	// quand un scénario tombe ; il ne couvre pas un binaire de test tué de l'extérieur.
-	t.Cleanup(func() {
-		_ = prism.Process.Kill()
-		_ = prism.Wait()
-	})
-
-	mock, err := awaitPrism(output, prismStartup)
-	require.NoError(t, err)
-
-	return mock
-}
-
-var (
-	// « Prism is listening on http://127.0.0.1:59086 » — la dernière ligne du démarrage.
-	prismListening = regexp.MustCompile(`Prism is listening on (http://\S+)`)
-	// « ℹ  info      GET        http://127.0.0.1:59086/admin/customers » — une ligne par opération.
-	prismRouteAnnouncement = regexp.MustCompile(`info\s+([A-Z]+)\s+(http://\S+)`)
-)
-
-func awaitPrism(output *bddtest.SyncBuffer, within time.Duration) (*prismMock, error) {
-	deadline := time.Now().Add(within)
-
-	for time.Now().Before(deadline) {
-		printed := output.String()
-
-		if listening := prismListening.FindStringSubmatch(printed); listening != nil {
-			return &prismMock{baseURL: listening[1], routes: announcedRoutes(printed)}, nil
-		}
-
-		time.Sleep(20 * time.Millisecond)
-	}
-
-	return nil, fmt.Errorf("le mock Prism n'a pas annoncé son écoute en %s :\n%s", within, output.String())
-}
-
-func announcedRoutes(printed string) []announcedRoute {
-	var routes []announcedRoute
-
-	for _, announcement := range prismRouteAnnouncement.FindAllStringSubmatch(printed, -1) {
-		routes = append(routes, announcedRoute{method: announcement[1], url: announcement[2]})
-	}
-
-	return routes
 }

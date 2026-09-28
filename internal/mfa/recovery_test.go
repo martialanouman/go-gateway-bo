@@ -1,7 +1,9 @@
 package mfa_test
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"regexp"
 	"strings"
 	"testing"
@@ -74,7 +76,7 @@ func TestACodeIsAcceptedWhateverItsFormatting(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			matched, err := mfa.MatchRecoveryCode(context.Background(), enrollment.RecoveryCodeHashes, presented)
+			matched, err := mfa.MatchRecoveryCode(context.Background(), discard, enrollment.RecoveryCodeHashes, presented)
 			require.NoError(t, err)
 			assert.Equal(t, 3, matched)
 		})
@@ -131,7 +133,7 @@ func TestAnUnknownCodeMatchesNoHash(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			matched, err := mfa.MatchRecoveryCode(context.Background(), enrollment.RecoveryCodeHashes, presented)
+			matched, err := mfa.MatchRecoveryCode(context.Background(), discard, enrollment.RecoveryCodeHashes, presented)
 			require.NoError(t, err)
 			assert.Equal(t, -1, matched)
 		})
@@ -165,7 +167,7 @@ func TestTheRecoveryCodeLoopDoesNotShortCircuit(t *testing.T) {
 
 	hashes := append(append([]string{}, enrollment.RecoveryCodeHashes...), duplicate)
 
-	matched, err := mfa.MatchRecoveryCode(context.Background(), hashes, enrollment.RecoveryCodes[0])
+	matched, err := mfa.MatchRecoveryCode(context.Background(), discard, hashes, enrollment.RecoveryCodes[0])
 	require.NoError(t, err)
 	assert.Equal(t, len(hashes)-1, matched,
 		"la boucle rend le premier rang qui colle et non le dernier : elle s'arrête donc dès qu'elle "+
@@ -181,7 +183,14 @@ func TestAnUnreadableHashDoesNotStopTheOthersFromMatching(t *testing.T) {
 
 	hashes := append([]string{"ceci n'est pas du PHC"}, enrollment.RecoveryCodeHashes...)
 
-	matched, err := mfa.MatchRecoveryCode(context.Background(), hashes, enrollment.RecoveryCodes[0])
+	var journal bytes.Buffer
+
+	matched, err := mfa.MatchRecoveryCode(context.Background(), slog.New(slog.NewJSONHandler(&journal, nil)),
+		hashes, enrollment.RecoveryCodes[0])
 	require.NoError(t, err)
 	assert.Equal(t, 1, matched)
+	assert.Contains(t, journal.String(), `"rank":0`)
+	assert.NotContains(t, journal.String(), "ceci n'est pas du PHC")
 }
+
+var discard = slog.New(slog.DiscardHandler)

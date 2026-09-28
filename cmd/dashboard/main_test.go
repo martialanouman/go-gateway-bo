@@ -130,6 +130,7 @@ func TestTheBuildStopsWhenItsDeadlinePasses(t *testing.T) {
 // Ces scénarios sont le seul endroit où le câblage réel est exercé (DN-3, niveau 2). Le registre qui
 // exige qu'ils aient tourné vit dans `internal/bddtest`, avec ses propres tests unitaires.
 func TestScenarios(t *testing.T) {
+	suiteGatewayURL = bddtest.AdminMock(t)
 	ran := &bddtest.Ledger{}
 	visited := &bddtest.OperationLedger{}
 
@@ -273,6 +274,7 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	realtime := &realtimeWorld{process: p}
 	realtime.registerSteps(ctx)
 	(&notificationsWorld{operators: operators, realtime: realtime}).registerSteps(ctx)
+	(&customerGroupsWorld{process: p}).registerSteps(ctx)
 	ctx.Then(`^le serveur s'arrête sans erreur$`, p.exitsCleanly)
 	ctx.Then(`^le tableau de bord s'affiche$`, p.servesDashboard)
 	ctx.Then(`^le script est servi$`, p.servesScript)

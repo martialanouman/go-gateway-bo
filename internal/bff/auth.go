@@ -14,23 +14,6 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// maximumPasswordLength et maximumEmailLength redisent en Go les bornes que le contrat déclare. Le
-// redire n'est pas une duplication : **rien dans ce dépôt ne valide une requête à l'exécution** contre
-// le YAML — le code engendré ne le fait pas, et `contract.feature` ne valide que les réponses.
-//
-// Le corps entier est déjà borné à huit kibioctets par `RequestSize`. Ces deux lignes bornent les
-// **champs**, et ce n'est pas redondant : huit kibioctets de mot de passe restent huit kibioctets à
-// hacher, et huit kibioctets d'adresse deviennent la clé `subject` de `login_attempt_counters`, la
-// seule table du schéma qu'une requête non authentifiée fait écrire.
-//
-// Le compte est en **runes** et non en octets, comme la `maxLength` du contrat et comme les deux
-// autres lectures bornées du dépôt. En octets, un mot de passe de 2 049 caractères accentués aurait
-// été refusé alors que le contrat l'autorise.
-const (
-	maximumPasswordLength = 4096
-	maximumEmailLength    = 320
-)
-
 // maximumLoginBodyBytes borne ce que le décodeur JSON accepte de lire. La borne du champ ne suffit
 // pas : elle s'applique après le décodage, donc après avoir lu le corps entier en mémoire.
 const maximumLoginBodyBytes = 8 * 1024
@@ -93,9 +76,7 @@ func (a API) Login(ctx context.Context, request LoginRequestObject) (LoginRespon
 	// pointeur sans condition — donc aucun test ne la garde. Elle reste parce que c'est la
 	// régénération du contrat qui décide de cette forme : un corps déclaré optionnel la rendrait
 	// atteignable, et son absence serait alors un panic.
-	if request.Body == nil ||
-		len([]rune(request.Body.Password)) > maximumPasswordLength ||
-		len([]rune(request.Body.Email)) > maximumEmailLength {
+	if request.Body == nil {
 		return Login400JSONResponse(badRequest()), nil
 	}
 

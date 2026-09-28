@@ -984,6 +984,32 @@ paths:
         '404': { $ref: '#/components/responses/NotificationInconnue' }
         '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
 
+  /customer-groups:
+    get:
+      operationId: listCustomerGroups
+      summary: Les groupes de clients de la passerelle
+      description: |
+        Relayée vers `list-customer-groups` de l'API Admin. Un groupe est organisationnel : il ne
+        porte ni solde, ni quota, ni règle de configuration.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/CustomerGroupStatus' }
+      responses:
+        '200':
+          description: Tous les groupes, ou ceux du statut demandé.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CustomerGroup' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
 components:
   parameters:
     OperatorId:
@@ -1001,6 +1027,19 @@ components:
     # Les réponses partagées par les routes d'administration. `PermissionRefusee` couvre les trois
     # refus possibles en 403 : l'origine (`forbidden_origin`), le second facteur non franchi
     # (`mfa_required`) et la permission manquante (`permission_denied`), qui la nomme.
+    RefusDeLaPasserelle:
+      description: |
+        La passerelle a refusé la demande ; `errors[]` nomme les champs en cause quand elle les donne.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PasserelleIndisponible:
+      description: |
+        La passerelle n'a pas répondu, ou a répondu en erreur : réessayer quand elle se rétablit.
+        Ce n'est jamais un module désactivé.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     SessionAbsente:
       description: Aucune session vivante.
       content:
@@ -1101,8 +1140,7 @@ components:
           maxLength: 320
         password:
           # La borne n'est pas cosmétique : chaque tentative coûte un argon2id de 64 MiB au serveur,
-          # et un corps sans borne en ferait une arme. Elle est **aussi** appliquée en Go — rien dans
-          # ce dépôt ne valide une requête à l'exécution contre ce fichier.
+          # et un corps sans borne en ferait une arme. Le BFF valide chaque requête contre ce fichier.
           type: string
           minLength: 1
           maxLength: 4096
@@ -1267,6 +1305,7 @@ components:
         challenge:
           type: string
           minLength: 43
+          maxLength: 64
         method:
           # Un discriminant explicite plutôt qu'un « essayer l'un puis l'autre » : essayer les deux
           # ferait payer les argon2id du chemin de récupération à chaque code TOTP faux, et la
@@ -1295,7 +1334,8 @@ components:
           #
           # L'asymétrie avec les options rendues plus bas, qui sont des DTO déclarés champ par champ,
           # est délibérée : c'est **en sortie** que déclarer garde quelque chose, puisqu'un champ
-          # absent du struct ne peut pas fuir. En entrée, un champ non déclaré est simplement ignoré.
+          # absent du struct ne peut pas fuir. En entrée, cet objet reste ouvert : le validateur y
+          # accepte tout champ, et c'est la bibliothèque qui juge l'assertion.
           #
           # `additionalProperties: true` est nécessaire et non décoratif : sans lui, le générateur
           # TypeScript rend `Record<string, never>`, un type où aucune clé ne peut être écrite. Mesuré
@@ -1741,13 +1781,42 @@ components:
     Error:
       type: object
       description: |
-        La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-        `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-        première route qui relaie la passerelle (step-059).
+        La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+        et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+        place chaque refus sous le champ qu'il nomme.
       additionalProperties: false
       properties:
         code:
           type: string
         message:
           type: string
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
       required: [code, message]
+
+    CustomerGroupStatus:
+      type: string
+      enum: [active, archived]
+
+    CustomerGroup:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        status: { $ref: '#/components/schemas/CustomerGroupStatus' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, name, status, createdAt, updatedAt]
+
+    FieldError:
+      type: object
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+      required: [field, message]

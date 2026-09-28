@@ -11,20 +11,6 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
-// maximumChallengeLength borne ce qu'un corps peut présenter comme challenge. Le contrat n'en déclare
-// que la longueur minimale, et `auth.ChallengeDigest` refuse déjà tout ce qui ne fait pas exactement
-// trente-deux octets décodés — cette borne-ci refuse simplement plus tôt, avant le décodage.
-const maximumChallengeLength = 64
-
-// maximumCodeLength redit en Go la borne que le contrat déclare, pour la même raison que celles de
-// `Login` : rien dans ce dépôt ne valide une requête à l'exécution contre le YAML.
-//
-// Ce qu'elle achète est un refus **tôt**, pas une économie de calcul : argon2id ne dépend pas de la
-// longueur de son entrée, donc un code de soixante-quatre caractères et un code de six coûtent
-// exactement le même quart de seconde. Le corps entier est par ailleurs déjà borné à huit kibioctets
-// par `RequestSize`.
-const maximumCodeLength = 64
-
 // EnrollTotp enrôle une application d'authentification et rend, **une seule fois**, de quoi la
 // configurer.
 //
@@ -441,7 +427,7 @@ func (a API) verifyPresentedFactor(ctx context.Context, operatorID string, metho
 // accompagné d'une assertion, est une requête que le serveur ne saurait pas interpréter — la traiter
 // comme un refus rendrait 401 là où le client a fait une faute de forme, et le lui cacherait.
 func presentedSecondFactorIsWellFormed(body MfaVerification) bool {
-	if len([]rune(body.Challenge)) > maximumChallengeLength || !body.Method.Valid() {
+	if !body.Method.Valid() {
 		return false
 	}
 
@@ -449,8 +435,7 @@ func presentedSecondFactorIsWellFormed(body MfaVerification) bool {
 		return body.Assertion != nil && len(*body.Assertion) > 0 && body.Code == nil
 	}
 
-	return body.Assertion == nil && body.Code != nil &&
-		len([]rune(*body.Code)) <= maximumCodeLength && *body.Code != ""
+	return body.Assertion == nil && body.Code != nil && *body.Code != ""
 }
 
 // verifySecondFactor aiguille sur la méthode présentée.
@@ -485,7 +470,7 @@ func presentedFactorIsWellFormed(request TotpEnrollmentRequest) bool {
 	// L'enum de **l'enrôlement** et non celui de la vérification, qui porte `webauthn` : les convertir
 	// l'un en l'autre ferait accepter ici une méthode que cette route ne sait pas exercer, et le repli
 	// de `verifyPresentedFactor` l'enverrait alors sur le chemin TOTP.
-	return request.Method.Valid() && len([]rune(*request.Code)) <= maximumCodeLength
+	return request.Method.Valid()
 }
 
 // refusedSecondFactor est le refus **unique** du second facteur, comme `refusedCredentials` l'est du
@@ -540,8 +525,7 @@ func secondFactorsOf(ctx context.Context, factors *mfa.Manager, operatorID strin
 func (a API) ConfirmTotp(ctx context.Context, request ConfirmTotpRequestObject) (ConfirmTotpResponseObject,
 	error,
 ) {
-	if request.Body == nil || request.Body.Code == "" ||
-		len([]rune(request.Body.Code)) > maximumCodeLength {
+	if request.Body == nil || request.Body.Code == "" {
 		return ConfirmTotp400JSONResponse(badRequest()), nil
 	}
 

@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"go/types"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,7 +75,7 @@ func servedByGuardRecording(t *testing.T, rules map[string]rule, grants grantsOf
 		[]StrictMiddlewareFunc{requirePermission(rules, grants, denied)},
 		StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  rejectRequest,
-			ResponseErrorHandlerFunc: reportFailedResponse,
+			ResponseErrorHandlerFunc: reportFailedResponse(slog.New(slog.DiscardHandler)),
 		})
 
 	rec := httptest.NewRecorder()

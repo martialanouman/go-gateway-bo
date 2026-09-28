@@ -3,10 +3,9 @@
 //
 // **Pourquoi engendrer plutôt qu'écrire.** `openapi-typescript` rend la forme et **jette les
 // contraintes** : `LoginRequest` sort en `{ email: string; password: string }`, quand le contrat
-// déclare `email.maxLength: 320` et `password.maxLength: 4096`. Le serveur les redit déjà à la main —
-// rien dans ce dépôt ne valide une requête à l'exécution contre le YAML — et une troisième rédaction
-// dériverait de la première comme la deuxième a failli le faire. Ici, un `maxLength` abaissé dans le
-// YAML change la sortie, donc le test.
+// déclare `email.maxLength: 320` et `password.maxLength: 4096`. Le serveur les applique en validant
+// chaque requête contre le YAML ; une rédaction à la main dériverait de lui. Ici, un `maxLength`
+// abaissé dans le YAML change la sortie, donc le test.
 //
 // **Les corps de requête, et eux seuls.** Un schéma de réponse n'a rien à valider : le client le
 // reçoit, il ne le compose pas. Les engendrer tous ferait du code sans consommateur que
