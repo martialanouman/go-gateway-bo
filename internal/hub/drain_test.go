@@ -2,6 +2,7 @@ package hub
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -92,4 +93,49 @@ func TestADeafClientDoesNotHoldRunBeyondTheGrace(t *testing.T) {
 	case <-time.After(4 * time.Second):
 		t.Fatal("Run attend un client muet au-delà du délai de grâce")
 	}
+}
+
+// Sans la porte fermée avant l'attente, une montée qui part de zéro socket pendant le drain rejoint un
+// WaitGroup déjà attendu : `go test -race` le voit, sur une passe sur quatre environ, d'où les dix arrêts.
+func TestUpgradesRacingTheDrainDoNotJoinIt(t *testing.T) {
+	t.Parallel()
+
+	for range 10 {
+		upgradeDuringDrain(t)
+	}
+}
+
+func upgradeDuringDrain(t *testing.T) {
+	t.Helper()
+
+	h := fastHub()
+	url := serveOn(t, h, grantAll)
+	stop, done := startHub(t, h, 2*time.Second)
+
+	quit := make(chan struct{})
+
+	var dialers sync.WaitGroup
+
+	for range 8 {
+		dialers.Go(func() {
+			for {
+				select {
+				case <-quit:
+					return
+				default:
+				}
+
+				//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
+				if conn, _, err := websocket.Dial(t.Context(), url, nil); err == nil {
+					_ = conn.CloseNow()
+				}
+			}
+		})
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	stop()
+	<-done
+	close(quit)
+	dialers.Wait()
 }
