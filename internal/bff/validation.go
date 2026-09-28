@@ -75,7 +75,7 @@ func refusalOf(router routers.Router, r *http.Request) (Error, bool) {
 func refusedFieldsOf(err error, field string) []FieldError {
 	// Un étage à la fois : `errors.As` sauterait du `RequestError` au `MultiError` qu'il enveloppe, et
 	// perdrait en route le nom du paramètre.
-	switch refused := err.(type) {
+	switch refused := err.(type) { //nolint:errorlint // voir juste au-dessus.
 	case openapi3.MultiError:
 		var fields []FieldError
 		for _, each := range refused {

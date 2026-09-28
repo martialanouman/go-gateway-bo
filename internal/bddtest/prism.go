@@ -79,6 +79,7 @@ func StartPrism(t *testing.T) *PrismMock {
 	}
 
 	output := &SyncBuffer{}
+	//nolint:gosec // G204 : le binaire et le contrat sont deux chemins fixes du dépôt.
 	prism := exec.Command(binary, "mock", "--port", "0", "--host", "127.0.0.1", contract)
 	// Un environnement construit de zéro : un `FORCE_COLOR` hérité du shell faisait colorer ses
 	// annonces à Prism, et les regex qui les lisent ne trouvaient plus aucune route.

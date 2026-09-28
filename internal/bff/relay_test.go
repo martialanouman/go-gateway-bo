@@ -33,8 +33,10 @@ func TestAnUpstreamValidationErrorKeepsItsFields(t *testing.T) {
 func TestAnUnavailableGatewayIsRelayedAsRetryable(t *testing.T) {
 	t.Parallel()
 
-	for _, upstream := range []int{http.StatusInternalServerError, http.StatusServiceUnavailable,
-		http.StatusTooManyRequests} {
+	for _, upstream := range []int{
+		http.StatusInternalServerError, http.StatusServiceUnavailable,
+		http.StatusTooManyRequests,
+	} {
 		status, body, relayed := relayError(&gateway.APIError{Status: upstream, Code: gateway.CodeUpstreamUnreadable})
 
 		assert.True(t, relayed)
