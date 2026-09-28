@@ -146,6 +146,10 @@ rédactions ne compilaient pas ; elles ont été réécrites jusqu'à nommer un 
 | Journal du code de secours illisible retiré | `TestAnUnreadableHashDoesNotStopTheOthersFromMatching` |
 | Garde sur `customers:read` au lieu de `groups:read` | scénario « sans groups:read, la liste est refusée… » |
 | Journal du 503 relayé retiré | scénario « une passerelle en panne… laisse une trace au journal du serveur » |
+| Erreur de transport rendue telle quelle (500) | scénario « une passerelle injoignable se dit indisponible… » |
+| URL non réduite au chemin avant validation (forme absolue) | `TestAnAbsoluteFormRequestIsValidatedAllTheSame` — le défaut, relevé en revue, a d'abord été reproduit par ce test |
+| Corps non rendu au handler après validation | `TestAnUnreachableDatabaseIsNotReadAsACredentialsRefusal`, `TestAnAccentedAddressUnderTheBoundIsNotRefused` et deux tests de forme du second facteur |
+| Message amont servi dans le 503 | scénario « une passerelle en panne… » par « la réponse ne porte pas » — **vert avant qu'on l'ajoute** : le scénario ne lisait que la sortie du serveur |
 
 ## Critère 4 — ce qu'aucun test ne garde
 - **La valeur 64 de `MaxConnsPerHost`.** Le test vérifie que la borne tient, pas qu'elle est juste ;
@@ -155,6 +159,14 @@ rédactions ne compilaient pas ; elles ont été réécrites jusqu'à nommer un 
   appel, donc un test en processus ne la rejoue pas.
 - **`auditRelayed` n'a pas encore d'appelant de production** : les mutations de step-060 seront les
   premières. Ses trois tests la gardent seule.
+- **L'issue d'une action relayée s'écrit hors de l'annulation de la requête**
+  (`context.WithoutCancel`, `relay.go`) : aucun test n'annule la requête entre l'appel et la seconde
+  écriture. Sans cette ligne, un onglet fermé laisse `attempted` seul, ce qui reste honnête.
+- **Un 422 relayé sert le `message` de la passerelle tel quel**, en anglais le plus souvent : c'est
+  la forme unique du §1.4, et la traduction des refus amont n'est pas de cette step.
+- **Un tokenUrl qui répond en erreur** voit son corps recopié au journal par `RetrieveError.Error()`
+  d'oauth2 v0.36.0 (`token.go:212`). Ce n'est pas du contenu de message (invariant a), mais c'est du
+  texte amont ; relevé en revue, laissé tel quel.
 
 ## Definition of Done
 - [x] `make check` vert, `make e2e` vert (28/09/2026).
