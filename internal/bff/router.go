@@ -9,6 +9,7 @@ package bff
 import (
 	"context"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/netip"
 
@@ -45,6 +46,7 @@ type Dependencies struct {
 	Origin string
 	// Realtime relaie les flux de la passerelle sur `/ws`.
 	Realtime *hub.Hub
+	Logger   *slog.Logger
 }
 
 // NewRouter assemble les routes du BFF et le service des assets de la SPA.
@@ -77,7 +79,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		// fait que sur une requête déjà bornée et porteuse d'un cookie scellé.
 		api.Use(withSession(deps.Sessions))
 
-		mountContract(api, deps.API, deps.Sessions, deps.Audit)
+		mountContract(api, deps.API, deps.Sessions, deps.Audit, deps.Logger)
 
 		// Deux raisons, et l'ordre des lignes n'en est pas une. La première est la forme : un
 		// `/api/*` inconnu rend le DTO d'erreur du produit, pas le texte brut de chi. La seconde
@@ -125,8 +127,10 @@ func NewRouter(deps Dependencies) http.Handler {
 // `TestTheContractMountInstallsTheProductErrorHandler` qui garde le montage. Sans l'option,
 // `HandlerFromMux` rendrait le message Go en `text/plain` — mesuré le 02/08/2026 sur un contrat muté
 // avec un paramètre de requête requis, puis restauré.
-func mountContract(api chi.Router, impl StrictServerInterface, sessions *session.Manager, audit *store.Audit) {
-	HandlerWithOptions(newContractHandler(impl, sessions, audit), ChiServerOptions{
+func mountContract(api chi.Router, impl StrictServerInterface, sessions *session.Manager, audit *store.Audit,
+	logger *slog.Logger,
+) {
+	HandlerWithOptions(newContractHandler(impl, sessions, audit, logger), ChiServerOptions{
 		BaseRouter:       api,
 		ErrorHandlerFunc: rejectRequest,
 	})
@@ -149,24 +153,20 @@ func mountContract(api chi.Router, impl StrictServerInterface, sessions *session
 // erreur — `fmt.Errorf("appel de %s: %w", cfg.Gateway.BaseURL, err)` — servirait sans lui l'adresse
 // interne de l'API Admin au navigateur.
 //
-// L'erreur n'est ni journalisée ni propagée, et c'est un manque assumé plutôt qu'un oubli : aucun
-// journal n'atteint ce paquet, la `Dependencies` de `NewRouter` ne portant pas de `*slog.Logger`, qui
-// s'arrête à `cmd/dashboard`. Un 500 servi ici ne laisse donc **aucune trace côté serveur**, y
-// compris sur une route qui travaille : un `password_hash` corrompu en base fait refuser la connexion
-// sans que rien ne le dise. Le premier appel réel à la passerelle (step-059) devra apporter les deux
-// à la fois.
+// L'erreur part au journal du serveur et jamais au navigateur : elle peut nommer la topologie interne.
 //
 // **L'ordre du slice compte.** La boucle du wrapper engendré enveloppe successivement, donc le
 // **dernier** élément est le plus extérieur : la garde s'exécute avant tout le reste, et son refus
 // court-circuite la machinerie de cookie — qui ne pose rien, ne posant que sur
 // `err == nil && pending.cookie != nil`.
 func newContractHandler(impl StrictServerInterface, sessions *session.Manager, audit *store.Audit,
+	logger *slog.Logger,
 ) ServerInterface {
 	return NewStrictHandlerWithOptions(impl,
 		[]StrictMiddlewareFunc{writePendingCookie(), requirePermission(authorization, grantsFrom(sessions), audit.Record)},
 		StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  rejectRequest,
-			ResponseErrorHandlerFunc: reportFailedResponse,
+			ResponseErrorHandlerFunc: reportFailedResponse(logger),
 		})
 }
 
@@ -196,8 +196,20 @@ func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
 	})
 }
 
-func reportFailedResponse(w http.ResponseWriter, _ *http.Request, _ error) {
-	writeJSON(w, http.StatusInternalServerError, unexpectedError())
+func reportFailedResponse(logger *slog.Logger) func(http.ResponseWriter, *http.Request, error) {
+	return func(w http.ResponseWriter, r *http.Request, err error) {
+		logger.ErrorContext(r.Context(), "une requête a échoué", "route", routeOf(r), "error", err)
+		writeJSON(w, http.StatusInternalServerError, unexpectedError())
+	}
+}
+
+// routeOf rend le motif et non le chemin : un identifiant dans l'URL n'a rien à faire au journal.
+func routeOf(r *http.Request) string {
+	if route := chi.RouteContext(r.Context()); route != nil && route.RoutePattern() != "" {
+		return r.Method + " " + route.RoutePattern()
+	}
+
+	return r.Method
 }
 
 func unexpectedError() Error {

@@ -216,6 +216,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		// une origine, pas deux.
 		Origin:   cfg.Auth.WebauthnOrigin,
 		Realtime: realtime,
+		Logger:   logger,
 	})
 
 	return serve(ctx, ln, router, cfg.ShutdownTimeout, logger)

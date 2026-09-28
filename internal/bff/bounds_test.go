@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -43,6 +44,7 @@ func apiRouter(t *testing.T) http.Handler {
 		// en 403 **avant** les bornes que ce fichier mesure, et chaque cas se lirait « refusée à la
 		// porte » pour la mauvaise porte.
 		Origin: dashboardOrigin,
+		Logger: slog.New(slog.DiscardHandler),
 	})
 }
 
@@ -342,6 +344,7 @@ func TestAnUnreachableDatabaseDoesNotCloseTheOperatorSession(t *testing.T) {
 	handler := NewRouter(Dependencies{
 		Assets: fstest.MapFS{},
 		API:    API{Sessions: session.NewManager(store.NewSessions(pool), secret)},
+		Logger: slog.New(slog.DiscardHandler),
 	})
 
 	request := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
