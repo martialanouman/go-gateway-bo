@@ -190,7 +190,8 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 	go func() {
 		defer close(realtimeDone)
-		realtime.Run(realtimeCtx, dialStream(cfg.Gateway.BaseURL, streams), coordination, cfg.Redis.Namespace)
+		realtime.Run(realtimeCtx, dialStream(cfg.Gateway.BaseURL, streams), coordination, cfg.Redis.Namespace,
+			cfg.ShutdownTimeout)
 	}()
 
 	defer func() {

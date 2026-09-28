@@ -10,9 +10,10 @@ import (
 )
 
 // Run tient l'instance dans le groupe jusqu'à l'annulation de ctx : elle brigue le bail, consomme la
-// passerelle quand elle le porte, et rediffuse ce qu'elle lit sur Redis — le porteur compris. Un seul
-// chemin : Redis injoignable, les sujets passent `stale`, sans repli sur une consommation directe.
-func (h *Hub) Run(ctx context.Context, dial Dialer, rdb *redis.Client, namespace string) {
+// passerelle quand elle le porte, et rediffuse ce qu'elle lit sur Redis — le porteur compris. À
+// l'annulation, elle attend aussi le drain des sockets, borné à grace. Un seul chemin : Redis
+// injoignable, les sujets passent `stale`, sans repli sur une consommation directe.
+func (h *Hub) Run(ctx context.Context, dial Dialer, rdb *redis.Client, namespace string, grace time.Duration) {
 	channel := namespace + ":realtime"
 	leader := lease{rdb: rdb, key: namespace + ":realtime:leader", holder: h.instance, ttl: h.leaseTTL}
 
@@ -22,8 +23,36 @@ func (h *Hub) Run(ctx context.Context, dial Dialer, rdb *redis.Client, namespace
 	group.Go(func() { h.lead(ctx, dial, rdb, channel, leader) })
 
 	<-ctx.Done()
+
+	h.mu.Lock()
+	h.draining = true
+	h.mu.Unlock()
+
+	// Le bail se rend en parallèle du drain : le délai de grâce court dès l'annulation.
 	close(h.stopping)
+	h.drain(grace)
 	group.Wait()
+}
+
+// drain attend que chaque socket ait fini sa poignée de fermeture, jamais au-delà de grace :
+// l'orchestrateur tuerait le process de toute façon.
+func (h *Hub) drain(grace time.Duration) {
+	drained := make(chan struct{})
+	go func() {
+		h.serving.Wait()
+		close(drained)
+	}()
+
+	select {
+	case <-drained:
+	case <-time.After(grace):
+		h.mu.Lock()
+		open := h.open
+		h.mu.Unlock()
+
+		h.logger.Warn("arrêt à l'échéance : des sockets n'ont pas fini leur fermeture",
+			"sockets", open, "grace", grace.String())
+	}
 }
 
 // leaderView est l'état des sujets vu par le porteur du bail : chaque changement part aussitôt sur

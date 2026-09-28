@@ -1,6 +1,6 @@
 # 022 — Le pool est détaché du contexte d'arrêt, et **sa fermeture non plus n'est gardée**
 
-> **Porteur :** step-047
+> **Porteur :** step-186
 
 ## Ce qu'elle coûte si elle dure
 
