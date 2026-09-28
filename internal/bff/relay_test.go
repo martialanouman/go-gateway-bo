@@ -1,13 +1,17 @@
 package bff
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/martialanouman/go-gateway-bo/internal/gateway"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 func TestAnUpstreamValidationErrorKeepsItsFields(t *testing.T) {
@@ -53,4 +57,83 @@ func TestARefusalOfTheMachineTokenIsNotRelayed(t *testing.T) {
 
 	_, _, relayed := relayError(errors.New("connexion refusée"))
 	assert.False(t, relayed)
+}
+
+type auditLine struct {
+	action string
+	after  string
+}
+
+type auditTrail struct {
+	lines  []auditLine
+	broken bool
+}
+
+func (a *auditTrail) record(_ context.Context, event store.Event) error {
+	if a.broken {
+		return errors.New("partition manquante")
+	}
+
+	after, err := event.After.JSON()
+	if err != nil {
+		return err
+	}
+
+	a.lines = append(a.lines, auditLine{action: event.Action, after: string(after)})
+
+	return nil
+}
+
+func TestARelayedActionIsAuditedBeforeTheCall(t *testing.T) {
+	t.Parallel()
+
+	trail := &auditTrail{}
+
+	var seenBeforeTheCall int
+
+	status, err := auditRelayed(context.Background(), trail.record, slog.New(slog.DiscardHandler),
+		store.Event{Action: "group.create", After: store.NewFields().Text("name", "Revendeurs")},
+		func(context.Context) (int, error) {
+			seenBeforeTheCall = len(trail.lines)
+
+			return http.StatusCreated, nil
+		})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, status)
+	assert.Equal(t, 1, seenBeforeTheCall, "l'intention n'était pas écrite quand l'appel est parti")
+	require.Len(t, trail.lines, 2)
+	assert.JSONEq(t, `{"name":"Revendeurs","outcome":"attempted"}`, trail.lines[0].after)
+	assert.JSONEq(t, `{"name":"Revendeurs","outcome":"succeeded","status":"201"}`, trail.lines[1].after)
+}
+
+func TestARelayedActionIsNotCalledWhenItCannotBeAudited(t *testing.T) {
+	t.Parallel()
+
+	called := false
+
+	_, err := auditRelayed(context.Background(), (&auditTrail{broken: true}).record, slog.New(slog.DiscardHandler),
+		store.Event{Action: "group.delete"},
+		func(context.Context) (int, error) {
+			called = true
+
+			return http.StatusNoContent, nil
+		})
+
+	require.Error(t, err)
+	assert.False(t, called, "une action est partie sans trace")
+}
+
+func TestARefusedRelayedActionIsAuditedAsFailed(t *testing.T) {
+	t.Parallel()
+
+	trail := &auditTrail{}
+
+	_, err := auditRelayed(context.Background(), trail.record, slog.New(slog.DiscardHandler),
+		store.Event{Action: "group.update"},
+		func(context.Context) (int, error) { return http.StatusUnprocessableEntity, nil })
+
+	require.NoError(t, err)
+	require.Len(t, trail.lines, 2)
+	assert.JSONEq(t, `{"outcome":"failed","status":"422"}`, trail.lines[1].after)
 }

@@ -1,10 +1,15 @@
 package bff
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/martialanouman/go-gateway-bo/internal/gateway"
+	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
 // relayError traduit une réponse d'erreur de la passerelle dans la forme du produit (§1.4). `relayed`
@@ -44,4 +49,40 @@ func fieldErrors(upstream gateway.APIError) *[]FieldError {
 	}
 
 	return &fields
+}
+
+// auditRelayed trace une action que la passerelle exécute : la transaction commune avec l'audit est
+// impossible, puisque l'action vit ailleurs. L'intention s'écrit donc **avant** l'appel, et une
+// écriture qui échoue l'empêche de partir. L'issue s'écrit après ; une panne entre les deux laisse
+// `attempted` seul, qui se lit « issue inconnue » et non « rien ».
+//
+// `call` rend le statut amont. La seconde écriture ne fait pas échouer la route : l'action est faite,
+// et l'annoncer ratée ferait recommencer l'opérateur.
+func auditRelayed(ctx context.Context, record func(context.Context, store.Event) error, logger *slog.Logger,
+	event store.Event,
+	call func(context.Context) (int, error),
+) (int, error) {
+	event.After = event.After.Text("outcome", "attempted")
+	if err := record(ctx, event); err != nil {
+		return 0, fmt.Errorf("l'intention de %s n'a pas pu être tracée : %w", event.Action, err)
+	}
+
+	status, err := call(ctx)
+
+	outcome := "succeeded"
+	if err != nil || status < http.StatusOK || status >= http.StatusMultipleChoices {
+		outcome = "failed"
+	}
+
+	event.After = event.After.Text("outcome", outcome)
+	if status != 0 {
+		event.After = event.After.Text("status", strconv.Itoa(status))
+	}
+
+	if recordErr := record(ctx, event); recordErr != nil {
+		logger.ErrorContext(ctx, "l'issue d'une action relayée n'a pas pu être tracée", "action", event.Action,
+			"outcome", outcome, "error", recordErr)
+	}
+
+	return status, err
 }
