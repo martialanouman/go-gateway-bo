@@ -182,8 +182,7 @@ func withAPIDeadlines(next http.Handler) http.Handler {
 		// Deux sources possibles : un `ResponseWriter` qui ne sait pas poser d'échéance, et une
 		// connexion déjà fermée — `(*response).SetReadDeadline` transmet à la `net.Conn` brute, qui
 		// rend alors une erreur. Aucune des deux ne mérite un 500 : la seconde décrit un client
-		// parti. Elle est écartée plutôt que journalisée parce qu'aucun journal n'atteint ce paquet
-		// (voir `newContractHandler`).
+		// parti, et un client parti n'est pas une panne à journaliser.
 		_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(apiBodyDeadline))
 
 		ctx, cancel := context.WithTimeout(r.Context(), apiRequestDeadline)

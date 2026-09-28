@@ -177,7 +177,7 @@ func machineCredentials(cfg config.GatewayConfig) clientcredentials.Config {
 
 // maxConnsPerHost borne la pression d'une instance sur l'API Admin (invariant e). La passerelle ne
 // parle que HTTP/1.1 (`go-gateway`, cmd/admin-api-svc/wiring.go:450) : une connexion porte une requête,
-// donc la borne est celle des requêtes en vol. Mesure dans tasks/steps/step-059.md.
+// donc la borne est celle des requêtes en vol. Mesure dans tasks/steps/done/step-059.md.
 const maxConnsPerHost = 64
 
 func outboundTransport(cfg config.GatewayConfig) (http.RoundTripper, error) {

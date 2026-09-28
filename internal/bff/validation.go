@@ -108,8 +108,9 @@ func refusedFieldsOf(err error, field string) []FieldError {
 	return namedFields([]string{field}, "")
 }
 
-// ponytail: le contrat étant en 3.1, openapi3filter valide par JSON Schema 2020 (validate_request.go:247
-// de kin-openapi v0.149.0), qui ne rend l'emplacement et la règle qu'en texte. Les formes lues ici
+// ponytail: le contrat étant en 3.1, openapi3filter valide par JSON Schema 2020 (kin-openapi v0.149.0,
+// validate_request.go:247 pour les paramètres, :359 pour les corps), qui ne rend l'emplacement et la
+// règle qu'en texte. Les formes lues ici
 // sont figées par validation_test.go : un bump qui les change fait rougir, il ne se tait pas.
 var (
 	failureAt     = regexp.MustCompile(`^(?:error at "[^"]*": )?at '([^']*)': (.*)$`)

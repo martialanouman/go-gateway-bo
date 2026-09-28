@@ -13,7 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// failingAPI rend 500 sur toute opération atteinte : un 400 prouve donc que le refus est venu avant.
+// servedByTheContract sert la requête par `failingAPI`, qui rend 500 sur toute opération atteinte :
+// un 400 prouve donc que le refus est venu avant.
 func servedByTheContract(t *testing.T, method, path, body string) (int, Error) {
 	t.Helper()
 

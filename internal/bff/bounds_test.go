@@ -153,8 +153,7 @@ func TestABodyLargerThanTheBoundIsNotDecoded(t *testing.T) {
 // La plus grave des lignes que ces tests gardent : une base injoignable lue comme un refus
 // d'identifiants ferait retaper son mot de passe à un opérateur dont le mot de passe est bon.
 //
-// Le corps est vérifié autant que le statut — `internal/bff` n'a pas de journal, donc ce que le
-// navigateur reçoit est tout ce qui existe.
+// Le corps est vérifié autant que le statut : c'est lui que l'opérateur lit.
 func TestAnUnreachableDatabaseIsNotReadAsACredentialsRefusal(t *testing.T) {
 	t.Parallel()
 

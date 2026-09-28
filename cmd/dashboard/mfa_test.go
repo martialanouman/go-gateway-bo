@@ -317,8 +317,8 @@ func (w *mfaWorld) presentCodeWithoutEnrolment() error {
 }
 
 // Les deux refus de forme. Le corps entier est déjà borné à huit kibioctets par le routeur : ce que
-// ces deux cas exercent est la borne du **champ**, redite en Go parce que rien ne valide une requête
-// contre le YAML à l'exécution.
+// ces deux cas exercent est la borne du **champ**, que le BFF juge en validant la requête contre le
+// contrat.
 func (w *mfaWorld) presentOversizedCode() error {
 	return w.verify("totp", strings.Repeat("1", 5_000))
 }

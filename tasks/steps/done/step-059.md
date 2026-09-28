@@ -59,8 +59,9 @@ de lecture, `GET /customer-groups`, les exerce. Le CRUD complet et l'écran vien
   déclaré) ; `Error.errors[]` ; la phrase « arrive avec la première route qui relaie la passerelle
   (step-060) » devient vraie de l'état livré. Régénération Go et TypeScript.
 - **Serveur** : `NewAdminClient` câblé dans `cmd/dashboard` et passé à `Dependencies` ; handler
-  `listCustomerGroups` et sa garde ; traduction `gateway.APIError` → `Error` (statut conservé pour
-  les 4xx amont ; un 503 amont reste une erreur avec « Réessayer », jamais « module désactivé », §1.4) ; logger ;
+  `listCustomerGroups` et sa garde ; traduction vers `Error` (un 422 amont relayé avec ses champs ;
+  429, 5xx et passerelle injoignable en 503 avec « Réessayer », jamais « module désactivé », §1.4 ;
+  tout autre statut amont en 500 journalisé) ; logger ;
   validation des requêtes ; `RoundTripper` du jeton ; transport ; `auditRelayed`.
 - **Les huit dettes payées, fichiers supprimés** : 002, 003, 015, 016, 031, 032, 033, 054.
 - **Renvois** : les fiches archivées qui désignent step-060 comme « première route qui appelle la
@@ -87,7 +88,8 @@ en vol. **64 par instance** : au pic, une rafale n'ajoute qu'une centaine de mil
 instances ne tiennent jamais plus de 128 requêtes ouvertes chez la passerelle (invariant e).
 
 ## Tests (écrits dans la même PR)
-- **godog (`internal/bff`, contre Prism)** : un opérateur `groups:read` voit la liste ; un opérateur
+- **godog (`cmd/dashboard/customer-groups.feature`, le succès contre Prism, les refus contre un
+  faux amont)** : un opérateur `groups:read` voit la liste ; un opérateur
   sans `groups:read` reçoit 403 et une ligne `permission.denied` ; un `status` hors enum est refusé
   en 400 avec `errors[]` nommant `status`, **sans appel amont** ; une réponse d'erreur amont est
   réexposée dans la forme du produit, `errors[]` compris (faux amont qui rend un 422 à `errors[]` :
@@ -114,6 +116,13 @@ instances ne tiennent jamais plus de 128 requêtes ouvertes chez la passerelle (
   en 3.0 au validateur est impossible : le contrat emploie `type: "null"` dans un `oneOf`. Les formes
   lues sont figées par `internal/bff/validation_test.go` ; un bump de kin-openapi qui les change fait
   rougir.
+- **Une passerelle injoignable ou qui expire rend 503** (`bff_upstream_unreachable`), comme la copie
+  de `PasserelleIndisponible` le promet : la première rédaction la laissait en 500 « erreur
+  imprévue ». *Relevé en revue le 28/09/2026.*
+- **La validation passe avant la garde.** Une requête mal formée est refusée en 400 avant qu'on
+  sache si l'opérateur pouvait l'envoyer, et sans ligne `permission.denied` — comme l'était déjà un
+  corps JSON illisible, que le handler engendré décode avant la garde. Le contrat est public pour la
+  SPA : ce 400 n'apprend rien à personne.
 - **Le logger vit dans `API`**, embarqué dans `Dependencies`, puisque les handlers journalisent aussi.
 - **Le lanceur Prism est partagé** (`internal/bddtest/prism.go`) : les scénarios du binaire montent
   le même mock que ceux d'`internal/gateway`.
