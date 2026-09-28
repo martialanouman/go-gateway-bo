@@ -77,9 +77,16 @@ func (w *realtimeWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^la socket refuse "([^"]*)" en nommant "([^"]*)"$`, w.refuses)
 	ctx.Then(`^aucune trame "([^"]*)" n'arrive$`, w.nothingArrives)
 	ctx.Given(`^deux instances démarrées, la première portant le bail$`, w.startTwoInstances)
+	ctx.Given(`^la socket est ouverte sur la première instance$`, func() error {
+		return w.openSocketAt(w.process.addr)
+	})
 	ctx.Given(`^la socket est ouverte sur la seconde instance$`, func() error {
 		return w.openSocketAt(w.second.addr)
 	})
+	ctx.When(`^la socket est ouverte sur la seconde instance$`, func() error {
+		return w.openSocketAt(w.second.addr)
+	})
+	ctx.Then(`^la socket est fermée avec le code (\d+)$`, w.socketClosedWithCode)
 	ctx.Then(`^la passerelle compte (\d+) connexions? sur le flux des sessions$`, w.gatewayCounts)
 	ctx.When(`^la première instance reçoit SIGTERM$`, func() error {
 		w.sigtermAt = time.Now()
@@ -158,6 +165,9 @@ func (w *realtimeWorld) openSocket() error {
 	return w.openSocketAt(w.process.addr)
 }
 
+// openSocketAt remplace w.conn : la précédente, déjà fermée côté serveur dans le scénario qui rouvre
+// sur une autre instance, est abandonnée proprement plutôt que fuitée. Les cookies rejoués sont ceux
+// que le navigateur du scénario a retenus de la première instance : c'est la preuve « même session ».
 func (w *realtimeWorld) openSocketAt(addr string) error {
 	header := http.Header{"Origin": {configuredOrigin}}
 	for name, value := range w.process.cookies {
@@ -179,7 +189,28 @@ func (w *realtimeWorld) openSocketAt(addr string) error {
 		return fmt.Errorf("ouvrir la socket (%d) : %w", status, err)
 	}
 
+	if w.conn != nil {
+		_ = w.conn.CloseNow()
+	}
+
 	w.conn = conn
+
+	return nil
+}
+
+// socketClosedWithCode lit la socket jusqu'à sa fermeture et compare le code annoncé.
+func (w *realtimeWorld) socketClosedWithCode(code int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), socketWait)
+	defer cancel()
+
+	var err error
+	for err == nil {
+		_, _, err = w.conn.Read(ctx)
+	}
+
+	if status := websocket.CloseStatus(err); status != websocket.StatusCode(code) {
+		return fmt.Errorf("la socket s'est fermée avec %d, %d attendu : %w", status, code, err)
+	}
 
 	return nil
 }

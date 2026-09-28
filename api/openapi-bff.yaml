@@ -1600,9 +1600,9 @@ components:
     # lue — ont la forme `Error`. Fermetures : 4401 quand la session a pris fin (revérifiée toutes les
     # 30 s, sans être prolongée) ; 1008 quand le client a laissé déborder sa file, si la trame peut
     # encore partir — un client qui ne lit plus voit la connexion tomber sans code ; 1011 quand la
-    # session n'a pas pu être vérifiée ; 1001 quand le hub s'arrête, que l'arrêt du binaire n'attend
-    # pas encore (le drain est la step-047). `internal/hub/frames.go` en porte les DTO, et les scénarios de `cmd/dashboard`
-    # valident chaque message reçu contre ces schémas.
+    # session n'a pas pu être vérifiée ; 1001 quand le serveur s'arrête : l'arrêt attend que chaque
+    # socket l'ait reçu, dans son délai de grâce. `internal/hub/frames.go` en porte les DTO, et les
+    # scénarios de `cmd/dashboard` valident chaque message reçu contre ces schémas.
     RealtimeRequest:
       type: object
       description: Le seul message que le client envoie, 4 Kio au plus.
