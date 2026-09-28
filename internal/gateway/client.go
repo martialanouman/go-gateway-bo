@@ -175,6 +175,11 @@ func machineCredentials(cfg config.GatewayConfig) clientcredentials.Config {
 	}
 }
 
+// maxConnsPerHost borne la pression d'une instance sur l'API Admin (invariant e). La passerelle ne
+// parle que HTTP/1.1 (`go-gateway`, cmd/admin-api-svc/wiring.go:450) : une connexion porte une requête,
+// donc la borne est celle des requêtes en vol. Mesure dans tasks/steps/step-059.md.
+const maxConnsPerHost = 64
+
 func outboundTransport(cfg config.GatewayConfig) (http.RoundTripper, error) {
 	clientTLS, err := mutualTLS(cfg)
 	if err != nil {
@@ -189,16 +194,8 @@ func outboundTransport(cfg config.GatewayConfig) (http.RoundTripper, error) {
 		// Le BFF ne parle qu'à un seul hôte, et le défaut de net/http (2) y ferait rouvrir une
 		// connexion sur trois requêtes concurrentes — poignée de main TLS comprise.
 		MaxIdleConnsPerHost: 32,
-
-		// `MaxConnsPerHost` n'est pas posé, et c'est le seul cadran qui bornerait les connexions
-		// **ouvertes** : celui du dessus ne borne que les inactives. C'est par lui que passerait la
-		// pression du tableau de bord sur la passerelle, donc l'invariant (e). Il se règle sur une
-		// concurrence réelle, et aucune route n'appelle encore la passerelle.
-		//
-		// `Proxy` n'est pas posé non plus, là où http.DefaultTransport pose `ProxyFromEnvironment`
-		// ($GOROOT/src/net/http/transport.go:47) : ce transport-ci ignore donc HTTPS_PROXY et
-		// NO_PROXY, en silence et à rebours du défaut de net/http. À trancher quand un déploiement
-		// dira s'il passe par un proxy d'egress.
+		MaxConnsPerHost:     maxConnsPerHost,
+		Proxy:               http.ProxyFromEnvironment,
 	}}, nil
 }
 

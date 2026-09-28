@@ -69,6 +69,23 @@ de lecture, `GET /customer-groups`, les exerce. Le CRUD complet et l'écran vien
   `tasks/todo.md` porte le renvoi. Les renvois vivants du code (`router.go`,
   `login.tsx`, `openapi-bff.yaml`) sont corrigés dans la PR des fiches.
 
+## Mesure de `MaxConnsPerHost`
+
+Relevée le 28/09/2026 sur un M4 Pro : un serveur HTTP/1.1 local, dont chaque réponse prend 20 ms,
+reçoit 300 appels concurrents (le pic : 300 opérateurs sur une seule instance).
+
+| `MaxConnsPerHost` | 300 appels | Pire latence |
+|---|---|---|
+| sans borne | 39 ms | 38 ms |
+| 128 | 69 ms | 69 ms |
+| **64** | **111 ms** | **111 ms** |
+| 32 | 218 ms | 218 ms |
+
+La passerelle impose HTTP/1.1 (`go-gateway`, `cmd/admin-api-svc/wiring.go:450`,
+`NextProtos: ["http/1.1"]`) : une connexion porte une requête, donc la borne est celle des requêtes
+en vol. **64 par instance** : au pic, une rafale n'ajoute qu'une centaine de millisecondes, et deux
+instances ne tiennent jamais plus de 128 requêtes ouvertes chez la passerelle (invariant e).
+
 ## Tests (écrits dans la même PR)
 - **godog (`internal/bff`, contre Prism)** : un opérateur `groups:read` voit la liste ; un opérateur
   sans `groups:read` reçoit 403 et une ligne `permission.denied` ; un `status` hors enum est refusé
