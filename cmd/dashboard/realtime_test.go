@@ -165,9 +165,10 @@ func (w *realtimeWorld) openSocket() error {
 	return w.openSocketAt(w.process.addr)
 }
 
-// openSocketAt remplace w.conn : la précédente, déjà fermée côté serveur dans le scénario qui rouvre
-// sur une autre instance, est abandonnée proprement plutôt que fuitée. Les cookies rejoués sont ceux
-// que le navigateur du scénario a retenus de la première instance : c'est la preuve « même session ».
+// openSocketAt remplace w.conn, fermant l'ancienne qu'elle soit déjà close côté serveur ou encore
+// vivante — le Contexte de `high-availability.feature` en ouvre une sur la seconde instance avant
+// qu'un scénario en ouvre une autre. Les cookies rejoués sont ceux que le navigateur du scénario a
+// retenus de la première instance : c'est la preuve « même session ».
 func (w *realtimeWorld) openSocketAt(addr string) error {
 	header := http.Header{"Origin": {configuredOrigin}}
 	for name, value := range w.process.cookies {
@@ -198,7 +199,6 @@ func (w *realtimeWorld) openSocketAt(addr string) error {
 	return nil
 }
 
-// socketClosedWithCode lit la socket jusqu'à sa fermeture et compare le code annoncé.
 func (w *realtimeWorld) socketClosedWithCode(code int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), socketWait)
 	defer cancel()

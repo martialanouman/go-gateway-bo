@@ -39,6 +39,10 @@ Fonctionnalité: Plusieurs instances, un seul consommateur de la passerelle
 
   # Déploiement roulant : l'instance arrêtée ferme ses sockets en 1001, et l'opérateur retrouve le
   # temps réel sur l'autre avec la même session — elles vivent en base, pas dans l'instance.
+  #
+  # Mutation `h.drain(grace)` retirée : vert 5/5. `Serve` écrit le 1001 avant d'attendre la réponse,
+  # et une trame écrite survit à la sortie du process ; le drain garde la réponse du client et une
+  # socket lente, que seul `internal/hub/drain_test.go` exerce.
   Scénario: une socket de l'instance arrêtée reçoit 1001, et la session la rouvre sur l'autre
     Étant donné la socket est ouverte sur la première instance
     Et l'opérateur s'abonne à "sessions.events"
@@ -48,8 +52,3 @@ Fonctionnalité: Plusieurs instances, un seul consommateur de la passerelle
     Quand la socket est ouverte sur la seconde instance
     Et l'opérateur s'abonne à "sessions.events"
     Alors le sujet "sessions.events" est annoncé "live"
-
-  # Critère 4 : mesuré, retirer l'attente du drain dans Run (h.drain(grace)) laisse ce scénario vert
-  # cinq passes sur cinq. Le process ne rend la main qu'après que lead/follow terminent, ce qui laisse
-  # le temps au 1001 de partir même sans l'attente explicite — c'est `internal/hub/drain_test.go` qui
-  # garde cette propriété, pas ce scénario.
