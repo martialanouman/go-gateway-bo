@@ -125,7 +125,7 @@ func runHub(t *testing.T, h *Hub, dial Dialer, rdb *redis.Client, namespace stri
 	done := make(chan struct{})
 
 	go func() {
-		h.Run(ctx, dial, rdb, namespace)
+		h.Run(ctx, dial, rdb, namespace, 5*time.Second)
 		close(done)
 	}()
 
@@ -316,7 +316,7 @@ func TestNoGoroutineOutlivesTheRelay(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		h.Run(ctx, gateway.dial, rdb, namespace)
+		h.Run(ctx, gateway.dial, rdb, namespace, 5*time.Second)
 		close(done)
 	}()
 
@@ -464,7 +464,7 @@ func TestStoppingTheHubDoesNotWaitForAFrozenRedis(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		h.Run(ctx, gateway.dial, rdb, namespace)
+		h.Run(ctx, gateway.dial, rdb, namespace, 5*time.Second)
 		close(done)
 	}()
 

@@ -32,6 +32,8 @@ const (
 	maxBackoff   = 30 * time.Second
 
 	statusSessionEnded websocket.StatusCode = 4401
+
+	goingAway = "Le serveur s'arrête : la connexion va se rétablir."
 )
 
 // Access dit si la session de la socket est encore vivante, et quelles permissions elle porte.
@@ -60,6 +62,11 @@ type Hub struct {
 	mu          sync.Mutex
 	subscribers map[Topic]map[*client]struct{}
 	statuses    map[Topic]statusMessage
+	// serving compte les sockets de Serve ; draining, posé sous mu, ferme la porte avant l'attente :
+	// un Add concurrent d'un Wait déjà commencé est une course.
+	serving  sync.WaitGroup
+	open     int
+	draining bool
 
 	stopping chan struct{}
 }
@@ -201,6 +208,13 @@ func (h *Hub) setGranted(c *client, granted []string) {
 func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, access Access) {
 	defer func() { _ = conn.CloseNow() }()
 
+	if !h.enter() {
+		_ = conn.Close(websocket.StatusGoingAway, goingAway)
+
+		return
+	}
+	defer h.leave()
+
 	conn.SetReadLimit(maxClientMessage)
 
 	alive, granted, err := access(ctx)
@@ -229,7 +243,7 @@ func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, access Access) {
 			return
 
 		case <-h.stopping:
-			_ = conn.Close(websocket.StatusGoingAway, "Le serveur s'arrête : la connexion va se rétablir.")
+			_ = conn.Close(websocket.StatusGoingAway, goingAway)
 
 			return
 
@@ -272,6 +286,28 @@ func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, access Access) {
 			h.dropForbidden(c, granted)
 		}
 	}
+}
+
+func (h *Hub) enter() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.draining {
+		return false
+	}
+
+	h.serving.Add(1)
+	h.open++
+
+	return true
+}
+
+func (h *Hub) leave() {
+	h.mu.Lock()
+	h.open--
+	h.mu.Unlock()
+
+	h.serving.Done()
 }
 
 func read(ctx context.Context, conn *websocket.Conn, requests chan<- []byte) {
