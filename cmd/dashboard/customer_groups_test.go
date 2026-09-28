@@ -24,7 +24,7 @@ type customerGroupsWorld struct {
 func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^une passerelle servie par le mock du contrat$`, w.servedByTheMock)
 	ctx.Given(`^une passerelle qui refuse la liste des groupes sur le champ "([^"]*)"$`, w.refusingOnField)
-	ctx.Given(`^une passerelle qui répond 500 avec le corps "([^"]*)"$`, w.failingWithBody)
+	ctx.Given(`^une passerelle qui répond 500 avec le message "([^"]*)"$`, w.failingWithMessage)
 	ctx.Given(`^une passerelle qui compte les requêtes reçues$`, func() error {
 		return w.answering(http.StatusOK, `[]`)
 	})
@@ -54,8 +54,11 @@ func (w *customerGroupsWorld) refusingOnField(field string) error {
 		field))
 }
 
-func (w *customerGroupsWorld) failingWithBody(body string) error {
-	return w.answering(http.StatusInternalServerError, body)
+// failingWithMessage rend l'enveloppe du contrat : son `message` est du texte amont, que ni la
+// réponse ni le journal ne doivent porter.
+func (w *customerGroupsWorld) failingWithMessage(message string) error {
+	return w.answering(http.StatusInternalServerError, fmt.Sprintf(`{"code":"internal_error","message":%q}`,
+		message))
 }
 
 func (w *customerGroupsWorld) answering(status int, body string) error {

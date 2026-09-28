@@ -374,8 +374,8 @@ Fonctionnalité: Le second facteur TOTP
     Et le serveur répond 401
     Et le refus ne dit pas ce qui a été refusé
 
-  # Les bornes que le contrat déclare sont redites en Go, parce que rien dans ce dépôt ne valide une
-  # requête à l'exécution contre le YAML. Sans ces deux cas, les redire ne serait qu'un commentaire.
+  # Les bornes que le contrat déclare, jugées par la validation des requêtes contre le YAML. Sans ces
+  # deux cas, rien ne dirait qu'elle est montée sur cette route.
   Scénario: une requête de second facteur mal formée est refusée sur sa forme
     Étant donné une installation avec un opérateur
     Et un serveur démarré

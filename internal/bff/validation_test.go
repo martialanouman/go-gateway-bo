@@ -99,3 +99,15 @@ func TestAShortChallengeIsRefusedOnItsField(t *testing.T) {
 	require.Equal(t, []string{"challenge"}, refusedFields(refusal))
 	assert.Equal(t, "Cette valeur est en deçà de la borne permise.", (*refusal.Errors)[0].Message)
 }
+
+// net/http accepte une ligne de requête en forme absolue et remplit alors `URL.Host` : le routeur du
+// contrat, qui compare l'URL entière à `servers`, ne la reconnaîtrait plus et la laisserait passer.
+func TestAnAbsoluteFormRequestIsValidatedAllTheSame(t *testing.T) {
+	t.Parallel()
+
+	status, refusal := servedByTheContract(t, http.MethodPost, "http://bff.exemple.test/api/auth/login",
+		`{"email":"a@exemple.test","password":"secret","admin":true}`)
+
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, refusedFields(refusal), "admin")
+}

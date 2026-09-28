@@ -61,8 +61,8 @@ func fieldErrors(upstream gateway.APIError) *[]FieldError {
 // écriture qui échoue l'empêche de partir. L'issue s'écrit après ; une panne entre les deux laisse
 // `attempted` seul, qui se lit « issue inconnue » et non « rien ».
 //
-// `call` rend le statut amont. La seconde écriture ne fait pas échouer la route : l'action est faite,
-// et l'annoncer ratée ferait recommencer l'opérateur.
+// `event.After` est complété sur place. `call` rend le statut amont. La seconde écriture ne fait pas
+// échouer la route : l'action est faite, et l'annoncer ratée ferait recommencer l'opérateur.
 func auditRelayed(ctx context.Context, record func(context.Context, store.Event) error, logger *slog.Logger,
 	event store.Event,
 	call func(context.Context) (int, error),
@@ -84,7 +84,8 @@ func auditRelayed(ctx context.Context, record func(context.Context, store.Event)
 		event.After = event.After.Text("status", strconv.Itoa(status))
 	}
 
-	if recordErr := record(ctx, event); recordErr != nil {
+	// Hors de l'annulation de la requête : un onglet fermé pendant l'appel ne doit pas effacer l'issue.
+	if recordErr := record(context.WithoutCancel(ctx), event); recordErr != nil {
 		logger.ErrorContext(ctx, "l'issue d'une action relayée n'a pas pu être tracée", "action", event.Action,
 			"outcome", outcome, "error", recordErr)
 	}

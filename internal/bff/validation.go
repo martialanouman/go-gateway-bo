@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -42,17 +43,26 @@ func validateAgainstTheContract() (func(http.Handler) http.Handler, error) {
 }
 
 func refusalOf(router routers.Router, r *http.Request) (Error, bool) {
-	route, pathParams, err := router.FindRoute(r)
+	// Le routeur compare l'URL entière à `servers` : une requête en forme absolue, que net/http accepte
+	// et dont il remplit `URL.Host`, ne serait plus reconnue et passerait sans être validée.
+	probe := *r
+	probe.URL = &url.URL{Path: r.URL.Path, RawPath: r.URL.RawPath, RawQuery: r.URL.RawQuery}
+
+	route, pathParams, err := router.FindRoute(&probe)
 	if err != nil {
 		return Error{}, false
 	}
 
 	err = openapi3filter.ValidateRequest(r.Context(), &openapi3filter.RequestValidationInput{
-		Request:    r,
+		Request:    &probe,
 		PathParams: pathParams,
 		Route:      route,
 		Options:    &openapi3filter.Options{MultiError: true},
 	})
+
+	// Le validateur a lu le corps et l'a restitué sur la copie : c'est celle-là que le handler lira.
+	r.Body, r.GetBody, r.ContentLength = probe.Body, probe.GetBody, probe.ContentLength
+
 	if err == nil {
 		return Error{}, false
 	}

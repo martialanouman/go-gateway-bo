@@ -27,7 +27,7 @@ func (a API) ListCustomerGroups(ctx context.Context, request ListCustomerGroupsR
 	}
 
 	if response.JSON200 == nil {
-		return nil, gateway.ErrorFrom(http.StatusBadGateway, nil)
+		return a.refusedListing(ctx, gateway.ErrorFrom(http.StatusBadGateway, nil))
 	}
 
 	groups := make(ListCustomerGroups200JSONResponse, 0, len(*response.JSON200))

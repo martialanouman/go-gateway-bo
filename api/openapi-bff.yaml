@@ -1334,7 +1334,8 @@ components:
           #
           # L'asymétrie avec les options rendues plus bas, qui sont des DTO déclarés champ par champ,
           # est délibérée : c'est **en sortie** que déclarer garde quelque chose, puisqu'un champ
-          # absent du struct ne peut pas fuir. En entrée, un champ non déclaré est simplement ignoré.
+          # absent du struct ne peut pas fuir. En entrée, cet objet reste ouvert : le validateur y
+          # accepte tout champ, et c'est la bibliothèque qui juge l'assertion.
           #
           # `additionalProperties: true` est nécessaire et non décoratif : sans lui, le générateur
           # TypeScript rend `Record<string, never>`, un type où aucune clé ne peut être écrite. Mesuré

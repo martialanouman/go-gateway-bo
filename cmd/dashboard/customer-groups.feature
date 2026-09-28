@@ -37,7 +37,7 @@ Fonctionnalité: Les groupes de clients relayés depuis la passerelle
     Et la réponse est conforme au contrat du BFF
 
   Scénario: une passerelle en panne se dit indisponible et laisse une trace au journal du serveur
-    Étant donné une passerelle qui répond 500 avec le corps "trace interne de la passerelle"
+    Étant donné une passerelle qui répond 500 avec le message "trace interne de la passerelle"
     Et un serveur démarré
     Et l'opérateur détient le rôle "Support"
     Et l'opérateur ouvre une session élevée
