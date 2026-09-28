@@ -91,8 +91,9 @@ func TestErrorFromNamesAnUnreadableBody(t *testing.T) {
 func TestUnreadableCodeIsNotAGatewayCode(t *testing.T) {
 	t.Parallel()
 
-	assert.True(t, strings.HasPrefix(gateway.CodeUpstreamUnreadable, "bff_"),
-		"le préfixe nomme l'émetteur, et l'émetteur est le BFF")
+	for _, code := range []string{gateway.CodeUpstreamUnreadable, gateway.CodeUpstreamUnreachable} {
+		assert.True(t, strings.HasPrefix(code, "bff_"), "le préfixe nomme l'émetteur, et l'émetteur est le BFF")
+	}
 }
 
 // smsBody tient lieu de ce que l'invariant (a) protège : du texte libre amont dont rien ne garantit

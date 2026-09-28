@@ -19,7 +19,7 @@ func (a API) ListCustomerGroups(ctx context.Context, request ListCustomerGroupsR
 
 	response, err := a.Gateway.ListCustomerGroupsWithResponse(ctx, &params)
 	if err != nil {
-		return nil, err
+		return a.refusedListing(ctx, err)
 	}
 
 	if err = gateway.ErrorFrom(response.StatusCode(), response.Body); err != nil {

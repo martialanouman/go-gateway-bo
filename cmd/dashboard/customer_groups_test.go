@@ -29,6 +29,7 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 		return w.answering(http.StatusOK, `[]`)
 	})
 	ctx.Then(`^la passerelle n'a reçu aucune requête$`, w.receivedNothing)
+	ctx.Given(`^une passerelle injoignable$`, w.unreachable)
 	ctx.Then(`^la réponse liste au moins un groupe$`, w.listsAtLeastOneGroup)
 	ctx.Then(`^le refus place une erreur sous le champ "([^"]*)"$`, w.refusalPlacesAnErrorUnder)
 	ctx.Then(`^la sortie du serveur porte "([^"]*)"$`, w.process.messageNames)
@@ -49,7 +50,7 @@ func (w *customerGroupsWorld) servedByTheMock() error {
 
 func (w *customerGroupsWorld) refusingOnField(field string) error {
 	return w.answering(http.StatusUnprocessableEntity, fmt.Sprintf(
-		`{"code":"validation_failed","message":"invalid request","errors":[{"field":%q,"message":"rejected"}]}`,
+		`{"code":"validation_error","message":"invalid request","errors":[{"field":%q,"message":"rejected"}]}`,
 		field))
 }
 
@@ -114,6 +115,15 @@ func (w *customerGroupsWorld) receivedNothing() error {
 	if received := w.received.Load(); received != 0 {
 		return fmt.Errorf("la passerelle a reçu %d requête(s) de liste des groupes", received)
 	}
+
+	return nil
+}
+
+// unreachable désigne un port qui vient d'être libéré : la connexion y est refusée.
+func (w *customerGroupsWorld) unreachable() error {
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closed.Close()
+	w.process.env["DASHBOARD_GATEWAY_BASE_URL"] = closed.URL
 
 	return nil
 }

@@ -57,3 +57,13 @@ Fonctionnalité: Les groupes de clients relayés depuis la passerelle
     Et le refus place une erreur sous le champ "status"
     Et la réponse est conforme au contrat du BFF
     Et la passerelle n'a reçu aucune requête
+
+  Scénario: une passerelle injoignable se dit indisponible, et non en erreur imprévue
+    Étant donné une passerelle injoignable
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/customer-groups"
+    Alors le serveur répond 503
+    Et le refus nomme "bff_upstream_unreachable"
+    Et la réponse est conforme au contrat du BFF

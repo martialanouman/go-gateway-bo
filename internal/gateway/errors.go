@@ -7,11 +7,14 @@ import (
 	"strings"
 )
 
-// CodeUpstreamUnreadable est le seul code que le BFF frappe lui-même : celui d'une réponse d'erreur
-// dont le corps n'est pas l'enveloppe du contrat. Le préfixe `bff_` nomme l'émetteur, et l'émetteur
-// n'est pas la passerelle — c'est ce qui interdit la confusion dans un log, et ce que garde
+// Les deux codes que le BFF frappe lui-même : une réponse d'erreur dont le corps n'est pas l'enveloppe
+// du contrat, et une passerelle qui n'a pas répondu du tout. Le préfixe `bff_` nomme l'émetteur, et
+// l'émetteur n'est pas la passerelle — c'est ce qui interdit la confusion dans un log, et ce que garde
 // `TestUnreadableCodeIsNotAGatewayCode`.
-const CodeUpstreamUnreadable = "bff_upstream_unreadable"
+const (
+	CodeUpstreamUnreadable  = "bff_upstream_unreadable"
+	CodeUpstreamUnreachable = "bff_upstream_unreachable"
+)
 
 // FieldError est un élément de `errors[]` : le champ fautif et son explication. Le type engendré ne
 // nomme pas cet élément — c'est un struct anonyme — et un formulaire ne peut pas placer ses erreurs
@@ -31,10 +34,8 @@ type FieldError struct {
 // qui affichera l'erreur en a besoin — c'est la sérialisation et le log qui les excluent, pas la
 // structure.
 //
-// Un appelant reconnaît ce qui l'intéresse par `errors.As` puis par Status et Code. Aucune taxonomie
-// (sentinelles, prédicats par famille) n'est écrite ici : aucune route du BFF n'appelle encore la
-// passerelle, et une taxonomie sans appelant est une liste de suppositions qu'aucun test ne peut
-// exercer.
+// Un appelant reconnaît ce qui l'intéresse par `errors.As` puis par Status et Code. La traduction
+// dans la forme du produit vit côté BFF, dans `relayError`.
 type APIError struct {
 	// Status vient de la ligne de statut : le contrat ne le duplique pas dans le corps.
 	Status  int

@@ -18,14 +18,14 @@ func TestAnUpstreamValidationErrorKeepsItsFields(t *testing.T) {
 	t.Parallel()
 
 	status, body, relayed := relayError(&gateway.APIError{
-		Status: http.StatusUnprocessableEntity, Code: "validation_failed", Message: "invalid status",
+		Status: http.StatusUnprocessableEntity, Code: "validation_error", Message: "invalid status",
 		Fields: []gateway.FieldError{{Field: "status", Message: "unknown customer group status"}},
 	})
 
 	assert.True(t, relayed)
 	assert.Equal(t, http.StatusUnprocessableEntity, status)
 	assert.Equal(t, Error{
-		Code: "validation_failed", Message: "invalid status",
+		Code: "validation_error", Message: "invalid status",
 		Errors: &[]FieldError{{Field: "status", Message: "unknown customer group status"}},
 	}, body)
 }
@@ -56,9 +56,17 @@ func TestARefusalOfTheMachineTokenIsNotRelayed(t *testing.T) {
 		_, _, relayed := relayError(&gateway.APIError{Status: upstream, Code: "unauthorized"})
 		assert.False(t, relayed)
 	}
+}
 
-	_, _, relayed := relayError(errors.New("connexion refusée"))
-	assert.False(t, relayed)
+func TestAnUnreachableGatewayIsRelayedAsRetryable(t *testing.T) {
+	t.Parallel()
+
+	status, body, relayed := relayError(errors.New("dial tcp 10.0.0.1:8443: connect: connection refused"))
+
+	assert.True(t, relayed)
+	assert.Equal(t, http.StatusServiceUnavailable, status)
+	assert.Equal(t, gateway.CodeUpstreamUnreachable, body.Code)
+	assert.NotContains(t, body.Message, "10.0.0.1")
 }
 
 type auditLine struct {
