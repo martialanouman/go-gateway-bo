@@ -272,11 +272,18 @@ type CurrentOperator struct {
 	Id          string `json:"id"`
 }
 
-// Error La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// Error La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type Error struct {
-	Code    string `json:"code"`
+	Code    string        `json:"code"`
+	Errors  *[]FieldError `json:"errors,omitempty"`
+	Message string        `json:"message"`
+}
+
+// FieldError defines model for FieldError.
+type FieldError struct {
+	Field   string `json:"field"`
 	Message string `json:"message"`
 }
 
@@ -575,59 +582,59 @@ type OperatorId = string
 // RoleId defines model for RoleId.
 type RoleId = string
 
-// AutoVerrouillage La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// AutoVerrouillage La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type AutoVerrouillage = Error
 
-// CompteDesactive La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// CompteDesactive La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type CompteDesactive = Error
 
-// NotificationInconnue La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// NotificationInconnue La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type NotificationInconnue = Error
 
-// OperateurInconnu La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// OperateurInconnu La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type OperateurInconnu = Error
 
-// OrigineRefusee La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// OrigineRefusee La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type OrigineRefusee = Error
 
-// PermissionRefusee La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// PermissionRefusee La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type PermissionRefusee = Error
 
-// RequeteInvalide La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// RequeteInvalide La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type RequeteInvalide = Error
 
-// RoleInconnu La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// RoleInconnu La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type RoleInconnu = Error
 
-// RoleIntouchable La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// RoleIntouchable La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type RoleIntouchable = Error
 
-// SessionAbsente La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// SessionAbsente La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type SessionAbsente = Error
 
-// TypeDeContenuRefuse La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-// `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-// première route qui relaie la passerelle (step-059).
+// TypeDeContenuRefuse La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
 type TypeDeContenuRefuse = Error
 
 // ListNotificationsParams defines parameters for ListNotifications.

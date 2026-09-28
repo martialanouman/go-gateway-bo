@@ -77,15 +77,10 @@ const credentials = z.object({
 })
 
 /**
- * **Les refus de champ viennent d'ici et non du serveur**, contrairement à ce que la fiche de
- * step-027 annonçait (« les erreurs champ par champ depuis `errors[]` »). Vérifié dans le contrat
- * plutôt que supposé : le schéma `Error` d'`api/openapi-bff.yaml` n'a que `code` et `message`, et il
- * écrit lui-même que « le champ `errors[]` que le §1.4 annonce arrive avec la première route qui
- * relaie la passerelle (step-059) ».
- *
- * L'écart est sans conséquence ici, et c'est la seconde raison de ne pas l'attendre : les refus que
- * cette route rend à un formulaire **rempli** — 401 et 429 — sont globaux par conception. (Elle en
- * déclare six en tout ; les quatre autres — 400, 403, 415, 503 — ne nomment pas davantage un champ.)
+ * **Les refus de champ viennent d'ici et non du serveur** : les refus que cette route rend à un
+ * formulaire **rempli** — 401 et 429 — sont globaux par conception, et n'ont donc pas d'`errors[]`.
+ * (Elle en déclare six en tout ; les quatre autres — 400, 403, 415, 503 — ne nomment pas davantage un
+ * champ.)
  * Le serveur se tait sur lequel des deux champs a manqué, puisque le dire nommerait les adresses qui
  * existent.
  */

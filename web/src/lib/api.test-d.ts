@@ -73,6 +73,7 @@ expectTypeOf<LoginOperation['responses'][200]['content']['application/json']>().
 expectTypeOf<LoginOperation['responses'][401]['content']['application/json']>().toEqualTypeOf<{
   code: string
   message: string
+  errors?: { field: string; message: string }[]
 }>()
 
 // Le 400 en fait partie : login est la première opération à porter un corps, donc la première dont le

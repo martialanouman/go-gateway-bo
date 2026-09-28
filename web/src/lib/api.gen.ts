@@ -922,12 +922,17 @@ export interface components {
             unreadCount: number;
         };
         /**
-         * @description La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-         *     `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-         *     première route qui relaie la passerelle (step-059).
+         * @description La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+         *     et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+         *     place chaque refus sous le champ qu'il nomme.
          */
         Error: {
             code: string;
+            message: string;
+            errors?: components["schemas"]["FieldError"][];
+        };
+        FieldError: {
+            field: string;
             message: string;
         };
     };

@@ -1741,13 +1741,26 @@ components:
     Error:
       type: object
       description: |
-        La forme d'erreur unique du produit. `code` se grep dans les journaux et ne se traduit pas,
-        `message` s'affiche à l'opérateur. Le champ `errors[]` que le §1.4 annonce arrive avec la
-        première route qui relaie la passerelle (step-059).
+        La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+        et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+        place chaque refus sous le champ qu'il nomme.
       additionalProperties: false
       properties:
         code:
           type: string
         message:
           type: string
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
       required: [code, message]
+
+    FieldError:
+      type: object
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+      required: [field, message]
