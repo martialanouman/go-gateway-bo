@@ -1,6 +1,6 @@
 # 015 — La validation des **requêtes** entrantes contre le schéma n'est pas faite à l'exécution
 
-> **Porteur :** step-060
+> **Porteur :** step-059
 
 ## Ce qu'elle coûte si elle dure
 
@@ -52,7 +52,7 @@ figée du même contrat, et `check-generated` interdit qu'elle dérive. La déci
 reprise plutôt qu'héritée.
 
 Et le validateur n'arrive pas seul : un refus champ par champ sans `errors[]` au DTO d'erreur rend un
-400 générique, **moins bon** que les refus écrits à la main aujourd'hui. C'est pourquoi step-060 les
+400 générique, **moins bon** que les refus écrits à la main aujourd'hui. C'est pourquoi step-059 les
 porte tous les deux.
 
 **`step-049` ne l'a pas payée, et ne pouvait pas.** Elle engendre bien les bornes du contrat en Zod

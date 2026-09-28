@@ -81,7 +81,7 @@ const credentials = z.object({
  * step-027 annonçait (« les erreurs champ par champ depuis `errors[]` »). Vérifié dans le contrat
  * plutôt que supposé : le schéma `Error` d'`api/openapi-bff.yaml` n'a que `code` et `message`, et il
  * écrit lui-même que « le champ `errors[]` que le §1.4 annonce arrive avec la première route qui
- * relaie la passerelle (step-060) ».
+ * relaie la passerelle (step-059) ».
  *
  * L'écart est sans conséquence ici, et c'est la seconde raison de ne pas l'attendre : les refus que
  * cette route rend à un formulaire **rempli** — 401 et 429 — sont globaux par conception. (Elle en

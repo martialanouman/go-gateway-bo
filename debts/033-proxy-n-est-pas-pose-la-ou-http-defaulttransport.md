@@ -1,6 +1,6 @@
 # 033 — `Proxy` n'est pas posé, là où `http.DefaultTransport` pose `ProxyFromEnvironment`
 
-> **Porteur :** step-060
+> **Porteur :** step-059
 
 ## Ce qu'elle coûte si elle dure
 
