@@ -129,9 +129,19 @@ func NewRouter(deps Dependencies) http.Handler {
 func mountContract(api chi.Router, impl StrictServerInterface, sessions *session.Manager, audit *store.Audit,
 	logger *slog.Logger,
 ) {
-	HandlerWithOptions(newContractHandler(impl, sessions, audit, logger), ChiServerOptions{
-		BaseRouter:       api,
-		ErrorHandlerFunc: rejectRequest,
+	// Une panique et non une erreur : le contrat embarqué est engendré, et `check-generated` refuse
+	// qu'il diverge du YAML — un échec ici est un binaire mal construit, pas une configuration.
+	validate, err := validateAgainstTheContract()
+	if err != nil {
+		panic(err)
+	}
+
+	api.Group(func(contract chi.Router) {
+		contract.Use(validate)
+		HandlerWithOptions(newContractHandler(impl, sessions, audit, logger), ChiServerOptions{
+			BaseRouter:       contract,
+			ErrorHandlerFunc: rejectRequest,
+		})
 	})
 }
 

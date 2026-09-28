@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 
 	"github.com/cucumber/godog"
 )
@@ -17,12 +18,17 @@ var suiteGatewayURL string
 type customerGroupsWorld struct {
 	process  *process
 	upstream *httptest.Server
+	received atomic.Int32
 }
 
 func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^une passerelle servie par le mock du contrat$`, w.servedByTheMock)
 	ctx.Given(`^une passerelle qui refuse la liste des groupes sur le champ "([^"]*)"$`, w.refusingOnField)
 	ctx.Given(`^une passerelle qui répond 500 avec le corps "([^"]*)"$`, w.failingWithBody)
+	ctx.Given(`^une passerelle qui compte les requêtes reçues$`, func() error {
+		return w.answering(http.StatusOK, `[]`)
+	})
+	ctx.Then(`^la passerelle n'a reçu aucune requête$`, w.receivedNothing)
 	ctx.Then(`^la réponse liste au moins un groupe$`, w.listsAtLeastOneGroup)
 	ctx.Then(`^le refus place une erreur sous le champ "([^"]*)"$`, w.refusalPlacesAnErrorUnder)
 	ctx.Then(`^la sortie du serveur porte "([^"]*)"$`, w.process.messageNames)
@@ -52,7 +58,12 @@ func (w *customerGroupsWorld) failingWithBody(body string) error {
 }
 
 func (w *customerGroupsWorld) answering(status int, body string) error {
-	w.upstream = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+	w.upstream = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		// Le hub ouvre aussi ses flux temps réel sur cette adresse : seul l'appel relayé compte.
+		if r.URL.Path == "/admin/customer-groups" {
+			w.received.Add(1)
+		}
+
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(status)
 		_, _ = rw.Write([]byte(body))
@@ -97,4 +108,12 @@ func (w *customerGroupsWorld) refusalPlacesAnErrorUnder(field string) error {
 	}
 
 	return fmt.Errorf("le refus ne place rien sous %q :\n%s", field, w.process.received.body)
+}
+
+func (w *customerGroupsWorld) receivedNothing() error {
+	if received := w.received.Load(); received != 0 {
+		return fmt.Errorf("la passerelle a reçu %d requête(s) de liste des groupes", received)
+	}
+
+	return nil
 }

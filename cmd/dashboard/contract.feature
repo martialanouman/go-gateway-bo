@@ -6,9 +6,8 @@ Fonctionnalité: Les réponses du BFF valident son contrat
   schéma et que la sérialisation émet du JSON conforme. Le scénario lit donc le contrat du dépôt
   lui-même et lui confronte la réponse que le binaire sert vraiment.
 
-  Ce que ce scénario n'observe pas : rien ne valide à l'exécution. La confrontation vit dans le test,
-  parce que le code engendré ne valide rien et que le middleware qui le ferait exigerait une copie du
-  contrat figée dans le binaire.
+  Ce que ce scénario n'observe pas : le binaire valide les requêtes à l'exécution, pas ses réponses.
+  La confrontation des réponses vit donc dans le test.
 
   Scénario: la sonde de vivacité rend ce que le contrat décrit
     Étant donné un serveur démarré

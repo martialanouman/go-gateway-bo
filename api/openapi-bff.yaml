@@ -1140,8 +1140,7 @@ components:
           maxLength: 320
         password:
           # La borne n'est pas cosmétique : chaque tentative coûte un argon2id de 64 MiB au serveur,
-          # et un corps sans borne en ferait une arme. Elle est **aussi** appliquée en Go — rien dans
-          # ce dépôt ne valide une requête à l'exécution contre ce fichier.
+          # et un corps sans borne en ferait une arme. Le BFF valide chaque requête contre ce fichier.
           type: string
           minLength: 1
           maxLength: 4096
@@ -1306,6 +1305,7 @@ components:
         challenge:
           type: string
           minLength: 43
+          maxLength: 64
         method:
           # Un discriminant explicite plutôt qu'un « essayer l'un puis l'autre » : essayer les deux
           # ferait payer les argon2id du chemin de récupération à chaque code TOTP faux, et la

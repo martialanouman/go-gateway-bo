@@ -79,8 +79,8 @@ const credentials = z.object({
 /**
  * **Les refus de champ viennent d'ici et non du serveur** : les refus que cette route rend à un
  * formulaire **rempli** — 401 et 429 — sont globaux par conception, et n'ont donc pas d'`errors[]`.
- * (Elle en déclare six en tout ; les quatre autres — 400, 403, 415, 503 — ne nomment pas davantage un
- * champ.)
+ * (Elle en déclare six en tout. Le 400 porte `errors[]`, mais les bornes qu'il juge sont celles que
+ * ce formulaire applique avant l'envoi ; 403, 415 et 503 ne nomment aucun champ.)
  * Le serveur se tait sur lequel des deux champs a manqué, puisque le dire nommerait les adresses qui
  * existent.
  */
