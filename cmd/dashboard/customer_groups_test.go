@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cucumber/godog"
@@ -20,6 +21,8 @@ type customerGroupsWorld struct {
 	process  *process
 	upstream *httptest.Server
 	received atomic.Int32
+	mu       sync.Mutex
+	queries  []string
 }
 
 func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
@@ -31,6 +34,7 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	})
 	ctx.When(`^le navigateur envoie (POST|PATCH|DELETE) "([^"]*)"(?: avec le corps '([^']*)')?$`, w.send)
 	ctx.Then(`^la passerelle n'a reçu aucune requête$`, w.receivedNothing)
+	ctx.Then(`^la passerelle a reçu "([^"]*)"$`, w.receivedQuery)
 	ctx.Given(`^une passerelle injoignable$`, w.unreachable)
 	ctx.Then(`^la réponse ne porte pas "([^"]*)"$`, w.responseOmits)
 	ctx.Then(`^la réponse liste au moins un groupe$`, w.listsAtLeastOneGroup)
@@ -67,8 +71,11 @@ func (w *customerGroupsWorld) failingWithMessage(message string) error {
 func (w *customerGroupsWorld) answering(status int, body string) error {
 	w.upstream = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// Le hub ouvre aussi ses flux temps réel sur cette adresse : seul l'appel relayé compte.
-		if strings.HasPrefix(r.URL.Path, "/admin/customer-groups") {
+		if strings.HasPrefix(r.URL.Path, "/admin/customer-groups") || strings.HasPrefix(r.URL.Path, "/admin/customers") {
 			w.received.Add(1)
+			w.mu.Lock()
+			w.queries = append(w.queries, r.URL.RawQuery)
+			w.mu.Unlock()
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
@@ -124,6 +131,19 @@ func (w *customerGroupsWorld) refusalPlacesAnErrorUnder(field string) error {
 	}
 
 	return fmt.Errorf("le refus ne place rien sous %q :\n%s", field, w.process.received.body)
+}
+
+func (w *customerGroupsWorld) receivedQuery(fragment string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	for _, query := range w.queries {
+		if strings.Contains(query, fragment) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("aucune requête reçue ne porte %q : %q", fragment, w.queries)
 }
 
 func (w *customerGroupsWorld) receivedNothing() error {

@@ -23,7 +23,7 @@ type auditWorld struct {
 func (w *auditWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^le journal porte (\d+) événement "([^"]+)"$`, w.journalHolds)
 	ctx.Then(`^l'événement porte l'adresse de l'appelant$`, w.eventCarriesTheAddress)
-	ctx.Then(`^l'issue "([^"]+)" désigne le groupe que la réponse rend$`, w.outcomeTargetsTheReturnedGroup)
+	ctx.Then(`^l'issue "([^"]+)" désigne (?:le groupe|le client) que la réponse rend$`, w.outcomeTargetsTheReturnedGroup)
 	ctx.Then(`^le journal ne porte ni le secret ni les codes de récupération$`, w.journalHidesSecrets)
 	ctx.Given(`^les partitions du journal sont retirées$`, w.auditPartitionsRemoved)
 	ctx.When(`^l'opérateur remplace son application d'authentification$`,
@@ -46,7 +46,7 @@ func (w *auditWorld) outcomeTargetsTheReturnedGroup(ctx context.Context, action 
 	}
 
 	if err := json.Unmarshal([]byte(w.login.process.received.body), &returned); err != nil || returned.ID == "" {
-		return fmt.Errorf("la réponse ne rend aucun groupe : %s", w.login.process.received.body)
+		return fmt.Errorf("la réponse ne rend aucun objet identifié : %s", w.login.process.received.body)
 	}
 
 	conn, err := w.connect(ctx)
