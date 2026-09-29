@@ -32,6 +32,10 @@ func TestAnArchivedGroupIsListedUnderItsStatusOnly(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
+	var none []struct{ ID string }
+	call(t, http.MethodGet, server.URL+fakegateway.GroupsPath, "", http.StatusOK, &none)
+	assert.NotNil(t, none, "une liste vide doit s'encoder [], pas null")
+
 	var created struct{ ID string }
 	call(t, http.MethodPost, server.URL+fakegateway.GroupsPath, `{"name":"Revendeurs"}`, http.StatusCreated, &created)
 	call(t, http.MethodPatch, server.URL+fakegateway.GroupsPath+"/"+created.ID, `{"status":"archived"}`,
