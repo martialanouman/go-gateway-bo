@@ -146,3 +146,23 @@ func (API) ListCustomerGroups(_ context.Context, _ bff.ListCustomerGroupsRequest
 ) (bff.ListCustomerGroupsResponseObject, error) {
 	return bff.ListCustomerGroups200JSONResponse{}, nil
 }
+
+func (API) CreateCustomerGroup(_ context.Context, _ bff.CreateCustomerGroupRequestObject,
+) (bff.CreateCustomerGroupResponseObject, error) {
+	return bff.CreateCustomerGroup201JSONResponse{}, nil
+}
+
+func (API) GetCustomerGroup(_ context.Context, _ bff.GetCustomerGroupRequestObject,
+) (bff.GetCustomerGroupResponseObject, error) {
+	return bff.GetCustomerGroup200JSONResponse{}, nil
+}
+
+func (API) UpdateCustomerGroup(_ context.Context, _ bff.UpdateCustomerGroupRequestObject,
+) (bff.UpdateCustomerGroupResponseObject, error) {
+	return bff.UpdateCustomerGroup200JSONResponse{}, nil
+}
+
+func (API) DeleteCustomerGroup(_ context.Context, _ bff.DeleteCustomerGroupRequestObject,
+) (bff.DeleteCustomerGroupResponseObject, error) {
+	return bff.DeleteCustomerGroup204Response{}, nil
+}

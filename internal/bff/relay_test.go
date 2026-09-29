@@ -103,7 +103,7 @@ func TestARelayedActionIsAuditedBeforeTheCall(t *testing.T) {
 
 	status, err := auditRelayed(context.Background(), trail.record, slog.New(slog.DiscardHandler),
 		store.Event{Action: "group.create", After: store.NewFields().Text("name", "Revendeurs")},
-		func(context.Context) (int, error) {
+		func(context.Context, *store.Event) (int, error) {
 			seenBeforeTheCall = len(trail.lines)
 
 			return http.StatusCreated, nil
@@ -124,7 +124,7 @@ func TestARelayedActionIsNotCalledWhenItCannotBeAudited(t *testing.T) {
 
 	_, err := auditRelayed(context.Background(), (&auditTrail{broken: true}).record, slog.New(slog.DiscardHandler),
 		store.Event{Action: "group.delete"},
-		func(context.Context) (int, error) {
+		func(context.Context, *store.Event) (int, error) {
 			called = true
 
 			return http.StatusNoContent, nil
@@ -141,7 +141,7 @@ func TestARefusedRelayedActionIsAuditedAsFailed(t *testing.T) {
 
 	_, err := auditRelayed(context.Background(), trail.record, slog.New(slog.DiscardHandler),
 		store.Event{Action: "group.update"},
-		func(context.Context) (int, error) { return http.StatusUnprocessableEntity, nil })
+		func(context.Context, *store.Event) (int, error) { return http.StatusUnprocessableEntity, nil })
 
 	require.NoError(t, err)
 	require.Len(t, trail.lines, 2)

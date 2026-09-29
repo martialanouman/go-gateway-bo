@@ -557,6 +557,30 @@ test('the binary serves the painted shell, then the application replaces it', as
   )
   await page.emulateMedia({ reducedMotion: null })
 
+  // step-060 : un groupe, de sa création à sa suppression, relayé jusqu'au faux amont et relu depuis
+  // lui — c'est lui qui le range sous « Archivés », pas l'état de l'écran.
+  await page.goto('/groups')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Groupes')
+  await page.getByRole('button', { name: 'Nouveau groupe' }).first().click()
+  const nouveauGroupe = page.getByRole('dialog', { name: 'Nouveau groupe' })
+  await nouveauGroupe.getByLabel('Nom').fill('Revendeurs de parcours')
+  await nouveauGroupe.getByLabel(/Description/).fill('Clients revendus par un partenaire.')
+  await nouveauGroupe.getByRole('button', { name: 'Créer le groupe' }).click()
+
+  const groupe = page.getByRole('row', { name: /Revendeurs de parcours/ })
+  await expect(groupe).toContainText('active')
+  await groupe.getByRole('button', { name: 'Archiver' }).click()
+  await expect(page.getByText(/Revendeurs de parcours est archivé/)).toBeVisible()
+  await expect(groupe).toHaveCount(0)
+
+  await page.getByRole('tab', { name: 'Archivés' }).click()
+  await expect(groupe).toContainText('archived')
+  await groupe.getByRole('button', { name: 'Supprimer' }).click()
+  const suppression = page.getByRole('dialog', { name: 'Supprimer Revendeurs de parcours' })
+  await expect(suppression).toContainText('aucun client n’est supprimé')
+  await suppression.getByRole('button', { name: 'Supprimer le groupe' }).click()
+  await expect(page.getByRole('heading', { level: 2, name: 'Aucun groupe archivé' })).toBeVisible()
+
   // step-030 : le premier administrateur fait entrer un second opérateur, sans toucher à la base.
   const mailpit = 'http://127.0.0.1:8025'
   // Un lancement précédent laisse ses messages dans Mailpit : sans cette purge, la recherche

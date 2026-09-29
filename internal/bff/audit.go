@@ -33,16 +33,20 @@ const (
 	actionRoleUpdate         = "role.update"
 	actionRoleDelete         = "role.delete"
 	actionNotificationRead   = "notification.read"
+	actionGroupCreate        = "group.create"
+	actionGroupUpdate        = "group.update"
+	actionGroupDelete        = "group.delete"
 )
 
 // Les types de cible que ces actions désignent. Le §3.1 les laisse libres ; les nommer ici évite que
 // deux handlers écrivent `passkey` et `webauthn_credential` pour la même chose, ce qu'aucune porte ne
 // verrait et qui rendrait un filtre par cible incomplet.
 const (
-	auditTargetOperator     = "operator"
-	auditTargetPasskey      = "passkey"
-	auditTargetRole         = "role"
-	auditTargetNotification = "notification"
+	auditTargetOperator      = "operator"
+	auditTargetPasskey       = "passkey"
+	auditTargetRole          = "role"
+	auditTargetNotification  = "notification"
+	auditTargetCustomerGroup = "customer_group"
 	// auditTargetOperation désigne l'opération du contrat qu'un refus a arrêtée.
 	auditTargetOperation = "operation"
 )

@@ -68,3 +68,81 @@ Fonctionnalité: Les groupes de clients relayés depuis la passerelle
     Alors le serveur répond 503
     Et le refus nomme "bff_upstream_unreachable"
     Et la réponse est conforme au contrat du BFF
+
+  Scénario: créer un groupe laisse sa trace avant et après l'appel à la passerelle
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/customer-groups" avec le corps '{"name":"Revendeurs"}'
+    Alors le serveur répond 201
+    Et la réponse est conforme au contrat du BFF
+    Et le journal porte 2 événement "group.create"
+    Et l'issue "group.create" désigne le groupe que la réponse rend
+
+  Scénario: archiver un groupe est une modification tracée
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie PATCH "/api/customer-groups/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b" avec le corps '{"status":"archived"}'
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+    Et le journal porte 2 événement "group.update"
+
+  Scénario: un opérateur qui détient groups:read lit un groupe par son identifiant
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/customer-groups/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+
+  Scénario: supprimer un groupe laisse sa trace
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie DELETE "/api/customer-groups/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b"
+    Alors le serveur répond 204
+    Et la réponse est conforme au contrat du BFF
+    Et le journal porte 2 événement "group.delete"
+
+  Plan du scénario: sans groups:write, une mutation est refusée avant d'atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie <méthode> "<chemin>" avec le corps '<corps>'
+    Alors le serveur répond 403
+    Et le refus nomme la permission "groups:write"
+    Et la passerelle n'a reçu aucune requête
+
+    Exemples:
+      | méthode | chemin                                                     | corps                     |
+      | POST    | /api/customer-groups                                       | {"name":"Revendeurs"}     |
+      | PATCH   | /api/customer-groups/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b | {"status":"archived"}     |
+      | DELETE  | /api/customer-groups/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b |                           |
+
+  Scénario: une description vidée est refusée sous son champ, sans atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie PATCH "/api/customer-groups/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b" avec le corps '{"description":""}'
+    Alors le serveur répond 422
+    Et le refus place une erreur sous le champ "description"
+    Et la réponse est conforme au contrat du BFF
+    Et la passerelle n'a reçu aucune requête
+
+  Scénario: une création dont l'intention ne peut pas s'écrire n'atteint pas la passerelle, et ne l'accuse pas
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Et les partitions du journal sont retirées
+    Quand le navigateur envoie POST "/api/customer-groups" avec le corps '{"name":"Revendeurs"}'
+    Alors le serveur répond 500
+    Et la réponse ne porte pas "bff_upstream_unreachable"
+    Et la passerelle n'a reçu aucune requête

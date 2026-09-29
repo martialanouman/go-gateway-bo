@@ -29,6 +29,7 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^une passerelle qui compte les requêtes reçues$`, func() error {
 		return w.answering(http.StatusOK, `[]`)
 	})
+	ctx.When(`^le navigateur envoie (POST|PATCH|DELETE) "([^"]*)"(?: avec le corps '([^']*)')?$`, w.send)
 	ctx.Then(`^la passerelle n'a reçu aucune requête$`, w.receivedNothing)
 	ctx.Given(`^une passerelle injoignable$`, w.unreachable)
 	ctx.Then(`^la réponse ne porte pas "([^"]*)"$`, w.responseOmits)
@@ -66,7 +67,7 @@ func (w *customerGroupsWorld) failingWithMessage(message string) error {
 func (w *customerGroupsWorld) answering(status int, body string) error {
 	w.upstream = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// Le hub ouvre aussi ses flux temps réel sur cette adresse : seul l'appel relayé compte.
-		if r.URL.Path == "/admin/customer-groups" {
+		if strings.HasPrefix(r.URL.Path, "/admin/customer-groups") {
 			w.received.Add(1)
 		}
 
@@ -77,6 +78,15 @@ func (w *customerGroupsWorld) answering(status int, body string) error {
 	w.process.env["DASHBOARD_GATEWAY_BASE_URL"] = w.upstream.URL
 
 	return nil
+}
+
+func (w *customerGroupsWorld) send(method, path, body string) error {
+	contentType := ""
+	if body != "" {
+		contentType = "application/json"
+	}
+
+	return w.process.send(method, path, contentType, body)
 }
 
 func (w *customerGroupsWorld) listsAtLeastOneGroup() error {

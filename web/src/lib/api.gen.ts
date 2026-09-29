@@ -571,11 +571,48 @@ export interface paths {
          */
         get: operations["listCustomerGroups"];
         put?: never;
-        post?: never;
+        /**
+         * Crée un groupe de clients
+         * @description Relayée vers `create-customer-group`. Le groupe naît actif et sans membre.
+         */
+        post: operations["createCustomerGroup"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/customer-groups/{groupId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Un groupe de clients
+         * @description Relayée vers `get-customer-group`.
+         */
+        get: operations["getCustomerGroup"];
+        put?: never;
+        post?: never;
+        /**
+         * Supprime un groupe, sans supprimer aucun client
+         * @description Relayée vers `delete-customer-group`. Les clients membres sont détachés du groupe ; aucun
+         *     n'est supprimé.
+         */
+        delete: operations["deleteCustomerGroup"];
+        options?: never;
+        head?: never;
+        /**
+         * Renomme, décrit, archive ou désarchive un groupe
+         * @description Relayée vers `update-customer-group`. Un champ absent reste inchangé. Une description vide
+         *     est refusée en 422 sous `description` : la passerelle lit une description nulle comme « ne
+         *     change pas », si bien qu'aucune requête ne sait encore effacer une description.
+         */
+        patch: operations["updateCustomerGroup"];
         trace?: never;
     };
 }
@@ -964,14 +1001,44 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        CustomerGroupCreation: {
+            name: string;
+            description?: string;
+        };
+        CustomerGroupUpdate: {
+            name?: string;
+            description?: string;
+            status?: components["schemas"]["CustomerGroupStatus"];
+        };
         FieldError: {
             field: string;
             message: string;
         };
     };
     responses: {
-        /** @description La passerelle a refusé la demande ; `errors[]` nomme les champs en cause quand elle les donne. */
+        /**
+         * @description La passerelle a refusé la demande, ou le BFF l'a refusée avant elle parce qu'elle ne saurait
+         *     pas l'exécuter (une description vidée) ; `errors[]` nomme les champs en cause quand il y en a.
+         */
         RefusDeLaPasserelle: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Aucun groupe ne porte cet identifiant. */
+        GroupeInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Un autre groupe porte déjà ce nom ; `errors[]` place le refus sous `name`. */
+        NomDeGroupePris: {
             headers: {
                 [name: string]: unknown;
             };
@@ -1108,6 +1175,7 @@ export interface components {
     parameters: {
         OperatorId: string;
         RoleId: string;
+        GroupId: string;
     };
     requestBodies: never;
     headers: never;
@@ -2230,6 +2298,124 @@ export interface operations {
             400: components["responses"]["RequeteInvalide"];
             401: components["responses"]["SessionAbsente"];
             403: components["responses"]["PermissionRefusee"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    createCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerGroupCreation"];
+            };
+        };
+        responses: {
+            /** @description Le groupe créé. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerGroup"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            409: components["responses"]["NomDeGroupePris"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    getCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le groupe. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerGroup"];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["GroupeInconnu"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    deleteCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le groupe est supprimé et ses membres détachés. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["GroupeInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    updateCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                groupId: components["parameters"]["GroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerGroupUpdate"];
+            };
+        };
+        responses: {
+            /** @description Le groupe modifié. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerGroup"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["GroupeInconnu"];
+            409: components["responses"]["NomDeGroupePris"];
+            415: components["responses"]["TypeDeContenuRefuse"];
             422: components["responses"]["RefusDeLaPasserelle"];
             503: components["responses"]["PasserelleIndisponible"];
         };
