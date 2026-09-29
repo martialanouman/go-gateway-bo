@@ -407,6 +407,23 @@ l'écran Clients rendu selon ses permissions, crée un client, et l'action laiss
 | **M8** | Facturation, contenu, RGPD | la monétisation et l'effacement |
 | **M9** | Alerting, audit, accessibilité, déploiement HA | la mise en production |
 
+> **Amendement de la spec v2.2, le 29/09/2026** (ADR-0020 et ADR-0021 de la passerelle : catégorie de
+> trafic par sender ID, fin de la politique de sender ID, priorité bornée). Les jalons ci-dessous le
+> reprennent par renvoi, sans réécriture de leurs sections : chaque step concernée relit la spec
+> amendée en ouvrant, et **relève le contrat** — 6.10.0 porte `priority_tier` sur les connecteurs, pas
+> encore la catégorie ni la limite de débit par sender ID, et garde `set-account-sender-id-policy`.
+>
+> | Spec | Step |
+> |---|---|
+> | §6.19 sender IDs : catégorie, limite de débit, filtre, signalements | **step-067** (nouvelle, M3) |
+> | Politique de sender ID retirée ; la fiche dit que tout expéditeur doit être enregistré | step-064 |
+> | Connecteurs : `priority_flag_default`, `priority_tier` | step-083 |
+> | Trafic : ventilation par catégorie (débit, lag, attente) | step-082 |
+> | CDR : filtre par catégorie ; trace : catégorie et priorité effective | step-100, step-102 |
+> | Simulateur : catégorie, priorité effective, connecteurs écartés | step-122 |
+> | Anti-spam : règle `category_mismatch` | step-146 |
+> | Alerte par défaut sur le lag OTP | step-180 |
+
 ---
 
 ## 5. M0 — Fondations & double toolchain
@@ -552,10 +569,10 @@ alimente — en topologie multi-instance.
 ## 8. M3 — Clients, comptes SMPP & identifiants
 
 **Objectif :** prouver la tranche verticale (§3) et livrer le socle du domaine à deux niveaux.
-**Dépend de :** M2 · **Steps :** 060 → 066
+**Dépend de :** M2 · **Steps :** 060 → 067 — *067 insérée le 29/09/2026, amendement v2.2*
 
 **Livrables** — groupes de clients (CRUD, filtre transverse), clients (liste, filtres, création, fiche,
-suspension **en cascade** chiffrée, sender IDs), comptes SMPP (canaux, politique de sender ID,
+suspension **en cascade** chiffrée, sender IDs avec catégorie et limite de débit), comptes SMPP (canaux,
 bascules `query_sm`/`cancel_sm`, webhooks, quotas, `max_sessions` avec **badge d'écart**), identifiants
 (**exactement deux cartes** masquées, secret montré **une seule fois**, rotation avec fenêtre de grâce,
 révocation avec impact chiffré, diagnostic d'échec de bind).
