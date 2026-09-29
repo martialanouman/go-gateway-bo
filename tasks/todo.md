@@ -251,7 +251,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
       audit du proxy ← **première route du BFF qui appelle la passerelle**. Les fiches archivées
       qui désignent step-060 pour ce rôle (extension d'`errors[]`, journal serveur, dettes du
       transport) se lisent step-059 : découpage arbitré le 28/09/2026
-- [ ] step-060 — Groupes de clients : CRUD et écran (le filtre par groupe naît avec step-061)
+- [x] step-060 — Groupes de clients : CRUD et écran (le filtre par groupe naît avec step-061)
 - [ ] step-061 — Clients : liste, filtres, création  ← **la tranche verticale est acquise ici**
 - [ ] step-062 — Fiche client : identité, statut, suspension en cascade, sender IDs
 - [ ] step-063 — Comptes SMPP : liste + création rattachée au client
