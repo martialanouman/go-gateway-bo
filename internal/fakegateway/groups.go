@@ -38,7 +38,9 @@ func (g *Groups) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case id == "" && r.Method == http.MethodGet:
 		status := r.URL.Query().Get("status")
-		listed := slices.DeleteFunc(slices.Clone(g.groups), func(candidate group) bool {
+		// `append` sur une tranche vide et non nulle : une liste sans groupe s'encode `[]`, jamais `null`,
+		// que le client engendré ne lit pas comme une liste.
+		listed := slices.DeleteFunc(append([]group{}, g.groups...), func(candidate group) bool {
 			return status != "" && candidate.Status != status
 		})
 		reply(w, http.StatusOK, listed)

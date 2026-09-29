@@ -561,6 +561,9 @@ test('the binary serves the painted shell, then the application replaces it', as
   // lui — c'est lui qui le range sous « Archivés », pas l'état de l'écran.
   await page.goto('/groups')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Groupes')
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'Aucun groupe pour l’instant' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Nouveau groupe' }).first().click()
   const nouveauGroupe = page.getByRole('dialog', { name: 'Nouveau groupe' })
   await nouveauGroupe.getByLabel('Nom').fill('Revendeurs de parcours')
