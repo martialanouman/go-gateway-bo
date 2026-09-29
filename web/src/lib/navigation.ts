@@ -59,7 +59,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     entries: [
       { to: '/customers', label: 'Clients', milestone: 'M3', anyOf: ['customers:read'] },
       { to: '/accounts', label: 'Comptes SMPP', milestone: 'M3', anyOf: ['accounts:read'] },
-      { to: '/groups', label: 'Groupes', milestone: 'M3', anyOf: ['groups:read'] },
+      { to: '/groups', label: 'Groupes', anyOf: ['groups:read'] },
     ],
   },
   {
