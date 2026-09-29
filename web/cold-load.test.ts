@@ -201,7 +201,10 @@ describe('cold load', () => {
     expect(gzipSync(sheet).byteLength, 'la feuille ne tient plus en un aller-retour').toBeLessThan(
       14_336,
     )
-    expect(sheet.byteLength, 'la feuille coûte trop cher à analyser').toBeLessThan(32_768)
+    // Relevé de 32 768 à 36 864 le 29/09/2026 (step-061), décision de l'utilisateur : la feuille était à
+    // trois octets du plafond, et la règle qui place la liste d'un `Select` au-dessus des modales en
+    // demandait 56. La borne compressée, celle de l'aller-retour, n'a pas bougé.
+    expect(sheet.byteLength, 'la feuille coûte trop cher à analyser').toBeLessThan(36_864)
   })
 
   it('keeps the entry script free of what a single route consumes', async () => {
