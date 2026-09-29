@@ -1117,7 +1117,8 @@ components:
     # (`mfa_required`) et la permission manquante (`permission_denied`), qui la nomme.
     RefusDeLaPasserelle:
       description: |
-        La passerelle a refusé la demande ; `errors[]` nomme les champs en cause quand elle les donne.
+        La passerelle a refusé la demande, ou le BFF l'a refusée avant elle parce qu'elle ne saurait
+        pas l'exécuter (une description vidée) ; `errors[]` nomme les champs en cause quand il y en a.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

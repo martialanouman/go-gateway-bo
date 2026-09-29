@@ -59,24 +59,8 @@ function GroupsScreen() {
     </Button>
   )
 
-  return (
-    <div className="page">
-      <header className="page__head">
-        <h1 className="page__title" ref={title} tabIndex={-1}>
-          Groupes
-        </h1>
-        {create}
-      </header>
-
-      <Tabs
-        onValueChange={(value) => setStatus(value as Status)}
-        tabs={[
-          { value: 'active', label: 'Actifs' },
-          { value: 'archived', label: 'Archivés' },
-        ]}
-        value={status}
-      />
-
+  const listing = (
+    <>
       {groups.isPending ? (
         <LoadingState label="Chargement des groupes…">
           <Skeleton height={38} />
@@ -113,9 +97,44 @@ function GroupsScreen() {
           onMoved={() => title.current?.focus()}
         />
       )}
+    </>
+  )
 
-      {pending?.kind === 'create' ? <GroupEditor onClose={close} /> : null}
-      {pending?.kind === 'edit' ? <GroupEditor group={pending.group} onClose={close} /> : null}
+  return (
+    <div className="page">
+      <header className="page__head">
+        <h1 className="page__title" ref={title} tabIndex={-1}>
+          Groupes
+        </h1>
+        {create}
+      </header>
+
+      {/* Le contenu est le panneau de l'onglet actif : sans lui, l'onglet promet un panneau que le
+          lecteur d'écran ne trouve pas. */}
+      <Tabs
+        onValueChange={(value) => setStatus(value as Status)}
+        tabs={(['active', 'archived'] as const).map((value) => ({
+          value,
+          label: value === 'active' ? 'Actifs' : 'Archivés',
+          panel: listing,
+        }))}
+        value={status}
+      />
+
+      {pending?.kind === 'create' ? (
+        <GroupEditor
+          onClose={close}
+          onSaved={() => {
+            close()
+            // Le groupe naît actif ; et le déclencheur de l'état vide disparaît avec lui.
+            setStatus('active')
+            title.current?.focus()
+          }}
+        />
+      ) : null}
+      {pending?.kind === 'edit' ? (
+        <GroupEditor group={pending.group} onClose={close} onSaved={close} />
+      ) : null}
       {pending?.kind === 'delete' ? (
         <ConfirmDelete
           group={pending.group}
@@ -210,7 +229,7 @@ function ToggleArchive({
       await queryClient.invalidateQueries({ queryKey: groupsQueryKey })
       toast({
         title: archiving
-          ? `${group.name} est archivé : ses clients le gardent, et il reste sous l’onglet Archivés.`
+          ? `${group.name} est archivé : ses clients le gardent, et il passe sous l’onglet Archivés.`
           : `${group.name} est de nouveau actif.`,
         severity: 'success',
       })
@@ -226,8 +245,17 @@ function ToggleArchive({
   )
 }
 
-function GroupEditor({ group, onClose }: { readonly group?: Group; readonly onClose: () => void }) {
+function GroupEditor({
+  group,
+  onClose,
+  onSaved,
+}: {
+  readonly group?: Group
+  readonly onClose: () => void
+  readonly onSaved: () => void
+}) {
   const queryClient = useQueryClient()
+  const toast = useToast()
   const form = useForm({
     resolver: formResolver(CustomerGroupCreation),
     defaultValues: { name: group?.name ?? '', description: group?.description ?? '' },
@@ -251,9 +279,13 @@ function GroupEditor({ group, onClose }: { readonly group?: Group; readonly onCl
             }),
             'Le groupe n’a pas été modifié',
           ),
-    onSuccess: async () => {
+    onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: groupsQueryKey })
-      onClose()
+      toast({
+        title: group === undefined ? `${saved.name} est créé.` : `${saved.name} est enregistré.`,
+        severity: 'success',
+      })
+      onSaved()
     },
     onError: (error) => {
       for (const { field, message } of fieldRefusalsOf(error)) {
@@ -284,7 +316,13 @@ function GroupEditor({ group, onClose }: { readonly group?: Group; readonly onCl
         className="form"
         id="group-editor"
         noValidate
-        onSubmit={form.handleSubmit((values) => save.mutate(values))}
+        onSubmit={form.handleSubmit((values) =>
+          group !== undefined &&
+          values.name === group.name &&
+          (values.description ?? '') === (group.description ?? '')
+            ? onClose()
+            : save.mutate(values),
+        )}
       >
         <p>
           Un groupe est organisationnel : il ne change ni solde, ni quota, ni routage. Action

@@ -75,17 +75,39 @@ describe('the groups screen', () => {
     }
   })
 
-  it('creates a group, which appears in the list', async () => {
+  it('creates a group from the archived tab, then shows it under Actifs with focus on the title', async () => {
     const user = userEvent.setup()
     await visit(WRITER)
 
+    await user.click(screen.getByRole('tab', { name: 'Archivés' }))
+    await screen.findByRole('heading', { level: 2, name: 'Aucun groupe archivé' })
     await user.click(screen.getByRole('button', { name: 'Nouveau groupe' }))
     const dialog = await screen.findByRole('dialog', { name: 'Nouveau groupe' })
     await user.type(within(dialog).getByLabelText('Nom'), 'Grands comptes')
     await user.click(within(dialog).getByRole('button', { name: 'Créer le groupe' }))
 
-    expect(await screen.findByRole('cell', { name: 'Grands comptes' })).toBeInTheDocument()
+    expect(await screen.findByText('Grands comptes est créé.')).toBeInTheDocument()
+    const panel = screen.getByRole('tabpanel')
+    expect(await within(panel).findByRole('cell', { name: 'Grands comptes' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Actifs' })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1, name: 'Groupes' })).toHaveFocus(),
+    )
+  })
+
+  it('sends nothing when an edit changes nothing', async () => {
+    const user = userEvent.setup()
+    const row = await visit(WRITER)
+    const patches = () =>
+      vi.mocked(fetch).mock.calls.filter(([request]) => (request as Request).method === 'PATCH')
+        .length
+
+    await user.click(row.getByRole('button', { name: 'Modifier' }))
+    const dialog = await screen.findByRole('dialog', { name: `Modifier ${RESELLERS.name}` })
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer le groupe' }))
+
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(patches()).toBe(0)
   })
 
   it('refuses an empty name under its field, before any request', async () => {

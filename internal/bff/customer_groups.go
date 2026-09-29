@@ -2,6 +2,7 @@ package bff
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -193,7 +194,7 @@ func (a API) UpdateCustomerGroup(ctx context.Context, request UpdateCustomerGrou
 
 	_, err = auditRelayed(ctx, a.Audit.Record, a.Logger, a.event(ctx, store.Event{
 		OperatorID: actor, Action: actionGroupUpdate, TargetType: auditTargetCustomerGroup,
-		TargetID: request.GroupId, After: after,
+		TargetID: id.String(), After: after,
 	}), func(ctx context.Context, _ *store.Event) (int, error) {
 		var callErr error
 
@@ -248,7 +249,7 @@ func (a API) DeleteCustomerGroup(ctx context.Context, request DeleteCustomerGrou
 
 	_, err = auditRelayed(ctx, a.Audit.Record, a.Logger, a.event(ctx, store.Event{
 		OperatorID: actor, Action: actionGroupDelete, TargetType: auditTargetCustomerGroup,
-		TargetID: request.GroupId,
+		TargetID: id.String(),
 	}), func(ctx context.Context, _ *store.Event) (int, error) {
 		var callErr error
 
@@ -286,7 +287,7 @@ func (a API) DeleteCustomerGroup(ctx context.Context, request DeleteCustomerGrou
 // sont rédigés ici, en français : la passerelle les écrit en anglais et sans nommer le geste.
 func (a API) relayedRefusal(ctx context.Context, operation string, err error) (int, Error, error) {
 	status, body, relayed := relayError(err)
-	if !relayed {
+	if !relayed || errors.Is(err, errIntentNotTraced) {
 		return 0, Error{}, err
 	}
 
@@ -345,7 +346,7 @@ func unknownGroup() Error {
 }
 
 func groupNameTaken(code string) Error {
-	const refusal = "Un autre groupe porte déjà ce nom. Choisissez-en un autre."
+	const refusal = "Un autre groupe, actif ou archivé, porte déjà ce nom. Choisissez-en un autre."
 
 	return Error{
 		Code: code, Message: refusal,

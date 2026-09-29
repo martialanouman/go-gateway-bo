@@ -23,7 +23,7 @@ func TestATakenGroupNameIsPlacedUnderTheNameField(t *testing.T) {
 	assert.NotContains(t, body.Message, "taken")
 	if assert.NotNil(t, body.Errors) {
 		assert.Equal(t, "name", (*body.Errors)[0].Field)
-		assert.Contains(t, (*body.Errors)[0].Message, "Un autre groupe porte déjà ce nom")
+		assert.Contains(t, (*body.Errors)[0].Message, "porte déjà ce nom")
 	}
 }
 

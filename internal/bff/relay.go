@@ -56,6 +56,10 @@ func fieldErrors(upstream gateway.APIError) *[]FieldError {
 	return &fields
 }
 
+// errIntentNotTraced distingue un journal en panne d'une passerelle injoignable : l'appel n'est pas
+// parti, et l'annoncer « réessayez, la passerelle… » enverrait chercher la panne au mauvais endroit.
+var errIntentNotTraced = errors.New("l'intention d'une action relayée n'a pas pu être tracée")
+
 // auditRelayed trace une action que la passerelle exécute : la transaction commune avec l'audit est
 // impossible, puisque l'action vit ailleurs. L'intention s'écrit donc **avant** l'appel, et une
 // écriture qui échoue l'empêche de partir. L'issue s'écrit après ; une panne entre les deux laisse
@@ -70,7 +74,7 @@ func auditRelayed(ctx context.Context, record func(context.Context, store.Event)
 ) (int, error) {
 	event.After = event.After.Text("outcome", "attempted")
 	if err := record(ctx, event); err != nil {
-		return 0, fmt.Errorf("l'intention de %s n'a pas pu être tracée : %w", event.Action, err)
+		return 0, fmt.Errorf("%w (%s) : %w", errIntentNotTraced, event.Action, err)
 	}
 
 	status, err := call(ctx, &event)

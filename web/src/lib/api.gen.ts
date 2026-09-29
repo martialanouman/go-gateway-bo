@@ -1016,7 +1016,10 @@ export interface components {
         };
     };
     responses: {
-        /** @description La passerelle a refusé la demande ; `errors[]` nomme les champs en cause quand elle les donne. */
+        /**
+         * @description La passerelle a refusé la demande, ou le BFF l'a refusée avant elle parce qu'elle ne saurait
+         *     pas l'exécuter (une description vidée) ; `errors[]` nomme les champs en cause quand il y en a.
+         */
         RefusDeLaPasserelle: {
             headers: {
                 [name: string]: unknown;

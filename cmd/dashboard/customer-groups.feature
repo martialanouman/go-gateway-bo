@@ -135,3 +135,14 @@ Fonctionnalité: Les groupes de clients relayés depuis la passerelle
     Et le refus place une erreur sous le champ "description"
     Et la réponse est conforme au contrat du BFF
     Et la passerelle n'a reçu aucune requête
+
+  Scénario: une création dont l'intention ne peut pas s'écrire n'atteint pas la passerelle, et ne l'accuse pas
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Et les partitions du journal sont retirées
+    Quand le navigateur envoie POST "/api/customer-groups" avec le corps '{"name":"Revendeurs"}'
+    Alors le serveur répond 500
+    Et la réponse ne porte pas "bff_upstream_unreachable"
+    Et la passerelle n'a reçu aucune requête
