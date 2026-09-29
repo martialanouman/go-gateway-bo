@@ -27,6 +27,7 @@ const GLYPHS = {
   ban: () => <g><circle cx="8" cy="8" r="5.4" /><path d="M4.2 11.8 11.8 4.2" /></g>,
   ellipsis: () => <g><circle cx="3.6" cy="8" r=".9" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r=".9" fill="currentColor" stroke="none" /><circle cx="12.4" cy="8" r=".9" fill="currentColor" stroke="none" /></g>,
   'ellipsis-vertical': () => <g><circle cx="8" cy="3.6" r=".9" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r=".9" fill="currentColor" stroke="none" /><circle cx="8" cy="12.4" r=".9" fill="currentColor" stroke="none" /></g>,
+  bell: () => <g><path d="M4.4 11.2V7.4a3.6 3.6 0 0 1 7.2 0v3.8l1.2 1.2H3.2Z" /><path d="M6.7 13.8a1.4 1.4 0 0 0 2.6 0" /></g>,
 };
 
 const ALIAS = {

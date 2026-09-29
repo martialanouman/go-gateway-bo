@@ -3,7 +3,7 @@
  * decorative pictograms and emoji are forbidden (charte §07).
  * Available: dot, square, diamond, circle, warning, bang, info, plus, minus, times,
  * check, chevron-up|down|left|right, arrow-up, arrow-down, refresh, search, ban,
- * ellipsis, ellipsis-vertical.
+ * ellipsis, ellipsis-vertical, bell.
  */
 export interface IconProps {
   name: string;

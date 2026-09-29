@@ -110,7 +110,21 @@ describe('the notification center trigger', () => {
 
     const button = await trigger('Notifications, 2 non lues')
 
-    expect(button).toHaveTextContent(/^Notifications2$/)
+    expect(button).toHaveTextContent(/^2$/)
+  })
+
+  it('shows a bell rather than a word, and names it in a tooltip', async () => {
+    const user = userEvent.setup()
+    openShell({ entries: [entry(1, { read: true })] })
+
+    const button = await trigger('Notifications, aucune non lue')
+    expect(button).toHaveTextContent(/^$/)
+    expect(button.querySelector('svg')).not.toBeNull()
+
+    await user.hover(button)
+    expect(
+      await screen.findByText('Notifications, aucune non lue', { selector: '.ui-tooltip' }),
+    ).toBeInTheDocument()
   })
 
   it('says a single unread notification in the singular', async () => {
@@ -128,13 +142,13 @@ describe('the notification center trigger', () => {
 
     const button = screen.getByRole('button', { name: /^Notifications/ })
     expect(button).toHaveAccessibleName('Notifications')
-    expect(button).toHaveTextContent(/^Notifications$/)
+    expect(button).toHaveTextContent(/^$/)
   })
 
   it('shows no count once everything is read', async () => {
     openShell({ entries: [entry(1, { read: true })] })
 
-    expect(await trigger('Notifications, aucune non lue')).toHaveTextContent(/^Notifications$/)
+    expect(await trigger('Notifications, aucune non lue')).toHaveTextContent(/^$/)
   })
 })
 
