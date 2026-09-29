@@ -3,6 +3,7 @@
 **Composant :** Tableau de bord Admin / Exploitation (BFF Go + SPA React, pnpm)
 **Document compagnon :** `specification-technique-passerelle-sms.md` (ce tableau de bord est un client de l'API Admin de la passerelle)
 **Statut :** v2.1 — *amendée le 01/08/2026 : le BFF passe en Go, le client devient une SPA Vite. Sections touchées : §1.3, §4 (diagramme, §4.1, §4.2), le chapeau de §5, §7. **Les exigences fonctionnelles — §1.1, §1.2, §6 — sont inchangées** : rien de ce que le produit doit faire ne dépendait de la pile.*
+*Amendement du 29/09/2026 (v2.2), suite aux ADR-0020 et ADR-0021 de la passerelle, toutes deux `Proposed` : catégorie de trafic par sender ID, fin de la politique de sender ID, priorité bornée par catégorie. Sections touchées : §1.1, §5 (endpoints), §6.1, §6.3, §6.4, §6.6, §6.8, §6.12, §6.19 (neuve).*
 
 *Note de convention : les blocs de code (schémas, endpoints API, diagrammes, JSON, y compris leurs commentaires) restent en anglais. Seul le texte narratif est en français.*
 
@@ -13,8 +14,8 @@
 ### 1.1 Exigences fonctionnelles
 
 - **Gestion des clients et de leurs comptes SMPP (admin)** — navigation à deux niveaux suivant le modèle de la passerelle (§6.18 compagnon) : un **client** détient un ou plusieurs **comptes SMPP**. Les clients n'ont aucun accès à la plateforme ; les admins créent/modifient/suspendent les deux niveaux et gèrent chaque sous-ressource.
-  - **Au niveau client** : identité, statut (suspendre un client suspend tous ses comptes), **sender IDs**, **facturation** (soldes MT et MO, plan tarifaire, découvert, `balance_scope`), **politique de stockage de contenu**, appartenance à un **groupe**.
-  - **Au niveau compte SMPP** : **identifiant de bind SMPP + une clé API** (création, rotation manuelle avec fenêtre de grâce, révocation), **canaux** (SMPP/REST), **politique d'autorisation de sender ID**, bascules **`query_sm`/`cancel_sm`**, **quotas/limites de débit**, `max_sessions`, **webhook MO/DLR**.
+  - **Au niveau client** : identité, statut (suspendre un client suspend tous ses comptes), **sender IDs** (avec leur **catégorie de trafic** et leur **limite de débit**, §6.19), **facturation** (soldes MT et MO, plan tarifaire, découvert, `balance_scope`), **politique de stockage de contenu**, appartenance à un **groupe**.
+  - **Au niveau compte SMPP** : **identifiant de bind SMPP + une clé API** (création, rotation manuelle avec fenêtre de grâce, révocation), **canaux** (SMPP/REST), bascules **`query_sm`/`cancel_sm`**, **quotas/limites de débit**, `max_sessions`, **webhook MO/DLR**.
 - **UI de groupes de clients (organisationnel)** — CRUD des groupes pour segmenter la base (par secteur, région, revendeur), affectation de clients, et filtrage par groupe partout où les clients/comptes apparaissent. Un groupe ne porte ni solde, ni quota, ni règle de configuration (§6.17 compagnon).
 - **UI de gestion des connecteurs** — CRUD des connecteurs SMSC, formulaire à divulgation progressive (champs requis d'abord, section « Avancé » pour l'ensemble SMPP), statut de bind en direct, **`link_status` et `breaker_state` distincts** (§6.5), configuration du pool de binds, rebind/déconnexion forcée, débit/taux d'erreur.
 - **UI de gestion des routes** — constructeur visuel des règles déclaratives (priorité, glisser-déposer, conditions), sélecteur de stratégie de distribution, plus le **routage par numéro exact** (§6.7).
@@ -397,7 +398,6 @@ POST                    /smpp-accounts/{id}/suspend       # cascade descendante 
 PATCH                   /smpp-accounts/{id}/channels
 PATCH                   /smpp-accounts/{id}/session-limits
 GET                     /smpp-accounts/{id}/sessions      # binds vivants vs max_sessions — alimente l'écart de §6.5
-PATCH                   /smpp-accounts/{id}/sender-id-policy
 PATCH                   /smpp-accounts/{id}/smpp-ops       # query_sm / cancel_sm toggles
 GET/POST/PATCH/DELETE  /smpp-accounts/{id}/webhooks
 GET     /smpp-accounts/{id}/credentials                  # masked
@@ -524,6 +524,7 @@ Le client envoie `{"action":"subscribe","topics":[...]}` au montage et `unsubscr
 - Table ordonnée par priorité avec glisser-déposer ; chaque ligne résume conditions, stratégie et connecteur(s).
 - Formulaire d'édition : champs structurés (compte/client/expéditeur/destination/contenu, testeur regex), menu de stratégie, éditeur de cibles adapté (poids pour `weighted`, ordre pour `failover_priority`), sélecteur de route de repli.
 - Action « Simuler » : soumettre un message d'exemple et voir la route/le connecteur résolus par le matching déclaratif ; une bannière signale si le compte a un script actif (qui prévaudrait) et si un numéro exact s'applique (prioritaire).
+- *(Amendement 29/09/2026, ADR-0020.)* La simulation affiche la **catégorie** de l'expéditeur et la **priorité effective**, et nomme tout connecteur écarté parce que son `priority_tier` dépasse la catégorie du message (« réservé à l'OTP »). Si plus aucune cible ne reste, elle le dit : c'est un « aucune route » en production.
 
 ### 6.2 Éditeur de scripts de routage personnalisés (admin)
 
@@ -536,12 +537,13 @@ Le client envoie `{"action":"subscribe","topics":[...]}` au montage et `unsubscr
 ### 6.3 Tableau de bord de trafic temps réel
 
 - Widgets : MT/s, MO/s, taux de succès, latence p50/p99, sessions actives — adossés au sujet WS `metrics.traffic` avec instantané REST au chargement.
+- *(Amendement 29/09/2026, ADR-0021.)* Ventilation par **catégorie** (`otp`, `transactional`, `marketing`) : débit, **lag** et **temps d'attente** avant envoi, par catégorie et par connecteur. Un lag OTP est un incident ; un lag marketing est de la backpressure attendue, affiché comme tel.
 - Ventilations par connecteur, **client**, **compte SMPP** et **groupe** (les trois niveaux du modèle ; la ventilation par groupe somme les séries par compte, le groupe n'étant pas un label Prometheus), triables, avec drill-down vers le CDR Explorer.
 - Bascule de plage (5 min / 1 h / 24 h) : plages courtes via WS, longues via instantané REST pré-agrégé.
 
 ### 6.4 CDR Explorer
 
-- Barre de filtre (**client**, **compte SMPP**, **groupe**, date, statut, source/dest, connecteur, route) avec vues sauvegardées ; le filtre par groupe est résolu vers les clients membres courants.
+- Barre de filtre (**client**, **compte SMPP**, **groupe**, **catégorie**, date, statut, source/dest, connecteur, route) avec vues sauvegardées ; le filtre par groupe est résolu vers les clients membres courants.
 - Table de résultats virtualisée, pagination côté serveur.
 - Panneau de détail : chronologie complète (soumis → routé → SMSC → DLR → remis), route/script/connecteur/décision de facturation, rendu en cascade de spans.
 - **Corps du message (dégradation propre)** : affiché uniquement si (a) la politique du client le stocke et (b) l'opérateur a `content:read` ; sinon un état explicite (« non stocké », « expiré », « effacé », « non autorisé »). Afficher le corps déclenche un appel `content:read` **audité** — mention « lecture journalisée » à côté du bouton.
@@ -558,6 +560,7 @@ Le client envoie `{"action":"subscribe","topics":[...]}` au montage et `unsubscr
 ### 6.6 UI anti-spam & réputation
 
 - CRUD reflétant le schéma anti-spam, aperçu « tester contre un exemple ».
+- *(Amendement 29/09/2026, ADR-0020.)* Type de règle **`category_mismatch`** : un expéditeur dont le trafic ne ressemble pas à sa catégorie déclarée (un OTP sans code, ou avec une URL). Action `flag` par défaut, `block` configurable. La file de revue montre l'expéditeur, sa catégorie et la règle en cause, **jamais un extrait du corps** (invariant a) ; « bloquer » et « reclasser l'expéditeur » y sont deux actions distinctes.
 - File de revue d'activité signalée (approuver/bloquer/liste blanche).
 - Graphique de tendance de réputation par client, seuils d'alerte alimentant `alert_rules`.
 
@@ -570,7 +573,7 @@ Le client envoie `{"action":"subscribe","topics":[...]}` au montage et `unsubscr
 
 **Répartition de l'évaluation entre Alertmanager et le BFF :**
 
-- **Métriques d'infrastructure** (`connector.error_rate`, `connector.status`, débit) — `evaluation_owner = alertmanager`. Le tableau de bord est l'UI de configuration (créer/éditer une règle écrit aussi la config Alertmanager via l'API Admin) ; l'évaluation et le déclenchement ont lieu dans Alertmanager, indépendamment de la disponibilité du tableau de bord. Alertmanager notifie le BFF par webhook pour peupler le centre de notification (affichage, pas détection ; il peut aussi paginer directement).
+- **Métriques d'infrastructure** (`connector.error_rate`, `connector.status`, débit, *lag par catégorie — amendement 29/09/2026, ADR-0021 : une règle par défaut alerte sur le lag OTP*) — `evaluation_owner = alertmanager`. Le tableau de bord est l'UI de configuration (créer/éditer une règle écrit aussi la config Alertmanager via l'API Admin) ; l'évaluation et le déclenchement ont lieu dans Alertmanager, indépendamment de la disponibilité du tableau de bord. Alertmanager notifie le BFF par webhook pour peupler le centre de notification (affichage, pas détection ; il peut aussi paginer directement).
 - **Métriques de domaine métier** (`account.reputation`, `billing.mo_floor_reached`) — `evaluation_owner = bff`. N'existent pas dans Prometheus. Évaluées sur une **source durable** (topic Kafka `billing.events` ou pull réconciliateur depuis `billing-svc`) avec un **curseur/offset persisté**, de sorte qu'un redémarrage/basculement rejoue les transitions manquées au lieu de les perdre ; le flux WS sert l'affichage, jamais l'unique détection.
 - **Réconciliation Alertmanager** : un job périodique vérifie que les règles `evaluation_owner=alertmanager` déclarées existent réellement dans Alertmanager et remonte toute dérive.
 - Sur déclenchement, une ligne `notifications` est créée et distribuée (email/webhook/Slack), avec dédoublonnage (transition + rappel périodique pour la sévérité critique).
@@ -676,7 +679,7 @@ Section « Facturation », visible aux détenteurs d'une permission `billing:*`,
 
 ### 6.12 Visualiseur de trace SMS
 
-- Cascade de spans par étape (ingestion, autorisation sender ID, opt-out, anti-spam, routage, débit, facturation, envoi, DLR, remise), avec durée/statut/attributs (route/script/connecteur, résultat de facturation, codes d'erreur).
+- Cascade de spans par étape (ingestion, autorisation sender ID, opt-out, anti-spam, routage, débit, facturation, envoi, DLR, remise), avec la **catégorie** et la **priorité effective** du message, et durée/statut/attributs (route/script/connecteur, résultat de facturation, codes d'erreur).
 - Étapes en échec ou lentes signalées.
 - **Le corps n'apparaît jamais** dans la trace (§6.11 compagnon).
 - Consultable par lien direct pour partage dans un ticket/fil.
@@ -722,6 +725,16 @@ Deux niveaux (`content:read` pour lire un corps ; `content:erase` et `gdpr:erase
 - **Effacement du contenu seul** (`content:erase`) : « détruit la clé — contenu illisible, métadonnées conservées, irréversible ».
 - **Effacement RGPD complet** (`gdpr:erase`) avec choix de cible : **client** (crypto-shred + purge, avertit si le grand livre doit être conservé pour obligation fiscale) ou **personne / MSISDN** (suppression ciblée across clients, job asynchrone + attestation, opt-out conservé).
 - **Journal des accès au contenu** : vue dédiée des lectures de corps (qui, quel message, quand).
+
+### 6.19 Sender IDs : catégorie de trafic et débit (admin)
+
+*Amendement du 29/09/2026 — ADR-0020 et ADR-0021 de la passerelle, toutes deux `Proposed`.*
+
+- **Tout expéditeur doit être enregistré**, numérique compris : un `source_addr` inconnu est rejeté par la passerelle. La politique de sender ID par compte disparaît, avec son écran et sa route. La page du client le dit à la place.
+- **Catégorie** (`otp` | `transactional` | `marketing`) sur chaque sender ID, **`marketing` par défaut**. Passer en `otp` ou `transactional` est un acte explicite : une confirmation nomme la conséquence (« ce trafic passera devant le marketing sur les connecteurs partagés »), et le changement est audité avec l'ancienne et la nouvelle valeur. Permission : `customers:write`.
+- **Limite de débit par sender ID** (messages/s, rafale) : l'engagement contractuel du flux, appliqué avant l'accusé de réception. Au-delà, le client reçoit un refus (`429` en REST, `ESME_RTHROTTLED` en SMPP) et **aucun CDR n'est écrit**. L'écran le dit, parce qu'un opérateur qui cherche un message refusé à l'admission ne le trouvera pas dans le CDR Explorer.
+- **Liste** : colonnes catégorie, limite, statut ; filtre par catégorie ; compteur de signalements `category_mismatch` récents par expéditeur, avec lien vers la file de revue (§6.6).
+- **Connecteurs** (section « Avancé » du formulaire) : `priority_flag_default` (le `priority_flag` envoyé quand le message n'en impose pas) et `priority_tier` (0 = tout trafic, 1 = transactionnel et OTP, 2 = OTP seul), chacun expliqué par sa conséquence. Un `priority_tier` > 0 affiche les routes qui n'ont pas d'autre cible, et donc ne serviraient plus rien à leur trafic non éligible.
 
 ---
 
