@@ -3,7 +3,7 @@
 **Composant :** Tableau de bord Admin / Exploitation (BFF Go + SPA React, pnpm)
 **Document compagnon :** `specification-technique-passerelle-sms.md` (ce tableau de bord est un client de l'API Admin de la passerelle)
 **Statut :** v2.1 — *amendée le 01/08/2026 : le BFF passe en Go, le client devient une SPA Vite. Sections touchées : §1.3, §4 (diagramme, §4.1, §4.2), le chapeau de §5, §7. **Les exigences fonctionnelles — §1.1, §1.2, §6 — sont inchangées** : rien de ce que le produit doit faire ne dépendait de la pile.*
-*Amendement du 29/09/2026 (v2.2), suite aux ADR-0020 et ADR-0021 de la passerelle, toutes deux `Proposed` : catégorie de trafic par sender ID, fin de la politique de sender ID, priorité bornée par catégorie. Sections touchées : §1.1, §5 (endpoints), §6.1, §6.3, §6.4, §6.6, §6.8, §6.12, §6.19 (neuve).*
+*Amendement du 29/09/2026 (v2.2), suite aux ADR-0020 et ADR-0021 de la passerelle, acceptées le 29/09/2026 : catégorie de trafic par sender ID, fin de la politique de sender ID, priorité bornée par catégorie. Sections touchées : §1.1, §5 (endpoints), §6.1, §6.3, §6.4, §6.6, §6.8, §6.12, §6.19 (neuve).*
 
 *Note de convention : les blocs de code (schémas, endpoints API, diagrammes, JSON, y compris leurs commentaires) restent en anglais. Seul le texte narratif est en français.*
 
@@ -728,7 +728,7 @@ Deux niveaux (`content:read` pour lire un corps ; `content:erase` et `gdpr:erase
 
 ### 6.19 Sender IDs : catégorie de trafic et débit (admin)
 
-*Amendement du 29/09/2026 — ADR-0020 et ADR-0021 de la passerelle, toutes deux `Proposed`.*
+*Amendement du 29/09/2026 — ADR-0020 et ADR-0021 de la passerelle, acceptées le 29/09/2026.*
 
 - **Tout expéditeur doit être enregistré**, numérique compris : un `source_addr` inconnu est rejeté par la passerelle. La politique de sender ID par compte disparaît, avec son écran et sa route. La page du client le dit à la place.
 - **Catégorie** (`otp` | `transactional` | `marketing`) sur chaque sender ID, **`marketing` par défaut**. Passer en `otp` ou `transactional` est un acte explicite : une confirmation nomme la conséquence (« ce trafic passera devant le marketing sur les connecteurs partagés »), et le changement est audité avec l'ancienne et la nouvelle valeur. Permission : `customers:write`.
