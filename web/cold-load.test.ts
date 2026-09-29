@@ -188,11 +188,11 @@ describe('cold load', () => {
     // `gzip -9` et le rapport de Vite rendent trois valeurs différentes pour la même feuille.
     //
     // La feuille des primitives est sur le chemin critique **à sa place** — tout écran la consomme
-    // au premier rendu, et la scinder ajouterait un aller-retour au lieu d'en retirer un. Reste
-    // `design-reference.css`, qui n'y a rien à faire : servie à tous pour une page que seul un
-    // développeur visite. La cause est mesurée — l'import de la route est statique dans
-    // `routeTree.gen.ts`, donc `autoCodeSplitting` scinde le composant et pas sa feuille. La corriger
-    // touche la génération de l'arbre de routes, pas les primitives, et vaut sa propre mesure.
+    // au premier rendu, et la scinder ajouterait un aller-retour au lieu d'en retirer un.
+    // `design-reference.css`, elle, n'y a rien à faire : `/_design` la lit par son adresse (`?url`)
+    // depuis le composant, que `autoCodeSplitting` diffère. Importée pour son effet de bord, elle
+    // restait dans le fichier de route, chargé d'office par l'arbre — et l'arrivée de `Select` dans un
+    // écran de la coquille l'a fait fusionner dans l'entrée (+2 209 octets, mesuré le 29/09/2026).
     const entry = /<link rel="stylesheet"[^>]*href="([^"]+)"/.exec(html)?.[1]
     expect(entry, "le document ne lie plus de feuille d'entrée").toBeDefined()
 

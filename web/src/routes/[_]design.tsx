@@ -29,7 +29,7 @@ import {
   SURFACES,
   TYPE_ROLES,
 } from '~/lib/design-tokens'
-import '~/styles/design-reference.css'
+import designReferenceSheet from '~/styles/design-reference.css?url'
 
 /**
  * `/_design` — la référence visuelle du dépôt.
@@ -94,6 +94,10 @@ const SPECIMEN_ROWS = [
 function DesignReference() {
   return (
     <main className="design">
+      {/* Lue par le composant, la feuille suit la page dans son morceau différé : importée pour son
+          seul effet de bord, elle restait dans le fichier de route, chargé d'office par l'arbre, et
+          finissait dans la feuille d'entrée servie à tous. */}
+      <link href={designReferenceSheet} precedence="default" rel="stylesheet" />
       <header className="design__intro">
         <h1 className="design__title">Référence visuelle</h1>
         <p className="design__lede">
