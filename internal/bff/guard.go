@@ -63,6 +63,10 @@ var authorization = map[string]rule{
 	"UpdateRole":                requires(permissions.RolesManage),
 	"DeleteRole":                requires(permissions.RolesManage),
 	"ListCustomerGroups":        requires(permissions.GroupsRead),
+	"GetCustomerGroup":          requires(permissions.GroupsRead),
+	"CreateCustomerGroup":       requires(permissions.GroupsWrite),
+	"UpdateCustomerGroup":       requires(permissions.GroupsWrite),
+	"DeleteCustomerGroup":       requires(permissions.GroupsWrite),
 	"Health": exempt("la sonde de l'orchestrateur, qui n'a pas de session et ne doit jamais " +
 		"dépendre d'une autre brique pour répondre"),
 	"Login": exempt("la porte d'entrée : exiger une session pour en ouvrir une n'a pas de sens. " +

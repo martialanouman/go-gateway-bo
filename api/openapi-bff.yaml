@@ -1009,6 +1009,89 @@ paths:
         '403': { $ref: '#/components/responses/PermissionRefusee' }
         '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
         '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    post:
+      operationId: createCustomerGroup
+      summary: Crée un groupe de clients
+      description: |
+        Relayée vers `create-customer-group`. Le groupe naît actif et sans membre.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerGroupCreation' }
+      responses:
+        '201':
+          description: Le groupe créé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerGroup' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '409': { $ref: '#/components/responses/NomDeGroupePris' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /customer-groups/{groupId}:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+    get:
+      operationId: getCustomerGroup
+      summary: Un groupe de clients
+      description: Relayée vers `get-customer-group`.
+      responses:
+        '200':
+          description: Le groupe.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerGroup' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/GroupeInconnu' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    patch:
+      operationId: updateCustomerGroup
+      summary: Renomme, décrit, archive ou désarchive un groupe
+      description: |
+        Relayée vers `update-customer-group`. Un champ absent reste inchangé. Une description vide
+        est refusée en 422 sous `description` : la passerelle lit une description nulle comme « ne
+        change pas », si bien qu'aucune requête ne sait encore effacer une description.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerGroupUpdate' }
+      responses:
+        '200':
+          description: Le groupe modifié.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerGroup' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/GroupeInconnu' }
+        '409': { $ref: '#/components/responses/NomDeGroupePris' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    delete:
+      operationId: deleteCustomerGroup
+      summary: Supprime un groupe, sans supprimer aucun client
+      description: |
+        Relayée vers `delete-customer-group`. Les clients membres sont détachés du groupe ; aucun
+        n'est supprimé.
+      responses:
+        '204':
+          description: Le groupe est supprimé et ses membres détachés.
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/GroupeInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
 
 components:
   parameters:
@@ -1022,6 +1105,11 @@ components:
       in: path
       required: true
       schema: { type: string }
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema: { type: string }
 
   responses:
     # Les réponses partagées par les routes d'administration. `PermissionRefusee` couvre les trois
@@ -1030,6 +1118,17 @@ components:
     RefusDeLaPasserelle:
       description: |
         La passerelle a refusé la demande ; `errors[]` nomme les champs en cause quand elle les donne.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    GroupeInconnu:
+      description: Aucun groupe ne porte cet identifiant.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NomDeGroupePris:
+      description: |
+        Un autre groupe porte déjà ce nom ; `errors[]` place le refus sous `name`.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -1810,6 +1909,22 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
       required: [id, name, status, createdAt, updatedAt]
+
+    CustomerGroupCreation:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+      required: [name]
+
+    CustomerGroupUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        status: { $ref: '#/components/schemas/CustomerGroupStatus' }
 
     FieldError:
       type: object

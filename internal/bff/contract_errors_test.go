@@ -249,3 +249,23 @@ func (failingAPI) ListCustomerGroups(_ context.Context, _ ListCustomerGroupsRequ
 ) (ListCustomerGroupsResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }
+
+func (failingAPI) CreateCustomerGroup(_ context.Context, _ CreateCustomerGroupRequestObject,
+) (CreateCustomerGroupResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) GetCustomerGroup(_ context.Context, _ GetCustomerGroupRequestObject,
+) (GetCustomerGroupResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) UpdateCustomerGroup(_ context.Context, _ UpdateCustomerGroupRequestObject,
+) (UpdateCustomerGroupResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) DeleteCustomerGroup(_ context.Context, _ DeleteCustomerGroupRequestObject,
+) (DeleteCustomerGroupResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}

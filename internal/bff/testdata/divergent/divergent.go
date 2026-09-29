@@ -141,3 +141,19 @@ func (API) ConfirmTotp(_ context.Context, _ bff.ConfirmTotpRequestObject,
 ) (bff.ConfirmTotpResponseObject, error) {
 	return bff.ConfirmTotp204Response{}, nil
 }
+
+func (API) CreateCustomerGroup(_ context.Context, _ bff.CreateCustomerGroupRequestObject) (bff.CreateCustomerGroupResponseObject, error) {
+	return nil, nil
+}
+
+func (API) GetCustomerGroup(_ context.Context, _ bff.GetCustomerGroupRequestObject) (bff.GetCustomerGroupResponseObject, error) {
+	return nil, nil
+}
+
+func (API) UpdateCustomerGroup(_ context.Context, _ bff.UpdateCustomerGroupRequestObject) (bff.UpdateCustomerGroupResponseObject, error) {
+	return nil, nil
+}
+
+func (API) DeleteCustomerGroup(_ context.Context, _ bff.DeleteCustomerGroupRequestObject) (bff.DeleteCustomerGroupResponseObject, error) {
+	return nil, nil
+}

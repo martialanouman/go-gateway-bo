@@ -61,18 +61,19 @@ func fieldErrors(upstream gateway.APIError) *[]FieldError {
 // écriture qui échoue l'empêche de partir. L'issue s'écrit après ; une panne entre les deux laisse
 // `attempted` seul, qui se lit « issue inconnue » et non « rien ».
 //
-// `event.After` est complété sur place. `call` rend le statut amont. La seconde écriture ne fait pas
-// échouer la route : l'action est faite, et l'annoncer ratée ferait recommencer l'opérateur.
+// `event.After` est complété sur place. `call` rend le statut amont, et peut compléter l'événement
+// de ce que seule la réponse connaît — l'identifiant d'un groupe créé. La seconde écriture ne fait
+// pas échouer la route : l'action est faite, et l'annoncer ratée ferait recommencer l'opérateur.
 func auditRelayed(ctx context.Context, record func(context.Context, store.Event) error, logger *slog.Logger,
 	event store.Event,
-	call func(context.Context) (int, error),
+	call func(context.Context, *store.Event) (int, error),
 ) (int, error) {
 	event.After = event.After.Text("outcome", "attempted")
 	if err := record(ctx, event); err != nil {
 		return 0, fmt.Errorf("l'intention de %s n'a pas pu être tracée : %w", event.Action, err)
 	}
 
-	status, err := call(ctx)
+	status, err := call(ctx, &event)
 
 	outcome := "succeeded"
 	if err != nil || status < http.StatusOK || status >= http.StatusMultipleChoices {
