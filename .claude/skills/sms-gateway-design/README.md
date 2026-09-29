@@ -109,7 +109,7 @@ No codebase and no Figma file were provided. The charter's rendered pages were r
 
 The charter closes this question: *« Pas de pictogrammes décoratifs ni d'emoji. Formes géométriques simples et glyphes fonctionnels uniquement. »*
 
-- **There is no icon library, no icon font and no CDN.** The complete set is drawn inline in `components/core/Icon.jsx`: `dot`, `square` (legend marker), `diamond`, `circle`, `warning`, `bang`, `info`, `plus`, `minus`, `times`, `check`, `chevron-up|down|left|right`, `arrow-up`, `arrow-down`, `refresh`, `search`, `ban`, `ellipsis`, `ellipsis-vertical`.
+- **There is no icon library, no icon font and no CDN.** The complete set is drawn inline in `components/core/Icon.jsx`: `dot`, `square` (legend marker), `diamond`, `circle`, `warning`, `bang`, `info`, `plus`, `minus`, `times`, `check`, `chevron-up|down|left|right`, `arrow-up`, `arrow-down`, `refresh`, `search`, `ban`, `ellipsis`, `ellipsis-vertical`, `bell` (the notification centre's icon-only trigger, added 29/09/2026).
 - **A name outside the set renders nothing** — deliberately. If a control seems to need an unavailable glyph, the answer is its text label.
 - **Sizes:** 14px in controls and rows, 16px in headers and empty states, 18px in specimens. Never under 12px. Stroke 1.5, `currentColor`, no fills except the dot/square/ellipsis markers.
 - **Where glyphs are allowed:** status dot (the most-used glyph in the product), legend square, menu chevrons, warning triangle, the boxed glyph inside an empty/error state, and icon-only controls that carry a tooltip (close, more, refresh).

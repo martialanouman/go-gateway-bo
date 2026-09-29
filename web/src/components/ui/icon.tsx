@@ -12,7 +12,7 @@ import type { ReactElement } from 'react'
  * absent, la réponse est son libellé texte. Substituer une forme voisine ferait passer une icône
  * décorative pour un glyphe fonctionnel.
  *
- * Les **vingt-deux** de la charte, tenus égaux au kit par `test/charter-glyphs.test.ts`, qui
+ * Les **vingt-trois** de la charte, tenus égaux au kit par `test/charter-glyphs.test.ts`, qui
  * les confronte à leur source plutôt que de recopier un compte.
  *
  * Ce qui n'est **pas** porté : la trentaine d'alias du kit (`x`, `close`, `lock`, `trash-2`…), qui
@@ -107,6 +107,12 @@ const GLYPHS = {
       <circle cx="8" cy="3.6" r=".9" fill="currentColor" stroke="none" />
       <circle cx="8" cy="8" r=".9" fill="currentColor" stroke="none" />
       <circle cx="8" cy="12.4" r=".9" fill="currentColor" stroke="none" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M4.4 11.2V7.4a3.6 3.6 0 0 1 7.2 0v3.8l1.2 1.2H3.2Z" />
+      <path d="M6.7 13.8a1.4 1.4 0 0 0 2.6 0" />
     </>
   ),
 } satisfies Record<string, ReactElement>

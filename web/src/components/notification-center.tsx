@@ -5,6 +5,7 @@ import {
   type DotTone,
   EmptyState,
   ErrorState,
+  Icon,
   LoadingState,
   Popover,
   Skeleton,
@@ -47,7 +48,7 @@ export function NotificationCenter() {
       title="Notifications"
       trigger={
         <>
-          Notifications
+          <Icon name="bell" size={14} />
           {unread !== undefined && unread > 0 ? (
             <span className="notifications__count">{unread}</span>
           ) : null}
