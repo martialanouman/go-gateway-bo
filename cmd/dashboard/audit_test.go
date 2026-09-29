@@ -23,6 +23,7 @@ type auditWorld struct {
 func (w *auditWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^le journal porte (\d+) événement "([^"]+)"$`, w.journalHolds)
 	ctx.Then(`^l'événement porte l'adresse de l'appelant$`, w.eventCarriesTheAddress)
+	ctx.Then(`^l'issue "([^"]+)" désigne le groupe que la réponse rend$`, w.outcomeTargetsTheReturnedGroup)
 	ctx.Then(`^le journal ne porte ni le secret ni les codes de récupération$`, w.journalHidesSecrets)
 	ctx.Given(`^les partitions du journal sont retirées$`, w.auditPartitionsRemoved)
 	ctx.When(`^l'opérateur remplace son application d'authentification$`,
@@ -35,6 +36,39 @@ func (w *auditWorld) registerSteps(ctx *godog.ScenarioContext) {
 	// toujours en compter deux si le retrait n'a pas eu lieu, une seule si le journal manquant ne l'a
 	// pas empêché.
 	ctx.Then(`^l'opérateur détient toujours sa clé d'accès$`, func() error { return w.passkeysHeld(2) })
+}
+
+// outcomeTargetsTheReturnedGroup lit la ligne d'issue : l'intention part avant que la passerelle ait
+// attribué l'identifiant, seule l'issue peut le porter.
+func (w *auditWorld) outcomeTargetsTheReturnedGroup(ctx context.Context, action string) error {
+	var returned struct {
+		ID string `json:"id"`
+	}
+
+	if err := json.Unmarshal([]byte(w.login.process.received.body), &returned); err != nil || returned.ID == "" {
+		return fmt.Errorf("la réponse ne rend aucun groupe : %s", w.login.process.received.body)
+	}
+
+	conn, err := w.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var target *string
+
+	err = conn.QueryRow(ctx, `SELECT target_id FROM audit_log WHERE action = $1 AND after_json->>'outcome' = 'succeeded'`,
+		action).Scan(&target)
+	if err != nil {
+		return fmt.Errorf("lire l'issue de %q : %w", action, err)
+	}
+
+	if target == nil || *target != returned.ID {
+		return fmt.Errorf("l'issue de %q désigne %v, la réponse rend %q", action, target, returned.ID)
+	}
+
+	return nil
 }
 
 func (w *auditWorld) connect(ctx context.Context) (*pgx.Conn, error) {

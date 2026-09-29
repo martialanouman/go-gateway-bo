@@ -78,6 +78,7 @@ Fonctionnalité: Les groupes de clients relayés depuis la passerelle
     Alors le serveur répond 201
     Et la réponse est conforme au contrat du BFF
     Et le journal porte 2 événement "group.create"
+    Et l'issue "group.create" désigne le groupe que la réponse rend
 
   Scénario: archiver un groupe est une modification tracée
     Étant donné une passerelle servie par le mock du contrat
