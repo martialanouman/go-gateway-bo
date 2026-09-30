@@ -37,6 +37,13 @@ function sent(fetch: ReturnType<typeof stubAdministration>, route: string) {
   })
 }
 
+// L'en-tête de la section et son état vide portent chacun le bouton ; le premier suffit.
+async function registerButton() {
+  return (
+    await screen.findAllByRole('button', { name: 'Enregistrer un sender ID' })
+  )[0] as HTMLElement
+}
+
 describe('the customer screen', () => {
   it('counts the accounts a suspension takes down before it leaves, then shows the customer suspended', async () => {
     const user = userEvent.setup()
@@ -100,9 +107,7 @@ describe('the customer screen', () => {
       },
     })
 
-    await user.click(
-      (await screen.findAllByRole('button', { name: 'Enregistrer un sender ID' }))[0],
-    )
+    await user.click(await registerButton())
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByRole('textbox', { name: 'Adresse' }), 'ACME')
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }))
@@ -195,9 +200,7 @@ describe('the customer screen', () => {
     const user = userEvent.setup()
     open(WRITER)
 
-    await user.click(
-      (await screen.findAllByRole('button', { name: 'Enregistrer un sender ID' }))[0],
-    )
+    await user.click(await registerButton())
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByRole('textbox', { name: 'Adresse' }), 'ACME{Enter}')
 
