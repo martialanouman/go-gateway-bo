@@ -53,7 +53,8 @@ describe('the customers screen', () => {
     const fetch = open(READER, { entry: `/customers?status=active&groupId=${RESELLERS.id}` })
 
     expect(await screen.findByRole('cell', { name: ACME.name })).toBeInTheDocument()
-    expect(screen.getByRole('cell', { name: RESELLERS.name })).toBeInTheDocument()
+    // Le nom vient de la liste des groupes, lue par une seconde requête : il s'attend.
+    expect(await screen.findByRole('cell', { name: RESELLERS.name })).toBeInTheDocument()
     const sent = customerReads(fetch).at(-1)
     expect(sent?.searchParams.get('status')).toBe('active')
     expect(sent?.searchParams.get('groupId')).toBe(RESELLERS.id)
