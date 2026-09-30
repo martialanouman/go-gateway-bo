@@ -43,9 +43,11 @@ overrides:
   # (confusion d'hôte, canonicalisation IDN sautée), GHSA-jqff-g426-hqxp (confusion d'hôte par schéma
   # percent-encodé) et GHSA-f65p-4m7j-42xc / GHSA-fph4-wmhf-6fwf (SSRF par autorité malformée ou
   # répétée). Le plancher est passé de 3.1.5 à 3.1.6 le 04/09/2026 : les trois derniers sont apparus
-  # après, et `^3.1.5` les laissait tous passer.
-  # Arrive par `ajv`, le validateur que Prism utilise pour juger les requêtes.
-  'ajv>fast-uri': '^3.1.6'
+  # après, et `^3.1.5` les laissait tous passer. Plancher passé à 3.1.8 le 30/09/2026 :
+  # GHSA-hrr3-gc8f-f4qj (casse d'hôte incohérente, modérée).
+  # Arrive par `ajv`, le validateur que Prism utilise pour juger les requêtes, et par
+  # `@hookform/resolvers`.
+  'ajv>fast-uri': '^3.1.8'
   # nanoid <3.3.17 : un générateur personnalisé boucle indéfiniment quand la taille vaut zéro
   # (GHSA-2v37-7h3g-55p8, élevée). `pnpm audit` l'annonce par huit chemins, mais `pnpm why` n'en voit
   # qu'un seul parent — `postcss`, qui s'en sert pour nommer ses fichiers de source map. Un sélecteur
