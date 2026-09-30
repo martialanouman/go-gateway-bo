@@ -28,7 +28,11 @@ func main() {
 	groups := &fakegateway.Groups{}
 	mux.Handle(fakegateway.GroupsPath, groups)
 	mux.Handle(fakegateway.GroupsPath+"/{id}", groups)
-	mux.Handle(fakegateway.CustomersPath, &fakegateway.Customers{})
+	customers := &fakegateway.Customers{}
+	mux.Handle(fakegateway.CustomersPath, customers)
+	mux.Handle(fakegateway.CustomersPath+"/{id}", customers)
+	mux.Handle(fakegateway.CustomersPath+"/{id}/{action}", customers)
+	mux.Handle(fakegateway.CustomersPath+"/{id}/{action}/{senderId}", customers)
 	mux.HandleFunc("GET /control/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})

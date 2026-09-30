@@ -594,6 +594,26 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(page.getByRole('row', { name: /Client de parcours/ })).toContainText(
     'Revendeurs de parcours',
   )
+
+  // step-062 : la fiche du client — un sender ID enregistré, puis la suspension, chiffrée avant de
+  // partir.
+  await page.getByRole('link', { name: 'Client de parcours' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Client de parcours')
+  await page.getByRole('button', { name: 'Enregistrer un sender ID' }).first().click()
+  const enregistrement = page.getByRole('dialog', { name: 'Enregistrer un sender ID' })
+  await enregistrement.getByLabel('Adresse').fill('PARCOURS')
+  await enregistrement.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(page.getByRole('row', { name: /PARCOURS/ })).toContainText(
+    'pending_carrier_approval',
+  )
+  await page.getByRole('button', { name: 'Suspendre' }).click()
+  const suspension = page.getByRole('dialog', { name: 'Suspendre Client de parcours' })
+  await expect(suspension).toContainText('Le client n’a aucun compte SMPP.')
+  await suspension.getByRole('button', { name: 'Suspendre le client' }).click()
+  await expect(page.getByRole('button', { name: 'Réactiver' })).toBeVisible()
+  await page.goto('/customers?status=suspended')
+  await expect(page.getByRole('row', { name: /Client de parcours/ })).toBeVisible()
+
   await page.goto('/groups')
   await groupe.getByRole('button', { name: 'Archiver' }).click()
   await expect(page.getByText(/Revendeurs de parcours est archivé/)).toBeVisible()
