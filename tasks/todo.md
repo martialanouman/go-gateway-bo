@@ -253,7 +253,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
       transport) se lisent step-059 : découpage arbitré le 28/09/2026
 - [x] step-060 — Groupes de clients : CRUD et écran (le filtre par groupe naît avec step-061)
 - [x] step-061 — Clients : liste, filtres, création  ← **la tranche verticale est acquise ici**
-- [ ] step-062 — Fiche client : identité, statut, suspension en cascade, sender IDs (liste nue ; catégorie et débit : step-067)
+- [x] step-062 — Fiche client : identité, statut, suspension en cascade, sender IDs (liste nue ; catégorie et débit : step-067)
 - [ ] step-063 — Comptes SMPP : liste + création rattachée au client
 - [ ] step-064 — Fiche compte : canaux, bascules SMPP, webhooks (plus de politique de sender ID, ADR-0020)
 - [ ] step-065 — Quotas, limites de débit et `max_sessions` (avertissement d'écart)
