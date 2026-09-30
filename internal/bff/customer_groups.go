@@ -302,6 +302,7 @@ func customerGroupDTO(group gateway.CustomerGroup) CustomerGroup {
 		Name:        group.Name,
 		Description: group.Description,
 		Status:      CustomerGroupStatus(group.Status),
+		MemberCount: int(group.MemberCount),
 		CreatedAt:   group.CreatedAt,
 		UpdatedAt:   group.UpdatedAt,
 	}

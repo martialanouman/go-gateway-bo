@@ -2206,9 +2206,13 @@ components:
         name: { type: string }
         description: { type: string }
         status: { $ref: '#/components/schemas/CustomerGroupStatus' }
+        memberCount:
+          type: integer
+          minimum: 0
+          description: Les clients membres, quel que soit leur statut.
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, name, status, createdAt, updatedAt]
+      required: [id, name, status, memberCount, createdAt, updatedAt]
 
     CustomerStatus:
       type: string

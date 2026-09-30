@@ -63,6 +63,7 @@ export const RESELLERS: Group = {
   name: 'Revendeurs',
   description: 'Clients revendus par un partenaire.',
   status: 'active',
+  memberCount: 1,
   createdAt: '2026-09-01T08:00:00Z',
   updatedAt: '2026-09-01T08:00:00Z',
 }
@@ -266,6 +267,7 @@ export function stubAdministration(
         const created: Group = {
           id: `group-${groups.length + 1}`,
           status: 'active',
+          memberCount: 0,
           createdAt: '2026-09-29T08:00:00Z',
           updatedAt: '2026-09-29T08:00:00Z',
           ...body,

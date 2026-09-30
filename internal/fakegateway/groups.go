@@ -17,15 +17,26 @@ type group struct {
 	Name        string    `json:"name"`
 	Description *string   `json:"description,omitempty"`
 	Status      string    `json:"status"`
+	MemberCount int       `json:"member_count"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Groups sert le CRUD des groupes de clients avec un état en mémoire : le mock Prism, sans état, ne
-// retrouverait pas sous le filtre « archivés » le groupe qu'un parcours vient d'archiver.
+// retrouverait pas sous le filtre « archivés » le groupe qu'un parcours vient d'archiver. Members,
+// quand il est posé, compte les clients d'un groupe.
 type Groups struct {
-	mu     sync.Mutex
-	groups []group
+	Members *Customers
+	mu      sync.Mutex
+	groups  []group
+}
+
+func (g *Groups) counted(found group) group {
+	if g.Members != nil {
+		found.MemberCount = g.Members.countIn(found.ID)
+	}
+
+	return found
 }
 
 func (g *Groups) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +54,10 @@ func (g *Groups) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		listed := slices.DeleteFunc(append([]group{}, g.groups...), func(candidate group) bool {
 			return status != "" && candidate.Status != status
 		})
+		for index := range listed {
+			listed[index] = g.counted(listed[index])
+		}
+
 		reply(w, http.StatusOK, listed)
 	case id == "" && r.Method == http.MethodPost:
 		var body struct {
@@ -65,7 +80,7 @@ func (g *Groups) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case index < 0:
 		reply(w, http.StatusNotFound, map[string]string{"code": "not_found", "message": "customer group not found"})
 	case r.Method == http.MethodGet:
-		reply(w, http.StatusOK, g.groups[index])
+		reply(w, http.StatusOK, g.counted(g.groups[index]))
 	case r.Method == http.MethodPatch:
 		var patch struct {
 			Name        *string `json:"name"`
@@ -92,7 +107,7 @@ func (g *Groups) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		updated.UpdatedAt = time.Now().UTC()
-		reply(w, http.StatusOK, *updated)
+		reply(w, http.StatusOK, g.counted(*updated))
 	case r.Method == http.MethodDelete:
 		g.groups = slices.Delete(g.groups, index, index+1)
 		w.WriteHeader(http.StatusNoContent)

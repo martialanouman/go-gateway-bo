@@ -205,3 +205,17 @@ func decode(w http.ResponseWriter, r *http.Request, into any) bool {
 
 	return true
 }
+
+func (c *Customers) countIn(groupID string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	count := 0
+	for _, member := range c.customers {
+		if member.GroupID != nil && *member.GroupID == groupID {
+			count++
+		}
+	}
+
+	return count
+}

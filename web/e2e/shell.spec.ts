@@ -623,7 +623,7 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(groupe).toContainText('archived')
   await groupe.getByRole('button', { name: 'Supprimer' }).click()
   const suppression = page.getByRole('dialog', { name: 'Supprimer Revendeurs de parcours' })
-  await expect(suppression).toContainText('aucun client n’est supprimé')
+  await expect(suppression).toContainText('Son client est détaché du groupe')
   await suppression.getByRole('button', { name: 'Supprimer le groupe' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'Aucun groupe archivé' })).toBeVisible()
 

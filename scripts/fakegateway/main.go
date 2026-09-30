@@ -25,10 +25,10 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/admin/stream/", gateway)
 
-	groups := &fakegateway.Groups{}
+	customers := &fakegateway.Customers{}
+	groups := &fakegateway.Groups{Members: customers}
 	mux.Handle(fakegateway.GroupsPath, groups)
 	mux.Handle(fakegateway.GroupsPath+"/{id}", groups)
-	customers := &fakegateway.Customers{}
 	mux.Handle(fakegateway.CustomersPath, customers)
 	mux.Handle(fakegateway.CustomersPath+"/{id}", customers)
 	mux.Handle(fakegateway.CustomersPath+"/{id}/{action}", customers)

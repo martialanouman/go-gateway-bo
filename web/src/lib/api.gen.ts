@@ -1193,6 +1193,8 @@ export interface components {
             name: string;
             description?: string;
             status: components["schemas"]["CustomerGroupStatus"];
+            /** @description Les clients membres, quel que soit leur statut. */
+            memberCount: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
