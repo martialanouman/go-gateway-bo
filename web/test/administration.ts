@@ -6,6 +6,7 @@ type Operator = components['schemas']['Operator']
 type Role = components['schemas']['Role']
 type Group = components['schemas']['CustomerGroup']
 type Customer = components['schemas']['Customer']
+type SenderId = components['schemas']['SenderId']
 
 /** L'opérateur de la session, tel que `stubSession` le rend dans `GET /auth/me`. */
 export const SELF_ID = '01960000-0000-7000-8000-000000000001'
@@ -94,6 +95,7 @@ export function stubAdministration(
     groups?: Group[]
     customers?: Customer[]
     customerPageSize?: number
+    senders?: SenderId[]
   } = {},
   replies: AdministrationReplies = {},
 ) {
@@ -102,6 +104,7 @@ export function stubAdministration(
   let roles = [...(initial.roles ?? [SUPER_ADMIN, AUDITOR, ON_CALL])]
   let groups = [...(initial.groups ?? [RESELLERS])]
   let customers = [...(initial.customers ?? [ACME])]
+  let senders = [...(initial.senders ?? [])]
   const customerPageSize = initial.customerPageSize ?? 50
 
   const fetch = vi.fn(async (request: Request) => {
@@ -110,7 +113,7 @@ export function stubAdministration(
     const declared = replies[route]
     if (declared !== undefined) return respond(declared)
 
-    const [, , collection, id, detail] = pathname.split('/')
+    const [, , collection, id, detail, detailId] = pathname.split('/')
     // `POST /operators/{id}/access-link` n'a pas de corps ; `request.json()` sur un flux vide lève.
     const raw = request.method === 'GET' || request.method === 'DELETE' ? '' : await request.text()
     const body = raw ? JSON.parse(raw) : undefined
@@ -182,6 +185,43 @@ export function stubAdministration(
       return new Response(null, { status: 204 })
     }
 
+    if (collection === 'customers' && id !== undefined) {
+      const target = customers.find((customer) => customer.id === id)
+      if (target === undefined) return respond({ status: 404, body: refusal('not_found') })
+      if (detail === 'sender-ids') {
+        if (request.method === 'POST') {
+          const created: SenderId = {
+            id: `sender-${senders.length + 1}`,
+            address: body.address,
+            status: 'pending_carrier_approval',
+            createdAt: '2026-09-30T08:00:00Z',
+          }
+          senders = [...senders, created]
+          return Response.json(created, { status: 201 })
+        }
+        if (request.method === 'PATCH') {
+          senders = senders.map((sender) =>
+            sender.id === detailId ? { ...sender, status: body.status } : sender,
+          )
+          return Response.json(senders.find((sender) => sender.id === detailId))
+        }
+        if (request.method === 'DELETE') {
+          senders = senders.filter((sender) => sender.id !== detailId)
+          return new Response(null, { status: 204 })
+        }
+        return Response.json(senders)
+      }
+      if (detail === 'suspension-impact') return Response.json({ accounts: 0, activeAccounts: 0 })
+
+      let updated = target
+      if (detail === 'suspend') updated = { ...target, status: 'suspended' }
+      if (detail === 'reactivate') updated = { ...target, status: 'active' }
+      if (request.method === 'PATCH') updated = { ...target, ...body }
+      if (detail === 'group') updated = { ...target, groupId: body.groupId }
+      customers = customers.map((customer) => (customer.id === id ? updated : customer))
+      return Response.json(updated)
+    }
+
     if (collection === 'customers') {
       if (request.method === 'POST') {
         const created: Customer = {
@@ -211,6 +251,12 @@ export function stubAdministration(
 
     if (collection === 'customer-groups') {
       const status = searchParams.get('status')
+      if (request.method === 'GET' && id !== undefined) {
+        const found = groups.find((group) => group.id === id)
+        return found === undefined
+          ? respond({ status: 404, body: refusal('not_found') })
+          : Response.json(found)
+      }
       if (request.method === 'GET') {
         return Response.json(groups.filter((group) => status === null || group.status === status))
       }
