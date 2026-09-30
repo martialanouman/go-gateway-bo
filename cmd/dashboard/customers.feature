@@ -66,14 +66,14 @@ Fonctionnalité: Les clients relayés depuis la passerelle
     Et la passerelle n'a reçu aucune requête
 
   Scénario: l'impact d'une suspension ne compte actifs que les comptes actifs
-    Étant donné une passerelle dont le client a 3 comptes, dont 2 actifs
+    Étant donné une passerelle dont le client a 3 comptes, dont 2 actifs et 1 fermé
     Et un serveur démarré
     Et l'opérateur détient le rôle "Support"
     Et l'opérateur ouvre une session élevée
     Quand le navigateur demande "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/suspension-impact"
     Alors le serveur répond 200
     Et la réponse est conforme au contrat du BFF
-    Et la réponse compte 3 comptes, dont 2 actifs
+    Et la réponse compte 3 comptes, dont 2 actifs et 1 fermé
 
   Scénario: sans customers:write, l'enregistrement d'un sender ID est refusé avant d'atteindre la passerelle
     Étant donné une passerelle qui compte les requêtes reçues
@@ -127,3 +127,11 @@ Fonctionnalité: Les clients relayés depuis la passerelle
       | réactiver un client          | POST    | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/reactivate                                       |                                                     | 200    | customer.reactivate |
       | approuver un sender ID       | PATCH   | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d  | {"status":"active"}                                 | 200    | sender_id.update    |
       | supprimer un sender ID       | DELETE  | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d  |                                                     | 204    | sender_id.delete    |
+
+  Scénario: détacher un client de son groupe envoie un groupe nul, pas un champ absent
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie PUT "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/group" avec le corps '{}'
+    Alors la passerelle a reçu un détachement de groupe

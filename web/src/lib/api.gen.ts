@@ -1229,6 +1229,8 @@ export interface components {
         SuspensionImpact: {
             accounts: number;
             activeAccounts: number;
+            /** @description Les comptes fermés, que la cascade de la passerelle repasse `suspended` comme les autres. */
+            closedAccounts: number;
         };
         /** @enum {string} */
         SenderIdStatus: "pending_carrier_approval" | "active" | "disabled";
@@ -1236,8 +1238,6 @@ export interface components {
             id: string;
             address: string;
             status: components["schemas"]["SenderIdStatus"];
-            /** Format: date-time */
-            approvedAt?: string;
             /** Format: date-time */
             createdAt: string;
         };

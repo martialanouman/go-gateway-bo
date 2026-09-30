@@ -211,7 +211,8 @@ export function stubAdministration(
         }
         return Response.json(senders)
       }
-      if (detail === 'suspension-impact') return Response.json({ accounts: 0, activeAccounts: 0 })
+      if (detail === 'suspension-impact')
+        return Response.json({ accounts: 0, activeAccounts: 0, closedAccounts: 0 })
 
       let updated = target
       if (detail === 'suspend') updated = { ...target, status: 'suspended' }

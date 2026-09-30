@@ -251,7 +251,6 @@ function SenderIds({
         />
       ) : senders.data.length === 0 ? (
         <EmptyState
-          action={register}
           description="Un sender ID enregistré naît en attente d’approbation de l’opérateur télécom."
           title="Aucun sender ID pour l’instant"
           titleAs="h3"
@@ -271,12 +270,9 @@ function SenderIds({
               cell: (sender: SenderId) => <span className="mono">{sender.status}</span>,
             },
             {
-              key: 'approvedAt',
-              header: 'Approuvé le',
-              cell: (sender: SenderId) =>
-                sender.approvedAt === undefined
-                  ? '—'
-                  : dateFormat.format(new Date(sender.approvedAt)),
+              key: 'createdAt',
+              header: 'Enregistré le',
+              cell: (sender: SenderId) => dateFormat.format(new Date(sender.createdAt)),
             },
             {
               key: 'actions',
@@ -284,7 +280,13 @@ function SenderIds({
               cell: (sender: SenderId) => (
                 <div className="row-actions">
                   <SenderStatusToggle blocked={blocked} customerId={customerId} sender={sender} />
-                  <Button {...blocked} onClick={() => onDelete(sender)} size="sm" variant="danger">
+                  <Button
+                    {...blocked}
+                    aria-label={`Supprimer ${sender.address}`}
+                    onClick={() => onDelete(sender)}
+                    size="sm"
+                    variant="danger"
+                  >
                     Supprimer
                   </Button>
                 </div>
@@ -311,6 +313,13 @@ function SenderStatusToggle({
   const queryClient = useQueryClient()
   const toast = useToast()
   const next = sender.status === 'active' ? 'disabled' : 'active'
+  const gesture =
+    next === 'disabled'
+      ? 'Désactiver'
+      : sender.status === 'pending_carrier_approval'
+        ? 'Approuver'
+        : 'Réactiver'
+  const done = { Désactiver: 'désactivé', Approuver: 'approuvé', Réactiver: 'réactivé' }[gesture]
   const change = useMutation({
     mutationFn: () =>
       orRefusal(
@@ -323,10 +332,7 @@ function SenderStatusToggle({
     onSuccess: async (changed) => {
       await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
       toast({
-        title:
-          changed.status === 'active'
-            ? `${changed.address} est approuvé.`
-            : `${changed.address} est désactivé.`,
+        title: `${changed.address} est ${done}.`,
         severity: 'success',
       })
     },
@@ -334,8 +340,14 @@ function SenderStatusToggle({
   })
 
   return (
-    <Button {...blocked} loading={change.isPending} onClick={() => change.mutate()} size="sm">
-      {next === 'active' ? 'Approuver' : 'Désactiver'}
+    <Button
+      {...blocked}
+      aria-label={`${gesture} ${sender.address}`}
+      loading={change.isPending}
+      onClick={() => change.mutate()}
+      size="sm"
+    >
+      {gesture}
     </Button>
   )
 }
@@ -548,11 +560,18 @@ function ConfirmSuspend({
 function suspensionConsequence({
   accounts,
   activeAccounts,
+  closedAccounts,
 }: components['schemas']['SuspensionImpact']) {
   if (accounts === 0) return 'Le client n’a aucun compte SMPP.'
   const counted = accounts === 1 ? '1 compte' : `${accounts} comptes`
   const active = activeAccounts === 1 ? '1 actif' : `${activeAccounts} actifs`
-  return `Ses ${counted}, dont ${active}, sont suspendus avec lui ; la passerelle coupe leurs sessions ouvertes.`
+  const reopened =
+    closedAccounts === 0
+      ? ''
+      : closedAccounts === 1
+        ? ' Son compte fermé redevient suspendu, donc réactivable.'
+        : ` Ses ${closedAccounts} comptes fermés redeviennent suspendus, donc réactivables.`
+  return `Ses ${counted}, dont ${active}, sont suspendus avec lui : la passerelle refuse tout nouveau bind et tente de couper les sessions ouvertes.${reopened}`
 }
 
 function ConfirmReactivate({

@@ -285,8 +285,12 @@ func (a API) GetCustomerSuspensionImpact(ctx context.Context, request GetCustome
 func suspensionImpact(accounts []gateway.SmppAccount) SuspensionImpact {
 	impact := SuspensionImpact{Accounts: len(accounts)}
 	for _, account := range accounts {
-		if account.Status == gateway.SmppAccountStatusActive {
+		switch account.Status {
+		case gateway.SmppAccountStatusActive:
 			impact.ActiveAccounts++
+		case gateway.SmppAccountStatusClosed:
+			impact.ClosedAccounts++
+		case gateway.SmppAccountStatusSuspended:
 		}
 	}
 

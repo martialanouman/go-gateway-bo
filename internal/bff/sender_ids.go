@@ -235,11 +235,10 @@ func parseSenderPath(rawCustomer, rawSender string) (gateway.Id, gateway.SenderI
 
 func senderIDDTO(sender gateway.SenderId) SenderId {
 	return SenderId{
-		Id:         sender.Id.String(),
-		Address:    sender.Address,
-		Status:     SenderIdStatus(sender.Status),
-		ApprovedAt: sender.ApprovedAt,
-		CreatedAt:  sender.CreatedAt,
+		Id:        sender.Id.String(),
+		Address:   sender.Address,
+		Status:    SenderIdStatus(sender.Status),
+		CreatedAt: sender.CreatedAt,
 	}
 }
 

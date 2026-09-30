@@ -25,13 +25,12 @@ type customer struct {
 }
 
 type senderID struct {
-	ID         string     `json:"id"`
-	CustomerID string     `json:"customer_id"`
-	Address    string     `json:"address"`
-	Status     string     `json:"status"`
-	ApprovedAt *time.Time `json:"approved_at,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	ID         string    `json:"id"`
+	CustomerID string    `json:"customer_id"`
+	Address    string    `json:"address"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // Customers sert les clients et leurs sender IDs avec un état en mémoire, pour qu'un parcours
@@ -186,14 +185,8 @@ func (c *Customers) serveSenderIDs(w http.ResponseWriter, r *http.Request, custo
 			return
 		}
 
-		now := time.Now().UTC()
 		updated := &c.senders[index]
-		updated.Status, updated.UpdatedAt = patch.Status, now
-
-		if patch.Status == "active" && updated.ApprovedAt == nil {
-			updated.ApprovedAt = &now
-		}
-
+		updated.Status, updated.UpdatedAt = patch.Status, time.Now().UTC()
 		reply(w, http.StatusOK, *updated)
 	case r.Method == http.MethodDelete:
 		c.senders = slices.Delete(c.senders, index, index+1)

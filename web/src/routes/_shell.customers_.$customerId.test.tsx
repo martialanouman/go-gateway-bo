@@ -37,26 +37,20 @@ function sent(fetch: ReturnType<typeof stubAdministration>, route: string) {
   })
 }
 
-// L'en-tête de la section et son état vide portent chacun le bouton ; le premier suffit.
-async function registerButton() {
-  return (
-    await screen.findAllByRole('button', { name: 'Enregistrer un sender ID' })
-  )[0] as HTMLElement
-}
-
 describe('the customer screen', () => {
   it('counts the accounts a suspension takes down before it leaves, then shows the customer suspended', async () => {
     const user = userEvent.setup()
     const fetch = open(WRITER, {
-      [IMPACT]: { status: 200, body: { accounts: 3, activeAccounts: 2 } },
+      [IMPACT]: { status: 200, body: { accounts: 3, activeAccounts: 1, closedAccounts: 1 } },
     })
 
     await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
     const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name}` })
 
     expect(
-      await within(dialog).findByText(/Ses 3 comptes, dont 2 actifs, sont suspendus avec lui/),
+      await within(dialog).findByText(/Ses 3 comptes, dont 1 actif, sont suspendus avec lui/),
     ).toBeInTheDocument()
+    expect(dialog).toHaveTextContent('Son compte fermé redevient suspendu, donc réactivable.')
     expect(sent(fetch, SUSPEND)).toBe(false)
 
     await user.click(within(dialog).getByRole('button', { name: 'Suspendre le client' }))
@@ -87,7 +81,7 @@ describe('the customer screen', () => {
     open(READER)
 
     for (const name of ['Renommer', 'Suspendre', 'Enregistrer un sender ID']) {
-      const control = (await screen.findAllByRole('button', { name }))[0]
+      const control = await screen.findByRole('button', { name })
       expect(control).toHaveAttribute('aria-disabled', 'true')
       expect(control).toHaveAccessibleDescription('Modifier un client demande customers:write.')
     }
@@ -107,7 +101,7 @@ describe('the customer screen', () => {
       },
     })
 
-    await user.click(await registerButton())
+    await user.click(await screen.findByRole('button', { name: 'Enregistrer un sender ID' }))
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByRole('textbox', { name: 'Adresse' }), 'ACME')
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }))
@@ -176,11 +170,11 @@ describe('the customer screen', () => {
     )
 
     const row = (await screen.findByRole('cell', { name: 'ACME' })).closest('tr') as HTMLElement
-    await user.click(within(row).getByRole('button', { name: 'Approuver' }))
-    expect(await within(row).findByRole('button', { name: 'Désactiver' })).toBeInTheDocument()
+    await user.click(within(row).getByRole('button', { name: 'Approuver ACME' }))
+    expect(await within(row).findByRole('button', { name: 'Désactiver ACME' })).toBeInTheDocument()
     expect(row).toHaveTextContent('active')
 
-    await user.click(within(row).getByRole('button', { name: 'Supprimer' }))
+    await user.click(within(row).getByRole('button', { name: 'Supprimer ACME' }))
     const dialog = await screen.findByRole('dialog', { name: 'Supprimer ACME' })
     await user.click(within(dialog).getByRole('button', { name: 'Supprimer le sender ID' }))
 
@@ -200,13 +194,13 @@ describe('the customer screen', () => {
     const user = userEvent.setup()
     open(WRITER)
 
-    await user.click(await registerButton())
+    await user.click(await screen.findByRole('button', { name: 'Enregistrer un sender ID' }))
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByRole('textbox', { name: 'Adresse' }), 'ACME{Enter}')
 
     const row = (await screen.findByRole('cell', { name: 'ACME' })).closest('tr') as HTMLElement
     expect(row).toHaveTextContent('pending_carrier_approval')
-    expect(within(row).getByRole('button', { name: 'Approuver' })).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Approuver ACME' })).toBeInTheDocument()
   })
 
   it('announces a sender ID the gateway refused to change', async () => {
@@ -226,7 +220,7 @@ describe('the customer screen', () => {
       },
     )
 
-    await user.click(await screen.findByRole('button', { name: 'Désactiver' }))
+    await user.click(await screen.findByRole('button', { name: 'Désactiver ACME' }))
 
     expect(await screen.findByText('Passerelle muette.')).toBeInTheDocument()
   })

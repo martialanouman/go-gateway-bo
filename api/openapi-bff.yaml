@@ -2263,7 +2263,12 @@ components:
       properties:
         accounts: { type: integer, minimum: 0 }
         activeAccounts: { type: integer, minimum: 0 }
-      required: [accounts, activeAccounts]
+        closedAccounts:
+          type: integer
+          minimum: 0
+          description: |
+            Les comptes fermés, que la cascade de la passerelle repasse `suspended` comme les autres.
+      required: [accounts, activeAccounts, closedAccounts]
 
     SenderIdStatus:
       type: string
@@ -2276,7 +2281,6 @@ components:
         id: { type: string }
         address: { type: string }
         status: { $ref: '#/components/schemas/SenderIdStatus' }
-        approvedAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
       required: [id, address, status, createdAt]
 
