@@ -165,3 +165,43 @@ func (API) ListCustomers(_ context.Context, _ bff.ListCustomersRequestObject) (b
 func (API) CreateCustomer(_ context.Context, _ bff.CreateCustomerRequestObject) (bff.CreateCustomerResponseObject, error) {
 	return nil, nil
 }
+
+func (API) GetCustomer(_ context.Context, _ bff.GetCustomerRequestObject) (bff.GetCustomerResponseObject, error) {
+	return nil, nil
+}
+
+func (API) UpdateCustomer(_ context.Context, _ bff.UpdateCustomerRequestObject) (bff.UpdateCustomerResponseObject, error) {
+	return nil, nil
+}
+
+func (API) SetCustomerGroup(_ context.Context, _ bff.SetCustomerGroupRequestObject) (bff.SetCustomerGroupResponseObject, error) {
+	return nil, nil
+}
+
+func (API) GetCustomerSuspensionImpact(_ context.Context, _ bff.GetCustomerSuspensionImpactRequestObject) (bff.GetCustomerSuspensionImpactResponseObject, error) {
+	return nil, nil
+}
+
+func (API) SuspendCustomer(_ context.Context, _ bff.SuspendCustomerRequestObject) (bff.SuspendCustomerResponseObject, error) {
+	return nil, nil
+}
+
+func (API) ReactivateCustomer(_ context.Context, _ bff.ReactivateCustomerRequestObject) (bff.ReactivateCustomerResponseObject, error) {
+	return nil, nil
+}
+
+func (API) ListSenderIds(_ context.Context, _ bff.ListSenderIdsRequestObject) (bff.ListSenderIdsResponseObject, error) {
+	return nil, nil
+}
+
+func (API) CreateSenderId(_ context.Context, _ bff.CreateSenderIdRequestObject) (bff.CreateSenderIdResponseObject, error) {
+	return nil, nil
+}
+
+func (API) UpdateSenderId(_ context.Context, _ bff.UpdateSenderIdRequestObject) (bff.UpdateSenderIdResponseObject, error) {
+	return nil, nil
+}
+
+func (API) DeleteSenderId(_ context.Context, _ bff.DeleteSenderIdRequestObject) (bff.DeleteSenderIdResponseObject, error) {
+	return nil, nil
+}
