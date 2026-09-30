@@ -166,3 +166,13 @@ func (API) DeleteCustomerGroup(_ context.Context, _ bff.DeleteCustomerGroupReque
 ) (bff.DeleteCustomerGroupResponseObject, error) {
 	return bff.DeleteCustomerGroup204Response{}, nil
 }
+
+func (API) ListCustomers(_ context.Context, _ bff.ListCustomersRequestObject,
+) (bff.ListCustomersResponseObject, error) {
+	return bff.ListCustomers200JSONResponse{}, nil
+}
+
+func (API) CreateCustomer(_ context.Context, _ bff.CreateCustomerRequestObject,
+) (bff.CreateCustomerResponseObject, error) {
+	return bff.CreateCustomer201JSONResponse{}, nil
+}

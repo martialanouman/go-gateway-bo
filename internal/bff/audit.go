@@ -36,6 +36,7 @@ const (
 	actionGroupCreate        = "group.create"
 	actionGroupUpdate        = "group.update"
 	actionGroupDelete        = "group.delete"
+	actionCustomerCreate     = "customer.create"
 )
 
 // Les types de cible que ces actions désignent. Le §3.1 les laisse libres ; les nommer ici évite que
@@ -47,6 +48,7 @@ const (
 	auditTargetRole          = "role"
 	auditTargetNotification  = "notification"
 	auditTargetCustomerGroup = "customer_group"
+	auditTargetCustomer      = "customer"
 	// auditTargetOperation désigne l'opération du contrat qu'un refus a arrêtée.
 	auditTargetOperation = "operation"
 )

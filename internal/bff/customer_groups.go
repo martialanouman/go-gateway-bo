@@ -2,7 +2,6 @@ package bff
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 
@@ -38,7 +37,7 @@ func (a API) ListCustomerGroups(ctx context.Context, request ListCustomerGroupsR
 	}
 
 	if err != nil {
-		status, body, err := a.relayedRefusal(ctx, operationListCustomerGroups, err)
+		status, body, err := a.groupRefusal(ctx, operationListCustomerGroups, err)
 
 		switch status {
 		case http.StatusUnprocessableEntity:
@@ -104,7 +103,7 @@ func (a API) CreateCustomerGroup(ctx context.Context, request CreateCustomerGrou
 	}
 
 	if err != nil {
-		status, body, err := a.relayedRefusal(ctx, operationCreateCustomerGroup, err)
+		status, body, err := a.groupRefusal(ctx, operationCreateCustomerGroup, err)
 
 		switch status {
 		case http.StatusConflict:
@@ -138,7 +137,7 @@ func (a API) GetCustomerGroup(ctx context.Context, request GetCustomerGroupReque
 	}
 
 	if err != nil {
-		status, body, err := a.relayedRefusal(ctx, operationGetCustomerGroup, err)
+		status, body, err := a.groupRefusal(ctx, operationGetCustomerGroup, err)
 
 		switch status {
 		case http.StatusNotFound:
@@ -214,7 +213,7 @@ func (a API) UpdateCustomerGroup(ctx context.Context, request UpdateCustomerGrou
 	}
 
 	if err != nil {
-		status, body, err := a.relayedRefusal(ctx, operationUpdateCustomerGroup, err)
+		status, body, err := a.groupRefusal(ctx, operationUpdateCustomerGroup, err)
 
 		switch status {
 		case http.StatusNotFound:
@@ -265,7 +264,7 @@ func (a API) DeleteCustomerGroup(ctx context.Context, request DeleteCustomerGrou
 	}
 
 	if err != nil {
-		status, body, err := a.relayedRefusal(ctx, operationDeleteCustomerGroup, err)
+		status, body, err := a.groupRefusal(ctx, operationDeleteCustomerGroup, err)
 
 		switch status {
 		case http.StatusNotFound:
@@ -282,18 +281,10 @@ func (a API) DeleteCustomerGroup(ctx context.Context, request DeleteCustomerGrou
 	return DeleteCustomerGroup204Response{}, nil
 }
 
-// relayedRefusal traduit l'échec d'une opération de groupe. Un statut nul rend `err` à l'appelant,
-// qui le laisse devenir un 500 journalisé ; tout autre statut vient avec le corps à servir. 404 et 409
-// sont rédigés ici, en français : la passerelle les écrit en anglais et sans nommer le geste.
-func (a API) relayedRefusal(ctx context.Context, operation string, err error) (int, Error, error) {
-	status, body, relayed := relayError(err)
-	if !relayed || errors.Is(err, errIntentNotTraced) {
-		return 0, Error{}, err
-	}
-
-	if status >= http.StatusInternalServerError {
-		a.Logger.WarnContext(ctx, "la passerelle a échoué", "operation", operation, "error", err)
-	}
+// groupRefusal rédige en français les deux refus qui nomment un groupe : la passerelle les écrit en
+// anglais et sans nommer le geste.
+func (a API) groupRefusal(ctx context.Context, operation string, err error) (int, Error, error) {
+	status, body, err := a.relayedRefusal(ctx, operation, err)
 
 	switch status {
 	case http.StatusNotFound:

@@ -5,6 +5,7 @@ import { type SessionOutcome, stubSession } from './session'
 type Operator = components['schemas']['Operator']
 type Role = components['schemas']['Role']
 type Group = components['schemas']['CustomerGroup']
+type Customer = components['schemas']['Customer']
 
 /** L'opérateur de la session, tel que `stubSession` le rend dans `GET /auth/me`. */
 export const SELF_ID = '01960000-0000-7000-8000-000000000001'
@@ -65,6 +66,15 @@ export const RESELLERS: Group = {
   updatedAt: '2026-09-01T08:00:00Z',
 }
 
+export const ACME: Customer = {
+  id: '0192b3c4-0000-7000-8000-00000000c001',
+  name: 'Acme Télécom',
+  status: 'active',
+  groupId: '0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b',
+  createdAt: '2026-09-02T08:00:00Z',
+  updatedAt: '2026-09-02T08:00:00Z',
+}
+
 type Reply = { readonly status: number; readonly body?: unknown }
 
 /** Un refus que le test veut voir rendu, route par route. */
@@ -78,13 +88,21 @@ export type AdministrationReplies = Partial<Record<string, Reply>>
  */
 export function stubAdministration(
   outcome: SessionOutcome,
-  initial: { operators?: Operator[]; roles?: Role[]; groups?: Group[] } = {},
+  initial: {
+    operators?: Operator[]
+    roles?: Role[]
+    groups?: Group[]
+    customers?: Customer[]
+    customerPageSize?: number
+  } = {},
   replies: AdministrationReplies = {},
 ) {
   const session = stubSession(outcome)
   let operators = [...(initial.operators ?? [SELF, COLLEAGUE])]
   let roles = [...(initial.roles ?? [SUPER_ADMIN, AUDITOR, ON_CALL])]
   let groups = [...(initial.groups ?? [RESELLERS])]
+  let customers = [...(initial.customers ?? [ACME])]
+  const customerPageSize = initial.customerPageSize ?? 50
 
   const fetch = vi.fn(async (request: Request) => {
     const { pathname, searchParams } = new URL(request.url)
@@ -162,6 +180,33 @@ export function stubAdministration(
 
       roles = roles.filter((role) => role.id !== id)
       return new Response(null, { status: 204 })
+    }
+
+    if (collection === 'customers') {
+      if (request.method === 'POST') {
+        const created: Customer = {
+          id: `customer-${customers.length + 1}`,
+          status: 'active',
+          createdAt: '2026-09-29T08:00:00Z',
+          updatedAt: '2026-09-29T08:00:00Z',
+          ...body,
+        }
+        customers = [...customers, created]
+        return Response.json(created, { status: 201 })
+      }
+
+      const matching = customers.filter(
+        (customer) =>
+          (searchParams.get('status') === null || customer.status === searchParams.get('status')) &&
+          (searchParams.get('groupId') === null ||
+            customer.groupId === searchParams.get('groupId')),
+      )
+      const start = Number(searchParams.get('cursor') ?? 0)
+      const end = start + customerPageSize
+      return Response.json({
+        items: matching.slice(start, end),
+        ...(end < matching.length ? { nextCursor: String(end) } : {}),
+      })
     }
 
     if (collection === 'customer-groups') {

@@ -572,6 +572,29 @@ test('the binary serves the painted shell, then the application replaces it', as
 
   const groupe = page.getByRole('row', { name: /Revendeurs de parcours/ })
   await expect(groupe).toContainText('active')
+
+  // step-061 : la tranche verticale — un client créé dans ce groupe, relayé, puis retrouvé par le lien
+  // que l'écran Groupes porte vers ses clients.
+  await page.goto('/customers')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Clients')
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'Aucun client pour l’instant' }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Nouveau client' }).first().click()
+  const nouveauClient = page.getByRole('dialog', { name: 'Nouveau client' })
+  await nouveauClient.getByLabel('Nom').fill('Client de parcours')
+  await nouveauClient.getByRole('combobox', { name: 'Groupe' }).click()
+  await page.getByRole('option', { name: 'Revendeurs de parcours' }).click()
+  await nouveauClient.getByRole('button', { name: 'Créer le client' }).click()
+  await expect(page.getByText('Client de parcours est créé.')).toBeVisible()
+
+  await page.goto('/groups')
+  await groupe.getByRole('link', { name: 'Voir les clients' }).click()
+  await expect(page).toHaveURL(/\/customers\?groupId=/)
+  await expect(page.getByRole('row', { name: /Client de parcours/ })).toContainText(
+    'Revendeurs de parcours',
+  )
+  await page.goto('/groups')
   await groupe.getByRole('button', { name: 'Archiver' }).click()
   await expect(page.getByText(/Revendeurs de parcours est archivé/)).toBeVisible()
   await expect(groupe).toHaveCount(0)

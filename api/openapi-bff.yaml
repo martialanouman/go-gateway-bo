@@ -1093,6 +1093,62 @@ paths:
         '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
         '503': { $ref: '#/components/responses/PasserelleIndisponible' }
 
+  /customers:
+    get:
+      operationId: listCustomers
+      summary: Une page de clients de la passerelle
+      description: |
+        Relayée vers `list-customers`, 50 clients par page. `groupId` ne garde que les membres courants
+        du groupe.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/CustomerStatus' }
+        - name: groupId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: cursor
+          in: query
+          required: false
+          description: Le `nextCursor` de la page précédente.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Une page de clients.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerPage' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    post:
+      operationId: createCustomer
+      summary: Crée un client
+      description: |
+        Relayée vers `create-customer`, avec le nom et le groupe seuls : la facturation et la politique
+        de contenu gardent les défauts de la passerelle.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerCreation' }
+      responses:
+        '201':
+          description: Le client créé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
 components:
   parameters:
     OperatorId:
@@ -1910,6 +1966,40 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
       required: [id, name, status, createdAt, updatedAt]
+
+    CustomerStatus:
+      type: string
+      enum: [active, suspended, closed]
+
+    Customer:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/CustomerStatus' }
+        groupId: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, name, status, createdAt, updatedAt]
+
+    CustomerPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Customer' }
+        nextCursor: { type: string }
+      required: [items]
+
+    CustomerCreation:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+        groupId: { type: string, format: uuid }
+      required: [name]
 
     CustomerGroupCreation:
       type: object

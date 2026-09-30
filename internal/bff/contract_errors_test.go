@@ -269,3 +269,13 @@ func (failingAPI) DeleteCustomerGroup(_ context.Context, _ DeleteCustomerGroupRe
 ) (DeleteCustomerGroupResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }
+
+func (failingAPI) ListCustomers(_ context.Context, _ ListCustomersRequestObject,
+) (ListCustomersResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) CreateCustomer(_ context.Context, _ CreateCustomerRequestObject,
+) (CreateCustomerResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}

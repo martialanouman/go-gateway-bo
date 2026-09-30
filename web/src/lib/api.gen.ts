@@ -615,6 +615,32 @@ export interface paths {
         patch: operations["updateCustomerGroup"];
         trace?: never;
     };
+    "/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Une page de clients de la passerelle
+         * @description Relayée vers `list-customers`, 50 clients par page. `groupId` ne garde que les membres courants
+         *     du groupe.
+         */
+        get: operations["listCustomers"];
+        put?: never;
+        /**
+         * Crée un client
+         * @description Relayée vers `create-customer`, avec le nom et le groupe seuls : la facturation et la politique
+         *     de contenu gardent les défauts de la passerelle.
+         */
+        post: operations["createCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1000,6 +1026,27 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        /** @enum {string} */
+        CustomerStatus: "active" | "suspended" | "closed";
+        Customer: {
+            id: string;
+            name: string;
+            status: components["schemas"]["CustomerStatus"];
+            groupId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CustomerPage: {
+            items: components["schemas"]["Customer"][];
+            nextCursor?: string;
+        };
+        CustomerCreation: {
+            name: string;
+            /** Format: uuid */
+            groupId?: string;
         };
         CustomerGroupCreation: {
             name: string;
@@ -2415,6 +2462,66 @@ export interface operations {
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["GroupeInconnu"];
             409: components["responses"]["NomDeGroupePris"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    listCustomers: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["CustomerStatus"];
+                groupId?: string;
+                /** @description Le `nextCursor` de la page précédente. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Une page de clients. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPage"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    createCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCreation"];
+            };
+        };
+        responses: {
+            /** @description Le client créé. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
             415: components["responses"]["TypeDeContenuRefuse"];
             422: components["responses"]["RefusDeLaPasserelle"];
             503: components["responses"]["PasserelleIndisponible"];

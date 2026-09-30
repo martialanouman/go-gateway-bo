@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
@@ -182,6 +182,7 @@ function GroupsTable({
           header: 'Actions',
           cell: (group) => (
             <div className="row-actions">
+              <GroupCustomers group={group} />
               <Button {...blocked} onClick={() => onAct({ kind: 'edit', group })} size="sm">
                 Modifier
               </Button>
@@ -388,5 +389,21 @@ function ConfirmDelete({
       <Refusal error={remove.error} />
       <p>Ses clients sont détachés du groupe ; aucun client n’est supprimé. Action journalisée.</p>
     </Modal>
+  )
+}
+
+function GroupCustomers({ group }: { readonly group: Group }) {
+  return usePermission('customers:read') ? (
+    <Link
+      className="ui-button ui-button--secondary ui-button--sm"
+      search={{ groupId: group.id }}
+      to="/customers"
+    >
+      Voir les clients
+    </Link>
+  ) : (
+    <Button blockedReason="Voir les clients d’un groupe demande customers:read." size="sm">
+      Voir les clients
+    </Button>
   )
 }

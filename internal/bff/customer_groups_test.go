@@ -14,7 +14,7 @@ import (
 func TestATakenGroupNameIsPlacedUnderTheNameField(t *testing.T) {
 	t.Parallel()
 
-	status, body, _ := API{Logger: slog.New(slog.DiscardHandler)}.relayedRefusal(context.Background(),
+	status, body, _ := API{Logger: slog.New(slog.DiscardHandler)}.groupRefusal(context.Background(),
 		operationCreateCustomerGroup,
 		&gateway.APIError{Status: http.StatusConflict, Code: "conflict", Message: "name already taken"})
 
@@ -30,7 +30,7 @@ func TestATakenGroupNameIsPlacedUnderTheNameField(t *testing.T) {
 func TestAnUnknownGroupIsRefusedInFrench(t *testing.T) {
 	t.Parallel()
 
-	status, body, _ := API{Logger: slog.New(slog.DiscardHandler)}.relayedRefusal(context.Background(),
+	status, body, _ := API{Logger: slog.New(slog.DiscardHandler)}.groupRefusal(context.Background(),
 		operationUpdateCustomerGroup,
 		&gateway.APIError{Status: http.StatusNotFound, Code: "not_found", Message: "customer group not found"})
 
