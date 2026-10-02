@@ -94,6 +94,11 @@ sender IDs. Chaque geste laisse sa trace.
   - réactiver un sender ID désactivé ne s'appelle plus « approuver » ;
   - boutons de ligne nommés par l'adresse ; bouton d'enregistrement plus doublé à l'état vide ;
   - un scénario fixe le `group_id: null` du détachement.
+- **Test au navigateur (agent-browser, 02/10/2026)**, contre le binaire : trois défauts corrigés —
+  la copie de suspension promettait « aucun de ses comptes ne peut plus envoyer » à un client sans
+  compte ; le titre « Groupe de Acme » n'élidait pas, il devient « Changer le groupe — Acme » ; la
+  pastille de statut flottait au milieu de l'en-tête, elle suit le nom (`.page__identity`). Un
+  quatrième, antérieur et transverse (« Failed to fetch »), est la dette 063.
 - **Écarté** : le statut d'un sender ID reste la valeur du contrat, en mono, comme celui d'un groupe :
   la charte garde les statuts en `snake_case`, grep-ables dans les journaux (`status-pill.tsx`).
 - **À remonter côté `go-gateway`** : la cascade qui rouvre un compte fermé est probablement un défaut

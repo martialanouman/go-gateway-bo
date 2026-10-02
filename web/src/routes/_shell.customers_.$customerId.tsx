@@ -95,10 +95,12 @@ function CustomerScreen() {
   return (
     <div className="page">
       <header className="page__head">
-        <h1 className="page__title" ref={title} tabIndex={-1}>
-          {current.name}
-        </h1>
-        <StatusPill kind="entity" state={current.status} />
+        <div className="page__identity">
+          <h1 className="page__title" ref={title} tabIndex={-1}>
+            {current.name}
+          </h1>
+          <StatusPill kind="entity" state={current.status} />
+        </div>
         <div className="row-actions">
           <Button {...blocked} onClick={() => setPending({ kind: 'rename' })}>
             Renommer
@@ -464,7 +466,7 @@ function AssignGroup({
       }
       onClose={onClose}
       open
-      title={`Groupe de ${customer.name}`}
+      title={`Changer le groupe — ${customer.name}`}
     >
       <div className="form">
         <p>
@@ -548,10 +550,7 @@ function ConfirmSuspend({
           <Skeleton height={20} />
         </LoadingState>
       ) : impact.isSuccess ? (
-        <p>
-          {suspensionConsequence(impact.data)} Aucun de ses comptes ne peut plus envoyer, en SMPP
-          comme en REST. Action journalisée.
-        </p>
+        <p>{suspensionConsequence(impact.data)} Action journalisée.</p>
       ) : null}
     </Modal>
   )
@@ -571,7 +570,7 @@ function suspensionConsequence({
       : closedAccounts === 1
         ? ' Son compte fermé redevient suspendu, donc réactivable.'
         : ` Ses ${closedAccounts} comptes fermés redeviennent suspendus, donc réactivables.`
-  return `Ses ${counted}, dont ${active}, sont suspendus avec lui : la passerelle refuse tout nouveau bind et tente de couper les sessions ouvertes.${reopened}`
+  return `Ses ${counted}, dont ${active}, sont suspendus avec lui : aucun ne peut plus envoyer, en SMPP comme en REST. La passerelle refuse tout nouveau bind et tente de couper les sessions ouvertes.${reopened}`
 }
 
 function ConfirmReactivate({

@@ -60,6 +60,18 @@ describe('the customer screen', () => {
     expect(screen.getByRole('heading', { level: 1, name: ACME.name })).toHaveFocus()
   })
 
+  it('promises nothing about accounts a customer does not have', async () => {
+    const user = userEvent.setup()
+    open(WRITER)
+
+    await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
+    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name}` })
+
+    expect(await within(dialog).findByText(/Le client n’a aucun compte SMPP\./)).toHaveTextContent(
+      'Le client n’a aucun compte SMPP. Action journalisée.',
+    )
+  })
+
   it('refuses to suspend while the impact cannot be read', async () => {
     const user = userEvent.setup()
     const fetch = open(WRITER, {
