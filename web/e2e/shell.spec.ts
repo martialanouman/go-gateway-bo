@@ -627,13 +627,17 @@ test('the binary serves the painted shell, then the application replaces it', as
   )
   await page.getByRole('button', { name: 'Nouveau webhook' }).click()
   const nouveauWebhook = page.getByRole('dialog', { name: 'Nouveau webhook' })
+  await nouveauWebhook.getByRole('combobox', { name: 'Événement' }).click()
+  await page.getByRole('option', { name: 'DLR — accusés de réception' }).click()
   await nouveauWebhook.getByLabel('URL').fill('https://client.example/dlr')
   await nouveauWebhook.getByRole('button', { name: 'Créer le webhook' }).click()
   const secretMontre = page.getByRole('dialog', { name: 'Secret de signature du webhook' })
   const secretDeWebhook = (await secretMontre.locator('.mono').textContent()) ?? ''
   expect(secretDeWebhook).toMatch(/^[\w-]{43}$/)
   await secretMontre.getByRole('button', { name: 'J’ai copié le secret' }).click()
-  await expect(page.getByRole('row', { name: /client\.example\/dlr/ })).toBeVisible()
+  await expect(page.getByRole('row', { name: /client\.example\/dlr/ })).toContainText(
+    'DLR — accusés de réception',
+  )
   await expect(page.locator('body')).not.toContainText(secretDeWebhook)
 
   await page.getByRole('link', { name: 'Client de parcours' }).click()

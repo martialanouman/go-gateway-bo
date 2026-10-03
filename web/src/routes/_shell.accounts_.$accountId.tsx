@@ -228,11 +228,11 @@ function Channels({
               {channel.name} : {channel.open ? 'ouvert' : 'coupé'}
             </span>
             <Button
-              {...(last
-                ? blockedBy(
+              {...('blockedReason' in blocked || !last
+                ? blocked
+                : blockedBy(
                     `Un compte garde au moins un canal : activez ${channel.other} avant de couper ${channel.name}.`,
-                  )
-                : blocked)}
+                  ))}
               loading={change.isPending}
               onClick={() =>
                 change.mutate(
@@ -368,9 +368,11 @@ function Webhooks({
   const full = webhooks.data?.length === EVENT_TYPES.length
   const create = (
     <Button
-      {...(full
-        ? blockedBy('Ce compte a déjà ses deux webhooks, MO et DLR : modifiez l’un d’eux.')
-        : blocked)}
+      {...('blockedReason' in blocked || !full
+        ? blocked
+        : blockedBy(
+            'Ce compte a déjà ses deux webhooks, MO et DLR : supprimez-en un pour le recréer.',
+          ))}
       onClick={onCreate}
       size="sm"
       variant="primary"

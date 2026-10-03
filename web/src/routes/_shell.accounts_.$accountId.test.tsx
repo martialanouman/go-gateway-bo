@@ -54,6 +54,24 @@ describe('the account screen', () => {
     )
   })
 
+  it('names the missing permission before the business rule', async () => {
+    stubAdministration(
+      { permissions: ['accounts:read', 'customers:read'] },
+      { accounts: [{ ...OTP_ACCOUNT, restEnabled: false }] },
+    )
+    render(
+      <RouterProvider
+        router={createAppRouter(
+          createMemoryHistory({ initialEntries: [`/accounts/${OTP_ACCOUNT.id}`] }),
+        )}
+      />,
+    )
+
+    expect(await screen.findByRole('button', { name: 'Couper SMPP' })).toHaveAccessibleDescription(
+      'Modifier un compte demande accounts:write.',
+    )
+  })
+
   it('warns that refusing an SMPP operation cuts the live binds before it does', async () => {
     const user = userEvent.setup()
     open()
@@ -110,6 +128,8 @@ describe('the account screen', () => {
     expect(shown).toHaveTextContent(WEBHOOK_SECRET)
     await user.click(within(shown).getByRole('button', { name: 'J’ai copié le secret' }))
 
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(document.body).not.toHaveTextContent(WEBHOOK_SECRET)
     await waitFor(() =>
       expect(JSON.stringify(queryClient.getMutationCache().getAll())).not.toContain(WEBHOOK_SECRET),
     )
@@ -190,7 +210,7 @@ describe('the account screen', () => {
     )
   })
 
-  it('disables a webhook, and says when the gateway refuses', async () => {
+  it('disables a webhook and says so', async () => {
     const user = userEvent.setup()
     open({ webhooks: [DLR] })
 
@@ -246,7 +266,7 @@ describe('the account screen', () => {
   it('shows a refusal about the event type, which has no field to sit under', async () => {
     const user = userEvent.setup()
     const refusal =
-      'Ce compte a déjà un webhook pour ce type d’événement. Modifiez celui qui existe.'
+      'Ce compte a déjà un webhook pour ce type d’événement. Supprimez-le, puis recréez-le.'
     open(
       {},
       {

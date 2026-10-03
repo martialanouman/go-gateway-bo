@@ -341,7 +341,7 @@ func unknownWebhook() Error {
 }
 
 func webhookEventTaken(code string) Error {
-	const refusal = "Ce compte a déjà un webhook pour ce type d'événement. Modifiez celui qui existe."
+	const refusal = "Ce compte a déjà un webhook pour ce type d'événement. Supprimez-le, puis recréez-le."
 
 	return Error{
 		Code: code, Message: refusal,

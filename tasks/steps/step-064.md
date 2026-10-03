@@ -103,6 +103,7 @@ restauré par `cp` pour le client.
 | `gcTime: 0` retiré à la création | `shows a new webhook secret once, and never again once the dialog is closed` |
 | `gcTime: 0` retiré à la rotation | `warns that a rotated secret breaks deliveries, then shows the new one once` (ajouté après la mutation, qui restait verte) |
 | Types déjà pris proposés à la création | `offers only the event types that have no webhook yet` |
+| Raison métier affichée avant la permission manquante (l'ordre d'avant la revue) | `names the missing permission before the business rule`, rouge sur cet ordre avant le correctif |
 
 ## Critère 4
 - **Contre la vraie passerelle, rien n'est joué** : c'est le même obstacle que pour step-061.
