@@ -19,7 +19,10 @@ export async function orRefusal<T>(
   call: Promise<{ data?: T; error?: unknown; response: Response }>,
   fallback: string,
 ): Promise<T> {
-  const { data, error, response } = await call
+  // Une requête qui n'aboutit pas lève l'erreur réseau du navigateur, en anglais.
+  const { data, error, response } = await call.catch(() => {
+    throw new Error(`${fallback} : le tableau de bord ne répond pas. Réessayez dans un instant.`)
+  })
   if (response.ok) return data as T
   throw Object.assign(new Error(refusalMessage(error, `${fallback} (HTTP ${response.status}).`)), {
     fields: fieldRefusals(error),
