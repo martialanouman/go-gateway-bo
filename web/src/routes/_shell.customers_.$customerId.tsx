@@ -33,6 +33,11 @@ const NO_GROUP = 'none'
 const customersQueryKey = ['gateway', 'customers'] as const
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })
 const WRITE_REFUSAL = 'Modifier un client demande customers:write.'
+const SENDER_STATUS_LABELS: Record<SenderId['status'], string> = {
+  pending_carrier_approval: 'En attente d’approbation',
+  active: 'Approuvé',
+  disabled: 'Désactivé',
+}
 
 export const Route = createFileRoute('/_shell/customers_/$customerId')({
   component: CustomerScreen,
@@ -194,7 +199,7 @@ function CustomerGroup({
     <section aria-labelledby="customer-group">
       <h2 id="customer-group">Groupe</h2>
       <div className="row-actions">
-        <p>{name}</p>
+        <span>{name}</span>
         <Button
           {...(canReadGroups
             ? blocked
@@ -246,52 +251,52 @@ function SenderIds({
     queryFn: () =>
       orRefusal(
         api.GET('/customers/{customerId}/sender-ids', { params: { path: { customerId } } }),
-        'Les sender IDs n’ont pas pu être lus',
+        'Les noms d’expéditeur n’ont pas pu être lus',
       ),
     retry: false,
   })
   const register = (
     <Button {...blocked} onClick={onRegister} size="sm" variant="primary">
-      Enregistrer un sender ID
+      Enregistrer un nom d’expéditeur
     </Button>
   )
 
   return (
     <section aria-labelledby="customer-senders">
       <div className="page__head">
-        <h2 id="customer-senders">Sender IDs</h2>
+        <h2 id="customer-senders">Noms d’expéditeur</h2>
         {register}
       </div>
       {senders.isPending ? (
-        <LoadingState label="Chargement des sender IDs…">
+        <LoadingState label="Chargement des noms d’expéditeur…">
           <Skeleton height={38} />
         </LoadingState>
       ) : senders.isError ? (
         <ErrorState
           description={senders.error.message}
           onRetry={() => void senders.refetch()}
-          title="Les sender IDs n’ont pas pu être chargés"
+          title="Les noms d’expéditeur n’ont pas pu être chargés"
           titleAs="h3"
         />
       ) : senders.data.length === 0 ? (
         <EmptyState
-          description="Un sender ID enregistré naît en attente d’approbation de l’opérateur télécom."
-          title="Aucun sender ID pour l’instant"
+          description="Un nom d’expéditeur enregistré naît en attente d’approbation de l’opérateur télécom."
+          title="Aucun nom d’expéditeur pour l’instant"
           titleAs="h3"
         />
       ) : (
         <DataTable
-          caption="Sender IDs du client"
+          caption="Noms d’expéditeur du client"
           columns={[
             {
               key: 'address',
-              header: 'Adresse',
+              header: 'Nom',
               cell: (sender: SenderId) => <span className="mono">{sender.address}</span>,
             },
             {
               key: 'status',
               header: 'Statut',
-              cell: (sender: SenderId) => <span className="mono">{sender.status}</span>,
+              cell: (sender: SenderId) => SENDER_STATUS_LABELS[sender.status],
             },
             {
               key: 'createdAt',
@@ -351,7 +356,7 @@ function SenderStatusToggle({
           params: { path: { customerId, senderId: sender.id } },
           body: { status: next },
         }),
-        'Le sender ID n’a pas été modifié',
+        'Le nom d’expéditeur n’a pas été modifié',
       ),
     onSuccess: async (changed) => {
       await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
@@ -663,7 +668,7 @@ function RegisterSender({
     mutationFn: (body: { address: string }) =>
       orRefusal(
         api.POST('/customers/{customerId}/sender-ids', { params: { path: { customerId } }, body }),
-        'Le sender ID n’a pas été enregistré',
+        'Le nom d’expéditeur n’a pas été enregistré',
       ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
@@ -694,7 +699,7 @@ function RegisterSender({
       }
       onClose={onClose}
       open
-      title="Enregistrer un sender ID"
+      title="Enregistrer un nom d’expéditeur"
     >
       <form
         className="form"
@@ -703,13 +708,14 @@ function RegisterSender({
         onSubmit={form.handleSubmit((values) => register.mutate(values))}
       >
         <p>
-          Le sender ID naît en attente d’approbation de l’opérateur télécom. Action journalisée.
+          Le nom d’expéditeur naît en attente d’approbation de l’opérateur télécom. Action
+          journalisée.
         </p>
         <Refusal error={placed ? null : register.error} />
         <Field
           error={form.formState.errors.address?.message}
-          hint="Alphanumérique ou numéro, 20 caractères au plus."
-          label="Adresse"
+          hint="De 2 à 11 caractères."
+          label="Nom"
         >
           <Input
             autoComplete="off"
@@ -741,7 +747,7 @@ function ConfirmDeleteSender({
         api.DELETE('/customers/{customerId}/sender-ids/{senderId}', {
           params: { path: { customerId, senderId: sender.id } },
         }),
-        'Le sender ID n’a pas été supprimé',
+        'Le nom d’expéditeur n’a pas été supprimé',
       ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
@@ -755,7 +761,7 @@ function ConfirmDeleteSender({
         <>
           <Button onClick={onClose}>Annuler</Button>
           <Button loading={remove.isPending} onClick={() => remove.mutate()} variant="danger">
-            Supprimer le sender ID
+            Supprimer le nom d’expéditeur
           </Button>
         </>
       }
@@ -765,7 +771,7 @@ function ConfirmDeleteSender({
     >
       <Refusal error={remove.error} />
       <p>
-        L’adresse quitte la liste du client ; la réenregistrer repart de l’approbation. Action
+        Le nom quitte la liste du client ; la réenregistrer repart de l’approbation. Action
         journalisée.
       </p>
     </Modal>

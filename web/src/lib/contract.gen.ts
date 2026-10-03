@@ -83,7 +83,7 @@ export const RoleUpdate = z.object({
 })
 
 export const SenderIdCreation = z.object({
-  address: z.string().min(1).max(20),
+  address: z.string().min(2).max(11),
 })
 
 export const SenderIdUpdate = z.object({

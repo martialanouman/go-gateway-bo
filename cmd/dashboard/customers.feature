@@ -75,7 +75,7 @@ Fonctionnalité: Les clients relayés depuis la passerelle
     Et la réponse est conforme au contrat du BFF
     Et la réponse compte 3 comptes, dont 2 actifs et 1 fermé
 
-  Scénario: sans customers:write, l'enregistrement d'un sender ID est refusé avant d'atteindre la passerelle
+  Scénario: sans customers:write, l'enregistrement d'un nom d'expéditeur est refusé avant d'atteindre la passerelle
     Étant donné une passerelle qui compte les requêtes reçues
     Et un serveur démarré
     Et l'opérateur détient le rôle "Support"
@@ -85,7 +85,21 @@ Fonctionnalité: Les clients relayés depuis la passerelle
     Et le refus nomme la permission "customers:write"
     Et la passerelle n'a reçu aucune requête
 
-  Scénario: une adresse déjà enregistrée par ce client est refusée sous son champ
+  Plan du scénario: un nom d'expéditeur de <taille> caractères est refusé avant d'atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids" avec le corps '{"address":"<nom>"}'
+    Alors le serveur répond 400
+    Et la passerelle n'a reçu aucune requête
+
+    Exemples:
+      | taille | nom          |
+      | 1      | A            |
+      | 12     | ABCDEFGHIJKL |
+
+  Scénario: un nom d'expéditeur déjà enregistré par ce client est refusé sous son champ
     Étant donné une passerelle qui répond 409 à l'enregistrement d'un sender ID
     Et un serveur démarré
     Et l'opérateur détient le rôle "Clientèle"

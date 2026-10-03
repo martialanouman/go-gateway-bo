@@ -92,7 +92,7 @@ describe('the customer screen', () => {
   it('disables and explains every change without customers:write', async () => {
     open(READER)
 
-    for (const name of ['Renommer', 'Suspendre', 'Enregistrer un sender ID']) {
+    for (const name of ['Renommer', 'Suspendre', 'Enregistrer un nom d’expéditeur']) {
       const control = await screen.findByRole('button', { name })
       expect(control).toHaveAttribute('aria-disabled', 'true')
       expect(control).toHaveAccessibleDescription('Modifier un client demande customers:write.')
@@ -101,7 +101,7 @@ describe('the customer screen', () => {
 
   it('places an address the customer already registered under its field', async () => {
     const user = userEvent.setup()
-    const refusal = 'Ce client a déjà enregistré cette adresse.'
+    const refusal = 'Ce client a déjà enregistré ce nom.'
     open(WRITER, {
       [`POST /api/customers/${ACME.id}/sender-ids`]: {
         status: 409,
@@ -113,14 +113,14 @@ describe('the customer screen', () => {
       },
     })
 
-    await user.click(await screen.findByRole('button', { name: 'Enregistrer un sender ID' }))
+    await user.click(await screen.findByRole('button', { name: 'Enregistrer un nom d’expéditeur' }))
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByRole('textbox', { name: 'Adresse' }), 'ACME')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Nom' }), 'ACME')
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }))
 
-    expect(
-      await within(dialog).findByRole('textbox', { name: 'Adresse' }),
-    ).toHaveAccessibleDescription(refusal)
+    expect(await within(dialog).findByRole('textbox', { name: 'Nom' })).toHaveAccessibleDescription(
+      refusal,
+    )
     expect(dialog.querySelector('.form-refusal')).toBeNull()
   })
 
@@ -184,13 +184,13 @@ describe('the customer screen', () => {
     const row = (await screen.findByRole('cell', { name: 'ACME' })).closest('tr') as HTMLElement
     await user.click(within(row).getByRole('button', { name: 'Approuver ACME' }))
     expect(await within(row).findByRole('button', { name: 'Désactiver ACME' })).toBeInTheDocument()
-    expect(row).toHaveTextContent('active')
+    expect(row).toHaveTextContent('Approuvé')
 
     await user.click(within(row).getByRole('button', { name: 'Supprimer ACME' }))
     const dialog = await screen.findByRole('dialog', { name: 'Supprimer ACME' })
-    await user.click(within(dialog).getByRole('button', { name: 'Supprimer le sender ID' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer le nom d’expéditeur' }))
 
-    expect(await screen.findByText('Aucun sender ID pour l’instant')).toBeInTheDocument()
+    expect(await screen.findByText('Aucun nom d’expéditeur pour l’instant')).toBeInTheDocument()
   })
 
   it('names an unknown customer instead of an empty page', async () => {
@@ -206,13 +206,28 @@ describe('the customer screen', () => {
     const user = userEvent.setup()
     open(WRITER)
 
-    await user.click(await screen.findByRole('button', { name: 'Enregistrer un sender ID' }))
+    await user.click(await screen.findByRole('button', { name: 'Enregistrer un nom d’expéditeur' }))
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByRole('textbox', { name: 'Adresse' }), 'ACME{Enter}')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Nom' }), 'ACME{Enter}')
 
     const row = (await screen.findByRole('cell', { name: 'ACME' })).closest('tr') as HTMLElement
-    expect(row).toHaveTextContent('pending_carrier_approval')
+    expect(row).toHaveTextContent('En attente d’approbation')
     expect(within(row).getByRole('button', { name: 'Approuver ACME' })).toBeInTheDocument()
+  })
+
+  it('holds a sender name between 2 and 11 characters before anything leaves', async () => {
+    const user = userEvent.setup()
+    const fetch = open(WRITER)
+
+    await user.click(await screen.findByRole('button', { name: 'Enregistrer un nom d’expéditeur' }))
+    const name = within(await screen.findByRole('dialog')).getByRole('textbox', { name: 'Nom' })
+    await user.type(name, 'A{Enter}')
+    await waitFor(() => expect(name).toHaveAccessibleDescription(/trop courte : 2 caractères/))
+    await user.clear(name)
+    await user.type(name, 'ABCDEFGHIJKL{Enter}')
+    await waitFor(() => expect(name).toHaveAccessibleDescription(/trop longue : 11 caractères/))
+
+    expect(sent(fetch, `POST /api/customers/${ACME.id}/sender-ids`)).toBe(false)
   })
 
   it('announces a sender ID the gateway refused to change', async () => {
