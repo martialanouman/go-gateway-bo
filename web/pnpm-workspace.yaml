@@ -18,6 +18,11 @@ allowBuilds:
 # volontairement la portée à ce chemin — rien d'autre du dépôt ne dépend de ces paquets, et une
 # correction globale masquerait le jour où quelque chose d'autre en dépendrait.
 overrides:
+  # braces <=3.0.3 : épuisement de pile par motifs profondément imbriqués (GHSA-vfj7-8cjw-p6xm,
+  # élevée), sans version corrigée publiée. Chemin unique : `@stoplight/prism-cli > chokidar@3`.
+  # chokidar 4 ne dépend plus de braces ; Prism n'y surveille qu'un fichier, `disableGlobbing`
+  # posé (`prism-cli/dist/util/runner.js`). chokidar 5 est ESM seul, Prism le charge en CJS.
+  '@stoplight/prism-cli>chokidar': '^4.0.3'
   # lodash <=4.17.23 : injection de code via `_.template` (GHSA-r5fr-rjxr-66jc, élevée) et deux
   # pollutions de prototype. Aucun correctif en 4.17.x — la première version saine est 4.18.
   'postman-collection>lodash': '^4.18.1'
