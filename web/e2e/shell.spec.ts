@@ -606,9 +606,23 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(page.getByRole('row', { name: /PARCOURS/ })).toContainText(
     'pending_carrier_approval',
   )
+
+  // step-063 : un compte créé depuis les comptes du client, que la suspension chiffre ensuite.
+  await page.getByRole('link', { name: 'Voir ses comptes' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Comptes de Client de parcours')
+  await page.getByRole('button', { name: 'Nouveau compte' }).first().click()
+  const nouveauCompte = page.getByRole('dialog', { name: 'Nouveau compte SMPP' })
+  await nouveauCompte.getByLabel('Nom').fill('compte-de-parcours')
+  await nouveauCompte.getByRole('button', { name: 'Créer le compte' }).click()
+  await expect(page.getByRole('row', { name: /compte-de-parcours/ })).toContainText('active')
+  await page
+    .getByRole('row', { name: /compte-de-parcours/ })
+    .getByRole('link', { name: 'Client de parcours' })
+    .click()
+
   await page.getByRole('button', { name: 'Suspendre' }).click()
   const suspension = page.getByRole('dialog', { name: 'Suspendre Client de parcours' })
-  await expect(suspension).toContainText('Le client n’a aucun compte SMPP.')
+  await expect(suspension).toContainText('Son compte est suspendu avec lui')
   await suspension.getByRole('button', { name: 'Suspendre le client' }).click()
   await expect(page.getByRole('button', { name: 'Réactiver' })).toBeVisible()
   await page.goto('/customers?status=suspended')

@@ -23,7 +23,7 @@ type auditWorld struct {
 func (w *auditWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^le journal porte (\d+) événement "([^"]+)"$`, w.journalHolds)
 	ctx.Then(`^l'événement porte l'adresse de l'appelant$`, w.eventCarriesTheAddress)
-	ctx.Then(`^l'issue "([^"]+)" désigne (?:le groupe|le client) que la réponse rend$`, w.outcomeTargetsTheReturnedGroup)
+	ctx.Then(`^l'issue "([^"]+)" désigne (?:le groupe|le client|le compte) que la réponse rend$`, w.outcomeTargetsTheReturnedGroup)
 	ctx.Then(`^l'issue "([^"]+)" désigne le client "([^"]+)"$`, w.outcomeTargets)
 	ctx.Then(`^le journal ne porte ni le secret ni les codes de récupération$`, w.journalHidesSecrets)
 	ctx.Given(`^les partitions du journal sont retirées$`, w.auditPartitionsRemoved)

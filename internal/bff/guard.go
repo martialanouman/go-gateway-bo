@@ -78,6 +78,8 @@ var authorization = map[string]rule{
 	"ListSenderIds":               requires(permissions.CustomersRead),
 	"CreateSenderId":              requires(permissions.CustomersWrite),
 	"UpdateSenderId":              requires(permissions.CustomersWrite),
+	"ListAccounts":                requires(permissions.AccountsRead),
+	"CreateAccount":               requires(permissions.AccountsWrite),
 	"DeleteSenderId":              requires(permissions.CustomersWrite),
 	"Health": exempt("la sonde de l'orchestrateur, qui n'a pas de session et ne doit jamais " +
 		"dépendre d'une autre brique pour répondre"),

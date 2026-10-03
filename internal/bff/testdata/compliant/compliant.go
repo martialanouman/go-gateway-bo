@@ -226,3 +226,13 @@ func (API) DeleteSenderId(_ context.Context, _ bff.DeleteSenderIdRequestObject,
 ) (bff.DeleteSenderIdResponseObject, error) {
 	return bff.DeleteSenderId204Response{}, nil
 }
+
+func (API) ListAccounts(_ context.Context, _ bff.ListAccountsRequestObject,
+) (bff.ListAccountsResponseObject, error) {
+	return bff.ListAccounts200JSONResponse{}, nil
+}
+
+func (API) CreateAccount(_ context.Context, _ bff.CreateAccountRequestObject,
+) (bff.CreateAccountResponseObject, error) {
+	return bff.CreateAccount201JSONResponse{}, nil
+}

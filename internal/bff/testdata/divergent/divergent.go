@@ -205,3 +205,11 @@ func (API) UpdateSenderId(_ context.Context, _ bff.UpdateSenderIdRequestObject) 
 func (API) DeleteSenderId(_ context.Context, _ bff.DeleteSenderIdRequestObject) (bff.DeleteSenderIdResponseObject, error) {
 	return nil, nil
 }
+
+func (API) ListAccounts(_ context.Context, _ bff.ListAccountsRequestObject) (bff.ListAccountsResponseObject, error) {
+	return nil, nil
+}
+
+func (API) CreateAccount(_ context.Context, _ bff.CreateAccountRequestObject) (bff.CreateAccountResponseObject, error) {
+	return nil, nil
+}

@@ -33,14 +33,71 @@ type senderID struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
-// Customers sert les clients et leurs sender IDs avec un état en mémoire, pour qu'un parcours
-// retrouve sous le filtre d'un groupe le client qu'il vient d'y créer, puis sur sa fiche ce qu'il
-// vient d'y faire. Une seule page : un parcours ne crée pas cinquante clients. Aucun compte : ils
-// naissent avec step-063.
+type account struct {
+	ID               string    `json:"id"`
+	CustomerID       string    `json:"customer_id"`
+	Name             string    `json:"name"`
+	Status           string    `json:"status"`
+	SmppEnabled      bool      `json:"smpp_enabled"`
+	RestEnabled      bool      `json:"rest_enabled"`
+	SenderIDPolicy   string    `json:"sender_id_policy"`
+	AllowedBindTypes string    `json:"allowed_bind_types"`
+	MaxSessions      int       `json:"max_sessions"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// Customers sert les clients, leurs sender IDs et leurs comptes avec un état en mémoire, pour qu'un
+// parcours retrouve ce qu'il vient de créer. Une seule page : un parcours ne crée pas cinquante
+// objets.
 type Customers struct {
 	mu        sync.Mutex
 	customers []customer
 	senders   []senderID
+	accounts  []account
+}
+
+// ServeAccounts sert list-smpp-accounts et create-smpp-account.
+func (c *Customers) ServeAccounts(w http.ResponseWriter, r *http.Request) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if r.Method == http.MethodGet {
+		reply(w, http.StatusOK, map[string]any{"data": c.accountsOf(r.URL.Query().Get("customerId")), "has_more": false})
+
+		return
+	}
+
+	var body struct {
+		CustomerID string `json:"customer_id"`
+		Name       string `json:"name"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+
+	if slices.ContainsFunc(c.accounts, func(candidate account) bool {
+		return candidate.CustomerID == body.CustomerID && candidate.Name == body.Name
+	}) {
+		reply(w, http.StatusConflict, map[string]string{"code": "conflict", "message": "account name taken"})
+
+		return
+	}
+
+	now := time.Now().UTC()
+	created := account{
+		ID: uuid.NewString(), CustomerID: body.CustomerID, Name: body.Name, Status: "active", SmppEnabled: true,
+		RestEnabled: true, SenderIDPolicy: "strict", AllowedBindTypes: "trx", MaxSessions: 1, CreatedAt: now,
+		UpdatedAt: now,
+	}
+	c.accounts = append(c.accounts, created)
+	reply(w, http.StatusCreated, created)
+}
+
+func (c *Customers) accountsOf(customerID string) []account {
+	return slices.DeleteFunc(append([]account{}, c.accounts...), func(candidate account) bool {
+		return customerID != "" && candidate.CustomerID != customerID
+	})
 }
 
 func (c *Customers) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -130,9 +187,16 @@ func (c *Customers) serveCustomer(w http.ResponseWriter, r *http.Request, id str
 	case action == "suspend" && r.Method == http.MethodPost:
 		found.Status = "suspended"
 		found.UpdatedAt = time.Now().UTC()
+
+		for index := range c.accounts {
+			if c.accounts[index].CustomerID == id {
+				c.accounts[index].Status = "suspended"
+			}
+		}
+
 		reply(w, http.StatusOK, *found)
 	case action == "smpp-accounts" && r.Method == http.MethodGet:
-		reply(w, http.StatusOK, []struct{}{})
+		reply(w, http.StatusOK, c.accountsOf(id))
 	case action == "sender-ids":
 		c.serveSenderIDs(w, r, id)
 	default:

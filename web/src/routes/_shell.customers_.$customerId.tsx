@@ -128,6 +128,7 @@ function CustomerScreen() {
         customer={current}
         onChange={() => setPending({ kind: 'group' })}
       />
+      <CustomerAccounts customerId={current.id} />
       <SenderIds
         blocked={blocked}
         customerId={current.id}
@@ -204,6 +205,27 @@ function CustomerGroup({
           Changer de groupe
         </Button>
       </div>
+    </section>
+  )
+}
+
+function CustomerAccounts({ customerId }: { readonly customerId: string }) {
+  return (
+    <section aria-labelledby="customer-accounts">
+      <h2 id="customer-accounts">Comptes SMPP</h2>
+      {usePermission('accounts:read') ? (
+        <Link
+          className="ui-button ui-button--secondary ui-button--sm"
+          search={{ customerId }}
+          to="/accounts"
+        >
+          Voir ses comptes
+        </Link>
+      ) : (
+        <Button blockedReason="Voir les comptes d’un client demande accounts:read." size="sm">
+          Voir ses comptes
+        </Button>
+      )}
     </section>
   )
 }
@@ -562,7 +584,11 @@ function suspensionConsequence({
   closedAccounts,
 }: components['schemas']['SuspensionImpact']) {
   if (accounts === 0) return 'Le client n’a aucun compte SMPP.'
-  const counted = accounts === 1 ? '1 compte' : `${accounts} comptes`
+  const cut = 'La passerelle refuse tout nouveau bind et tente de couper les sessions ouvertes.'
+  if (accounts === 1) {
+    const reopened = closedAccounts === 1 ? ' Fermé, il redevient suspendu, donc réactivable.' : ''
+    return `Son compte est suspendu avec lui : il ne peut plus envoyer, en SMPP comme en REST. ${cut}${reopened}`
+  }
   const active = activeAccounts === 1 ? '1 actif' : `${activeAccounts} actifs`
   const reopened =
     closedAccounts === 0
@@ -570,7 +596,7 @@ function suspensionConsequence({
       : closedAccounts === 1
         ? ' Son compte fermé redevient suspendu, donc réactivable.'
         : ` Ses ${closedAccounts} comptes fermés redeviennent suspendus, donc réactivables.`
-  return `Ses ${counted}, dont ${active}, sont suspendus avec lui : aucun ne peut plus envoyer, en SMPP comme en REST. La passerelle refuse tout nouveau bind et tente de couper les sessions ouvertes.${reopened}`
+  return `Ses ${accounts} comptes, dont ${active}, sont suspendus avec lui : aucun ne peut plus envoyer, en SMPP comme en REST. ${cut}${reopened}`
 }
 
 function ConfirmReactivate({

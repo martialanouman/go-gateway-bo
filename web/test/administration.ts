@@ -7,6 +7,7 @@ type Role = components['schemas']['Role']
 type Group = components['schemas']['CustomerGroup']
 type Customer = components['schemas']['Customer']
 type SenderId = components['schemas']['SenderId']
+type Account = components['schemas']['SmppAccount']
 
 /** L'opérateur de la session, tel que `stubSession` le rend dans `GET /auth/me`. */
 export const SELF_ID = '01960000-0000-7000-8000-000000000001'
@@ -97,6 +98,7 @@ export function stubAdministration(
     customers?: Customer[]
     customerPageSize?: number
     senders?: SenderId[]
+    accounts?: Account[]
   } = {},
   replies: AdministrationReplies = {},
 ) {
@@ -106,6 +108,7 @@ export function stubAdministration(
   let groups = [...(initial.groups ?? [RESELLERS])]
   let customers = [...(initial.customers ?? [ACME])]
   let senders = [...(initial.senders ?? [])]
+  let accounts = [...(initial.accounts ?? [])]
   const customerPageSize = initial.customerPageSize ?? 50
 
   const fetch = vi.fn(async (request: Request) => {
@@ -184,6 +187,29 @@ export function stubAdministration(
 
       roles = roles.filter((role) => role.id !== id)
       return new Response(null, { status: 204 })
+    }
+
+    if (collection === 'accounts') {
+      if (request.method === 'POST') {
+        const created: Account = {
+          id: `account-${accounts.length + 1}`,
+          status: 'active',
+          createdAt: '2026-10-03T08:00:00Z',
+          ...body,
+        }
+        accounts = [...accounts, created]
+        return Response.json(created, { status: 201 })
+      }
+      const customerId = searchParams.get('customerId')
+      const listed = accounts.filter(
+        (account) => customerId === null || account.customerId === customerId,
+      )
+      const start = Number(searchParams.get('cursor') ?? 0)
+      const end = start + customerPageSize
+      return Response.json({
+        items: listed.slice(start, end),
+        ...(end < listed.length ? { nextCursor: String(end) } : {}),
+      })
     }
 
     if (collection === 'customers' && id !== undefined) {

@@ -135,3 +135,51 @@ Fonctionnalité: Les clients relayés depuis la passerelle
     Et l'opérateur ouvre une session élevée
     Quand le navigateur envoie PUT "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/group" avec le corps '{}'
     Alors la passerelle a reçu un détachement de groupe
+
+  Scénario: un opérateur accounts:read voit les comptes d'un client
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/accounts?customerId=0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b&status=active"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+
+  Scénario: le filtre par client atteint la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/accounts?customerId=0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b"
+    Alors la passerelle a reçu "customerId=0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b"
+
+  Scénario: créer un compte laisse sa trace, et l'issue désigne le compte créé
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/accounts" avec le corps '{"customerId":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b","name":"trafic-otp"}'
+    Alors le serveur répond 201
+    Et la réponse est conforme au contrat du BFF
+    Et le journal porte 2 événement "account.create"
+    Et l'issue "account.create" désigne le compte que la réponse rend
+
+  Scénario: sans accounts:write, la création d'un compte est refusée avant d'atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/accounts" avec le corps '{"customerId":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b","name":"trafic-otp"}'
+    Alors le serveur répond 403
+    Et le refus nomme la permission "accounts:write"
+    Et la passerelle n'a reçu aucune requête
+
+  Scénario: un nom de compte déjà pris chez ce client est refusé sous son champ
+    Étant donné une passerelle qui répond 409 à la création
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/accounts" avec le corps '{"customerId":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b","name":"trafic-otp"}'
+    Alors le serveur répond 409
+    Et la réponse est conforme au contrat du BFF
+    Et le refus place une erreur sous le champ "name"

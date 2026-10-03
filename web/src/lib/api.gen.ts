@@ -812,6 +812,31 @@ export interface paths {
         patch: operations["updateSenderId"];
         trace?: never;
     };
+    "/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Une page de comptes SMPP
+         * @description Relayée vers `list-smpp-accounts`, 50 comptes par page.
+         */
+        get: operations["listAccounts"];
+        put?: never;
+        /**
+         * Crée un compte SMPP rattaché à un client
+         * @description Relayée vers `create-smpp-account`, avec le client et le nom seuls : canaux, type de bind et
+         *     `max_sessions` gardent les défauts de la passerelle.
+         */
+        post: operations["createAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1250,6 +1275,23 @@ export interface components {
             /** @enum {string} */
             status: "active" | "disabled";
         };
+        SmppAccount: {
+            id: string;
+            customerId: string;
+            name: string;
+            status: components["schemas"]["CustomerStatus"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AccountPage: {
+            items: components["schemas"]["SmppAccount"][];
+            nextCursor?: string;
+        };
+        AccountCreation: {
+            /** Format: uuid */
+            customerId: string;
+            name: string;
+        };
         CustomerGroupCreation: {
             name: string;
             description?: string;
@@ -1306,6 +1348,15 @@ export interface components {
         };
         /** @description Ce client a déjà enregistré cette adresse ; `errors[]` place le refus sous `address`. */
         SenderIdPris: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Ce client a déjà un compte de ce nom ; `errors[]` place le refus sous `name`. */
+        NomDeComptePris: {
             headers: {
                 [name: string]: unknown;
             };
@@ -3050,6 +3101,67 @@ export interface operations {
             401: components["responses"]["SessionAbsente"];
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["SenderIdInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    listAccounts: {
+        parameters: {
+            query?: {
+                customerId?: string;
+                status?: components["schemas"]["CustomerStatus"];
+                /** @description Le `nextCursor` de la page précédente. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Une page de comptes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountPage"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    createAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCreation"];
+            };
+        };
+        responses: {
+            /** @description Le compte créé. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmppAccount"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            409: components["responses"]["NomDeComptePris"];
             415: components["responses"]["TypeDeContenuRefuse"];
             422: components["responses"]["RefusDeLaPasserelle"];
             503: components["responses"]["PasserelleIndisponible"];

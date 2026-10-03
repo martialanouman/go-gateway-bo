@@ -329,3 +329,13 @@ func (failingAPI) DeleteSenderId(_ context.Context, _ DeleteSenderIdRequestObjec
 ) (DeleteSenderIdResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }
+
+func (failingAPI) ListAccounts(_ context.Context, _ ListAccountsRequestObject,
+) (ListAccountsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) CreateAccount(_ context.Context, _ CreateAccountRequestObject,
+) (CreateAccountResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
