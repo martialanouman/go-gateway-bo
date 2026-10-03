@@ -6,6 +6,7 @@ import {
   Button,
   DataTable,
   EmptyState,
+  ENTITY_LABELS,
   ErrorState,
   Field,
   Input,
@@ -113,7 +114,7 @@ function CustomersScreen() {
           }
           options={[
             { value: ALL, label: 'Tous les statuts' },
-            ...STATUSES.map((value) => ({ value, label: value })),
+            ...STATUSES.map((value) => ({ value, label: ENTITY_LABELS[value] })),
           ]}
           size="sm"
           value={status ?? ALL}

@@ -563,13 +563,13 @@ function ConfirmSuspend({
             onClick={() => suspend.mutate()}
             variant="danger"
           >
-            Suspendre le client
+            Suspendre
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Suspendre ${customer.name}`}
+      title={`Suspendre ${customer.name} ?`}
     >
       <Refusal error={suspend.error ?? impact.error} />
       {impact.isPending ? (
@@ -577,7 +577,13 @@ function ConfirmSuspend({
           <Skeleton height={20} />
         </LoadingState>
       ) : impact.isSuccess ? (
-        <p>{suspensionConsequence(impact.data)} Action journalisée.</p>
+        <>
+          <p>{suspensionConsequence(impact.data)}</p>
+          <p>
+            Le client pourra être réactivé ensuite. L’action est enregistrée dans le journal
+            d’audit.
+          </p>
+        </>
       ) : null}
     </Modal>
   )
@@ -588,20 +594,25 @@ function suspensionConsequence({
   activeAccounts,
   closedAccounts,
 }: components['schemas']['SuspensionImpact']) {
-  if (accounts === 0) return 'Le client n’a aucun compte SMPP.'
-  const cut = 'La passerelle refuse tout nouveau bind et tente de couper les sessions ouvertes.'
-  if (accounts === 1) {
-    const reopened = closedAccounts === 1 ? ' Fermé, il redevient suspendu, donc réactivable.' : ''
-    return `Son compte est suspendu avec lui : il ne peut plus envoyer, en SMPP comme en REST. ${cut}${reopened}`
-  }
-  const active = activeAccounts === 1 ? '1 actif' : `${activeAccounts} actifs`
+  if (accounts === 0)
+    return 'Ce client n’a aucun compte SMPP : la suspension n’interrompt aucun envoi.'
+  const counted =
+    accounts === 1
+      ? 'Son compte SMPP sera suspendu'
+      : `Ses ${accounts} comptes SMPP seront suspendus`
+  const active =
+    accounts === 1 || activeAccounts === accounts
+      ? ''
+      : activeAccounts === 1
+        ? ', dont 1 actif'
+        : `, dont ${activeAccounts} actifs`
   const reopened =
     closedAccounts === 0
       ? ''
       : closedAccounts === 1
-        ? ' Son compte fermé redevient suspendu, donc réactivable.'
-        : ` Ses ${closedAccounts} comptes fermés redeviennent suspendus, donc réactivables.`
-  return `Ses ${accounts} comptes, dont ${active}, sont suspendus avec lui : aucun ne peut plus envoyer, en SMPP comme en REST. ${cut}${reopened}`
+        ? ' Un compte fermé repassera suspendu, et pourra donc être réactivé.'
+        : ` ${closedAccounts} comptes fermés repasseront suspendus, et pourront donc être réactivés.`
+  return `${counted}${active} : plus aucun SMS ne pourra être envoyé, en SMPP comme en REST, et la passerelle tentera de couper les sessions ouvertes.${reopened}`
 }
 
 function ConfirmReactivate({
@@ -638,19 +649,20 @@ function ConfirmReactivate({
             onClick={() => reactivate.mutate()}
             variant="primary"
           >
-            Réactiver le client
+            Réactiver
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Réactiver ${customer.name}`}
+      title={`Réactiver ${customer.name} ?`}
     >
       <Refusal error={reactivate.error} />
       <p>
-        Ses comptes restent suspendus : la passerelle ne les réactive pas avec lui. Action
-        journalisée.
+        Le client redevient actif, mais ses comptes SMPP restent suspendus : ils ne pourront pas
+        envoyer de SMS tant qu’ils ne seront pas réactivés un par un.
       </p>
+      <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
   )
 }
@@ -761,19 +773,20 @@ function ConfirmDeleteSender({
         <>
           <Button onClick={onClose}>Annuler</Button>
           <Button loading={remove.isPending} onClick={() => remove.mutate()} variant="danger">
-            Supprimer le nom d’expéditeur
+            Supprimer
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Supprimer ${sender.address}`}
+      title={`Supprimer le nom d’expéditeur ${sender.address} ?`}
     >
       <Refusal error={remove.error} />
       <p>
-        Le nom quitte la liste du client ; la réenregistrer repart de l’approbation. Action
-        journalisée.
+        {sender.address} disparaîtra de la liste du client. Pour l’utiliser de nouveau, il faudra
+        l’enregistrer et attendre une nouvelle approbation de l’opérateur télécom.
       </p>
+      <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
   )
 }

@@ -171,7 +171,7 @@ function GroupsTable({
         {
           key: 'status',
           header: 'Statut',
-          cell: (group) => <span className="mono">{group.status}</span>,
+          cell: (group) => (group.status === 'active' ? 'Actif' : 'Archivé'),
         },
         {
           key: 'createdAt',

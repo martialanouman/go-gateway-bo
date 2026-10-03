@@ -151,7 +151,7 @@ describe('the groups screen', () => {
     await user.click(screen.getByRole('tab', { name: 'Archivés' }))
     const archived = await screen.findByRole('cell', { name: RESELLERS.name })
     const archivedRow = within(archived.closest('tr') as HTMLElement)
-    expect(archivedRow.getByText('archived')).toBeInTheDocument()
+    expect(archivedRow.getByText('Archivé')).toBeInTheDocument()
 
     await user.click(archivedRow.getByRole('button', { name: 'Désarchiver' }))
     expect(await screen.findByText(/Revendeurs est de nouveau actif/)).toBeInTheDocument()

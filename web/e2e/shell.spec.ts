@@ -571,7 +571,7 @@ test('the binary serves the painted shell, then the application replaces it', as
   await nouveauGroupe.getByRole('button', { name: 'Créer le groupe' }).click()
 
   const groupe = page.getByRole('row', { name: /Revendeurs de parcours/ })
-  await expect(groupe).toContainText('active')
+  await expect(groupe).toContainText('Actif')
 
   // step-061 : la tranche verticale — un client créé dans ce groupe, relayé, puis retrouvé par le lien
   // que l'écran Groupes porte vers ses clients.
@@ -614,16 +614,16 @@ test('the binary serves the painted shell, then the application replaces it', as
   const nouveauCompte = page.getByRole('dialog', { name: 'Nouveau compte SMPP' })
   await nouveauCompte.getByLabel('Nom').fill('compte-de-parcours')
   await nouveauCompte.getByRole('button', { name: 'Créer le compte' }).click()
-  await expect(page.getByRole('row', { name: /compte-de-parcours/ })).toContainText('active')
+  await expect(page.getByRole('row', { name: /compte-de-parcours/ })).toContainText('Actif')
   await page
     .getByRole('row', { name: /compte-de-parcours/ })
     .getByRole('link', { name: 'Client de parcours' })
     .click()
 
   await page.getByRole('button', { name: 'Suspendre' }).click()
-  const suspension = page.getByRole('dialog', { name: 'Suspendre Client de parcours' })
-  await expect(suspension).toContainText('Son compte est suspendu avec lui')
-  await suspension.getByRole('button', { name: 'Suspendre le client' }).click()
+  const suspension = page.getByRole('dialog', { name: 'Suspendre Client de parcours ?' })
+  await expect(suspension).toContainText('Son compte SMPP sera suspendu')
+  await suspension.getByRole('button', { name: 'Suspendre' }).click()
   await expect(page.getByRole('button', { name: 'Réactiver' })).toBeVisible()
   await page.goto('/customers?status=suspended')
   await expect(page.getByRole('row', { name: /Client de parcours/ })).toBeVisible()
@@ -634,7 +634,7 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(groupe).toHaveCount(0)
 
   await page.getByRole('tab', { name: 'Archivés' }).click()
-  await expect(groupe).toContainText('archived')
+  await expect(groupe).toContainText('Archivé')
   await groupe.getByRole('button', { name: 'Supprimer' }).click()
   const suppression = page.getByRole('dialog', { name: 'Supprimer Revendeurs de parcours' })
   await expect(suppression).toContainText('Son client est détaché du groupe')

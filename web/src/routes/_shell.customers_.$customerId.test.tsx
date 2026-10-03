@@ -45,15 +45,17 @@ describe('the customer screen', () => {
     })
 
     await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
-    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name}` })
+    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name} ?` })
 
     expect(
-      await within(dialog).findByText(/Ses 3 comptes, dont 1 actif, sont suspendus avec lui/),
+      await within(dialog).findByText(/Ses 3 comptes SMPP seront suspendus, dont 1 actif/),
     ).toBeInTheDocument()
-    expect(dialog).toHaveTextContent('Son compte fermé redevient suspendu, donc réactivable.')
+    expect(dialog).toHaveTextContent(
+      'Un compte fermé repassera suspendu, et pourra donc être réactivé.',
+    )
     expect(sent(fetch, SUSPEND)).toBe(false)
 
-    await user.click(within(dialog).getByRole('button', { name: 'Suspendre le client' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Suspendre' }))
 
     expect(await screen.findByRole('button', { name: 'Réactiver' })).toBeInTheDocument()
     expect(sent(fetch, SUSPEND)).toBe(true)
@@ -65,11 +67,14 @@ describe('the customer screen', () => {
     open(WRITER)
 
     await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
-    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name}` })
+    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name} ?` })
 
-    expect(await within(dialog).findByText(/Le client n’a aucun compte SMPP\./)).toHaveTextContent(
-      'Le client n’a aucun compte SMPP. Action journalisée.',
-    )
+    expect(
+      await within(dialog).findByText(
+        'Ce client n’a aucun compte SMPP : la suspension n’interrompt aucun envoi.',
+      ),
+    ).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('plus aucun SMS')
   })
 
   it('refuses to suspend while the impact cannot be read', async () => {
@@ -84,7 +89,7 @@ describe('the customer screen', () => {
     await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByText('Passerelle muette.')
-    await user.click(within(dialog).getByRole('button', { name: 'Suspendre le client' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Suspendre' }))
 
     expect(sent(fetch, SUSPEND)).toBe(false)
   })
@@ -129,9 +134,9 @@ describe('the customer screen', () => {
     open(WRITER, {}, { customers: [{ ...ACME, status: 'suspended' }] })
 
     await user.click(await screen.findByRole('button', { name: 'Réactiver' }))
-    const dialog = await screen.findByRole('dialog', { name: `Réactiver ${ACME.name}` })
-    expect(dialog).toHaveTextContent('Ses comptes restent suspendus')
-    await user.click(within(dialog).getByRole('button', { name: 'Réactiver le client' }))
+    const dialog = await screen.findByRole('dialog', { name: `Réactiver ${ACME.name} ?` })
+    expect(dialog).toHaveTextContent('ses comptes SMPP restent suspendus')
+    await user.click(within(dialog).getByRole('button', { name: 'Réactiver' }))
 
     expect(await screen.findByRole('button', { name: 'Suspendre' })).toBeInTheDocument()
   })
@@ -187,8 +192,10 @@ describe('the customer screen', () => {
     expect(row).toHaveTextContent('Approuvé')
 
     await user.click(within(row).getByRole('button', { name: 'Supprimer ACME' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Supprimer ACME' })
-    await user.click(within(dialog).getByRole('button', { name: 'Supprimer le nom d’expéditeur' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Supprimer le nom d’expéditeur ACME ?',
+    })
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer' }))
 
     expect(await screen.findByText('Aucun nom d’expéditeur pour l’instant')).toBeInTheDocument()
   })

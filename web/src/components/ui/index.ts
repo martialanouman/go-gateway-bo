@@ -40,6 +40,7 @@ export { LoadingState, type LoadingStateProps, Skeleton, type SkeletonProps } fr
 export {
   type BreakerState,
   type DeliveryStatus,
+  ENTITY_LABELS,
   type EntityStatus,
   type LinkStatus,
   StatusPill,
