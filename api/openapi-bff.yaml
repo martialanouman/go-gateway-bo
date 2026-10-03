@@ -2353,7 +2353,11 @@ components:
       type: object
       additionalProperties: false
       properties:
-        address: { type: string, minLength: 1, maxLength: 20 }
+        address:
+          type: string
+          minLength: 2
+          maxLength: 11
+          pattern: '^[a-zA-Z0-9+\-\s]+$'
       required: [address]
 
     SenderIdUpdate:

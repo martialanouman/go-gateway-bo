@@ -243,11 +243,11 @@ func senderIDDTO(sender gateway.SenderId) SenderId {
 }
 
 func unknownSenderID() Error {
-	return Error{Code: "not_found", Message: "Ce client n'a aucun sender ID de cet identifiant. Rechargez la fiche."}
+	return Error{Code: "not_found", Message: "Ce client n'a aucun nom d'expéditeur de cet identifiant. Rechargez la fiche."}
 }
 
 func senderAddressTaken(code string) Error {
-	const refusal = "Ce client a déjà enregistré cette adresse. Retrouvez-la dans la liste de ses sender IDs."
+	const refusal = "Ce client a déjà enregistré ce nom. Retrouvez-le dans la liste de ses noms d'expéditeur."
 
 	return Error{
 		Code: code, Message: refusal,

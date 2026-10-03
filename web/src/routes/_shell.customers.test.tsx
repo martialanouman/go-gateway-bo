@@ -58,7 +58,7 @@ describe('the customers screen', () => {
     const sent = customerReads(fetch).at(-1)
     expect(sent?.searchParams.get('status')).toBe('active')
     expect(sent?.searchParams.get('groupId')).toBe(RESELLERS.id)
-    expect(screen.getByRole('combobox', { name: 'Statut' })).toHaveTextContent('active')
+    expect(screen.getByRole('combobox', { name: 'Statut' })).toHaveTextContent('Actif')
   })
 
   it('ignores a status the contract does not know', async () => {
@@ -100,7 +100,7 @@ describe('the customers screen', () => {
     expect(customerReads(fetch).at(-1)?.searchParams.get('groupId')).toBe(RESELLERS.id)
 
     await user.click(screen.getByRole('combobox', { name: 'Statut' }))
-    await user.click(await screen.findByRole('option', { name: 'suspended' }))
+    await user.click(await screen.findByRole('option', { name: 'Suspendu' }))
     await screen.findByRole('heading', { level: 2, name: 'Aucun client trouvé' })
     expect(customerReads(fetch).at(-1)?.searchParams.get('status')).toBe('suspended')
 

@@ -33,6 +33,11 @@ const NO_GROUP = 'none'
 const customersQueryKey = ['gateway', 'customers'] as const
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })
 const WRITE_REFUSAL = 'Modifier un client demande customers:write.'
+const SENDER_STATUS_LABELS: Record<SenderId['status'], string> = {
+  pending_carrier_approval: 'En attente d’approbation',
+  active: 'Approuvé',
+  disabled: 'Désactivé',
+}
 
 export const Route = createFileRoute('/_shell/customers_/$customerId')({
   component: CustomerScreen,
@@ -194,7 +199,7 @@ function CustomerGroup({
     <section aria-labelledby="customer-group">
       <h2 id="customer-group">Groupe</h2>
       <div className="row-actions">
-        <p>{name}</p>
+        <span>{name}</span>
         <Button
           {...(canReadGroups
             ? blocked
@@ -246,52 +251,52 @@ function SenderIds({
     queryFn: () =>
       orRefusal(
         api.GET('/customers/{customerId}/sender-ids', { params: { path: { customerId } } }),
-        'Les sender IDs n’ont pas pu être lus',
+        'Les noms d’expéditeur n’ont pas pu être lus',
       ),
     retry: false,
   })
   const register = (
     <Button {...blocked} onClick={onRegister} size="sm" variant="primary">
-      Enregistrer un sender ID
+      Enregistrer un nom d’expéditeur
     </Button>
   )
 
   return (
     <section aria-labelledby="customer-senders">
       <div className="page__head">
-        <h2 id="customer-senders">Sender IDs</h2>
+        <h2 id="customer-senders">Noms d’expéditeur</h2>
         {register}
       </div>
       {senders.isPending ? (
-        <LoadingState label="Chargement des sender IDs…">
+        <LoadingState label="Chargement des noms d’expéditeur…">
           <Skeleton height={38} />
         </LoadingState>
       ) : senders.isError ? (
         <ErrorState
           description={senders.error.message}
           onRetry={() => void senders.refetch()}
-          title="Les sender IDs n’ont pas pu être chargés"
+          title="Les noms d’expéditeur n’ont pas pu être chargés"
           titleAs="h3"
         />
       ) : senders.data.length === 0 ? (
         <EmptyState
-          description="Un sender ID enregistré naît en attente d’approbation de l’opérateur télécom."
-          title="Aucun sender ID pour l’instant"
+          description="Un nom d’expéditeur enregistré naît en attente d’approbation de l’opérateur télécom."
+          title="Aucun nom d’expéditeur pour l’instant"
           titleAs="h3"
         />
       ) : (
         <DataTable
-          caption="Sender IDs du client"
+          caption="Noms d’expéditeur du client"
           columns={[
             {
               key: 'address',
-              header: 'Adresse',
+              header: 'Nom',
               cell: (sender: SenderId) => <span className="mono">{sender.address}</span>,
             },
             {
               key: 'status',
               header: 'Statut',
-              cell: (sender: SenderId) => <span className="mono">{sender.status}</span>,
+              cell: (sender: SenderId) => SENDER_STATUS_LABELS[sender.status],
             },
             {
               key: 'createdAt',
@@ -351,7 +356,7 @@ function SenderStatusToggle({
           params: { path: { customerId, senderId: sender.id } },
           body: { status: next },
         }),
-        'Le sender ID n’a pas été modifié',
+        'Le nom d’expéditeur n’a pas été modifié',
       ),
     onSuccess: async (changed) => {
       await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
@@ -558,13 +563,13 @@ function ConfirmSuspend({
             onClick={() => suspend.mutate()}
             variant="danger"
           >
-            Suspendre le client
+            Suspendre
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Suspendre ${customer.name}`}
+      title={`Suspendre ${customer.name} ?`}
     >
       <Refusal error={suspend.error ?? impact.error} />
       {impact.isPending ? (
@@ -572,7 +577,13 @@ function ConfirmSuspend({
           <Skeleton height={20} />
         </LoadingState>
       ) : impact.isSuccess ? (
-        <p>{suspensionConsequence(impact.data)} Action journalisée.</p>
+        <>
+          <p>{suspensionConsequence(impact.data)}</p>
+          <p>
+            Le client pourra être réactivé ensuite. L’action est enregistrée dans le journal
+            d’audit.
+          </p>
+        </>
       ) : null}
     </Modal>
   )
@@ -583,20 +594,25 @@ function suspensionConsequence({
   activeAccounts,
   closedAccounts,
 }: components['schemas']['SuspensionImpact']) {
-  if (accounts === 0) return 'Le client n’a aucun compte SMPP.'
-  const cut = 'La passerelle refuse tout nouveau bind et tente de couper les sessions ouvertes.'
-  if (accounts === 1) {
-    const reopened = closedAccounts === 1 ? ' Fermé, il redevient suspendu, donc réactivable.' : ''
-    return `Son compte est suspendu avec lui : il ne peut plus envoyer, en SMPP comme en REST. ${cut}${reopened}`
-  }
-  const active = activeAccounts === 1 ? '1 actif' : `${activeAccounts} actifs`
+  if (accounts === 0)
+    return 'Ce client n’a aucun compte SMPP : la suspension n’interrompt aucun envoi.'
+  const counted =
+    accounts === 1
+      ? 'Son compte SMPP sera suspendu'
+      : `Ses ${accounts} comptes SMPP seront suspendus`
+  const active =
+    accounts === 1 || activeAccounts === accounts
+      ? ''
+      : activeAccounts === 1
+        ? ', dont 1 actif'
+        : `, dont ${activeAccounts} actifs`
   const reopened =
     closedAccounts === 0
       ? ''
       : closedAccounts === 1
-        ? ' Son compte fermé redevient suspendu, donc réactivable.'
-        : ` Ses ${closedAccounts} comptes fermés redeviennent suspendus, donc réactivables.`
-  return `Ses ${accounts} comptes, dont ${active}, sont suspendus avec lui : aucun ne peut plus envoyer, en SMPP comme en REST. ${cut}${reopened}`
+        ? ' Un compte fermé repassera suspendu, et pourra donc être réactivé.'
+        : ` ${closedAccounts} comptes fermés repasseront suspendus, et pourront donc être réactivés.`
+  return `${counted}${active} : plus aucun SMS ne pourra être envoyé, en SMPP comme en REST, et la passerelle tentera de couper les sessions ouvertes.${reopened}`
 }
 
 function ConfirmReactivate({
@@ -633,19 +649,20 @@ function ConfirmReactivate({
             onClick={() => reactivate.mutate()}
             variant="primary"
           >
-            Réactiver le client
+            Réactiver
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Réactiver ${customer.name}`}
+      title={`Réactiver ${customer.name} ?`}
     >
       <Refusal error={reactivate.error} />
       <p>
-        Ses comptes restent suspendus : la passerelle ne les réactive pas avec lui. Action
-        journalisée.
+        Le client redevient actif, mais ses comptes SMPP restent suspendus : ils ne pourront pas
+        envoyer de SMS tant qu’ils ne seront pas réactivés un par un.
       </p>
+      <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
   )
 }
@@ -663,7 +680,7 @@ function RegisterSender({
     mutationFn: (body: { address: string }) =>
       orRefusal(
         api.POST('/customers/{customerId}/sender-ids', { params: { path: { customerId } }, body }),
-        'Le sender ID n’a pas été enregistré',
+        'Le nom d’expéditeur n’a pas été enregistré',
       ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
@@ -694,7 +711,7 @@ function RegisterSender({
       }
       onClose={onClose}
       open
-      title="Enregistrer un sender ID"
+      title="Enregistrer un nom d’expéditeur"
     >
       <form
         className="form"
@@ -703,13 +720,14 @@ function RegisterSender({
         onSubmit={form.handleSubmit((values) => register.mutate(values))}
       >
         <p>
-          Le sender ID naît en attente d’approbation de l’opérateur télécom. Action journalisée.
+          Le nom d’expéditeur naît en attente d’approbation de l’opérateur télécom. Action
+          journalisée.
         </p>
         <Refusal error={placed ? null : register.error} />
         <Field
           error={form.formState.errors.address?.message}
-          hint="Alphanumérique ou numéro, 20 caractères au plus."
-          label="Adresse"
+          hint="De 2 à 11 caractères : lettres, chiffres, espaces, + et -."
+          label="Nom"
         >
           <Input
             autoComplete="off"
@@ -741,7 +759,7 @@ function ConfirmDeleteSender({
         api.DELETE('/customers/{customerId}/sender-ids/{senderId}', {
           params: { path: { customerId, senderId: sender.id } },
         }),
-        'Le sender ID n’a pas été supprimé',
+        'Le nom d’expéditeur n’a pas été supprimé',
       ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
@@ -755,19 +773,20 @@ function ConfirmDeleteSender({
         <>
           <Button onClick={onClose}>Annuler</Button>
           <Button loading={remove.isPending} onClick={() => remove.mutate()} variant="danger">
-            Supprimer le sender ID
+            Supprimer
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Supprimer ${sender.address}`}
+      title={`Supprimer le nom d’expéditeur ${sender.address} ?`}
     >
       <Refusal error={remove.error} />
       <p>
-        L’adresse quitte la liste du client ; la réenregistrer repart de l’approbation. Action
-        journalisée.
+        {sender.address} disparaîtra de la liste du client. Pour l’utiliser de nouveau, il faudra
+        l’enregistrer et attendre une nouvelle approbation de l’opérateur télécom.
       </p>
+      <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
   )
 }

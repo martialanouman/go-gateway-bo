@@ -14,6 +14,14 @@ import { BREAKER_STATES, DELIVERY_TONES, ENTITY_TONES, LINK_TONES, StatusPill } 
  * Déduire la dimension de la valeur peindrait un client résilié en pilule verte « circuit sain » ;
  * c'est cette devinette qu'on vérifie absente.
  */
+describe('StatusPill — entity', () => {
+  it('reads a customer or account status in French', () => {
+    render(<StatusPill kind="entity" state="suspended" />)
+
+    expect(screen.getByText('Suspendu')).toBeInTheDocument()
+  })
+})
+
 describe('StatusPill — link_status', () => {
   it('renders a dot and the API label, in snake_case', () => {
     // C'est ce qu'un opérateur grep dans les logs : le traduire couperait le lien entre l'écran et
@@ -118,7 +126,7 @@ describe('StatusPill — the dimension is declared, never guessed', () => {
     // intervention, et la peindre en alerte enverrait chercher une panne qui n'existe pas.
     expect(container.querySelector('.ui-breaker')).toBeNull()
     expect(container.querySelector('.ui-dot--idle')).not.toBeNull()
-    expect(screen.getByText('closed')).toBeInTheDocument()
+    expect(screen.getByText('Fermé')).toBeInTheDocument()
   })
 
   it('lets no value live in two dimensions at once', () => {

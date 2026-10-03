@@ -128,10 +128,10 @@ describe('the operators screen', () => {
 
     await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Désactiver' }))
     const dialog = await screen.findByRole('dialog', {
-      name: `Désactiver ${COLLEAGUE.displayName}`,
+      name: `Désactiver ${COLLEAGUE.displayName} ?`,
     })
-    expect(dialog).toHaveTextContent(/sessions sont fermées/)
-    await user.click(within(dialog).getByRole('button', { name: 'Désactiver le compte' }))
+    expect(dialog).toHaveTextContent(/sessions seront fermées/)
+    await user.click(within(dialog).getByRole('button', { name: 'Désactiver' }))
 
     expect(
       await row(COLLEAGUE.email).findByRole('button', { name: 'Réactiver' }),
@@ -306,9 +306,9 @@ describe('the operators screen', () => {
 
     await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Désactiver' }))
     const dialog = await screen.findByRole('dialog', {
-      name: `Désactiver ${COLLEAGUE.displayName}`,
+      name: `Désactiver ${COLLEAGUE.displayName} ?`,
     })
-    await user.click(within(dialog).getByRole('button', { name: 'Désactiver le compte' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Désactiver' }))
 
     expect(await within(dialog).findByText('Le compte reste actif.')).toBeInTheDocument()
   })
@@ -395,7 +395,9 @@ describe('the operators screen', () => {
     await user.click(row(SELF.email).getByRole('button', { name: 'Envoyer un lien' }))
 
     expect(
-      await screen.findByRole('dialog', { name: `Envoyer un lien à ${SELF.displayName}` }),
+      await screen.findByRole('dialog', {
+        name: `Envoyer un lien de réinitialisation à ${SELF.displayName} ?`,
+      }),
     ).toBeInTheDocument()
   })
 
@@ -405,11 +407,11 @@ describe('the operators screen', () => {
 
     await user.click(row(COLLEAGUE.email).getByRole('button', { name: 'Envoyer un lien' }))
     const dialog = await screen.findByRole('dialog', {
-      name: `Envoyer un lien à ${COLLEAGUE.displayName}`,
+      name: `Envoyer un lien de réinitialisation à ${COLLEAGUE.displayName} ?`,
     })
-    expect(dialog).toHaveTextContent(/Rien ne change avant son usage/)
-    expect(dialog).toHaveTextContent(/second facteur est retiré/)
-    await user.click(within(dialog).getByRole('button', { name: 'Envoyer le lien' }))
+    expect(dialog).toHaveTextContent(/Rien ne changera avant son usage/)
+    expect(dialog).toHaveTextContent(/second facteur sera retiré/)
+    await user.click(within(dialog).getByRole('button', { name: 'Envoyer' }))
 
     await waitFor(() =>
       expect(
@@ -430,9 +432,9 @@ describe('the operators screen', () => {
 
     await user.click(row(pending.email).getByRole('button', { name: 'Envoyer un lien' }))
     const dialog = await screen.findByRole('dialog', {
-      name: `Envoyer un lien à ${pending.displayName}`,
+      name: `Envoyer un lien d’activation à ${pending.displayName} ?`,
     })
     expect(dialog).toHaveTextContent(/72 heures/)
-    expect(dialog).toHaveTextContent(/lien envoyé plus tôt cesse de valoir/)
+    expect(dialog).toHaveTextContent(/lien envoyé plus tôt cessera de valoir/)
   })
 })

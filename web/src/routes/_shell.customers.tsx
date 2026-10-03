@@ -6,6 +6,7 @@ import {
   Button,
   DataTable,
   EmptyState,
+  ENTITY_LABELS,
   ErrorState,
   Field,
   Input,
@@ -113,7 +114,7 @@ function CustomersScreen() {
           }
           options={[
             { value: ALL, label: 'Tous les statuts' },
-            ...STATUSES.map((value) => ({ value, label: value })),
+            ...STATUSES.map((value) => ({ value, label: ENTITY_LABELS[value] })),
           ]}
           size="sm"
           value={status ?? ALL}
@@ -283,7 +284,8 @@ function CreateCustomer({
       >
         <p>
           Le client naît actif, sans compte ni sender ID ; sa facturation et sa politique de contenu
-          gardent les réglages par défaut de la passerelle. Action journalisée.
+          gardent les réglages par défaut de la passerelle. L’action est enregistrée dans le journal
+          d’audit.
         </p>
         <Refusal error={placed ? null : create.error} />
         <Field error={form.formState.errors.name?.message} label="Nom">

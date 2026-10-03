@@ -45,15 +45,17 @@ describe('the customer screen', () => {
     })
 
     await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
-    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name}` })
+    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name} ?` })
 
     expect(
-      await within(dialog).findByText(/Ses 3 comptes, dont 1 actif, sont suspendus avec lui/),
+      await within(dialog).findByText(/Ses 3 comptes SMPP seront suspendus, dont 1 actif/),
     ).toBeInTheDocument()
-    expect(dialog).toHaveTextContent('Son compte fermé redevient suspendu, donc réactivable.')
+    expect(dialog).toHaveTextContent(
+      'Un compte fermé repassera suspendu, et pourra donc être réactivé.',
+    )
     expect(sent(fetch, SUSPEND)).toBe(false)
 
-    await user.click(within(dialog).getByRole('button', { name: 'Suspendre le client' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Suspendre' }))
 
     expect(await screen.findByRole('button', { name: 'Réactiver' })).toBeInTheDocument()
     expect(sent(fetch, SUSPEND)).toBe(true)
@@ -65,11 +67,14 @@ describe('the customer screen', () => {
     open(WRITER)
 
     await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
-    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name}` })
+    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name} ?` })
 
-    expect(await within(dialog).findByText(/Le client n’a aucun compte SMPP\./)).toHaveTextContent(
-      'Le client n’a aucun compte SMPP. Action journalisée.',
-    )
+    expect(
+      await within(dialog).findByText(
+        'Ce client n’a aucun compte SMPP : la suspension n’interrompt aucun envoi.',
+      ),
+    ).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('plus aucun SMS')
   })
 
   it('refuses to suspend while the impact cannot be read', async () => {
@@ -84,7 +89,7 @@ describe('the customer screen', () => {
     await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByText('Passerelle muette.')
-    await user.click(within(dialog).getByRole('button', { name: 'Suspendre le client' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Suspendre' }))
 
     expect(sent(fetch, SUSPEND)).toBe(false)
   })
@@ -92,7 +97,7 @@ describe('the customer screen', () => {
   it('disables and explains every change without customers:write', async () => {
     open(READER)
 
-    for (const name of ['Renommer', 'Suspendre', 'Enregistrer un sender ID']) {
+    for (const name of ['Renommer', 'Suspendre', 'Enregistrer un nom d’expéditeur']) {
       const control = await screen.findByRole('button', { name })
       expect(control).toHaveAttribute('aria-disabled', 'true')
       expect(control).toHaveAccessibleDescription('Modifier un client demande customers:write.')
@@ -101,7 +106,7 @@ describe('the customer screen', () => {
 
   it('places an address the customer already registered under its field', async () => {
     const user = userEvent.setup()
-    const refusal = 'Ce client a déjà enregistré cette adresse.'
+    const refusal = 'Ce client a déjà enregistré ce nom.'
     open(WRITER, {
       [`POST /api/customers/${ACME.id}/sender-ids`]: {
         status: 409,
@@ -113,14 +118,14 @@ describe('the customer screen', () => {
       },
     })
 
-    await user.click(await screen.findByRole('button', { name: 'Enregistrer un sender ID' }))
+    await user.click(await screen.findByRole('button', { name: 'Enregistrer un nom d’expéditeur' }))
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByRole('textbox', { name: 'Adresse' }), 'ACME')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Nom' }), 'ACME')
     await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }))
 
-    expect(
-      await within(dialog).findByRole('textbox', { name: 'Adresse' }),
-    ).toHaveAccessibleDescription(refusal)
+    expect(await within(dialog).findByRole('textbox', { name: 'Nom' })).toHaveAccessibleDescription(
+      refusal,
+    )
     expect(dialog.querySelector('.form-refusal')).toBeNull()
   })
 
@@ -129,9 +134,9 @@ describe('the customer screen', () => {
     open(WRITER, {}, { customers: [{ ...ACME, status: 'suspended' }] })
 
     await user.click(await screen.findByRole('button', { name: 'Réactiver' }))
-    const dialog = await screen.findByRole('dialog', { name: `Réactiver ${ACME.name}` })
-    expect(dialog).toHaveTextContent('Ses comptes restent suspendus')
-    await user.click(within(dialog).getByRole('button', { name: 'Réactiver le client' }))
+    const dialog = await screen.findByRole('dialog', { name: `Réactiver ${ACME.name} ?` })
+    expect(dialog).toHaveTextContent('ses comptes SMPP restent suspendus')
+    await user.click(within(dialog).getByRole('button', { name: 'Réactiver' }))
 
     expect(await screen.findByRole('button', { name: 'Suspendre' })).toBeInTheDocument()
   })
@@ -184,13 +189,15 @@ describe('the customer screen', () => {
     const row = (await screen.findByRole('cell', { name: 'ACME' })).closest('tr') as HTMLElement
     await user.click(within(row).getByRole('button', { name: 'Approuver ACME' }))
     expect(await within(row).findByRole('button', { name: 'Désactiver ACME' })).toBeInTheDocument()
-    expect(row).toHaveTextContent('active')
+    expect(row).toHaveTextContent('Approuvé')
 
     await user.click(within(row).getByRole('button', { name: 'Supprimer ACME' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Supprimer ACME' })
-    await user.click(within(dialog).getByRole('button', { name: 'Supprimer le sender ID' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Supprimer le nom d’expéditeur ACME ?',
+    })
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer' }))
 
-    expect(await screen.findByText('Aucun sender ID pour l’instant')).toBeInTheDocument()
+    expect(await screen.findByText('Aucun nom d’expéditeur pour l’instant')).toBeInTheDocument()
   })
 
   it('names an unknown customer instead of an empty page', async () => {
@@ -206,13 +213,34 @@ describe('the customer screen', () => {
     const user = userEvent.setup()
     open(WRITER)
 
-    await user.click(await screen.findByRole('button', { name: 'Enregistrer un sender ID' }))
+    await user.click(await screen.findByRole('button', { name: 'Enregistrer un nom d’expéditeur' }))
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByRole('textbox', { name: 'Adresse' }), 'ACME{Enter}')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Nom' }), 'ACME{Enter}')
 
     const row = (await screen.findByRole('cell', { name: 'ACME' })).closest('tr') as HTMLElement
-    expect(row).toHaveTextContent('pending_carrier_approval')
+    expect(row).toHaveTextContent('En attente d’approbation')
     expect(within(row).getByRole('button', { name: 'Approuver ACME' })).toBeInTheDocument()
+  })
+
+  it('holds a sender name to 2-11 letters, digits, spaces, + and - before anything leaves', async () => {
+    const user = userEvent.setup()
+    const fetch = open(WRITER)
+
+    await user.click(await screen.findByRole('button', { name: 'Enregistrer un nom d’expéditeur' }))
+    const name = within(await screen.findByRole('dialog')).getByRole('textbox', { name: 'Nom' })
+    await user.type(name, 'A{Enter}')
+    await waitFor(() => expect(name).toHaveAccessibleDescription(/trop courte : 2 caractères/))
+    await user.clear(name)
+    await user.type(name, 'ABCDEFGHIJKL{Enter}')
+    await waitFor(() => expect(name).toHaveAccessibleDescription(/trop longue : 11 caractères/))
+    await user.clear(name)
+    await user.type(name, 'ACME!{Enter}')
+    await waitFor(() => expect(name).toHaveAccessibleDescription(/caractère non accepté/))
+    await user.clear(name)
+    await user.type(name, 'INFO +225-1')
+    expect(name).not.toHaveAccessibleDescription(/non accepté|trop/)
+
+    expect(sent(fetch, `POST /api/customers/${ACME.id}/sender-ids`)).toBe(false)
   })
 
   it('announces a sender ID the gateway refused to change', async () => {
