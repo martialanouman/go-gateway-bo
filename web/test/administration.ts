@@ -8,6 +8,7 @@ type Group = components['schemas']['CustomerGroup']
 type Customer = components['schemas']['Customer']
 type SenderId = components['schemas']['SenderId']
 type Account = components['schemas']['SmppAccount']
+type Webhook = components['schemas']['Webhook']
 
 /** L'opérateur de la session, tel que `stubSession` le rend dans `GET /auth/me`. */
 export const SELF_ID = '01960000-0000-7000-8000-000000000001'
@@ -78,6 +79,21 @@ export const ACME: Customer = {
   updatedAt: '2026-09-02T08:00:00Z',
 }
 
+export const OTP_ACCOUNT: Account = {
+  id: '0192b3c4-0000-7000-8000-0000000a0001',
+  customerId: ACME.id,
+  name: 'trafic-otp',
+  status: 'active',
+  smppEnabled: true,
+  restEnabled: true,
+  querySmEnabled: true,
+  cancelSmEnabled: true,
+  createdAt: '2026-10-01T08:00:00Z',
+}
+
+/** Le secret que le faux BFF rend à la création et à la rotation d'un webhook. */
+export const WEBHOOK_SECRET = 'c2VjcmV0LWRlLXRlc3QtcXVpLW5lLXNlcnQtcXUnaWNp'
+
 type Reply = { readonly status: number; readonly body?: unknown }
 
 /** Un refus que le test veut voir rendu, route par route. */
@@ -99,6 +115,7 @@ export function stubAdministration(
     customerPageSize?: number
     senders?: SenderId[]
     accounts?: Account[]
+    webhooks?: Webhook[]
   } = {},
   replies: AdministrationReplies = {},
 ) {
@@ -109,6 +126,7 @@ export function stubAdministration(
   let customers = [...(initial.customers ?? [ACME])]
   let senders = [...(initial.senders ?? [])]
   let accounts = [...(initial.accounts ?? [])]
+  let webhooks = [...(initial.webhooks ?? [])]
   const customerPageSize = initial.customerPageSize ?? 50
 
   const fetch = vi.fn(async (request: Request) => {
@@ -117,7 +135,7 @@ export function stubAdministration(
     const declared = replies[route]
     if (declared !== undefined) return respond(declared)
 
-    const [, , collection, id, detail, detailId] = pathname.split('/')
+    const [, , collection, id, detail, detailId, detailAction] = pathname.split('/')
     // `POST /operators/{id}/access-link` n'a pas de corps ; `request.json()` sur un flux vide lève.
     const raw = request.method === 'GET' || request.method === 'DELETE' ? '' : await request.text()
     const body = raw ? JSON.parse(raw) : undefined
@@ -189,11 +207,47 @@ export function stubAdministration(
       return new Response(null, { status: 204 })
     }
 
+    if (collection === 'accounts' && id !== undefined) {
+      const target = accounts.find((account) => account.id === id)
+      if (target === undefined) return respond({ status: 404, body: refusal('not_found') })
+      if (detail === 'webhooks') {
+        if (request.method === 'POST' && detailId === undefined) {
+          const created: Webhook = {
+            id: `webhook-${webhooks.length + 1}`,
+            status: 'active',
+            ...body,
+          }
+          webhooks = [...webhooks, created]
+          return Response.json({ webhook: created, secret: WEBHOOK_SECRET }, { status: 201 })
+        }
+        const webhook = webhooks.find((candidate) => candidate.id === detailId)
+        if (detailAction === 'secret') return Response.json({ webhook, secret: WEBHOOK_SECRET })
+        if (request.method === 'PATCH') {
+          webhooks = webhooks.map((candidate) =>
+            candidate.id === detailId ? { ...candidate, ...body } : candidate,
+          )
+          return Response.json(webhooks.find((candidate) => candidate.id === detailId))
+        }
+        if (request.method === 'DELETE') {
+          webhooks = webhooks.filter((candidate) => candidate.id !== detailId)
+          return new Response(null, { status: 204 })
+        }
+        return Response.json(webhooks)
+      }
+      const updated = request.method === 'PUT' ? { ...target, ...body } : target
+      accounts = accounts.map((account) => (account.id === id ? updated : account))
+      return Response.json(updated)
+    }
+
     if (collection === 'accounts') {
       if (request.method === 'POST') {
         const created: Account = {
           id: `account-${accounts.length + 1}`,
           status: 'active',
+          smppEnabled: true,
+          restEnabled: true,
+          querySmEnabled: true,
+          cancelSmEnabled: true,
           createdAt: '2026-10-03T08:00:00Z',
           ...body,
         }

@@ -114,7 +114,7 @@ func TestARelayedActionIsAuditedBeforeTheCall(t *testing.T) {
 	assert.Equal(t, 1, seenBeforeTheCall, "l'intention n'était pas écrite quand l'appel est parti")
 	require.Len(t, trail.lines, 2)
 	assert.JSONEq(t, `{"name":"Revendeurs","outcome":"attempted"}`, trail.lines[0].after)
-	assert.JSONEq(t, `{"name":"Revendeurs","outcome":"succeeded","status":"201"}`, trail.lines[1].after)
+	assert.JSONEq(t, `{"name":"Revendeurs","outcome":"succeeded","http_status":"201"}`, trail.lines[1].after)
 }
 
 func TestARelayedActionIsNotCalledWhenItCannotBeAudited(t *testing.T) {
@@ -145,5 +145,5 @@ func TestARefusedRelayedActionIsAuditedAsFailed(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, trail.lines, 2)
-	assert.JSONEq(t, `{"outcome":"failed","status":"422"}`, trail.lines[1].after)
+	assert.JSONEq(t, `{"outcome":"failed","http_status":"422"}`, trail.lines[1].after)
 }

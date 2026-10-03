@@ -1421,6 +1421,188 @@ paths:
         '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
         '503': { $ref: '#/components/responses/PasserelleIndisponible' }
 
+  /accounts/{accountId}:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      operationId: getAccount
+      summary: La fiche d'un compte SMPP
+      description: Relayée vers `get-smpp-account`. La politique de sender ID n'est pas exposée (ADR-0020).
+      responses:
+        '200':
+          description: Le compte.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmppAccount' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/CompteInconnu' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /accounts/{accountId}/channels:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    put:
+      operationId: setAccountChannels
+      summary: Active ou coupe les canaux SMPP et REST d'un compte
+      description: Relayée vers `set-account-channels`. Un canal au moins reste actif.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountChannels' }
+      responses:
+        '200':
+          description: Le compte modifié.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmppAccount' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/CompteInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /accounts/{accountId}/smpp-ops:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    put:
+      operationId: setAccountSmppOps
+      summary: Autorise ou refuse query_sm et cancel_sm
+      description: |
+        Relayée vers `set-account-smpp-ops`. Tout changement coupe les binds vivants du compte, qui se
+        reconnectent sous le nouveau réglage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountSmppOps' }
+      responses:
+        '200':
+          description: Le compte modifié.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmppAccount' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/CompteInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /accounts/{accountId}/webhooks:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      operationId: listWebhooks
+      summary: Les webhooks MO et DLR d'un compte
+      description: Relayée vers `list-webhooks`. Le secret de signature n'est jamais rendu.
+      responses:
+        '200':
+          description: Tous les webhooks du compte.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Webhook' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/CompteInconnu' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    post:
+      operationId: createWebhook
+      summary: Crée le webhook d'un type d'événement
+      description: |
+        Relayée vers `create-webhook`. Le BFF engendre le secret de signature et le rend dans cette
+        réponse seulement : il n'est ni conservé ni réaffiché (invariant b).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookCreation' }
+      responses:
+        '201':
+          description: Le webhook créé, et son secret, montré cette fois seulement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookSecret' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/CompteInconnu' }
+        '409': { $ref: '#/components/responses/TypeDeWebhookPris' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /accounts/{accountId}/webhooks/{webhookId}:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+      - $ref: '#/components/parameters/WebhookId'
+    patch:
+      operationId: updateWebhook
+      summary: Change l'URL d'un webhook, ou l'active et le désactive
+      description: Relayée vers `update-webhook`, sans secret ni politique de reprise.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookUpdate' }
+      responses:
+        '200':
+          description: Le webhook modifié.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Webhook' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/WebhookInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    delete:
+      operationId: deleteWebhook
+      summary: Supprime un webhook
+      description: Relayée vers `delete-webhook`.
+      responses:
+        '204':
+          description: Le webhook est supprimé.
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/WebhookInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /accounts/{accountId}/webhooks/{webhookId}/secret:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+      - $ref: '#/components/parameters/WebhookId'
+    post:
+      operationId: rotateWebhookSecret
+      summary: Remplace le secret de signature d'un webhook
+      description: |
+        Relayée vers `update-webhook` avec le secret seul. L'ancien secret cesse aussitôt de signer :
+        aucune fenêtre de grâce. Le nouveau n'est rendu que dans cette réponse (invariant b).
+      responses:
+        '200':
+          description: Le webhook, et son nouveau secret, montré cette fois seulement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookSecret' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/WebhookInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
 components:
   parameters:
     OperatorId:
@@ -1445,6 +1627,16 @@ components:
       schema: { type: string }
     SenderIdParam:
       name: senderId
+      in: path
+      required: true
+      schema: { type: string }
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema: { type: string }
+    WebhookId:
+      name: webhookId
       in: path
       required: true
       schema: { type: string }
@@ -1484,6 +1676,23 @@ components:
     NomDeComptePris:
       description: |
         Ce client a déjà un compte de ce nom ; `errors[]` place le refus sous `name`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    CompteInconnu:
+      description: Aucun compte SMPP ne porte cet identifiant.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    WebhookInconnu:
+      description: Ce compte n'a aucun webhook de cet identifiant.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TypeDeWebhookPris:
+      description: |
+        Ce compte a déjà un webhook pour ce type d'événement ; `errors[]` place le refus sous
+        `eventType`.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -2375,8 +2584,67 @@ components:
         customerId: { type: string }
         name: { type: string }
         status: { $ref: '#/components/schemas/CustomerStatus' }
+        smppEnabled: { type: boolean }
+        restEnabled: { type: boolean }
+        querySmEnabled: { type: boolean }
+        cancelSmEnabled: { type: boolean }
         createdAt: { type: string, format: date-time }
-      required: [id, customerId, name, status, createdAt]
+      required: [id, customerId, name, status, smppEnabled, restEnabled, querySmEnabled, cancelSmEnabled, createdAt]
+
+    AccountChannels:
+      type: object
+      additionalProperties: false
+      properties:
+        smppEnabled: { type: boolean }
+        restEnabled: { type: boolean }
+      required: [smppEnabled, restEnabled]
+
+    AccountSmppOps:
+      type: object
+      additionalProperties: false
+      properties:
+        querySmEnabled: { type: boolean }
+        cancelSmEnabled: { type: boolean }
+      required: [querySmEnabled, cancelSmEnabled]
+
+    WebhookEventType:
+      type: string
+      enum: [mo, dlr]
+
+    Webhook:
+      type: object
+      additionalProperties: false
+      description: Jamais de secret ici ; seul `WebhookSecret` le porte, une fois.
+      properties:
+        id: { type: string }
+        eventType: { $ref: '#/components/schemas/WebhookEventType' }
+        url: { type: string }
+        status: { type: string, enum: [active, disabled] }
+      required: [id, eventType, url, status]
+
+    WebhookSecret:
+      type: object
+      additionalProperties: false
+      properties:
+        webhook: { $ref: '#/components/schemas/Webhook' }
+        secret: { type: string }
+      required: [webhook, secret]
+
+    WebhookCreation:
+      type: object
+      additionalProperties: false
+      properties:
+        eventType: { $ref: '#/components/schemas/WebhookEventType' }
+        url: { type: string, format: uri, pattern: '^https?://[^/]' }
+      required: [eventType, url]
+
+    WebhookUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        url: { type: string, format: uri, pattern: '^https?://[^/]' }
+        status: { type: string, enum: [active, disabled] }
 
     AccountPage:
       type: object

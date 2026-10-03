@@ -85,8 +85,9 @@ func auditRelayed(ctx context.Context, record func(context.Context, store.Event)
 	}
 
 	event.After = event.After.Text("outcome", outcome)
+	// `http_status` et non `status` : le statut métier de l'objet, posé par le handler, porte ce nom.
 	if status != 0 {
-		event.After = event.After.Text("status", strconv.Itoa(status))
+		event.After = event.After.Text("http_status", strconv.Itoa(status))
 	}
 
 	// Hors de l'annulation de la requête : un onglet fermé pendant l'appel ne doit pas effacer l'issue.

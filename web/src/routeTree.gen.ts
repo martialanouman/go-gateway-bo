@@ -34,6 +34,7 @@ import { Route as ShellScriptsRouteImport } from './routes/_shell.scripts'
 import { Route as ShellSessionsRouteImport } from './routes/_shell.sessions'
 import { Route as ShellSuppressionsRouteImport } from './routes/_shell.suppressions'
 import { Route as ShellTrafficRouteImport } from './routes/_shell.traffic'
+import { Route as ShellAccountsAccountIdRouteImport } from './routes/_shell.accounts_.$accountId'
 import { Route as ShellCustomersCustomerIdRouteImport } from './routes/_shell.customers_.$customerId'
 
 const DesignRoute = DesignRouteImport.update({
@@ -160,6 +161,11 @@ const ShellTrafficRoute = ShellTrafficRouteImport.update({
   path: '/traffic',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellAccountsAccountIdRoute = ShellAccountsAccountIdRouteImport.update({
+  id: '/accounts_/$accountId',
+  path: '/accounts/$accountId',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellCustomersCustomerIdRoute =
   ShellCustomersCustomerIdRouteImport.update({
     id: '/customers_/$customerId',
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/sessions': typeof ShellSessionsRoute
   '/suppressions': typeof ShellSuppressionsRoute
   '/traffic': typeof ShellTrafficRoute
+  '/accounts/$accountId': typeof ShellAccountsAccountIdRoute
   '/customers/$customerId': typeof ShellCustomersCustomerIdRoute
 }
 export interface FileRoutesByTo {
@@ -219,6 +226,7 @@ export interface FileRoutesByTo {
   '/suppressions': typeof ShellSuppressionsRoute
   '/traffic': typeof ShellTrafficRoute
   '/': typeof ShellIndexRoute
+  '/accounts/$accountId': typeof ShellAccountsAccountIdRoute
   '/customers/$customerId': typeof ShellCustomersCustomerIdRoute
 }
 export interface FileRoutesById {
@@ -248,6 +256,7 @@ export interface FileRoutesById {
   '/_shell/suppressions': typeof ShellSuppressionsRoute
   '/_shell/traffic': typeof ShellTrafficRoute
   '/_shell/': typeof ShellIndexRoute
+  '/_shell/accounts_/$accountId': typeof ShellAccountsAccountIdRoute
   '/_shell/customers_/$customerId': typeof ShellCustomersCustomerIdRoute
 }
 export interface FileRouteTypes {
@@ -277,6 +286,7 @@ export interface FileRouteTypes {
     | '/sessions'
     | '/suppressions'
     | '/traffic'
+    | '/accounts/$accountId'
     | '/customers/$customerId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -304,6 +314,7 @@ export interface FileRouteTypes {
     | '/suppressions'
     | '/traffic'
     | '/'
+    | '/accounts/$accountId'
     | '/customers/$customerId'
   id:
     | '__root__'
@@ -332,6 +343,7 @@ export interface FileRouteTypes {
     | '/_shell/suppressions'
     | '/_shell/traffic'
     | '/_shell/'
+    | '/_shell/accounts_/$accountId'
     | '/_shell/customers_/$customerId'
   fileRoutesById: FileRoutesById
 }
@@ -521,6 +533,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellTrafficRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/accounts_/$accountId': {
+      id: '/_shell/accounts_/$accountId'
+      path: '/accounts/$accountId'
+      fullPath: '/accounts/$accountId'
+      preLoaderRoute: typeof ShellAccountsAccountIdRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/customers_/$customerId': {
       id: '/_shell/customers_/$customerId'
       path: '/customers/$customerId'
@@ -551,6 +570,7 @@ interface ShellRouteChildren {
   ShellSuppressionsRoute: typeof ShellSuppressionsRoute
   ShellTrafficRoute: typeof ShellTrafficRoute
   ShellIndexRoute: typeof ShellIndexRoute
+  ShellAccountsAccountIdRoute: typeof ShellAccountsAccountIdRoute
   ShellCustomersCustomerIdRoute: typeof ShellCustomersCustomerIdRoute
 }
 
@@ -574,6 +594,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellSuppressionsRoute: ShellSuppressionsRoute,
   ShellTrafficRoute: ShellTrafficRoute,
   ShellIndexRoute: ShellIndexRoute,
+  ShellAccountsAccountIdRoute: ShellAccountsAccountIdRoute,
   ShellCustomersCustomerIdRoute: ShellCustomersCustomerIdRoute,
 }
 
