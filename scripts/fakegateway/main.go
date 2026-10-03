@@ -33,6 +33,7 @@ func main() {
 	mux.Handle(fakegateway.CustomersPath+"/{id}", customers)
 	mux.Handle(fakegateway.CustomersPath+"/{id}/{action}", customers)
 	mux.Handle(fakegateway.CustomersPath+"/{id}/{action}/{senderId}", customers)
+	mux.HandleFunc("/admin/smpp-accounts", customers.ServeAccounts)
 	mux.HandleFunc("GET /control/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
