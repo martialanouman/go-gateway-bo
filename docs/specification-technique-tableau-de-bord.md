@@ -730,7 +730,7 @@ Deux niveaux (`content:read` pour lire un corps ; `content:erase` et `gdpr:erase
 
 *Amendement du 29/09/2026 — ADR-0020 et ADR-0021 de la passerelle, acceptées le 29/09/2026.*
 
-- **Tout expéditeur doit être enregistré**, numérique compris : un `source_addr` inconnu est rejeté par la passerelle. La politique de sender ID par compte disparaît, avec son écran et sa route. La page du client le dit à la place.
+- **Tout expéditeur doit être enregistré**, numérique compris : un `source_addr` inconnu est rejeté par la passerelle. La politique de sender ID par compte disparaît, avec son écran et sa route ; aucun écran ne rappelle la règle, qui va de soi (arbitré le 03/10/2026).
 - **Catégorie** (`otp` | `transactional` | `marketing`) sur chaque sender ID, **`marketing` par défaut**. Passer en `otp` ou `transactional` est un acte explicite : une confirmation nomme la conséquence (« ce trafic passera devant le marketing sur les connecteurs partagés »), et le changement est audité avec l'ancienne et la nouvelle valeur. Permission : `customers:write`.
 - **Limite de débit par sender ID** (messages/s, rafale) : l'engagement contractuel du flux, appliqué avant l'accusé de réception. Au-delà, le client reçoit un refus (`429` en REST, `ESME_RTHROTTLED` en SMPP) et **aucun CDR n'est écrit**. L'écran le dit, parce qu'un opérateur qui cherche un message refusé à l'admission ne le trouvera pas dans le CDR Explorer.
 - **Liste** : colonnes catégorie, limite, statut ; filtre par catégorie ; compteur de signalements `category_mismatch` récents par expéditeur, avec lien vers la file de revue (§6.6).

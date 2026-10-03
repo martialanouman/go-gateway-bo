@@ -417,7 +417,7 @@ l'écran Clients rendu selon ses permissions, crée un client, et l'action laiss
 > | Spec | Step |
 > |---|---|
 > | §6.19 sender IDs : catégorie, limite de débit, filtre, signalements | **step-067** (nouvelle, M3) |
-> | Politique de sender ID retirée ; la fiche dit que tout expéditeur doit être enregistré | step-064 |
+> | Politique de sender ID retirée : jamais exposée ni relayée (la règle « tout expéditeur enregistré » n'est pas rappelée à l'écran, arbitré le 03/10/2026) | step-064 |
 > | Connecteurs : `priority_flag_default`, `priority_tier` | step-083 |
 > | Trafic : ventilation par catégorie (débit, lag, attente) | step-082 |
 > | CDR : filtre par catégorie ; trace : catégorie et priorité effective | step-100, step-102 |
