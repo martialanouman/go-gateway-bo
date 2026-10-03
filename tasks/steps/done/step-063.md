@@ -1,6 +1,6 @@
 # step-063 — Comptes SMPP : liste + création rattachée au client
 
-> **Jalon :** M3 (plan §8 ; spec §1.1) · **Statut :** EN COURS
+> **Jalon :** M3 (plan §8 ; spec §1.1) · **Statut :** FAIT
 > **Dépend de :** step-062 · **Bloque :** step-064
 
 ## But
@@ -9,8 +9,8 @@ opérateur `accounts:write` crée un compte rattaché à un client, et l'action 
 
 ## Décisions (arbitrées sur le contexte, 03/10/2026)
 - **Contrat Admin : 6.10.0**, toujours la dernière publiée (relevé le 03/10/2026). Rien à relever.
-- **Une liste, `/accounts`**, filtrée par l'URL (`customerId`, `status`), « Afficher les suivants »
-  (plan §1.5). La fiche client y mène par un lien : un seul écran de liste, pas deux.
+- **Une liste, `/accounts`**, filtrée par l'URL sur un client, « Afficher les suivants »
+  (plan §1.5). Pas de filtre par statut : rien ne le demande encore. La fiche client y mène par un lien : un seul écran de liste, pas deux.
 - **Création depuis la liste filtrée sur un client** : c'est le client du filtre qui reçoit le compte,
   sans sélecteur de client (une liste paginée ne se choisit pas dans un `Select`). Hors filtre, le
   bouton est désactivé et dit par où passer.
@@ -34,6 +34,27 @@ opérateur `accounts:write` crée un compte rattaché à un client, et l'action 
   créer un, puis la suspension chiffre ce compte.
 - **Vitest** : création bloquée et expliquée hors filtre client ; `fetch` qui échoue s'annonce en
   français.
+
+## Tableau des mutations
+
+Jouées le 03/10/2026, après un commit, fichier restauré par `cp`, `-count=1`.
+
+| Mutation | Ce qui tombe |
+|---|---|
+| `CreateAccount` gardée par `accounts:read` | « sans accounts:write, la création d'un compte est refusée… » |
+| `customerId` non relayé | « le filtre par client atteint la passerelle » |
+| Cible de l'audit non posée | « créer un compte laisse sa trace… » |
+| 409 relayé sans le placer sous `name` | « un nom de compte déjà pris chez ce client… » |
+| `orRefusal` sans traduction de l'échec réseau | `names a request that never reached the dashboard in French` |
+
+## Critère 4
+- **Contre la vraie passerelle, rien n'est joué** : même obstacle que step-061.
+- **« Son compte est suspendu avec lui »** n'est gardé que par le parcours e2e.
+
+## Definition of Done
+- [x] `make check` vert hors `vuln-web`, rouge sur un avis publié ailleurs (braces) : PR #136.
+- [x] `make e2e` vert ; invariants (c) et DTO tenus, mutations à l'appui.
+- [x] Dette 063 payée, fichier supprimé.
 
 ## Hors périmètre
 - Fiche compte, canaux, bascules, webhooks : step-064. Quotas et `max_sessions` : step-065.
