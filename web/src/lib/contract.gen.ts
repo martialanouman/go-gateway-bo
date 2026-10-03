@@ -17,6 +17,11 @@ export const AccessLinkUse = z.object({
   token: z.string().max(64),
 })
 
+export const AccountCreation = z.object({
+  customerId: z.string(),
+  name: z.string().min(1),
+})
+
 export const CustomerCreation = z.object({
   groupId: z.string().optional(),
   name: z.string().min(1),

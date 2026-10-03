@@ -41,7 +41,7 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 		return w.receivedQuery(`"group_id":null`)
 	})
 	ctx.Given(`^une passerelle dont le client a (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.servingAccounts)
-	ctx.Given(`^une passerelle qui répond 409 à l'enregistrement d'un sender ID$`, func() error {
+	ctx.Given(`^une passerelle qui répond 409 (?:à l'enregistrement d'un sender ID|à la création)$`, func() error {
 		return w.answering(http.StatusConflict, `{"code":"conflict","message":"sender id already exists"}`)
 	})
 	ctx.Then(`^la réponse compte (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.countsAccounts)
@@ -81,7 +81,8 @@ func (w *customerGroupsWorld) failingWithMessage(message string) error {
 func (w *customerGroupsWorld) answering(status int, body string) error {
 	w.upstream = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// Le hub ouvre aussi ses flux temps réel sur cette adresse : seul l'appel relayé compte.
-		if strings.HasPrefix(r.URL.Path, "/admin/customer-groups") || strings.HasPrefix(r.URL.Path, "/admin/customers") {
+		if strings.HasPrefix(r.URL.Path, "/admin/customer-groups") || strings.HasPrefix(r.URL.Path, "/admin/customers") ||
+			strings.HasPrefix(r.URL.Path, "/admin/smpp-accounts") {
 			w.received.Add(1)
 			sent, _ := io.ReadAll(r.Body)
 			w.mu.Lock()
