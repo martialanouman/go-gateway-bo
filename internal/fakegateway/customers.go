@@ -40,6 +40,8 @@ type account struct {
 	Status           string    `json:"status"`
 	SmppEnabled      bool      `json:"smpp_enabled"`
 	RestEnabled      bool      `json:"rest_enabled"`
+	QuerySmEnabled   bool      `json:"query_sm_enabled"`
+	CancelSmEnabled  bool      `json:"cancel_sm_enabled"`
 	SenderIDPolicy   string    `json:"sender_id_policy"`
 	AllowedBindTypes string    `json:"allowed_bind_types"`
 	MaxSessions      int       `json:"max_sessions"`
@@ -55,6 +57,15 @@ type Customers struct {
 	customers []customer
 	senders   []senderID
 	accounts  []account
+	webhooks  []webhook
+}
+
+type webhook struct {
+	ID        string `json:"id"`
+	AccountID string `json:"account_id"`
+	EventType string `json:"event_type"`
+	URL       string `json:"url"`
+	Status    string `json:"status"`
 }
 
 // ServeAccounts sert list-smpp-accounts et create-smpp-account.
@@ -87,11 +98,61 @@ func (c *Customers) ServeAccounts(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	created := account{
 		ID: uuid.NewString(), CustomerID: body.CustomerID, Name: body.Name, Status: "active", SmppEnabled: true,
-		RestEnabled: true, SenderIDPolicy: "strict", AllowedBindTypes: "trx", MaxSessions: 1, CreatedAt: now,
+		RestEnabled: true, QuerySmEnabled: true, CancelSmEnabled: true, SenderIDPolicy: "strict", AllowedBindTypes: "trx", MaxSessions: 1, CreatedAt: now,
 		UpdatedAt: now,
 	}
 	c.accounts = append(c.accounts, created)
 	reply(w, http.StatusCreated, created)
+}
+
+// ServeAccount sert get-smpp-account, set-account-channels, list-webhooks et create-webhook : ce que
+// le parcours de la fiche compte traverse.
+func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	id := r.PathValue("id")
+
+	index := slices.IndexFunc(c.accounts, func(candidate account) bool { return candidate.ID == id })
+	if index < 0 {
+		reply(w, http.StatusNotFound, map[string]string{"code": "not_found", "message": "no such account"})
+
+		return
+	}
+
+	switch action := r.PathValue("action"); {
+	case action == "" && r.Method == http.MethodGet:
+		reply(w, http.StatusOK, c.accounts[index])
+	case action == "channels" && r.Method == http.MethodPatch:
+		var body struct {
+			SmppEnabled bool `json:"smpp_enabled"`
+			RestEnabled bool `json:"rest_enabled"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+
+		c.accounts[index].SmppEnabled, c.accounts[index].RestEnabled = body.SmppEnabled, body.RestEnabled
+		reply(w, http.StatusOK, c.accounts[index])
+	case action == "webhooks" && r.Method == http.MethodGet:
+		reply(w, http.StatusOK, slices.DeleteFunc(append([]webhook{}, c.webhooks...), func(candidate webhook) bool {
+			return candidate.AccountID != id
+		}))
+	case action == "webhooks" && r.Method == http.MethodPost:
+		var body struct {
+			EventType string `json:"event_type"`
+			URL       string `json:"url"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+
+		created := webhook{ID: uuid.NewString(), AccountID: id, EventType: body.EventType, URL: body.URL, Status: "active"}
+		c.webhooks = append(c.webhooks, created)
+		reply(w, http.StatusCreated, created)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
 }
 
 func (c *Customers) accountsOf(customerID string) []account {

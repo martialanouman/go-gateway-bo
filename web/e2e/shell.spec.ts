@@ -615,10 +615,28 @@ test('the binary serves the painted shell, then the application replaces it', as
   await nouveauCompte.getByLabel('Nom').fill('compte-de-parcours')
   await nouveauCompte.getByRole('button', { name: 'Créer le compte' }).click()
   await expect(page.getByRole('row', { name: /compte-de-parcours/ })).toContainText('Actif')
-  await page
-    .getByRole('row', { name: /compte-de-parcours/ })
-    .getByRole('link', { name: 'Client de parcours' })
-    .click()
+
+  // step-064 : la fiche du compte, un canal coupé, un webhook dont le secret ne se montre qu'une fois.
+  await page.getByRole('link', { name: 'compte-de-parcours' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('compte-de-parcours')
+  await page.getByRole('button', { name: 'Couper REST' }).click()
+  await expect(page.getByText('REST : coupé')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Couper SMPP' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+  await page.getByRole('button', { name: 'Nouveau webhook' }).click()
+  const nouveauWebhook = page.getByRole('dialog', { name: 'Nouveau webhook' })
+  await nouveauWebhook.getByLabel('URL').fill('https://client.example/dlr')
+  await nouveauWebhook.getByRole('button', { name: 'Créer le webhook' }).click()
+  const secretMontre = page.getByRole('dialog', { name: 'Secret de signature du webhook' })
+  const secretDeWebhook = (await secretMontre.locator('.mono').textContent()) ?? ''
+  expect(secretDeWebhook).toMatch(/^[\w-]{43}$/)
+  await secretMontre.getByRole('button', { name: 'J’ai copié le secret' }).click()
+  await expect(page.getByRole('row', { name: /client\.example\/dlr/ })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(secretDeWebhook)
+
+  await page.getByRole('link', { name: 'Client de parcours' }).click()
 
   await page.getByRole('button', { name: 'Suspendre' }).click()
   const suspension = page.getByRole('dialog', { name: 'Suspendre Client de parcours ?' })
