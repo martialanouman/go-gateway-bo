@@ -61,13 +61,14 @@ Fonctionnalité: La fiche d'un compte SMPP
     Alors le serveur répond <statut>
     Et la réponse est conforme au contrat du BFF
     Et le journal porte 2 événement "<action>"
+    Et l'issue "<action>" porte '<trace>'
 
     Exemples:
-      | geste                     | méthode | adresse                                                                                                  | corps                                            | statut | action                |
-      | régler les canaux         | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/channels                                              | {"smppEnabled":true,"restEnabled":false}         | 200    | account.channels      |
-      | régler les opérations     | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/smpp-ops                                              | {"querySmEnabled":true,"cancelSmEnabled":false}  | 200    | account.smpp_ops      |
-      | désactiver un webhook     | PATCH   | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f         | {"status":"disabled"}                            | 200    | webhook.update        |
-      | supprimer un webhook      | DELETE  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f         |                                                  | 204    | webhook.delete        |
+      | geste                     | méthode | adresse                                                                                                  | corps                                            | statut | action                | trace                         |
+      | régler les canaux         | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/channels                                              | {"smppEnabled":true,"restEnabled":false}         | 200    | account.channels      | "rest_enabled": false         |
+      | régler les opérations     | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/smpp-ops                                              | {"querySmEnabled":true,"cancelSmEnabled":false}  | 200    | account.smpp_ops      | "cancel_sm_enabled": false    |
+      | désactiver un webhook     | PATCH   | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f         | {"status":"disabled"}                            | 200    | webhook.update        | "status": "disabled"          |
+      | supprimer un webhook      | DELETE  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f         |                                                  | 204    | webhook.delete        | "account_id": "0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e" |
 
   Scénario: créer un webhook rend un secret que la passerelle a reçu, et que le journal ignore
     Étant donné une passerelle qui crée un webhook
@@ -115,5 +116,9 @@ Fonctionnalité: La fiche d'un compte SMPP
 
     Exemples:
       | geste                       | méthode | adresse                                                                                                         | corps                                                |
+      | le réglage des canaux       | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/channels                                                     | {"smppEnabled":true,"restEnabled":true}              |
       | le réglage des opérations   | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/smpp-ops                                                     | {"querySmEnabled":true,"cancelSmEnabled":true}       |
+      | la création d'un webhook    | POST    | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks                                                     | {"eventType":"mo","url":"https://client.example/mo"} |
+      | la modification d'un webhook | PATCH  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f                | {"status":"disabled"}                                |
+      | la suppression d'un webhook | DELETE  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f                |                                                      |
       | la rotation d'un secret     | POST    | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f/secret         |                                                      |

@@ -27,6 +27,7 @@ func (w *auditWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^l'issue "([^"]+)" désigne le client "([^"]+)"$`, w.outcomeTargets)
 	ctx.Then(`^le journal ne porte ni le secret ni les codes de récupération$`, w.journalHidesSecrets)
 	ctx.Then(`^le journal ne porte pas le secret que la réponse rend$`, w.journalHidesTheReturnedSecret)
+	ctx.Then(`^l'issue "([^"]+)" porte '([^']+)'$`, w.outcomeCarries)
 	ctx.Given(`^les partitions du journal sont retirées$`, w.auditPartitionsRemoved)
 	ctx.When(`^l'opérateur remplace son application d'authentification$`,
 		w.mfa.replaceProvingTheCurrentCode)
@@ -383,6 +384,29 @@ func (w *auditWorld) journalHidesTheReturnedSecret(ctx context.Context) error {
 
 	if leaks != 0 {
 		return fmt.Errorf("le journal porte le secret rendu dans %d ligne(s)", leaks)
+	}
+
+	return nil
+}
+
+func (w *auditWorld) outcomeCarries(ctx context.Context, action, fragment string) error {
+	conn, err := w.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var after string
+
+	err = conn.QueryRow(ctx, `SELECT after_json::text FROM audit_log WHERE action = $1 AND after_json->>'outcome' = 'succeeded'`,
+		action).Scan(&after)
+	if err != nil {
+		return fmt.Errorf("lire l'issue de %q : %w", action, err)
+	}
+
+	if !strings.Contains(after, fragment) {
+		return fmt.Errorf("l'issue de %q ne porte pas %s : %s", action, fragment, after)
 	}
 
 	return nil
