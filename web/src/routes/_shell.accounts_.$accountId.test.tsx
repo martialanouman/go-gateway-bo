@@ -73,9 +73,9 @@ describe('the account screen', () => {
     expect(await screen.findByRole('cell', { name: 'https://client.example/dlr' })).toBeVisible()
   })
 
-  it('warns that a rotated secret breaks deliveries until the customer installs it', async () => {
+  it('warns that a rotated secret breaks deliveries, then shows the new one once', async () => {
     const user = userEvent.setup()
-    open({ webhooks: [DLR] })
+    const { queryClient } = open({ webhooks: [DLR] })
 
     await user.click(
       await screen.findByRole('button', { name: 'Remplacer le secret du webhook DLR' }),
@@ -86,6 +86,14 @@ describe('the account screen', () => {
 
     expect(dialog).toHaveTextContent(
       'L’ancien secret cessera aussitôt de signer : le client rejettera les DLR tant qu’il n’aura pas installé le nouveau.',
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Remplacer' }))
+    const shown = await screen.findByRole('dialog', { name: 'Secret de signature du webhook' })
+    expect(shown).toHaveTextContent(WEBHOOK_SECRET)
+    await user.click(within(shown).getByRole('button', { name: 'J’ai copié le secret' }))
+
+    await waitFor(() =>
+      expect(JSON.stringify(queryClient.getMutationCache().getAll())).not.toContain(WEBHOOK_SECRET),
     )
   })
 
