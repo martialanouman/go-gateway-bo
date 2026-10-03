@@ -339,3 +339,43 @@ func (failingAPI) CreateAccount(_ context.Context, _ CreateAccountRequestObject,
 ) (CreateAccountResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }
+
+func (failingAPI) GetAccount(_ context.Context, _ GetAccountRequestObject,
+) (GetAccountResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) SetAccountChannels(_ context.Context, _ SetAccountChannelsRequestObject,
+) (SetAccountChannelsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) SetAccountSmppOps(_ context.Context, _ SetAccountSmppOpsRequestObject,
+) (SetAccountSmppOpsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) ListWebhooks(_ context.Context, _ ListWebhooksRequestObject,
+) (ListWebhooksResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) CreateWebhook(_ context.Context, _ CreateWebhookRequestObject,
+) (CreateWebhookResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) UpdateWebhook(_ context.Context, _ UpdateWebhookRequestObject,
+) (UpdateWebhookResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) RotateWebhookSecret(_ context.Context, _ RotateWebhookSecretRequestObject,
+) (RotateWebhookSecretResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) DeleteWebhook(_ context.Context, _ DeleteWebhookRequestObject,
+) (DeleteWebhookResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}

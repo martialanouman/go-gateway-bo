@@ -203,3 +203,14 @@ func TestAnArrayCarriesItsItemsAndItsBound(t *testing.T) {
 
 	require.Contains(t, renderContract(t, contract), "roleIds: z.array(z.string().max(64)).max(100).optional(),")
 }
+
+func TestABooleanBecomesAZodBoolean(t *testing.T) {
+	rendered := renderContract(t, strings.Replace(
+		miniContract,
+		"          type: string\n          maxLength: 320",
+		"          type: boolean",
+		1,
+	))
+
+	require.Contains(t, rendered, "email: z.boolean(),")
+}

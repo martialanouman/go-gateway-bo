@@ -837,6 +837,151 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{accountId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * La fiche d'un compte SMPP
+         * @description Relayée vers `get-smpp-account`. La politique de sender ID n'est pas exposée (ADR-0020).
+         */
+        get: operations["getAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{accountId}/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Active ou coupe les canaux SMPP et REST d'un compte
+         * @description Relayée vers `set-account-channels`. Un canal au moins reste actif.
+         */
+        put: operations["setAccountChannels"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{accountId}/smpp-ops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Autorise ou refuse query_sm et cancel_sm
+         * @description Relayée vers `set-account-smpp-ops`. Tout changement coupe les binds vivants du compte, qui se
+         *     reconnectent sous le nouveau réglage.
+         */
+        put: operations["setAccountSmppOps"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{accountId}/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Les webhooks MO et DLR d'un compte
+         * @description Relayée vers `list-webhooks`. Le secret de signature n'est jamais rendu.
+         */
+        get: operations["listWebhooks"];
+        put?: never;
+        /**
+         * Crée le webhook d'un type d'événement
+         * @description Relayée vers `create-webhook`. Le BFF engendre le secret de signature et le rend dans cette
+         *     réponse seulement : il n'est ni conservé ni réaffiché (invariant b).
+         */
+        post: operations["createWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{accountId}/webhooks/{webhookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+                webhookId: components["parameters"]["WebhookId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Supprime un webhook
+         * @description Relayée vers `delete-webhook`.
+         */
+        delete: operations["deleteWebhook"];
+        options?: never;
+        head?: never;
+        /**
+         * Change l'URL d'un webhook, ou l'active et le désactive
+         * @description Relayée vers `update-webhook`, sans secret ni politique de reprise.
+         */
+        patch: operations["updateWebhook"];
+        trace?: never;
+    };
+    "/accounts/{accountId}/webhooks/{webhookId}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+                webhookId: components["parameters"]["WebhookId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remplace le secret de signature d'un webhook
+         * @description Relayée vers `update-webhook` avec le secret seul. L'ancien secret cesse aussitôt de signer :
+         *     aucune fenêtre de grâce. Le nouveau n'est rendu que dans cette réponse (invariant b).
+         */
+        post: operations["rotateWebhookSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1280,8 +1425,45 @@ export interface components {
             customerId: string;
             name: string;
             status: components["schemas"]["CustomerStatus"];
+            smppEnabled: boolean;
+            restEnabled: boolean;
+            querySmEnabled: boolean;
+            cancelSmEnabled: boolean;
             /** Format: date-time */
             createdAt: string;
+        };
+        AccountChannels: {
+            smppEnabled: boolean;
+            restEnabled: boolean;
+        };
+        AccountSmppOps: {
+            querySmEnabled: boolean;
+            cancelSmEnabled: boolean;
+        };
+        /** @enum {string} */
+        WebhookEventType: "mo" | "dlr";
+        /** @description Jamais de secret ici ; seul `WebhookSecret` le porte, une fois. */
+        Webhook: {
+            id: string;
+            eventType: components["schemas"]["WebhookEventType"];
+            url: string;
+            /** @enum {string} */
+            status: "active" | "disabled";
+        };
+        WebhookSecret: {
+            webhook: components["schemas"]["Webhook"];
+            secret: string;
+        };
+        WebhookCreation: {
+            eventType: components["schemas"]["WebhookEventType"];
+            /** Format: uri */
+            url: string;
+        };
+        WebhookUpdate: {
+            /** Format: uri */
+            url?: string;
+            /** @enum {string} */
+            status?: "active" | "disabled";
         };
         AccountPage: {
             items: components["schemas"]["SmppAccount"][];
@@ -1357,6 +1539,36 @@ export interface components {
         };
         /** @description Ce client a déjà un compte de ce nom ; `errors[]` place le refus sous `name`. */
         NomDeComptePris: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Aucun compte SMPP ne porte cet identifiant. */
+        CompteInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Ce compte n'a aucun webhook de cet identifiant. */
+        WebhookInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
+         * @description Ce compte a déjà un webhook pour ce type d'événement ; `errors[]` place le refus sous
+         *     `eventType`.
+         */
+        TypeDeWebhookPris: {
             headers: {
                 [name: string]: unknown;
             };
@@ -1505,6 +1717,8 @@ export interface components {
         GroupId: string;
         CustomerId: string;
         SenderIdParam: string;
+        AccountId: string;
+        WebhookId: string;
     };
     requestBodies: never;
     headers: never;
@@ -3162,6 +3376,250 @@ export interface operations {
             401: components["responses"]["SessionAbsente"];
             403: components["responses"]["PermissionRefusee"];
             409: components["responses"]["NomDeComptePris"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    getAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le compte. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmppAccount"];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    setAccountChannels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountChannels"];
+            };
+        };
+        responses: {
+            /** @description Le compte modifié. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmppAccount"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    setAccountSmppOps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountSmppOps"];
+            };
+        };
+        responses: {
+            /** @description Le compte modifié. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmppAccount"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    listWebhooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tous les webhooks du compte. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Webhook"][];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    createWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookCreation"];
+            };
+        };
+        responses: {
+            /** @description Le webhook créé, et son secret, montré cette fois seulement. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSecret"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
+            409: components["responses"]["TypeDeWebhookPris"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    deleteWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+                webhookId: components["parameters"]["WebhookId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le webhook est supprimé. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["WebhookInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    updateWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+                webhookId: components["parameters"]["WebhookId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookUpdate"];
+            };
+        };
+        responses: {
+            /** @description Le webhook modifié. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Webhook"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["WebhookInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    rotateWebhookSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+                webhookId: components["parameters"]["WebhookId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le webhook, et son nouveau secret, montré cette fois seulement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSecret"];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["WebhookInconnu"];
             415: components["responses"]["TypeDeContenuRefuse"];
             422: components["responses"]["RefusDeLaPasserelle"];
             503: components["responses"]["PasserelleIndisponible"];

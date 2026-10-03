@@ -213,6 +213,9 @@ func zodFor(schema *openapi3.Schema) (string, error) {
 	case schema.Type.Is("string"):
 		return stringExpression(schema), nil
 
+	case schema.Type.Is("boolean"):
+		return "z.boolean()", nil
+
 	case schema.Type.Is("array") && schema.Items != nil:
 		items, err := zodFor(schema.Items.Value)
 		if err != nil {

@@ -26,6 +26,7 @@ func (w *auditWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^l'issue "([^"]+)" désigne (?:le groupe|le client|le compte) que la réponse rend$`, w.outcomeTargetsTheReturnedGroup)
 	ctx.Then(`^l'issue "([^"]+)" désigne le client "([^"]+)"$`, w.outcomeTargets)
 	ctx.Then(`^le journal ne porte ni le secret ni les codes de récupération$`, w.journalHidesSecrets)
+	ctx.Then(`^le journal ne porte pas le secret que la réponse rend$`, w.journalHidesTheReturnedSecret)
 	ctx.Given(`^les partitions du journal sont retirées$`, w.auditPartitionsRemoved)
 	ctx.When(`^l'opérateur remplace son application d'authentification$`,
 		w.mfa.replaceProvingTheCurrentCode)
@@ -354,6 +355,34 @@ func (w *auditWorld) passkeysHeld(expected int) error {
 	if decoded.SecondFactors.Passkeys != expected {
 		return fmt.Errorf("l'opérateur détient %d clé(s) d'accès pour %d attendue(s)",
 			decoded.SecondFactors.Passkeys, expected)
+	}
+
+	return nil
+}
+
+func (w *auditWorld) journalHidesTheReturnedSecret(ctx context.Context) error {
+	secret, err := returnedSecret(w.login.process.received.body)
+	if err != nil {
+		return err
+	}
+
+	conn, err := w.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var leaks int
+
+	err = conn.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE strpos(audit_log::text, $1) > 0`,
+		secret).Scan(&leaks)
+	if err != nil {
+		return fmt.Errorf("chercher le secret dans le journal : %w", err)
+	}
+
+	if leaks != 0 {
+		return fmt.Errorf("le journal porte le secret rendu dans %d ligne(s)", leaks)
 	}
 
 	return nil
