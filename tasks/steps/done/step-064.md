@@ -111,9 +111,12 @@ restauré par `cp` pour le client.
   Prism. Seule la copie est tenue.
 
 ## Definition of Done
-- [ ] `make check` vert ; `make e2e` vert.
-- [ ] Invariants (b), (c) et DTO tenus, mutations à l'appui.
-- [ ] Spec §6.19 et plan §4 ne réclament plus la phrase « tout expéditeur doit être enregistré ».
+- [x] `make check` vert ; `make e2e` vert.
+- [x] Invariants (b), (c) et DTO tenus, mutations à l'appui.
+- [x] Spec §6.19 et plan §4 ne réclament plus la phrase « tout expéditeur doit être enregistré ».
+
+- [x] Revue en sous-agent : un blocage (copie renvoyant à « modifier » un webhook que la fiche ne
+  modifie pas), corrigé et revérifié. Dette 065 ouverte (copie de suspension contredite par 6.10.1).
 
 ## Hors périmètre
 - `max_sessions`, `allowed_bind_types`, quotas, binds vivants : step-065. Identifiants de bind et clés
