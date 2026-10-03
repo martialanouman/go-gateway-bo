@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
@@ -167,10 +167,11 @@ function GroupsTable({
       columns={[
         { key: 'name', header: 'Nom', cell: (group) => group.name },
         { key: 'description', header: 'Description', cell: (group) => group.description ?? '—' },
+        { key: 'memberCount', header: 'Clients', cell: (group) => group.memberCount },
         {
           key: 'status',
           header: 'Statut',
-          cell: (group) => <span className="mono">{group.status}</span>,
+          cell: (group) => (group.status === 'active' ? 'Actif' : 'Archivé'),
         },
         {
           key: 'createdAt',
@@ -182,6 +183,7 @@ function GroupsTable({
           header: 'Actions',
           cell: (group) => (
             <div className="row-actions">
+              <GroupCustomers group={group} />
               <Button {...blocked} onClick={() => onAct({ kind: 'edit', group })} size="sm">
                 Modifier
               </Button>
@@ -377,16 +379,39 @@ function ConfirmDelete({
         <>
           <Button onClick={onClose}>Annuler</Button>
           <Button loading={remove.isPending} onClick={() => remove.mutate()} variant="danger">
-            Supprimer le groupe
+            Supprimer
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Supprimer ${group.name}`}
+      title={`Supprimer le groupe ${group.name} ?`}
     >
       <Refusal error={remove.error} />
-      <p>Ses clients sont détachés du groupe ; aucun client n’est supprimé. Action journalisée.</p>
+      <p>{detachedMembers(group.memberCount)}</p>
+      <p>La suppression est définitive. L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
+  )
+}
+
+function detachedMembers(count: number) {
+  if (count === 0) return 'Le groupe n’a aucun client : aucun client ne sera détaché.'
+  if (count === 1) return 'Son client sera détaché du groupe ; il ne sera pas supprimé.'
+  return `Ses ${count} clients seront détachés du groupe ; aucun ne sera supprimé.`
+}
+
+function GroupCustomers({ group }: { readonly group: Group }) {
+  return usePermission('customers:read') ? (
+    <Link
+      className="ui-button ui-button--secondary ui-button--sm"
+      search={{ groupId: group.id }}
+      to="/customers"
+    >
+      Voir les clients
+    </Link>
+  ) : (
+    <Button blockedReason="Voir les clients d’un groupe demande customers:read." size="sm">
+      Voir les clients
+    </Button>
   )
 }

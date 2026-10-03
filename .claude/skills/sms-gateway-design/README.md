@@ -47,7 +47,7 @@ No codebase and no Figma file were provided. The charter's rendered pages were r
 
 **Empty ≠ error ≠ disabled.** Five distinct states, five distinct copies (charte §08): *chargement* (skeleton reproducing the real layout), *état vide* (nothing yet + how to create), *aucun résultat* (filters too narrow + how to widen), *module désactivé* (graceful degradation), *erreur* (HTTP reality + « vos données locales restent affichées » + Réessayer).
 
-**Casing.** Sentence case for labels, titles and buttons. Micro-labels (10.5px) are UPPERCASE with +0.08em tracking. Status pills keep the API's own lowercase snake_case (`half_open`, `reconnecting`) because that is what the payload says.
+**Casing.** Sentence case for labels, titles and buttons. Micro-labels (10.5px) are UPPERCASE with +0.08em tracking. Technical status pills (link, breaker, delivery) keep the API's own lowercase snake_case (`half_open`, `reconnecting`) because that is what the payload says and what operators grep in logs. Administrative statuses (customer, account, group, sender name) are shown in French (`Actif`, `Suspendu`, `Fermé`).
 
 **Buttons are verbs, and destructive buttons name the act:** *« Effectuer la rotation »*, *« Déconnecter »*, *« Lever le désabonnement »*, *« Lancer le job »*, *« Réessayer »* — never *« OK »* or a bare *« Confirmer »*.
 

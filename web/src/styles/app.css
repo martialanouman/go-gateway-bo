@@ -346,6 +346,12 @@
   justify-content: space-between;
 }
 
+.page__identity {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: center;
+}
+
 .page__title {
   margin: 0;
   color: var(--text-primary);
@@ -370,6 +376,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-4);
+  align-items: center;
 }
 
 .mono,

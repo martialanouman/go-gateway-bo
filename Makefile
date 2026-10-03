@@ -288,6 +288,7 @@ generate: ## Engendre tout ce qui dérive d'une source du dépôt : les deux con
 	go tool oapi-codegen --config api/oapi-codegen-bff.yaml $(CONTRACT_BFF)
 	$(OPENAPI_TS) $(CONTRACT_BFF) -o $(BFF_TYPES)
 	go run ./cmd/zodgen $(CONTRACT_BFF) $(CONTRACT_ZOD)
+	pnpm -C web exec biome format --write $(CONTRACT_ZOD:web/%=%)
 	@$(MAKE) --no-print-directory generate-permissions
 
 # Une cible à part, et non trois lignes de plus dans `generate` : celle-ci est du **Go pur**, quand

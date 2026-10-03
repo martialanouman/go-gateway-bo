@@ -275,7 +275,8 @@ function CreateOperator({
       >
         <p>
           Le compte naît actif, sans rôle ni mot de passe : son titulaire le définit par un lien
-          d’activation reçu par e-mail, puis enrôle son second facteur. Action journalisée.
+          d’activation reçu par e-mail, puis enrôle son second facteur. L’action est enregistrée
+          dans le journal d’audit.
         </p>
         <Refusal error={create.error} />
         <Field error={errors.email?.message} label="Adresse e-mail">
@@ -366,7 +367,7 @@ function AssignRoles({
           <legend>Rôles</legend>
           <p>
             Les permissions s’additionnent : l’opérateur détient l’union de ses rôles, dès sa
-            prochaine requête. Action journalisée.
+            prochaine requête. L’action est enregistrée dans le journal d’audit.
           </p>
           {roles.data.map((role) => (
             <label className="role-choice__option" key={role.id}>
@@ -406,20 +407,21 @@ function ConfirmDisable({
             }
             variant="danger"
           >
-            Désactiver le compte
+            Désactiver
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Désactiver ${operator.displayName}`}
+      title={`Désactiver ${operator.displayName} ?`}
     >
       <Refusal error={setStatus.error} />
       <p>
-        Ses sessions sont fermées immédiatement, et il ne peut plus se connecter. Ses rôles et son
-        second facteur restent en place ; « Réactiver » lui rend l’accès, par une nouvelle
-        connexion. Action journalisée.
+        Ses sessions seront fermées immédiatement et il ne pourra plus se connecter. Ses rôles et
+        son second facteur resteront en place : « Réactiver » lui rendra l’accès, par une nouvelle
+        connexion.
       </p>
+      <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
   )
 }
@@ -455,30 +457,31 @@ function ConfirmSendLink({
         <>
           <Button onClick={onClose}>Annuler</Button>
           <Button loading={send.isPending} onClick={() => send.mutate()} variant="primary">
-            Envoyer le lien
+            Envoyer
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Envoyer un lien à ${operator.displayName}`}
+      title={`Envoyer un lien ${isActivation ? 'd’activation' : 'de réinitialisation'} à ${operator.displayName} ?`}
     >
       <Refusal error={send.error} />
       <p>
         {isActivation ? (
           <>
-            Un lien d’activation part à {operator.email} ; il vaut 72 heures. Un lien envoyé plus
-            tôt cesse de valoir. Action journalisée.
+            Un lien d’activation sera envoyé à {operator.email} ; il restera valable 72 heures. Un
+            lien envoyé plus tôt cessera de valoir.
           </>
         ) : (
           <>
-            Un lien de réinitialisation part à {operator.email} ; il vaut 1 heure. Rien ne change
-            avant son usage : son mot de passe, son second facteur et ses sessions restent valables
-            jusque-là. À l’usage, il définit un nouveau mot de passe, son second facteur est retiré
-            et ses sessions sont fermées. Action journalisée.
+            Un lien de réinitialisation sera envoyé à {operator.email} ; il restera valable 1 heure.
+            Rien ne changera avant son usage : son mot de passe, son second facteur et ses sessions
+            resteront valables jusque-là. À l’usage, l’opérateur définira un nouveau mot de passe,
+            son second facteur sera retiré et ses sessions seront fermées.
           </>
         )}
       </p>
+      <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
   )
 }

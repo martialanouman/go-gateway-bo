@@ -5,6 +5,9 @@ import { type SessionOutcome, stubSession } from './session'
 type Operator = components['schemas']['Operator']
 type Role = components['schemas']['Role']
 type Group = components['schemas']['CustomerGroup']
+type Customer = components['schemas']['Customer']
+type SenderId = components['schemas']['SenderId']
+type Account = components['schemas']['SmppAccount']
 
 /** L'opérateur de la session, tel que `stubSession` le rend dans `GET /auth/me`. */
 export const SELF_ID = '01960000-0000-7000-8000-000000000001'
@@ -61,8 +64,18 @@ export const RESELLERS: Group = {
   name: 'Revendeurs',
   description: 'Clients revendus par un partenaire.',
   status: 'active',
+  memberCount: 1,
   createdAt: '2026-09-01T08:00:00Z',
   updatedAt: '2026-09-01T08:00:00Z',
+}
+
+export const ACME: Customer = {
+  id: '0192b3c4-0000-7000-8000-00000000c001',
+  name: 'Acme Télécom',
+  status: 'active',
+  groupId: '0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b',
+  createdAt: '2026-09-02T08:00:00Z',
+  updatedAt: '2026-09-02T08:00:00Z',
 }
 
 type Reply = { readonly status: number; readonly body?: unknown }
@@ -78,13 +91,25 @@ export type AdministrationReplies = Partial<Record<string, Reply>>
  */
 export function stubAdministration(
   outcome: SessionOutcome,
-  initial: { operators?: Operator[]; roles?: Role[]; groups?: Group[] } = {},
+  initial: {
+    operators?: Operator[]
+    roles?: Role[]
+    groups?: Group[]
+    customers?: Customer[]
+    customerPageSize?: number
+    senders?: SenderId[]
+    accounts?: Account[]
+  } = {},
   replies: AdministrationReplies = {},
 ) {
   const session = stubSession(outcome)
   let operators = [...(initial.operators ?? [SELF, COLLEAGUE])]
   let roles = [...(initial.roles ?? [SUPER_ADMIN, AUDITOR, ON_CALL])]
   let groups = [...(initial.groups ?? [RESELLERS])]
+  let customers = [...(initial.customers ?? [ACME])]
+  let senders = [...(initial.senders ?? [])]
+  let accounts = [...(initial.accounts ?? [])]
+  const customerPageSize = initial.customerPageSize ?? 50
 
   const fetch = vi.fn(async (request: Request) => {
     const { pathname, searchParams } = new URL(request.url)
@@ -92,7 +117,7 @@ export function stubAdministration(
     const declared = replies[route]
     if (declared !== undefined) return respond(declared)
 
-    const [, , collection, id, detail] = pathname.split('/')
+    const [, , collection, id, detail, detailId] = pathname.split('/')
     // `POST /operators/{id}/access-link` n'a pas de corps ; `request.json()` sur un flux vide lève.
     const raw = request.method === 'GET' || request.method === 'DELETE' ? '' : await request.text()
     const body = raw ? JSON.parse(raw) : undefined
@@ -164,8 +189,102 @@ export function stubAdministration(
       return new Response(null, { status: 204 })
     }
 
+    if (collection === 'accounts') {
+      if (request.method === 'POST') {
+        const created: Account = {
+          id: `account-${accounts.length + 1}`,
+          status: 'active',
+          createdAt: '2026-10-03T08:00:00Z',
+          ...body,
+        }
+        accounts = [...accounts, created]
+        return Response.json(created, { status: 201 })
+      }
+      const customerId = searchParams.get('customerId')
+      const listed = accounts.filter(
+        (account) => customerId === null || account.customerId === customerId,
+      )
+      const start = Number(searchParams.get('cursor') ?? 0)
+      const end = start + customerPageSize
+      return Response.json({
+        items: listed.slice(start, end),
+        ...(end < listed.length ? { nextCursor: String(end) } : {}),
+      })
+    }
+
+    if (collection === 'customers' && id !== undefined) {
+      const target = customers.find((customer) => customer.id === id)
+      if (target === undefined) return respond({ status: 404, body: refusal('not_found') })
+      if (detail === 'sender-ids') {
+        if (request.method === 'POST') {
+          const created: SenderId = {
+            id: `sender-${senders.length + 1}`,
+            address: body.address,
+            status: 'pending_carrier_approval',
+            createdAt: '2026-09-30T08:00:00Z',
+          }
+          senders = [...senders, created]
+          return Response.json(created, { status: 201 })
+        }
+        if (request.method === 'PATCH') {
+          senders = senders.map((sender) =>
+            sender.id === detailId ? { ...sender, status: body.status } : sender,
+          )
+          return Response.json(senders.find((sender) => sender.id === detailId))
+        }
+        if (request.method === 'DELETE') {
+          senders = senders.filter((sender) => sender.id !== detailId)
+          return new Response(null, { status: 204 })
+        }
+        return Response.json(senders)
+      }
+      if (detail === 'suspension-impact')
+        return Response.json({ accounts: 0, activeAccounts: 0, closedAccounts: 0 })
+
+      let updated = target
+      if (detail === 'suspend') updated = { ...target, status: 'suspended' }
+      if (detail === 'reactivate') updated = { ...target, status: 'active' }
+      if (request.method === 'PATCH') updated = { ...target, ...body }
+      if (detail === 'group') updated = { ...target, groupId: body.groupId }
+      customers = customers.map((customer) => (customer.id === id ? updated : customer))
+      return Response.json(updated)
+    }
+
+    if (collection === 'customers') {
+      if (request.method === 'POST') {
+        const created: Customer = {
+          id: `customer-${customers.length + 1}`,
+          status: 'active',
+          createdAt: '2026-09-29T08:00:00Z',
+          updatedAt: '2026-09-29T08:00:00Z',
+          ...body,
+        }
+        customers = [...customers, created]
+        return Response.json(created, { status: 201 })
+      }
+
+      const matching = customers.filter(
+        (customer) =>
+          (searchParams.get('status') === null || customer.status === searchParams.get('status')) &&
+          (searchParams.get('groupId') === null ||
+            customer.groupId === searchParams.get('groupId')),
+      )
+      const start = Number(searchParams.get('cursor') ?? 0)
+      const end = start + customerPageSize
+      return Response.json({
+        items: matching.slice(start, end),
+        ...(end < matching.length ? { nextCursor: String(end) } : {}),
+      })
+    }
+
     if (collection === 'customer-groups') {
       const status = searchParams.get('status')
+      if (request.method === 'GET' && id !== undefined) {
+        const found = groups.find((group) => group.id === id)
+        return found === undefined
+          ? respond({ status: 404, body: refusal('not_found') })
+          : Response.json(found)
+      }
       if (request.method === 'GET') {
         return Response.json(groups.filter((group) => status === null || group.status === status))
       }
@@ -174,6 +293,7 @@ export function stubAdministration(
         const created: Group = {
           id: `group-${groups.length + 1}`,
           status: 'active',
+          memberCount: 0,
           createdAt: '2026-09-29T08:00:00Z',
           updatedAt: '2026-09-29T08:00:00Z',
           ...body,

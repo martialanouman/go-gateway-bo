@@ -98,13 +98,9 @@ import { z } from 'zod'
 // déplacer une opération dans le YAML réécrirait sinon tout le fichier engendré, et le diff de la PR
 // cesserait de nommer ce qui a changé.
 //
-// **Aucun repli de ligne n'est implémenté, et rien ne le garde.** La sortie est **incluse** dans le
-// périmètre de Biome — contrairement à `api.gen.ts` — et Biome reporte à la ligne toute propriété
-// qui dépasse 100 colonnes. La plus longue d'aujourd'hui en fait 58. Un enum du contrat assez large
-// pour franchir le seuil rendrait donc `lint-web` et `check-generated` contradictoires, chacune
-// exigeant l'inverse de l'autre. Vérifié plutôt que supposé : `biome check` accepte la sortie
-// courante telle quelle. Le remède, le jour venu, est d'exclure ce fichier dans `web/biome.json`
-// comme `api.gen.ts` l'est — pas d'implémenter le repli, que `cmd/permissionsgen` a payé cher.
+// **Aucun repli de ligne ici** : `make generate` passe la sortie à `biome format`, qui la découpe
+// (une chaîne de plus de trois appels, ou de plus de 100 colonnes). Le fichier reste ainsi dans le
+// périmètre de Biome, et `lint-web` ne contredit jamais `check-generated`.
 func render(doc *openapi3.T) ([]byte, error) {
 	var out strings.Builder
 
@@ -253,6 +249,12 @@ func stringExpression(schema *openapi3.Schema) string {
 
 	if schema.MaxLength != nil {
 		expression += fmt.Sprintf(".max(%d)", *schema.MaxLength)
+	}
+
+	// Un littéral, comme Biome l'exige (`useRegexLiterals`) : le motif du contrat est déjà une regex
+	// ECMA, seule la barre oblique qui fermerait le littéral s'échappe.
+	if schema.Pattern != "" {
+		expression += ".regex(/" + strings.ReplaceAll(schema.Pattern, "/", `\/`) + "/)"
 	}
 
 	return expression

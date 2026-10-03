@@ -14,8 +14,9 @@ import { Dot } from './icon'
  * coloré + libellé mono. La raison est opérationnelle : un disjoncteur ouvert sur un lien vivant
  * (attendre la reprise) et un bind mort (rebind manuel) demandent des actions opposées.
  *
- * **Le libellé reste en `snake_case`** : ce sont les valeurs du contrat, qu'un opérateur grep dans
- * les logs. Les traduire couperait le lien entre l'écran et la trace.
+ * **Le libellé reste en `snake_case`** pour les états techniques — lien, disjoncteur, remise —, qu'un
+ * opérateur grep dans les logs. Le statut d'un client ou d'un compte, lui, se lit en français
+ * (décision de l'utilisateur, 03/10/2026) : c'est un état administratif, pas une trace.
  *
  * Les quatre énumérations sont tenues égales au contrat par `test/contract-statuses.test.ts`.
  */
@@ -55,6 +56,12 @@ export const ENTITY_TONES: Readonly<Record<EntityStatus, DotTone>> = {
   // Un client résilié n'est pas une panne : c'est une fin de vie administrative. Le peindre en rouge
   // enverrait chercher une intervention là où il n'y a rien à réparer.
   closed: 'idle',
+}
+
+export const ENTITY_LABELS: Readonly<Record<EntityStatus, string>> = {
+  active: 'Actif',
+  suspended: 'Suspendu',
+  closed: 'Fermé',
 }
 
 export const DELIVERY_TONES: Readonly<Record<DeliveryStatus, DotTone>> = {
@@ -133,7 +140,9 @@ export function StatusPill(props: StatusPillProps) {
       role={announce ? 'status' : undefined}
     >
       <Dot tone={tone} live={live} className="ui-status__dot" />
-      <span className="ui-status__label">{label ?? state}</span>
+      <span className="ui-status__label">
+        {label ?? (kind === 'entity' ? ENTITY_LABELS[state] : state)}
+      </span>
       {meta === undefined ? null : <span className="ui-status__meta">{meta}</span>}
     </span>
   )
