@@ -168,11 +168,11 @@ describe('the groups screen', () => {
 
     expect(row.getByRole('cell', { name: '1' })).toBeInTheDocument()
     await user.click(row.getByRole('button', { name: 'Supprimer' }))
-    const dialog = await screen.findByRole('dialog', { name: `Supprimer ${RESELLERS.name}` })
-    expect(dialog).toHaveTextContent(
-      'Son client est détaché du groupe ; aucun client n’est supprimé.',
-    )
-    await user.click(within(dialog).getByRole('button', { name: 'Supprimer le groupe' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: `Supprimer le groupe ${RESELLERS.name} ?`,
+    })
+    expect(dialog).toHaveTextContent('Son client sera détaché du groupe ; il ne sera pas supprimé.')
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer' }))
 
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Aucun groupe pour l’instant' }),

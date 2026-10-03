@@ -284,7 +284,8 @@ function CreateCustomer({
       >
         <p>
           Le client naît actif, sans compte ni sender ID ; sa facturation et sa politique de contenu
-          gardent les réglages par défaut de la passerelle. Action journalisée.
+          gardent les réglages par défaut de la passerelle. L’action est enregistrée dans le journal
+          d’audit.
         </p>
         <Refusal error={placed ? null : create.error} />
         <Field error={form.formState.errors.name?.message} label="Nom">

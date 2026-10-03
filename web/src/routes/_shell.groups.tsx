@@ -379,24 +379,25 @@ function ConfirmDelete({
         <>
           <Button onClick={onClose}>Annuler</Button>
           <Button loading={remove.isPending} onClick={() => remove.mutate()} variant="danger">
-            Supprimer le groupe
+            Supprimer
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Supprimer ${group.name}`}
+      title={`Supprimer le groupe ${group.name} ?`}
     >
       <Refusal error={remove.error} />
-      <p>{detachedMembers(group.memberCount)} Action journalisée.</p>
+      <p>{detachedMembers(group.memberCount)}</p>
+      <p>La suppression est définitive. L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
   )
 }
 
 function detachedMembers(count: number) {
-  if (count === 0) return 'Le groupe n’a aucun client : rien n’est détaché.'
-  if (count === 1) return 'Son client est détaché du groupe ; aucun client n’est supprimé.'
-  return `Ses ${count} clients sont détachés du groupe ; aucun client n’est supprimé.`
+  if (count === 0) return 'Le groupe n’a aucun client : aucun client ne sera détaché.'
+  if (count === 1) return 'Son client sera détaché du groupe ; il ne sera pas supprimé.'
+  return `Ses ${count} clients seront détachés du groupe ; aucun ne sera supprimé.`
 }
 
 function GroupCustomers({ group }: { readonly group: Group }) {

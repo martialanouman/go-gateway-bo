@@ -636,9 +636,11 @@ test('the binary serves the painted shell, then the application replaces it', as
   await page.getByRole('tab', { name: 'Archivés' }).click()
   await expect(groupe).toContainText('Archivé')
   await groupe.getByRole('button', { name: 'Supprimer' }).click()
-  const suppression = page.getByRole('dialog', { name: 'Supprimer Revendeurs de parcours' })
-  await expect(suppression).toContainText('Son client est détaché du groupe')
-  await suppression.getByRole('button', { name: 'Supprimer le groupe' }).click()
+  const suppression = page.getByRole('dialog', {
+    name: 'Supprimer le groupe Revendeurs de parcours ?',
+  })
+  await expect(suppression).toContainText('Son client sera détaché du groupe')
+  await suppression.getByRole('button', { name: 'Supprimer' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'Aucun groupe archivé' })).toBeVisible()
 
   // step-030 : le premier administrateur fait entrer un second opérateur, sans toucher à la base.

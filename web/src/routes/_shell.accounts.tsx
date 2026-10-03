@@ -222,7 +222,7 @@ function CreateAccount({
       >
         <p>
           Le compte naît actif, ouvert en SMPP et en REST, une session au plus ; il ne peut se lier
-          qu’une fois ses identifiants créés. Action journalisée.
+          qu’une fois ses identifiants créés. L’action est enregistrée dans le journal d’audit.
         </p>
         <Refusal error={placed ? null : create.error} />
         <Field error={form.formState.errors.name?.message} label="Nom">
