@@ -2,10 +2,9 @@ package bff
 
 import (
 	"encoding/base64"
-	"encoding/json"
+	"reflect"
+	"strings"
 	"testing"
-
-	"github.com/martialanouman/go-gateway-bo/internal/gateway"
 
 	"github.com/stretchr/testify/require"
 )
@@ -24,11 +23,12 @@ func TestAWebhookSecretCarriesThirtyTwoRandomBytes(t *testing.T) {
 }
 
 // Le DTO de la liste ne peut pas fuir un champ qu'il ne déclare pas : seul `WebhookSecret` le porte.
-func TestTheListedWebhookCarriesNoSecret(t *testing.T) {
-	serialized, err := json.Marshal(webhookDTO(gateway.Webhook{EventType: "dlr", Url: "https://client.example"}))
-	require.NoError(t, err)
-
-	var fields map[string]any
-	require.NoError(t, json.Unmarshal(serialized, &fields))
-	require.NotContains(t, fields, "secret")
+// Les tags et non la sortie : un champ facultatif serait `omitempty`, absent tant que personne ne le
+// remplit, et le test resterait vert le jour où il naîtrait.
+func TestTheListedWebhookDeclaresNoSecret(t *testing.T) {
+	webhook := reflect.TypeFor[Webhook]()
+	for field := range webhook.Fields() {
+		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		require.NotEqual(t, "secret", name, "le DTO Webhook déclare un champ secret")
+	}
 }
