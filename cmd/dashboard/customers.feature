@@ -85,7 +85,7 @@ Fonctionnalité: Les clients relayés depuis la passerelle
     Et le refus nomme la permission "customers:write"
     Et la passerelle n'a reçu aucune requête
 
-  Plan du scénario: un nom d'expéditeur de <taille> caractères est refusé avant d'atteindre la passerelle
+  Plan du scénario: un nom d'expéditeur <défaut> est refusé avant d'atteindre la passerelle
     Étant donné une passerelle qui compte les requêtes reçues
     Et un serveur démarré
     Et l'opérateur détient le rôle "Clientèle"
@@ -95,9 +95,10 @@ Fonctionnalité: Les clients relayés depuis la passerelle
     Et la passerelle n'a reçu aucune requête
 
     Exemples:
-      | taille | nom          |
-      | 1      | A            |
-      | 12     | ABCDEFGHIJKL |
+      | défaut                | nom          |
+      | d'un caractère        | A            |
+      | de douze caractères   | ABCDEFGHIJKL |
+      | à caractère interdit  | ACME!        |
 
   Scénario: un nom d'expéditeur déjà enregistré par ce client est refusé sous son champ
     Étant donné une passerelle qui répond 409 à l'enregistrement d'un sender ID

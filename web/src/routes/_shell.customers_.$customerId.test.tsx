@@ -215,7 +215,7 @@ describe('the customer screen', () => {
     expect(within(row).getByRole('button', { name: 'Approuver ACME' })).toBeInTheDocument()
   })
 
-  it('holds a sender name between 2 and 11 characters before anything leaves', async () => {
+  it('holds a sender name to 2-11 letters, digits, spaces, + and - before anything leaves', async () => {
     const user = userEvent.setup()
     const fetch = open(WRITER)
 
@@ -226,6 +226,12 @@ describe('the customer screen', () => {
     await user.clear(name)
     await user.type(name, 'ABCDEFGHIJKL{Enter}')
     await waitFor(() => expect(name).toHaveAccessibleDescription(/trop longue : 11 caractères/))
+    await user.clear(name)
+    await user.type(name, 'ACME!{Enter}')
+    await waitFor(() => expect(name).toHaveAccessibleDescription(/caractère non accepté/))
+    await user.clear(name)
+    await user.type(name, 'INFO +225-1')
+    expect(name).not.toHaveAccessibleDescription(/non accepté|trop/)
 
     expect(sent(fetch, `POST /api/customers/${ACME.id}/sender-ids`)).toBe(false)
   })

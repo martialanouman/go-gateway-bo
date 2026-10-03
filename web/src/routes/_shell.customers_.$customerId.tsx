@@ -714,7 +714,7 @@ function RegisterSender({
         <Refusal error={placed ? null : register.error} />
         <Field
           error={form.formState.errors.address?.message}
-          hint="De 2 à 11 caractères."
+          hint="De 2 à 11 caractères : lettres, chiffres, espaces, + et -."
           label="Nom"
         >
           <Input

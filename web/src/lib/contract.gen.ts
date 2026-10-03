@@ -83,7 +83,11 @@ export const RoleUpdate = z.object({
 })
 
 export const SenderIdCreation = z.object({
-  address: z.string().min(2).max(11),
+  address: z
+    .string()
+    .min(2)
+    .max(11)
+    .regex(/^[a-zA-Z0-9+\-\s]+$/),
 })
 
 export const SenderIdUpdate = z.object({
