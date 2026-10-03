@@ -557,13 +557,12 @@ function CreateWebhook({
     },
     onError: (error) => {
       for (const { field, message } of fieldRefusalsOf(error)) {
-        if (field === 'eventType' || field === 'url') form.setError(field, { message })
+        if (field === 'url') form.setError(field, { message })
       }
     },
   })
-  const placed = fieldRefusalsOf(create.error).some(
-    ({ field }) => field === 'eventType' || field === 'url',
-  )
+  // Le Select n'a pas de zone d'erreur : un refus sur `eventType` passe par le bandeau.
+  const placed = fieldRefusalsOf(create.error).some(({ field }) => field === 'url')
 
   return (
     <Modal

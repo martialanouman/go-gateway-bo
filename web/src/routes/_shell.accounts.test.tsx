@@ -33,6 +33,15 @@ function open(
 }
 
 describe('the accounts screen', () => {
+  it('opens the account screen from its name', async () => {
+    const user = userEvent.setup()
+    open('/accounts')
+
+    await user.click(await screen.findByRole('link', { name: OTP.name }))
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Canaux' })).toBeInTheDocument()
+  })
+
   it('names the customer of each account and links to it', async () => {
     open('/accounts')
 
