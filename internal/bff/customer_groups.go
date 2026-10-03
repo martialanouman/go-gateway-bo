@@ -122,7 +122,7 @@ func (a API) CreateCustomerGroup(ctx context.Context, request CreateCustomerGrou
 
 func (a API) GetCustomerGroup(ctx context.Context, request GetCustomerGroupRequestObject,
 ) (GetCustomerGroupResponseObject, error) {
-	id, known := groupID(request.GroupId)
+	id, known := parseID(request.GroupId)
 	if !known {
 		return GetCustomerGroup404JSONResponse{GroupeInconnuJSONResponse(unknownGroup())}, nil
 	}
@@ -161,7 +161,7 @@ func (a API) UpdateCustomerGroup(ctx context.Context, request UpdateCustomerGrou
 		return nil, err
 	}
 
-	id, known := groupID(request.GroupId)
+	id, known := parseID(request.GroupId)
 	if !known {
 		return UpdateCustomerGroup404JSONResponse{GroupeInconnuJSONResponse(unknownGroup())}, nil
 	}
@@ -239,7 +239,7 @@ func (a API) DeleteCustomerGroup(ctx context.Context, request DeleteCustomerGrou
 		return nil, err
 	}
 
-	id, known := groupID(request.GroupId)
+	id, known := parseID(request.GroupId)
 	if !known {
 		return DeleteCustomerGroup404JSONResponse{GroupeInconnuJSONResponse(unknownGroup())}, nil
 	}
@@ -302,14 +302,15 @@ func customerGroupDTO(group gateway.CustomerGroup) CustomerGroup {
 		Name:        group.Name,
 		Description: group.Description,
 		Status:      CustomerGroupStatus(group.Status),
+		MemberCount: int(group.MemberCount),
 		CreatedAt:   group.CreatedAt,
 		UpdatedAt:   group.UpdatedAt,
 	}
 }
 
-// groupID refuse un identifiant qui n'est pas un UUID avant tout appel : la passerelle le refuserait
-// en 422 sur le format, là où, pour l'opérateur, c'est un groupe qui n'existe pas.
-func groupID(raw string) (gateway.Id, bool) {
+// parseID refuse un identifiant qui n'est pas un UUID avant tout appel : la passerelle le refuserait
+// en 422 sur le format, là où, pour l'opérateur, c'est un objet qui n'existe pas.
+func parseID(raw string) (gateway.Id, bool) {
 	id, err := uuid.Parse(raw)
 
 	return id, err == nil

@@ -25,10 +25,14 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/admin/stream/", gateway)
 
-	groups := &fakegateway.Groups{}
+	customers := &fakegateway.Customers{}
+	groups := &fakegateway.Groups{Members: customers}
 	mux.Handle(fakegateway.GroupsPath, groups)
 	mux.Handle(fakegateway.GroupsPath+"/{id}", groups)
-	mux.Handle(fakegateway.CustomersPath, &fakegateway.Customers{})
+	mux.Handle(fakegateway.CustomersPath, customers)
+	mux.Handle(fakegateway.CustomersPath+"/{id}", customers)
+	mux.Handle(fakegateway.CustomersPath+"/{id}/{action}", customers)
+	mux.Handle(fakegateway.CustomersPath+"/{id}/{action}/{senderId}", customers)
 	mux.HandleFunc("GET /control/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})

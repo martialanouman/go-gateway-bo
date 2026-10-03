@@ -29,12 +29,14 @@ describe('the navigation table', () => {
     // ajoutée sans entrée serait un écran que personne ne trouve. Aucun des deux ne rougirait le test
     // qui parcourt la table.
     const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
-    // Enfant de `_shell` et absent d'`OFF_RAIL`, qui nomme les écrans atteints autrement : c'est ce
-    // qui fait un écran du rail.
+    // Enfant de `_shell`, sans paramètre — une fiche s'atteint depuis sa liste — et absent
+    // d'`OFF_RAIL`, qui nomme les écrans atteints autrement : c'est ce qui fait un écran du rail.
     const screens = Object.entries(router.routesByPath)
       .filter(
         ([path, route]) =>
-          !(OFF_RAIL as readonly string[]).includes(path) && route.id.startsWith('/_shell/'),
+          !(OFF_RAIL as readonly string[]).includes(path) &&
+          !path.includes('$') &&
+          route.id.startsWith('/_shell/'),
       )
       .map(([path]) => path)
       .sort()

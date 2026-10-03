@@ -34,6 +34,7 @@ import { Route as ShellScriptsRouteImport } from './routes/_shell.scripts'
 import { Route as ShellSessionsRouteImport } from './routes/_shell.sessions'
 import { Route as ShellSuppressionsRouteImport } from './routes/_shell.suppressions'
 import { Route as ShellTrafficRouteImport } from './routes/_shell.traffic'
+import { Route as ShellCustomersCustomerIdRouteImport } from './routes/_shell.customers_.$customerId'
 
 const DesignRoute = DesignRouteImport.update({
   id: '/_design',
@@ -159,6 +160,12 @@ const ShellTrafficRoute = ShellTrafficRouteImport.update({
   path: '/traffic',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellCustomersCustomerIdRoute =
+  ShellCustomersCustomerIdRouteImport.update({
+    id: '/customers_/$customerId',
+    path: '/customers/$customerId',
+    getParentRoute: () => ShellRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/_design': typeof DesignRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByFullPath {
   '/sessions': typeof ShellSessionsRoute
   '/suppressions': typeof ShellSuppressionsRoute
   '/traffic': typeof ShellTrafficRoute
+  '/customers/$customerId': typeof ShellCustomersCustomerIdRoute
 }
 export interface FileRoutesByTo {
   '/_design': typeof DesignRoute
@@ -211,6 +219,7 @@ export interface FileRoutesByTo {
   '/suppressions': typeof ShellSuppressionsRoute
   '/traffic': typeof ShellTrafficRoute
   '/': typeof ShellIndexRoute
+  '/customers/$customerId': typeof ShellCustomersCustomerIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -239,6 +248,7 @@ export interface FileRoutesById {
   '/_shell/suppressions': typeof ShellSuppressionsRoute
   '/_shell/traffic': typeof ShellTrafficRoute
   '/_shell/': typeof ShellIndexRoute
+  '/_shell/customers_/$customerId': typeof ShellCustomersCustomerIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/sessions'
     | '/suppressions'
     | '/traffic'
+    | '/customers/$customerId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/_design'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/suppressions'
     | '/traffic'
     | '/'
+    | '/customers/$customerId'
   id:
     | '__root__'
     | '/_design'
@@ -320,6 +332,7 @@ export interface FileRouteTypes {
     | '/_shell/suppressions'
     | '/_shell/traffic'
     | '/_shell/'
+    | '/_shell/customers_/$customerId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -508,6 +521,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellTrafficRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/customers_/$customerId': {
+      id: '/_shell/customers_/$customerId'
+      path: '/customers/$customerId'
+      fullPath: '/customers/$customerId'
+      preLoaderRoute: typeof ShellCustomersCustomerIdRouteImport
+      parentRoute: typeof ShellRoute
+    }
   }
 }
 
@@ -531,6 +551,7 @@ interface ShellRouteChildren {
   ShellSuppressionsRoute: typeof ShellSuppressionsRoute
   ShellTrafficRoute: typeof ShellTrafficRoute
   ShellIndexRoute: typeof ShellIndexRoute
+  ShellCustomersCustomerIdRoute: typeof ShellCustomersCustomerIdRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
@@ -553,6 +574,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellSuppressionsRoute: ShellSuppressionsRoute,
   ShellTrafficRoute: ShellTrafficRoute,
   ShellIndexRoute: ShellIndexRoute,
+  ShellCustomersCustomerIdRoute: ShellCustomersCustomerIdRoute,
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)

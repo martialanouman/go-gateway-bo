@@ -43,3 +43,95 @@ Fonctionnalité: Les clients relayés depuis la passerelle
     Alors le serveur répond 403
     Et le refus nomme la permission "customers:write"
     Et la passerelle n'a reçu aucune requête
+
+  Scénario: suspendre un client laisse sa trace sur ce client
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/suspend"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+    Et le journal porte 2 événement "customer.suspend"
+    Et l'issue "customer.suspend" désigne le client "0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b"
+
+  Scénario: sans customers:write, la suspension est refusée avant d'atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/suspend"
+    Alors le serveur répond 403
+    Et le refus nomme la permission "customers:write"
+    Et la passerelle n'a reçu aucune requête
+
+  Scénario: l'impact d'une suspension ne compte actifs que les comptes actifs
+    Étant donné une passerelle dont le client a 3 comptes, dont 2 actifs et 1 fermé
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/suspension-impact"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+    Et la réponse compte 3 comptes, dont 2 actifs et 1 fermé
+
+  Scénario: sans customers:write, l'enregistrement d'un sender ID est refusé avant d'atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids" avec le corps '{"address":"ACME"}'
+    Alors le serveur répond 403
+    Et le refus nomme la permission "customers:write"
+    Et la passerelle n'a reçu aucune requête
+
+  Scénario: une adresse déjà enregistrée par ce client est refusée sous son champ
+    Étant donné une passerelle qui répond 409 à l'enregistrement d'un sender ID
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids" avec le corps '{"address":"ACME"}'
+    Alors le serveur répond 409
+    Et la réponse est conforme au contrat du BFF
+    Et le refus place une erreur sous le champ "address"
+    Et le journal porte 2 événement "sender_id.create"
+
+  Plan du scénario: un opérateur customers:read lit <objet>
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "<adresse>"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+
+    Exemples:
+      | objet                  | adresse                                                          |
+      | la fiche d'un client   | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b              |
+      | les sender IDs         | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids   |
+
+  Plan du scénario: <geste> laisse sa trace
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie <méthode> "<adresse>" avec le corps '<corps>'
+    Alors le serveur répond <statut>
+    Et la réponse est conforme au contrat du BFF
+    Et le journal porte 2 événement "<action>"
+
+    Exemples:
+      | geste                        | méthode | adresse                                                                                              | corps                                               | statut | action              |
+      | renommer un client           | PATCH   | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b                                                  | {"name":"Acme"}                                     | 200    | customer.update     |
+      | affecter un client           | PUT     | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/group                                            | {"groupId":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7c"}  | 200    | customer.group      |
+      | réactiver un client          | POST    | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/reactivate                                       |                                                     | 200    | customer.reactivate |
+      | approuver un sender ID       | PATCH   | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d  | {"status":"active"}                                 | 200    | sender_id.update    |
+      | supprimer un sender ID       | DELETE  | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d  |                                                     | 204    | sender_id.delete    |
+
+  Scénario: détacher un client de son groupe envoie un groupe nul, pas un champ absent
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie PUT "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/group" avec le corps '{}'
+    Alors la passerelle a reçu un détachement de groupe

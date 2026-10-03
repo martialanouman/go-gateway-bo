@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import {
@@ -171,7 +171,15 @@ function CustomersScreen() {
           <DataTable
             caption="Clients"
             columns={[
-              { key: 'name', header: 'Nom', cell: (customer: Customer) => customer.name },
+              {
+                key: 'name',
+                header: 'Nom',
+                cell: (customer: Customer) => (
+                  <Link params={{ customerId: customer.id }} to="/customers/$customerId">
+                    {customer.name}
+                  </Link>
+                ),
+              },
               {
                 key: 'status',
                 header: 'Statut',

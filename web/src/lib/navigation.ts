@@ -3,9 +3,14 @@ import type { PermissionKey } from './permissions.gen'
 
 /**
  * Les écrans du rail, **dérivés de l'arbre** : les enfants de `_shell`, moins ceux d'`OFF_RAIL`.
- * Une route posée hors de la coquille, `/login` par exemple, reste hors du rail sans rien retrancher.
+ * Une route posée hors de la coquille, `/login` par exemple, reste hors du rail sans rien retrancher ;
+ * une fiche, qui attend un identifiant, s'atteint depuis sa liste.
  */
-type ShellScreen<Id> = Id extends `/_shell/${infer Path}` ? `/${Path}` : never
+type ShellScreen<Id> = Id extends `/_shell/${infer Path}`
+  ? Path extends `${string}$${string}`
+    ? never
+    : `/${Path}`
+  : never
 
 /** `/account` est atteint par le nom de l'opérateur, dans la barre supérieure, et non par le rail. */
 export const OFF_RAIL = ['/', '/account'] as const

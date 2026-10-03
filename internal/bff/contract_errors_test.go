@@ -279,3 +279,53 @@ func (failingAPI) CreateCustomer(_ context.Context, _ CreateCustomerRequestObjec
 ) (CreateCustomerResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }
+
+func (failingAPI) GetCustomer(_ context.Context, _ GetCustomerRequestObject,
+) (GetCustomerResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) UpdateCustomer(_ context.Context, _ UpdateCustomerRequestObject,
+) (UpdateCustomerResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) SetCustomerGroup(_ context.Context, _ SetCustomerGroupRequestObject,
+) (SetCustomerGroupResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) GetCustomerSuspensionImpact(_ context.Context, _ GetCustomerSuspensionImpactRequestObject,
+) (GetCustomerSuspensionImpactResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) SuspendCustomer(_ context.Context, _ SuspendCustomerRequestObject,
+) (SuspendCustomerResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) ReactivateCustomer(_ context.Context, _ ReactivateCustomerRequestObject,
+) (ReactivateCustomerResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) ListSenderIds(_ context.Context, _ ListSenderIdsRequestObject,
+) (ListSenderIdsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) CreateSenderId(_ context.Context, _ CreateSenderIdRequestObject,
+) (CreateSenderIdResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) UpdateSenderId(_ context.Context, _ UpdateSenderIdRequestObject,
+) (UpdateSenderIdResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) DeleteSenderId(_ context.Context, _ DeleteSenderIdRequestObject,
+) (DeleteSenderIdResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}

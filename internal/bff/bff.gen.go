@@ -233,6 +233,45 @@ func (e OperatorUpdateStatus) Valid() bool {
 	}
 }
 
+// Defines values for SenderIdStatus.
+const (
+	SenderIdStatusActive                 SenderIdStatus = "active"
+	SenderIdStatusDisabled               SenderIdStatus = "disabled"
+	SenderIdStatusPendingCarrierApproval SenderIdStatus = "pending_carrier_approval"
+)
+
+// Valid indicates whether the value is a known member of the SenderIdStatus enum.
+func (e SenderIdStatus) Valid() bool {
+	switch e {
+	case SenderIdStatusActive:
+		return true
+	case SenderIdStatusDisabled:
+		return true
+	case SenderIdStatusPendingCarrierApproval:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SenderIdUpdateStatus.
+const (
+	SenderIdUpdateStatusActive   SenderIdUpdateStatus = "active"
+	SenderIdUpdateStatusDisabled SenderIdUpdateStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the SenderIdUpdateStatus enum.
+func (e SenderIdUpdateStatus) Valid() bool {
+	switch e {
+	case SenderIdUpdateStatusActive:
+		return true
+	case SenderIdUpdateStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TotpEnrollmentRequestMethod.
 const (
 	TotpEnrollmentRequestMethodRecoveryCode TotpEnrollmentRequestMethod = "recovery_code"
@@ -336,12 +375,20 @@ type CustomerCreation struct {
 
 // CustomerGroup defines model for CustomerGroup.
 type CustomerGroup struct {
-	CreatedAt   time.Time           `json:"createdAt"`
-	Description *string             `json:"description,omitempty"`
-	Id          string              `json:"id"`
+	CreatedAt   time.Time `json:"createdAt"`
+	Description *string   `json:"description,omitempty"`
+	Id          string    `json:"id"`
+
+	// MemberCount Les clients membres, quel que soit leur statut.
+	MemberCount int                 `json:"memberCount"`
 	Name        string              `json:"name"`
 	Status      CustomerGroupStatus `json:"status"`
 	UpdatedAt   time.Time           `json:"updatedAt"`
+}
+
+// CustomerGroupAssignment defines model for CustomerGroupAssignment.
+type CustomerGroupAssignment struct {
+	GroupId *openapi_types.UUID `json:"groupId,omitempty"`
 }
 
 // CustomerGroupCreation defines model for CustomerGroupCreation.
@@ -368,6 +415,11 @@ type CustomerPage struct {
 
 // CustomerStatus defines model for CustomerStatus.
 type CustomerStatus string
+
+// CustomerUpdate defines model for CustomerUpdate.
+type CustomerUpdate struct {
+	Name string `json:"name"`
+}
 
 // Error La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
 // et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
@@ -548,6 +600,39 @@ type SecondFactors struct {
 	Totp                   bool `json:"totp"`
 }
 
+// SenderId defines model for SenderId.
+type SenderId struct {
+	Address   string         `json:"address"`
+	CreatedAt time.Time      `json:"createdAt"`
+	Id        string         `json:"id"`
+	Status    SenderIdStatus `json:"status"`
+}
+
+// SenderIdCreation defines model for SenderIdCreation.
+type SenderIdCreation struct {
+	Address string `json:"address"`
+}
+
+// SenderIdStatus defines model for SenderIdStatus.
+type SenderIdStatus string
+
+// SenderIdUpdate defines model for SenderIdUpdate.
+type SenderIdUpdate struct {
+	Status SenderIdUpdateStatus `json:"status"`
+}
+
+// SenderIdUpdateStatus defines model for SenderIdUpdate.Status.
+type SenderIdUpdateStatus string
+
+// SuspensionImpact defines model for SuspensionImpact.
+type SuspensionImpact struct {
+	Accounts       int `json:"accounts"`
+	ActiveAccounts int `json:"activeAccounts"`
+
+	// ClosedAccounts Les comptes fermés, que la cascade de la passerelle repasse `suspended` comme les autres.
+	ClosedAccounts int `json:"closedAccounts"`
+}
+
 // TotpConfirmation Un code de l'application d'authentification en attente, remplaçante ou ajoutée.
 type TotpConfirmation struct {
 	Code string `json:"code"`
@@ -673,6 +758,9 @@ type WebauthnRegistrationOptions struct {
 // WebauthnRegistrationOptionsPublicKeyPubKeyCredParamsType defines model for WebauthnRegistrationOptions.PublicKey.PubKeyCredParams.Type.
 type WebauthnRegistrationOptionsPublicKeyPubKeyCredParamsType string
 
+// CustomerId defines model for CustomerId.
+type CustomerId = string
+
 // GroupId defines model for GroupId.
 type GroupId = string
 
@@ -682,10 +770,18 @@ type OperatorId = string
 // RoleId defines model for RoleId.
 type RoleId = string
 
+// SenderIdParam defines model for SenderIdParam.
+type SenderIdParam = string
+
 // AutoVerrouillage La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
 // et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
 // place chaque refus sous le champ qu'il nomme.
 type AutoVerrouillage = Error
+
+// ClientInconnu La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
+type ClientInconnu = Error
 
 // CompteDesactive La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
 // et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
@@ -747,6 +843,16 @@ type RoleInconnu = Error
 // place chaque refus sous le champ qu'il nomme.
 type RoleIntouchable = Error
 
+// SenderIdInconnu La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
+type SenderIdInconnu = Error
+
+// SenderIdPris La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
+// et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
+// place chaque refus sous le champ qu'il nomme.
+type SenderIdPris = Error
+
 // SessionAbsente La forme d'erreur unique du produit, et celle de l'API Admin. `code` se grep dans les journaux
 // et ne se traduit pas, `message` s'affiche à l'opérateur. `errors[]`, quand il est présent,
 // place chaque refus sous le champ qu'il nomme.
@@ -803,6 +909,18 @@ type UpdateCustomerGroupJSONRequestBody = CustomerGroupUpdate
 
 // CreateCustomerJSONRequestBody defines body for CreateCustomer for application/json ContentType.
 type CreateCustomerJSONRequestBody = CustomerCreation
+
+// UpdateCustomerJSONRequestBody defines body for UpdateCustomer for application/json ContentType.
+type UpdateCustomerJSONRequestBody = CustomerUpdate
+
+// SetCustomerGroupJSONRequestBody defines body for SetCustomerGroup for application/json ContentType.
+type SetCustomerGroupJSONRequestBody = CustomerGroupAssignment
+
+// CreateSenderIdJSONRequestBody defines body for CreateSenderId for application/json ContentType.
+type CreateSenderIdJSONRequestBody = SenderIdCreation
+
+// UpdateSenderIdJSONRequestBody defines body for UpdateSenderId for application/json ContentType.
+type UpdateSenderIdJSONRequestBody = SenderIdUpdate
 
 // CreateOperatorJSONRequestBody defines body for CreateOperator for application/json ContentType.
 type CreateOperatorJSONRequestBody = OperatorCreation
@@ -878,6 +996,36 @@ type ServerInterface interface {
 	// CreateCustomer Crée un client
 	// (POST /customers)
 	CreateCustomer(w http.ResponseWriter, r *http.Request)
+	// GetCustomer La fiche d'un client
+	// (GET /customers/{customerId})
+	GetCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId)
+	// UpdateCustomer Renomme un client
+	// (PATCH /customers/{customerId})
+	UpdateCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId)
+	// SetCustomerGroup Affecte un client à un groupe, ou l'en détache
+	// (PUT /customers/{customerId}/group)
+	SetCustomerGroup(w http.ResponseWriter, r *http.Request, customerId CustomerId)
+	// ReactivateCustomer Réactive un client, sans réactiver ses comptes
+	// (POST /customers/{customerId}/reactivate)
+	ReactivateCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId)
+	// ListSenderIds Les sender IDs d'un client
+	// (GET /customers/{customerId}/sender-ids)
+	ListSenderIds(w http.ResponseWriter, r *http.Request, customerId CustomerId)
+	// CreateSenderId Enregistre un sender ID
+	// (POST /customers/{customerId}/sender-ids)
+	CreateSenderId(w http.ResponseWriter, r *http.Request, customerId CustomerId)
+	// DeleteSenderId Supprime un sender ID
+	// (DELETE /customers/{customerId}/sender-ids/{senderId})
+	DeleteSenderId(w http.ResponseWriter, r *http.Request, customerId CustomerId, senderId SenderIdParam)
+	// UpdateSenderId Approuve ou désactive un sender ID
+	// (PATCH /customers/{customerId}/sender-ids/{senderId})
+	UpdateSenderId(w http.ResponseWriter, r *http.Request, customerId CustomerId, senderId SenderIdParam)
+	// SuspendCustomer Suspend un client et tous ses comptes
+	// (POST /customers/{customerId}/suspend)
+	SuspendCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId)
+	// GetCustomerSuspensionImpact Ce que la suspension d'un client suspendrait avec lui
+	// (GET /customers/{customerId}/suspension-impact)
+	GetCustomerSuspensionImpact(w http.ResponseWriter, r *http.Request, customerId CustomerId)
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
@@ -1031,6 +1179,66 @@ func (_ Unimplemented) ListCustomers(w http.ResponseWriter, r *http.Request, par
 // CreateCustomer Crée un client
 // (POST /customers)
 func (_ Unimplemented) CreateCustomer(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetCustomer La fiche d'un client
+// (GET /customers/{customerId})
+func (_ Unimplemented) GetCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateCustomer Renomme un client
+// (PATCH /customers/{customerId})
+func (_ Unimplemented) UpdateCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetCustomerGroup Affecte un client à un groupe, ou l'en détache
+// (PUT /customers/{customerId}/group)
+func (_ Unimplemented) SetCustomerGroup(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ReactivateCustomer Réactive un client, sans réactiver ses comptes
+// (POST /customers/{customerId}/reactivate)
+func (_ Unimplemented) ReactivateCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListSenderIds Les sender IDs d'un client
+// (GET /customers/{customerId}/sender-ids)
+func (_ Unimplemented) ListSenderIds(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateSenderId Enregistre un sender ID
+// (POST /customers/{customerId}/sender-ids)
+func (_ Unimplemented) CreateSenderId(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteSenderId Supprime un sender ID
+// (DELETE /customers/{customerId}/sender-ids/{senderId})
+func (_ Unimplemented) DeleteSenderId(w http.ResponseWriter, r *http.Request, customerId CustomerId, senderId SenderIdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateSenderId Approuve ou désactive un sender ID
+// (PATCH /customers/{customerId}/sender-ids/{senderId})
+func (_ Unimplemented) UpdateSenderId(w http.ResponseWriter, r *http.Request, customerId CustomerId, senderId SenderIdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SuspendCustomer Suspend un client et tous ses comptes
+// (POST /customers/{customerId}/suspend)
+func (_ Unimplemented) SuspendCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetCustomerSuspensionImpact Ce que la suspension d'un client suspendrait avec lui
+// (GET /customers/{customerId}/suspension-impact)
+func (_ Unimplemented) GetCustomerSuspensionImpact(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1484,6 +1692,284 @@ func (siw *ServerInterfaceWrapper) CreateCustomer(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateCustomer(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCustomer operation middleware
+func (siw *ServerInterfaceWrapper) GetCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCustomer(w, r, customerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCustomer operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCustomer(w, r, customerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetCustomerGroup operation middleware
+func (siw *ServerInterfaceWrapper) SetCustomerGroup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetCustomerGroup(w, r, customerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReactivateCustomer operation middleware
+func (siw *ServerInterfaceWrapper) ReactivateCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReactivateCustomer(w, r, customerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSenderIds operation middleware
+func (siw *ServerInterfaceWrapper) ListSenderIds(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSenderIds(w, r, customerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSenderId operation middleware
+func (siw *ServerInterfaceWrapper) CreateSenderId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSenderId(w, r, customerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSenderId operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSenderId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "senderId" -------------
+	var senderId SenderIdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "senderId", chi.URLParam(r, "senderId"), &senderId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "senderId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSenderId(w, r, customerId, senderId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSenderId operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSenderId(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "senderId" -------------
+	var senderId SenderIdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "senderId", chi.URLParam(r, "senderId"), &senderId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "senderId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSenderId(w, r, customerId, senderId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SuspendCustomer operation middleware
+func (siw *ServerInterfaceWrapper) SuspendCustomer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SuspendCustomer(w, r, customerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCustomerSuspensionImpact operation middleware
+func (siw *ServerInterfaceWrapper) GetCustomerSuspensionImpact(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customerId" -------------
+	var customerId CustomerId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customerId", chi.URLParam(r, "customerId"), &customerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customerId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCustomerSuspensionImpact(w, r, customerId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1958,11 +2444,43 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/customers", wrapper.CreateCustomer)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/customers/{customerId}", wrapper.GetCustomer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/customers/{customerId}", wrapper.UpdateCustomer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/customers/{customerId}/group", wrapper.SetCustomerGroup)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/customers/{customerId}/suspension-impact", wrapper.GetCustomerSuspensionImpact)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/customers/{customerId}/suspend", wrapper.SuspendCustomer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/customers/{customerId}/reactivate", wrapper.ReactivateCustomer)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/customers/{customerId}/sender-ids", wrapper.ListSenderIds)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/customers/{customerId}/sender-ids", wrapper.CreateSenderId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/customers/{customerId}/sender-ids/{senderId}", wrapper.DeleteSenderId)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/customers/{customerId}/sender-ids/{senderId}", wrapper.UpdateSenderId)
+	})
 
 	return r
 }
 
 type AutoVerrouillageJSONResponse Error
+
+type ClientInconnuJSONResponse Error
 
 type CompteDesactiveJSONResponse Error
 
@@ -1987,6 +2505,10 @@ type RequeteInvalideJSONResponse Error
 type RoleInconnuJSONResponse Error
 
 type RoleIntouchableJSONResponse Error
+
+type SenderIdInconnuJSONResponse Error
+
+type SenderIdPrisJSONResponse Error
 
 type SessionAbsenteJSONResponse Error
 
@@ -3818,6 +4340,1134 @@ func (response CreateCustomer503JSONResponse) VisitCreateCustomerResponse(w http
 	return err
 }
 
+type GetCustomerRequestObject struct {
+	CustomerId CustomerId `json:"customerId"`
+}
+
+type GetCustomerResponseObject interface {
+	VisitGetCustomerResponse(w http.ResponseWriter) error
+}
+
+type GetCustomer200JSONResponse Customer
+
+func (response GetCustomer200JSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomer401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response GetCustomer401JSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomer403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response GetCustomer403JSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomer404JSONResponse struct{ ClientInconnuJSONResponse }
+
+func (response GetCustomer404JSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomer422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response GetCustomer422JSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomer503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response GetCustomer503JSONResponse) VisitGetCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomerRequestObject struct {
+	CustomerId CustomerId `json:"customerId"`
+	Body       *UpdateCustomerJSONRequestBody
+}
+
+type UpdateCustomerResponseObject interface {
+	VisitUpdateCustomerResponse(w http.ResponseWriter) error
+}
+
+type UpdateCustomer200JSONResponse Customer
+
+func (response UpdateCustomer200JSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer400JSONResponse struct{ RequeteInvalideJSONResponse }
+
+func (response UpdateCustomer400JSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response UpdateCustomer401JSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response UpdateCustomer403JSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer404JSONResponse struct{ ClientInconnuJSONResponse }
+
+func (response UpdateCustomer404JSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response UpdateCustomer415JSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response UpdateCustomer422JSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCustomer503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response UpdateCustomer503JSONResponse) VisitUpdateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerGroupRequestObject struct {
+	CustomerId CustomerId `json:"customerId"`
+	Body       *SetCustomerGroupJSONRequestBody
+}
+
+type SetCustomerGroupResponseObject interface {
+	VisitSetCustomerGroupResponse(w http.ResponseWriter) error
+}
+
+type SetCustomerGroup200JSONResponse Customer
+
+func (response SetCustomerGroup200JSONResponse) VisitSetCustomerGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerGroup400JSONResponse struct{ RequeteInvalideJSONResponse }
+
+func (response SetCustomerGroup400JSONResponse) VisitSetCustomerGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerGroup401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response SetCustomerGroup401JSONResponse) VisitSetCustomerGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerGroup403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response SetCustomerGroup403JSONResponse) VisitSetCustomerGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerGroup404JSONResponse struct{ ClientInconnuJSONResponse }
+
+func (response SetCustomerGroup404JSONResponse) VisitSetCustomerGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerGroup415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response SetCustomerGroup415JSONResponse) VisitSetCustomerGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerGroup422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response SetCustomerGroup422JSONResponse) VisitSetCustomerGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetCustomerGroup503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response SetCustomerGroup503JSONResponse) VisitSetCustomerGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateCustomerRequestObject struct {
+	CustomerId CustomerId `json:"customerId"`
+}
+
+type ReactivateCustomerResponseObject interface {
+	VisitReactivateCustomerResponse(w http.ResponseWriter) error
+}
+
+type ReactivateCustomer200JSONResponse Customer
+
+func (response ReactivateCustomer200JSONResponse) VisitReactivateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateCustomer401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response ReactivateCustomer401JSONResponse) VisitReactivateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateCustomer403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response ReactivateCustomer403JSONResponse) VisitReactivateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateCustomer404JSONResponse struct{ ClientInconnuJSONResponse }
+
+func (response ReactivateCustomer404JSONResponse) VisitReactivateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateCustomer415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response ReactivateCustomer415JSONResponse) VisitReactivateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateCustomer422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response ReactivateCustomer422JSONResponse) VisitReactivateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateCustomer503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response ReactivateCustomer503JSONResponse) VisitReactivateCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSenderIdsRequestObject struct {
+	CustomerId CustomerId `json:"customerId"`
+}
+
+type ListSenderIdsResponseObject interface {
+	VisitListSenderIdsResponse(w http.ResponseWriter) error
+}
+
+type ListSenderIds200JSONResponse []SenderId
+
+func (response ListSenderIds200JSONResponse) VisitListSenderIdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSenderIds401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response ListSenderIds401JSONResponse) VisitListSenderIdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSenderIds403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response ListSenderIds403JSONResponse) VisitListSenderIdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSenderIds404JSONResponse struct{ ClientInconnuJSONResponse }
+
+func (response ListSenderIds404JSONResponse) VisitListSenderIdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSenderIds422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response ListSenderIds422JSONResponse) VisitListSenderIdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSenderIds503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response ListSenderIds503JSONResponse) VisitListSenderIdsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSenderIdRequestObject struct {
+	CustomerId CustomerId `json:"customerId"`
+	Body       *CreateSenderIdJSONRequestBody
+}
+
+type CreateSenderIdResponseObject interface {
+	VisitCreateSenderIdResponse(w http.ResponseWriter) error
+}
+
+type CreateSenderId201JSONResponse SenderId
+
+func (response CreateSenderId201JSONResponse) VisitCreateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSenderId400JSONResponse struct{ RequeteInvalideJSONResponse }
+
+func (response CreateSenderId400JSONResponse) VisitCreateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSenderId401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response CreateSenderId401JSONResponse) VisitCreateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSenderId403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response CreateSenderId403JSONResponse) VisitCreateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSenderId409JSONResponse struct{ SenderIdPrisJSONResponse }
+
+func (response CreateSenderId409JSONResponse) VisitCreateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSenderId415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response CreateSenderId415JSONResponse) VisitCreateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSenderId422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response CreateSenderId422JSONResponse) VisitCreateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSenderId503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response CreateSenderId503JSONResponse) VisitCreateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSenderIdRequestObject struct {
+	CustomerId CustomerId    `json:"customerId"`
+	SenderId   SenderIdParam `json:"senderId"`
+}
+
+type DeleteSenderIdResponseObject interface {
+	VisitDeleteSenderIdResponse(w http.ResponseWriter) error
+}
+
+type DeleteSenderId204Response struct {
+}
+
+func (response DeleteSenderId204Response) VisitDeleteSenderIdResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteSenderId401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response DeleteSenderId401JSONResponse) VisitDeleteSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSenderId403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response DeleteSenderId403JSONResponse) VisitDeleteSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSenderId404JSONResponse struct{ SenderIdInconnuJSONResponse }
+
+func (response DeleteSenderId404JSONResponse) VisitDeleteSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSenderId415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response DeleteSenderId415JSONResponse) VisitDeleteSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSenderId422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response DeleteSenderId422JSONResponse) VisitDeleteSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSenderId503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response DeleteSenderId503JSONResponse) VisitDeleteSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSenderIdRequestObject struct {
+	CustomerId CustomerId    `json:"customerId"`
+	SenderId   SenderIdParam `json:"senderId"`
+	Body       *UpdateSenderIdJSONRequestBody
+}
+
+type UpdateSenderIdResponseObject interface {
+	VisitUpdateSenderIdResponse(w http.ResponseWriter) error
+}
+
+type UpdateSenderId200JSONResponse SenderId
+
+func (response UpdateSenderId200JSONResponse) VisitUpdateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSenderId400JSONResponse struct{ RequeteInvalideJSONResponse }
+
+func (response UpdateSenderId400JSONResponse) VisitUpdateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSenderId401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response UpdateSenderId401JSONResponse) VisitUpdateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSenderId403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response UpdateSenderId403JSONResponse) VisitUpdateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSenderId404JSONResponse struct{ SenderIdInconnuJSONResponse }
+
+func (response UpdateSenderId404JSONResponse) VisitUpdateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSenderId415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response UpdateSenderId415JSONResponse) VisitUpdateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSenderId422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response UpdateSenderId422JSONResponse) VisitUpdateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSenderId503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response UpdateSenderId503JSONResponse) VisitUpdateSenderIdResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendCustomerRequestObject struct {
+	CustomerId CustomerId `json:"customerId"`
+}
+
+type SuspendCustomerResponseObject interface {
+	VisitSuspendCustomerResponse(w http.ResponseWriter) error
+}
+
+type SuspendCustomer200JSONResponse Customer
+
+func (response SuspendCustomer200JSONResponse) VisitSuspendCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendCustomer401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response SuspendCustomer401JSONResponse) VisitSuspendCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendCustomer403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response SuspendCustomer403JSONResponse) VisitSuspendCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendCustomer404JSONResponse struct{ ClientInconnuJSONResponse }
+
+func (response SuspendCustomer404JSONResponse) VisitSuspendCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendCustomer415JSONResponse struct {
+	TypeDeContenuRefuseJSONResponse
+}
+
+func (response SuspendCustomer415JSONResponse) VisitSuspendCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendCustomer422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response SuspendCustomer422JSONResponse) VisitSuspendCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuspendCustomer503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response SuspendCustomer503JSONResponse) VisitSuspendCustomerResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomerSuspensionImpactRequestObject struct {
+	CustomerId CustomerId `json:"customerId"`
+}
+
+type GetCustomerSuspensionImpactResponseObject interface {
+	VisitGetCustomerSuspensionImpactResponse(w http.ResponseWriter) error
+}
+
+type GetCustomerSuspensionImpact200JSONResponse SuspensionImpact
+
+func (response GetCustomerSuspensionImpact200JSONResponse) VisitGetCustomerSuspensionImpactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomerSuspensionImpact401JSONResponse struct{ SessionAbsenteJSONResponse }
+
+func (response GetCustomerSuspensionImpact401JSONResponse) VisitGetCustomerSuspensionImpactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomerSuspensionImpact403JSONResponse struct{ PermissionRefuseeJSONResponse }
+
+func (response GetCustomerSuspensionImpact403JSONResponse) VisitGetCustomerSuspensionImpactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomerSuspensionImpact404JSONResponse struct{ ClientInconnuJSONResponse }
+
+func (response GetCustomerSuspensionImpact404JSONResponse) VisitGetCustomerSuspensionImpactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomerSuspensionImpact422JSONResponse struct {
+	RefusDeLaPasserelleJSONResponse
+}
+
+func (response GetCustomerSuspensionImpact422JSONResponse) VisitGetCustomerSuspensionImpactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCustomerSuspensionImpact503JSONResponse struct {
+	PasserelleIndisponibleJSONResponse
+}
+
+func (response GetCustomerSuspensionImpact503JSONResponse) VisitGetCustomerSuspensionImpactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type HealthRequestObject struct {
 }
 
@@ -4827,6 +6477,36 @@ type StrictServerInterface interface {
 	// CreateCustomer Crée un client
 	// (POST /customers)
 	CreateCustomer(ctx context.Context, request CreateCustomerRequestObject) (CreateCustomerResponseObject, error)
+	// GetCustomer La fiche d'un client
+	// (GET /customers/{customerId})
+	GetCustomer(ctx context.Context, request GetCustomerRequestObject) (GetCustomerResponseObject, error)
+	// UpdateCustomer Renomme un client
+	// (PATCH /customers/{customerId})
+	UpdateCustomer(ctx context.Context, request UpdateCustomerRequestObject) (UpdateCustomerResponseObject, error)
+	// SetCustomerGroup Affecte un client à un groupe, ou l'en détache
+	// (PUT /customers/{customerId}/group)
+	SetCustomerGroup(ctx context.Context, request SetCustomerGroupRequestObject) (SetCustomerGroupResponseObject, error)
+	// ReactivateCustomer Réactive un client, sans réactiver ses comptes
+	// (POST /customers/{customerId}/reactivate)
+	ReactivateCustomer(ctx context.Context, request ReactivateCustomerRequestObject) (ReactivateCustomerResponseObject, error)
+	// ListSenderIds Les sender IDs d'un client
+	// (GET /customers/{customerId}/sender-ids)
+	ListSenderIds(ctx context.Context, request ListSenderIdsRequestObject) (ListSenderIdsResponseObject, error)
+	// CreateSenderId Enregistre un sender ID
+	// (POST /customers/{customerId}/sender-ids)
+	CreateSenderId(ctx context.Context, request CreateSenderIdRequestObject) (CreateSenderIdResponseObject, error)
+	// DeleteSenderId Supprime un sender ID
+	// (DELETE /customers/{customerId}/sender-ids/{senderId})
+	DeleteSenderId(ctx context.Context, request DeleteSenderIdRequestObject) (DeleteSenderIdResponseObject, error)
+	// UpdateSenderId Approuve ou désactive un sender ID
+	// (PATCH /customers/{customerId}/sender-ids/{senderId})
+	UpdateSenderId(ctx context.Context, request UpdateSenderIdRequestObject) (UpdateSenderIdResponseObject, error)
+	// SuspendCustomer Suspend un client et tous ses comptes
+	// (POST /customers/{customerId}/suspend)
+	SuspendCustomer(ctx context.Context, request SuspendCustomerRequestObject) (SuspendCustomerResponseObject, error)
+	// GetCustomerSuspensionImpact Ce que la suspension d'un client suspendrait avec lui
+	// (GET /customers/{customerId}/suspension-impact)
+	GetCustomerSuspensionImpact(ctx context.Context, request GetCustomerSuspensionImpactRequestObject) (GetCustomerSuspensionImpactResponseObject, error)
 	// Health Sonde de vivacité
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -5435,6 +7115,296 @@ func (sh *strictHandler) CreateCustomer(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// GetCustomer operation middleware
+func (sh *strictHandler) GetCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	var request GetCustomerRequestObject
+
+	request.CustomerId = customerId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCustomer(ctx, request.(GetCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCustomerResponseObject); ok {
+		if err := validResponse.VisitGetCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateCustomer operation middleware
+func (sh *strictHandler) UpdateCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	var request UpdateCustomerRequestObject
+
+	request.CustomerId = customerId
+
+	var body UpdateCustomerJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateCustomer(ctx, request.(UpdateCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateCustomerResponseObject); ok {
+		if err := validResponse.VisitUpdateCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetCustomerGroup operation middleware
+func (sh *strictHandler) SetCustomerGroup(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	var request SetCustomerGroupRequestObject
+
+	request.CustomerId = customerId
+
+	var body SetCustomerGroupJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetCustomerGroup(ctx, request.(SetCustomerGroupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetCustomerGroup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetCustomerGroupResponseObject); ok {
+		if err := validResponse.VisitSetCustomerGroupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReactivateCustomer operation middleware
+func (sh *strictHandler) ReactivateCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	var request ReactivateCustomerRequestObject
+
+	request.CustomerId = customerId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReactivateCustomer(ctx, request.(ReactivateCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReactivateCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReactivateCustomerResponseObject); ok {
+		if err := validResponse.VisitReactivateCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSenderIds operation middleware
+func (sh *strictHandler) ListSenderIds(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	var request ListSenderIdsRequestObject
+
+	request.CustomerId = customerId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSenderIds(ctx, request.(ListSenderIdsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSenderIds")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSenderIdsResponseObject); ok {
+		if err := validResponse.VisitListSenderIdsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSenderId operation middleware
+func (sh *strictHandler) CreateSenderId(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	var request CreateSenderIdRequestObject
+
+	request.CustomerId = customerId
+
+	var body CreateSenderIdJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSenderId(ctx, request.(CreateSenderIdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSenderId")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSenderIdResponseObject); ok {
+		if err := validResponse.VisitCreateSenderIdResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSenderId operation middleware
+func (sh *strictHandler) DeleteSenderId(w http.ResponseWriter, r *http.Request, customerId CustomerId, senderId SenderIdParam) {
+	var request DeleteSenderIdRequestObject
+
+	request.CustomerId = customerId
+	request.SenderId = senderId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSenderId(ctx, request.(DeleteSenderIdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSenderId")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSenderIdResponseObject); ok {
+		if err := validResponse.VisitDeleteSenderIdResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSenderId operation middleware
+func (sh *strictHandler) UpdateSenderId(w http.ResponseWriter, r *http.Request, customerId CustomerId, senderId SenderIdParam) {
+	var request UpdateSenderIdRequestObject
+
+	request.CustomerId = customerId
+	request.SenderId = senderId
+
+	var body UpdateSenderIdJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSenderId(ctx, request.(UpdateSenderIdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSenderId")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSenderIdResponseObject); ok {
+		if err := validResponse.VisitUpdateSenderIdResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SuspendCustomer operation middleware
+func (sh *strictHandler) SuspendCustomer(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	var request SuspendCustomerRequestObject
+
+	request.CustomerId = customerId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SuspendCustomer(ctx, request.(SuspendCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SuspendCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SuspendCustomerResponseObject); ok {
+		if err := validResponse.VisitSuspendCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCustomerSuspensionImpact operation middleware
+func (sh *strictHandler) GetCustomerSuspensionImpact(w http.ResponseWriter, r *http.Request, customerId CustomerId) {
+	var request GetCustomerSuspensionImpactRequestObject
+
+	request.CustomerId = customerId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCustomerSuspensionImpact(ctx, request.(GetCustomerSuspensionImpactRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCustomerSuspensionImpact")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCustomerSuspensionImpactResponseObject); ok {
+		if err := validResponse.VisitGetCustomerSuspensionImpactResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Health operation middleware
 func (sh *strictHandler) Health(w http.ResponseWriter, r *http.Request) {
 	var request HealthRequestObject
@@ -5777,250 +7747,267 @@ func (sh *strictHandler) UpdateRole(w http.ResponseWriter, r *http.Request, role
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"csJCHtqGCpHFyJt6dDC6LZdq9Povr/9vAAAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

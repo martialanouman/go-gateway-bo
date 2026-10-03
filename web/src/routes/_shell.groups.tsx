@@ -167,6 +167,7 @@ function GroupsTable({
       columns={[
         { key: 'name', header: 'Nom', cell: (group) => group.name },
         { key: 'description', header: 'Description', cell: (group) => group.description ?? '—' },
+        { key: 'memberCount', header: 'Clients', cell: (group) => group.memberCount },
         {
           key: 'status',
           header: 'Statut',
@@ -387,9 +388,15 @@ function ConfirmDelete({
       title={`Supprimer ${group.name}`}
     >
       <Refusal error={remove.error} />
-      <p>Ses clients sont détachés du groupe ; aucun client n’est supprimé. Action journalisée.</p>
+      <p>{detachedMembers(group.memberCount)} Action journalisée.</p>
     </Modal>
   )
+}
+
+function detachedMembers(count: number) {
+  if (count === 0) return 'Le groupe n’a aucun client : rien n’est détaché.'
+  if (count === 1) return 'Son client est détaché du groupe ; aucun client n’est supprimé.'
+  return `Ses ${count} clients sont détachés du groupe ; aucun client n’est supprimé.`
 }
 
 function GroupCustomers({ group }: { readonly group: Group }) {

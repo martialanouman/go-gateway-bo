@@ -2822,6 +2822,9 @@ type CustomerGroup struct {
 	CreatedBy   *openapi_types.UUID `json:"created_by,omitempty"`
 	Description *string             `json:"description,omitempty"`
 	Id          openapi_types.UUID  `json:"id"`
+
+	// MemberCount Customers whose group_id designates this group, whatever their status.
+	MemberCount int64               `json:"member_count"`
 	Name        string              `json:"name"`
 	Status      CustomerGroupStatus `json:"status"`
 	UpdatedAt   time.Time           `json:"updated_at"`
