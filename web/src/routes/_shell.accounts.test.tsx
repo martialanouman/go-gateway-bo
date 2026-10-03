@@ -13,6 +13,10 @@ const OTP: components['schemas']['SmppAccount'] = {
   customerId: ACME.id,
   name: 'trafic-otp',
   status: 'active',
+  smppEnabled: true,
+  restEnabled: true,
+  querySmEnabled: true,
+  cancelSmEnabled: true,
   createdAt: '2026-10-01T08:00:00Z',
 }
 

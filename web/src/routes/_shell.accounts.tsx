@@ -131,7 +131,15 @@ function AccountsScreen() {
           <DataTable
             caption="Comptes SMPP"
             columns={[
-              { key: 'name', header: 'Nom', cell: (account: Account) => account.name },
+              {
+                key: 'name',
+                header: 'Nom',
+                cell: (account: Account) => (
+                  <Link params={{ accountId: account.id }} to="/accounts/$accountId">
+                    {account.name}
+                  </Link>
+                ),
+              },
               {
                 key: 'customer',
                 header: 'Client',
