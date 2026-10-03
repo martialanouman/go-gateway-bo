@@ -36,6 +36,15 @@ const (
 	actionGroupCreate        = "group.create"
 	actionGroupUpdate        = "group.update"
 	actionGroupDelete        = "group.delete"
+	actionCustomerCreate     = "customer.create"
+	actionCustomerUpdate     = "customer.update"
+	actionCustomerGroup      = "customer.group"
+	actionCustomerSuspend    = "customer.suspend"
+	actionCustomerReactivate = "customer.reactivate"
+	actionSenderIDCreate     = "sender_id.create"
+	actionSenderIDUpdate     = "sender_id.update"
+	actionSenderIDDelete     = "sender_id.delete"
+	actionAccountCreate      = "account.create"
 )
 
 // Les types de cible que ces actions désignent. Le §3.1 les laisse libres ; les nommer ici évite que
@@ -47,6 +56,9 @@ const (
 	auditTargetRole          = "role"
 	auditTargetNotification  = "notification"
 	auditTargetCustomerGroup = "customer_group"
+	auditTargetCustomer      = "customer"
+	auditTargetSenderID      = "sender_id"
+	auditTargetAccount       = "smpp_account"
 	// auditTargetOperation désigne l'opération du contrat qu'un refus a arrêtée.
 	auditTargetOperation = "operation"
 )

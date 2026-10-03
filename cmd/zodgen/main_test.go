@@ -70,6 +70,15 @@ func TestAConstraintTightenedInTheYamlChangesTheOutput(t *testing.T) {
 	require.Contains(t, resserre, "password: z.string().min(1).max(40),")
 }
 
+// Un motif écrit avec des barres obliques inverses doit arriver intact dans le littéral : `\s` mal
+// échappé deviendrait `s` et laisserait passer ce que le serveur refuse.
+func TestAPatternReachesTheOutputIntact(t *testing.T) {
+	rendered := renderContract(t, strings.Replace(miniContract, "maxLength: 320",
+		"maxLength: 320\n          pattern: '^[a-z\\-\\s]+$'", 1))
+
+	require.Contains(t, rendered, `email: z.string().max(320).regex(/^[a-z\-\s]+$/),`)
+}
+
 // Le champ facultatif du contrat reste facultatif dans le schéma : le rendre obligatoire ferait
 // refuser par le client une requête que le serveur accepte — un refus qui n'existe nulle part.
 func TestAFieldMissingFromRequiredIsOptional(t *testing.T) {

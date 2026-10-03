@@ -17,6 +17,20 @@ export const AccessLinkUse = z.object({
   token: z.string().max(64),
 })
 
+export const AccountCreation = z.object({
+  customerId: z.string(),
+  name: z.string().min(1),
+})
+
+export const CustomerCreation = z.object({
+  groupId: z.string().optional(),
+  name: z.string().min(1),
+})
+
+export const CustomerGroupAssignment = z.object({
+  groupId: z.string().optional(),
+})
+
 export const CustomerGroupCreation = z.object({
   description: z.string().optional(),
   name: z.string().min(1),
@@ -26,6 +40,10 @@ export const CustomerGroupUpdate = z.object({
   description: z.string().optional(),
   name: z.string().min(1).optional(),
   status: z.enum(['active', 'archived']).optional(),
+})
+
+export const CustomerUpdate = z.object({
+  name: z.string().min(1),
 })
 
 export const LoginRequest = z.object({
@@ -62,6 +80,18 @@ export const RoleCreation = z.object({
 export const RoleUpdate = z.object({
   description: z.string().max(500),
   permissions: z.array(z.string()).max(100),
+})
+
+export const SenderIdCreation = z.object({
+  address: z
+    .string()
+    .min(2)
+    .max(11)
+    .regex(/^[a-zA-Z0-9+\-\s]+$/),
+})
+
+export const SenderIdUpdate = z.object({
+  status: z.enum(['active', 'disabled']),
 })
 
 export const TotpConfirmation = z.object({

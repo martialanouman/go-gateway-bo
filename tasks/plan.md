@@ -130,7 +130,7 @@ Aucune autre bibliothèque pour ces rôles sans décision d'équipe.
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat | `@martialanouman/gateway-api-contracts` | **6.9.0** |
+| Contrat | `@martialanouman/gateway-api-contracts` | **6.10.0** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests | `vitest` + `@playwright/test` | 4.1.10 / 1.62.0 |
 | Langage | `typescript` | 7.0.2 |
@@ -312,8 +312,9 @@ pas la compilation. Une contrainte de validation resserrée (`additionalProperti
 > Aucun de ces points n'aurait été vu en lisant seulement le numéro de version, et quatre sur six ne
 > font pas échouer la compilation.
 
-**Dette soldée le 08/08/2026 : le dépôt était alors en 4.0.2** (step-009) ; il est en **6.9.0**
-depuis le 26/09/2026 (deux bumps dédiés, 6.8.0 puis 6.9.0, qui décrit les trames temps réel). Les deux majeures qui le séparaient
+**Dette soldée le 08/08/2026 : le dépôt était alors en 4.0.2** (step-009) ; il est en **6.10.0**
+depuis le 30/09/2026 (6.8.0 et 6.9.0 le 26/09, qui décrit les trames temps réel ; 6.10.0 à step-062,
+qui ajoute `member_count` aux groupes). Les deux majeures qui le séparaient
 de 2.5.0 ont été relues ligne à ligne, et ce qu'elles changent est inscrit dans
 `tasks/steps/done/step-009.md`. En résumé : 133 opérations avant et après, aucune ajoutée, retirée ni
 renommée, six touchées dont aucune que le BFF appelle — le bump s'est payé sur le seul
@@ -406,6 +407,23 @@ l'écran Clients rendu selon ses permissions, crée un client, et l'action laiss
 | **M7** | Conformité : opt-out, numéros entrants, anti-spam | l'exploitation conforme |
 | **M8** | Facturation, contenu, RGPD | la monétisation et l'effacement |
 | **M9** | Alerting, audit, accessibilité, déploiement HA | la mise en production |
+
+> **Amendement de la spec v2.2, le 29/09/2026** (ADR-0020 et ADR-0021 de la passerelle : catégorie de
+> trafic par sender ID, fin de la politique de sender ID, priorité bornée). Les jalons ci-dessous le
+> reprennent par renvoi, sans réécriture de leurs sections : chaque step concernée relit la spec
+> amendée en ouvrant, et **relève le contrat** — 6.10.0 porte `priority_tier` sur les connecteurs, pas
+> encore la catégorie ni la limite de débit par sender ID, et garde `set-account-sender-id-policy`.
+>
+> | Spec | Step |
+> |---|---|
+> | §6.19 sender IDs : catégorie, limite de débit, filtre, signalements | **step-067** (nouvelle, M3) |
+> | Politique de sender ID retirée ; la fiche dit que tout expéditeur doit être enregistré | step-064 |
+> | Connecteurs : `priority_flag_default`, `priority_tier` | step-083 |
+> | Trafic : ventilation par catégorie (débit, lag, attente) | step-082 |
+> | CDR : filtre par catégorie ; trace : catégorie et priorité effective | step-100, step-102 |
+> | Simulateur : catégorie, priorité effective, connecteurs écartés | step-122 |
+> | Anti-spam : règle `category_mismatch` | step-146 |
+> | Alerte par défaut sur le lag OTP | step-180 |
 
 ---
 
@@ -552,10 +570,10 @@ alimente — en topologie multi-instance.
 ## 8. M3 — Clients, comptes SMPP & identifiants
 
 **Objectif :** prouver la tranche verticale (§3) et livrer le socle du domaine à deux niveaux.
-**Dépend de :** M2 · **Steps :** 060 → 066
+**Dépend de :** M2 · **Steps :** 060 → 067 — *067 insérée le 29/09/2026, amendement v2.2*
 
 **Livrables** — groupes de clients (CRUD, filtre transverse), clients (liste, filtres, création, fiche,
-suspension **en cascade** chiffrée, sender IDs), comptes SMPP (canaux, politique de sender ID,
+suspension **en cascade** chiffrée, sender IDs avec catégorie et limite de débit), comptes SMPP (canaux,
 bascules `query_sm`/`cancel_sm`, webhooks, quotas, `max_sessions` avec **badge d'écart**), identifiants
 (**exactement deux cartes** masquées, secret montré **une seule fois**, rotation avec fenêtre de grâce,
 révocation avec impact chiffré, diagnostic d'échec de bind).
@@ -758,7 +776,7 @@ M3 → M4 → M5 → M9`.
 ## 16. Dépendance externe : l'état réel de la passerelle
 
 **C'était la contrainte de planification la plus importante de ce document. Elle est levée, et c'est
-la mesure qui le dit.** Le contrat 6.9.0 décrit **134 opérations** : `list-audit-log` s'est ajoutée
+la mesure qui le dit.** Le contrat 6.10.0 décrit **134 opérations**, comme 6.9.0 : `list-audit-log` s'est ajoutée
 aux 133 que les versions 2.5.0 à 6.7.x décrivaient. La passerelle les sert **toutes**, relevé le
 26/09/2026 sur `go-gateway` au commit `7723f3d`. Aucune opération n'existe plus seulement au contrat.
 

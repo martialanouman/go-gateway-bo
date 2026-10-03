@@ -36,6 +36,9 @@ export function refusalInFrench(issue: z.core.$ZodRawIssue): string {
     case 'too_small':
       return `Cette saisie est trop courte : ${countOfCharacters(issue.minimum)} au minimum.`
 
+    case 'invalid_format':
+      return 'Cette saisie contient un caractère non accepté.'
+
     case 'invalid_value':
       return 'Cette valeur n’est pas dans la liste attendue.'
 

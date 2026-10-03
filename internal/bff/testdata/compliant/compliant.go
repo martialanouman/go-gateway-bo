@@ -166,3 +166,73 @@ func (API) DeleteCustomerGroup(_ context.Context, _ bff.DeleteCustomerGroupReque
 ) (bff.DeleteCustomerGroupResponseObject, error) {
 	return bff.DeleteCustomerGroup204Response{}, nil
 }
+
+func (API) ListCustomers(_ context.Context, _ bff.ListCustomersRequestObject,
+) (bff.ListCustomersResponseObject, error) {
+	return bff.ListCustomers200JSONResponse{}, nil
+}
+
+func (API) CreateCustomer(_ context.Context, _ bff.CreateCustomerRequestObject,
+) (bff.CreateCustomerResponseObject, error) {
+	return bff.CreateCustomer201JSONResponse{}, nil
+}
+
+func (API) GetCustomer(_ context.Context, _ bff.GetCustomerRequestObject,
+) (bff.GetCustomerResponseObject, error) {
+	return bff.GetCustomer200JSONResponse{}, nil
+}
+
+func (API) UpdateCustomer(_ context.Context, _ bff.UpdateCustomerRequestObject,
+) (bff.UpdateCustomerResponseObject, error) {
+	return bff.UpdateCustomer200JSONResponse{}, nil
+}
+
+func (API) SetCustomerGroup(_ context.Context, _ bff.SetCustomerGroupRequestObject,
+) (bff.SetCustomerGroupResponseObject, error) {
+	return bff.SetCustomerGroup200JSONResponse{}, nil
+}
+
+func (API) GetCustomerSuspensionImpact(_ context.Context, _ bff.GetCustomerSuspensionImpactRequestObject,
+) (bff.GetCustomerSuspensionImpactResponseObject, error) {
+	return bff.GetCustomerSuspensionImpact200JSONResponse{}, nil
+}
+
+func (API) SuspendCustomer(_ context.Context, _ bff.SuspendCustomerRequestObject,
+) (bff.SuspendCustomerResponseObject, error) {
+	return bff.SuspendCustomer200JSONResponse{}, nil
+}
+
+func (API) ReactivateCustomer(_ context.Context, _ bff.ReactivateCustomerRequestObject,
+) (bff.ReactivateCustomerResponseObject, error) {
+	return bff.ReactivateCustomer200JSONResponse{}, nil
+}
+
+func (API) ListSenderIds(_ context.Context, _ bff.ListSenderIdsRequestObject,
+) (bff.ListSenderIdsResponseObject, error) {
+	return bff.ListSenderIds200JSONResponse{}, nil
+}
+
+func (API) CreateSenderId(_ context.Context, _ bff.CreateSenderIdRequestObject,
+) (bff.CreateSenderIdResponseObject, error) {
+	return bff.CreateSenderId201JSONResponse{}, nil
+}
+
+func (API) UpdateSenderId(_ context.Context, _ bff.UpdateSenderIdRequestObject,
+) (bff.UpdateSenderIdResponseObject, error) {
+	return bff.UpdateSenderId200JSONResponse{}, nil
+}
+
+func (API) DeleteSenderId(_ context.Context, _ bff.DeleteSenderIdRequestObject,
+) (bff.DeleteSenderIdResponseObject, error) {
+	return bff.DeleteSenderId204Response{}, nil
+}
+
+func (API) ListAccounts(_ context.Context, _ bff.ListAccountsRequestObject,
+) (bff.ListAccountsResponseObject, error) {
+	return bff.ListAccounts200JSONResponse{}, nil
+}
+
+func (API) CreateAccount(_ context.Context, _ bff.CreateAccountRequestObject,
+) (bff.CreateAccountResponseObject, error) {
+	return bff.CreateAccount201JSONResponse{}, nil
+}

@@ -129,8 +129,10 @@ describe('the roles screen', () => {
         (await screen.findByRole('cell', { name: ON_CALL.name })).closest('tr') as HTMLElement,
       ).getByRole('button', { name: 'Supprimer' }),
     )
-    const dialog = await screen.findByRole('dialog', { name: `Supprimer ${ON_CALL.name}` })
-    await user.click(within(dialog).getByRole('button', { name: 'Supprimer le rôle' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: `Supprimer le rôle ${ON_CALL.name} ?`,
+    })
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer' }))
 
     await waitFor(() =>
       expect(screen.queryByRole('cell', { name: ON_CALL.name })).not.toBeInTheDocument(),
@@ -179,12 +181,11 @@ describe('the roles screen', () => {
       ).getByRole('button', { name: 'Supprimer' }),
     )
     await user.click(
-      within(await screen.findByRole('dialog', { name: `Supprimer ${ON_CALL.name}` })).getByRole(
-        'button',
-        {
-          name: 'Supprimer le rôle',
-        },
-      ),
+      within(
+        await screen.findByRole('dialog', { name: `Supprimer le rôle ${ON_CALL.name} ?` }),
+      ).getByRole('button', {
+        name: 'Supprimer',
+      }),
     )
 
     await waitFor(() =>
@@ -261,8 +262,10 @@ describe('the roles screen', () => {
         (await screen.findByRole('cell', { name: ON_CALL.name })).closest('tr') as HTMLElement,
       ).getByRole('button', { name: 'Supprimer' }),
     )
-    const dialog = await screen.findByRole('dialog', { name: `Supprimer ${ON_CALL.name}` })
-    await user.click(within(dialog).getByRole('button', { name: 'Supprimer le rôle' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: `Supprimer le rôle ${ON_CALL.name} ?`,
+    })
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer' }))
 
     expect(await within(dialog).findByText('Détenu entre-temps.')).toBeInTheDocument()
   })

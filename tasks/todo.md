@@ -1,6 +1,6 @@
 # Découpage en steps — Tableau de bord Admin (BFF Go + SPA React)
 
-Dérivé de `plan.md`, lui-même dérivé de `../docs/specification-technique-tableau-de-bord.md` (v2.1).
+Dérivé de `plan.md`, lui-même dérivé de `../docs/specification-technique-tableau-de-bord.md` (v2.2, amendée le 29/09/2026 : catégorie de trafic et priorité, ADR-0020/0021 — renvois dans `plan.md` §4).
 **Un fichier `steps/step-NNN.md` = une PR** : petite, reviewable, laisse le dépôt vert une fois
 mergée. Découpage par jalon (M0…M9) ; numérotation par blocs de 20, pour laisser de la marge
 d'insertion.
@@ -62,7 +62,7 @@ Versions Go relevées sur `proxy.golang.org` le 01/08/2026 ; versions JS telles 
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat API | `@martialanouman/gateway-api-contracts` | **6.9.0** |
+| Contrat API | `@martialanouman/gateway-api-contracts` | **6.10.0** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests client | Vitest + Playwright | 4.1.10 / 1.62.0 |
 | Langage client | TypeScript, `strict` | 7.0.2 |
@@ -252,26 +252,27 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
       qui désignent step-060 pour ce rôle (extension d'`errors[]`, journal serveur, dettes du
       transport) se lisent step-059 : découpage arbitré le 28/09/2026
 - [x] step-060 — Groupes de clients : CRUD et écran (le filtre par groupe naît avec step-061)
-- [ ] step-061 — Clients : liste, filtres, création  ← **la tranche verticale est acquise ici**
-- [ ] step-062 — Fiche client : identité, statut, suspension en cascade, sender IDs
-- [ ] step-063 — Comptes SMPP : liste + création rattachée au client
-- [ ] step-064 — Fiche compte : canaux, politique de sender ID, bascules SMPP, webhooks
+- [x] step-061 — Clients : liste, filtres, création  ← **la tranche verticale est acquise ici**
+- [x] step-062 — Fiche client : identité, statut, suspension en cascade, sender IDs (liste nue ; catégorie et débit : step-067)
+- [x] step-063 — Comptes SMPP : liste + création rattachée au client
+- [ ] step-064 — Fiche compte : canaux, bascules SMPP, webhooks (plus de politique de sender ID, ADR-0020)
 - [ ] step-065 — Quotas, limites de débit et `max_sessions` (avertissement d'écart)
 - [ ] step-066 — Identifiants : deux cartes masquées, secret une fois, rotation, révocation  *(invariant b)*
+- [ ] step-067 — Sender IDs : catégorie de trafic, limite de débit, filtre, signalements `category_mismatch` (§6.19)  ⚠️ **attend le contrat** : 6.10.0 n'a ni catégorie ni limite par sender ID
 
 ## M4 — Exploitation temps réel : trafic, connecteurs, sessions  (§6.3, §6.5)
 - [ ] step-080 — Trafic : instantané REST, widgets et graphiques
 - [ ] step-081 — Trafic : flux WS + bascule de plage (5 min / 1 h / 24 h)
-- [ ] step-082 — Trafic : ventilations connecteur/client/compte/groupe + drill-down CDR
-- [ ] step-083 — Connecteurs : CRUD à divulgation progressive, pool de binds, reconnexion
+- [ ] step-082 — Trafic : ventilations connecteur/client/compte/groupe/**catégorie** (débit, lag, attente) + drill-down CDR
+- [ ] step-083 — Connecteurs : CRUD à divulgation progressive, pool de binds, reconnexion, `priority_flag_default` et `priority_tier` en « Avancé »
 - [ ] step-084 — Connecteurs : santé par bind — `link_status` vs `breaker_state` — et rebind
 - [ ] step-085 — Moniteur de sessions : table virtualisée + deltas WS
 - [ ] step-086 — Sessions : déconnexion forcée + écart `max_sessions`
 
 ## M5 — CDR Explorer & trace  (§6.4, §6.12)
-- [ ] step-100 — Recherche CDR : filtres, curseur, table virtualisée + vues sauvegardées
+- [ ] step-100 — Recherche CDR : filtres (**catégorie** comprise), curseur, table virtualisée + vues sauvegardées
 - [ ] step-101 — Fiche message composée côté BFF
-- [ ] step-102 — Visualiseur de trace (cascade de spans)
+- [ ] step-102 — Visualiseur de trace (cascade de spans, catégorie et priorité effective)
 - [ ] step-103 — Corps du message gardé par `content:read` + journal des accès  *(invariant a)*
 - [ ] step-104 — Export CSV asynchrone gouverné ◊
 
@@ -288,7 +289,7 @@ au passage le manque amont — `cdr:export_bulk` est exigé par le contrat sans 
 ## M6 — Routage & scripts  (§6.1, §6.2, §6.7, §6.13)
 - [ ] step-120 — Routes : table par priorité + réordonnancement souris et clavier
 - [ ] step-121 — Éditeur de route : conditions, stratégie, cibles, route de repli
-- [ ] step-122 — Simulateur de route + bandeau de précédence
+- [ ] step-122 — Simulateur de route + bandeau de précédence ; catégorie, priorité effective, connecteurs écartés par `priority_tier`
 - [ ] step-123 — Routage par numéro exact : CRUD, lookup, import MNP en masse
 - [ ] step-124 — Éditeur Monaco : contrat `resolveRoute`, validation, test contre payload
 - [ ] step-125 — Scripts : versions, publication, retour arrière, portée, santé en direct
@@ -301,7 +302,7 @@ au passage le manque amont — `cdr:export_bulk` est exigé par le contrat sans 
 - [ ] step-143 — Levée de suppression (`suppressions:delete`, confirmation, audit)
 - [ ] step-144 — Numéros entrants : CRUD, affectation, mots-clés
 - [ ] step-145 — File « MO non routés » + création de règle à la volée
-- [ ] step-146 — Anti-spam : CRUD, test, file de revue, tendance de réputation
+- [ ] step-146 — Anti-spam : CRUD, test, file de revue, tendance de réputation ; règle `category_mismatch`
 
 ## M8 — Facturation, contenu & RGPD  (§6.11, §6.18)
 - [ ] step-160 — Facturation : proxy fin + dégradation « module désactivé »
@@ -313,7 +314,7 @@ au passage le manque amont — `cdr:export_bulk` est exigé par le contrat sans 
 - [ ] step-166 — Effacement RGPD (client / MSISDN) + suivi de job + attestation
 
 ## M9 — Alerting, audit & mise en production  (§6.8, §1.2, §4.1)
-- [ ] step-180 — `alert_rules` : CRUD + UI de configuration
+- [ ] step-180 — `alert_rules` : CRUD + UI de configuration ; règle par défaut sur le lag OTP
 - [ ] step-181 — Webhook Alertmanager entrant + distribution des notifications
 - [ ] step-182 — Évaluateur Go sur source durable à offset persisté
 - [ ] step-183 — Réconciliation Alertmanager  ⚠️ **bloqué : surface absente du contrat**

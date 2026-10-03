@@ -68,3 +68,20 @@ func call(t *testing.T, method, url, body string, status int, into any) {
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(into))
 	}
 }
+
+func TestACustomerIsListedUnderItsGroupOnly(t *testing.T) {
+	server := httptest.NewServer(&fakegateway.Customers{})
+	defer server.Close()
+
+	var page struct{ Data []struct{ ID string } }
+	call(t, http.MethodGet, server.URL, "", http.StatusOK, &page)
+	assert.NotNil(t, page.Data, "une page vide doit porter data: [], pas null")
+
+	var created struct{ ID string }
+	call(t, http.MethodPost, server.URL, `{"name":"Acme","group_id":"g1"}`, http.StatusCreated, &created)
+	call(t, http.MethodPost, server.URL, `{"name":"Bêta"}`, http.StatusCreated, nil)
+
+	call(t, http.MethodGet, server.URL+"?groupId=g1", "", http.StatusOK, &page)
+	require.Len(t, page.Data, 1)
+	assert.Equal(t, created.ID, page.Data[0].ID)
+}
