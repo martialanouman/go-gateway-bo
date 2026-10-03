@@ -615,6 +615,228 @@ export interface paths {
         patch: operations["updateCustomerGroup"];
         trace?: never;
     };
+    "/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Une page de clients de la passerelle
+         * @description Relayée vers `list-customers`, 50 clients par page. `groupId` ne garde que les membres courants
+         *     du groupe.
+         */
+        get: operations["listCustomers"];
+        put?: never;
+        /**
+         * Crée un client
+         * @description Relayée vers `create-customer`, avec le nom et le groupe seuls : la facturation et la politique
+         *     de contenu gardent les défauts de la passerelle.
+         */
+        post: operations["createCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{customerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * La fiche d'un client
+         * @description Relayée vers `get-customer`.
+         */
+        get: operations["getCustomer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Renomme un client
+         * @description Relayée vers `update-customer`, avec le nom seul.
+         */
+        patch: operations["updateCustomer"];
+        trace?: never;
+    };
+    "/customers/{customerId}/group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Affecte un client à un groupe, ou l'en détache
+         * @description Relayée vers `set-customer-group`. Un `groupId` absent détache le client.
+         */
+        put: operations["setCustomerGroup"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{customerId}/suspension-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Ce que la suspension d'un client suspendrait avec lui
+         * @description Lue depuis `list-customer-accounts`, 500 comptes au plus. Aucun nombre de sessions : il
+         *     exige le registre de sessions.
+         */
+        get: operations["getCustomerSuspensionImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{customerId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suspend un client et tous ses comptes
+         * @description Relayée vers `suspend-customer` : le client et tous ses comptes passent `suspended`, et la
+         *     passerelle coupe leurs sessions ouvertes.
+         */
+        post: operations["suspendCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{customerId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Réactive un client, sans réactiver ses comptes
+         * @description Relayée vers `update-customer` avec `status: active`. Les comptes restent suspendus : chacun
+         *     se réactive depuis sa fiche.
+         */
+        post: operations["reactivateCustomer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{customerId}/sender-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Les sender IDs d'un client
+         * @description Relayée vers `list-sender-ids`.
+         */
+        get: operations["listSenderIds"];
+        put?: never;
+        /**
+         * Enregistre un sender ID
+         * @description Relayée vers `create-sender-id`. Le sender ID naît en attente d'approbation de l'opérateur
+         *     télécom.
+         */
+        post: operations["createSenderId"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{customerId}/sender-ids/{senderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+                senderId: components["parameters"]["SenderIdParam"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Supprime un sender ID
+         * @description Relayée vers `delete-sender-id`.
+         */
+        delete: operations["deleteSenderId"];
+        options?: never;
+        head?: never;
+        /**
+         * Approuve ou désactive un sender ID
+         * @description Relayée vers `update-sender-id`.
+         */
+        patch: operations["updateSenderId"];
+        trace?: never;
+    };
+    "/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Une page de comptes SMPP
+         * @description Relayée vers `list-smpp-accounts`, 50 comptes par page.
+         */
+        get: operations["listAccounts"];
+        put?: never;
+        /**
+         * Crée un compte SMPP rattaché à un client
+         * @description Relayée vers `create-smpp-account`, avec le client et le nom seuls : canaux, type de bind et
+         *     `max_sessions` gardent les défauts de la passerelle.
+         */
+        post: operations["createAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -996,10 +1218,79 @@ export interface components {
             name: string;
             description?: string;
             status: components["schemas"]["CustomerGroupStatus"];
+            /** @description Les clients membres, quel que soit leur statut. */
+            memberCount: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        /** @enum {string} */
+        CustomerStatus: "active" | "suspended" | "closed";
+        Customer: {
+            id: string;
+            name: string;
+            status: components["schemas"]["CustomerStatus"];
+            groupId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CustomerPage: {
+            items: components["schemas"]["Customer"][];
+            nextCursor?: string;
+        };
+        CustomerCreation: {
+            name: string;
+            /** Format: uuid */
+            groupId?: string;
+        };
+        CustomerUpdate: {
+            name: string;
+        };
+        CustomerGroupAssignment: {
+            /** Format: uuid */
+            groupId?: string;
+        };
+        SuspensionImpact: {
+            accounts: number;
+            activeAccounts: number;
+            /** @description Les comptes fermés, que la cascade de la passerelle repasse `suspended` comme les autres. */
+            closedAccounts: number;
+        };
+        /** @enum {string} */
+        SenderIdStatus: "pending_carrier_approval" | "active" | "disabled";
+        SenderId: {
+            id: string;
+            address: string;
+            status: components["schemas"]["SenderIdStatus"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SenderIdCreation: {
+            address: string;
+        };
+        SenderIdUpdate: {
+            /** @enum {string} */
+            status: "active" | "disabled";
+        };
+        SmppAccount: {
+            id: string;
+            customerId: string;
+            name: string;
+            status: components["schemas"]["CustomerStatus"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AccountPage: {
+            items: components["schemas"]["SmppAccount"][];
+            nextCursor?: string;
+        };
+        AccountCreation: {
+            /** Format: uuid */
+            customerId: string;
+            name: string;
         };
         CustomerGroupCreation: {
             name: string;
@@ -1030,6 +1321,42 @@ export interface components {
         };
         /** @description Aucun groupe ne porte cet identifiant. */
         GroupeInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Aucun client ne porte cet identifiant. */
+        ClientInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Ce client n'a aucun sender ID de cet identifiant. */
+        SenderIdInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Ce client a déjà enregistré cette adresse ; `errors[]` place le refus sous `address`. */
+        SenderIdPris: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Ce client a déjà un compte de ce nom ; `errors[]` place le refus sous `name`. */
+        NomDeComptePris: {
             headers: {
                 [name: string]: unknown;
             };
@@ -1176,6 +1503,8 @@ export interface components {
         OperatorId: string;
         RoleId: string;
         GroupId: string;
+        CustomerId: string;
+        SenderIdParam: string;
     };
     requestBodies: never;
     headers: never;
@@ -2415,6 +2744,424 @@ export interface operations {
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["GroupeInconnu"];
             409: components["responses"]["NomDeGroupePris"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    listCustomers: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["CustomerStatus"];
+                groupId?: string;
+                /** @description Le `nextCursor` de la page précédente. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Une page de clients. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPage"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    createCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCreation"];
+            };
+        };
+        responses: {
+            /** @description Le client créé. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    getCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le client. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["ClientInconnu"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    updateCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Le client renommé. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["ClientInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    setCustomerGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerGroupAssignment"];
+            };
+        };
+        responses: {
+            /** @description Le client, avec son nouveau groupe. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["ClientInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    getCustomerSuspensionImpact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les comptes du client. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuspensionImpact"];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["ClientInconnu"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    suspendCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le client suspendu. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["ClientInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    reactivateCustomer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le client réactivé. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["ClientInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    listSenderIds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tous les sender IDs du client. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SenderId"][];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["ClientInconnu"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    createSenderId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SenderIdCreation"];
+            };
+        };
+        responses: {
+            /** @description Le sender ID enregistré. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SenderId"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            409: components["responses"]["SenderIdPris"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    deleteSenderId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+                senderId: components["parameters"]["SenderIdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Le sender ID est supprimé. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["SenderIdInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    updateSenderId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+                senderId: components["parameters"]["SenderIdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SenderIdUpdate"];
+            };
+        };
+        responses: {
+            /** @description Le sender ID modifié. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SenderId"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["SenderIdInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    listAccounts: {
+        parameters: {
+            query?: {
+                customerId?: string;
+                status?: components["schemas"]["CustomerStatus"];
+                /** @description Le `nextCursor` de la page précédente. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Une page de comptes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountPage"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    createAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCreation"];
+            };
+        };
+        responses: {
+            /** @description Le compte créé. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmppAccount"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            409: components["responses"]["NomDeComptePris"];
             415: components["responses"]["TypeDeContenuRefuse"];
             422: components["responses"]["RefusDeLaPasserelle"];
             503: components["responses"]["PasserelleIndisponible"];

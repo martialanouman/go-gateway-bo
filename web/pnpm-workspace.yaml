@@ -18,6 +18,11 @@ allowBuilds:
 # volontairement la portée à ce chemin — rien d'autre du dépôt ne dépend de ces paquets, et une
 # correction globale masquerait le jour où quelque chose d'autre en dépendrait.
 overrides:
+  # braces <=3.0.3 : épuisement de pile par motifs profondément imbriqués (GHSA-vfj7-8cjw-p6xm,
+  # élevée), sans version corrigée publiée. Chemin unique : `@stoplight/prism-cli > chokidar@3`.
+  # chokidar 4 ne dépend plus de braces ; Prism n'y surveille qu'un fichier, `disableGlobbing`
+  # posé (`prism-cli/dist/util/runner.js`). chokidar 5 est ESM seul, Prism le charge en CJS.
+  '@stoplight/prism-cli>chokidar': '^4.0.3'
   # lodash <=4.17.23 : injection de code via `_.template` (GHSA-r5fr-rjxr-66jc, élevée) et deux
   # pollutions de prototype. Aucun correctif en 4.17.x — la première version saine est 4.18.
   'postman-collection>lodash': '^4.18.1'
@@ -43,9 +48,11 @@ overrides:
   # (confusion d'hôte, canonicalisation IDN sautée), GHSA-jqff-g426-hqxp (confusion d'hôte par schéma
   # percent-encodé) et GHSA-f65p-4m7j-42xc / GHSA-fph4-wmhf-6fwf (SSRF par autorité malformée ou
   # répétée). Le plancher est passé de 3.1.5 à 3.1.6 le 04/09/2026 : les trois derniers sont apparus
-  # après, et `^3.1.5` les laissait tous passer.
-  # Arrive par `ajv`, le validateur que Prism utilise pour juger les requêtes.
-  'ajv>fast-uri': '^3.1.6'
+  # après, et `^3.1.5` les laissait tous passer. Plancher passé à 3.1.8 le 30/09/2026 :
+  # GHSA-hrr3-gc8f-f4qj (casse d'hôte incohérente, modérée).
+  # Arrive par `ajv`, le validateur que Prism utilise pour juger les requêtes, et par
+  # `@hookform/resolvers`.
+  'ajv>fast-uri': '^3.1.8'
   # nanoid <3.3.17 : un générateur personnalisé boucle indéfiniment quand la taille vaut zéro
   # (GHSA-2v37-7h3g-55p8, élevée). `pnpm audit` l'annonce par huit chemins, mais `pnpm why` n'en voit
   # qu'un seul parent — `postcss`, qui s'en sert pour nommer ses fichiers de source map. Un sélecteur

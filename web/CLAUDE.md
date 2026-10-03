@@ -24,6 +24,18 @@ désactivé (dégradation propre, **jamais** une erreur) · erreur (réalité HT
 restent affichées » + Réessayer). **Source : `tasks/plan.md` §1.9** — cette liste en dérive et
 n'arbitre rien ; le chargement à froid y est un sixième *moment*, pas un sixième état.
 
+**Modale de confirmation** (Material Design, *Dialogs*) — décidé le 03/10/2026, vaut pour toute
+modale qui engage une action :
+- **titre** : une question qui nomme l'action et son objet — « Suspendre BICICI ? » ;
+- **corps** : ce qui va se passer, au futur et en langage courant, y compris ce qui ne se défait pas
+  et comment revenir en arrière ; une phrase par idée, sans jargon (« journalisée » devient
+  « L'action est enregistrée dans le journal d'audit. ») ;
+- **boutons** : le verbe du titre seul pour confirmer (« Suspendre »), « Annuler » pour renoncer —
+  jamais « OK » ni « Oui ».
+
+**Statuts** : technique (lien, disjoncteur, remise) en `snake_case` du contrat, que l'opérateur grep ;
+administratif (client, compte, groupe, nom d'expéditeur) en français — « Actif », « Suspendu ».
+
 **Un écran non encore livré** : route déclarée + état vide explicite nommant le jalon. Jamais une page
 blanche ni un lien mort.
 

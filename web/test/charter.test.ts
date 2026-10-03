@@ -158,6 +158,8 @@ describe('charter tokens', () => {
     const imported = ['src/main.tsx', 'src/routes/[_]design.tsx'].flatMap((file) =>
       parseAst(readFileSync(join(web, file), 'utf8'), { lang: 'tsx' })
         .body.flatMap((node) => (node.type === 'ImportDeclaration' ? [node.source.value] : []))
+        // `?url` compte : `/_design` lit sa feuille par son adresse pour la garder hors de l'entrée.
+        .map((specifier) => specifier.replace(/\?url$/, ''))
         .filter((specifier) => specifier.endsWith('.css'))
         .map((specifier) => join(web, 'src', specifier.replace(/^~\//, ''))),
     )

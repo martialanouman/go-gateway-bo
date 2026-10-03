@@ -1093,6 +1093,334 @@ paths:
         '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
         '503': { $ref: '#/components/responses/PasserelleIndisponible' }
 
+  /customers:
+    get:
+      operationId: listCustomers
+      summary: Une page de clients de la passerelle
+      description: |
+        Relayée vers `list-customers`, 50 clients par page. `groupId` ne garde que les membres courants
+        du groupe.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/CustomerStatus' }
+        - name: groupId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: cursor
+          in: query
+          required: false
+          description: Le `nextCursor` de la page précédente.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Une page de clients.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CustomerPage' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    post:
+      operationId: createCustomer
+      summary: Crée un client
+      description: |
+        Relayée vers `create-customer`, avec le nom et le groupe seuls : la facturation et la politique
+        de contenu gardent les défauts de la passerelle.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerCreation' }
+      responses:
+        '201':
+          description: Le client créé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /customers/{customerId}:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    get:
+      operationId: getCustomer
+      summary: La fiche d'un client
+      description: Relayée vers `get-customer`.
+      responses:
+        '200':
+          description: Le client.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/ClientInconnu' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    patch:
+      operationId: updateCustomer
+      summary: Renomme un client
+      description: Relayée vers `update-customer`, avec le nom seul.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerUpdate' }
+      responses:
+        '200':
+          description: Le client renommé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/ClientInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /customers/{customerId}/group:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    put:
+      operationId: setCustomerGroup
+      summary: Affecte un client à un groupe, ou l'en détache
+      description: Relayée vers `set-customer-group`. Un `groupId` absent détache le client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerGroupAssignment' }
+      responses:
+        '200':
+          description: Le client, avec son nouveau groupe.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/ClientInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /customers/{customerId}/suspension-impact:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    get:
+      operationId: getCustomerSuspensionImpact
+      summary: Ce que la suspension d'un client suspendrait avec lui
+      description: |
+        Lue depuis `list-customer-accounts`, 500 comptes au plus. Aucun nombre de sessions : il
+        exige le registre de sessions.
+      responses:
+        '200':
+          description: Les comptes du client.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuspensionImpact' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/ClientInconnu' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /customers/{customerId}/suspend:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    post:
+      operationId: suspendCustomer
+      summary: Suspend un client et tous ses comptes
+      description: |
+        Relayée vers `suspend-customer` : le client et tous ses comptes passent `suspended`, et la
+        passerelle coupe leurs sessions ouvertes.
+      responses:
+        '200':
+          description: Le client suspendu.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/ClientInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /customers/{customerId}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    post:
+      operationId: reactivateCustomer
+      summary: Réactive un client, sans réactiver ses comptes
+      description: |
+        Relayée vers `update-customer` avec `status: active`. Les comptes restent suspendus : chacun
+        se réactive depuis sa fiche.
+      responses:
+        '200':
+          description: Le client réactivé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/ClientInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /customers/{customerId}/sender-ids:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+    get:
+      operationId: listSenderIds
+      summary: Les sender IDs d'un client
+      description: Relayée vers `list-sender-ids`.
+      responses:
+        '200':
+          description: Tous les sender IDs du client.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SenderId' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/ClientInconnu' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    post:
+      operationId: createSenderId
+      summary: Enregistre un sender ID
+      description: |
+        Relayée vers `create-sender-id`. Le sender ID naît en attente d'approbation de l'opérateur
+        télécom.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SenderIdCreation' }
+      responses:
+        '201':
+          description: Le sender ID enregistré.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SenderId' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '409': { $ref: '#/components/responses/SenderIdPris' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /customers/{customerId}/sender-ids/{senderId}:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+      - $ref: '#/components/parameters/SenderIdParam'
+    patch:
+      operationId: updateSenderId
+      summary: Approuve ou désactive un sender ID
+      description: Relayée vers `update-sender-id`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SenderIdUpdate' }
+      responses:
+        '200':
+          description: Le sender ID modifié.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SenderId' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/SenderIdInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    delete:
+      operationId: deleteSenderId
+      summary: Supprime un sender ID
+      description: Relayée vers `delete-sender-id`.
+      responses:
+        '204':
+          description: Le sender ID est supprimé.
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/SenderIdInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /accounts:
+    get:
+      operationId: listAccounts
+      summary: Une page de comptes SMPP
+      description: Relayée vers `list-smpp-accounts`, 50 comptes par page.
+      parameters:
+        - name: customerId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/CustomerStatus' }
+        - name: cursor
+          in: query
+          required: false
+          description: Le `nextCursor` de la page précédente.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Une page de comptes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountPage' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    post:
+      operationId: createAccount
+      summary: Crée un compte SMPP rattaché à un client
+      description: |
+        Relayée vers `create-smpp-account`, avec le client et le nom seuls : canaux, type de bind et
+        `max_sessions` gardent les défauts de la passerelle.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountCreation' }
+      responses:
+        '201':
+          description: Le compte créé.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmppAccount' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '409': { $ref: '#/components/responses/NomDeComptePris' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
 components:
   parameters:
     OperatorId:
@@ -1110,6 +1438,16 @@ components:
       in: path
       required: true
       schema: { type: string }
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema: { type: string }
+    SenderIdParam:
+      name: senderId
+      in: path
+      required: true
+      schema: { type: string }
 
   responses:
     # Les réponses partagées par les routes d'administration. `PermissionRefusee` couvre les trois
@@ -1124,6 +1462,28 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     GroupeInconnu:
       description: Aucun groupe ne porte cet identifiant.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ClientInconnu:
+      description: Aucun client ne porte cet identifiant.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SenderIdInconnu:
+      description: Ce client n'a aucun sender ID de cet identifiant.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SenderIdPris:
+      description: |
+        Ce client a déjà enregistré cette adresse ; `errors[]` place le refus sous `address`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NomDeComptePris:
+      description: |
+        Ce client a déjà un compte de ce nom ; `errors[]` place le refus sous `name`.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -1907,9 +2267,134 @@ components:
         name: { type: string }
         description: { type: string }
         status: { $ref: '#/components/schemas/CustomerGroupStatus' }
+        memberCount:
+          type: integer
+          minimum: 0
+          description: Les clients membres, quel que soit leur statut.
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, name, status, memberCount, createdAt, updatedAt]
+
+    CustomerStatus:
+      type: string
+      enum: [active, suspended, closed]
+
+    Customer:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/CustomerStatus' }
+        groupId: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
       required: [id, name, status, createdAt, updatedAt]
+
+    CustomerPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Customer' }
+        nextCursor: { type: string }
+      required: [items]
+
+    CustomerCreation:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+        groupId: { type: string, format: uuid }
+      required: [name]
+
+    CustomerUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+      required: [name]
+
+    CustomerGroupAssignment:
+      type: object
+      additionalProperties: false
+      properties:
+        groupId: { type: string, format: uuid }
+
+    SuspensionImpact:
+      type: object
+      additionalProperties: false
+      properties:
+        accounts: { type: integer, minimum: 0 }
+        activeAccounts: { type: integer, minimum: 0 }
+        closedAccounts:
+          type: integer
+          minimum: 0
+          description: |
+            Les comptes fermés, que la cascade de la passerelle repasse `suspended` comme les autres.
+      required: [accounts, activeAccounts, closedAccounts]
+
+    SenderIdStatus:
+      type: string
+      enum: [pending_carrier_approval, active, disabled]
+
+    SenderId:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        address: { type: string }
+        status: { $ref: '#/components/schemas/SenderIdStatus' }
+        createdAt: { type: string, format: date-time }
+      required: [id, address, status, createdAt]
+
+    SenderIdCreation:
+      type: object
+      additionalProperties: false
+      properties:
+        address:
+          type: string
+          minLength: 2
+          maxLength: 11
+          pattern: '^[a-zA-Z0-9+\-\s]+$'
+      required: [address]
+
+    SenderIdUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [active, disabled] }
+      required: [status]
+
+    SmppAccount:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        customerId: { type: string }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/CustomerStatus' }
+        createdAt: { type: string, format: date-time }
+      required: [id, customerId, name, status, createdAt]
+
+    AccountPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SmppAccount' }
+        nextCursor: { type: string }
+      required: [items]
+
+    AccountCreation:
+      type: object
+      additionalProperties: false
+      properties:
+        customerId: { type: string, format: uuid }
+        name: { type: string, minLength: 1 }
+      required: [customerId, name]
 
     CustomerGroupCreation:
       type: object

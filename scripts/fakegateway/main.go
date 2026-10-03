@@ -1,6 +1,6 @@
 // Command fakegateway sert `internal/fakegateway` comme processus, pour que les parcours Playwright
 // aient un amont : le mock Prism ne sert pas les flux temps réel, que ces parcours seuls exercent
-// contre le vrai binaire, et ne garde pas l'état des groupes qu'un parcours crée puis archive.
+// contre le vrai binaire, et ne garde pas l'état des groupes et des clients qu'un parcours crée.
 package main
 
 import (
@@ -25,9 +25,15 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/admin/stream/", gateway)
 
-	groups := &fakegateway.Groups{}
+	customers := &fakegateway.Customers{}
+	groups := &fakegateway.Groups{Members: customers}
 	mux.Handle(fakegateway.GroupsPath, groups)
 	mux.Handle(fakegateway.GroupsPath+"/{id}", groups)
+	mux.Handle(fakegateway.CustomersPath, customers)
+	mux.Handle(fakegateway.CustomersPath+"/{id}", customers)
+	mux.Handle(fakegateway.CustomersPath+"/{id}/{action}", customers)
+	mux.Handle(fakegateway.CustomersPath+"/{id}/{action}/{senderId}", customers)
+	mux.HandleFunc("/admin/smpp-accounts", customers.ServeAccounts)
 	mux.HandleFunc("GET /control/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})

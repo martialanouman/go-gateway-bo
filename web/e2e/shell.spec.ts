@@ -571,17 +571,76 @@ test('the binary serves the painted shell, then the application replaces it', as
   await nouveauGroupe.getByRole('button', { name: 'Créer le groupe' }).click()
 
   const groupe = page.getByRole('row', { name: /Revendeurs de parcours/ })
-  await expect(groupe).toContainText('active')
+  await expect(groupe).toContainText('Actif')
+
+  // step-061 : la tranche verticale — un client créé dans ce groupe, relayé, puis retrouvé par le lien
+  // que l'écran Groupes porte vers ses clients.
+  await page.goto('/customers')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Clients')
+  await expect(
+    page.getByRole('heading', { level: 2, name: 'Aucun client pour l’instant' }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Nouveau client' }).first().click()
+  const nouveauClient = page.getByRole('dialog', { name: 'Nouveau client' })
+  await nouveauClient.getByLabel('Nom').fill('Client de parcours')
+  await nouveauClient.getByRole('combobox', { name: 'Groupe' }).click()
+  await page.getByRole('option', { name: 'Revendeurs de parcours' }).click()
+  await nouveauClient.getByRole('button', { name: 'Créer le client' }).click()
+  await expect(page.getByText('Client de parcours est créé.')).toBeVisible()
+
+  await page.goto('/groups')
+  await groupe.getByRole('link', { name: 'Voir les clients' }).click()
+  await expect(page).toHaveURL(/\/customers\?groupId=/)
+  await expect(page.getByRole('row', { name: /Client de parcours/ })).toContainText(
+    'Revendeurs de parcours',
+  )
+
+  // step-062 : la fiche du client — un nom d’expéditeur enregistré, puis la suspension, chiffrée avant de
+  // partir.
+  await page.getByRole('link', { name: 'Client de parcours' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Client de parcours')
+  await page.getByRole('button', { name: 'Enregistrer un nom d’expéditeur' }).first().click()
+  const enregistrement = page.getByRole('dialog', { name: 'Enregistrer un nom d’expéditeur' })
+  await enregistrement.getByLabel('Nom').fill('PARCOURS')
+  await enregistrement.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(page.getByRole('row', { name: /PARCOURS/ })).toContainText(
+    'En attente d’approbation',
+  )
+
+  // step-063 : un compte créé depuis les comptes du client, que la suspension chiffre ensuite.
+  await page.getByRole('link', { name: 'Voir ses comptes' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Comptes de Client de parcours')
+  await page.getByRole('button', { name: 'Nouveau compte' }).first().click()
+  const nouveauCompte = page.getByRole('dialog', { name: 'Nouveau compte SMPP' })
+  await nouveauCompte.getByLabel('Nom').fill('compte-de-parcours')
+  await nouveauCompte.getByRole('button', { name: 'Créer le compte' }).click()
+  await expect(page.getByRole('row', { name: /compte-de-parcours/ })).toContainText('Actif')
+  await page
+    .getByRole('row', { name: /compte-de-parcours/ })
+    .getByRole('link', { name: 'Client de parcours' })
+    .click()
+
+  await page.getByRole('button', { name: 'Suspendre' }).click()
+  const suspension = page.getByRole('dialog', { name: 'Suspendre Client de parcours ?' })
+  await expect(suspension).toContainText('Son compte SMPP sera suspendu')
+  await suspension.getByRole('button', { name: 'Suspendre' }).click()
+  await expect(page.getByRole('button', { name: 'Réactiver' })).toBeVisible()
+  await page.goto('/customers?status=suspended')
+  await expect(page.getByRole('row', { name: /Client de parcours/ })).toBeVisible()
+
+  await page.goto('/groups')
   await groupe.getByRole('button', { name: 'Archiver' }).click()
   await expect(page.getByText(/Revendeurs de parcours est archivé/)).toBeVisible()
   await expect(groupe).toHaveCount(0)
 
   await page.getByRole('tab', { name: 'Archivés' }).click()
-  await expect(groupe).toContainText('archived')
+  await expect(groupe).toContainText('Archivé')
   await groupe.getByRole('button', { name: 'Supprimer' }).click()
-  const suppression = page.getByRole('dialog', { name: 'Supprimer Revendeurs de parcours' })
-  await expect(suppression).toContainText('aucun client n’est supprimé')
-  await suppression.getByRole('button', { name: 'Supprimer le groupe' }).click()
+  const suppression = page.getByRole('dialog', {
+    name: 'Supprimer le groupe Revendeurs de parcours ?',
+  })
+  await expect(suppression).toContainText('Son client sera détaché du groupe')
+  await suppression.getByRole('button', { name: 'Supprimer' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'Aucun groupe archivé' })).toBeVisible()
 
   // step-030 : le premier administrateur fait entrer un second opérateur, sans toucher à la base.

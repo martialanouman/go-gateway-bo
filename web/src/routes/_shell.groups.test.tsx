@@ -151,7 +151,7 @@ describe('the groups screen', () => {
     await user.click(screen.getByRole('tab', { name: 'Archivés' }))
     const archived = await screen.findByRole('cell', { name: RESELLERS.name })
     const archivedRow = within(archived.closest('tr') as HTMLElement)
-    expect(archivedRow.getByText('archived')).toBeInTheDocument()
+    expect(archivedRow.getByText('Archivé')).toBeInTheDocument()
 
     await user.click(archivedRow.getByRole('button', { name: 'Désarchiver' }))
     expect(await screen.findByText(/Revendeurs est de nouveau actif/)).toBeInTheDocument()
@@ -162,14 +162,17 @@ describe('the groups screen', () => {
     expect(await screen.findByRole('cell', { name: RESELLERS.name })).toBeInTheDocument()
   })
 
-  it('deletes a group after a confirmation that says no customer is deleted', async () => {
+  it('deletes a group after a confirmation that counts the customers it detaches', async () => {
     const user = userEvent.setup()
     const row = await visit(WRITER)
 
+    expect(row.getByRole('cell', { name: '1' })).toBeInTheDocument()
     await user.click(row.getByRole('button', { name: 'Supprimer' }))
-    const dialog = await screen.findByRole('dialog', { name: `Supprimer ${RESELLERS.name}` })
-    expect(dialog).toHaveTextContent('aucun client n’est supprimé')
-    await user.click(within(dialog).getByRole('button', { name: 'Supprimer le groupe' }))
+    const dialog = await screen.findByRole('dialog', {
+      name: `Supprimer le groupe ${RESELLERS.name} ?`,
+    })
+    expect(dialog).toHaveTextContent('Son client sera détaché du groupe ; il ne sera pas supprimé.')
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer' }))
 
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Aucun groupe pour l’instant' }),

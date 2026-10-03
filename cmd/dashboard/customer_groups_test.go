@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/cucumber/godog"
@@ -20,6 +22,8 @@ type customerGroupsWorld struct {
 	process  *process
 	upstream *httptest.Server
 	received atomic.Int32
+	mu       sync.Mutex
+	queries  []string
 }
 
 func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
@@ -29,8 +33,18 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^une passerelle qui compte les requêtes reçues$`, func() error {
 		return w.answering(http.StatusOK, `[]`)
 	})
-	ctx.When(`^le navigateur envoie (POST|PATCH|DELETE) "([^"]*)"(?: avec le corps '([^']*)')?$`, w.send)
+	ctx.When(`^le navigateur envoie (POST|PUT|PATCH|DELETE) "([^"]*)"(?: avec le corps '([^']*)')?$`, w.send)
 	ctx.Then(`^la passerelle n'a reçu aucune requête$`, w.receivedNothing)
+	ctx.Then(`^la passerelle a reçu "([^"]*)"$`, w.receivedQuery)
+	// Le détachement ne s'écrit qu'en `null` : la passerelle exige le champ présent.
+	ctx.Then(`^la passerelle a reçu un détachement de groupe$`, func() error {
+		return w.receivedQuery(`"group_id":null`)
+	})
+	ctx.Given(`^une passerelle dont le client a (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.servingAccounts)
+	ctx.Given(`^une passerelle qui répond 409 (?:à l'enregistrement d'un sender ID|à la création)$`, func() error {
+		return w.answering(http.StatusConflict, `{"code":"conflict","message":"sender id already exists"}`)
+	})
+	ctx.Then(`^la réponse compte (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.countsAccounts)
 	ctx.Given(`^une passerelle injoignable$`, w.unreachable)
 	ctx.Then(`^la réponse ne porte pas "([^"]*)"$`, w.responseOmits)
 	ctx.Then(`^la réponse liste au moins un groupe$`, w.listsAtLeastOneGroup)
@@ -67,8 +81,13 @@ func (w *customerGroupsWorld) failingWithMessage(message string) error {
 func (w *customerGroupsWorld) answering(status int, body string) error {
 	w.upstream = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// Le hub ouvre aussi ses flux temps réel sur cette adresse : seul l'appel relayé compte.
-		if strings.HasPrefix(r.URL.Path, "/admin/customer-groups") {
+		if strings.HasPrefix(r.URL.Path, "/admin/customer-groups") || strings.HasPrefix(r.URL.Path, "/admin/customers") ||
+			strings.HasPrefix(r.URL.Path, "/admin/smpp-accounts") {
 			w.received.Add(1)
+			sent, _ := io.ReadAll(r.Body)
+			w.mu.Lock()
+			w.queries = append(w.queries, r.URL.RawQuery+" "+string(sent))
+			w.mu.Unlock()
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
@@ -126,6 +145,19 @@ func (w *customerGroupsWorld) refusalPlacesAnErrorUnder(field string) error {
 	return fmt.Errorf("le refus ne place rien sous %q :\n%s", field, w.process.received.body)
 }
 
+func (w *customerGroupsWorld) receivedQuery(fragment string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	for _, query := range w.queries {
+		if strings.Contains(query, fragment) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("aucune requête reçue ne porte %q : %q", fragment, w.queries)
+}
+
 func (w *customerGroupsWorld) receivedNothing() error {
 	if received := w.received.Load(); received != 0 {
 		return fmt.Errorf("la passerelle a reçu %d requête(s) de liste des groupes", received)
@@ -146,6 +178,45 @@ func (w *customerGroupsWorld) unreachable() error {
 func (w *customerGroupsWorld) responseOmits(fragment string) error {
 	if strings.Contains(w.process.received.body, fragment) {
 		return fmt.Errorf("la réponse porte %q :\n%s", fragment, w.process.received.body)
+	}
+
+	return nil
+}
+
+func (w *customerGroupsWorld) servingAccounts(total, active, closed int) error {
+	accounts := make([]string, 0, total)
+	for index := range total {
+		status := "suspended"
+		if index < active {
+			status = "active"
+		} else if index < active+closed {
+			status = "closed"
+		}
+
+		accounts = append(accounts, fmt.Sprintf(`{"id":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a%02d",`+
+			`"customer_id":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b","name":"compte %d","status":%q,`+
+			`"smpp_enabled":true,"rest_enabled":false,"sender_id_policy":"strict","allowed_bind_types":"trx",`+
+			`"max_sessions":1,"created_at":"2026-09-30T00:00:00Z","updated_at":"2026-09-30T00:00:00Z"}`,
+			index, index, status))
+	}
+
+	return w.answering(http.StatusOK, "["+strings.Join(accounts, ",")+"]")
+}
+
+func (w *customerGroupsWorld) countsAccounts(total, active, closed int) error {
+	var impact struct {
+		Accounts       int `json:"accounts"`
+		ActiveAccounts int `json:"activeAccounts"`
+		ClosedAccounts int `json:"closedAccounts"`
+	}
+
+	if err := json.Unmarshal([]byte(w.process.received.body), &impact); err != nil {
+		return fmt.Errorf("la réponse n'est pas un impact : %w\n%s", err, w.process.received.body)
+	}
+
+	if impact.Accounts != total || impact.ActiveAccounts != active || impact.ClosedAccounts != closed {
+		return fmt.Errorf("la réponse compte %d comptes dont %d actifs et %d fermés, attendu %d, %d et %d",
+			impact.Accounts, impact.ActiveAccounts, impact.ClosedAccounts, total, active, closed)
 	}
 
 	return nil

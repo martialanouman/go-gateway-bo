@@ -226,7 +226,7 @@ function RoleEditor({ role, onClose }: { readonly role?: Role; readonly onClose:
           {role === undefined
             ? 'Le rôle accorde exactement les clés cochées.'
             : 'Ses détenteurs reçoivent aussitôt les clés cochées.'}{' '}
-          Action journalisée.
+          L’action est enregistrée dans le journal d’audit.
         </p>
         <Refusal error={save.error} />
         {role === undefined ? (
@@ -281,19 +281,20 @@ function ConfirmDelete({
         <>
           <Button onClick={onClose}>Annuler</Button>
           <Button loading={remove.isPending} onClick={() => remove.mutate()} variant="danger">
-            Supprimer le rôle
+            Supprimer
           </Button>
         </>
       }
       onClose={onClose}
       open
-      title={`Supprimer ${role.name}`}
+      title={`Supprimer le rôle ${role.name} ?`}
     >
       <Refusal error={remove.error} />
       <p>
-        Personne ne détient ce rôle : le supprimer ne retire rien à aucun opérateur. Action
-        journalisée.
+        Personne ne détient ce rôle : sa suppression ne retirera aucune permission à aucun
+        opérateur. Elle est définitive.
       </p>
+      <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
   )
 }

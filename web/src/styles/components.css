@@ -405,6 +405,12 @@
   min-width: var(--anchor-width);
 }
 
+/* Une liste ouverte depuis une modale est portée sous `body` : sous `--z-modal`, elle s'ouvrait sous
+   le corps de la modale, qui prenait le clic (mesuré par le parcours, 29/09/2026). */
+.ui-select__positioner {
+  z-index: calc(var(--z-modal) + 1);
+}
+
 .ui-select__popup,
 .ui-popover__popup {
   overflow: auto;
