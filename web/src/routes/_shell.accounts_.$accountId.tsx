@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { PageHeader } from '~/components/page-header'
 import { CopyButton } from '~/components/totp-enrollment'
 import {
   Button,
+  Card,
   DataTable,
   EmptyState,
   ErrorState,
@@ -79,6 +81,7 @@ function AccountScreen() {
   if (account.isPending) {
     return (
       <div className="page">
+        <PageHeader crumbs={[{ label: 'Comptes', link: { to: '/accounts' } }]} title="Compte" />
         <LoadingState label="Chargement du compte…">
           <Skeleton height={32} />
           <Skeleton height={38} />
@@ -91,6 +94,7 @@ function AccountScreen() {
   if (account.isError) {
     return (
       <div className="page">
+        <PageHeader crumbs={[{ label: 'Comptes', link: { to: '/accounts' } }]} title="Compte" />
         <ErrorState
           description={account.error.message}
           onRetry={() => void account.refetch()}
@@ -104,23 +108,35 @@ function AccountScreen() {
   const current = account.data
 
   return (
-    <div className="page">
-      <header className="page__head">
-        <div className="page__identity">
-          <h1 className="page__title" ref={title} tabIndex={-1}>
-            {current.name}
-          </h1>
-          <StatusPill kind="entity" state={current.status} />
-        </div>
-      </header>
-
-      <p>
-        <CustomerLink customerId={current.customerId} /> ·{' '}
-        <Link search={{ customerId: current.customerId }} to="/accounts">
-          Ses comptes
-        </Link>{' '}
-        · Créé le {dateFormat.format(new Date(current.createdAt))}
-      </p>
+    <>
+      <PageHeader
+        actions={
+          <Link
+            className="ui-button ui-button--secondary ui-button--sm"
+            search={{ customerId: current.customerId }}
+            to="/accounts"
+          >
+            Ses comptes
+          </Link>
+        }
+        badges={
+          <>
+            <StatusPill kind="entity" state={current.status} />
+            <span className="page-header__meta">
+              Créé le {dateFormat.format(new Date(current.createdAt))}
+            </span>
+          </>
+        }
+        crumbs={[
+          { label: 'Clients', link: { to: '/customers' } },
+          {
+            label: <CustomerName customerId={current.customerId} />,
+            link: { to: '/customers/$customerId', params: { customerId: current.customerId } },
+          },
+        ]}
+        title={current.name}
+        titleRef={title}
+      />
 
       <Tabs
         defaultValue="settings"
@@ -129,13 +145,15 @@ function AccountScreen() {
             value: 'settings',
             label: 'Réglages',
             panel: (
-              <div className="settings-grid">
-                <Channels account={current} writeRefusal={writeRefusal} />
-                <SmppOps
-                  account={current}
-                  onChange={(op) => setPending({ kind: 'smpp-op', op })}
-                  writeRefusal={writeRefusal}
-                />
+              <div className="page">
+                <div className="card-grid">
+                  <Channels account={current} writeRefusal={writeRefusal} />
+                  <SmppOps
+                    account={current}
+                    onChange={(op) => setPending({ kind: 'smpp-op', op })}
+                    writeRefusal={writeRefusal}
+                  />
+                </div>
               </div>
             ),
           },
@@ -143,35 +161,41 @@ function AccountScreen() {
             value: 'webhooks',
             label: 'Webhooks MO/DLR',
             panel: (
-              <Webhooks
-                accountId={current.id}
-                blocked={blocked}
-                onCreate={() => setPending({ kind: 'create-webhook' })}
-                onDelete={(webhook) => setPending({ kind: 'delete', webhook })}
-                onRotate={(webhook) => setPending({ kind: 'rotate', webhook })}
-              />
+              <div className="page">
+                <Webhooks
+                  accountId={current.id}
+                  blocked={blocked}
+                  onCreate={() => setPending({ kind: 'create-webhook' })}
+                  onDelete={(webhook) => setPending({ kind: 'delete', webhook })}
+                  onRotate={(webhook) => setPending({ kind: 'rotate', webhook })}
+                />
+              </div>
             ),
           },
           {
             value: 'credentials',
             label: 'Identifiants',
             panel: (
-              <EmptyState
-                description={`Le bind SMPP et la clé API REST arrivent avec le jalon M3 — ${MILESTONES.M3}. Tant qu’ils n’existent pas, ce compte ne peut pas se lier.`}
-                title="Les identifiants ne sont pas encore livrés"
-                titleAs="h2"
-              />
+              <div className="page">
+                <EmptyState
+                  description={`Le bind SMPP et la clé API REST arrivent avec le jalon M3 — ${MILESTONES.M3}. Tant qu’ils n’existent pas, ce compte ne peut pas se lier.`}
+                  title="Les identifiants ne sont pas encore livrés"
+                  titleAs="h2"
+                />
+              </div>
             ),
           },
           {
             value: 'quotas',
             label: 'Quotas & sessions',
             panel: (
-              <EmptyState
-                description={`Les quotas, max_sessions et les binds ouverts arrivent avec le jalon M3 — ${MILESTONES.M3}.`}
-                title="Les quotas et les sessions ne sont pas encore livrés"
-                titleAs="h2"
-              />
+              <div className="page">
+                <EmptyState
+                  description={`Les quotas, max_sessions et les binds ouverts arrivent avec le jalon M3 — ${MILESTONES.M3}.`}
+                  title="Les quotas et les sessions ne sont pas encore livrés"
+                  titleAs="h2"
+                />
+              </div>
             ),
           },
         ]}
@@ -206,12 +230,12 @@ function AccountScreen() {
       {pending?.kind === 'secret' ? (
         <WebhookSecretShown onClose={closeToTitle} secret={pending.secret} />
       ) : null}
-    </div>
+    </>
   )
 }
 
 // La clé de la fiche client, partagée avec la liste des comptes.
-function CustomerLink({ customerId }: { readonly customerId: string }) {
+function CustomerName({ customerId }: { readonly customerId: string }) {
   const customer = useQuery({
     queryKey: ['gateway', 'customers', 'detail', customerId],
     queryFn: () =>
@@ -222,11 +246,7 @@ function CustomerLink({ customerId }: { readonly customerId: string }) {
     enabled: usePermission('customers:read'),
     retry: false,
   })
-  return (
-    <Link params={{ customerId }} to="/customers/$customerId">
-      {customer.data?.name ?? <span className="mono">{customerId}</span>}
-    </Link>
-  )
+  return customer.data?.name ?? <span className="mono">{customerId}</span>
 }
 
 function useSetAccount(accountId: string) {
@@ -274,11 +294,7 @@ function Channels({
   const openCount = channels.filter((channel) => channel.open).length
 
   return (
-    <section aria-labelledby="account-channels" className="settings-card">
-      <div className="settings-card__head">
-        <h2 id="account-channels">Canaux</h2>
-        <p className="settings-card__note">S’appliquent immédiatement</p>
-      </div>
+    <Card subtitle="S’appliquent immédiatement" title="Canaux">
       <Refusal error={change.error} />
       {channels.map((channel) => (
         <Switch
@@ -310,7 +326,7 @@ function Channels({
           }
         />
       ))}
-    </section>
+    </Card>
   )
 }
 
@@ -329,10 +345,10 @@ function SmppOps({
   readonly onChange: (op: SmppOp) => void
 }) {
   return (
-    <section aria-labelledby="account-smpp-ops" className="settings-card">
-      <div className="settings-card__head">
-        <h2 id="account-smpp-ops">Opérations SMPP</h2>
-      </div>
+    <Card
+      subtitle="Tout changement coupe les binds ouverts de ce compte, après confirmation."
+      title="Opérations SMPP"
+    >
       {(Object.keys(SMPP_OPS) as SmppOp[]).map((op) => (
         <Switch
           blockedReason={writeRefusal}
@@ -343,10 +359,7 @@ function SmppOps({
           onCheckedChange={() => onChange(op)}
         />
       ))}
-      <p className="settings-card__note">
-        Tout changement coupe les binds ouverts de ce compte, après confirmation.
-      </p>
-    </section>
+    </Card>
   )
 }
 
@@ -442,11 +455,11 @@ function Webhooks({
   )
 
   return (
-    <section aria-labelledby="account-webhooks">
-      <div className="page__head">
-        <h2 id="account-webhooks">Webhooks</h2>
-        {create}
-      </div>
+    <Card
+      actions={create}
+      flush={webhooks.isSuccess && webhooks.data.length > 0}
+      title="Webhooks MO / DLR"
+    >
       {webhooks.isPending ? (
         <LoadingState label="Chargement des webhooks…">
           <Skeleton height={38} />
@@ -467,6 +480,7 @@ function Webhooks({
       ) : (
         <DataTable
           caption="Webhooks du compte"
+          dense
           columns={[
             {
               key: 'eventType',
@@ -522,7 +536,7 @@ function Webhooks({
           rows={webhooks.data}
         />
       )}
-    </section>
+    </Card>
   )
 }
 

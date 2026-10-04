@@ -72,6 +72,7 @@
 
 .shell__topbar {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--sp-6);
   padding: 0 var(--sp-7);
@@ -80,11 +81,105 @@
 }
 
 .shell__content {
-  padding: var(--pad-panel);
+  min-width: 0;
+}
+
+/* L'en-tête de l'écran, projeté par `PageHeader` : fil d'Ariane, titre, badges, actions. */
+.topbar__start {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-6);
+  min-width: 0;
+}
+
+.page-header__crumbs {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.page-header__crumbs ol {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-12);
+  list-style: none;
+  white-space: nowrap;
+}
+
+.page-header__crumbs li + li::before {
+  margin-right: var(--sp-4);
+  content: "›" / "";
+}
+
+.page-header__crumbs a {
+  color: var(--text-faint);
+}
+
+.page-header__crumbs a:hover {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.page-header__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  min-width: 20ch;
+}
+
+/* Seul le titre rétrécit : badges et date gardent leur largeur. */
+.page-header__identity > :not(.page-header__title) {
+  flex: none;
+}
+
+.page-header__title {
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ls-snug);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-header__meta {
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Sous 1280 px, la barre garde le titre et les actions ; la date reste sur la ligne de la liste. */
+@media (max-width: 1279px) {
+  .page-header__meta {
+    display: none;
+  }
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-7);
+  align-items: start;
+}
+
+.page-header__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-left: auto;
 }
 
 .topbar__end {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--sp-6);
   margin-left: auto;
@@ -162,6 +257,7 @@
 .page {
   display: grid;
   gap: var(--sp-9);
+  padding: var(--pad-panel);
   align-content: start;
   max-width: var(--content-max);
 }
@@ -335,39 +431,6 @@
   text-align: center;
 }
 
-/*
- * Les écrans d'administration — opérateurs et rôles. Aucune référence visuelle dans la charte (open
- * item 3) : ils composent les primitives et n'inventent que la mise en page.
- */
-.page__head {
-  display: flex;
-  gap: var(--sp-7);
-  align-items: center;
-  justify-content: space-between;
-}
-
-.page__identity {
-  display: flex;
-  gap: var(--sp-4);
-  align-items: center;
-}
-
-.page__title {
-  margin: 0;
-  color: var(--text-primary);
-  font: var(--text-page-title);
-  font-variant-numeric: tabular-nums;
-}
-
-.page__notes {
-  display: grid;
-  gap: var(--sp-4);
-  color: var(--text-muted);
-  font: var(--text-caption);
-  font-variant-numeric: tabular-nums;
-}
-
-.page__notes p,
 .form p {
   margin: 0;
 }
@@ -480,8 +543,6 @@
 }
 
 .account__panel {
-  display: grid;
-  gap: var(--sp-7);
   max-width: 60ch;
   color: var(--text-muted);
   font: var(--text-body);

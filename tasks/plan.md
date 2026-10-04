@@ -570,7 +570,7 @@ alimente — en topologie multi-instance.
 ## 8. M3 — Clients, comptes SMPP & identifiants
 
 **Objectif :** prouver la tranche verticale (§3) et livrer le socle du domaine à deux niveaux.
-**Dépend de :** M2 · **Steps :** 060 → 067 — *067 insérée le 29/09/2026, amendement v2.2*
+**Dépend de :** M2 · **Steps :** 060 → 068 — *067 insérée le 29/09/2026, amendement v2.2 ; 068 insérée le 04/10/2026 (coquille alignée sur la maquette), jouée avant 065*
 
 **Livrables** — groupes de clients (CRUD, filtre transverse), clients (liste, filtres, création, fiche,
 suspension **en cascade** chiffrée, sender IDs avec catégorie et limite de débit), comptes SMPP (canaux,

@@ -610,7 +610,8 @@ test('the binary serves the painted shell, then the application replaces it', as
   // step-063 : un compte créé depuis les comptes du client, que la suspension chiffre ensuite.
   await page.getByRole('link', { name: 'Voir ses comptes' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Comptes de Client de parcours')
-  await page.getByRole('button', { name: 'Nouveau compte' }).first().click()
+  // step-068 : l'action d'une liste vit dans sa sous-barre, sous la barre supérieure.
+  await page.locator('.ui-toolbar').getByRole('button', { name: 'Nouveau compte' }).click()
   const nouveauCompte = page.getByRole('dialog', { name: 'Nouveau compte' })
   await nouveauCompte.getByLabel('Nom').fill('compte-de-parcours')
   await nouveauCompte.getByRole('button', { name: 'Créer le compte' }).click()
@@ -638,7 +639,13 @@ test('the binary serves the painted shell, then the application replaces it', as
   )
   await expect(page.locator('body')).not.toContainText(secretDeWebhook)
 
-  await page.getByRole('link', { name: 'Client de parcours' }).click()
+  // step-068 : le fil d'Ariane de la barre supérieure ramène au client du compte.
+  await page
+    .getByRole('banner')
+    .getByRole('navigation', { name: 'Fil d’Ariane' })
+    .getByRole('link', { name: 'Client de parcours' })
+    .click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Client de parcours')
 
   await page.getByRole('button', { name: 'Suspendre' }).click()
   const suspension = page.getByRole('dialog', { name: 'Suspendre Client de parcours ?' })

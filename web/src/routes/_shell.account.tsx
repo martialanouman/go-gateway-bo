@@ -1,12 +1,14 @@
 import { browserSupportsWebAuthn } from '@simplewebauthn/browser'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { PageHeader } from '~/components/page-header'
 import { TotpEnrollment } from '~/components/totp-enrollment'
 import {
   Button,
+  Card,
   DataTable,
   EmptyState,
   ErrorState,
@@ -90,11 +92,7 @@ function AccountScreen() {
 
   return (
     <div className="page">
-      <header className="page__head">
-        <h1 className="page__title" ref={title} tabIndex={-1}>
-          Mon compte
-        </h1>
-      </header>
+      <PageHeader title="Mon compte" titleRef={title} />
 
       {enroll.data !== undefined ? (
         <TotpFlow
@@ -149,7 +147,6 @@ function Panel({
   readonly focusOnMount?: boolean
   readonly children: ReactNode
 }) {
-  const titleId = useId()
   const heading = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
@@ -157,17 +154,9 @@ function Panel({
   }, [focusOnMount])
 
   return (
-    <section aria-labelledby={titleId} className="account__panel">
-      <h2
-        className="auth__subtitle"
-        id={titleId}
-        ref={heading}
-        tabIndex={focusOnMount ? -1 : undefined}
-      >
-        {title}
-      </h2>
+    <Card className="account__panel" title={title} titleRef={focusOnMount ? heading : undefined}>
       {children}
-    </section>
+    </Card>
   )
 }
 
@@ -336,6 +325,7 @@ function Passkeys({ factors }: { readonly factors: Me['secondFactors'] }) {
       ) : (
         <DataTable
           caption="Clés d’accès du compte"
+          dense
           columns={[
             { key: 'name', header: 'Nom', cell: (passkey) => passkey.name },
             {

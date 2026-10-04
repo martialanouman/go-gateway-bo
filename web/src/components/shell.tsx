@@ -5,6 +5,7 @@ import { EmptyState, ErrorState, LoadingState, Skeleton, ToastStack } from '~/co
 import { HttpError, isUnauthenticated, meQueryOptions } from '~/lib/api'
 import { RealtimeProvider } from '~/lib/realtime'
 import { NotificationToasts } from './notification-toasts'
+import { PageHeaderProvider, PageHeaderSlot } from './page-header'
 import { Rail } from './rail'
 import { TopBar } from './top-bar'
 
@@ -19,10 +20,12 @@ import { TopBar } from './top-bar'
 export function ShellPending() {
   return (
     <Frame live={false}>
-      <LoadingState label="Ouverture de la session">
-        <Skeleton width={240} />
-        <Skeleton width={180} />
-      </LoadingState>
+      <div className="page">
+        <LoadingState label="Ouverture de la session">
+          <Skeleton width={240} />
+          <Skeleton width={180} />
+        </LoadingState>
+      </div>
     </Frame>
   )
 }
@@ -46,26 +49,28 @@ export function Shell({ children }: { readonly children: ReactNode }) {
   if (isUnauthenticated(me.error)) {
     return (
       <Frame live={false}>
-        <EmptyState
-          description={
-            <>
-              <p>
-                Le tableau de bord ne montre aucun écran sans session : la navigation et les données
-                restent fermées.
-              </p>
-              <p>
-                {/* Sans destination à rejouer : l'adresse d'où l'on vient ne correspond à aucun
+        <div className="page">
+          <EmptyState
+            description={
+              <>
+                <p>
+                  Le tableau de bord ne montre aucun écran sans session : la navigation et les
+                  données restent fermées.
+                </p>
+                <p>
+                  {/* Sans destination à rejouer : l'adresse d'où l'on vient ne correspond à aucun
                     écran, et y revenir ramènerait à ce même message. */}
-                <Link search={{ passwordSet: false, redirect: undefined }} to="/login">
-                  Se connecter
-                </Link>{' '}
-                ouvre une session et conduit à l’accueil.
-              </p>
-            </>
-          }
-          title="Aucune session ouverte"
-          titleAs="h1"
-        />
+                  <Link search={{ passwordSet: false, redirect: undefined }} to="/login">
+                    Se connecter
+                  </Link>{' '}
+                  ouvre une session et conduit à l’accueil.
+                </p>
+              </>
+            }
+            title="Aucune session ouverte"
+            titleAs="h1"
+          />
+        </div>
       </Frame>
     )
   }
@@ -74,7 +79,16 @@ export function Shell({ children }: { readonly children: ReactNode }) {
   // l'écran (invariant e).
   if (me.data !== undefined) {
     return (
-      <Frame live rail={<Rail />} topbar={<TopBar operator={me.data.operator} />}>
+      <Frame
+        live
+        rail={<Rail />}
+        topbar={
+          <>
+            <PageHeaderSlot />
+            <TopBar operator={me.data.operator} />
+          </>
+        }
+      >
         {children}
         <NotificationToasts />
       </Frame>
@@ -85,18 +99,20 @@ export function Shell({ children }: { readonly children: ReactNode }) {
     const status = me.error instanceof HttpError ? String(me.error.status) : 'réseau'
     return (
       <Frame live={false}>
-        <ErrorState
-          description="Le tableau de bord n’a pas pu vérifier la session ; aucun écran ne s’ouvre sans elle."
-          // `router.invalidate()` et non `me.refetch()` : ce qu'il faut rejouer est la **garde**,
-          // pas la seule requête. Une relecture réussie peut rendre une session **non élevée**, et
-          // la coquille se peignait alors tout entière — `beforeLoad` ne se rejoue pas de lui-même
-          // — pour un cockpit dont chaque appel gardé rendrait 403. La garde, elle, tranche.
-          onRetry={() => void router.invalidate()}
-          request={`GET /api/auth/me · ${status}`}
-          // Le titre par défaut accuse l'API Admin ; c'est le BFF qui répond à `/auth/me`.
-          title="Impossible de vérifier la session"
-          titleAs="h1"
-        />
+        <div className="page">
+          <ErrorState
+            description="Le tableau de bord n’a pas pu vérifier la session ; aucun écran ne s’ouvre sans elle."
+            // `router.invalidate()` et non `me.refetch()` : ce qu'il faut rejouer est la **garde**,
+            // pas la seule requête. Une relecture réussie peut rendre une session **non élevée**, et
+            // la coquille se peignait alors tout entière — `beforeLoad` ne se rejoue pas de lui-même
+            // — pour un cockpit dont chaque appel gardé rendrait 403. La garde, elle, tranche.
+            onRetry={() => void router.invalidate()}
+            request={`GET /api/auth/me · ${status}`}
+            // Le titre par défaut accuse l'API Admin ; c'est le BFF qui répond à `/auth/me`.
+            title="Impossible de vérifier la session"
+            titleAs="h1"
+          />
+        </div>
       </Frame>
     )
   }
@@ -127,28 +143,30 @@ function Frame({
     // seule branche de session, ils changeraient la forme de l'arbre, et React remonterait le cadre.
     <ToastStack>
       <RealtimeProvider enabled={live}>
-        <div className="shell">
-          {/* biome-ignore lint/a11y/useValidAnchor: `#contenu` est une vraie destination ; le clic ne fait qu'y porter le focus. */}
-          <a
-            className="shell__skip"
-            href="#contenu"
-            onClick={(event) => {
-              // Le fragment seul ne déplace pas le focus : `main` ne le prend que si on le lui donne, et le
-              // test du lien d'évitement rougit sans `focus()`. `preventDefault` garde `#contenu` hors de
-              // l'adresse ; aucun test ne rougit s'il disparaît — l'historique en mémoire du test ne voit
-              // pas le fragment.
-              event.preventDefault()
-              document.getElementById('contenu')?.focus()
-            }}
-          >
-            Aller au contenu
-          </a>
-          {rail ?? <div className="shell__rail" />}
-          <header className="shell__topbar">{topbar}</header>
-          <main className="shell__content" id="contenu" tabIndex={-1}>
-            {children}
-          </main>
-        </div>
+        <PageHeaderProvider>
+          <div className="shell">
+            {/* biome-ignore lint/a11y/useValidAnchor: `#contenu` est une vraie destination ; le clic ne fait qu'y porter le focus. */}
+            <a
+              className="shell__skip"
+              href="#contenu"
+              onClick={(event) => {
+                // Le fragment seul ne déplace pas le focus : `main` ne le prend que si on le lui donne, et le
+                // test du lien d'évitement rougit sans `focus()`. `preventDefault` garde `#contenu` hors de
+                // l'adresse ; aucun test ne rougit s'il disparaît — l'historique en mémoire du test ne voit
+                // pas le fragment.
+                event.preventDefault()
+                document.getElementById('contenu')?.focus()
+              }}
+            >
+              Aller au contenu
+            </a>
+            {rail ?? <div className="shell__rail" />}
+            <header className="shell__topbar">{topbar}</header>
+            <main className="shell__content" id="contenu" tabIndex={-1}>
+              {children}
+            </main>
+          </div>
+        </PageHeaderProvider>
       </RealtimeProvider>
     </ToastStack>
   )

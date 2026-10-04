@@ -207,6 +207,9 @@ describe('the customer screen', () => {
       await screen.findByText('La fiche du client n’a pas pu être chargée'),
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Revenir à la liste des clients' })).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('banner')).getByRole('heading', { level: 1, name: 'Client' }),
+    ).toBeInTheDocument()
   })
 
   it('registers a sender ID, which appears awaiting approval', async () => {

@@ -199,3 +199,15 @@ describe('the realtime socket', () => {
     expect(FakeWebSocket.instances).toHaveLength(1)
   })
 })
+
+describe('the page header', () => {
+  it('shows the title of the screen in the top bar, as its only h1', async () => {
+    visit('/rate-plans', { permissions: ['billing:read'] })
+
+    await screen.findByRole('heading', { level: 1, name: 'Plans tarifaires' })
+    expect(within(screen.getByRole('banner')).getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Plans tarifaires',
+    )
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+  })
+})

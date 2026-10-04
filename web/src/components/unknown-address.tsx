@@ -15,11 +15,13 @@ import { EmptyState } from '~/components/ui'
 export function UnknownAddress() {
   return (
     <Shell>
-      <EmptyState
-        description="Le lien est peut-être incomplet, ou l'écran n'est pas encore livré. Les écrans arrivent jalon par jalon, et chacun apparaît dans la navigation dès qu'il existe."
-        title="Cette adresse ne correspond à aucun écran"
-        titleAs="h1"
-      />
+      <div className="page">
+        <EmptyState
+          description="Le lien est peut-être incomplet, ou l'écran n'est pas encore livré. Les écrans arrivent jalon par jalon, et chacun apparaît dans la navigation dès qu'il existe."
+          title="Cette adresse ne correspond à aucun écran"
+          titleAs="h1"
+        />
+      </div>
     </Shell>
   )
 }

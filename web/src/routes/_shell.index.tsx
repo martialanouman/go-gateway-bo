@@ -12,21 +12,23 @@ export const Route = createFileRoute('/_shell/')({ component: HomeScreen })
  */
 function HomeScreen() {
   return (
-    <EmptyState
-      description={
-        <>
-          <p>
-            Les écrans arrivent jalon par jalon. Le trafic en direct, les connecteurs et les
-            sessions SMPP ouvrent le jalon M4 ; l'authentification et les rôles, le jalon M1.
-          </p>
-          <p>
-            Chaque écran arrive avec sa route, son état vide et le jalon qui le porte : aucun lien
-            ne mène nulle part.
-          </p>
-        </>
-      }
-      title="Le cockpit d'exploitation se construit"
-      titleAs="h1"
-    />
+    <div className="page">
+      <EmptyState
+        description={
+          <>
+            <p>
+              Les écrans arrivent jalon par jalon. Le trafic en direct, les connecteurs et les
+              sessions SMPP ouvrent le jalon M4 ; l'authentification et les rôles, le jalon M1.
+            </p>
+            <p>
+              Chaque écran arrive avec sa route, son état vide et le jalon qui le porte : aucun lien
+              ne mène nulle part.
+            </p>
+          </>
+        }
+        title="Le cockpit d'exploitation se construit"
+        titleAs="h1"
+      />
+    </div>
   )
 }
