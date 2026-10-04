@@ -1,6 +1,6 @@
 import { EmptyState } from '~/components/ui'
-import { PageHeader } from './page-header'
 import { MILESTONES, type NavPath, navEntry } from '~/lib/navigation'
+import { PageHeader } from './page-header'
 
 /**
  * Une route déclarée dont l'écran n'est pas livré (§1.9) : elle nomme son jalon, jamais un blanc.
