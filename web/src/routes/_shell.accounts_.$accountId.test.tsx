@@ -42,15 +42,20 @@ function open(
   return { fetch, queryClient: router.options.context.queryClient }
 }
 
+async function openWebhooks(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('tab', { name: 'Webhooks MO/DLR' }))
+}
+
 describe('the account screen', () => {
   it('keeps the last open channel open, and says why', async () => {
     open({ accounts: [{ ...OTP_ACCOUNT, restEnabled: false }] })
 
-    const cut = await screen.findByRole('button', { name: 'Couper SMPP' })
+    const smpp = await screen.findByRole('switch', { name: 'SMPP' })
 
-    expect(cut).toHaveAttribute('aria-disabled', 'true')
-    expect(cut).toHaveAccessibleDescription(
-      'Un compte garde au moins un canal : activez REST avant de couper SMPP.',
+    expect(smpp).toBeChecked()
+    expect(smpp).toHaveAttribute('aria-disabled', 'true')
+    expect(smpp).toHaveAccessibleDescription(
+      /Un compte garde au moins un canal : activez REST avant de couper SMPP\./,
     )
   })
 
@@ -67,8 +72,8 @@ describe('the account screen', () => {
       />,
     )
 
-    expect(await screen.findByRole('button', { name: 'Couper SMPP' })).toHaveAccessibleDescription(
-      'Modifier un compte demande accounts:write.',
+    expect(await screen.findByRole('switch', { name: 'SMPP' })).toHaveAccessibleDescription(
+      /Modifier un compte demande accounts:write\.$/,
     )
   })
 
@@ -76,19 +81,55 @@ describe('the account screen', () => {
     const user = userEvent.setup()
     open()
 
-    await user.click(await screen.findByRole('button', { name: 'Refuser cancel_sm' }))
+    const cancelSm = await screen.findByRole('switch', { name: 'cancel_sm' })
+    await user.click(cancelSm)
     const dialog = await screen.findByRole('dialog', { name: 'Refuser cancel_sm ?' })
 
     expect(dialog).toHaveTextContent('Les binds ouverts de ce compte seront coupés')
+    expect(cancelSm).toBeChecked()
     await user.click(within(dialog).getByRole('button', { name: 'Refuser' }))
 
-    expect(await screen.findByRole('button', { name: 'Autoriser cancel_sm' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'cancel_sm' })).not.toBeChecked())
+  })
+
+  it('leaves an SMPP operation as it was when the operator cancels', async () => {
+    const user = userEvent.setup()
+    const { fetch } = open()
+
+    await user.click(await screen.findByRole('switch', { name: 'query_sm' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Refuser query_sm ?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Annuler' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.getByRole('switch', { name: 'query_sm' })).toBeChecked()
+    expect(fetch.mock.calls.some(([request]) => (request as Request).method === 'PUT')).toBe(false)
+  })
+
+  it('names what is not delivered yet in the credentials and quotas tabs', async () => {
+    const user = userEvent.setup()
+    open()
+
+    await user.click(await screen.findByRole('tab', { name: 'Identifiants' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Les identifiants ne sont pas encore livrés' }),
+    ).toBeVisible()
+    expect(screen.getByRole('tabpanel')).toHaveTextContent(
+      'Tant qu’ils n’existent pas, ce compte ne peut pas se lier.',
+    )
+
+    await user.click(screen.getByRole('tab', { name: 'Quotas & sessions' }))
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Les quotas et les sessions ne sont pas encore livrés',
+      }),
+    ).toBeVisible()
   })
 
   it('shows a new webhook secret once, and never again once the dialog is closed', async () => {
     const user = userEvent.setup()
     const { queryClient } = open()
 
+    await openWebhooks(user)
     await user.click(await screen.findByRole('button', { name: 'Nouveau webhook' }))
     const form = await screen.findByRole('dialog', { name: 'Nouveau webhook' })
     await user.type(
@@ -116,6 +157,7 @@ describe('the account screen', () => {
     const user = userEvent.setup()
     const { queryClient } = open({ webhooks: [DLR] })
 
+    await openWebhooks(user)
     await user.click(
       await screen.findByRole('button', { name: 'Remplacer le secret du webhook DLR' }),
     )
@@ -142,6 +184,7 @@ describe('the account screen', () => {
     const user = userEvent.setup()
     open({ webhooks: [DLR] })
 
+    await openWebhooks(user)
     await user.click(await screen.findByRole('button', { name: 'Nouveau webhook' }))
     const form = await screen.findByRole('dialog', { name: 'Nouveau webhook' })
 
@@ -190,20 +233,21 @@ describe('the account screen', () => {
     const user = userEvent.setup()
     open()
 
-    await user.click(await screen.findByRole('button', { name: 'Couper REST' }))
+    await user.click(await screen.findByRole('switch', { name: 'REST' }))
 
-    expect(await screen.findByText('REST : coupé')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'REST' })).not.toBeChecked())
     expect(await screen.findByText(`REST est coupé pour ${OTP_ACCOUNT.name}.`)).toBeInTheDocument()
   })
 
-  it('says the webhooks could not be read, without hiding the rest of the account', async () => {
+  it('says the webhooks could not be read, and reads them again on retry', async () => {
+    const user = userEvent.setup()
     const { fetch } = open({}, { [`GET ${WEBHOOKS}`]: UNREACHABLE })
 
+    await openWebhooks(user)
     expect(
       await screen.findByRole('heading', { name: 'Les webhooks n’ont pas pu être chargés' }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Couper SMPP' })).toBeVisible()
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Réessayer' }))
+    await user.click(screen.getByRole('button', { name: 'Réessayer' }))
     await waitFor(() =>
       expect(
         fetch.mock.calls.filter(
@@ -217,6 +261,7 @@ describe('the account screen', () => {
     const user = userEvent.setup()
     open({ webhooks: [DLR] })
 
+    await openWebhooks(user)
     await user.click(await screen.findByRole('button', { name: 'Désactiver le webhook DLR' }))
     expect(await screen.findByText('Le webhook DLR est désactivé.')).toBeInTheDocument()
     expect(await screen.findByRole('cell', { name: 'Désactivé' })).toBeInTheDocument()
@@ -226,6 +271,7 @@ describe('the account screen', () => {
     const user = userEvent.setup()
     open({ webhooks: [DLR] }, { [`PATCH ${WEBHOOKS}/${DLR.id}`]: UNREACHABLE })
 
+    await openWebhooks(user)
     await user.click(await screen.findByRole('button', { name: 'Désactiver le webhook DLR' }))
 
     expect(await screen.findByText('Passerelle muette.')).toBeInTheDocument()
@@ -235,6 +281,7 @@ describe('the account screen', () => {
     const user = userEvent.setup()
     open({ webhooks: [DLR] })
 
+    await openWebhooks(user)
     await user.click(await screen.findByRole('button', { name: 'Supprimer le webhook DLR' }))
     const dialog = await screen.findByRole('dialog', { name: 'Supprimer le webhook DLR ?' })
     expect(dialog).toHaveTextContent(
@@ -252,6 +299,7 @@ describe('the account screen', () => {
     const user = userEvent.setup()
     open()
 
+    await openWebhooks(user)
     await user.click(await screen.findByRole('button', { name: 'Nouveau webhook' }))
     const form = await screen.findByRole('dialog', { name: 'Nouveau webhook' })
     await user.click(within(form).getByRole('combobox', { name: 'Événement' }))
@@ -284,6 +332,7 @@ describe('the account screen', () => {
       },
     )
 
+    await openWebhooks(user)
     await user.click(await screen.findByRole('button', { name: 'Nouveau webhook' }))
     const form = await screen.findByRole('dialog', { name: 'Nouveau webhook' })
     await user.type(within(form).getByRole('textbox', { name: 'URL' }), 'https://client.example/mo')

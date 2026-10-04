@@ -379,11 +379,6 @@
   align-items: center;
 }
 
-.row-stack {
-  display: grid;
-  gap: var(--sp-4);
-}
-
 .mono,
 .role-keys,
 .permission-picker__key {

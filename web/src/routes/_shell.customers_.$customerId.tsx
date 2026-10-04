@@ -217,7 +217,7 @@ function CustomerGroup({
 function CustomerAccounts({ customerId }: { readonly customerId: string }) {
   return (
     <section aria-labelledby="customer-accounts">
-      <h2 id="customer-accounts">Comptes SMPP</h2>
+      <h2 id="customer-accounts">Comptes</h2>
       {usePermission('accounts:read') ? (
         <Link
           className="ui-button ui-button--secondary ui-button--sm"
@@ -594,12 +594,9 @@ function suspensionConsequence({
   activeAccounts,
   closedAccounts,
 }: components['schemas']['SuspensionImpact']) {
-  if (accounts === 0)
-    return 'Ce client n’a aucun compte SMPP : la suspension n’interrompt aucun envoi.'
+  if (accounts === 0) return 'Ce client n’a aucun compte : la suspension n’interrompt aucun envoi.'
   const counted =
-    accounts === 1
-      ? 'Son compte SMPP sera suspendu'
-      : `Ses ${accounts} comptes SMPP seront suspendus`
+    accounts === 1 ? 'Son compte sera suspendu' : `Ses ${accounts} comptes seront suspendus`
   const active =
     accounts === 1 || activeAccounts === accounts
       ? ''
@@ -659,8 +656,8 @@ function ConfirmReactivate({
     >
       <Refusal error={reactivate.error} />
       <p>
-        Le client redevient actif, mais ses comptes SMPP restent suspendus : ils ne pourront pas
-        envoyer de SMS tant qu’ils ne seront pas réactivés un par un.
+        Le client redevient actif, mais ses comptes restent suspendus : ils ne pourront pas envoyer
+        de SMS tant qu’ils ne seront pas réactivés un par un.
       </p>
       <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>

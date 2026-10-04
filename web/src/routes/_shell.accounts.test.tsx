@@ -69,7 +69,7 @@ describe('the accounts screen', () => {
       await screen.findByRole('heading', { level: 1, name: `Comptes de ${ACME.name}` }),
     ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Nouveau compte' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Nouveau compte SMPP' })
+    const dialog = await screen.findByRole('dialog', { name: 'Nouveau compte' })
     await user.type(within(dialog).getByRole('textbox', { name: 'Nom' }), 'trafic-marketing{Enter}')
 
     expect(await screen.findByRole('cell', { name: 'trafic-marketing' })).toBeInTheDocument()

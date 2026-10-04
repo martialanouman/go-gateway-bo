@@ -287,7 +287,7 @@ func enabledByDefault(flag *bool) bool {
 }
 
 func unknownAccount() Error {
-	return Error{Code: "not_found", Message: "Aucun compte SMPP ne porte cet identifiant. Rechargez la liste."}
+	return Error{Code: "not_found", Message: "Aucun compte ne porte cet identifiant. Rechargez la liste."}
 }
 
 func lastChannel(code string) Error {

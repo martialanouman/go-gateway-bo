@@ -15,6 +15,8 @@ import {
   Select,
   Skeleton,
   StatusPill,
+  Switch,
+  Tabs,
   useToast,
 } from '~/components/ui'
 import { blockedBy, fieldRefusalsOf, orRefusal, Refusal } from '~/lib/administration'
@@ -22,6 +24,7 @@ import { api } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
 import { WebhookCreation } from '~/lib/contract.gen'
 import { formResolver } from '~/lib/form'
+import { MILESTONES } from '~/lib/navigation'
 import { usePermission } from '~/lib/permissions'
 
 type Account = components['schemas']['SmppAccount']
@@ -56,7 +59,8 @@ function AccountScreen() {
   const { accountId } = Route.useParams()
   const [pending, setPending] = useState<Pending | null>(null)
   const title = useRef<HTMLHeadingElement>(null)
-  const blocked = blockedBy(usePermission('accounts:write') ? undefined : WRITE_REFUSAL)
+  const writeRefusal = usePermission('accounts:write') ? undefined : WRITE_REFUSAL
+  const blocked = blockedBy(writeRefusal)
   const close = () => setPending(null)
   const closeToTitle = () => {
     close()
@@ -118,18 +122,59 @@ function AccountScreen() {
         · Créé le {dateFormat.format(new Date(current.createdAt))}
       </p>
 
-      <Channels account={current} blocked={blocked} />
-      <SmppOps
-        account={current}
-        blocked={blocked}
-        onChange={(op) => setPending({ kind: 'smpp-op', op })}
-      />
-      <Webhooks
-        accountId={current.id}
-        blocked={blocked}
-        onCreate={() => setPending({ kind: 'create-webhook' })}
-        onDelete={(webhook) => setPending({ kind: 'delete', webhook })}
-        onRotate={(webhook) => setPending({ kind: 'rotate', webhook })}
+      <Tabs
+        defaultValue="settings"
+        tabs={[
+          {
+            value: 'settings',
+            label: 'Réglages',
+            panel: (
+              <div className="settings-grid">
+                <Channels account={current} writeRefusal={writeRefusal} />
+                <SmppOps
+                  account={current}
+                  onChange={(op) => setPending({ kind: 'smpp-op', op })}
+                  writeRefusal={writeRefusal}
+                />
+              </div>
+            ),
+          },
+          {
+            value: 'webhooks',
+            label: 'Webhooks MO/DLR',
+            panel: (
+              <Webhooks
+                accountId={current.id}
+                blocked={blocked}
+                onCreate={() => setPending({ kind: 'create-webhook' })}
+                onDelete={(webhook) => setPending({ kind: 'delete', webhook })}
+                onRotate={(webhook) => setPending({ kind: 'rotate', webhook })}
+              />
+            ),
+          },
+          {
+            value: 'credentials',
+            label: 'Identifiants',
+            panel: (
+              <EmptyState
+                description={`Le bind SMPP et la clé API REST arrivent avec le jalon M3 — ${MILESTONES.M3}. Tant qu’ils n’existent pas, ce compte ne peut pas se lier.`}
+                title="Les identifiants ne sont pas encore livrés"
+                titleAs="h2"
+              />
+            ),
+          },
+          {
+            value: 'quotas',
+            label: 'Quotas & sessions',
+            panel: (
+              <EmptyState
+                description={`Les quotas, max_sessions et les binds ouverts arrivent avec le jalon M3 — ${MILESTONES.M3}.`}
+                title="Les quotas et les sessions ne sont pas encore livrés"
+                titleAs="h2"
+              />
+            ),
+          },
+        ]}
       />
 
       {pending?.kind === 'smpp-op' ? (
@@ -192,10 +237,10 @@ function useSetAccount(accountId: string) {
 
 function Channels({
   account,
-  blocked,
+  writeRefusal,
 }: {
   readonly account: Account
-  readonly blocked: ReturnType<typeof blockedBy>
+  readonly writeRefusal: string | undefined
 }) {
   const toast = useToast()
   const setAccount = useSetAccount(account.id)
@@ -211,86 +256,96 @@ function Channels({
     onSuccess: setAccount,
   })
   const channels = [
-    { name: 'SMPP', other: 'REST', open: account.smppEnabled, field: 'smppEnabled' },
-    { name: 'REST', other: 'SMPP', open: account.restEnabled, field: 'restEnabled' },
+    {
+      name: 'SMPP',
+      other: 'REST',
+      hint: 'Les clients se lient en SMPP.',
+      open: account.smppEnabled,
+      field: 'smppEnabled',
+    },
+    {
+      name: 'REST',
+      other: 'SMPP',
+      hint: 'Les clients envoient par l’API HTTP.',
+      open: account.restEnabled,
+      field: 'restEnabled',
+    },
   ] as const
   const openCount = channels.filter((channel) => channel.open).length
 
   return (
-    <section aria-labelledby="account-channels">
-      <h2 id="account-channels">Canaux</h2>
-      <Refusal error={change.error} />
-      <div className="row-stack">
-        {channels.map((channel) => {
-          const gesture = channel.open ? 'Couper' : 'Ouvrir'
-          const last = channel.open && openCount === 1
-          return (
-            <div className="row-actions" key={channel.name}>
-              <span>
-                {channel.name} : {channel.open ? 'ouvert' : 'coupé'}
-              </span>
-              <Button
-                {...('blockedReason' in blocked || !last
-                  ? blocked
-                  : blockedBy(
-                      `Un compte garde au moins un canal : activez ${channel.other} avant de couper ${channel.name}.`,
-                    ))}
-                loading={change.isPending}
-                onClick={() =>
-                  change.mutate(
-                    {
-                      smppEnabled: account.smppEnabled,
-                      restEnabled: account.restEnabled,
-                      [channel.field]: !channel.open,
-                    },
-                    {
-                      onSuccess: () =>
-                        toast({
-                          title: `${channel.name} est ${channel.open ? 'coupé' : 'ouvert'} pour ${account.name}.`,
-                          severity: 'success',
-                        }),
-                    },
-                  )
-                }
-                size="sm"
-              >
-                {`${gesture} ${channel.name}`}
-              </Button>
-            </div>
-          )
-        })}
+    <section aria-labelledby="account-channels" className="settings-card">
+      <div className="settings-card__head">
+        <h2 id="account-channels">Canaux</h2>
+        <p className="settings-card__note">S’appliquent immédiatement</p>
       </div>
+      <Refusal error={change.error} />
+      {channels.map((channel) => (
+        <Switch
+          blockedReason={
+            writeRefusal ??
+            (channel.open && openCount === 1
+              ? `Un compte garde au moins un canal : activez ${channel.other} avant de couper ${channel.name}.`
+              : undefined)
+          }
+          checked={channel.open}
+          description={channel.hint}
+          key={channel.name}
+          label={channel.name}
+          onCheckedChange={(open) =>
+            change.mutate(
+              {
+                smppEnabled: account.smppEnabled,
+                restEnabled: account.restEnabled,
+                [channel.field]: open,
+              },
+              {
+                onSuccess: () =>
+                  toast({
+                    title: `${channel.name} est ${open ? 'ouvert' : 'coupé'} pour ${account.name}.`,
+                    severity: 'success',
+                  }),
+              },
+            )
+          }
+        />
+      ))}
     </section>
   )
 }
 
+const SMPP_OP_HINTS: Record<SmppOp, string> = {
+  querySm: 'Le client interroge l’état d’un message.',
+  cancelSm: 'Le client annule un message encore en attente.',
+}
+
 function SmppOps({
   account,
-  blocked,
+  writeRefusal,
   onChange,
 }: {
   readonly account: Account
-  readonly blocked: ReturnType<typeof blockedBy>
+  readonly writeRefusal: string | undefined
   readonly onChange: (op: SmppOp) => void
 }) {
   return (
-    <section aria-labelledby="account-smpp-ops">
-      <h2 id="account-smpp-ops">Opérations SMPP</h2>
-      <div className="row-stack">
-        {(Object.keys(SMPP_OPS) as SmppOp[]).map((op) => {
-          const allowed = account[`${op}Enabled`]
-          return (
-            <div className="row-actions" key={op}>
-              <span>
-                <span className="mono">{SMPP_OPS[op]}</span> : {allowed ? 'autorisé' : 'refusé'}
-              </span>
-              <Button {...blocked} onClick={() => onChange(op)} size="sm">
-                {`${allowed ? 'Refuser' : 'Autoriser'} ${SMPP_OPS[op]}`}
-              </Button>
-            </div>
-          )
-        })}
+    <section aria-labelledby="account-smpp-ops" className="settings-card">
+      <div className="settings-card__head">
+        <h2 id="account-smpp-ops">Opérations SMPP</h2>
       </div>
+      {(Object.keys(SMPP_OPS) as SmppOp[]).map((op) => (
+        <Switch
+          blockedReason={writeRefusal}
+          checked={account[`${op}Enabled`]}
+          description={SMPP_OP_HINTS[op]}
+          key={op}
+          label={SMPP_OPS[op]}
+          onCheckedChange={() => onChange(op)}
+        />
+      ))}
+      <p className="settings-card__note">
+        Tout changement coupe les binds ouverts de ce compte, après confirmation.
+      </p>
     </section>
   )
 }

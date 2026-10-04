@@ -46,6 +46,7 @@ export {
   StatusPill,
   type StatusPillProps,
 } from './status-pill'
+export { Switch, type SwitchProps } from './switch'
 export { type TabDefinition, Tabs, type TabsProps } from './tabs'
 export {
   TOAST_TIMEOUT,

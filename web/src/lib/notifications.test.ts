@@ -37,7 +37,7 @@ describe('describeNotification', () => {
   it('names the SMPP account and its customer', () => {
     expect(
       describeNotification(billing({ ownerType: 'smpp_account', ownerId: 'acct-3' })).description,
-    ).toBe(`Le solde du compte SMPP acct-3 du client cust-9 est à ${minusFiveThousand} crédits.`)
+    ).toBe(`Le solde du compte acct-3 du client cust-9 est à ${minusFiveThousand} crédits.`)
   })
 
   it('falls back to the raw owner type', () => {

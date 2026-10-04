@@ -99,7 +99,7 @@ function AccountsScreen() {
     <div className="page">
       <header className="page__head">
         <h1 className="page__title">
-          {customerId === undefined ? 'Comptes SMPP' : `Comptes de ${customerName ?? 'ce client'}`}
+          {customerId === undefined ? 'Comptes' : `Comptes de ${customerName ?? 'ce client'}`}
         </h1>
         {create}
       </header>
@@ -122,14 +122,14 @@ function AccountsScreen() {
       ) : rows.length === 0 ? (
         <EmptyState
           action={create}
-          description="Un compte SMPP porte les identifiants, les canaux et les quotas d’un client."
+          description="Un compte porte les identifiants SMPP et REST, les canaux et les quotas d’un client."
           title="Aucun compte pour l’instant"
           titleAs="h2"
         />
       ) : (
         <>
           <DataTable
-            caption="Comptes SMPP"
+            caption="Comptes"
             columns={[
               {
                 key: 'name',
@@ -220,7 +220,7 @@ function CreateAccount({
       }
       onClose={onClose}
       open
-      title="Nouveau compte SMPP"
+      title="Nouveau compte"
     >
       <form
         className="form"

@@ -163,7 +163,7 @@ function CustomersScreen() {
       ) : rows.length === 0 ? (
         <EmptyState
           action={create}
-          description="Un client porte ses comptes SMPP, ses sender IDs et sa facturation."
+          description="Un client porte ses comptes, ses sender IDs et sa facturation."
           title="Aucun client pour l’instant"
           titleAs="h2"
         />

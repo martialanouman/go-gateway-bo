@@ -62,6 +62,15 @@ vivants du compte) et gère les webhooks du compte. Chaque geste laisse une trac
 - **Permissions existantes** : `accounts:read` et `accounts:write`. Le catalogue nomme déjà les
   webhooks dans `accounts:write`, donc aucune permission n'est ajoutée.
 
+- **Après le test de l'utilisateur dans un navigateur (04/10/2026)** : les réglages binaires
+  appliqués aussitôt deviennent des **switches** (charte, `forms/Switch`, construits sur le Switch de
+  Base UI), rangés en deux cartes « Canaux » et « Opérations SMPP ». Un switch d'opération SMPP ouvre
+  d'abord la modale, et reste en place si l'opérateur annule. La fiche passe en **onglets** comme la
+  maquette `AccountScreen.jsx` : Réglages, Webhooks MO/DLR, et deux états vides qui nomment leur
+  jalon (Identifiants, Quotas & sessions). Le secret se copie d'un clic. **« Comptes SMPP » devient
+  « Comptes »** dans toute la copie : un compte porte aussi le canal REST. La règle est consignée en
+  spec §1.1.
+
 ## Tests
 - **godog** (`cmd/dashboard/`, à côté des scénarios comptes) :
   - la fiche sous `accounts:read` est conforme et ne contient aucun `senderIdPolicy` ;
