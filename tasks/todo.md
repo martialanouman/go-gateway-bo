@@ -257,7 +257,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [x] step-063 — Comptes SMPP : liste + création rattachée au client
 - [x] step-064 — Fiche compte : canaux, bascules SMPP, webhooks (plus de politique de sender ID, ADR-0020)
 - [x] step-068 — Coquille et écrans livrés alignés sur la maquette du kit : titre et fil d'Ariane dans la barre supérieure, `Toolbar`, onglets pleine largeur, `Card`, tables denses  *(insérée le 04/10/2026)*
-- [ ] step-065 — `max_sessions`, type de bind et binds ouverts (avertissement d'écart) ; le débit relève du sender ID, step-067
+- [x] step-065 — `max_sessions`, type de bind et binds ouverts (avertissement d'écart) ; le débit relève du sender ID, step-067
 - [ ] step-066 — Identifiants : deux cartes masquées, secret une fois, rotation, révocation  *(invariant b)*
 - [ ] step-067 — Sender IDs : catégorie de trafic, limite de débit, filtre, signalements `category_mismatch` (§6.19)  ⚠️ **attend le contrat** : 6.10.1 n'a ni catégorie ni limite par sender ID
 
