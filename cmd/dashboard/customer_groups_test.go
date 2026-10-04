@@ -36,12 +36,16 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.When(`^le navigateur envoie (POST|PUT|PATCH|DELETE) "([^"]*)"(?: avec le corps '([^']*)')?$`, w.send)
 	ctx.Then(`^la passerelle n'a reçu aucune requête$`, w.receivedNothing)
 	ctx.Then(`^la passerelle a reçu "([^"]*)"$`, w.receivedQuery)
+	ctx.Then(`^la passerelle a reçu '([^']*)'$`, w.receivedQuery)
+	ctx.Then(`^la passerelle a reçu le secret que la réponse rend$`, w.receivedTheReturnedSecret)
+	ctx.Given(`^une passerelle qui refuse les canaux sur le champ "([^"]*)"$`, w.refusingOnField)
+	ctx.Given(`^une passerelle qui crée un webhook$`, w.creatingAWebhook)
 	// Le détachement ne s'écrit qu'en `null` : la passerelle exige le champ présent.
 	ctx.Then(`^la passerelle a reçu un détachement de groupe$`, func() error {
 		return w.receivedQuery(`"group_id":null`)
 	})
 	ctx.Given(`^une passerelle dont le client a (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.servingAccounts)
-	ctx.Given(`^une passerelle qui répond 409 (?:à l'enregistrement d'un sender ID|à la création)$`, func() error {
+	ctx.Given(`^une passerelle qui répond 409 (?:à l'enregistrement d'un sender ID|à la création|à la création d'un webhook)$`, func() error {
 		return w.answering(http.StatusConflict, `{"code":"conflict","message":"sender id already exists"}`)
 	})
 	ctx.Then(`^la réponse compte (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.countsAccounts)
@@ -79,6 +83,10 @@ func (w *customerGroupsWorld) failingWithMessage(message string) error {
 }
 
 func (w *customerGroupsWorld) answering(status int, body string) error {
+	return w.answeringBy(func(*http.Request) int { return status }, body)
+}
+
+func (w *customerGroupsWorld) answeringBy(statusFor func(*http.Request) int, body string) error {
 	w.upstream = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// Le hub ouvre aussi ses flux temps réel sur cette adresse : seul l'appel relayé compte.
 		if strings.HasPrefix(r.URL.Path, "/admin/customer-groups") || strings.HasPrefix(r.URL.Path, "/admin/customers") ||
@@ -91,7 +99,7 @@ func (w *customerGroupsWorld) answering(status int, body string) error {
 		}
 
 		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(status)
+		rw.WriteHeader(statusFor(r))
 		_, _ = rw.Write([]byte(body))
 	}))
 	w.process.env["DASHBOARD_GATEWAY_BASE_URL"] = w.upstream.URL
@@ -220,4 +228,38 @@ func (w *customerGroupsWorld) countsAccounts(total, active, closed int) error {
 	}
 
 	return nil
+}
+
+// creatingAWebhook rend le même webhook à la création (201) et à la rotation (200), que le client
+// engendré ne lit que sous leur statut propre.
+func (w *customerGroupsWorld) creatingAWebhook() error {
+	return w.answeringBy(func(r *http.Request) int {
+		if r.Method == http.MethodPost {
+			return http.StatusCreated
+		}
+
+		return http.StatusOK
+	}, `{"id":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f","account_id":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e",`+
+		`"event_type":"dlr","url":"https://client.example/dlr","status":"active"}`)
+}
+
+func (w *customerGroupsWorld) receivedTheReturnedSecret() error {
+	secret, err := returnedSecret(w.process.received.body)
+	if err != nil {
+		return err
+	}
+
+	return w.receivedQuery(fmt.Sprintf(`"secret":%q`, secret))
+}
+
+func returnedSecret(body string) (string, error) {
+	var returned struct {
+		Secret string `json:"secret"`
+	}
+
+	if err := json.Unmarshal([]byte(body), &returned); err != nil || returned.Secret == "" {
+		return "", fmt.Errorf("la réponse ne rend aucun secret :\n%s", body)
+	}
+
+	return returned.Secret, nil
 }

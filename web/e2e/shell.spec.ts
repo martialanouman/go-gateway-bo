@@ -611,18 +611,38 @@ test('the binary serves the painted shell, then the application replaces it', as
   await page.getByRole('link', { name: 'Voir ses comptes' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Comptes de Client de parcours')
   await page.getByRole('button', { name: 'Nouveau compte' }).first().click()
-  const nouveauCompte = page.getByRole('dialog', { name: 'Nouveau compte SMPP' })
+  const nouveauCompte = page.getByRole('dialog', { name: 'Nouveau compte' })
   await nouveauCompte.getByLabel('Nom').fill('compte-de-parcours')
   await nouveauCompte.getByRole('button', { name: 'Créer le compte' }).click()
   await expect(page.getByRole('row', { name: /compte-de-parcours/ })).toContainText('Actif')
-  await page
-    .getByRole('row', { name: /compte-de-parcours/ })
-    .getByRole('link', { name: 'Client de parcours' })
-    .click()
+
+  // step-064 : la fiche du compte, un canal coupé, un webhook dont le secret ne se montre qu'une fois.
+  await page.getByRole('link', { name: 'compte-de-parcours' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('compte-de-parcours')
+  await page.getByRole('switch', { name: 'REST' }).click()
+  await expect(page.getByRole('switch', { name: 'REST' })).not.toBeChecked()
+  await expect(page.getByRole('switch', { name: 'SMPP' })).toHaveAttribute('aria-disabled', 'true')
+  await page.getByRole('tab', { name: 'Webhooks MO/DLR' }).click()
+  await page.getByRole('button', { name: 'Nouveau webhook' }).click()
+  const nouveauWebhook = page.getByRole('dialog', { name: 'Nouveau webhook' })
+  await nouveauWebhook.getByRole('combobox', { name: 'Événement' }).click()
+  await page.getByRole('option', { name: 'DLR — accusés de réception' }).click()
+  await nouveauWebhook.getByLabel('URL').fill('https://client.example/dlr')
+  await nouveauWebhook.getByRole('button', { name: 'Créer le webhook' }).click()
+  const secretMontre = page.getByRole('dialog', { name: 'Secret de signature du webhook' })
+  const secretDeWebhook = (await secretMontre.locator('.mono').textContent()) ?? ''
+  expect(secretDeWebhook).toMatch(/^[\w-]{43}$/)
+  await secretMontre.getByRole('button', { name: 'J’ai copié le secret' }).click()
+  await expect(page.getByRole('row', { name: /client\.example\/dlr/ })).toContainText(
+    'DLR — accusés de réception',
+  )
+  await expect(page.locator('body')).not.toContainText(secretDeWebhook)
+
+  await page.getByRole('link', { name: 'Client de parcours' }).click()
 
   await page.getByRole('button', { name: 'Suspendre' }).click()
   const suspension = page.getByRole('dialog', { name: 'Suspendre Client de parcours ?' })
-  await expect(suspension).toContainText('Son compte SMPP sera suspendu')
+  await expect(suspension).toContainText('Son compte sera suspendu')
   await suspension.getByRole('button', { name: 'Suspendre' }).click()
   await expect(page.getByRole('button', { name: 'Réactiver' })).toBeVisible()
   await page.goto('/customers?status=suspended')

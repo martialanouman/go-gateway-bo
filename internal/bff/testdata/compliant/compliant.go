@@ -236,3 +236,43 @@ func (API) CreateAccount(_ context.Context, _ bff.CreateAccountRequestObject,
 ) (bff.CreateAccountResponseObject, error) {
 	return bff.CreateAccount201JSONResponse{}, nil
 }
+
+func (API) GetAccount(_ context.Context, _ bff.GetAccountRequestObject,
+) (bff.GetAccountResponseObject, error) {
+	return bff.GetAccount200JSONResponse{}, nil
+}
+
+func (API) SetAccountChannels(_ context.Context, _ bff.SetAccountChannelsRequestObject,
+) (bff.SetAccountChannelsResponseObject, error) {
+	return bff.SetAccountChannels200JSONResponse{}, nil
+}
+
+func (API) SetAccountSmppOps(_ context.Context, _ bff.SetAccountSmppOpsRequestObject,
+) (bff.SetAccountSmppOpsResponseObject, error) {
+	return bff.SetAccountSmppOps200JSONResponse{}, nil
+}
+
+func (API) ListWebhooks(_ context.Context, _ bff.ListWebhooksRequestObject,
+) (bff.ListWebhooksResponseObject, error) {
+	return bff.ListWebhooks200JSONResponse{}, nil
+}
+
+func (API) CreateWebhook(_ context.Context, _ bff.CreateWebhookRequestObject,
+) (bff.CreateWebhookResponseObject, error) {
+	return bff.CreateWebhook201JSONResponse{}, nil
+}
+
+func (API) UpdateWebhook(_ context.Context, _ bff.UpdateWebhookRequestObject,
+) (bff.UpdateWebhookResponseObject, error) {
+	return bff.UpdateWebhook200JSONResponse{}, nil
+}
+
+func (API) RotateWebhookSecret(_ context.Context, _ bff.RotateWebhookSecretRequestObject,
+) (bff.RotateWebhookSecretResponseObject, error) {
+	return bff.RotateWebhookSecret200JSONResponse{}, nil
+}
+
+func (API) DeleteWebhook(_ context.Context, _ bff.DeleteWebhookRequestObject,
+) (bff.DeleteWebhookResponseObject, error) {
+	return bff.DeleteWebhook204Response{}, nil
+}

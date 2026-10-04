@@ -13,7 +13,7 @@
 
 ### 1.1 Exigences fonctionnelles
 
-- **Gestion des clients et de leurs comptes SMPP (admin)** — navigation à deux niveaux suivant le modèle de la passerelle (§6.18 compagnon) : un **client** détient un ou plusieurs **comptes SMPP**. Les clients n'ont aucun accès à la plateforme ; les admins créent/modifient/suspendent les deux niveaux et gèrent chaque sous-ressource.
+- **Gestion des clients et de leurs comptes SMPP (admin)** — navigation à deux niveaux suivant le modèle de la passerelle (§6.18 compagnon) : un **client** détient un ou plusieurs **comptes SMPP**. *À l'écran, on dit « compte » : un compte porte aussi le canal REST et sa clé API (arbitré le 04/10/2026). Le code et le contrat gardent `smpp_account`.* Les clients n'ont aucun accès à la plateforme ; les admins créent/modifient/suspendent les deux niveaux et gèrent chaque sous-ressource.
   - **Au niveau client** : identité, statut (suspendre un client suspend tous ses comptes), **sender IDs** (avec leur **catégorie de trafic** et leur **limite de débit**, §6.19), **facturation** (soldes MT et MO, plan tarifaire, découvert, `balance_scope`), **politique de stockage de contenu**, appartenance à un **groupe**.
   - **Au niveau compte SMPP** : **identifiant de bind SMPP + une clé API** (création, rotation manuelle avec fenêtre de grâce, révocation), **canaux** (SMPP/REST), bascules **`query_sm`/`cancel_sm`**, **quotas/limites de débit**, `max_sessions`, **webhook MO/DLR**.
 - **UI de groupes de clients (organisationnel)** — CRUD des groupes pour segmenter la base (par secteur, région, revendeur), affectation de clients, et filtrage par groupe partout où les clients/comptes apparaissent. Un groupe ne porte ni solde, ni quota, ni règle de configuration (§6.17 compagnon).
@@ -730,7 +730,7 @@ Deux niveaux (`content:read` pour lire un corps ; `content:erase` et `gdpr:erase
 
 *Amendement du 29/09/2026 — ADR-0020 et ADR-0021 de la passerelle, acceptées le 29/09/2026.*
 
-- **Tout expéditeur doit être enregistré**, numérique compris : un `source_addr` inconnu est rejeté par la passerelle. La politique de sender ID par compte disparaît, avec son écran et sa route. La page du client le dit à la place.
+- **Tout expéditeur doit être enregistré**, numérique compris : un `source_addr` inconnu est rejeté par la passerelle. La politique de sender ID par compte disparaît, avec son écran et sa route ; aucun écran ne rappelle la règle, qui va de soi (arbitré le 03/10/2026).
 - **Catégorie** (`otp` | `transactional` | `marketing`) sur chaque sender ID, **`marketing` par défaut**. Passer en `otp` ou `transactional` est un acte explicite : une confirmation nomme la conséquence (« ce trafic passera devant le marketing sur les connecteurs partagés »), et le changement est audité avec l'ancienne et la nouvelle valeur. Permission : `customers:write`.
 - **Limite de débit par sender ID** (messages/s, rafale) : l'engagement contractuel du flux, appliqué avant l'accusé de réception. Au-delà, le client reçoit un refus (`429` en REST, `ESME_RTHROTTLED` en SMPP) et **aucun CDR n'est écrit**. L'écran le dit, parce qu'un opérateur qui cherche un message refusé à l'admission ne le trouvera pas dans le CDR Explorer.
 - **Liste** : colonnes catégorie, limite, statut ; filtre par catégorie ; compteur de signalements `category_mismatch` récents par expéditeur, avec lien vers la file de revue (§6.6).

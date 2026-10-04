@@ -213,3 +213,35 @@ func (API) ListAccounts(_ context.Context, _ bff.ListAccountsRequestObject) (bff
 func (API) CreateAccount(_ context.Context, _ bff.CreateAccountRequestObject) (bff.CreateAccountResponseObject, error) {
 	return nil, nil
 }
+
+func (API) GetAccount(_ context.Context, _ bff.GetAccountRequestObject) (bff.GetAccountResponseObject, error) {
+	return nil, nil
+}
+
+func (API) SetAccountChannels(_ context.Context, _ bff.SetAccountChannelsRequestObject) (bff.SetAccountChannelsResponseObject, error) {
+	return nil, nil
+}
+
+func (API) SetAccountSmppOps(_ context.Context, _ bff.SetAccountSmppOpsRequestObject) (bff.SetAccountSmppOpsResponseObject, error) {
+	return nil, nil
+}
+
+func (API) ListWebhooks(_ context.Context, _ bff.ListWebhooksRequestObject) (bff.ListWebhooksResponseObject, error) {
+	return nil, nil
+}
+
+func (API) CreateWebhook(_ context.Context, _ bff.CreateWebhookRequestObject) (bff.CreateWebhookResponseObject, error) {
+	return nil, nil
+}
+
+func (API) UpdateWebhook(_ context.Context, _ bff.UpdateWebhookRequestObject) (bff.UpdateWebhookResponseObject, error) {
+	return nil, nil
+}
+
+func (API) RotateWebhookSecret(_ context.Context, _ bff.RotateWebhookSecretRequestObject) (bff.RotateWebhookSecretResponseObject, error) {
+	return nil, nil
+}
+
+func (API) DeleteWebhook(_ context.Context, _ bff.DeleteWebhookRequestObject) (bff.DeleteWebhookResponseObject, error) {
+	return nil, nil
+}

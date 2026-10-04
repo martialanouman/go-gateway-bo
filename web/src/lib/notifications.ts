@@ -36,7 +36,7 @@ function describeBillingAlert(alert: BillingAlert) {
 // `BalanceScope` de l'API Admin ; le BFF le type en chaîne libre, d'où le repli brut.
 function balanceOwner({ ownerType, ownerId, customerId }: BillingAlert) {
   if (ownerType === 'customer') return `du client ${customerId}`
-  if (ownerType === 'smpp_account') return `du compte SMPP ${ownerId} du client ${customerId}`
+  if (ownerType === 'smpp_account') return `du compte ${ownerId} du client ${customerId}`
   return `${ownerType} ${ownerId} du client ${customerId}`
 }
 

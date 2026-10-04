@@ -57,9 +57,7 @@ describe('notification toasts', () => {
 
     expect(await screen.findByText('Plancher de facturation MO atteint')).toBeInTheDocument()
     expect(
-      screen.getByText(
-        /^Le solde du compte SMPP acc-7 du client cus-42 est à 1\s250\s000 crédits\.$/,
-      ),
+      screen.getByText(/^Le solde du compte acc-7 du client cus-42 est à 1\s250\s000 crédits\.$/),
     ).toBeInTheDocument()
     expect(screen.getByText('source · bff')).toBeInTheDocument()
     expect(document.querySelector('.ui-toast--warning')).not.toBeNull()

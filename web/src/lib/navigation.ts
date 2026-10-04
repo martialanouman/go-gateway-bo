@@ -21,7 +21,7 @@ export type Milestone = 'M3' | 'M4' | 'M5' | 'M6' | 'M7' | 'M8' | 'M9'
 
 // Les intitulés de `tasks/plan.md`, §8 à §14.
 export const MILESTONES: Record<Milestone, string> = {
-  M3: 'Clients, comptes SMPP et identifiants',
+  M3: 'Clients, comptes et identifiants',
   M4: 'Exploitation temps réel',
   M5: 'CDR Explorer et trace',
   M6: 'Routage et scripts',
@@ -63,7 +63,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: 'Clients',
     entries: [
       { to: '/customers', label: 'Clients', anyOf: ['customers:read'] },
-      { to: '/accounts', label: 'Comptes SMPP', anyOf: ['accounts:read'] },
+      { to: '/accounts', label: 'Comptes', anyOf: ['accounts:read'] },
       { to: '/groups', label: 'Groupes', anyOf: ['groups:read'] },
     ],
   },

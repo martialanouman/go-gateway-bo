@@ -736,3 +736,115 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Switch — charte `forms/Switch` : un réglage binaire appliqué aussitôt. */
+.ui-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-7);
+  padding: var(--sp-5) 0;
+}
+
+.ui-switch-row--compact {
+  display: inline-flex;
+  padding: 0;
+}
+
+.ui-switch-row + .ui-switch-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ui-switch-row__text {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.ui-switch-row__label {
+  color: var(--text-primary);
+  font: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-switch-row__hint {
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-switch {
+  display: inline-flex;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--n-600);
+  cursor: pointer;
+  transition: background-color var(--dur-base) var(--ease-productive);
+}
+
+.ui-switch[data-checked] {
+  background: var(--teal-700);
+}
+
+.ui-switch:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.ui-switch[aria-disabled="true"] {
+  background: var(--n-700);
+  cursor: not-allowed;
+}
+
+.ui-switch__thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--n-200);
+  transition:
+    transform var(--dur-base) var(--ease-productive),
+    background-color var(--dur-base) var(--ease-productive);
+}
+
+.ui-switch[data-checked] .ui-switch__thumb {
+  transform: translateX(16px);
+  background: var(--teal-100);
+}
+
+/* Une carte de réglages, sur le modèle `Card` de la charte. */
+.settings-card {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-4);
+  padding: var(--sp-7);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+.settings-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-6);
+}
+
+.settings-card__head h2 {
+  margin: 0;
+}
+
+.settings-card__note {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-7);
+}

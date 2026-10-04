@@ -9,8 +9,11 @@ import (
 )
 
 const (
-	operationListAccounts  = "list-smpp-accounts"
-	operationCreateAccount = "create-smpp-account"
+	operationListAccounts      = "list-smpp-accounts"
+	operationCreateAccount     = "create-smpp-account"
+	operationGetAccount        = "get-smpp-account"
+	operationSetAccountChannel = "set-account-channels"
+	operationSetAccountSmppOps = "set-account-smpp-ops"
 )
 
 func (a API) ListAccounts(ctx context.Context, request ListAccountsRequestObject,
@@ -109,13 +112,188 @@ func (a API) CreateAccount(ctx context.Context, request CreateAccountRequestObje
 	return CreateAccount201JSONResponse(accountDTO(*response.JSON201)), nil
 }
 
+func (a API) GetAccount(ctx context.Context, request GetAccountRequestObject) (GetAccountResponseObject, error) {
+	id, known := parseID(request.AccountId)
+	if !known {
+		return GetAccount404JSONResponse{CompteInconnuJSONResponse(unknownAccount())}, nil
+	}
+
+	response, err := a.Gateway.GetSmppAccountWithResponse(ctx, id)
+	if err == nil {
+		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
+	}
+
+	if err == nil && response.JSON200 == nil {
+		err = gateway.ErrorFrom(http.StatusBadGateway, nil)
+	}
+
+	if err != nil {
+		status, body, err := a.accountRefusal(ctx, operationGetAccount, err)
+
+		switch status {
+		case http.StatusNotFound:
+			return GetAccount404JSONResponse{CompteInconnuJSONResponse(body)}, nil
+		case http.StatusUnprocessableEntity:
+			return GetAccount422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
+		case http.StatusServiceUnavailable:
+			return GetAccount503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
+		default:
+			return nil, err
+		}
+	}
+
+	return GetAccount200JSONResponse(accountDTO(*response.JSON200)), nil
+}
+
+func (a API) SetAccountChannels(ctx context.Context, request SetAccountChannelsRequestObject,
+) (SetAccountChannelsResponseObject, error) {
+	actor, err := actorOf(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	id, known := parseID(request.AccountId)
+	if !known {
+		return SetAccountChannels404JSONResponse{CompteInconnuJSONResponse(unknownAccount())}, nil
+	}
+
+	var response *gateway.SetAccountChannelsResponse
+
+	_, err = auditRelayed(ctx, a.Audit.Record, a.Logger, a.event(ctx, store.Event{
+		OperatorID: actor, Action: actionAccountChannels, TargetType: auditTargetAccount, TargetID: id.String(),
+		After: store.NewFields().Flag("smpp_enabled", request.Body.SmppEnabled).
+			Flag("rest_enabled", request.Body.RestEnabled),
+	}), func(ctx context.Context, _ *store.Event) (int, error) {
+		var callErr error
+
+		response, callErr = a.Gateway.SetAccountChannelsWithResponse(ctx, id, gateway.SetAccountChannelsJSONRequestBody{
+			SmppEnabled: request.Body.SmppEnabled, RestEnabled: request.Body.RestEnabled,
+		})
+		if callErr != nil {
+			return 0, callErr
+		}
+
+		return response.StatusCode(), nil
+	})
+	if err == nil {
+		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
+	}
+
+	if err == nil && response.JSON200 == nil {
+		err = gateway.ErrorFrom(http.StatusBadGateway, nil)
+	}
+
+	if err != nil {
+		status, body, err := a.accountRefusal(ctx, operationSetAccountChannel, err)
+
+		switch status {
+		case http.StatusNotFound:
+			return SetAccountChannels404JSONResponse{CompteInconnuJSONResponse(body)}, nil
+		case http.StatusUnprocessableEntity:
+			return SetAccountChannels422JSONResponse{RefusDeLaPasserelleJSONResponse(lastChannel(body.Code))}, nil
+		case http.StatusServiceUnavailable:
+			return SetAccountChannels503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
+		default:
+			return nil, err
+		}
+	}
+
+	return SetAccountChannels200JSONResponse(accountDTO(*response.JSON200)), nil
+}
+
+func (a API) SetAccountSmppOps(ctx context.Context, request SetAccountSmppOpsRequestObject,
+) (SetAccountSmppOpsResponseObject, error) {
+	actor, err := actorOf(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	id, known := parseID(request.AccountId)
+	if !known {
+		return SetAccountSmppOps404JSONResponse{CompteInconnuJSONResponse(unknownAccount())}, nil
+	}
+
+	var response *gateway.SetAccountSmppOpsResponse
+
+	_, err = auditRelayed(ctx, a.Audit.Record, a.Logger, a.event(ctx, store.Event{
+		OperatorID: actor, Action: actionAccountSmppOps, TargetType: auditTargetAccount, TargetID: id.String(),
+		After: store.NewFields().Flag("query_sm_enabled", request.Body.QuerySmEnabled).
+			Flag("cancel_sm_enabled", request.Body.CancelSmEnabled),
+	}), func(ctx context.Context, _ *store.Event) (int, error) {
+		var callErr error
+
+		response, callErr = a.Gateway.SetAccountSmppOpsWithResponse(ctx, id, gateway.SetAccountSmppOpsJSONRequestBody{
+			QuerySmEnabled: &request.Body.QuerySmEnabled, CancelSmEnabled: &request.Body.CancelSmEnabled,
+		})
+		if callErr != nil {
+			return 0, callErr
+		}
+
+		return response.StatusCode(), nil
+	})
+	if err == nil {
+		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
+	}
+
+	if err == nil && response.JSON200 == nil {
+		err = gateway.ErrorFrom(http.StatusBadGateway, nil)
+	}
+
+	if err != nil {
+		status, body, err := a.accountRefusal(ctx, operationSetAccountSmppOps, err)
+
+		switch status {
+		case http.StatusNotFound:
+			return SetAccountSmppOps404JSONResponse{CompteInconnuJSONResponse(body)}, nil
+		case http.StatusUnprocessableEntity:
+			return SetAccountSmppOps422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
+		case http.StatusServiceUnavailable:
+			return SetAccountSmppOps503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
+		default:
+			return nil, err
+		}
+	}
+
+	return SetAccountSmppOps200JSONResponse(accountDTO(*response.JSON200)), nil
+}
+
+func (a API) accountRefusal(ctx context.Context, operation string, err error) (int, Error, error) {
+	status, body, err := a.relayedRefusal(ctx, operation, err)
+	if status == http.StatusNotFound {
+		body = Error{Code: body.Code, Message: unknownAccount().Message}
+	}
+
+	return status, body, err
+}
+
 func accountDTO(account gateway.SmppAccount) SmppAccount {
 	return SmppAccount{
-		Id:         account.Id.String(),
-		CustomerId: account.CustomerId.String(),
-		Name:       account.Name,
-		Status:     CustomerStatus(account.Status),
-		CreatedAt:  account.CreatedAt,
+		Id:              account.Id.String(),
+		CustomerId:      account.CustomerId.String(),
+		Name:            account.Name,
+		Status:          CustomerStatus(account.Status),
+		SmppEnabled:     account.SmppEnabled,
+		RestEnabled:     account.RestEnabled,
+		QuerySmEnabled:  enabledByDefault(account.QuerySmEnabled),
+		CancelSmEnabled: enabledByDefault(account.CancelSmEnabled),
+		CreatedAt:       account.CreatedAt,
+	}
+}
+
+// enabledByDefault lit un drapeau que le contrat laisse facultatif : la passerelle l'active à la
+// création d'un compte (`DEFAULT true`), et c'est donc ce qu'un champ absent veut dire.
+func enabledByDefault(flag *bool) bool {
+	return flag == nil || *flag
+}
+
+func unknownAccount() Error {
+	return Error{Code: "not_found", Message: "Aucun compte ne porte cet identifiant. Rechargez la liste."}
+}
+
+func lastChannel(code string) Error {
+	return Error{
+		Code:    code,
+		Message: "Un compte garde au moins un canal : activez l'autre avant de couper celui-ci.",
 	}
 }
 

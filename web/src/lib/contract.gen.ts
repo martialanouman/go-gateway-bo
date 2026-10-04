@@ -17,9 +17,19 @@ export const AccessLinkUse = z.object({
   token: z.string().max(64),
 })
 
+export const AccountChannels = z.object({
+  restEnabled: z.boolean(),
+  smppEnabled: z.boolean(),
+})
+
 export const AccountCreation = z.object({
   customerId: z.string(),
   name: z.string().min(1),
+})
+
+export const AccountSmppOps = z.object({
+  cancelSmEnabled: z.boolean(),
+  querySmEnabled: z.boolean(),
 })
 
 export const CustomerCreation = z.object({
@@ -106,4 +116,17 @@ export const TotpEnrollmentRequest = z.object({
 export const WebauthnRegistration = z.object({
   attestation: z.record(z.string(), z.unknown()),
   name: z.string().min(1).max(64),
+})
+
+export const WebhookCreation = z.object({
+  eventType: z.enum(['mo', 'dlr']),
+  url: z.string().regex(/^https?:\/\/[^\/]/),
+})
+
+export const WebhookUpdate = z.object({
+  status: z.enum(['active', 'disabled']).optional(),
+  url: z
+    .string()
+    .regex(/^https?:\/\/[^\/]/)
+    .optional(),
 })

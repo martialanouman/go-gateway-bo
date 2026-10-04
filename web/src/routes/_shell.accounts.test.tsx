@@ -13,6 +13,10 @@ const OTP: components['schemas']['SmppAccount'] = {
   customerId: ACME.id,
   name: 'trafic-otp',
   status: 'active',
+  smppEnabled: true,
+  restEnabled: true,
+  querySmEnabled: true,
+  cancelSmEnabled: true,
   createdAt: '2026-10-01T08:00:00Z',
 }
 
@@ -29,6 +33,15 @@ function open(
 }
 
 describe('the accounts screen', () => {
+  it('opens the account screen from its name', async () => {
+    const user = userEvent.setup()
+    open('/accounts')
+
+    await user.click(await screen.findByRole('link', { name: OTP.name }))
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Canaux' })).toBeInTheDocument()
+  })
+
   it('names the customer of each account and links to it', async () => {
     open('/accounts')
 
@@ -56,7 +69,7 @@ describe('the accounts screen', () => {
       await screen.findByRole('heading', { level: 1, name: `Comptes de ${ACME.name}` }),
     ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Nouveau compte' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Nouveau compte SMPP' })
+    const dialog = await screen.findByRole('dialog', { name: 'Nouveau compte' })
     await user.type(within(dialog).getByRole('textbox', { name: 'Nom' }), 'trafic-marketing{Enter}')
 
     expect(await screen.findByRole('cell', { name: 'trafic-marketing' })).toBeInTheDocument()
