@@ -52,9 +52,9 @@ const (
 	actionWebhookUpdate      = "webhook.update"
 	actionWebhookRotate      = "webhook.rotate_secret"
 	actionWebhookDelete      = "webhook.delete"
-	actionCredentialCreate   = "credential.create"
-	actionCredentialRotate   = "credential.rotate"
-	actionCredentialRevoke   = "credential.revoke"
+	actionCredentialCreate   = "credential.create" //nolint:gosec // G101 : un nom d'action d'audit, pas un secret.
+	actionCredentialRotate   = "credential.rotate" //nolint:gosec // G101 : un nom d'action d'audit, pas un secret.
+	actionCredentialRevoke   = "credential.revoke" //nolint:gosec // G101 : un nom d'action d'audit, pas un secret.
 )
 
 // Les types de cible que ces actions désignent. Le §3.1 les laisse libres ; les nommer ici évite que

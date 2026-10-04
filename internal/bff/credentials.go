@@ -8,6 +8,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
+//nolint:gosec // G101 : des noms d'opérations du contrat, pas des secrets.
 const (
 	operationListCredentials  = "list-credentials"
 	operationCreateCredential = "create-credential"
