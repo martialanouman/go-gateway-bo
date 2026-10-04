@@ -1,6 +1,6 @@
 # step-068 — Coquille et écrans livrés alignés sur la maquette du kit
 
-> **Jalon :** M3 (plan §7, §8 ; charte `ui_kits/admin-console`) · **Statut :** À FAIRE
+> **Jalon :** M3 (plan §7, §8 ; charte `ui_kits/admin-console`) · **Statut :** FAIT
 > **Dépend de :** step-064 · **Bloque :** step-065
 > *Insérée le 04/10/2026, après le test de la fiche compte par l'utilisateur.*
 
@@ -53,6 +53,19 @@ Les écrans en attente (`PendingScreen`) suivent le même en-tête.
 - **Rôle de l'opérateur** absent de la barre supérieure : c'est l'écart de step-040, refusé par le
   contrat du BFF.
 
+## Écarts assumés à la livraison (04/10/2026)
+- **Les listes ne sont pas en `Card`.** Les tables de liste vont jusqu'aux marges de la page, comme
+  dans `CdrExplorerScreen.jsx`. La ligne « rôles » de l'écart 4 est donc retirée : l'écran est une
+  liste, sans section.
+- **Groupes sans `Toolbar`.** Les onglets Actifs / Archivés jouent le rôle de la sous-barre, et
+  « Nouveau groupe » monte dans la barre supérieure. Une sous-barre en plus empilerait deux bandes
+  de 44 px pour une seule action.
+- **Marge de page à 24 px (`--pad-panel`).** La maquette `Page` pose 16 px (`--sp-7`). Le squelette
+  d'`index.html` peint déjà 24 px, et un écart entre les deux ferait sauter le contenu à
+  l'hydratation.
+- **Sous 1280 px, la date de création quitte la barre.** Le bloc d’identité garde 20ch, seul le titre rétrécit, et le fil d’Ariane se
+  tronque. Mesuré à 1440, 1280 et 1024 px : aucun défilement horizontal.
+
 ## Tests
 - **Parcours e2e** étendu, sans nouveau fichier : le fil d'Ariane d'une fiche compte mène au client,
   et l'action d'en-tête d'une liste (« Nouveau compte ») est atteinte dans la sous-barre.
@@ -69,11 +82,25 @@ Les écrans en attente (`PendingScreen`) suivent le même en-tête.
 ## Critère 4
 - Un écart visuel (marge, alignement) ne se teste pas en Vitest. Il se constate sur les captures,
   écrites dans la PR.
+- **Aucun test ne rougit si `dense` disparaît d'une table**, ni si `.page` perd son `padding` :
+  vérifié en lisant les suites, qui n'assertent aucune classe de mise en page. La marge de l'accueil
+  a été mesurée dans le navigateur (24 px) ; la densité se lit sur les captures.
+
+## Mutations (04/10/2026)
+| Mutation | Test qui tombe |
+|---|---|
+| Fil d'Ariane retiré de la fiche compte | `leads back to its customer through the breadcrumb of the top bar` et un autre |
+| En-tête rendu dans le contenu, pas par le portail | `shows the title of the screen in the top bar, as its only h1` |
+| Titre de carte sans `tabIndex` | `lets its title take the focus when given a ref`, plus un test de Mon compte |
+| Actions de `Toolbar` hors de la zone de fin | `puts the filters first and the actions at the end` |
+| `flush` ignoré | `carries a table without inner padding when flush` |
+| `titleRef` non transmis au `h1` | 9 tests de focus (groupes, rôles, clients, fiche client, fiche compte, Mon compte) |
+| En-tête retiré d'une fiche en erreur (compte, puis client) | `says the account could not be read…`, `names an unknown customer…` |
 
 ## Definition of Done
-- [ ] `make check` vert ; `make e2e` vert.
-- [ ] Les 5 écarts traités sur les 8 écrans, captures avant/après dans la PR.
-- [ ] `settings-card` retiré, `Card` et `Toolbar` dans le kit, avec leurs tests.
+- [x] `make check` vert ; `make e2e` vert.
+- [x] Les 5 écarts traités sur les 8 écrans, captures avant/après dans la PR.
+- [x] `settings-card` retiré, `Card` et `Toolbar` dans le kit, avec leurs tests.
 
 ## Hors périmètre
 - Les écrans non livrés : chacun suivra la coquille à sa step.
