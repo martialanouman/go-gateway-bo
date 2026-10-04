@@ -1,7 +1,13 @@
 # step-066 — Identifiants : deux cartes masquées, secret une fois, rotation, révocation
 
 > **Jalon :** M3 (plan §8 ; spec §6.14) · **Statut :** À FAIRE
-> **Dépend de :** step-064 (modale « montré une fois »), step-065 (binds ouverts du compte) · **Bloque :** —
+> **Dépend de :** step-064 (modale « montré une fois »), step-065 (binds ouverts du compte), **les correctifs
+> d'identifiants de `go-gateway` et le contrat qui les publie** · **Bloque :** —
+>
+> ⚠️ **Le merge attend la passerelle** (option A, arbitrée par l'utilisateur le 04/10/2026) : la copie
+> décrit le comportement **corrigé**. La step se code contre Prism dès maintenant ; le bump du contrat
+> se fait **au début de la reprise**, une fois la version publiée sortie de quarantaine, et son diff
+> YAML se relit avant le merge.
 
 ## But
 Dans l'onglet « Identifiants » de la fiche compte, un opérateur `credentials:read` voit **exactement
@@ -14,11 +20,14 @@ journaux. Chaque écriture laisse une trace d'audit, qui ne contient jamais le s
 payée.
 
 ## Décisions (arbitrées sur le contexte, 04/10/2026)
-- **Contrat : il reste en 6.10.1.** La version a été relevée au début de la step (API GitHub
+- **Contrat : on code contre la 6.10.1, on merge sur la version corrigée.** La version a été relevée au début de la step (API GitHub
   Packages, 04/10/2026 à 14:35 UTC). La 6.11.0 a été publiée le 03/10 à 19:55 UTC, la 6.12.0 le 04/10
   à 05:03 UTC, et la quarantaine pnpm (`minimumReleaseAge: 1440`) retient les deux. Le diff de
   `go-gateway/api/openapi-admin.yaml` depuis la 6.10.1 ne touche à aucune opération ni à aucun
-  schéma d'identifiant. L'écart est consigné dans la PR.
+  schéma d'identifiant. L'écart est consigné dans la PR. **Trois correctifs sont demandés à `go-gateway`**
+  (prompt transmis le 04/10/2026) : la rotation sans grâce d'un `smpp_bind` coupe ses binds ouverts ;
+  révoquer ou désactiver une `api_key` ne coupe plus aucun bind SMPP ; la rotation d'un identifiant
+  révoqué le réactive, sans fenêtre de grâce (422 sinon), et répond 409 si son `system_id` a été repris.
 - **Ce que la carte affiche** : le type, le `system_id` pour le bind SMPP, le statut, la dernière
   utilisation, la date de création et l'état de rotation (date de la dernière rotation, échéance de
   la grâce). **Aucun fragment du secret** : le contrat ne porte pas de « 4 derniers caractères », et
@@ -34,7 +43,7 @@ payée.
   `create-credential`. Pour le bind SMPP, une modale demande le `system_id`, de 1 à 15 caractères :
   la borne est engendrée depuis le contrat. La clé API se crée sans saisie, après une modale de
   confirmation. Un 409 (type déjà présent, ou révoqué) se place sous le formulaire, et la copie
-  nomme la révocation quand c'est elle la cause.
+  dit de faire tourner l'identifiant quand c'est une révocation qui occupe la place.
 - **Le secret vient de la passerelle**, contrairement au webhook, où c'est le BFF qui l'engendre. Le
   BFF le relaie une seule fois, dans le DTO `CredentialSecret` (`{ credential, secret }`), qui ne sert
   qu'aux réponses de création et de rotation. Le DTO `Credential` n'a pas ce champ. Le BFF ne
@@ -50,27 +59,27 @@ payée.
   parmi quatre valeurs : « Aucune », « 1 heure », « 24 heures » (le défaut) et « 7 jours », qui est le
   maximum du contrat (604 800 s). Le BFF accepte toute valeur de 0 à 604 800, avec la borne du
   contrat.
-  **La copie suit la passerelle, pas la spec** : `rotate` n'appelle aucune déconnexion
-  (`go-gateway/internal/adminapi/credentials.go`, relu le 04/10/2026), donc **les binds ouverts
-  restent ouverts**. Sans fenêtre de grâce, l'ancien secret sera refusé dès la prochaine connexion
-  (bind) ou le prochain appel REST. Avec une fenêtre, il restera accepté jusqu'à l'échéance, qui
-  s'affiche ensuite sur la carte. La spec §6.14, qui disait « une rotation sans grâce coupe les binds
-  vivants », est corrigée.
+  **La copie suit la passerelle corrigée.** Bind SMPP sans grâce : l'ancien secret sera refusé
+  aussitôt et **les binds ouverts seront coupés** — la modale les chiffre par
+  `GET /accounts/{accountId}/sessions`, comme la révocation. Bind SMPP avec grâce : aucun bind n'est
+  coupé, l'ancien secret restera accepté jusqu'à l'échéance, qui s'affiche ensuite sur la carte. Clé
+  API : aucun bind n'est jamais coupé ; sans grâce, l'ancienne clé sera refusée au prochain appel
+  REST. La spec §6.14 dit déjà « une rotation sans grâce coupe les binds vivants » ; seul l'amendement
+  écrit au premier commit, qui décrivait la passerelle d'avant les correctifs, est retiré.
   Modale Material : titre « Faire tourner l'identifiant SMPP ? », conséquences au futur, bouton
   « Faire tourner ».
-- **Un identifiant révoqué ne tourne pas.** La passerelle accepte la rotation mais laisse le statut
-  à `revoked`, si bien que le nouveau secret ne servirait à rien. Le bouton est désactivé, et son
-  infobulle le dit. La description de `revoke-credential` (« Use rotate to issue a new secret ») est
-  trompeuse : l'écart est signalé dans la PR pour `go-gateway`.
+- **Un identifiant révoqué se réactive par rotation, sans grâce.** La carte révoquée propose « Faire
+  tourner » ; la modale masque le choix de grâce et dit que l'identifiant redeviendra actif avec un
+  nouveau secret, l'ancien restant refusé. Le BFF n'envoie aucune grâce pour ce cas ; le 422 et le 409
+  de la passerelle se rédigent en français (« ce system_id est désormais pris par un autre compte »).
 - **Révocation** (`credentials:write`) : `DELETE /accounts/{accountId}/credentials/{credentialId}`
   relaie `revoke-credential`. Avant confirmation, la modale relit les binds ouverts par
   `GET /accounts/{accountId}/sessions` (step-065) et chiffre l'impact : « Les 3 binds ouverts de ce
-  compte seront coupés ». **Révoquer la clé API coupe aussi les binds SMPP**, parce que la passerelle
-  déconnecte le compte entier (`disconnectAccount`, quel que soit le type), et la copie le dit. Si le
-  chiffre ne peut pas être lu, la modale dit que tous les binds ouverts seront coupés, sans chiffre,
-  et la révocation reste possible. **La révocation est définitive pour ce compte** : la ligne est
-  conservée et la passerelle refuse d'en créer une autre du même type (409). La modale le dit.
-  Bouton : « Révoquer ».
+  compte seront coupés » — pour le bind SMPP seulement. **Révoquer la clé API ne coupe aucun bind** :
+  la modale dit que tout appel REST avec cette clé sera refusé. Si le chiffre ne peut pas être lu, la
+  modale dit que tous les binds ouverts seront coupés, sans chiffre, et la révocation reste possible.
+  La ligne est conservée : on ne recrée pas l'identifiant, on le fait tourner pour le réactiver, et la
+  modale le dit. Bouton : « Révoquer ».
 - **Désactivation** (`update-credential-status`) : aucun écran ne la demande au §6.14. Elle n'est pas
   construite. La carte affiche simplement le statut « Désactivé » s'il arrive.
 - **La modale « montré une fois »** de step-064 devient un composant partagé, `SecretShown` (titre et
@@ -123,12 +132,13 @@ payée.
   - aucune carte n'expose de bouton « révéler » ni de fragment de secret ;
   - après la création ou la rotation, le secret s'affiche une fois. Après « J'ai copié le secret »,
     il n'est plus dans le DOM ni dans le cache des mutations ;
-  - la modale de rotation propose la grâce, avec 24 heures par défaut, envoie la valeur choisie et
-    dit que les binds ouverts restent ouverts ; « Aucune » dit que l'ancien secret sera refusé à la
-    prochaine connexion ;
-  - la modale de révocation chiffre les binds coupés, dit que la clé API coupe aussi les binds SMPP,
-    et reste utilisable quand le chiffre ne peut pas être lu ;
-  - une carte révoquée désactive la rotation, et l'infobulle dit pourquoi ;
+  - la modale de rotation propose la grâce, avec 24 heures par défaut, et envoie la valeur choisie ;
+    pour le bind SMPP, « Aucune » chiffre les binds qui seront coupés, une grâce dit qu'aucun ne l'est ;
+    pour la clé API, aucune copie ne parle de binds ;
+  - la modale de révocation du bind SMPP chiffre les binds coupés, et reste utilisable quand le
+    chiffre ne peut pas être lu ; celle de la clé API ne parle d'aucun bind ;
+  - une carte révoquée propose la rotation sans choix de grâce, n'envoie aucune grâce, et dit que
+    l'identifiant redeviendra actif ;
   - sans `credentials:write` ou `credentials:rotate`, chaque bouton est désactivé et nomme la
     permission qui manque.
 - **Parcours e2e**, en étendant celui de step-065 : l'onglet « Identifiants », la création du bind
@@ -140,14 +150,16 @@ payée.
 
 ## Critère 4
 - Contre la vraie passerelle, rien n'est joué : c'est le même obstacle que pour step-061.
-- « Les binds ouverts restent ouverts à la rotation » et « la révocation coupe tout le compte » sont
-  des comportements de la passerelle (relus le 04/10/2026). Contre Prism, seule la copie est tenue.
+- Les coupures de binds (rotation sans grâce, révocation du bind SMPP), leur absence pour la clé API
+  et la réactivation par rotation sont des comportements de la passerelle **corrigée** : à relire dans
+  son code au moment du bump, avant le merge. Contre Prism, seule la copie est tenue.
 - « Introuvable dans les journaux » : le secret ne traverse aucun appel au logger du BFF, ce qui se
   vérifie par lecture du handler. Aucun test ne capture la sortie du journal pour ce champ.
 
 ## Definition of Done
 - [ ] `make check` vert ; `make e2e` vert.
 - [ ] Invariants (b) et (c), et DTO tenus, mutations à l'appui.
+- [ ] Correctifs `go-gateway` mergés, contrat bumpé, diff YAML relu.
 - [ ] Spec §6.14 amendée ; dette 028 supprimée ; step-069 inscrite.
 - [ ] Revue en sous-agent : aucun blocage.
 
