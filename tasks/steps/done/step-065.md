@@ -119,6 +119,8 @@ motif a été vérifié avant d'être remplacé.
 | La modale ne le dit plus | `warns before lowering…` |
 | Refus numériques rédigés en caractères (bas, haut), fraction en refus générique | les trois tests de `a number refused` |
 | `integerExpression` sans ses bornes | `TestAnIntegerCarriesItsBoundsAndRefusesFractions` |
+| `Select` sans son conteneur `.ui-field` | parcours e2e : écart libellé–déclencheur de 16 px contre 8 pour le champ voisin |
+| Identifiant `max_sessions` rendu en capitales | parcours e2e : `text-transform` vaut `uppercase` |
 | Suspension : comptes fermés comptés, cas « tous fermés » retiré, comptes fermés tus | `counts the accounts a suspension takes down…`, `says a suspension takes nothing down when every account is closed` |
 
 ## Critère 4
@@ -141,6 +143,16 @@ motif a été vérifié avant d'être remplacé.
   - l'audit du type n'était pas affirmé ;
   - `too_big` numérique manquait ;
   - le bloc CSS était mal rangé.
+
+- **Après le test de l'utilisateur dans un navigateur (04/10/2026)**, deux défauts visuels :
+  - le libellé `max_sessions` sortait en capitales (« MAX_SESSIONS »), contre la règle de la charte
+    qui garde un identifiant verbatim. Il devient « Binds simultanés », suivi de `max_sessions` en mono,
+    hors capitales ;
+  - le `Select` posait son libellé et son déclencheur comme deux enfants de la grille du formulaire,
+    à 24 px l'un de l'autre au lieu de 8. Il les groupe désormais dans un `.ui-field`, ce qui corrige
+    aussi le formulaire de création de webhook. La règle de la sous-barre vise ce conteneur.
+    Une classe propre aurait fait dépasser à la feuille d'entrée son plafond de 31 octets,
+    alors que la réutilisation tient dessous.
 
 ## Hors périmètre
 - Déconnexion forcée, « Forcer la convergence », mises à jour en deltas : step-085, step-086.
