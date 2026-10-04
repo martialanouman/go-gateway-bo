@@ -570,13 +570,13 @@ alimente — en topologie multi-instance.
 ## 8. M3 — Clients, comptes SMPP & identifiants
 
 **Objectif :** prouver la tranche verticale (§3) et livrer le socle du domaine à deux niveaux.
-**Dépend de :** M2 · **Steps :** 060 → 068 — *067 insérée le 29/09/2026, amendement v2.2 ; 068 insérée le 04/10/2026 (coquille alignée sur la maquette), jouée avant 065*
+**Dépend de :** M2 · **Steps :** 060 → 069 — *067 insérée le 29/09/2026, amendement v2.2 ; 068 insérée le 04/10/2026 (coquille alignée sur la maquette), jouée avant 065*
 
 **Livrables** — groupes de clients (CRUD, filtre transverse), clients (liste, filtres, création, fiche,
 suspension **en cascade** chiffrée, sender IDs avec catégorie et limite de débit), comptes SMPP (canaux,
 bascules `query_sm`/`cancel_sm`, webhooks, quotas, `max_sessions` avec **badge d'écart**), identifiants
 (**exactement deux cartes** masquées, secret montré **une seule fois**, rotation avec fenêtre de grâce,
-révocation avec impact chiffré, diagnostic d'échec de bind).
+révocation avec impact chiffré ; le diagnostic d'échec de bind est détaché en step-069, qui attend le contrat).
 
 **Hors périmètre :** déconnexion forcée des sessions (M4) ; facturation du client (M8).
 
