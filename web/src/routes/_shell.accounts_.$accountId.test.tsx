@@ -415,7 +415,7 @@ describe('the sessions of an account', () => {
     open({ sessions: THREE_BINDS })
 
     await openQuotas(user)
-    const limit = await screen.findByRole('spinbutton', { name: 'max_sessions' })
+    const limit = await screen.findByRole('spinbutton', { name: 'Binds simultanés max_sessions' })
     await user.clear(limit)
     await user.type(limit, '2')
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
@@ -432,7 +432,7 @@ describe('the sessions of an account', () => {
     open({ sessions: THREE_BINDS })
 
     await openQuotas(user)
-    const limit = await screen.findByRole('spinbutton', { name: 'max_sessions' })
+    const limit = await screen.findByRole('spinbutton', { name: 'Binds simultanés max_sessions' })
     await user.clear(limit)
     await user.type(limit, '3')
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
@@ -449,7 +449,7 @@ describe('the sessions of an account', () => {
     const { fetch } = open({ sessions: THREE_BINDS })
 
     await openQuotas(user)
-    const limit = await screen.findByRole('spinbutton', { name: 'max_sessions' })
+    const limit = await screen.findByRole('spinbutton', { name: 'Binds simultanés max_sessions' })
     await user.clear(limit)
     await user.type(limit, '1')
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }))

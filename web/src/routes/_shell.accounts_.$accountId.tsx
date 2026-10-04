@@ -511,8 +511,12 @@ function Sessions({
             <Refusal error={lowering === null ? save.error : null} />
             <Field
               error={form.formState.errors.maxSessions?.message}
-              hint="Binds simultanés admis ; 0 n’en admet aucun."
-              label="max_sessions"
+              hint="0 n’en admet aucun."
+              label={
+                <>
+                  Binds simultanés <span className="mono">max_sessions</span>
+                </>
+              }
             >
               <Input
                 inputMode="numeric"

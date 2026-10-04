@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto'
-import { expect, type Request, test } from '@playwright/test'
+import { expect, type Locator, type Request, test } from '@playwright/test'
 
 /**
  * Le seul parcours du dépôt, et il tourne contre le **binaire**. Ce qu'il prouve que rien d'autre ne
@@ -642,8 +642,24 @@ test('the binary serves the painted shell, then the application replaces it', as
   // step-065 : limiter le compte sous son bind ouvert avertit, n'est pas bloqué, et signale l'écart.
   await page.getByRole('tab', { name: 'Quotas & sessions' }).click()
   await expect(page.getByText('1 ouvert / limite 1')).toBeVisible()
-  await expect(page.getByRole('spinbutton', { name: 'max_sessions' })).toHaveValue('1')
-  await page.getByRole('spinbutton', { name: 'max_sessions' }).fill('0')
+  const limite = page.getByRole('spinbutton', { name: /max_sessions/ })
+  await expect(limite).toHaveValue('1')
+  // La charte : un identifiant reste verbatim, en mono et en minuscules, même dans un libellé capitalisé.
+  await expect(page.locator('.ui-field__label .mono', { hasText: 'max_sessions' })).toHaveCSS(
+    'text-transform',
+    'none',
+  )
+  // Un libellé de sélecteur colle à son déclencheur comme celui d'un champ à son entrée.
+  const ecart = async (libelle: Locator, controle: Locator) =>
+    ((await controle.boundingBox())?.y ?? 0) -
+    (((await libelle.boundingBox())?.y ?? 0) + ((await libelle.boundingBox())?.height ?? 0))
+  expect(
+    await ecart(
+      page.locator('.ui-select__label', { hasText: 'Type de bind admis' }),
+      page.getByRole('combobox', { name: 'Type de bind admis' }),
+    ),
+  ).toBe(await ecart(page.locator('.ui-field__label', { hasText: 'max_sessions' }), limite))
+  await limite.fill('0')
   await page.getByRole('button', { name: 'Enregistrer' }).click()
   const limitation = page.getByRole('dialog', { name: 'Limiter ce compte à 0 bind ?' })
   await expect(limitation).toContainText('Ce compte a 1 bind ouvert : aucun ne sera coupé.')
