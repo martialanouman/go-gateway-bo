@@ -106,6 +106,7 @@ export function Button({
         <Tooltip.Trigger
           render={
             <BaseButton
+              {...rest}
               aria-describedby={reasonId}
               aria-disabled
               className={classes}
