@@ -96,6 +96,95 @@ describe('the credentials of an SMPP account', () => {
     expect(within(card('Identifiant SMPP')).queryByRole('button', { name: /Créer/ })).toBeNull()
   })
 
+  it('creates the API key after a confirmation, and shows it once', async () => {
+    const user = userEvent.setup()
+    const { fetch } = open({ credentials: [SMPP] })
+
+    await openCredentials(user)
+    await user.click(await screen.findByRole('button', { name: 'Créer la clé API' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Créer la clé API ?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Créer' }))
+
+    const shown = await screen.findByRole('dialog', { name: 'Nouvelle clé API' })
+    expect(shown).toHaveTextContent(CREDENTIAL_SECRET)
+    expect(await sentTo(fetch, 'POST', CREDENTIALS)[0]?.clone().json()).toEqual({ type: 'api_key' })
+  })
+
+  it('says what to do when the API key already exists', async () => {
+    const user = userEvent.setup()
+    const refusal =
+      'Ce compte a déjà une clé API, active ou révoquée : faites-la tourner pour obtenir une nouvelle clé.'
+    open(
+      {},
+      {
+        [`POST ${CREDENTIALS}`]: {
+          status: 409,
+          body: {
+            code: 'conflict',
+            message: refusal,
+            errors: [{ field: 'type', message: refusal }],
+          },
+        },
+      },
+    )
+
+    await openCredentials(user)
+    await user.click(await screen.findByRole('button', { name: 'Créer la clé API' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Créer la clé API ?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Créer' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('faites-la tourner')
+  })
+
+  it('places a taken system_id under its field', async () => {
+    const user = userEvent.setup()
+    const refusal =
+      'Ce compte a déjà un identifiant SMPP, ou ce system_id appartient à un autre compte : faites tourner l’identifiant existant, ou choisissez un autre system_id.'
+    open(
+      {},
+      {
+        [`POST ${CREDENTIALS}`]: {
+          status: 409,
+          body: {
+            code: 'conflict',
+            message: refusal,
+            errors: [{ field: 'systemId', message: refusal }],
+          },
+        },
+      },
+    )
+
+    await openCredentials(user)
+    await user.click(await screen.findByRole('button', { name: 'Créer l’identifiant SMPP' }))
+    const form = await screen.findByRole('dialog', { name: 'Nouvel identifiant SMPP' })
+    const systemId = within(form).getByRole('textbox', { name: /system_id/ })
+    await user.type(systemId, 'acme01')
+    await user.click(within(form).getByRole('button', { name: 'Créer' }))
+
+    await waitFor(() =>
+      expect(systemId).toHaveAccessibleDescription(/choisissez un autre system_id/),
+    )
+    expect(within(form).getAllByRole('alert')).toHaveLength(1)
+  })
+
+  it('reads the credentials again when the operator retries', async () => {
+    const user = userEvent.setup()
+    const { fetch } = open(
+      { credentials: [SMPP] },
+      {
+        [`GET ${CREDENTIALS}`]: {
+          status: 503,
+          body: { code: 'upstream_unreachable', message: '' },
+        },
+      },
+    )
+
+    await openCredentials(user)
+    await user.click(await screen.findByRole('button', { name: 'Réessayer' }))
+
+    await waitFor(() => expect(sentTo(fetch, 'GET', CREDENTIALS)).toHaveLength(2))
+  })
+
   it('keeps every credential masked, with nothing to reveal', async () => {
     const user = userEvent.setup()
     open({ credentials: [SMPP, API_KEY] })

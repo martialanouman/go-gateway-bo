@@ -33,31 +33,39 @@ payée.
   la grâce). **Aucun fragment du secret** : le contrat ne porte pas de « 4 derniers caractères », et
   la passerelle ne garde qu'une empreinte (argon2id pour le bind, empreinte pour la clé), dont rien
   ne se déduit. La spec §6.14 est amendée dans la même PR. Le `MaskedSecret` du kit est repris sans
-  sa ligne `last4`. Le `system_id` n'est pas un secret : c'est l'identifiant de connexion, et le
+  sa ligne `last4`, et sa ligne de points devient un fait « Secret : masqué » : la feuille d'entrée
+  n'avait plus la place d'une règle propre (plafond de 36 864 octets bruts, ~70 de marge mesurés), et
+  les faits tiennent en une rangée flexible. Le `system_id` n'est pas un secret : c'est l'identifiant de connexion, et le
   contrat le rend dans sa vue masquée.
 - **Deux cartes, pas une liste** : la liste du contrat est rangée par `type`. Une carte dont le type
   manque affiche « Aucun identifiant SMPP » (ou « Aucune clé API ») et le bouton « Créer ».
-  Si la passerelle rendait deux lignes du même type, ce qui contredirait sa contrainte de schéma, la
-  plus récente l'emporte, sans autre traitement.
+  La passerelle ne rend jamais deux lignes du même type (`credentials_one_per_type_uq`) : l'écran
+  prend la première, sans arbitrage qu'aucun test ne pourrait atteindre.
 - **Création** (`credentials:write`) : `POST /accounts/{accountId}/credentials` relaie
   `create-credential`. Pour le bind SMPP, une modale demande le `system_id`, de 1 à 15 caractères :
   la borne est engendrée depuis le contrat. La clé API se crée sans saisie, après une modale de
-  confirmation. Un 409 (type déjà présent, ou révoqué) se place sous le formulaire, et la copie
-  dit de faire tourner l'identifiant quand c'est une révocation qui occupe la place.
+  confirmation. **Le 409 a deux causes que la passerelle ne distingue pas** : le type déjà présent
+  sur ce compte (actif ou révoqué), ou, pour un bind SMPP, le `system_id` déjà pris par un autre
+  compte (index `credentials_system_id_uq`). Le BFF place donc le refus sous `type` pour une clé API
+  (« faites-la tourner ») et sous `systemId` pour un bind SMPP, en nommant les deux causes.
 - **Le secret vient de la passerelle**, contrairement au webhook, où c'est le BFF qui l'engendre. Le
   BFF le relaie une seule fois, dans le DTO `CredentialSecret` (`{ credential, secret }`), qui ne sert
   qu'aux réponses de création et de rotation. Le DTO `Credential` n'a pas ce champ. Le BFF ne
   stocke pas le secret, ne le journalise pas et ne le met pas dans l'audit.
 - **Le DTO du secret est le seul à porter le champ, et un test le vérifie** (plan §8). On énumère
   tous les types de réponse du paquet `bff` par le type-checker, avec `loadBFF` et
-  `responseInterfaces` de `dto_test.go`. Les types qui atteignent un champ JSON `secret` doivent
-  être exactement `CredentialSecret`, `WebhookSecret` et l'inscription TOTP. Une **liste d'égalité**,
-  et non une liste d'interdits : ajouter un `secret` à n'importe quel autre DTO fait rougir le test.
+  `responseInterfaces` de `dto_test.go`. Les réponses qui atteignent un champ JSON `secret` doivent
+  être exactement les cinq affichages uniques : création et rotation d'un identifiant, création et
+  rotation d'un secret de webhook, enrôlement TOTP (`TestOnlyTheOneTimeDisplaysCarryASecret`). Le
+  test nomme les types de réponse et non les schémas, parce qu'oapi-codegen redéclare chaque schéma
+  sous le nom de sa réponse. Une **liste d'égalité**, et non une liste d'interdits : ajouter un
+  `secret` à n'importe quel autre DTO fait rougir le test.
   C'est ce qui paie la **dette 028**, dont le fichier est supprimé.
 - **Rotation** (`credentials:rotate`) : `POST /accounts/{accountId}/credentials/{credentialId}/rotate`
   relaie `rotate-credential` avec `grace_period_sec`. Dans la modale, la fenêtre de grâce se choisit
   parmi quatre valeurs : « Aucune », « 1 heure », « 24 heures » (le défaut) et « 7 jours », qui est le
-  maximum du contrat (604 800 s). Le BFF accepte toute valeur de 0 à 604 800, avec la borne du
+  maximum du contrat (604 800 s). « Aucune » s'envoie `0`, que la passerelle corrigée traite comme
+  l'absence de grâce. Le BFF accepte toute valeur de 0 à 604 800, avec la borne du
   contrat.
   **La copie suit la passerelle corrigée.** Bind SMPP sans grâce : l'ancien secret sera refusé
   aussitôt et **les binds ouverts seront coupés** — la modale les chiffre par
@@ -95,8 +103,12 @@ payée.
   jamais.
 - **Le code du client** sort de la route, déjà longue de 1 040 lignes : l'onglet vit dans
   `web/src/components/account-credentials.tsx`.
-- **Le faux amont** (`internal/fakegateway`) sert les quatre opérations, avec un secret fixe par
-  appel. Le parcours e2e peut ainsi créer, faire tourner et révoquer.
+- **Défaut trouvé en route, corrigé à la racine** : un `Button` bloqué ne transmettait pas ses
+  autres props, si bien qu'un `aria-label` disparaissait dès que l'action était interdite. Les
+  boutons de webhook d'un opérateur sans `accounts:write` étaient déjà touchés.
+- **Le faux amont** (`internal/fakegateway`) sert les quatre opérations comme la passerelle corrigée,
+  avec un secret aléatoire par appel. Son motif de route à trois segments `{webhookId}` devient
+  `{itemId}`, partagé avec les identifiants. Le parcours e2e peut ainsi créer, faire tourner et révoquer.
 - **Le diagnostic d'échec de bind n'est pas construit** : aucune opération du contrat 6.10.1 ne rend
   les échecs d'authentification. Il est reporté à une nouvelle ligne, **step-069**, dans
   `tasks/todo.md`, ⚠️ en attente du contrat. Le plan §8 et la spec §6.14 le disent.
@@ -104,7 +116,8 @@ payée.
 ## Ordre d'implémentation (un commit vert chacun)
 1. Fiche, todo (step-069), spec §6.14 amendée.
 2. `api/openapi-bff.yaml` : quatre routes, `Credential`, `CredentialSecret`, `CredentialCreation`,
-   `CredentialRotation`, et les réponses 404 « identifiant inconnu » et 409 « type pris ». Puis
+   `CredentialRotation`, et les réponses 404 « identifiant inconnu », 409 « type pris » et 409
+   « system_id repris » (rotation d'un révoqué). Puis
    `make generate`.
 3. Scénarios godog **rouges** dans `cmd/dashboard/credentials.feature`.
 4. `internal/bff/credentials.go` : handlers, DTO, garde, audit. Les scénarios passent au vert.

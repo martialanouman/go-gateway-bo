@@ -142,9 +142,7 @@ export function Credentials({
   }
 
   const held = (type: CredentialType) =>
-    credentials.data
-      .filter((credential) => credential.type === type)
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0]
+    credentials.data.find((credential) => credential.type === type)
   const current = pending === null || pending.kind === 'create' ? undefined : held(pending.type)
 
   return (
