@@ -47,12 +47,12 @@ describe('the customer screen', () => {
     await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
     const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name} ?` })
 
+    // La cascade laisse un compte fermé fermé (contrat 6.10.1) : des trois, deux seront suspendus.
     expect(
-      await within(dialog).findByText(/Ses 3 comptes seront suspendus, dont 1 actif/),
+      await within(dialog).findByText(/Ses 2 comptes seront suspendus, dont 1 actif/),
     ).toBeInTheDocument()
-    expect(dialog).toHaveTextContent(
-      'Un compte fermé repassera suspendu, et pourra donc être réactivé.',
-    )
+    expect(dialog).toHaveTextContent('Son compte fermé reste fermé.')
+    expect(dialog).not.toHaveTextContent('repassera')
     expect(sent(fetch, SUSPEND)).toBe(false)
 
     await user.click(within(dialog).getByRole('button', { name: 'Suspendre' }))
