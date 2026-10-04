@@ -1,6 +1,6 @@
 # step-066 — Identifiants : deux cartes masquées, secret une fois, rotation, révocation
 
-> **Jalon :** M3 (plan §8 ; spec §6.14) · **Statut :** À FAIRE
+> **Jalon :** M3 (plan §8 ; spec §6.14) · **Statut :** FAIT — merge en attente de `go-gateway`
 > **Dépend de :** step-064 (modale « montré une fois »), step-065 (binds ouverts du compte), **les correctifs
 > d'identifiants de `go-gateway` et le contrat qui les publie** · **Bloque :** —
 >
@@ -159,7 +159,42 @@ payée.
   révocation.
 
 ## Tableau des mutations
-*(À remplir après commit, `-count=1`, dans un worktree, restauration par `cp`.)*
+Jouées le 04/10/2026 après commit, `-count=1`. Les lignes 1 à 21 l'ont été dans un worktree isolé,
+sur 878a3fd. Les suivantes ont été jouées dans l'arbre principal au fil de l'écriture, chacune
+restaurée par `cp`. Chaque motif a été vérifié présent une seule fois, et chaque mutation compile.
+
+| Mutation | Ce qui tombe |
+|---|---|
+| 1. `RotateCredential` gardé par `credentials:write` | « sans credentials:rotate, la rotation est refusée…, même avec credentials:write » |
+| 2. `RevokeCredential` gardé par `credentials:read` | « sans credentials:write, la révocation d'un identifiant est refusée… » |
+| 3. `ListCredentials` gardé par `accounts:read` | « sans credentials:read, la lecture des identifiants est refusée… » |
+| 4. `CreateCredential` retiré de la table de garde | `TestEveryContractOperationIsDecided`, plus quatre scénarios de création (fermée par défaut) |
+| 5. `system_id` absent de l'audit | « créer un identifiant SMPP rend le secret de la passerelle, que le journal ignore » |
+| 6. `grace_period_sec` absent de l'audit | « faire tourner un identifiant relaie la fenêtre de grâce… » |
+| 7. Grâce relayée `nil` | le même scénario (« aucune requête reçue ne porte "grace_period_sec":86400 ») |
+| 8. Secret constant dans `credentialSecretDTO` | les scénarios de création et de rotation (« la réponse rend "constant" ») |
+| 9. 409 du bind SMPP placé sous `type` | « un conflit à la création…, le system_id peut aussi être pris par un autre compte » |
+| 10. Secret écrit dans l'audit de création | « … que le journal ignore » (« le journal porte le secret rendu dans 1 ligne ») |
+| 11. `gcTime: 0` retiré | `shows a new SMPP secret once, and never again once the dialog is closed` (cache des mutations) |
+| 12. Grâce par défaut d'une heure | `rotates with a 24-hour grace by default, which cuts no bind` |
+| 13. Grâce envoyée pour un identifiant révoqué | `brings a revoked credential back with a rotation that carries no grace` |
+| 14. Choix de grâce affiché pour un révoqué | le même test |
+| 15. Révocation bloquée quand les binds ne se lisent pas | `still revokes when the open binds cannot be counted…` |
+| 16. Identifiants lus sans `credentials:read` | `reads nothing without credentials:read, and says so` |
+| 17. « Faire tourner » non gardé | `names the missing permission on each gesture` |
+| 18. La fermeture du secret ne vide pas l'état | `shows a new SMPP secret once…` (la modale reste ouverte) |
+| 19. Carte vide non rendue | six tests, dont `shows exactly two cards…` |
+| 20. Clé API sans grâce : phrase du bind SMPP | `never speaks of binds when rotating the API key` |
+| 21. `Button` bloqué sans `{...rest}` | `keeps the accessible name its caller gives it`, `names the missing permission on each gesture` |
+| 22. Champ `apiSecret` ajouté au DTO `Credential` | `TestOnlyTheOneTimeDisplaysCarryASecret`, qui nomme `Credential` |
+| 23. Refus sous `systemId` doublé d'un bandeau | `places a taken system_id under its field` |
+| 24. `case 409` retiré de la rotation | « un identifiant révoqué dont le system_id a été repris ne revit pas… » (500 au lieu de 409) |
+| 25. 404 de rotation non réécrit | « un identifiant disparu entre-temps se nomme en français… » |
+| 26. Focus non rendu au titre après le secret | `shows a new SMPP secret once…` |
+| 27. Seconde révocation d'un révoqué permise | `brings a revoked credential back…` |
+| 28. Grâce affichée sur un identifiant révoqué | `shows the grace deadline only while the old secret is still accepted` |
+| 29. Grâce échue affichée | `stops showing a grace that has run out` |
+| 30. Clé API révoquée au masculin | `shows the grace deadline only while…` |
 
 ## Critère 4
 - Contre la vraie passerelle, rien n'est joué : c'est le même obstacle que pour step-061.
@@ -170,11 +205,18 @@ payée.
   vérifie par lecture du handler. Aucun test ne capture la sortie du journal pour ce champ.
 
 ## Definition of Done
-- [ ] `make check` vert ; `make e2e` vert.
-- [ ] Invariants (b) et (c), et DTO tenus, mutations à l'appui.
+- [x] `make check` vert ; `make e2e` vert.
+- [x] Invariants (b) et (c), et DTO tenus, mutations à l'appui.
 - [ ] Correctifs `go-gateway` mergés, contrat bumpé, diff YAML relu.
-- [ ] Spec §6.14 amendée ; dette 028 supprimée ; step-069 inscrite.
-- [ ] Revue en sous-agent : aucun blocage.
+- [x] Spec §6.14 amendée ; dette 028 supprimée ; step-069 inscrite.
+- [x] Revue en sous-agent : aucun blocage. Les six constats « à corriger » sont traités : échéance de
+  grâce affichée sur un révoqué ou après l'échéance, accord de la clé API, phrase du 404, et trois
+  comportements sans test (focus après le secret, seconde révocation, refus de rotation). Parmi les
+  mineurs, sont traités : la copie de révocation, `aria-live` sur le chiffre des binds, `GRACES.phrase`,
+  le décor 409 qui parlait de sender ID, la fidélité du faux amont et sa route `{verb}`, ainsi que les
+  parseurs jumeaux. Restent sans suite, délibérément : la dissymétrie des titres de la modale de
+  secret, le plan à deux exemples du 409 (deux effets distincts, champ et consigne), et le `system_id`
+  qu'une clé API porterait dans l'audit.
 
 ## Hors périmètre
 - Diagnostic d'échec de bind : step-069, en attente du contrat.
