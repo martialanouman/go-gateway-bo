@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { Credentials } from '~/components/account-credentials'
 import { PageHeader } from '~/components/page-header'
-import { CopyButton } from '~/components/totp-enrollment'
+import { SecretShown } from '~/components/secret-shown'
 import {
   Banner,
   Button,
@@ -187,11 +188,7 @@ function AccountScreen() {
             label: 'Identifiants',
             panel: (
               <div className="page">
-                <EmptyState
-                  description={`Le bind SMPP et la clé API REST arrivent avec le jalon M3 — ${MILESTONES.M3}. Tant qu’ils n’existent pas, ce compte ne peut pas se lier.`}
-                  title="Les identifiants ne sont pas encore livrés"
-                  titleAs="h2"
-                />
+                <Credentials accountId={current.id} onSecretClosed={() => title.current?.focus()} />
               </div>
             ),
           },
@@ -234,7 +231,14 @@ function AccountScreen() {
         />
       ) : null}
       {pending?.kind === 'secret' ? (
-        <WebhookSecretShown onClose={closeToTitle} secret={pending.secret} />
+        <SecretShown
+          onClose={closeToTitle}
+          secret={pending.secret}
+          title="Secret de signature du webhook"
+        >
+          Ce secret ne sera plus jamais affiché. Transmettez-le au client par un canal sûr : il s’en
+          sert pour vérifier que chaque appel vient bien de la passerelle.
+        </SecretShown>
       ) : null}
     </>
   )
@@ -953,34 +957,6 @@ function ConfirmRotate({
         n’aura pas installé le nouveau.
       </p>
       <p>L’action est enregistrée dans le journal d’audit.</p>
-    </Modal>
-  )
-}
-
-function WebhookSecretShown({
-  secret,
-  onClose,
-}: {
-  readonly secret: string
-  readonly onClose: () => void
-}) {
-  return (
-    <Modal
-      footer={
-        <Button onClick={onClose} variant="primary">
-          J’ai copié le secret
-        </Button>
-      }
-      onClose={onClose}
-      open
-      title="Secret de signature du webhook"
-    >
-      <p>
-        Ce secret ne sera plus jamais affiché. Transmettez-le au client par un canal sûr : il s’en
-        sert pour vérifier que chaque appel vient bien de la passerelle.
-      </p>
-      <p className="mono">{secret}</p>
-      <CopyButton done="Secret copié." label="Copier le secret" value={secret} />
     </Modal>
   )
 }
