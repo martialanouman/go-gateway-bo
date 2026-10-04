@@ -51,4 +51,11 @@ describe('Switch', () => {
     expect(onCheckedChange).not.toHaveBeenCalled()
     expect(control).toBeChecked()
   })
+
+  it('keeps its name for screen readers when compact, as in a table cell', () => {
+    render(<Switch checked compact label="Webhook DLR actif" onCheckedChange={vi.fn()} />)
+
+    expect(screen.getByRole('switch', { name: 'Webhook DLR actif' })).toBeChecked()
+    expect(screen.getByText('Webhook DLR actif')).toHaveClass('ui-visually-hidden')
+  })
 })

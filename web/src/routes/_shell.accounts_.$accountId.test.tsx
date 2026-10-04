@@ -262,9 +262,14 @@ describe('the account screen', () => {
     open({ webhooks: [DLR] })
 
     await openWebhooks(user)
-    await user.click(await screen.findByRole('button', { name: 'Désactiver le webhook DLR' }))
+    const delivery = await screen.findByRole('switch', { name: 'Webhook DLR actif' })
+    expect(delivery).toBeChecked()
+    await user.click(delivery)
+
     expect(await screen.findByText('Le webhook DLR est désactivé.')).toBeInTheDocument()
-    expect(await screen.findByRole('cell', { name: 'Désactivé' })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Webhook DLR actif' })).not.toBeChecked(),
+    )
   })
 
   it('warns when the gateway refuses to change a webhook', async () => {
@@ -272,9 +277,10 @@ describe('the account screen', () => {
     open({ webhooks: [DLR] }, { [`PATCH ${WEBHOOKS}/${DLR.id}`]: UNREACHABLE })
 
     await openWebhooks(user)
-    await user.click(await screen.findByRole('button', { name: 'Désactiver le webhook DLR' }))
+    await user.click(await screen.findByRole('switch', { name: 'Webhook DLR actif' }))
 
     expect(await screen.findByText('Passerelle muette.')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Webhook DLR actif' })).toBeChecked()
   })
 
   it('deletes a webhook after naming where deliveries stop', async () => {

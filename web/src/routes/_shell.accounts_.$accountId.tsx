@@ -481,7 +481,13 @@ function Webhooks({
             {
               key: 'status',
               header: 'Statut',
-              cell: (webhook: Webhook) => WEBHOOK_STATUS_LABELS[webhook.status],
+              cell: (webhook: Webhook) => (
+                <WebhookDelivery
+                  accountId={accountId}
+                  webhook={webhook}
+                  writeRefusal={'blockedReason' in blocked ? blocked.blockedReason : undefined}
+                />
+              ),
             },
             {
               key: 'actions',
@@ -490,11 +496,6 @@ function Webhooks({
                 const event = webhook.eventType.toUpperCase()
                 return (
                   <div className="row-actions">
-                    <WebhookStatusToggle
-                      accountId={accountId}
-                      blocked={blocked}
-                      webhook={webhook}
-                    />
                     <Button
                       {...blocked}
                       aria-label={`Remplacer le secret du webhook ${event}`}
@@ -537,35 +538,33 @@ function useWebhooks(accountId: string) {
   })
 }
 
-function WebhookStatusToggle({
+function WebhookDelivery({
   accountId,
   webhook,
-  blocked,
+  writeRefusal,
 }: {
   readonly accountId: string
   readonly webhook: Webhook
-  readonly blocked: ReturnType<typeof blockedBy>
+  readonly writeRefusal: string | undefined
 }) {
   const queryClient = useQueryClient()
   const toast = useToast()
-  const next = webhook.status === 'active' ? 'disabled' : 'active'
-  const gesture = next === 'disabled' ? 'Désactiver' : 'Activer'
   const event = webhook.eventType.toUpperCase()
   const change = useMutation({
-    mutationFn: () =>
+    mutationFn: (status: Webhook['status']) =>
       orRefusal(
         api.PATCH('/accounts/{accountId}/webhooks/{webhookId}', {
           params: { path: { accountId, webhookId: webhook.id } },
-          body: { status: next },
+          body: { status },
         }),
         'Le webhook n’a pas été modifié',
       ),
-    onSuccess: async () => {
+    onSuccess: async (changed) => {
       await queryClient.invalidateQueries({
         queryKey: [...accountsQueryKey, accountId, 'webhooks'],
       })
       toast({
-        title: `Le webhook ${event} est ${next === 'disabled' ? 'désactivé' : 'activé'}.`,
+        title: `Le webhook ${event} est ${changed.status === 'disabled' ? 'désactivé' : 'activé'}.`,
         severity: 'success',
       })
     },
@@ -573,15 +572,16 @@ function WebhookStatusToggle({
   })
 
   return (
-    <Button
-      {...blocked}
-      aria-label={`${gesture} le webhook ${event}`}
-      loading={change.isPending}
-      onClick={() => change.mutate()}
-      size="sm"
-    >
-      {gesture}
-    </Button>
+    <div className="row-actions">
+      <Switch
+        blockedReason={writeRefusal}
+        checked={webhook.status === 'active'}
+        compact
+        label={`Webhook ${event} actif`}
+        onCheckedChange={(active) => change.mutate(active ? 'active' : 'disabled')}
+      />
+      <span aria-hidden="true">{WEBHOOK_STATUS_LABELS[webhook.status]}</span>
+    </div>
   )
 }
 

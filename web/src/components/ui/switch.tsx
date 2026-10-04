@@ -9,6 +9,8 @@ export type SwitchProps = {
   readonly onCheckedChange: (checked: boolean) => void
   /** Interdit, et la phrase qui dit pourquoi : le switch reste atteignable au clavier (voir `Button`). */
   readonly blockedReason?: string
+  /** Dans une cellule de tableau : le libellé ne s'adresse qu'aux lecteurs d'écran. */
+  readonly compact?: boolean
 }
 
 /**
@@ -21,6 +23,7 @@ export function Switch({
   checked,
   onCheckedChange,
   blockedReason,
+  compact = false,
 }: SwitchProps) {
   const labelId = useId()
   const descriptionId = useId()
@@ -44,9 +47,13 @@ export function Switch({
   )
 
   return (
-    <div className="ui-switch-row">
+    <div
+      className={['ui-switch-row', compact ? 'ui-switch-row--compact' : '']
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="ui-switch-row__text">
-        <span className="ui-switch-row__label" id={labelId}>
+        <span className={compact ? 'ui-visually-hidden' : 'ui-switch-row__label'} id={labelId}>
           {label}
         </span>
         {description ? (

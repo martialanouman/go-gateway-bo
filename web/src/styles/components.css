@@ -746,6 +746,11 @@
   padding: var(--sp-5) 0;
 }
 
+.ui-switch-row--compact {
+  display: inline-flex;
+  padding: 0;
+}
+
 .ui-switch-row + .ui-switch-row {
   border-top: 1px solid var(--border-subtle);
 }
