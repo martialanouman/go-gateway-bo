@@ -117,7 +117,7 @@ Fonctionnalité: La fiche d'un compte SMPP
     Et la réponse est conforme au contrat du BFF
     Et le refus place une erreur sous le champ "eventType"
 
-  Plan du scénario: sans accounts:read, <objet> est refusé avant d'atteindre la passerelle
+  Plan du scénario: sans accounts:read, la lecture de <objet> est refusée avant d'atteindre la passerelle
     Étant donné une passerelle qui compte les requêtes reçues
     Et un serveur démarré
     Et l'opérateur détient le rôle "Reporting"
