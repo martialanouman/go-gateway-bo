@@ -672,16 +672,18 @@ test('the binary serves the painted shell, then the application replaces it', as
   await page.getByRole('tab', { name: 'Identifiants' }).click()
   await page.getByRole('button', { name: 'Créer l’identifiant SMPP' }).click()
   const nouvelIdentifiant = page.getByRole('dialog', { name: 'Nouvel identifiant SMPP' })
-  await nouvelIdentifiant.getByLabel(/system_id/).fill('parcours01')
+  await nouvelIdentifiant.getByRole('button', { name: 'Générer un system_id' }).click()
+  const systemId = await nouvelIdentifiant.getByLabel(/system_id/).inputValue()
+  expect(systemId).toMatch(/^comptede-[a-z0-9]{6}$/)
   await nouvelIdentifiant.getByRole('button', { name: 'Créer' }).click()
   const secretDeBindMontre = page.getByRole('dialog', {
     name: 'Mot de passe de l’identifiant SMPP',
   })
   const secretDeBind = (await secretDeBindMontre.locator('.mono').textContent()) ?? ''
-  expect(secretDeBind).toMatch(/^[A-Z2-7]{26}$/)
+  expect(secretDeBind).toMatch(/^[\w-]{8}$/)
   await secretDeBindMontre.getByRole('button', { name: 'J’ai copié le secret' }).click()
   const carteSmpp = page.getByRole('region', { name: 'Identifiant SMPP' })
-  await expect(carteSmpp).toContainText('parcours01')
+  await expect(carteSmpp).toContainText(systemId)
   await expect(page.locator('body')).not.toContainText(secretDeBind)
   await carteSmpp.getByRole('button', { name: 'Faire tourner l’identifiant SMPP' }).click()
   const rotation = page.getByRole('dialog', { name: 'Faire tourner l’identifiant SMPP ?' })

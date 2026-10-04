@@ -20,6 +20,7 @@ import type { components } from '~/lib/api.gen'
 import { CredentialCreation } from '~/lib/contract.gen'
 import { formResolver } from '~/lib/form'
 import { usePermission } from '~/lib/permissions'
+import { generatedSystemId } from '~/lib/system-id'
 
 type Credential = components['schemas']['Credential']
 type CredentialType = components['schemas']['CredentialType']
@@ -93,9 +94,11 @@ const KINDS: Record<
 
 export function Credentials({
   accountId,
+  accountName,
   onSecretClosed,
 }: {
   readonly accountId: string
+  readonly accountName: string
   readonly onSecretClosed: () => void
 }) {
   const readable = usePermission('credentials:read')
@@ -169,6 +172,7 @@ export function Credentials({
       {pending?.kind === 'create' && pending.type === 'smpp_bind' ? (
         <CreateSmppCredential
           accountId={accountId}
+          accountName={accountName}
           onClose={close}
           onCreated={showSecret('smpp_bind')}
         />
@@ -336,10 +340,12 @@ const SmppCreation = CredentialCreation.required({ systemId: true })
 
 function CreateSmppCredential({
   accountId,
+  accountName,
   onClose,
   onCreated,
 }: {
   readonly accountId: string
+  readonly accountName: string
   readonly onClose: () => void
   readonly onCreated: (secret: string) => void
 }) {
@@ -401,6 +407,14 @@ function CreateSmppCredential({
             {...form.register('systemId')}
           />
         </Field>
+        <Button
+          onClick={() =>
+            form.setValue('systemId', generatedSystemId(accountName), { shouldValidate: true })
+          }
+          size="sm"
+        >
+          Générer un system_id
+        </Button>
       </form>
     </Modal>
   )

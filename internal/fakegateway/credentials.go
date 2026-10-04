@@ -2,6 +2,7 @@ package fakegateway
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"net/http"
 	"slices"
 	"time"
@@ -88,7 +89,7 @@ func (c *Customers) createCredential(w http.ResponseWriter, r *http.Request, acc
 		CreatedAt: time.Now().UTC(),
 	}
 	c.creds = append(c.creds, created)
-	reply(w, http.StatusCreated, credentialWithSecret{credential: created, Secret: rand.Text()})
+	reply(w, http.StatusCreated, credentialWithSecret{credential: created, Secret: secretFor(created.Type)})
 }
 
 func (c *Customers) rotateCredential(w http.ResponseWriter, r *http.Request, index int) {
@@ -123,5 +124,19 @@ func (c *Customers) rotateCredential(w http.ResponseWriter, r *http.Request, ind
 		c.creds[index].GraceExpiresAt = &expires
 	}
 
-	reply(w, http.StatusOK, credentialWithSecret{credential: c.creds[index], Secret: rand.Text()})
+	reply(w, http.StatusOK, credentialWithSecret{credential: c.creds[index], Secret: secretFor(c.creds[index].Type)})
+}
+
+// secretFor suit `go-gateway/internal/credential` : un mot de passe de bind tient dans les 8
+// caractères du champ SMPP, une clé API porte le préfixe `sgw_`.
+func secretFor(credentialType string) string {
+	size, prefix := 6, ""
+	if credentialType == "api_key" {
+		size, prefix = 32, "sgw_"
+	}
+
+	secret := make([]byte, size)
+	_, _ = rand.Read(secret)
+
+	return prefix + base64.RawURLEncoding.EncodeToString(secret)
 }

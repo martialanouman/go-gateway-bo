@@ -188,7 +188,11 @@ function AccountScreen() {
             label: 'Identifiants',
             panel: (
               <div className="page">
-                <Credentials accountId={current.id} onSecretClosed={() => title.current?.focus()} />
+                <Credentials
+                  accountId={current.id}
+                  accountName={current.name}
+                  onSecretClosed={() => title.current?.focus()}
+                />
               </div>
             ),
           },

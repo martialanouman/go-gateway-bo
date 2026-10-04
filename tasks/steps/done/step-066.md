@@ -48,6 +48,14 @@ payée.
   sur ce compte (actif ou révoqué), ou, pour un bind SMPP, le `system_id` déjà pris par un autre
   compte (index `credentials_system_id_uq`). Le BFF place donc le refus sous `type` pour une clé API
   (« faites-la tourner ») et sous `systemId` pour un bind SMPP, en nommant les deux causes.
+- **« Générer un system_id »** (demandé par l'utilisateur au test, le 04/10/2026) : le nom du compte,
+  réduit à `[a-z0-9]` et tronqué à 8 caractères, puis un tiret et 6 caractères tirés par
+  `crypto.getRandomValues`. Le résultat fait au plus 15 caractères. Si le nom ne donne aucun caractère
+  utilisable, 12 caractères aléatoires. L'opérateur peut retoucher la valeur. **L'unicité est celle de
+  la passerelle** (`credentials_system_id_uq`) : aucune opération du contrat ne dit si un `system_id`
+  est libre, et le refus 409 s'affiche déjà sous le champ.
+  Le mot de passe, lui, reste engendré par la passerelle (8 caractères). Les 26 caractères vus au test
+  venaient du faux amont, qui imite désormais `go-gateway/internal/credential`.
 - **Le secret vient de la passerelle**, contrairement au webhook, où c'est le BFF qui l'engendre. Le
   BFF le relaie une seule fois, dans le DTO `CredentialSecret` (`{ credential, secret }`), qui ne sert
   qu'aux réponses de création et de rotation. Le DTO `Credential` n'a pas ce champ. Le BFF ne

@@ -136,6 +136,32 @@ describe('the credentials of an SMPP account', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('faites-la tourner')
   })
 
+  it('generates a system_id from the account name, which the creation then sends', async () => {
+    const user = userEvent.setup()
+    const { fetch } = open()
+
+    await openCredentials(user)
+    await user.click(await screen.findByRole('button', { name: 'Créer l’identifiant SMPP' }))
+    const form = await screen.findByRole('dialog', { name: 'Nouvel identifiant SMPP' })
+    await user.click(within(form).getByRole('button', { name: 'Générer un system_id' }))
+    const generated = (within(form).getByRole('textbox', { name: /system_id/ }) as HTMLInputElement)
+      .value
+    await user.click(within(form).getByRole('button', { name: 'Créer' }))
+
+    await screen.findByRole('dialog', { name: 'Mot de passe de l’identifiant SMPP' })
+    expect(generated).toMatch(/^[a-z0-9]{1,8}-[a-z0-9]{6}$/)
+    expect(generated.split('-')[0]).toBe(
+      OTP_ACCOUNT.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 8),
+    )
+    expect(await sentTo(fetch, 'POST', CREDENTIALS)[0]?.clone().json()).toEqual({
+      type: 'smpp_bind',
+      systemId: generated,
+    })
+  })
+
   it('places a taken system_id under its field', async () => {
     const user = userEvent.setup()
     const refusal =
