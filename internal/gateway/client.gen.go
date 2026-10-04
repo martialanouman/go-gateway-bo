@@ -4719,12 +4719,16 @@ type ClientInterface interface {
 
 	// UpdateCustomerWithBody Update a customer
 	//
+	// A closed customer stays closed — any other status is refused with 422.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /admin/customers/{id} (the `UpdateCustomer` operationId).
 	UpdateCustomerWithBody(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCustomer Update a customer
+	//
+	// A closed customer stays closed — any other status is refused with 422.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4897,6 +4901,8 @@ type ClientInterface interface {
 	ListCustomerAccounts(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SuspendCustomer Suspend a customer (cascades — suspends all its SMPP accounts)
+	//
+	// Closed SMPP accounts stay closed. A closed customer stays closed — suspending it is refused with 422.
 	//
 	// Corresponds with POST /admin/customers/{id}/suspend (the `SuspendCustomer` operationId).
 	SuspendCustomer(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5483,12 +5489,16 @@ type ClientInterface interface {
 
 	// UpdateSmppAccountWithBody Update an SMPP account
 	//
+	// A closed account stays closed — any other status is refused with 422.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /admin/smpp-accounts/{id} (the `UpdateSmppAccount` operationId).
 	UpdateSmppAccountWithBody(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateSmppAccount Update an SMPP account
+	//
+	// A closed account stays closed — any other status is refused with 422.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5622,7 +5632,7 @@ type ClientInterface interface {
 
 	// SuspendSmppAccount Suspend an SMPP account
 	//
-	// Disconnects the account's live binds (reason account_suspended).
+	// Disconnects the account's live binds (reason account_suspended). A closed account stays closed — suspending it is refused with 422.
 	//
 	// Corresponds with POST /admin/smpp-accounts/{id}/suspend (the `SuspendSmppAccount` operationId).
 	SuspendSmppAccount(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6387,6 +6397,8 @@ func (c *Client) GetCustomer(ctx context.Context, id Id, reqEditors ...RequestEd
 
 // UpdateCustomerWithBody Update a customer
 //
+// A closed customer stays closed — any other status is refused with 422.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PATCH /admin/customers/{id} (the `UpdateCustomer` operationId).
@@ -6403,6 +6415,8 @@ func (c *Client) UpdateCustomerWithBody(ctx context.Context, id Id, contentType 
 }
 
 // UpdateCustomer Update a customer
+//
+// A closed customer stays closed — any other status is refused with 422.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6835,6 +6849,8 @@ func (c *Client) ListCustomerAccounts(ctx context.Context, id Id, reqEditors ...
 }
 
 // SuspendCustomer Suspend a customer (cascades — suspends all its SMPP accounts)
+//
+// Closed SMPP accounts stay closed. A closed customer stays closed — suspending it is refused with 422.
 //
 // Corresponds with POST /admin/customers/{id}/suspend (the `SuspendCustomer` operationId).
 func (c *Client) SuspendCustomer(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8311,6 +8327,8 @@ func (c *Client) GetSmppAccount(ctx context.Context, id Id, reqEditors ...Reques
 
 // UpdateSmppAccountWithBody Update an SMPP account
 //
+// A closed account stays closed — any other status is refused with 422.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PATCH /admin/smpp-accounts/{id} (the `UpdateSmppAccount` operationId).
@@ -8327,6 +8345,8 @@ func (c *Client) UpdateSmppAccountWithBody(ctx context.Context, id Id, contentTy
 }
 
 // UpdateSmppAccount Update an SMPP account
+//
+// A closed account stays closed — any other status is refused with 422.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8640,7 +8660,7 @@ func (c *Client) SetAccountSmppOps(ctx context.Context, id Id, body SetAccountSm
 
 // SuspendSmppAccount Suspend an SMPP account
 //
-// Disconnects the account's live binds (reason account_suspended).
+// Disconnects the account's live binds (reason account_suspended). A closed account stays closed — suspending it is refused with 422.
 //
 // Corresponds with POST /admin/smpp-accounts/{id}/suspend (the `SuspendSmppAccount` operationId).
 func (c *Client) SuspendSmppAccount(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15192,12 +15212,16 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateCustomerWithBodyWithResponse Update a customer
 	//
+	// A closed customer stays closed — any other status is refused with 422.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/customers/{id} (the `UpdateCustomer` operationId).
 	UpdateCustomerWithBodyWithResponse(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCustomerResponse, error)
 
 	// UpdateCustomerWithResponse Update a customer
+	//
+	// A closed customer stays closed — any other status is refused with 422.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15388,6 +15412,8 @@ type ClientWithResponsesInterface interface {
 	ListCustomerAccountsWithResponse(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*ListCustomerAccountsResponse, error)
 
 	// SuspendCustomerWithResponse Suspend a customer (cascades — suspends all its SMPP accounts)
+	//
+	// Closed SMPP accounts stay closed. A closed customer stays closed — suspending it is refused with 422.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16048,12 +16074,16 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateSmppAccountWithBodyWithResponse Update an SMPP account
 	//
+	// A closed account stays closed — any other status is refused with 422.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/smpp-accounts/{id} (the `UpdateSmppAccount` operationId).
 	UpdateSmppAccountWithBodyWithResponse(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSmppAccountResponse, error)
 
 	// UpdateSmppAccountWithResponse Update an SMPP account
+	//
+	// A closed account stays closed — any other status is refused with 422.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16193,7 +16223,7 @@ type ClientWithResponsesInterface interface {
 
 	// SuspendSmppAccountWithResponse Suspend an SMPP account
 	//
-	// Disconnects the account's live binds (reason account_suspended).
+	// Disconnects the account's live binds (reason account_suspended). A closed account stays closed — suspending it is refused with 422.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -25436,6 +25466,8 @@ func (c *ClientWithResponses) GetCustomerWithResponse(ctx context.Context, id Id
 
 // UpdateCustomerWithBodyWithResponse Update a customer
 //
+// A closed customer stays closed — any other status is refused with 422.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /admin/customers/{id} (the `UpdateCustomer` operationId).
@@ -25448,6 +25480,8 @@ func (c *ClientWithResponses) UpdateCustomerWithBodyWithResponse(ctx context.Con
 }
 
 // UpdateCustomerWithResponse Update a customer
+//
+// A closed customer stays closed — any other status is refused with 422.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25794,6 +25828,8 @@ func (c *ClientWithResponses) ListCustomerAccountsWithResponse(ctx context.Conte
 }
 
 // SuspendCustomerWithResponse Suspend a customer (cascades — suspends all its SMPP accounts)
+//
+// Closed SMPP accounts stay closed. A closed customer stays closed — suspending it is refused with 422.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -26988,6 +27024,8 @@ func (c *ClientWithResponses) GetSmppAccountWithResponse(ctx context.Context, id
 
 // UpdateSmppAccountWithBodyWithResponse Update an SMPP account
 //
+// A closed account stays closed — any other status is refused with 422.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /admin/smpp-accounts/{id} (the `UpdateSmppAccount` operationId).
@@ -27000,6 +27038,8 @@ func (c *ClientWithResponses) UpdateSmppAccountWithBodyWithResponse(ctx context.
 }
 
 // UpdateSmppAccountWithResponse Update an SMPP account
+//
+// A closed account stays closed — any other status is refused with 422.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27247,7 +27287,7 @@ func (c *ClientWithResponses) SetAccountSmppOpsWithResponse(ctx context.Context,
 
 // SuspendSmppAccountWithResponse Suspend an SMPP account
 //
-// Disconnects the account's live binds (reason account_suspended).
+// Disconnects the account's live binds (reason account_suspended). A closed account stays closed — suspending it is refused with 422.
 //
 // Returns a wrapper object for the known response body format(s).
 //
