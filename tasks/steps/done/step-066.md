@@ -1,6 +1,6 @@
 # step-066 — Identifiants : deux cartes masquées, secret une fois, rotation, révocation
 
-> **Jalon :** M3 (plan §8 ; spec §6.14) · **Statut :** FAIT — merge en attente de `go-gateway`
+> **Jalon :** M3 (plan §8 ; spec §6.14) · **Statut :** FAIT
 > **Dépend de :** step-064 (modale « montré une fois »), step-065 (binds ouverts du compte), **les correctifs
 > d'identifiants de `go-gateway` et le contrat qui les publie** · **Bloque :** —
 >
@@ -199,15 +199,20 @@ restaurée par `cp`. Chaque motif a été vérifié présent une seule fois, et 
 ## Critère 4
 - Contre la vraie passerelle, rien n'est joué : c'est le même obstacle que pour step-061.
 - Les coupures de binds (rotation sans grâce, révocation du bind SMPP), leur absence pour la clé API
-  et la réactivation par rotation sont des comportements de la passerelle **corrigée** : à relire dans
-  son code au moment du bump, avant le merge. Contre Prism, seule la copie est tenue.
+  et la réactivation par rotation sont des comportements de la passerelle. **Relus le 04/10/2026 dans
+  `go-gateway` d2c8e47** : la copie dit vrai. Contre Prism, seule la copie est tenue. Un cas limite
+  est cohérent : réactiver un bind SMPP révoqué passe par une coupure sans grâce, mais un identifiant
+  révoqué n'a plus de bind ouvert, et la copie n'en annonce aucun.
 - « Introuvable dans les journaux » : le secret ne traverse aucun appel au logger du BFF, ce qui se
   vérifie par lecture du handler. Aucun test ne capture la sortie du journal pour ce champ.
 
 ## Definition of Done
 - [x] `make check` vert ; `make e2e` vert.
 - [x] Invariants (b) et (c), et DTO tenus, mutations à l'appui.
-- [ ] Correctifs `go-gateway` mergés, contrat bumpé, diff YAML relu.
+- [x] Correctifs `go-gateway` mergés (d2c8e47, PR #261), contrat bumpé en **6.13.0** et diff YAML
+  relu. La version est sortie de la quarantaine pnpm par une exception épinglée à 6.13.0, décidée par
+  l'utilisateur le 04/10/2026. Le bump apporte aussi 6.11.0 et 6.12.0 : la dette 018 est payée par le
+  contrat, et la dette 064 est réécrite (la passerelle tient la règle, le tableau de bord pas encore).
 - [x] Spec §6.14 amendée ; dette 028 supprimée ; step-069 inscrite.
 - [x] Revue en sous-agent : aucun blocage. Les six constats « à corriger » sont traités : échéance de
   grâce affichée sur un révoqué ou après l'échéance, accord de la clé API, phrase du 404, et trois
