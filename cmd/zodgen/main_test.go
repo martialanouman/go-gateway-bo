@@ -116,7 +116,7 @@ func TestAFreeFormObjectPassesThroughWithoutBeingDescribed(t *testing.T) {
 // l'exécution, et qui ne garde plus rien. C'est le mode d'échec d'un générateur partiel, et
 // il est muet.
 func TestATypeTheGeneratorCannotRenderIsRefused(t *testing.T) {
-	doc, err := load([]byte(strings.Replace(miniContract, "type: string\n          maxLength: 320", "type: integer\n          maximum: 10", 1)))
+	doc, err := load([]byte(strings.Replace(miniContract, "type: string\n          maxLength: 320", "type: number\n          maximum: 10", 1)))
 	require.NoError(t, err)
 
 	_, err = render(doc)
@@ -213,4 +213,15 @@ func TestABooleanBecomesAZodBoolean(t *testing.T) {
 	))
 
 	require.Contains(t, rendered, "email: z.boolean(),")
+}
+
+func TestAnIntegerCarriesItsBoundsAndRefusesFractions(t *testing.T) {
+	rendered := renderContract(t, strings.Replace(
+		miniContract,
+		"          type: string\n          maxLength: 320",
+		"          type: integer\n          minimum: 0\n          maximum: 64",
+		1,
+	))
+
+	require.Contains(t, rendered, "email: z.number().int().min(0).max(64),")
 }

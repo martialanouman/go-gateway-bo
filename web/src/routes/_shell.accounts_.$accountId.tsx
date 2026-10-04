@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { PageHeader } from '~/components/page-header'
 import { CopyButton } from '~/components/totp-enrollment'
 import {
+  Banner,
   Button,
   Card,
   DataTable,
@@ -24,7 +25,7 @@ import {
 import { blockedBy, fieldRefusalsOf, orRefusal, Refusal } from '~/lib/administration'
 import { api } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
-import { WebhookCreation } from '~/lib/contract.gen'
+import { AccountSessionLimits, WebhookCreation } from '~/lib/contract.gen'
 import { formResolver } from '~/lib/form'
 import { MILESTONES } from '~/lib/navigation'
 import { usePermission } from '~/lib/permissions'
@@ -32,6 +33,9 @@ import { usePermission } from '~/lib/permissions'
 type Account = components['schemas']['SmppAccount']
 type Webhook = components['schemas']['Webhook']
 type EventType = components['schemas']['WebhookEventType']
+type BindType = components['schemas']['BindType']
+type Limits = components['schemas']['AccountSessionLimits']
+type OpenBind = components['schemas']['AccountSession']
 type SmppOp = 'querySm' | 'cancelSm'
 type Pending =
   | { readonly kind: 'smpp-op'; readonly op: SmppOp }
@@ -41,6 +45,7 @@ type Pending =
 
 const accountsQueryKey = ['gateway', 'accounts'] as const
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })
+const dateTimeFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'medium' })
 const WRITE_REFUSAL = 'Modifier un compte demande accounts:write.'
 const EVENT_TYPES: readonly EventType[] = ['mo', 'dlr']
 const EVENT_LABELS: Record<EventType, string> = {
@@ -52,6 +57,11 @@ const WEBHOOK_STATUS_LABELS: Record<Webhook['status'], string> = {
   disabled: 'Désactivé',
 }
 const SMPP_OPS: Record<SmppOp, string> = { querySm: 'query_sm', cancelSm: 'cancel_sm' }
+const BIND_TYPES: Record<BindType, string> = {
+  trx: 'émission et réception',
+  tx: 'émission seule',
+  rx: 'réception seule',
+}
 
 export const Route = createFileRoute('/_shell/accounts_/$accountId')({
   component: AccountScreen,
@@ -190,11 +200,7 @@ function AccountScreen() {
             label: 'Quotas & sessions',
             panel: (
               <div className="page">
-                <EmptyState
-                  description={`Les quotas, max_sessions et les binds ouverts arrivent avec le jalon M3 — ${MILESTONES.M3}.`}
-                  title="Les quotas et les sessions ne sont pas encore livrés"
-                  titleAs="h2"
-                />
+                <Sessions account={current} writeRefusal={writeRefusal} />
               </div>
             ),
           },
@@ -421,6 +427,222 @@ function ConfirmSmppOp({
       </p>
       <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
+  )
+}
+
+function binds(count: number) {
+  return `${count} bind${count > 1 ? 's' : ''}`
+}
+
+function openBinds(count: number) {
+  return `${binds(count)} ouvert${count > 1 ? 's' : ''}`
+}
+
+function Sessions({
+  account,
+  writeRefusal,
+}: {
+  readonly account: Account
+  readonly writeRefusal: string | undefined
+}) {
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const setAccount = useSetAccount(account.id)
+  const [lowering, setLowering] = useState<Limits | null>(null)
+  const sessionsKey = [...accountsQueryKey, account.id, 'sessions']
+  const live = useQuery({
+    queryKey: sessionsKey,
+    queryFn: () =>
+      orRefusal(
+        api.GET('/accounts/{accountId}/sessions', { params: { path: { accountId: account.id } } }),
+        'Les binds ouverts n’ont pas pu être lus',
+      ),
+    retry: false,
+  })
+  const form = useForm({
+    resolver: formResolver(AccountSessionLimits),
+    defaultValues: { maxSessions: account.maxSessions, allowedBindTypes: account.allowedBindTypes },
+  })
+  const save = useMutation({
+    mutationFn: (body: Limits) =>
+      orRefusal(
+        api.PUT('/accounts/{accountId}/session-limits', {
+          params: { path: { accountId: account.id } },
+          body,
+        }),
+        'Les limites n’ont pas été enregistrées',
+      ),
+    onSuccess: async (changed) => {
+      setAccount(changed)
+      setLowering(null)
+      await queryClient.invalidateQueries({ queryKey: sessionsKey })
+      toast({
+        title: `Limites enregistrées pour ${account.name} : max_sessions ${changed.maxSessions}, bind ${changed.allowedBindTypes}.`,
+        severity: 'success',
+      })
+    },
+  })
+  const submit = (limits: Limits) =>
+    live.isSuccess &&
+    limits.maxSessions !== account.maxSessions &&
+    limits.maxSessions < live.data.active
+      ? setLowering(limits)
+      : save.mutate(limits)
+  const unlisted = live.isSuccess ? live.data.active - live.data.sessions.length : 0
+
+  return (
+    <>
+      {live.isSuccess && live.data.active > live.data.maxSessions ? (
+        <Banner title={`${openBinds(live.data.active)} / limite ${live.data.maxSessions}`}>
+          Le compte dépasse sa limite, mais aucun bind ouvert n’est coupé : la passerelle refusera
+          tout nouveau bind tant que leur nombre ne sera pas repassé sous la limite. Pour converger
+          plus tôt, il faudra déconnecter des binds depuis le moniteur de sessions, qui arrive avec
+          le jalon M4 — {MILESTONES.M4}.
+        </Banner>
+      ) : null}
+      <div className="card-grid">
+        <Card subtitle="S’appliquent aux prochains binds" title="Limites">
+          <form
+            className="form"
+            id="session-limits"
+            noValidate
+            onSubmit={form.handleSubmit(submit)}
+          >
+            <Refusal error={lowering === null ? save.error : null} />
+            <Field
+              error={form.formState.errors.maxSessions?.message}
+              hint="0 n’en admet aucun."
+              label={
+                <>
+                  Binds simultanés <span className="mono">max_sessions</span>
+                </>
+              }
+            >
+              <Input
+                inputMode="numeric"
+                min={0}
+                mono
+                step={1}
+                type="number"
+                {...form.register('maxSessions', { valueAsNumber: true })}
+              />
+            </Field>
+            <Select
+              label="Type de bind admis"
+              onValueChange={(value) => form.setValue('allowedBindTypes', value as BindType)}
+              options={(Object.keys(BIND_TYPES) as BindType[]).map((type) => ({
+                value: type,
+                label: `${type} — ${BIND_TYPES[type]}`,
+              }))}
+              value={form.watch('allowedBindTypes')}
+            />
+            <div>
+              <Button
+                {...blockedBy(writeRefusal)}
+                loading={save.isPending && lowering === null}
+                type="submit"
+                variant="primary"
+              >
+                Enregistrer
+              </Button>
+            </div>
+          </form>
+        </Card>
+        <Card
+          flush={live.isSuccess && live.data.sessions.length > 0 && unlisted <= 0}
+          subtitle={
+            live.isSuccess
+              ? `${live.data.active} ouvert${live.data.active > 1 ? 's' : ''} / limite ${live.data.maxSessions}`
+              : undefined
+          }
+          title="Binds ouverts"
+        >
+          {live.isPending ? (
+            <LoadingState label="Chargement des binds ouverts…">
+              <Skeleton height={38} />
+            </LoadingState>
+          ) : live.isError ? (
+            <ErrorState
+              description={live.error.message}
+              onRetry={() => void live.refetch()}
+              title="Les binds ouverts n’ont pas pu être chargés"
+              titleAs="h3"
+            />
+          ) : live.data.active === 0 ? (
+            <EmptyState
+              description={`Aucun client n’est lié à ce compte en SMPP. Cette liste n’est pas suivie en direct : le moniteur de sessions le fera, avec le jalon M4 — ${MILESTONES.M4}.`}
+              inline
+              title="Aucun bind ouvert"
+              titleAs="h3"
+            />
+          ) : (
+            <>
+              {live.data.sessions.length === 0 ? null : (
+                <DataTable
+                  caption="Binds ouverts du compte"
+                  columns={[
+                    {
+                      key: 'bindType',
+                      header: 'Type',
+                      cell: (bind: OpenBind) => <span className="mono">{bind.bindType}</span>,
+                    },
+                    {
+                      key: 'remoteAddr',
+                      header: 'Adresse',
+                      cell: (bind: OpenBind) => (
+                        <span className="mono">{bind.remoteAddr ?? '—'}</span>
+                      ),
+                    },
+                    {
+                      key: 'connectedAt',
+                      header: 'Ouvert le',
+                      cell: (bind: OpenBind) => dateTimeFormat.format(new Date(bind.connectedAt)),
+                    },
+                  ]}
+                  dense
+                  rowKey={(bind) => bind.id}
+                  rows={live.data.sessions}
+                />
+              )}
+              {unlisted > 0 ? (
+                <p>
+                  {unlisted === 1
+                    ? '1 bind compté par la passerelle n’est pas encore listé : il le sera à son prochain rafraîchissement.'
+                    : `${unlisted} binds comptés par la passerelle ne sont pas encore listés : ils le seront à leur prochain rafraîchissement.`}
+                </p>
+              ) : null}
+            </>
+          )}
+        </Card>
+      </div>
+      {lowering !== null && live.isSuccess ? (
+        <Modal
+          footer={
+            <>
+              <Button onClick={() => setLowering(null)}>Annuler</Button>
+              <Button
+                loading={save.isPending}
+                onClick={() => save.mutate(lowering)}
+                variant="primary"
+              >
+                Limiter
+              </Button>
+            </>
+          }
+          onClose={() => setLowering(null)}
+          open
+          title={`Limiter ce compte à ${binds(lowering.maxSessions)} ?`}
+        >
+          <Refusal error={save.error} />
+          <p>Ce compte a {openBinds(live.data.active)} : aucun ne sera coupé.</p>
+          <p>
+            Il restera au-dessus de sa limite tant que des binds ne se fermeront pas, et aucun
+            nouveau bind ne sera admis d’ici là.
+          </p>
+          <p>L’action est enregistrée dans le journal d’audit.</p>
+        </Modal>
+      ) : null}
+    </>
   )
 }
 

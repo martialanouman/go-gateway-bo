@@ -19,6 +19,7 @@ Fonctionnalité: La fiche d'un compte SMPP
       | objet                 | adresse                                                       |
       | la fiche d'un compte  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e            |
       | ses webhooks          | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks   |
+      | ses binds ouverts     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/sessions   |
 
   Scénario: la fiche d'un compte ne dit rien de la politique de sender ID
     Étant donné une passerelle servie par le mock du contrat
@@ -28,6 +29,16 @@ Fonctionnalité: La fiche d'un compte SMPP
     Quand le navigateur demande "/api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e"
     Alors le serveur répond 200
     Et la réponse ne porte pas "senderIdPolicy"
+
+  Scénario: les binds ouverts se comptent comme la passerelle les compte, pas à la longueur de leur liste
+    Étant donné une passerelle qui compte 8 binds ouverts pour une limite de 4, sans en lister aucun
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/sessions"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+    Et la réponse compte 8 binds ouverts pour une limite de 4
 
   Plan du scénario: <geste> atteint la passerelle
     Étant donné une passerelle qui compte les requêtes reçues
@@ -41,6 +52,7 @@ Fonctionnalité: La fiche d'un compte SMPP
       | geste               | route    | corps                                           | relayé                                          |
       | couper REST         | channels | {"smppEnabled":true,"restEnabled":false}        | "rest_enabled":false                            |
       | refuser cancel_sm   | smpp-ops | {"querySmEnabled":true,"cancelSmEnabled":false} | "cancel_sm_enabled":false                       |
+      | abaisser la limite  | session-limits | {"maxSessions":2,"allowedBindTypes":"trx"} | {"allowed_bind_types":"trx","max_sessions":2}   |
 
   Scénario: couper le dernier canal est refusé en des termes qui disent quoi faire
     Étant donné une passerelle qui refuse les canaux sur le champ "smpp_enabled"
@@ -67,6 +79,7 @@ Fonctionnalité: La fiche d'un compte SMPP
       | geste                     | méthode | adresse                                                                                                  | corps                                            | statut | action                | trace                         |
       | régler les canaux         | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/channels                                              | {"smppEnabled":true,"restEnabled":false}         | 200    | account.channels      | "rest_enabled": false         |
       | régler les opérations     | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/smpp-ops                                              | {"querySmEnabled":true,"cancelSmEnabled":false}  | 200    | account.smpp_ops      | "cancel_sm_enabled": false    |
+      | régler les sessions       | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/session-limits                                        | {"maxSessions":2,"allowedBindTypes":"tx"}        | 200    | account.session_limits | "max_sessions": 2, "allowed_bind_types": "tx" |
       | désactiver un webhook     | PATCH   | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f         | {"status":"disabled"}                            | 200    | webhook.update        | "status": "disabled"          |
       | supprimer un webhook      | DELETE  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f         |                                                  | 204    | webhook.delete        | "account_id": "0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e" |
 
@@ -104,6 +117,22 @@ Fonctionnalité: La fiche d'un compte SMPP
     Et la réponse est conforme au contrat du BFF
     Et le refus place une erreur sous le champ "eventType"
 
+  Plan du scénario: sans accounts:read, la lecture de <objet> est refusée avant d'atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Reporting"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "<adresse>"
+    Alors le serveur répond 403
+    Et le refus nomme la permission "accounts:read"
+    Et la passerelle n'a reçu aucune requête
+
+    Exemples:
+      | objet                 | adresse                                                       |
+      | la fiche d'un compte  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e            |
+      | ses webhooks          | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks   |
+      | ses binds ouverts     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/sessions   |
+
   Plan du scénario: sans accounts:write, <geste> est refusé avant d'atteindre la passerelle
     Étant donné une passerelle qui compte les requêtes reçues
     Et un serveur démarré
@@ -118,6 +147,7 @@ Fonctionnalité: La fiche d'un compte SMPP
       | geste                       | méthode | adresse                                                                                                         | corps                                                |
       | le réglage des canaux       | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/channels                                                     | {"smppEnabled":true,"restEnabled":true}              |
       | le réglage des opérations   | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/smpp-ops                                                     | {"querySmEnabled":true,"cancelSmEnabled":true}       |
+      | le réglage des sessions     | PUT     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/session-limits                                               | {"maxSessions":1,"allowedBindTypes":"trx"}           |
       | la création d'un webhook    | POST    | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks                                                     | {"eventType":"mo","url":"https://client.example/mo"} |
       | la modification d'un webhook | PATCH  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f                | {"status":"disabled"}                                |
       | la suppression d'un webhook | DELETE  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7f                |                                                      |

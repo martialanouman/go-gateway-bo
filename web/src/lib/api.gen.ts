@@ -904,6 +904,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{accountId}/session-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Règle max_sessions et le type de bind admis
+         * @description Relayée vers `set-account-session-limits`. Une limite inférieure aux binds ouverts est acceptée :
+         *     la passerelle ne coupe aucun bind ouvert, elle refuse seulement les nouveaux.
+         */
+        put: operations["setAccountSessionLimits"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{accountId}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Les binds ouverts d'un compte, face à sa limite
+         * @description Relayée vers `list-account-sessions`. `active` peut dépasser `maxSessions`, et la liste peut
+         *     compter moins de binds que `active` : un bind admis par un registre plus ancien n'y figure qu'à
+         *     son rafraîchissement.
+         */
+        get: operations["listAccountSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/accounts/{accountId}/webhooks": {
         parameters: {
             query?: never;
@@ -1429,8 +1476,31 @@ export interface components {
             restEnabled: boolean;
             querySmEnabled: boolean;
             cancelSmEnabled: boolean;
+            allowedBindTypes: components["schemas"]["BindType"];
+            maxSessions: number;
             /** Format: date-time */
             createdAt: string;
+        };
+        /**
+         * @description Un seul type, malgré le pluriel de `allowedBindTypes` ; le bind doit l'égaler.
+         * @enum {string}
+         */
+        BindType: "tx" | "rx" | "trx";
+        AccountSessionLimits: {
+            maxSessions: number;
+            allowedBindTypes: components["schemas"]["BindType"];
+        };
+        AccountSessions: {
+            maxSessions: number;
+            active: number;
+            sessions: components["schemas"]["AccountSession"][];
+        };
+        AccountSession: {
+            id: string;
+            bindType: components["schemas"]["BindType"];
+            remoteAddr: string | null;
+            /** Format: date-time */
+            connectedAt: string;
         };
         AccountChannels: {
             smppEnabled: boolean;
@@ -3470,6 +3540,66 @@ export interface operations {
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["CompteInconnu"];
             415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    setAccountSessionLimits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountSessionLimits"];
+            };
+        };
+        responses: {
+            /** @description Le compte modifié. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmppAccount"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    listAccountSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les binds ouverts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountSessions"];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
             422: components["responses"]["RefusDeLaPasserelle"];
             503: components["responses"]["PasserelleIndisponible"];
         };

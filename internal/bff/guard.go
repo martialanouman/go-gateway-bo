@@ -83,6 +83,8 @@ var authorization = map[string]rule{
 	"GetAccount":                  requires(permissions.AccountsRead),
 	"SetAccountChannels":          requires(permissions.AccountsWrite),
 	"SetAccountSmppOps":           requires(permissions.AccountsWrite),
+	"SetAccountSessionLimits":     requires(permissions.AccountsWrite),
+	"ListAccountSessions":         requires(permissions.AccountsRead),
 	"ListWebhooks":                requires(permissions.AccountsRead),
 	"CreateWebhook":               requires(permissions.AccountsWrite),
 	"UpdateWebhook":               requires(permissions.AccountsWrite),

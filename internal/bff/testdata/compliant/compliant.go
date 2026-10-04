@@ -252,6 +252,16 @@ func (API) SetAccountSmppOps(_ context.Context, _ bff.SetAccountSmppOpsRequestOb
 	return bff.SetAccountSmppOps200JSONResponse{}, nil
 }
 
+func (API) SetAccountSessionLimits(_ context.Context, _ bff.SetAccountSessionLimitsRequestObject,
+) (bff.SetAccountSessionLimitsResponseObject, error) {
+	return bff.SetAccountSessionLimits200JSONResponse{}, nil
+}
+
+func (API) ListAccountSessions(_ context.Context, _ bff.ListAccountSessionsRequestObject,
+) (bff.ListAccountSessionsResponseObject, error) {
+	return bff.ListAccountSessions200JSONResponse{}, nil
+}
+
 func (API) ListWebhooks(_ context.Context, _ bff.ListWebhooksRequestObject,
 ) (bff.ListWebhooksResponseObject, error) {
 	return bff.ListWebhooks200JSONResponse{}, nil

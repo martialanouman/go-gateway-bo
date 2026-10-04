@@ -9,6 +9,7 @@ type Customer = components['schemas']['Customer']
 type SenderId = components['schemas']['SenderId']
 type Account = components['schemas']['SmppAccount']
 type Webhook = components['schemas']['Webhook']
+type AccountSession = components['schemas']['AccountSession']
 
 /** L'opérateur de la session, tel que `stubSession` le rend dans `GET /auth/me`. */
 export const SELF_ID = '01960000-0000-7000-8000-000000000001'
@@ -88,6 +89,8 @@ export const OTP_ACCOUNT: Account = {
   restEnabled: true,
   querySmEnabled: true,
   cancelSmEnabled: true,
+  allowedBindTypes: 'trx',
+  maxSessions: 4,
   createdAt: '2026-10-01T08:00:00Z',
 }
 
@@ -116,6 +119,10 @@ export function stubAdministration(
     senders?: SenderId[]
     accounts?: Account[]
     webhooks?: Webhook[]
+    /** Les binds ouverts de chaque compte servi, tous comptes confondus. */
+    sessions?: AccountSession[]
+    /** Ce que la passerelle compte, qui peut dépasser la liste (`list-account-sessions`). */
+    activeBinds?: number
   } = {},
   replies: AdministrationReplies = {},
 ) {
@@ -127,6 +134,8 @@ export function stubAdministration(
   let senders = [...(initial.senders ?? [])]
   let accounts = [...(initial.accounts ?? [])]
   let webhooks = [...(initial.webhooks ?? [])]
+  const sessions = initial.sessions ?? []
+  const activeBinds = initial.activeBinds ?? sessions.length
   const customerPageSize = initial.customerPageSize ?? 50
 
   const fetch = vi.fn(async (request: Request) => {
@@ -234,6 +243,9 @@ export function stubAdministration(
         }
         return Response.json(webhooks)
       }
+      if (detail === 'sessions') {
+        return Response.json({ maxSessions: target.maxSessions, active: activeBinds, sessions })
+      }
       const updated = request.method === 'PUT' ? { ...target, ...body } : target
       accounts = accounts.map((account) => (account.id === id ? updated : account))
       return Response.json(updated)
@@ -248,6 +260,8 @@ export function stubAdministration(
           restEnabled: true,
           querySmEnabled: true,
           cancelSmEnabled: true,
+          allowedBindTypes: 'trx',
+          maxSessions: 1,
           createdAt: '2026-10-03T08:00:00Z',
           ...body,
         }

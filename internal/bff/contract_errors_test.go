@@ -355,6 +355,16 @@ func (failingAPI) SetAccountSmppOps(_ context.Context, _ SetAccountSmppOpsReques
 	return nil, errors.ErrUnsupported
 }
 
+func (failingAPI) SetAccountSessionLimits(_ context.Context, _ SetAccountSessionLimitsRequestObject,
+) (SetAccountSessionLimitsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) ListAccountSessions(_ context.Context, _ ListAccountSessionsRequestObject,
+) (ListAccountSessionsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
 func (failingAPI) ListWebhooks(_ context.Context, _ ListWebhooksRequestObject,
 ) (ListWebhooksResponseObject, error) {
 	return nil, errors.ErrUnsupported

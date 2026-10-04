@@ -24,16 +24,18 @@ export function refusalInFrench(issue: z.core.$ZodRawIssue): string {
     // d'abord » de `CLAUDE.md` gouverne la copie qui **explique** un refus ; un refus de champ, lui,
     // tient sur une ligne à côté du champ, et l'opérateur y cherche quoi faire.
     case 'invalid_type':
-      return 'Renseignez ce champ.'
+      return issue.expected === 'int' ? 'Saisissez un nombre entier.' : 'Renseignez ce champ.'
 
     // **Aucune attribution au serveur ici.** Elle serait fausse une fois sur deux : `internal/bff/
     // auth.go` ne compare que des **maxima**, et le `minLength: 1` que le contrat pose sur
     // `password` n'y est gardé par rien — un mot de passe vide n'y est pas refusé en 400, il part à
     // `Authenticator.Login` et revient en 401. Le message dit donc la borne, pas qui la tient.
     case 'too_big':
+      if (issue.origin === 'number') return `Saisissez un nombre au plus égal à ${issue.maximum}.`
       return `Cette saisie est trop longue : ${countOfCharacters(issue.maximum)} au maximum.`
 
     case 'too_small':
+      if (issue.origin === 'number') return `Saisissez un nombre au moins égal à ${issue.minimum}.`
       return `Cette saisie est trop courte : ${countOfCharacters(issue.minimum)} au minimum.`
 
     case 'invalid_format':

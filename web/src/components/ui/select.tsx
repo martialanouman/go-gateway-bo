@@ -65,12 +65,16 @@ export function Select({
         accessible et perdait la cible de clic, alors que cette docstring promet de « redonner ce que
         le natif offrait ».
       */}
-      <BaseSelect.Label className="ui-select__label">{label}</BaseSelect.Label>
+      {/* Le couple libellé–déclencheur forme un seul enfant : dans la grille d'un formulaire, deux
+          frères recevraient l'espacement entre champs, et le libellé flotterait loin de son contrôle. */}
+      <div className="ui-field">
+        <BaseSelect.Label className="ui-select__label">{label}</BaseSelect.Label>
 
-      <BaseSelect.Trigger className={triggerClasses}>
-        <BaseSelect.Value placeholder={placeholder} />
-        <BaseSelect.Icon className="ui-select__caret" aria-hidden="true" />
-      </BaseSelect.Trigger>
+        <BaseSelect.Trigger className={triggerClasses}>
+          <BaseSelect.Value placeholder={placeholder} />
+          <BaseSelect.Icon className="ui-select__caret" aria-hidden="true" />
+        </BaseSelect.Trigger>
+      </div>
 
       <BaseSelect.Portal>
         <BaseSelect.Positioner className="ui-select__positioner" sideOffset={4}>

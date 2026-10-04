@@ -235,6 +235,12 @@
   gap: var(--sp-4);
 }
 
+/* Un identifiant de l'API reste verbatim dans un libellé capitalisé : l'opérateur le grep tel quel. */
+.ui-field__label .mono {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 .ui-field__label {
   display: flex;
   align-items: center;
@@ -347,7 +353,6 @@
 /* ─── Sélecteur ────────────────────────────────────────────────────────────────────────────── */
 .ui-select__label {
   display: block;
-  margin-bottom: var(--sp-4);
   color: var(--text-muted);
   font: var(--text-overline);
   font-variant-numeric: tabular-nums;
@@ -814,6 +819,43 @@
   background: var(--teal-100);
 }
 
+/* ─── Bandeau (`Banner` de la charte) ──────────────────────────────────────────────────────── */
+
+.ui-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  padding: var(--sp-6);
+  border: 1px solid color-mix(in srgb, var(--red-500) 30%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--tint-red);
+  color: var(--text-secondary);
+  font-size: var(--fs-13);
+}
+
+.ui-banner__icon {
+  display: flex;
+  flex: none;
+  margin-top: 1px;
+  color: var(--red-500);
+}
+
+.ui-banner__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.ui-banner__title {
+  color: var(--text-primary);
+  font-weight: var(--fw-medium);
+}
+
+.ui-banner__text {
+  color: var(--text-muted);
+}
+
 /* ─── Carte et sous-barre (`Card`, `Toolbar` de la charte) ─────────────────────────────────── */
 .ui-card {
   display: flex;
@@ -883,8 +925,9 @@
 }
 
 /* Dans la sous-barre, un filtre tient sur une ligne : libellé à gauche, déclencheur à sa largeur. */
-.ui-toolbar .ui-select__label {
-  margin-bottom: 0;
+.ui-toolbar .ui-field {
+  flex-direction: row;
+  align-items: center;
 }
 
 .ui-toolbar .ui-select {
@@ -892,7 +935,7 @@
   min-width: 180px;
 }
 
-.ui-toolbar .ui-select + .ui-select__label {
+.ui-toolbar .ui-field + .ui-field {
   margin-left: var(--sp-5);
 }
 

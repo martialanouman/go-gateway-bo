@@ -49,6 +49,12 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 		return w.answering(http.StatusConflict, `{"code":"conflict","message":"sender id already exists"}`)
 	})
 	ctx.Then(`^la réponse compte (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.countsAccounts)
+	ctx.Given(`^une passerelle qui compte (\d+) binds ouverts pour une limite de (\d+), sans en lister aucun$`,
+		func(active, limit int) error {
+			return w.answering(http.StatusOK,
+				fmt.Sprintf(`{"max_sessions":%d,"active":%d,"sessions":[]}`, limit, active))
+		})
+	ctx.Then(`^la réponse compte (\d+) binds ouverts pour une limite de (\d+)$`, w.countsOpenBinds)
 	ctx.Given(`^une passerelle injoignable$`, w.unreachable)
 	ctx.Then(`^la réponse ne porte pas "([^"]*)"$`, w.responseOmits)
 	ctx.Then(`^la réponse liste au moins un groupe$`, w.listsAtLeastOneGroup)
@@ -186,6 +192,24 @@ func (w *customerGroupsWorld) unreachable() error {
 func (w *customerGroupsWorld) responseOmits(fragment string) error {
 	if strings.Contains(w.process.received.body, fragment) {
 		return fmt.Errorf("la réponse porte %q :\n%s", fragment, w.process.received.body)
+	}
+
+	return nil
+}
+
+func (w *customerGroupsWorld) countsOpenBinds(active, limit int) error {
+	var live struct {
+		Active      int `json:"active"`
+		MaxSessions int `json:"maxSessions"`
+	}
+
+	if err := json.Unmarshal([]byte(w.process.received.body), &live); err != nil {
+		return fmt.Errorf("la réponse n'est pas un compte de binds : %w\n%s", err, w.process.received.body)
+	}
+
+	if live.Active != active || live.MaxSessions != limit {
+		return fmt.Errorf("la réponse compte %d binds pour une limite de %d, et non %d pour %d",
+			live.Active, live.MaxSessions, active, limit)
 	}
 
 	return nil

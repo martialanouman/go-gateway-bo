@@ -616,21 +616,32 @@ function suspensionConsequence({
   closedAccounts,
 }: components['schemas']['SuspensionImpact']) {
   if (accounts === 0) return 'Ce client n’a aucun compte : la suspension n’interrompt aucun envoi.'
+  const suspended = accounts - closedAccounts
+  if (suspended === 0)
+    return accounts === 1
+      ? 'Son compte est fermé et le restera : la suspension n’interrompt aucun envoi.'
+      : `Ses ${accounts} comptes sont fermés et le resteront : la suspension n’interrompt aucun envoi.`
   const counted =
-    accounts === 1 ? 'Son compte sera suspendu' : `Ses ${accounts} comptes seront suspendus`
+    suspended === accounts
+      ? accounts === 1
+        ? 'Son compte sera suspendu'
+        : `Ses ${accounts} comptes seront suspendus`
+      : suspended === 1
+        ? 'Un de ses comptes sera suspendu'
+        : `${suspended} de ses comptes seront suspendus`
   const active =
-    accounts === 1 || activeAccounts === accounts
+    suspended === 1 || activeAccounts === suspended
       ? ''
       : activeAccounts === 1
         ? ', dont 1 actif'
         : `, dont ${activeAccounts} actifs`
-  const reopened =
+  const closed =
     closedAccounts === 0
       ? ''
       : closedAccounts === 1
-        ? ' Un compte fermé repassera suspendu, et pourra donc être réactivé.'
-        : ` ${closedAccounts} comptes fermés repasseront suspendus, et pourront donc être réactivés.`
-  return `${counted}${active} : plus aucun SMS ne pourra être envoyé, en SMPP comme en REST, et la passerelle tentera de couper les sessions ouvertes.${reopened}`
+        ? ' Le compte fermé restera fermé.'
+        : ` Les ${closedAccounts} comptes fermés resteront fermés.`
+  return `${counted}${active} : plus aucun SMS ne pourra être envoyé, en SMPP comme en REST, et la passerelle tentera de couper les sessions ouvertes.${closed}`
 }
 
 function ConfirmReactivate({

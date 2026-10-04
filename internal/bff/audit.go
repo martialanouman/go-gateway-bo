@@ -47,6 +47,7 @@ const (
 	actionAccountCreate      = "account.create"
 	actionAccountChannels    = "account.channels"
 	actionAccountSmppOps     = "account.smpp_ops"
+	actionAccountLimits      = "account.session_limits"
 	actionWebhookCreate      = "webhook.create"
 	actionWebhookUpdate      = "webhook.update"
 	actionWebhookRotate      = "webhook.rotate_secret"

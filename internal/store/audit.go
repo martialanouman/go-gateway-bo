@@ -37,6 +37,10 @@ func (f *Fields) Flag(name string, value bool) *Fields {
 	return f.with(name, value)
 }
 
+func (f *Fields) Number(name string, value int) *Fields {
+	return f.with(name, value)
+}
+
 func (f *Fields) with(name string, value any) *Fields {
 	if f == nil {
 		f = NewFields()

@@ -123,7 +123,7 @@ describe('the account screen', () => {
     expect(fetch.mock.calls.some(([request]) => (request as Request).method === 'PUT')).toBe(false)
   })
 
-  it('names what is not delivered yet in the credentials and quotas tabs', async () => {
+  it('names what is not delivered yet in the credentials tab', async () => {
     const user = userEvent.setup()
     open()
 
@@ -134,13 +134,6 @@ describe('the account screen', () => {
     expect(screen.getByRole('tabpanel')).toHaveTextContent(
       'Tant qu’ils n’existent pas, ce compte ne peut pas se lier.',
     )
-
-    await user.click(screen.getByRole('tab', { name: 'Quotas & sessions' }))
-    expect(
-      await screen.findByRole('heading', {
-        name: 'Les quotas et les sessions ne sont pas encore livrés',
-      }),
-    ).toBeVisible()
   })
 
   it('shows a new webhook secret once, and never again once the dialog is closed', async () => {
@@ -366,5 +359,167 @@ describe('the account screen', () => {
     await user.click(within(form).getByRole('button', { name: 'Créer le webhook' }))
 
     expect(await within(form).findByText(refusal)).toBeVisible()
+  })
+})
+
+const BIND: components['schemas']['AccountSession'] = {
+  id: 'session-1',
+  bindType: 'trx',
+  remoteAddr: '10.4.19.7',
+  connectedAt: '2026-10-04T08:00:00Z',
+}
+const THREE_BINDS = [BIND, { ...BIND, id: 'session-2' }, { ...BIND, id: 'session-3' }]
+
+async function openQuotas(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('tab', { name: 'Quotas & sessions' }))
+}
+
+describe('the sessions of an account', () => {
+  it('flags an account above its limit, and says that no bind is cut', async () => {
+    const user = userEvent.setup()
+    open({ accounts: [{ ...OTP_ACCOUNT, maxSessions: 1 }], sessions: THREE_BINDS })
+
+    await openQuotas(user)
+
+    const gap = await screen.findByRole('alert')
+    expect(gap).toHaveTextContent('3 binds ouverts / limite 1')
+    expect(gap).toHaveTextContent('aucun bind ouvert n’est coupé')
+    expect(screen.getAllByRole('cell', { name: '10.4.19.7' })).toHaveLength(3)
+  })
+
+  it('counts the binds the gateway counts, and says which ones are not listed yet', async () => {
+    const user = userEvent.setup()
+    open({ accounts: [{ ...OTP_ACCOUNT, maxSessions: 2 }], sessions: [], activeBinds: 3 })
+
+    await openQuotas(user)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('3 binds ouverts / limite 2')
+    expect(screen.getByRole('tabpanel')).toHaveTextContent(
+      '3 binds comptés par la passerelle ne sont pas encore listés',
+    )
+    expect(screen.queryByText('Aucun bind ouvert')).toBeNull()
+  })
+
+  it('raises no flag when the account sits exactly at its limit', async () => {
+    const user = userEvent.setup()
+    open({ accounts: [{ ...OTP_ACCOUNT, maxSessions: 3 }], sessions: THREE_BINDS })
+
+    await openQuotas(user)
+
+    expect(await screen.findByText('3 ouverts / limite 3')).toBeVisible()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('warns before lowering the limit under the open binds, then lowers it without cutting any', async () => {
+    const user = userEvent.setup()
+    open({ sessions: THREE_BINDS })
+
+    await openQuotas(user)
+    const limit = await screen.findByRole('spinbutton', { name: 'Binds simultanés max_sessions' })
+    await user.clear(limit)
+    await user.type(limit, '2')
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Limiter ce compte à 2 binds ?' })
+    expect(dialog).toHaveTextContent('Ce compte a 3 binds ouverts : aucun ne sera coupé.')
+    await user.click(within(dialog).getByRole('button', { name: 'Limiter' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('3 binds ouverts / limite 2')
+  })
+
+  it('saves a limit equal to the open binds without asking', async () => {
+    const user = userEvent.setup()
+    open({ sessions: THREE_BINDS })
+
+    await openQuotas(user)
+    const limit = await screen.findByRole('spinbutton', { name: 'Binds simultanés max_sessions' })
+    await user.clear(limit)
+    await user.type(limit, '3')
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(await screen.findByText('3 ouverts / limite 3')).toBeVisible()
+    expect(screen.queryByRole('dialog', { name: /Limiter/ })).toBeNull()
+    expect(
+      screen.getByText('Limites enregistrées pour trafic-otp : max_sessions 3, bind trx.'),
+    ).toBeVisible()
+  })
+
+  it('leaves the limit as it was when the operator backs out of lowering it', async () => {
+    const user = userEvent.setup()
+    const { fetch } = open({ sessions: THREE_BINDS })
+
+    await openQuotas(user)
+    const limit = await screen.findByRole('spinbutton', { name: 'Binds simultanés max_sessions' })
+    await user.clear(limit)
+    await user.type(limit, '1')
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    await screen.findByRole('dialog', { name: 'Limiter ce compte à 1 bind ?' })
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Limiter ce compte à 1 bind ?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Annuler' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(fetch.mock.calls.some(([request]) => (request as Request).method === 'PUT')).toBe(false)
+    expect(screen.getByText('3 ouverts / limite 4')).toBeVisible()
+  })
+
+  it('saves the bind type the operator picks, without warning about a limit left as it was', async () => {
+    const user = userEvent.setup()
+    open({ accounts: [{ ...OTP_ACCOUNT, maxSessions: 1 }], sessions: THREE_BINDS })
+
+    await openQuotas(user)
+    await user.click(await screen.findByRole('combobox', { name: 'Type de bind admis' }))
+    await user.click(await screen.findByRole('option', { name: 'tx — émission seule' }))
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    await screen.findByText('Limites enregistrées pour trafic-otp : max_sessions 1, bind tx.')
+    expect(screen.queryByRole('dialog', { name: /Limiter/ })).toBeNull()
+
+    // Rouvert, l'onglet relit le compte enregistré : le type choisi a fait l'aller-retour.
+    await user.click(screen.getByRole('tab', { name: 'Réglages' }))
+    await openQuotas(user)
+    expect(await screen.findByRole('combobox', { name: 'Type de bind admis' })).toHaveTextContent(
+      'tx — émission seule',
+    )
+  })
+
+  it('reads the open binds again when the operator retries', async () => {
+    const user = userEvent.setup()
+    const { fetch } = open({}, { [`GET /api/accounts/${OTP_ACCOUNT.id}/sessions`]: UNREACHABLE })
+    const sessionReads = () =>
+      fetch.mock.calls.filter(
+        ([request]) =>
+          new URL((request as Request).url).pathname === `/api/accounts/${OTP_ACCOUNT.id}/sessions`,
+      )
+
+    await openQuotas(user)
+    await user.click(await screen.findByRole('button', { name: 'Réessayer' }))
+
+    expect(
+      screen.getByRole('heading', { name: 'Les binds ouverts n’ont pas pu être chargés' }),
+    ).toBeVisible()
+    await waitFor(() => expect(sessionReads()).toHaveLength(2))
+  })
+
+  it('names the missing permission on the save button', async () => {
+    const user = userEvent.setup()
+    stubAdministration(
+      { permissions: ['accounts:read', 'customers:read'] },
+      { accounts: [OTP_ACCOUNT] },
+    )
+    render(
+      <RouterProvider
+        router={createAppRouter(
+          createMemoryHistory({ initialEntries: [`/accounts/${OTP_ACCOUNT.id}`] }),
+        )}
+      />,
+    )
+
+    await openQuotas(user)
+
+    const save = await screen.findByRole('button', { name: 'Enregistrer' })
+    expect(save).toHaveAttribute('aria-disabled', 'true')
+    expect(save).toHaveAccessibleDescription('Modifier un compte demande accounts:write.')
   })
 })
