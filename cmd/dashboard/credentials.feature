@@ -51,6 +51,7 @@ Fonctionnalité: Les identifiants d'un compte SMPP
     Et l'opérateur ouvre une session élevée
     Quand le navigateur envoie DELETE "/api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/credentials/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a80"
     Alors le serveur répond 204
+    Et la réponse est conforme au contrat du BFF
     Et le journal porte 2 événement "credential.revoke"
     Et l'issue "credential.revoke" porte '"account_id": "0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e"'
 
