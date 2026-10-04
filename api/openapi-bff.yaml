@@ -1494,6 +1494,56 @@ paths:
         '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
         '503': { $ref: '#/components/responses/PasserelleIndisponible' }
 
+  /accounts/{accountId}/session-limits:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    put:
+      operationId: setAccountSessionLimits
+      summary: Règle max_sessions et le type de bind admis
+      description: |
+        Relayée vers `set-account-session-limits`. Une limite inférieure aux binds ouverts est acceptée :
+        la passerelle ne coupe aucun bind ouvert, elle refuse seulement les nouveaux.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AccountSessionLimits' }
+      responses:
+        '200':
+          description: Le compte modifié.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmppAccount' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/CompteInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /accounts/{accountId}/sessions:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      operationId: listAccountSessions
+      summary: Les binds ouverts d'un compte, face à sa limite
+      description: |
+        Relayée vers `list-account-sessions`. `active` peut dépasser `maxSessions`, et la liste peut
+        compter moins de binds que `active` : un bind admis par un registre plus ancien n'y figure qu'à
+        son rafraîchissement.
+      responses:
+        '200':
+          description: Les binds ouverts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountSessions' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/CompteInconnu' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
   /accounts/{accountId}/webhooks:
     parameters:
       - $ref: '#/components/parameters/AccountId'
@@ -2588,8 +2638,44 @@ components:
         restEnabled: { type: boolean }
         querySmEnabled: { type: boolean }
         cancelSmEnabled: { type: boolean }
+        allowedBindTypes: { $ref: '#/components/schemas/BindType' }
+        maxSessions: { type: integer, minimum: 0 }
         createdAt: { type: string, format: date-time }
-      required: [id, customerId, name, status, smppEnabled, restEnabled, querySmEnabled, cancelSmEnabled, createdAt]
+      required: [id, customerId, name, status, smppEnabled, restEnabled, querySmEnabled, cancelSmEnabled, allowedBindTypes, maxSessions, createdAt]
+
+    BindType:
+      type: string
+      description: Un seul type, malgré le pluriel de `allowedBindTypes` ; le bind doit l'égaler.
+      enum: [tx, rx, trx]
+
+    AccountSessionLimits:
+      type: object
+      additionalProperties: false
+      properties:
+        maxSessions: { type: integer, minimum: 0 }
+        allowedBindTypes: { $ref: '#/components/schemas/BindType' }
+      required: [maxSessions, allowedBindTypes]
+
+    AccountSessions:
+      type: object
+      additionalProperties: false
+      properties:
+        maxSessions: { type: integer }
+        active: { type: integer }
+        sessions:
+          type: array
+          items: { $ref: '#/components/schemas/AccountSession' }
+      required: [maxSessions, active, sessions]
+
+    AccountSession:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        bindType: { $ref: '#/components/schemas/BindType' }
+        remoteAddr: { type: [string, "null"] }
+        connectedAt: { type: string, format: date-time }
+      required: [id, bindType, remoteAddr, connectedAt]
 
     AccountChannels:
       type: object

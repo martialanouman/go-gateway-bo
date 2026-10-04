@@ -14,6 +14,8 @@ const (
 	operationGetAccount        = "get-smpp-account"
 	operationSetAccountChannel = "set-account-channels"
 	operationSetAccountSmppOps = "set-account-smpp-ops"
+	operationSetAccountLimits  = "set-account-session-limits"
+	operationListSessions      = "list-account-sessions"
 )
 
 func (a API) ListAccounts(ctx context.Context, request ListAccountsRequestObject,
@@ -257,6 +259,111 @@ func (a API) SetAccountSmppOps(ctx context.Context, request SetAccountSmppOpsReq
 	return SetAccountSmppOps200JSONResponse(accountDTO(*response.JSON200)), nil
 }
 
+func (a API) SetAccountSessionLimits(ctx context.Context, request SetAccountSessionLimitsRequestObject,
+) (SetAccountSessionLimitsResponseObject, error) {
+	actor, err := actorOf(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	id, known := parseID(request.AccountId)
+	if !known {
+		return SetAccountSessionLimits404JSONResponse{CompteInconnuJSONResponse(unknownAccount())}, nil
+	}
+
+	var response *gateway.SetAccountSessionLimitsResponse
+
+	_, err = auditRelayed(ctx, a.Audit.Record, a.Logger, a.event(ctx, store.Event{
+		OperatorID: actor, Action: actionAccountLimits, TargetType: auditTargetAccount, TargetID: id.String(),
+		After: store.NewFields().Number("max_sessions", request.Body.MaxSessions).
+			Text("allowed_bind_types", string(request.Body.AllowedBindTypes)),
+	}), func(ctx context.Context, _ *store.Event) (int, error) {
+		var callErr error
+
+		response, callErr = a.Gateway.SetAccountSessionLimitsWithResponse(ctx, id,
+			gateway.SetAccountSessionLimitsJSONRequestBody{
+				MaxSessions: request.Body.MaxSessions, AllowedBindTypes: gateway.BindType(request.Body.AllowedBindTypes),
+			})
+		if callErr != nil {
+			return 0, callErr
+		}
+
+		return response.StatusCode(), nil
+	})
+	if err == nil {
+		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
+	}
+
+	if err == nil && response.JSON200 == nil {
+		err = gateway.ErrorFrom(http.StatusBadGateway, nil)
+	}
+
+	if err != nil {
+		status, body, err := a.accountRefusal(ctx, operationSetAccountLimits, err)
+
+		switch status {
+		case http.StatusNotFound:
+			return SetAccountSessionLimits404JSONResponse{CompteInconnuJSONResponse(body)}, nil
+		case http.StatusUnprocessableEntity:
+			return SetAccountSessionLimits422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
+		case http.StatusServiceUnavailable:
+			return SetAccountSessionLimits503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
+		default:
+			return nil, err
+		}
+	}
+
+	return SetAccountSessionLimits200JSONResponse(accountDTO(*response.JSON200)), nil
+}
+
+func (a API) ListAccountSessions(ctx context.Context, request ListAccountSessionsRequestObject,
+) (ListAccountSessionsResponseObject, error) {
+	id, known := parseID(request.AccountId)
+	if !known {
+		return ListAccountSessions404JSONResponse{CompteInconnuJSONResponse(unknownAccount())}, nil
+	}
+
+	response, err := a.Gateway.ListAccountSessionsWithResponse(ctx, id)
+	if err == nil {
+		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
+	}
+
+	if err == nil && response.JSON200 == nil {
+		err = gateway.ErrorFrom(http.StatusBadGateway, nil)
+	}
+
+	if err != nil {
+		status, body, err := a.accountRefusal(ctx, operationListSessions, err)
+
+		switch status {
+		case http.StatusNotFound:
+			return ListAccountSessions404JSONResponse{CompteInconnuJSONResponse(body)}, nil
+		case http.StatusUnprocessableEntity:
+			return ListAccountSessions422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
+		case http.StatusServiceUnavailable:
+			return ListAccountSessions503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
+		default:
+			return nil, err
+		}
+	}
+
+	live := ListAccountSessions200JSONResponse{
+		MaxSessions: response.JSON200.MaxSessions,
+		Active:      response.JSON200.Active,
+		Sessions:    make([]AccountSession, 0, len(response.JSON200.Sessions)),
+	}
+	for _, session := range response.JSON200.Sessions {
+		live.Sessions = append(live.Sessions, AccountSession{
+			Id:          session.Id.String(),
+			BindType:    BindType(session.BindType),
+			RemoteAddr:  session.RemoteAddr,
+			ConnectedAt: session.ConnectedAt,
+		})
+	}
+
+	return live, nil
+}
+
 func (a API) accountRefusal(ctx context.Context, operation string, err error) (int, Error, error) {
 	status, body, err := a.relayedRefusal(ctx, operation, err)
 	if status == http.StatusNotFound {
@@ -268,15 +375,17 @@ func (a API) accountRefusal(ctx context.Context, operation string, err error) (i
 
 func accountDTO(account gateway.SmppAccount) SmppAccount {
 	return SmppAccount{
-		Id:              account.Id.String(),
-		CustomerId:      account.CustomerId.String(),
-		Name:            account.Name,
-		Status:          CustomerStatus(account.Status),
-		SmppEnabled:     account.SmppEnabled,
-		RestEnabled:     account.RestEnabled,
-		QuerySmEnabled:  enabledByDefault(account.QuerySmEnabled),
-		CancelSmEnabled: enabledByDefault(account.CancelSmEnabled),
-		CreatedAt:       account.CreatedAt,
+		Id:               account.Id.String(),
+		CustomerId:       account.CustomerId.String(),
+		Name:             account.Name,
+		Status:           CustomerStatus(account.Status),
+		SmppEnabled:      account.SmppEnabled,
+		RestEnabled:      account.RestEnabled,
+		QuerySmEnabled:   enabledByDefault(account.QuerySmEnabled),
+		CancelSmEnabled:  enabledByDefault(account.CancelSmEnabled),
+		AllowedBindTypes: BindType(account.AllowedBindTypes),
+		MaxSessions:      account.MaxSessions,
+		CreatedAt:        account.CreatedAt,
 	}
 }
 

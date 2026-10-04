@@ -216,6 +216,9 @@ func zodFor(schema *openapi3.Schema) (string, error) {
 	case schema.Type.Is("boolean"):
 		return "z.boolean()", nil
 
+	case schema.Type.Is("integer"):
+		return integerExpression(schema), nil
+
 	case schema.Type.Is("array") && schema.Items != nil:
 		items, err := zodFor(schema.Items.Value)
 		if err != nil {
@@ -258,6 +261,20 @@ func stringExpression(schema *openapi3.Schema) string {
 	// ECMA, seule la barre oblique qui fermerait le littéral s'échappe.
 	if schema.Pattern != "" {
 		expression += ".regex(/" + strings.ReplaceAll(schema.Pattern, "/", `\/`) + "/)"
+	}
+
+	return expression
+}
+
+func integerExpression(schema *openapi3.Schema) string {
+	expression := "z.number().int()"
+
+	if schema.Min != nil {
+		expression += fmt.Sprintf(".min(%v)", *schema.Min)
+	}
+
+	if schema.Max != nil {
+		expression += fmt.Sprintf(".max(%v)", *schema.Max)
 	}
 
 	return expression

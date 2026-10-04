@@ -27,6 +27,11 @@ export const AccountCreation = z.object({
   name: z.string().min(1),
 })
 
+export const AccountSessionLimits = z.object({
+  allowedBindTypes: z.enum(['tx', 'rx', 'trx']),
+  maxSessions: z.number().int().min(0),
+})
+
 export const AccountSmppOps = z.object({
   cancelSmEnabled: z.boolean(),
   querySmEnabled: z.boolean(),
