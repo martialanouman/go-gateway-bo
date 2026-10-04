@@ -107,3 +107,10 @@ minimumReleaseAgeStrict: true
 # paquet publié il y a quelques heures — le scénario même que la quarantaine couvre. La seule raison
 # valable est un correctif de sécurité qui ne peut pas attendre (`pnpm audit --fix` l'ajoute alors
 # lui-même) ; le justifier ici, avec la version.
+#
+# Exception unique, décidée par l'utilisateur le 04/10/2026 : le contrat 6.13.0 est publié par ce
+# même propriétaire depuis `go-gateway`, et porte les correctifs d'identifiants que step-066 a demandés
+# (d2c8e47). Épinglée à cette version : une 6.13.1 repasse par la quarantaine. À retirer au prochain
+# bump du contrat.
+minimumReleaseAgeExclude:
+  - '@martialanouman/gateway-api-contracts@6.13.0'
