@@ -128,11 +128,16 @@
   display: flex;
   align-items: center;
   gap: var(--sp-5);
-  min-width: 0;
+  min-width: 20ch;
+}
+
+/* Seul le titre rétrécit : badges et date gardent leur largeur. */
+.page-header__identity > :not(.page-header__title) {
+  flex: none;
 }
 
 .page-header__title {
-  min-width: 12ch;
+  min-width: 0;
   overflow: hidden;
   margin: 0;
   color: var(--text-primary);
