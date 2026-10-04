@@ -35,16 +35,11 @@ const ROTATE_REFUSAL = 'Faire tourner un identifiant demande credentials:rotate.
 const TYPES: readonly CredentialType[] = ['smpp_bind', 'api_key']
 const DEFAULT_GRACE = '86400'
 const GRACES = [
-  { value: '0', label: 'Aucune' },
-  { value: '3600', label: '1 heure' },
-  { value: DEFAULT_GRACE, label: '24 heures' },
-  { value: '604800', label: '7 jours' },
+  { value: '0', label: 'Aucune', phrase: '' },
+  { value: '3600', label: '1 heure', phrase: 'une heure' },
+  { value: DEFAULT_GRACE, label: '24 heures', phrase: '24 heures' },
+  { value: '604800', label: '7 jours', phrase: '7 jours' },
 ] as const
-const STATUS_LABELS: Record<Credential['status'], string> = {
-  active: 'Actif',
-  disabled: 'Désactivé',
-  revoked: 'Révoqué',
-}
 
 const KINDS: Record<
   CredentialType,
@@ -58,6 +53,9 @@ const KINDS: Record<
     readonly cutover: string
     readonly revived: string
     readonly creation: string
+    readonly statuses: Record<Credential['status'], string>
+    readonly created: string
+    readonly alreadyRevoked: string
   }
 > = {
   smpp_bind: {
@@ -73,6 +71,9 @@ const KINDS: Record<
       'Cet identifiant redeviendra actif avec un nouveau mot de passe. L’ancien restera refusé.',
     creation:
       'La passerelle créera le mot de passe, et le tableau de bord ne l’affichera qu’une fois.',
+    statuses: { active: 'Actif', disabled: 'Désactivé', revoked: 'Révoqué' },
+    created: 'Créé le',
+    alreadyRevoked: 'Cet identifiant est déjà révoqué.',
   },
   api_key: {
     title: 'Clé API',
@@ -84,6 +85,9 @@ const KINDS: Record<
     cutover: 'L’ancienne clé sera refusée dès le prochain appel REST.',
     revived: 'Cette clé redeviendra active avec une nouvelle valeur. L’ancienne restera refusée.',
     creation: 'La passerelle créera la clé, et le tableau de bord ne l’affichera qu’une fois.',
+    statuses: { active: 'Active', disabled: 'Désactivée', revoked: 'Révoquée' },
+    created: 'Créée le',
+    alreadyRevoked: 'Cette clé est déjà révoquée.',
   },
 }
 
@@ -251,9 +255,7 @@ function CredentialCard({
             Faire tourner
           </Button>
           <Button
-            {...blockedBy(
-              writeRefusal ?? (revoked ? 'Cet identifiant est déjà révoqué.' : undefined),
-            )}
+            {...blockedBy(writeRefusal ?? (revoked ? kind.alreadyRevoked : undefined))}
             aria-label={`Révoquer ${kind.object}`}
             onClick={onRevoke}
             size="sm"
@@ -263,7 +265,7 @@ function CredentialCard({
           </Button>
         </div>
       }
-      subtitle={STATUS_LABELS[credential.status]}
+      subtitle={kind.statuses[credential.status]}
       title={kind.title}
     >
       <dl className="facts">
@@ -286,7 +288,7 @@ function CredentialCard({
           </dd>
         </div>
         <div>
-          <dt>Créé le</dt>
+          <dt>{kind.created}</dt>
           <dd>{dateFormat.format(new Date(credential.createdAt))}</dd>
         </div>
         <div>
@@ -297,7 +299,9 @@ function CredentialCard({
               : `le ${dateFormat.format(new Date(credential.rotatedAt))}`}
           </dd>
         </div>
-        {credential.graceExpiresAt === null ? null : (
+        {credential.status !== 'active' ||
+        credential.graceExpiresAt === null ||
+        new Date(credential.graceExpiresAt).getTime() <= Date.now() ? null : (
           <div>
             <dt>Ancien secret accepté jusqu’au</dt>
             <dd>{dateTimeFormat.format(new Date(credential.graceExpiresAt))}</dd>
@@ -502,10 +506,7 @@ function ConfirmRotation({
       ),
     onRotated,
   )
-  const duration = GRACES.find(({ value }) => value === grace)?.label.replace(
-    /^1 heure$/,
-    'une heure',
-  )
+  const duration = GRACES.find(({ value }) => value === grace)?.phrase ?? ''
 
   return (
     <Modal
@@ -536,9 +537,9 @@ function ConfirmRotation({
             options={GRACES}
             value={grace}
           />
-          <p>
+          <p aria-live="polite">
             {grace !== '0'
-              ? kind.graceKept(duration ?? '')
+              ? kind.graceKept(duration)
               : credential.type === 'api_key'
                 ? kind.cutover
                 : live.isPending
@@ -598,13 +599,13 @@ function ConfirmRevocation({
     >
       <Refusal error={revoke.error} />
       {smpp ? (
-        <p>
+        <p aria-live="polite">
           {live.isPending
             ? 'Lecture des binds ouverts…'
             : live.data?.active === 0
               ? 'Aucun bind n’est ouvert sur ce compte.'
               : `${capitalized(bindsCut(live))}.`}{' '}
-          Le client ne pourra plus se lier avec ce mot de passe.
+          Le client ne pourra plus se lier en SMPP.
         </p>
       ) : (
         <p>Tout appel REST avec cette clé sera refusé. Aucun bind SMPP ne sera coupé.</p>

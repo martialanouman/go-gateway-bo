@@ -129,7 +129,7 @@ func (a API) RevokeCredential(ctx context.Context, request RevokeCredentialReque
 		return nil, err
 	}
 
-	accountID, credentialID, known := parseCredentialPath(request.AccountId, request.CredentialId)
+	accountID, credentialID, known := parseAccountItemPath(request.AccountId, request.CredentialId)
 	if !known {
 		return RevokeCredential404JSONResponse{IdentifiantInconnuJSONResponse(unknownCredential())}, nil
 	}
@@ -178,7 +178,7 @@ func (a API) RotateCredential(ctx context.Context, request RotateCredentialReque
 		return nil, err
 	}
 
-	accountID, credentialID, known := parseCredentialPath(request.AccountId, request.CredentialId)
+	accountID, credentialID, known := parseAccountItemPath(request.AccountId, request.CredentialId)
 	if !known {
 		return RotateCredential404JSONResponse{IdentifiantInconnuJSONResponse(unknownCredential())}, nil
 	}
@@ -241,13 +241,6 @@ func (a API) credentialRefusal(ctx context.Context, operation string, err error)
 	return status, body, err
 }
 
-func parseCredentialPath(rawAccount, rawCredential string) (gateway.Id, gateway.CredId, bool) {
-	accountID, accountKnown := parseID(rawAccount)
-	credentialID, credentialKnown := parseID(rawCredential)
-
-	return accountID, credentialID, accountKnown && credentialKnown
-}
-
 func credentialDTO(credential gateway.Credential) Credential {
 	return Credential{
 		Id:             credential.Id.String(),
@@ -275,7 +268,7 @@ func credentialSecretDTO(created gateway.CredentialWithSecret) CredentialSecret 
 }
 
 func unknownCredential() Error {
-	return Error{Code: "not_found", Message: "Ce compte n'a aucun identifiant de cet identifiant technique. Rechargez la fiche."}
+	return Error{Code: "not_found", Message: "Cet identifiant n'existe plus sur ce compte. Rechargez la fiche."}
 }
 
 // credentialTaken : pour un bind SMPP, la passerelle rend le même 409 que le type soit déjà pris

@@ -62,6 +62,19 @@ func (c *Customers) createCredential(w http.ResponseWriter, r *http.Request, acc
 		return
 	}
 
+	if body.Type == "smpp_bind" && (body.SystemID == nil || *body.SystemID == "") {
+		reply(w, http.StatusUnprocessableEntity, map[string]any{
+			"code": "validation_error", "message": "system_id is required for an smpp_bind credential",
+			"errors": []map[string]string{{"field": "system_id", "message": "required when type is smpp_bind"}},
+		})
+
+		return
+	}
+
+	if body.Type == "api_key" {
+		body.SystemID = nil
+	}
+
 	if slices.ContainsFunc(c.creds, func(candidate credential) bool {
 		return candidate.AccountID == accountID && candidate.Type == body.Type
 	}) {

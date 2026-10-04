@@ -42,12 +42,21 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^une passerelle qui crée un webhook$`, w.creatingAWebhook)
 	ctx.Given(`^une passerelle qui crée un identifiant$`, w.creatingACredential)
 	ctx.Then(`^la réponse rend le secret que la passerelle a engendré$`, w.returnsTheGatewaySecret)
+	ctx.Given(`^une passerelle qui répond 409 à la création d'un identifiant$`, func() error {
+		return w.answering(http.StatusConflict, `{"code":"conflict","message":"credential type taken"}`)
+	})
+	ctx.Given(`^une passerelle qui répond 409 à la rotation d'un identifiant$`, func() error {
+		return w.answering(http.StatusConflict, `{"code":"conflict","message":"system_id taken by another account"}`)
+	})
+	ctx.Given(`^une passerelle qui répond 404 à la rotation d'un identifiant$`, func() error {
+		return w.answering(http.StatusNotFound, `{"code":"not_found","message":"credential not found"}`)
+	})
 	// Le détachement ne s'écrit qu'en `null` : la passerelle exige le champ présent.
 	ctx.Then(`^la passerelle a reçu un détachement de groupe$`, func() error {
 		return w.receivedQuery(`"group_id":null`)
 	})
 	ctx.Given(`^une passerelle dont le client a (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.servingAccounts)
-	ctx.Given(`^une passerelle qui répond 409 (?:à l'enregistrement d'un sender ID|à la création|à la création d'un webhook|à la création d'un identifiant)$`, func() error {
+	ctx.Given(`^une passerelle qui répond 409 (?:à l'enregistrement d'un sender ID|à la création|à la création d'un webhook)$`, func() error {
 		return w.answering(http.StatusConflict, `{"code":"conflict","message":"sender id already exists"}`)
 	})
 	ctx.Then(`^la réponse compte (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.countsAccounts)

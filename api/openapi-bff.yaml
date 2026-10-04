@@ -1849,7 +1849,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     IdentifiantInconnu:
-      description: Ce compte n'a aucun identifiant de cet identifiant technique.
+      description: Cet identifiant n'existe pas sur ce compte.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

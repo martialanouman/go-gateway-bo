@@ -137,6 +137,8 @@ func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch action := r.PathValue("action"); {
+	case r.PathValue("verb") != "" && action != "credentials":
+		http.NotFound(w, r)
 	case action == "" && r.Method == http.MethodGet:
 		reply(w, http.StatusOK, c.accounts[index])
 	case action == "channels" && r.Method == http.MethodPatch:

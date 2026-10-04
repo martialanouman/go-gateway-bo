@@ -228,6 +228,7 @@ describe('the credentials of an SMPP account', () => {
       systemId: 'acme01',
     })
     expect(await within(card('Identifiant SMPP')).findByText('acme01')).toBeVisible()
+    expect(screen.getByRole('heading', { level: 1, name: OTP_ACCOUNT.name })).toHaveFocus()
   })
 
   it('rotates with a 24-hour grace by default, which cuts no bind', async () => {
@@ -296,9 +297,10 @@ describe('the credentials of an SMPP account', () => {
     const { fetch } = open({ credentials: [{ ...SMPP, status: 'revoked' }] })
 
     await openCredentials(user)
-    await user.click(
-      await screen.findByRole('button', { name: 'Faire tourner l’identifiant SMPP' }),
-    )
+    expect(
+      await screen.findByRole('button', { name: 'Révoquer l’identifiant SMPP' }),
+    ).toHaveAccessibleDescription('Cet identifiant est déjà révoqué.')
+    await user.click(screen.getByRole('button', { name: 'Faire tourner l’identifiant SMPP' }))
     const dialog = await screen.findByRole('dialog', { name: 'Faire tourner l’identifiant SMPP ?' })
 
     expect(within(dialog).queryByRole('combobox', { name: 'Fenêtre de grâce' })).toBeNull()
@@ -309,6 +311,34 @@ describe('the credentials of an SMPP account', () => {
 
     await screen.findByRole('dialog', { name: 'Mot de passe de l’identifiant SMPP' })
     expect(await sentTo(fetch, 'POST', `${CREDENTIALS}/${SMPP.id}/rotate`)[0]?.json()).toEqual({})
+  })
+
+  it('shows the grace deadline only while the old secret is still accepted', async () => {
+    const user = userEvent.setup()
+    open({
+      credentials: [
+        { ...SMPP, rotatedAt: '2026-10-04T12:00:00Z', graceExpiresAt: '2099-01-01T00:00:00Z' },
+        { ...API_KEY, status: 'revoked', graceExpiresAt: '2099-01-01T00:00:00Z' },
+      ],
+    })
+
+    await openCredentials(user)
+    await screen.findByText('acme01')
+
+    expect(card('Identifiant SMPP')).toHaveTextContent('Ancien secret accepté jusqu’au')
+    expect(card('Clé API')).not.toHaveTextContent('Ancien secret accepté')
+    expect(card('Clé API')).toHaveTextContent('Révoquée')
+    expect(card('Clé API')).toHaveTextContent('Créée le')
+  })
+
+  it('stops showing a grace that has run out', async () => {
+    const user = userEvent.setup()
+    open({ credentials: [{ ...SMPP, graceExpiresAt: '2020-01-01T00:00:00Z' }] })
+
+    await openCredentials(user)
+    await screen.findByText('acme01')
+
+    expect(card('Identifiant SMPP')).not.toHaveTextContent('Ancien secret accepté')
   })
 
   it('counts the binds a revocation of the SMPP credential will cut', async () => {

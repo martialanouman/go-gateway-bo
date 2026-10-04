@@ -1751,7 +1751,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Ce compte n'a aucun identifiant de cet identifiant technique. */
+        /** @description Cet identifiant n'existe pas sur ce compte. */
         IdentifiantInconnu: {
             headers: {
                 [name: string]: unknown;
