@@ -55,7 +55,7 @@ function GroupsScreen() {
     retry: false,
   })
   const create = (
-    <Button {...blocked} onClick={() => setPending({ kind: 'create' })} variant="primary">
+    <Button {...blocked} onClick={() => setPending({ kind: 'create' })} size="sm" variant="primary">
       Nouveau groupe
     </Button>
   )

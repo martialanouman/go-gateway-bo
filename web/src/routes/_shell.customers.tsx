@@ -88,6 +88,7 @@ function CustomersScreen() {
     <Button
       {...blockedBy(canWrite ? undefined : 'Créer un client demande customers:write.')}
       onClick={() => setCreating(true)}
+      size="sm"
       variant="primary"
     >
       Nouveau client

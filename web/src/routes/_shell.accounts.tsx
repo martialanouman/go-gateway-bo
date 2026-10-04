@@ -91,6 +91,7 @@ function AccountsScreen() {
             : undefined,
       )}
       onClick={() => setCreating(true)}
+      size="sm"
       variant="primary"
     >
       Nouveau compte
