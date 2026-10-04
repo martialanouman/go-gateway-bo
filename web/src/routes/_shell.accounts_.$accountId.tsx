@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { CopyButton } from '~/components/totp-enrollment'
 import {
   Button,
   DataTable,
@@ -219,44 +220,46 @@ function Channels({
     <section aria-labelledby="account-channels">
       <h2 id="account-channels">Canaux</h2>
       <Refusal error={change.error} />
-      {channels.map((channel) => {
-        const gesture = channel.open ? 'Couper' : 'Ouvrir'
-        const last = channel.open && openCount === 1
-        return (
-          <div className="row-actions" key={channel.name}>
-            <span>
-              {channel.name} : {channel.open ? 'ouvert' : 'coupé'}
-            </span>
-            <Button
-              {...('blockedReason' in blocked || !last
-                ? blocked
-                : blockedBy(
-                    `Un compte garde au moins un canal : activez ${channel.other} avant de couper ${channel.name}.`,
-                  ))}
-              loading={change.isPending}
-              onClick={() =>
-                change.mutate(
-                  {
-                    smppEnabled: account.smppEnabled,
-                    restEnabled: account.restEnabled,
-                    [channel.field]: !channel.open,
-                  },
-                  {
-                    onSuccess: () =>
-                      toast({
-                        title: `${channel.name} est ${channel.open ? 'coupé' : 'ouvert'} pour ${account.name}.`,
-                        severity: 'success',
-                      }),
-                  },
-                )
-              }
-              size="sm"
-            >
-              {`${gesture} ${channel.name}`}
-            </Button>
-          </div>
-        )
-      })}
+      <div className="row-stack">
+        {channels.map((channel) => {
+          const gesture = channel.open ? 'Couper' : 'Ouvrir'
+          const last = channel.open && openCount === 1
+          return (
+            <div className="row-actions" key={channel.name}>
+              <span>
+                {channel.name} : {channel.open ? 'ouvert' : 'coupé'}
+              </span>
+              <Button
+                {...('blockedReason' in blocked || !last
+                  ? blocked
+                  : blockedBy(
+                      `Un compte garde au moins un canal : activez ${channel.other} avant de couper ${channel.name}.`,
+                    ))}
+                loading={change.isPending}
+                onClick={() =>
+                  change.mutate(
+                    {
+                      smppEnabled: account.smppEnabled,
+                      restEnabled: account.restEnabled,
+                      [channel.field]: !channel.open,
+                    },
+                    {
+                      onSuccess: () =>
+                        toast({
+                          title: `${channel.name} est ${channel.open ? 'coupé' : 'ouvert'} pour ${account.name}.`,
+                          severity: 'success',
+                        }),
+                    },
+                  )
+                }
+                size="sm"
+              >
+                {`${gesture} ${channel.name}`}
+              </Button>
+            </div>
+          )
+        })}
+      </div>
     </section>
   )
 }
@@ -273,19 +276,21 @@ function SmppOps({
   return (
     <section aria-labelledby="account-smpp-ops">
       <h2 id="account-smpp-ops">Opérations SMPP</h2>
-      {(Object.keys(SMPP_OPS) as SmppOp[]).map((op) => {
-        const allowed = account[`${op}Enabled`]
-        return (
-          <div className="row-actions" key={op}>
-            <span>
-              <span className="mono">{SMPP_OPS[op]}</span> : {allowed ? 'autorisé' : 'refusé'}
-            </span>
-            <Button {...blocked} onClick={() => onChange(op)} size="sm">
-              {`${allowed ? 'Refuser' : 'Autoriser'} ${SMPP_OPS[op]}`}
-            </Button>
-          </div>
-        )
-      })}
+      <div className="row-stack">
+        {(Object.keys(SMPP_OPS) as SmppOp[]).map((op) => {
+          const allowed = account[`${op}Enabled`]
+          return (
+            <div className="row-actions" key={op}>
+              <span>
+                <span className="mono">{SMPP_OPS[op]}</span> : {allowed ? 'autorisé' : 'refusé'}
+              </span>
+              <Button {...blocked} onClick={() => onChange(op)} size="sm">
+                {`${allowed ? 'Refuser' : 'Autoriser'} ${SMPP_OPS[op]}`}
+              </Button>
+            </div>
+          )
+        })}
+      </div>
     </section>
   )
 }
@@ -684,6 +689,7 @@ function WebhookSecretShown({
         sert pour vérifier que chaque appel vient bien de la passerelle.
       </p>
       <p className="mono">{secret}</p>
+      <CopyButton done="Secret copié." label="Copier le secret" value={secret} />
     </Modal>
   )
 }

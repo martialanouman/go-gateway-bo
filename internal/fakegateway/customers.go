@@ -105,8 +105,8 @@ func (c *Customers) ServeAccounts(w http.ResponseWriter, r *http.Request) {
 	reply(w, http.StatusCreated, created)
 }
 
-// ServeAccount sert get-smpp-account, set-account-channels, list-webhooks et create-webhook : ce que
-// le parcours de la fiche compte traverse.
+// ServeAccount sert la fiche d'un compte : sa lecture, ses canaux, ses opérations SMPP et ses
+// webhooks.
 func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -134,6 +134,26 @@ func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
 
 		c.accounts[index].SmppEnabled, c.accounts[index].RestEnabled = body.SmppEnabled, body.RestEnabled
 		reply(w, http.StatusOK, c.accounts[index])
+	case action == "smpp-ops" && r.Method == http.MethodPatch:
+		var body struct {
+			QuerySmEnabled  *bool `json:"query_sm_enabled"`
+			CancelSmEnabled *bool `json:"cancel_sm_enabled"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+
+		if body.QuerySmEnabled != nil {
+			c.accounts[index].QuerySmEnabled = *body.QuerySmEnabled
+		}
+
+		if body.CancelSmEnabled != nil {
+			c.accounts[index].CancelSmEnabled = *body.CancelSmEnabled
+		}
+
+		reply(w, http.StatusOK, c.accounts[index])
+	case action == "webhooks" && r.PathValue("webhookId") != "":
+		c.serveWebhook(w, r, id, r.PathValue("webhookId"))
 	case action == "webhooks" && r.Method == http.MethodGet:
 		reply(w, http.StatusOK, slices.DeleteFunc(append([]webhook{}, c.webhooks...), func(candidate webhook) bool {
 			return candidate.AccountID != id
@@ -150,6 +170,43 @@ func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
 		created := webhook{ID: uuid.NewString(), AccountID: id, EventType: body.EventType, URL: body.URL, Status: "active"}
 		c.webhooks = append(c.webhooks, created)
 		reply(w, http.StatusCreated, created)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (c *Customers) serveWebhook(w http.ResponseWriter, r *http.Request, accountID, webhookID string) {
+	index := slices.IndexFunc(c.webhooks, func(candidate webhook) bool {
+		return candidate.AccountID == accountID && candidate.ID == webhookID
+	})
+	if index < 0 {
+		reply(w, http.StatusNotFound, map[string]string{"code": "not_found", "message": "no such webhook"})
+
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPatch:
+		var body struct {
+			URL    *string `json:"url"`
+			Status *string `json:"status"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+
+		if body.URL != nil {
+			c.webhooks[index].URL = *body.URL
+		}
+
+		if body.Status != nil {
+			c.webhooks[index].Status = *body.Status
+		}
+
+		reply(w, http.StatusOK, c.webhooks[index])
+	case http.MethodDelete:
+		c.webhooks = slices.Delete(c.webhooks, index, index+1)
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}

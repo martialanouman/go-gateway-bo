@@ -99,6 +99,9 @@ describe('the account screen', () => {
 
     const shown = await screen.findByRole('dialog', { name: 'Secret de signature du webhook' })
     expect(shown).toHaveTextContent(WEBHOOK_SECRET)
+    await user.click(within(shown).getByRole('button', { name: 'Copier le secret' }))
+    expect(await navigator.clipboard.readText()).toBe(WEBHOOK_SECRET)
+    expect(shown).toHaveTextContent('Secret copié.')
     await user.click(within(shown).getByRole('button', { name: 'J’ai copié le secret' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
