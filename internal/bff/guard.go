@@ -90,6 +90,10 @@ var authorization = map[string]rule{
 	"UpdateWebhook":               requires(permissions.AccountsWrite),
 	"RotateWebhookSecret":         requires(permissions.AccountsWrite),
 	"DeleteWebhook":               requires(permissions.AccountsWrite),
+	"ListCredentials":             requires(permissions.CredentialsRead),
+	"CreateCredential":            requires(permissions.CredentialsWrite),
+	"RevokeCredential":            requires(permissions.CredentialsWrite),
+	"RotateCredential":            requires(permissions.CredentialsRotate),
 	"DeleteSenderId":              requires(permissions.CustomersWrite),
 	"Health": exempt("la sonde de l'orchestrateur, qui n'a pas de session et ne doit jamais " +
 		"dépendre d'une autre brique pour répondre"),

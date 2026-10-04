@@ -52,6 +52,9 @@ const (
 	actionWebhookUpdate      = "webhook.update"
 	actionWebhookRotate      = "webhook.rotate_secret"
 	actionWebhookDelete      = "webhook.delete"
+	actionCredentialCreate   = "credential.create"
+	actionCredentialRotate   = "credential.rotate"
+	actionCredentialRevoke   = "credential.revoke"
 )
 
 // Les types de cible que ces actions désignent. Le §3.1 les laisse libres ; les nommer ici évite que
@@ -67,6 +70,7 @@ const (
 	auditTargetSenderID      = "sender_id"
 	auditTargetAccount       = "smpp_account"
 	auditTargetWebhook       = "webhook"
+	auditTargetCredential    = "credential"
 	// auditTargetOperation désigne l'opération du contrat qu'un refus a arrêtée.
 	auditTargetOperation = "operation"
 )

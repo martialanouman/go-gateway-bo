@@ -1653,6 +1653,103 @@ paths:
         '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
         '503': { $ref: '#/components/responses/PasserelleIndisponible' }
 
+  /accounts/{accountId}/credentials:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      operationId: listCredentials
+      summary: Les identifiants d'un compte, masqués
+      description: Relayée vers `list-credentials`. Aucun secret n'est rendu, ni aucun fragment de secret.
+      responses:
+        '200':
+          description: Les identifiants du compte, au plus un par type.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Credential' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/CompteInconnu' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    post:
+      operationId: createCredential
+      summary: Crée l'identifiant SMPP ou la clé API d'un compte
+      description: |
+        Relayée vers `create-credential`. La passerelle engendre le secret ; le BFF le rend dans cette
+        réponse seulement, sans le conserver ni le journaliser (invariant b).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CredentialCreation' }
+      responses:
+        '201':
+          description: L'identifiant créé, et son secret, montré cette fois seulement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CredentialSecret' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/CompteInconnu' }
+        '409': { $ref: '#/components/responses/TypeDIdentifiantPris' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /accounts/{accountId}/credentials/{credentialId}:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+      - $ref: '#/components/parameters/CredentialId'
+    delete:
+      operationId: revokeCredential
+      summary: Révoque un identifiant
+      description: |
+        Relayée vers `revoke-credential`. La ligne est conservée au statut `revoked` ; la révocation d'un
+        identifiant SMPP coupe les binds ouverts du compte. Une rotation le réactive.
+      responses:
+        '204':
+          description: L'identifiant est révoqué.
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/IdentifiantInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /accounts/{accountId}/credentials/{credentialId}/rotate:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+      - $ref: '#/components/parameters/CredentialId'
+    post:
+      operationId: rotateCredential
+      summary: Fait tourner un identifiant, avec une fenêtre de grâce facultative
+      description: |
+        Relayée vers `rotate-credential`. Sans grâce, l'ancien secret est refusé aussitôt et la rotation
+        d'un identifiant SMPP coupe ses binds ouverts. Un identifiant révoqué redevient actif, sans grâce
+        possible. Le nouveau secret n'est rendu que dans cette réponse (invariant b).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CredentialRotation' }
+      responses:
+        '200':
+          description: L'identifiant, et son nouveau secret, montré cette fois seulement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CredentialSecret' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/IdentifiantInconnu' }
+        '409': { $ref: '#/components/responses/SystemIdRepris' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
 components:
   parameters:
     OperatorId:
@@ -1687,6 +1784,11 @@ components:
       schema: { type: string }
     WebhookId:
       name: webhookId
+      in: path
+      required: true
+      schema: { type: string }
+    CredentialId:
+      name: credentialId
       in: path
       required: true
       schema: { type: string }
@@ -1743,6 +1845,25 @@ components:
       description: |
         Ce compte a déjà un webhook pour ce type d'événement ; `errors[]` place le refus sous
         `eventType`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    IdentifiantInconnu:
+      description: Ce compte n'a aucun identifiant de cet identifiant technique.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TypeDIdentifiantPris:
+      description: |
+        Ce compte a déjà un identifiant de ce type, actif ou révoqué, ou ce `system_id` est pris par un
+        autre compte : la passerelle ne distingue pas les deux. `errors[]` place le refus sous `type`
+        pour une clé API, sous `systemId` pour un identifiant SMPP.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SystemIdRepris:
+      description: |
+        L'identifiant révoqué ne peut pas revivre : un autre compte a pris son `system_id` depuis.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -2731,6 +2852,47 @@ components:
       properties:
         url: { type: string, format: uri, pattern: '^https?://[^/]' }
         status: { type: string, enum: [active, disabled] }
+
+    CredentialType:
+      type: string
+      enum: [smpp_bind, api_key]
+
+    Credential:
+      type: object
+      additionalProperties: false
+      description: Masqué, toujours ; seul `CredentialSecret` porte le secret, une fois.
+      properties:
+        id: { type: string }
+        type: { $ref: '#/components/schemas/CredentialType' }
+        systemId: { type: [string, "null"] }
+        status: { type: string, enum: [active, disabled, revoked] }
+        lastUsedAt: { type: [string, "null"], format: date-time }
+        graceExpiresAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        rotatedAt: { type: [string, "null"], format: date-time }
+      required: [id, type, systemId, status, lastUsedAt, graceExpiresAt, createdAt, rotatedAt]
+
+    CredentialSecret:
+      type: object
+      additionalProperties: false
+      properties:
+        credential: { $ref: '#/components/schemas/Credential' }
+        secret: { type: string }
+      required: [credential, secret]
+
+    CredentialCreation:
+      type: object
+      additionalProperties: false
+      properties:
+        type: { $ref: '#/components/schemas/CredentialType' }
+        systemId: { type: string, minLength: 1, maxLength: 15 }
+      required: [type]
+
+    CredentialRotation:
+      type: object
+      additionalProperties: false
+      properties:
+        gracePeriodSec: { type: integer, minimum: 0, maximum: 604800 }
 
     AccountPage:
       type: object

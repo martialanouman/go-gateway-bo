@@ -40,12 +40,14 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^la passerelle a reçu le secret que la réponse rend$`, w.receivedTheReturnedSecret)
 	ctx.Given(`^une passerelle qui refuse les canaux sur le champ "([^"]*)"$`, w.refusingOnField)
 	ctx.Given(`^une passerelle qui crée un webhook$`, w.creatingAWebhook)
+	ctx.Given(`^une passerelle qui crée un identifiant$`, w.creatingACredential)
+	ctx.Then(`^la réponse rend le secret que la passerelle a engendré$`, w.returnsTheGatewaySecret)
 	// Le détachement ne s'écrit qu'en `null` : la passerelle exige le champ présent.
 	ctx.Then(`^la passerelle a reçu un détachement de groupe$`, func() error {
 		return w.receivedQuery(`"group_id":null`)
 	})
 	ctx.Given(`^une passerelle dont le client a (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.servingAccounts)
-	ctx.Given(`^une passerelle qui répond 409 (?:à l'enregistrement d'un sender ID|à la création|à la création d'un webhook)$`, func() error {
+	ctx.Given(`^une passerelle qui répond 409 (?:à l'enregistrement d'un sender ID|à la création|à la création d'un webhook|à la création d'un identifiant)$`, func() error {
 		return w.answering(http.StatusConflict, `{"code":"conflict","message":"sender id already exists"}`)
 	})
 	ctx.Then(`^la réponse compte (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.countsAccounts)
@@ -286,4 +288,33 @@ func returnedSecret(body string) (string, error) {
 	}
 
 	return returned.Secret, nil
+}
+
+const gatewayCredentialSecret = "Zq8m2Lp4"
+
+// creatingACredential rend le même identifiant à la création (201) et à la rotation (200), avec un
+// secret que seule la passerelle connaît : le BFF n'en engendre aucun.
+func (w *customerGroupsWorld) creatingACredential() error {
+	return w.answeringBy(func(r *http.Request) int {
+		if strings.HasSuffix(r.URL.Path, "/rotate") {
+			return http.StatusOK
+		}
+
+		return http.StatusCreated
+	}, `{"id":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a80","account_id":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e",`+
+		`"type":"smpp_bind","system_id":"acme01","status":"active","created_at":"2026-10-04T10:00:00Z",`+
+		`"secret":"`+gatewayCredentialSecret+`"}`)
+}
+
+func (w *customerGroupsWorld) returnsTheGatewaySecret() error {
+	secret, err := returnedSecret(w.process.received.body)
+	if err != nil {
+		return err
+	}
+
+	if secret != gatewayCredentialSecret {
+		return fmt.Errorf("la réponse rend %q, la passerelle a engendré %q", secret, gatewayCredentialSecret)
+	}
+
+	return nil
 }
