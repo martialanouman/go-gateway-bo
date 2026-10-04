@@ -47,6 +47,24 @@ async function openWebhooks(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('the account screen', () => {
+  it('leads back to its customer through the breadcrumb of the top bar', async () => {
+    open()
+
+    // La silhouette d'attente a sa propre barre : on attend le titre avant de lire celle de l'écran.
+    await screen.findByRole('heading', { level: 1, name: OTP_ACCOUNT.name })
+    const banner = screen.getByRole('banner')
+    expect(within(banner).getByRole('heading', { level: 1 })).toHaveTextContent(OTP_ACCOUNT.name)
+    const crumbs = within(banner).getByRole('navigation', { name: 'Fil d’Ariane' })
+    expect(within(crumbs).getByRole('link', { name: 'Clients' })).toHaveAttribute(
+      'href',
+      '/customers',
+    )
+    expect(await within(crumbs).findByRole('link', { name: ACME.name })).toHaveAttribute(
+      'href',
+      `/customers/${ACME.id}`,
+    )
+  })
+
   it('keeps the last open channel open, and says why', async () => {
     open({ accounts: [{ ...OTP_ACCOUNT, restEnabled: false }] })
 

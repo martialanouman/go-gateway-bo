@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import { createRef } from 'react'
 import { describe, expect, it } from 'vitest'
 import { Card } from './card'
 
@@ -26,5 +27,14 @@ describe('Card', () => {
 
     const table = screen.getByRole('table', { name: 'Comptes' })
     expect(table.parentElement).toHaveClass('ui-card__body--flush')
+  })
+
+  it('lets its title take the focus when given a ref', () => {
+    const title = createRef<HTMLHeadingElement>()
+    render(<Card title="Clés d’accès" titleRef={title} />)
+
+    title.current?.focus()
+
+    expect(screen.getByRole('heading', { name: 'Clés d’accès' })).toHaveFocus()
   })
 })

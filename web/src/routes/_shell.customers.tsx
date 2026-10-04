@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { PageHeader } from '~/components/page-header'
 import {
   Button,
   DataTable,
@@ -16,6 +17,7 @@ import {
   Select,
   Skeleton,
   StatusPill,
+  Toolbar,
   useToast,
 } from '~/components/ui'
 import { blockedBy, fieldRefusalsOf, orRefusal, Refusal } from '~/lib/administration'
@@ -93,15 +95,9 @@ function CustomersScreen() {
   )
 
   return (
-    <div className="page">
-      <header className="page__head">
-        <h1 className="page__title" ref={title} tabIndex={-1}>
-          Clients
-        </h1>
-        {create}
-      </header>
-
-      <div className="row-actions">
+    <>
+      <PageHeader title="Clients" titleRef={title} />
+      <Toolbar end={create}>
         <Select
           label="Statut"
           onValueChange={(value) =>
@@ -138,96 +134,101 @@ function CustomersScreen() {
             value={groupId ?? ALL}
           />
         ) : null}
-      </div>
+      </Toolbar>
 
-      {customers.isPending ? (
-        <LoadingState label="Chargement des clients…">
-          <Skeleton height={38} />
-          <Skeleton height={38} />
-          <Skeleton height={38} />
-        </LoadingState>
-      ) : customers.isError ? (
-        <ErrorState
-          description={customers.error.message}
-          onRetry={() => void customers.refetch()}
-          title="Les clients n’ont pas pu être chargés"
-          titleAs="h2"
-        />
-      ) : rows.length === 0 && filtered ? (
-        <NoResults
-          description="Aucun client ne correspond à ces filtres. Retirez-en un pour élargir la liste."
-          onReset={() => void navigate({ search: {} })}
-          title="Aucun client trouvé"
-          titleAs="h2"
-        />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          action={create}
-          description="Un client porte ses comptes, ses sender IDs et sa facturation."
-          title="Aucun client pour l’instant"
-          titleAs="h2"
-        />
-      ) : (
-        <>
-          <DataTable
-            caption="Clients"
-            columns={[
-              {
-                key: 'name',
-                header: 'Nom',
-                cell: (customer: Customer) => (
-                  <Link params={{ customerId: customer.id }} to="/customers/$customerId">
-                    {customer.name}
-                  </Link>
-                ),
-              },
-              {
-                key: 'status',
-                header: 'Statut',
-                cell: (customer: Customer) => <StatusPill kind="entity" state={customer.status} />,
-              },
-              {
-                key: 'group',
-                header: 'Groupe',
-                cell: (customer: Customer) =>
-                  customer.groupId === undefined
-                    ? '—'
-                    : (groupNames.get(customer.groupId) ?? (
-                        <span className="mono">{customer.groupId}</span>
-                      )),
-              },
-              {
-                key: 'createdAt',
-                header: 'Créé le',
-                cell: (customer: Customer) => dateFormat.format(new Date(customer.createdAt)),
-              },
-            ]}
-            rowKey={(customer) => customer.id}
-            rows={rows}
+      <div className="page">
+        {customers.isPending ? (
+          <LoadingState label="Chargement des clients…">
+            <Skeleton height={38} />
+            <Skeleton height={38} />
+            <Skeleton height={38} />
+          </LoadingState>
+        ) : customers.isError ? (
+          <ErrorState
+            description={customers.error.message}
+            onRetry={() => void customers.refetch()}
+            title="Les clients n’ont pas pu être chargés"
+            titleAs="h2"
           />
-          {customers.hasNextPage ? (
-            <Button
-              loading={customers.isFetchingNextPage}
-              onClick={() => void customers.fetchNextPage()}
-            >
-              Afficher les suivants
-            </Button>
-          ) : null}
-        </>
-      )}
+        ) : rows.length === 0 && filtered ? (
+          <NoResults
+            description="Aucun client ne correspond à ces filtres. Retirez-en un pour élargir la liste."
+            onReset={() => void navigate({ search: {} })}
+            title="Aucun client trouvé"
+            titleAs="h2"
+          />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            action={create}
+            description="Un client porte ses comptes, ses sender IDs et sa facturation."
+            title="Aucun client pour l’instant"
+            titleAs="h2"
+          />
+        ) : (
+          <>
+            <DataTable
+              caption="Clients"
+              dense
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Nom',
+                  cell: (customer: Customer) => (
+                    <Link params={{ customerId: customer.id }} to="/customers/$customerId">
+                      {customer.name}
+                    </Link>
+                  ),
+                },
+                {
+                  key: 'status',
+                  header: 'Statut',
+                  cell: (customer: Customer) => (
+                    <StatusPill kind="entity" state={customer.status} />
+                  ),
+                },
+                {
+                  key: 'group',
+                  header: 'Groupe',
+                  cell: (customer: Customer) =>
+                    customer.groupId === undefined
+                      ? '—'
+                      : (groupNames.get(customer.groupId) ?? (
+                          <span className="mono">{customer.groupId}</span>
+                        )),
+                },
+                {
+                  key: 'createdAt',
+                  header: 'Créé le',
+                  cell: (customer: Customer) => dateFormat.format(new Date(customer.createdAt)),
+                },
+              ]}
+              rowKey={(customer) => customer.id}
+              rows={rows}
+            />
+            {customers.hasNextPage ? (
+              <Button
+                loading={customers.isFetchingNextPage}
+                onClick={() => void customers.fetchNextPage()}
+              >
+                Afficher les suivants
+              </Button>
+            ) : null}
+          </>
+        )}
 
-      {creating ? (
-        <CreateCustomer
-          groups={groups.data ?? []}
-          onClose={() => setCreating(false)}
-          onCreated={() => {
-            setCreating(false)
-            // Le déclencheur de l'état vide disparaît avec la première ligne.
-            title.current?.focus()
-          }}
-        />
-      ) : null}
-    </div>
+        {creating ? (
+          <CreateCustomer
+            groups={groups.data ?? []}
+            onClose={() => setCreating(false)}
+            onCreated={() => {
+              setCreating(false)
+              // Le déclencheur de l'état vide disparaît avec la première ligne.
+              title.current?.focus()
+            }}
+          />
+        ) : null}
+      </div>
+    </>
   )
 }
 

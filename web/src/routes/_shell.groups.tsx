@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { PageHeader } from '~/components/page-header'
 import {
   Button,
   DataTable,
@@ -60,7 +61,7 @@ function GroupsScreen() {
   )
 
   const listing = (
-    <>
+    <div className="page">
       {groups.isPending ? (
         <LoadingState label="Chargement des groupes…">
           <Skeleton height={38} />
@@ -97,17 +98,12 @@ function GroupsScreen() {
           onMoved={() => title.current?.focus()}
         />
       )}
-    </>
+    </div>
   )
 
   return (
-    <div className="page">
-      <header className="page__head">
-        <h1 className="page__title" ref={title} tabIndex={-1}>
-          Groupes
-        </h1>
-        {create}
-      </header>
+    <>
+      <PageHeader actions={create} title="Groupes" titleRef={title} />
 
       {/* Le contenu est le panneau de l'onglet actif : sans lui, l'onglet promet un panneau que le
           lecteur d'écran ne trouve pas. */}
@@ -146,7 +142,7 @@ function GroupsScreen() {
           }}
         />
       ) : null}
-    </div>
+    </>
   )
 }
 
@@ -164,6 +160,7 @@ function GroupsTable({
   return (
     <DataTable
       caption="Groupes de clients"
+      dense
       columns={[
         { key: 'name', header: 'Nom', cell: (group) => group.name },
         { key: 'description', header: 'Description', cell: (group) => group.description ?? '—' },

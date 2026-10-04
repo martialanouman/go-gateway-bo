@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { PageHeader } from '~/components/page-header'
 import {
   Button,
+  Card,
   DataTable,
   EmptyState,
   ErrorState,
@@ -99,41 +101,50 @@ function CustomerScreen() {
 
   return (
     <div className="page">
-      <header className="page__head">
-        <div className="page__identity">
-          <h1 className="page__title" ref={title} tabIndex={-1}>
-            {current.name}
-          </h1>
-          <StatusPill kind="entity" state={current.status} />
-        </div>
-        <div className="row-actions">
-          <Button {...blocked} onClick={() => setPending({ kind: 'rename' })}>
-            Renommer
-          </Button>
-          {current.status === 'active' ? (
-            <Button {...blocked} onClick={() => setPending({ kind: 'suspend' })} variant="danger">
-              Suspendre
+      <PageHeader
+        actions={
+          <>
+            <Button {...blocked} onClick={() => setPending({ kind: 'rename' })} size="sm">
+              Renommer
             </Button>
-          ) : null}
-          {current.status === 'suspended' ? (
-            <Button {...blocked} onClick={() => setPending({ kind: 'reactivate' })}>
-              Réactiver
-            </Button>
-          ) : null}
-        </div>
-      </header>
-
-      <p>
-        <Link to="/customers">Tous les clients</Link> · Créé le{' '}
-        {dateFormat.format(new Date(current.createdAt))}
-      </p>
-
-      <CustomerGroup
-        blocked={blocked}
-        customer={current}
-        onChange={() => setPending({ kind: 'group' })}
+            {current.status === 'active' ? (
+              <Button
+                {...blocked}
+                onClick={() => setPending({ kind: 'suspend' })}
+                size="sm"
+                variant="danger"
+              >
+                Suspendre
+              </Button>
+            ) : null}
+            {current.status === 'suspended' ? (
+              <Button {...blocked} onClick={() => setPending({ kind: 'reactivate' })} size="sm">
+                Réactiver
+              </Button>
+            ) : null}
+          </>
+        }
+        badges={
+          <>
+            <StatusPill kind="entity" state={current.status} />
+            <span className="page-header__meta">
+              Créé le {dateFormat.format(new Date(current.createdAt))}
+            </span>
+          </>
+        }
+        crumbs={[{ label: 'Clients', link: { to: '/customers' } }]}
+        title={current.name}
+        titleRef={title}
       />
-      <CustomerAccounts customerId={current.id} />
+
+      <div className="card-grid">
+        <CustomerGroup
+          blocked={blocked}
+          customer={current}
+          onChange={() => setPending({ kind: 'group' })}
+        />
+        <CustomerAccounts customerId={current.id} />
+      </div>
       <SenderIds
         blocked={blocked}
         customerId={current.id}
@@ -196,10 +207,8 @@ function CustomerGroup({
     )
 
   return (
-    <section aria-labelledby="customer-group">
-      <h2 id="customer-group">Groupe</h2>
-      <div className="row-actions">
-        <span>{name}</span>
+    <Card
+      actions={
         <Button
           {...(canReadGroups
             ? blocked
@@ -209,29 +218,38 @@ function CustomerGroup({
         >
           Changer de groupe
         </Button>
-      </div>
-    </section>
+      }
+      title="Groupe"
+    >
+      <span>{name}</span>
+    </Card>
   )
 }
 
 function CustomerAccounts({ customerId }: { readonly customerId: string }) {
   return (
-    <section aria-labelledby="customer-accounts">
-      <h2 id="customer-accounts">Comptes</h2>
-      {usePermission('accounts:read') ? (
-        <Link
-          className="ui-button ui-button--secondary ui-button--sm"
-          search={{ customerId }}
-          to="/accounts"
-        >
-          Voir ses comptes
-        </Link>
-      ) : (
-        <Button blockedReason="Voir les comptes d’un client demande accounts:read." size="sm">
-          Voir ses comptes
-        </Button>
-      )}
-    </section>
+    <Card
+      actions={
+        usePermission('accounts:read') ? (
+          <Link
+            className="ui-button ui-button--secondary ui-button--sm"
+            search={{ customerId }}
+            to="/accounts"
+          >
+            Voir ses comptes
+          </Link>
+        ) : (
+          <Button blockedReason="Voir les comptes d’un client demande accounts:read." size="sm">
+            Voir ses comptes
+          </Button>
+        )
+      }
+      title="Comptes"
+    >
+      <span>
+        Un compte porte les identifiants SMPP et REST, les canaux et les quotas d’un client.
+      </span>
+    </Card>
   )
 }
 
@@ -262,11 +280,11 @@ function SenderIds({
   )
 
   return (
-    <section aria-labelledby="customer-senders">
-      <div className="page__head">
-        <h2 id="customer-senders">Noms d’expéditeur</h2>
-        {register}
-      </div>
+    <Card
+      actions={register}
+      flush={senders.isSuccess && senders.data.length > 0}
+      title="Noms d’expéditeur"
+    >
       {senders.isPending ? (
         <LoadingState label="Chargement des noms d’expéditeur…">
           <Skeleton height={38} />
@@ -287,6 +305,7 @@ function SenderIds({
       ) : (
         <DataTable
           caption="Noms d’expéditeur du client"
+          dense
           columns={[
             {
               key: 'address',
@@ -326,7 +345,7 @@ function SenderIds({
           rows={senders.data}
         />
       )}
-    </section>
+    </Card>
   )
 }
 

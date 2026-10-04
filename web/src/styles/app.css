@@ -136,6 +136,20 @@
   white-space: nowrap;
 }
 
+.page-header__meta {
+  color: var(--text-muted);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-7);
+  align-items: start;
+}
+
 .page-header__actions {
   display: flex;
   align-items: center;
@@ -396,39 +410,6 @@
   text-align: center;
 }
 
-/*
- * Les écrans d'administration — opérateurs et rôles. Aucune référence visuelle dans la charte (open
- * item 3) : ils composent les primitives et n'inventent que la mise en page.
- */
-.page__head {
-  display: flex;
-  gap: var(--sp-7);
-  align-items: center;
-  justify-content: space-between;
-}
-
-.page__identity {
-  display: flex;
-  gap: var(--sp-4);
-  align-items: center;
-}
-
-.page__title {
-  margin: 0;
-  color: var(--text-primary);
-  font: var(--text-page-title);
-  font-variant-numeric: tabular-nums;
-}
-
-.page__notes {
-  display: grid;
-  gap: var(--sp-4);
-  color: var(--text-muted);
-  font: var(--text-caption);
-  font-variant-numeric: tabular-nums;
-}
-
-.page__notes p,
 .form p {
   margin: 0;
 }
@@ -541,8 +522,6 @@
 }
 
 .account__panel {
-  display: grid;
-  gap: var(--sp-7);
   max-width: 60ch;
   color: var(--text-muted);
   font: var(--text-body);

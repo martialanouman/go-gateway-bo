@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { PageHeader } from '~/components/page-header'
 import {
   Button,
   DataTable,
@@ -13,6 +14,7 @@ import {
   Modal,
   Skeleton,
   StatusPill,
+  Toolbar,
   useToast,
 } from '~/components/ui'
 import { blockedBy, fieldRefusalsOf, orRefusal, Refusal } from '~/lib/administration'
@@ -96,84 +98,96 @@ function AccountsScreen() {
   )
 
   return (
-    <div className="page">
-      <header className="page__head">
-        <h1 className="page__title">
-          {customerId === undefined ? 'Comptes' : `Comptes de ${customerName ?? 'ce client'}`}
-        </h1>
-        {create}
-      </header>
+    <>
+      <PageHeader
+        crumbs={
+          customerId === undefined
+            ? undefined
+            : [
+                { label: 'Clients', link: { to: '/customers' } },
+                {
+                  label: customerName ?? 'ce client',
+                  link: { to: '/customers/$customerId', params: { customerId } },
+                },
+              ]
+        }
+        title={customerId === undefined ? 'Comptes' : `Comptes de ${customerName ?? 'ce client'}`}
+      />
+      <Toolbar end={create}>
+        {customerId === undefined ? null : <Link to="/accounts">Tous les comptes</Link>}
+      </Toolbar>
 
-      {customerId === undefined ? null : <Link to="/accounts">Tous les comptes</Link>}
-
-      {accounts.isPending ? (
-        <LoadingState label="Chargement des comptes…">
-          <Skeleton height={38} />
-          <Skeleton height={38} />
-          <Skeleton height={38} />
-        </LoadingState>
-      ) : accounts.isError ? (
-        <ErrorState
-          description={accounts.error.message}
-          onRetry={() => void accounts.refetch()}
-          title="Les comptes n’ont pas pu être chargés"
-          titleAs="h2"
-        />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          action={create}
-          description="Un compte porte les identifiants SMPP et REST, les canaux et les quotas d’un client."
-          title="Aucun compte pour l’instant"
-          titleAs="h2"
-        />
-      ) : (
-        <>
-          <DataTable
-            caption="Comptes"
-            columns={[
-              {
-                key: 'name',
-                header: 'Nom',
-                cell: (account: Account) => (
-                  <Link params={{ accountId: account.id }} to="/accounts/$accountId">
-                    {account.name}
-                  </Link>
-                ),
-              },
-              {
-                key: 'customer',
-                header: 'Client',
-                cell: (account: Account) => <CustomerCell customerId={account.customerId} />,
-              },
-              {
-                key: 'status',
-                header: 'Statut',
-                cell: (account: Account) => <StatusPill kind="entity" state={account.status} />,
-              },
-              {
-                key: 'createdAt',
-                header: 'Créé le',
-                cell: (account: Account) => dateFormat.format(new Date(account.createdAt)),
-              },
-            ]}
-            rowKey={(account) => account.id}
-            rows={rows}
+      <div className="page">
+        {accounts.isPending ? (
+          <LoadingState label="Chargement des comptes…">
+            <Skeleton height={38} />
+            <Skeleton height={38} />
+            <Skeleton height={38} />
+          </LoadingState>
+        ) : accounts.isError ? (
+          <ErrorState
+            description={accounts.error.message}
+            onRetry={() => void accounts.refetch()}
+            title="Les comptes n’ont pas pu être chargés"
+            titleAs="h2"
           />
-          {accounts.hasNextPage ? (
-            <Button
-              loading={accounts.isFetchingNextPage}
-              onClick={() => void accounts.fetchNextPage()}
-            >
-              Afficher les suivants
-            </Button>
-          ) : null}
-        </>
-      )}
+        ) : rows.length === 0 ? (
+          <EmptyState
+            action={create}
+            description="Un compte porte les identifiants SMPP et REST, les canaux et les quotas d’un client."
+            title="Aucun compte pour l’instant"
+            titleAs="h2"
+          />
+        ) : (
+          <>
+            <DataTable
+              caption="Comptes"
+              dense
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Nom',
+                  cell: (account: Account) => (
+                    <Link params={{ accountId: account.id }} to="/accounts/$accountId">
+                      {account.name}
+                    </Link>
+                  ),
+                },
+                {
+                  key: 'customer',
+                  header: 'Client',
+                  cell: (account: Account) => <CustomerCell customerId={account.customerId} />,
+                },
+                {
+                  key: 'status',
+                  header: 'Statut',
+                  cell: (account: Account) => <StatusPill kind="entity" state={account.status} />,
+                },
+                {
+                  key: 'createdAt',
+                  header: 'Créé le',
+                  cell: (account: Account) => dateFormat.format(new Date(account.createdAt)),
+                },
+              ]}
+              rowKey={(account) => account.id}
+              rows={rows}
+            />
+            {accounts.hasNextPage ? (
+              <Button
+                loading={accounts.isFetchingNextPage}
+                onClick={() => void accounts.fetchNextPage()}
+              >
+                Afficher les suivants
+              </Button>
+            ) : null}
+          </>
+        )}
 
-      {creating && customerId !== undefined ? (
-        <CreateAccount customerId={customerId} onClose={() => setCreating(false)} />
-      ) : null}
-    </div>
+        {creating && customerId !== undefined ? (
+          <CreateAccount customerId={customerId} onClose={() => setCreating(false)} />
+        ) : null}
+      </div>
+    </>
   )
 }
 

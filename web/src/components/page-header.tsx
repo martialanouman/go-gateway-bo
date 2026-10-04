@@ -9,7 +9,7 @@ type Slot = {
   readonly attach: (node: HTMLElement | null) => void
 }
 
-const SlotContext = createContext<Slot>({ node: null, attach: () => {} })
+const SlotContext = createContext<Slot | undefined>(undefined)
 
 /**
  * L'en-tête d'un écran vit dans la barre supérieure de la coquille, mais l'écran le déclare : son titre
@@ -22,7 +22,7 @@ export function PageHeaderProvider({ children }: { readonly children: ReactNode 
 }
 
 export function PageHeaderSlot() {
-  return <div className="topbar__start" ref={useContext(SlotContext).attach} />
+  return <div className="topbar__start" ref={useContext(SlotContext)?.attach} />
 }
 
 export function PageHeader({
@@ -38,8 +38,8 @@ export function PageHeader({
   readonly badges?: ReactNode
   readonly actions?: ReactNode
 }) {
-  const { node } = useContext(SlotContext)
-  if (node === null) return null
+  const node = useContext(SlotContext)?.node
+  if (node == null) return null
 
   return createPortal(
     <>

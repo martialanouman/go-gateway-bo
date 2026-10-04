@@ -6,12 +6,12 @@ export function Toolbar({
   end,
 }: {
   readonly children?: ReactNode
-  readonly end?: ReactNode
+  readonly end: ReactNode
 }) {
   return (
     <div className="ui-toolbar">
       {children}
-      {end === undefined ? null : <div className="ui-toolbar__end">{end}</div>}
+      <div className="ui-toolbar__end">{end}</div>
     </div>
   )
 }
