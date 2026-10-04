@@ -31,6 +31,7 @@ export function refusalInFrench(issue: z.core.$ZodRawIssue): string {
     // `password` n'y est gardé par rien — un mot de passe vide n'y est pas refusé en 400, il part à
     // `Authenticator.Login` et revient en 401. Le message dit donc la borne, pas qui la tient.
     case 'too_big':
+      if (issue.origin === 'number') return `Saisissez un nombre au plus égal à ${issue.maximum}.`
       return `Cette saisie est trop longue : ${countOfCharacters(issue.maximum)} au maximum.`
 
     case 'too_small':

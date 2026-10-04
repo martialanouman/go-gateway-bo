@@ -477,15 +477,18 @@ function Sessions({
       setLowering(null)
       await queryClient.invalidateQueries({ queryKey: sessionsKey })
       toast({
-        title: `max_sessions vaut désormais ${changed.maxSessions} pour ${account.name}.`,
+        title: `Limites enregistrées pour ${account.name} : max_sessions ${changed.maxSessions}, bind ${changed.allowedBindTypes}.`,
         severity: 'success',
       })
     },
   })
   const submit = (limits: Limits) =>
-    live.isSuccess && limits.maxSessions < live.data.active
+    live.isSuccess &&
+    limits.maxSessions !== account.maxSessions &&
+    limits.maxSessions < live.data.active
       ? setLowering(limits)
       : save.mutate(limits)
+  const unlisted = live.isSuccess ? live.data.active - live.data.sessions.length : 0
 
   return (
     <>
@@ -542,7 +545,7 @@ function Sessions({
           </form>
         </Card>
         <Card
-          flush={live.isSuccess && live.data.sessions.length > 0}
+          flush={live.isSuccess && live.data.sessions.length > 0 && unlisted <= 0}
           subtitle={
             live.isSuccess
               ? `${live.data.active} ouvert${live.data.active > 1 ? 's' : ''} / limite ${live.data.maxSessions}`
@@ -561,37 +564,50 @@ function Sessions({
               title="Les binds ouverts n’ont pas pu être chargés"
               titleAs="h3"
             />
-          ) : live.data.sessions.length === 0 ? (
+          ) : live.data.active === 0 ? (
             <EmptyState
-              description="Un bind apparaît ici dès que le client se connecte en SMPP. La liste est lue à l’ouverture de l’onglet et après chaque enregistrement."
+              description={`Aucun client n’est lié à ce compte en SMPP. Cette liste n’est pas suivie en direct : le moniteur de sessions le fera, avec le jalon M4 — ${MILESTONES.M4}.`}
               inline
               title="Aucun bind ouvert"
               titleAs="h3"
             />
           ) : (
-            <DataTable
-              caption="Binds ouverts du compte"
-              columns={[
-                {
-                  key: 'bindType',
-                  header: 'Type',
-                  cell: (bind: OpenBind) => <span className="mono">{bind.bindType}</span>,
-                },
-                {
-                  key: 'remoteAddr',
-                  header: 'Adresse',
-                  cell: (bind: OpenBind) => <span className="mono">{bind.remoteAddr ?? '—'}</span>,
-                },
-                {
-                  key: 'connectedAt',
-                  header: 'Ouvert le',
-                  cell: (bind: OpenBind) => dateTimeFormat.format(new Date(bind.connectedAt)),
-                },
-              ]}
-              dense
-              rowKey={(bind) => bind.id}
-              rows={live.data.sessions}
-            />
+            <>
+              {live.data.sessions.length === 0 ? null : (
+                <DataTable
+                  caption="Binds ouverts du compte"
+                  columns={[
+                    {
+                      key: 'bindType',
+                      header: 'Type',
+                      cell: (bind: OpenBind) => <span className="mono">{bind.bindType}</span>,
+                    },
+                    {
+                      key: 'remoteAddr',
+                      header: 'Adresse',
+                      cell: (bind: OpenBind) => (
+                        <span className="mono">{bind.remoteAddr ?? '—'}</span>
+                      ),
+                    },
+                    {
+                      key: 'connectedAt',
+                      header: 'Ouvert le',
+                      cell: (bind: OpenBind) => dateTimeFormat.format(new Date(bind.connectedAt)),
+                    },
+                  ]}
+                  dense
+                  rowKey={(bind) => bind.id}
+                  rows={live.data.sessions}
+                />
+              )}
+              {unlisted > 0 ? (
+                <p>
+                  {unlisted === 1
+                    ? '1 bind compté par la passerelle n’est pas encore listé : il le sera à son prochain rafraîchissement.'
+                    : `${unlisted} binds comptés par la passerelle ne sont pas encore listés : ils le seront à leur prochain rafraîchissement.`}
+                </p>
+              ) : null}
+            </>
           )}
         </Card>
       </div>

@@ -618,9 +618,17 @@ function suspensionConsequence({
   if (accounts === 0) return 'Ce client n’a aucun compte : la suspension n’interrompt aucun envoi.'
   const suspended = accounts - closedAccounts
   if (suspended === 0)
-    return 'Tous ses comptes sont fermés et le restent : la suspension n’interrompt aucun envoi.'
+    return accounts === 1
+      ? 'Son compte est fermé et le restera : la suspension n’interrompt aucun envoi.'
+      : `Ses ${accounts} comptes sont fermés et le resteront : la suspension n’interrompt aucun envoi.`
   const counted =
-    suspended === 1 ? 'Son compte sera suspendu' : `Ses ${suspended} comptes seront suspendus`
+    suspended === accounts
+      ? accounts === 1
+        ? 'Son compte sera suspendu'
+        : `Ses ${accounts} comptes seront suspendus`
+      : suspended === 1
+        ? 'Un de ses comptes sera suspendu'
+        : `${suspended} de ses comptes seront suspendus`
   const active =
     suspended === 1 || activeAccounts === suspended
       ? ''
@@ -631,8 +639,8 @@ function suspensionConsequence({
     closedAccounts === 0
       ? ''
       : closedAccounts === 1
-        ? ' Son compte fermé reste fermé.'
-        : ` Ses ${closedAccounts} comptes fermés restent fermés.`
+        ? ' Le compte fermé restera fermé.'
+        : ` Les ${closedAccounts} comptes fermés resteront fermés.`
   return `${counted}${active} : plus aucun SMS ne pourra être envoyé, en SMPP comme en REST, et la passerelle tentera de couper les sessions ouvertes.${closed}`
 }
 

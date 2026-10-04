@@ -814,7 +814,8 @@
   background: var(--teal-100);
 }
 
-/* ─── Carte et sous-barre (`Card`, `Toolbar` de la charte) ─────────────────────────────────── */
+/* ─── Bandeau (`Banner` de la charte) ──────────────────────────────────────────────────────── */
+
 .ui-banner {
   display: flex;
   align-items: flex-start;
@@ -850,6 +851,7 @@
   color: var(--text-muted);
 }
 
+/* ─── Carte et sous-barre (`Card`, `Toolbar` de la charte) ─────────────────────────────────── */
 .ui-card {
   display: flex;
   flex-direction: column;

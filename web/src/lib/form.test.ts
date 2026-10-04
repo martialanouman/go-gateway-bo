@@ -77,6 +77,10 @@ describe('a number refused', () => {
     expect(refusal).toBe('Saisissez un nombre au moins égal à 0.')
   })
 
+  it('names an upper bound as a number too', () => {
+    expect(refusalOf(z.number().int().max(64), 65)).toBe('Saisissez un nombre au plus égal à 64.')
+  })
+
   it('asks for a whole number when given a fraction', () => {
     expect(refusalOf(AccountSessionLimits.shape.maxSessions, 1.5)).toBe(
       'Saisissez un nombre entier.',

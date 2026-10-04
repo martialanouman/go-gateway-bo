@@ -121,6 +121,8 @@ export function stubAdministration(
     webhooks?: Webhook[]
     /** Les binds ouverts de chaque compte servi, tous comptes confondus. */
     sessions?: AccountSession[]
+    /** Ce que la passerelle compte, qui peut dépasser la liste (`list-account-sessions`). */
+    activeBinds?: number
   } = {},
   replies: AdministrationReplies = {},
 ) {
@@ -133,6 +135,7 @@ export function stubAdministration(
   let accounts = [...(initial.accounts ?? [])]
   let webhooks = [...(initial.webhooks ?? [])]
   const sessions = initial.sessions ?? []
+  const activeBinds = initial.activeBinds ?? sessions.length
   const customerPageSize = initial.customerPageSize ?? 50
 
   const fetch = vi.fn(async (request: Request) => {
@@ -241,7 +244,7 @@ export function stubAdministration(
         return Response.json(webhooks)
       }
       if (detail === 'sessions') {
-        return Response.json({ maxSessions: target.maxSessions, active: sessions.length, sessions })
+        return Response.json({ maxSessions: target.maxSessions, active: activeBinds, sessions })
       }
       const updated = request.method === 'PUT' ? { ...target, ...body } : target
       accounts = accounts.map((account) => (account.id === id ? updated : account))

@@ -49,9 +49,9 @@ describe('the customer screen', () => {
 
     // La cascade laisse un compte fermé fermé (contrat 6.10.1) : des trois, deux seront suspendus.
     expect(
-      await within(dialog).findByText(/Ses 2 comptes seront suspendus, dont 1 actif/),
+      await within(dialog).findByText(/2 de ses comptes seront suspendus, dont 1 actif/),
     ).toBeInTheDocument()
-    expect(dialog).toHaveTextContent('Son compte fermé reste fermé.')
+    expect(dialog).toHaveTextContent('Le compte fermé restera fermé.')
     expect(dialog).not.toHaveTextContent('repassera')
     expect(sent(fetch, SUSPEND)).toBe(false)
 
@@ -60,6 +60,22 @@ describe('the customer screen', () => {
     expect(await screen.findByRole('button', { name: 'Réactiver' })).toBeInTheDocument()
     expect(sent(fetch, SUSPEND)).toBe(true)
     expect(screen.getByRole('heading', { level: 1, name: ACME.name })).toHaveFocus()
+  })
+
+  it('says a suspension takes nothing down when every account is closed', async () => {
+    const user = userEvent.setup()
+    open(WRITER, {
+      [IMPACT]: { status: 200, body: { accounts: 2, activeAccounts: 0, closedAccounts: 2 } },
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Suspendre' }))
+    const dialog = await screen.findByRole('dialog', { name: `Suspendre ${ACME.name} ?` })
+
+    expect(
+      await within(dialog).findByText(
+        'Ses 2 comptes sont fermés et le resteront : la suspension n’interrompt aucun envoi.',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('promises nothing about accounts a customer does not have', async () => {
