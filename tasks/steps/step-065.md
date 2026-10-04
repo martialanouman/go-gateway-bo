@@ -1,6 +1,6 @@
 # step-065 — `max_sessions`, type de bind et binds ouverts (avertissement d'écart)
 
-> **Jalon :** M3 (plan §8 ; spec §1.1, §6.5) · **Statut :** EN COURS
+> **Jalon :** M3 (plan §8 ; spec §1.1, §6.5) · **Statut :** FAIT
 > **Dépend de :** step-064 · **Bloque :** step-086
 
 ## But
@@ -67,24 +67,59 @@ pas bloqué : la copie dit qu'aucun bind ouvert n'est coupé. Chaque réglage la
 ## Tests
 - **godog** (`cmd/dashboard/accounts.feature`) :
   - les binds ouverts se lisent sous `accounts:read`, et la réponse est conforme ;
+  - `active` vient de la passerelle et non de la longueur de la liste (8 comptés, aucun listé) ;
   - le réglage atteint l'amont avec les deux champs ;
-  - le réglage laisse deux événements, et l'issue porte la limite posée ;
-  - sans `accounts:write`, le réglage répond 403 sans appel amont (une ligne de plus dans le plan
-    existant).
+  - le réglage laisse deux événements, et l'issue porte les deux valeurs posées ;
+  - sans `accounts:write`, le réglage répond 403 sans appel amont ;
+  - sans `accounts:read`, la fiche, les webhooks et les binds répondent 403 sans appel amont.
 - **Vitest** :
   - le badge d'écart apparaît quand `active > maxSessions`, nomme les deux chiffres et dit
     qu'aucun bind n'est coupé ; il disparaît à égalité ;
+  - des binds comptés mais pas encore listés sont nommés, sans état vide ;
   - abaisser sous les binds ouverts ouvre la modale, qui dit qu'aucun bind ne sera coupé, puis
-    enregistre ;
-  - une limite égale aux binds ouverts s'enregistre sans modale ;
+    enregistre ; « Annuler » et Échap n'enregistrent rien ;
+  - une limite égale aux binds ouverts s'enregistre sans modale, et changer le seul type de bind
+    aussi ;
+  - « Réessayer » relit les binds ;
   - sans `accounts:write`, « Enregistrer » est désactivé et l'infobulle nomme la permission ;
+  - les refus numériques sont rédigés en nombre ;
   - la suspension d'un client compte les comptes fermés à part et ne promet aucune réouverture.
-- **Parcours e2e**, en étendant celui de step-064 : l'onglet « Quotas & sessions », une nouvelle
-  limite enregistrée, et le toast qui la confirme.
+- **zodgen** : un entier porte ses bornes (`TestAnIntegerCarriesItsBoundsAndRefusesFractions`).
+- **Parcours e2e**, en étendant celui de step-064 : l'onglet « Quotas & sessions », la limite lue
+  sur la fiche, puis une limite posée sous le bind ouvert, la modale, et le bandeau d'écart.
 
 ## Tableau des mutations
-À remplir après implémentation (`-count=1`, worktree pour le serveur, restauration par `cp` côté
-client).
+
+Jouées le 04/10/2026 après commit, `-count=1`, dans un worktree, fichiers restaurés par `cp`. Chaque
+motif a été vérifié avant d'être remplacé.
+
+| Mutation | Ce qui tombe |
+|---|---|
+| `SetAccountSessionLimits` gardé par `accounts:read` | « sans accounts:write, le réglage des sessions est refusé… » |
+| `SetAccountSessionLimits` retiré de la table de garde | ce scénario, plus « abaisser la limite atteint la passerelle » et « régler les sessions laisse sa trace » (fermée par défaut) |
+| `ListAccountSessions` exempté de permission | « sans accounts:read, la lecture de ses binds ouverts est refusée… ». Ce plan a été **ajouté après la mutation**, qui restait verte, et il couvre aussi la fiche et les webhooks, que rien ne tenait. |
+| `allowed_bind_types` absent de l'audit | « régler les sessions laisse sa trace ». Avant la revue, seule `max_sessions` y était affirmée, et la mutation restait verte. |
+| `max_sessions` absent de l'audit | le même scénario |
+| Limite relayée constante | « abaisser la limite atteint la passerelle » |
+| `active` compté sur la liste (BFF) | « les binds ouverts se comptent comme la passerelle les compte… » |
+| `maxSessions` absent du DTO de la fiche | parcours e2e, `toHaveValue('1')` : le champ est un `int` toujours sérialisé, et Prism rend 0, donc aucun scénario ne le voit |
+| Écart levé à égalité (`>=`) | `raises no flag when the account sits exactly at its limit` |
+| Écart jugé sur la longueur de la liste (client) | `counts the binds the gateway counts…`. La doublure rendait `active` égal à la liste, si bien que la mutation restait verte avant la revue. |
+| État vide jugé sur la liste | le même test, une fois passé à « 3 comptés, aucun listé » (la première version listait un bind et restait verte) |
+| Binds non listés passés sous silence | le même test |
+| Modale retirée | `warns before lowering…`, `leaves the limit as it was…` |
+| Modale aussi à égalité (`<=`) | `saves a limit equal to the open binds without asking` |
+| Modale même sans changement de limite | `saves the bind type the operator picks, without warning…` |
+| Type de bind non réglable | le même test |
+| « Annuler » enregistre | `leaves the limit as it was when the operator backs out of lowering it` |
+| « Réessayer » ne relit rien | `reads the open binds again when the operator retries` |
+| « Enregistrer » non gardé | `names the missing permission on the save button` |
+| Binds non relus après enregistrement | `warns before lowering…`, `saves a limit equal…` |
+| Le bandeau ne dit plus qu'aucun bind n'est coupé | `flags an account above its limit, and says that no bind is cut` |
+| La modale ne le dit plus | `warns before lowering…` |
+| Refus numériques rédigés en caractères (bas, haut), fraction en refus générique | les trois tests de `a number refused` |
+| `integerExpression` sans ses bornes | `TestAnIntegerCarriesItsBoundsAndRefusesFractions` |
+| Suspension : comptes fermés comptés, cas « tous fermés » retiré, comptes fermés tus | `counts the accounts a suspension takes down…`, `says a suspension takes nothing down when every account is closed` |
 
 ## Critère 4
 - **Contre la vraie passerelle, rien n'est joué** : c'est le même obstacle que pour step-061.
@@ -92,10 +127,20 @@ client).
   n'appelle aucune déconnexion, relu le 04/10/2026). Contre Prism, seule la copie est tenue.
 
 ## Definition of Done
-- [ ] `make check` vert ; `make e2e` vert.
-- [ ] Invariants (c) et DTO tenus, mutations à l'appui.
-- [ ] Spec §1.1 corrigée ; dette 065 supprimée.
-- [ ] Revue en sous-agent sans blocage.
+- [x] `make check` vert ; `make e2e` vert.
+- [x] Invariants (c) et DTO tenus, mutations à l'appui.
+- [x] Spec §1.1 et §6.5 amendées ; dette 065 supprimée ; plan et todo annoncent 6.10.1.
+- [x] Revue en sous-agent : aucun blocage. Les quatre constats « à corriger » et les cinq mineurs
+  sont traités :
+  - l'état vide se jugeait sur la liste, alors que la passerelle compte des binds qu'elle ne liste
+    pas encore ;
+  - la doublure ne distinguait pas `active` de la longueur de la liste ;
+  - aucun test ne changeait le type de bind ;
+  - la modale s'ouvrait même sans changement de limite, et le toast ne nommait que `max_sessions` ;
+  - la copie de suspension avait des fautes d'accord et un présent ;
+  - l'audit du type n'était pas affirmé ;
+  - `too_big` numérique manquait ;
+  - le bloc CSS était mal rangé.
 
 ## Hors périmètre
 - Déconnexion forcée, « Forcer la convergence », mises à jour en deltas : step-085, step-086.
