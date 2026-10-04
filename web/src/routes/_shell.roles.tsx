@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { PermissionPicker } from '~/components/admin/permission-picker'
+import { PageHeader } from '~/components/page-header'
 import {
   Button,
   DataTable,
@@ -11,6 +12,7 @@ import {
   LoadingState,
   Modal,
   Skeleton,
+  Toolbar,
 } from '~/components/ui'
 import { blockedBy, orRefusal, Refusal, rolesQueryKey, useRoles } from '~/lib/administration'
 import { api, meQueryOptions } from '~/lib/api'
@@ -37,52 +39,54 @@ function RolesScreen() {
   const title = useRef<HTMLHeadingElement>(null)
 
   return (
-    <div className="page">
-      <header className="page__head">
-        <h1 className="page__title" ref={title} tabIndex={-1}>
-          Rôles
-        </h1>
-        <Button
-          {...blockedBy(canManage ? undefined : 'La composition d’un rôle demande roles:manage.')}
-          onClick={() => setPending({ kind: 'create' })}
-          variant="primary"
-        >
-          Nouveau rôle
-        </Button>
-      </header>
+    <>
+      <PageHeader title="Rôles" titleRef={title} />
+      <Toolbar
+        end={
+          <Button
+            {...blockedBy(canManage ? undefined : 'La composition d’un rôle demande roles:manage.')}
+            onClick={() => setPending({ kind: 'create' })}
+            size="sm"
+            variant="primary"
+          >
+            Nouveau rôle
+          </Button>
+        }
+      />
+      <div className="page">
+        {roles.isPending ? (
+          <LoadingState label="Chargement des rôles…">
+            <Skeleton height={38} />
+            <Skeleton height={38} />
+            <Skeleton height={38} />
+          </LoadingState>
+        ) : roles.isError ? (
+          <ErrorState
+            description={roles.error.message}
+            onRetry={() => void roles.refetch()}
+            title="Les rôles n’ont pas pu être chargés"
+            titleAs="h2"
+          />
+        ) : (
+          <RolesTable onAct={setPending} roles={roles.data} />
+        )}
 
-      {roles.isPending ? (
-        <LoadingState label="Chargement des rôles…">
-          <Skeleton height={38} />
-          <Skeleton height={38} />
-          <Skeleton height={38} />
-        </LoadingState>
-      ) : roles.isError ? (
-        <ErrorState
-          description={roles.error.message}
-          onRetry={() => void roles.refetch()}
-          title="Les rôles n’ont pas pu être chargés"
-          titleAs="h2"
-        />
-      ) : (
-        <RolesTable onAct={setPending} roles={roles.data} />
-      )}
-
-      {pending?.kind === 'create' ? <RoleEditor onClose={close} /> : null}
-      {pending?.kind === 'edit' ? <RoleEditor onClose={close} role={pending.role} /> : null}
-      {pending?.kind === 'view' ? <RoleView onClose={close} role={pending.role} /> : null}
-      {pending?.kind === 'delete' ? (
-        <ConfirmDelete
-          onClose={close}
-          onDeleted={() => {
-            close()
-            // La ligne du déclencheur disparaît avec le rôle : sans ceci, le focus tombe sur `body`.
-            title.current?.focus()
-          }}
-          role={pending.role}
-        />
-      ) : null}
-    </div>
+        {pending?.kind === 'create' ? <RoleEditor onClose={close} /> : null}
+        {pending?.kind === 'edit' ? <RoleEditor onClose={close} role={pending.role} /> : null}
+        {pending?.kind === 'view' ? <RoleView onClose={close} role={pending.role} /> : null}
+        {pending?.kind === 'delete' ? (
+          <ConfirmDelete
+            onClose={close}
+            onDeleted={() => {
+              close()
+              // La ligne du déclencheur disparaît avec le rôle : sans ceci, le focus tombe sur `body`.
+              title.current?.focus()
+            }}
+            role={pending.role}
+          />
+        ) : null}
+      </div>
+    </>
   )
 }
 
@@ -96,6 +100,7 @@ function RolesTable({
   return (
     <DataTable
       caption="Rôles du tableau de bord"
+      dense
       columns={[
         {
           key: 'name',

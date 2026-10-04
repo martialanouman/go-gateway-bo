@@ -80,7 +80,67 @@
 }
 
 .shell__content {
-  padding: var(--pad-panel);
+  min-width: 0;
+}
+
+/* L'en-tête de l'écran, projeté par `PageHeader` : fil d'Ariane, titre, badges, actions. */
+.topbar__start {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-6);
+  min-width: 0;
+}
+
+.page-header__crumbs ol {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-12);
+  list-style: none;
+  white-space: nowrap;
+}
+
+.page-header__crumbs li + li::before {
+  margin-right: var(--sp-4);
+  content: "›";
+}
+
+.page-header__crumbs a {
+  color: var(--text-faint);
+}
+
+.page-header__crumbs a:hover {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.page-header__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  min-width: 0;
+}
+
+.page-header__title {
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-card-title);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--ls-snug);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-left: auto;
 }
 
 .topbar__end {
@@ -162,6 +222,7 @@
 .page {
   display: grid;
   gap: var(--sp-9);
+  padding: var(--pad-panel);
   align-content: start;
   max-width: var(--content-max);
 }

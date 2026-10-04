@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
+import { PageHeader } from '~/components/page-header'
 import {
   Button,
   DataTable,
@@ -12,6 +13,7 @@ import {
   LoadingState,
   Modal,
   Skeleton,
+  Toolbar,
   useToast,
 } from '~/components/ui'
 import { blockedBy, operatorsQueryKey, orRefusal, Refusal, useRoles } from '~/lib/administration'
@@ -51,39 +53,43 @@ function OperatorsScreen() {
   const canManage = usePermission('operators:manage')
 
   return (
-    <div className="page">
-      <header className="page__head">
-        <h1 className="page__title">Opérateurs</h1>
-        <Button
-          {...blockedBy(
-            canManage ? undefined : 'La création d’un opérateur demande operators:manage.',
-          )}
-          onClick={() => setCreating(true)}
-          variant="primary"
-        >
-          Nouvel opérateur
-        </Button>
-      </header>
+    <>
+      <PageHeader title="Opérateurs" />
+      <Toolbar
+        end={
+          <Button
+            {...blockedBy(
+              canManage ? undefined : 'La création d’un opérateur demande operators:manage.',
+            )}
+            onClick={() => setCreating(true)}
+            size="sm"
+            variant="primary"
+          >
+            Nouvel opérateur
+          </Button>
+        }
+      />
+      <div className="page">
+        {operators.isPending ? (
+          <LoadingState label="Chargement des opérateurs…">
+            <Skeleton height={38} />
+            <Skeleton height={38} />
+            <Skeleton height={38} />
+          </LoadingState>
+        ) : operators.isError ? (
+          <ErrorState
+            description={operators.error.message}
+            onRetry={() => void operators.refetch()}
+            title="Les opérateurs n’ont pas pu être chargés"
+            titleAs="h2"
+          />
+        ) : (
+          <OperatorsTable operators={operators.data} />
+        )}
 
-      {operators.isPending ? (
-        <LoadingState label="Chargement des opérateurs…">
-          <Skeleton height={38} />
-          <Skeleton height={38} />
-          <Skeleton height={38} />
-        </LoadingState>
-      ) : operators.isError ? (
-        <ErrorState
-          description={operators.error.message}
-          onRetry={() => void operators.refetch()}
-          title="Les opérateurs n’ont pas pu être chargés"
-          titleAs="h2"
-        />
-      ) : (
-        <OperatorsTable operators={operators.data} />
-      )}
-
-      <CreateOperator onClose={() => setCreating(false)} open={creating} />
-    </div>
+        <CreateOperator onClose={() => setCreating(false)} open={creating} />
+      </div>
+    </>
   )
 }
 
@@ -103,6 +109,7 @@ function OperatorsTable({ operators }: { readonly operators: readonly Operator[]
       <Refusal error={setStatus.error} />
       <DataTable
         caption="Opérateurs du tableau de bord"
+        dense
         columns={[
           {
             key: 'operator',

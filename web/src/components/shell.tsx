@@ -5,6 +5,7 @@ import { EmptyState, ErrorState, LoadingState, Skeleton, ToastStack } from '~/co
 import { HttpError, isUnauthenticated, meQueryOptions } from '~/lib/api'
 import { RealtimeProvider } from '~/lib/realtime'
 import { NotificationToasts } from './notification-toasts'
+import { PageHeaderProvider, PageHeaderSlot } from './page-header'
 import { Rail } from './rail'
 import { TopBar } from './top-bar'
 
@@ -74,7 +75,16 @@ export function Shell({ children }: { readonly children: ReactNode }) {
   // l'écran (invariant e).
   if (me.data !== undefined) {
     return (
-      <Frame live rail={<Rail />} topbar={<TopBar operator={me.data.operator} />}>
+      <Frame
+        live
+        rail={<Rail />}
+        topbar={
+          <>
+            <PageHeaderSlot />
+            <TopBar operator={me.data.operator} />
+          </>
+        }
+      >
         {children}
         <NotificationToasts />
       </Frame>
@@ -127,28 +137,30 @@ function Frame({
     // seule branche de session, ils changeraient la forme de l'arbre, et React remonterait le cadre.
     <ToastStack>
       <RealtimeProvider enabled={live}>
-        <div className="shell">
-          {/* biome-ignore lint/a11y/useValidAnchor: `#contenu` est une vraie destination ; le clic ne fait qu'y porter le focus. */}
-          <a
-            className="shell__skip"
-            href="#contenu"
-            onClick={(event) => {
-              // Le fragment seul ne déplace pas le focus : `main` ne le prend que si on le lui donne, et le
-              // test du lien d'évitement rougit sans `focus()`. `preventDefault` garde `#contenu` hors de
-              // l'adresse ; aucun test ne rougit s'il disparaît — l'historique en mémoire du test ne voit
-              // pas le fragment.
-              event.preventDefault()
-              document.getElementById('contenu')?.focus()
-            }}
-          >
-            Aller au contenu
-          </a>
-          {rail ?? <div className="shell__rail" />}
-          <header className="shell__topbar">{topbar}</header>
-          <main className="shell__content" id="contenu" tabIndex={-1}>
-            {children}
-          </main>
-        </div>
+        <PageHeaderProvider>
+          <div className="shell">
+            {/* biome-ignore lint/a11y/useValidAnchor: `#contenu` est une vraie destination ; le clic ne fait qu'y porter le focus. */}
+            <a
+              className="shell__skip"
+              href="#contenu"
+              onClick={(event) => {
+                // Le fragment seul ne déplace pas le focus : `main` ne le prend que si on le lui donne, et le
+                // test du lien d'évitement rougit sans `focus()`. `preventDefault` garde `#contenu` hors de
+                // l'adresse ; aucun test ne rougit s'il disparaît — l'historique en mémoire du test ne voit
+                // pas le fragment.
+                event.preventDefault()
+                document.getElementById('contenu')?.focus()
+              }}
+            >
+              Aller au contenu
+            </a>
+            {rail ?? <div className="shell__rail" />}
+            <header className="shell__topbar">{topbar}</header>
+            <main className="shell__content" id="contenu" tabIndex={-1}>
+              {children}
+            </main>
+          </div>
+        </PageHeaderProvider>
       </RealtimeProvider>
     </ToastStack>
   )
