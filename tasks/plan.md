@@ -130,7 +130,7 @@ Aucune autre bibliothèque pour ces rôles sans décision d'équipe.
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat | `@martialanouman/gateway-api-contracts` | **6.10.0** |
+| Contrat | `@martialanouman/gateway-api-contracts` | **6.10.1** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests | `vitest` + `@playwright/test` | 4.1.10 / 1.62.0 |
 | Langage | `typescript` | 7.0.2 |
@@ -312,9 +312,9 @@ pas la compilation. Une contrainte de validation resserrée (`additionalProperti
 > Aucun de ces points n'aurait été vu en lisant seulement le numéro de version, et quatre sur six ne
 > font pas échouer la compilation.
 
-**Dette soldée le 08/08/2026 : le dépôt était alors en 4.0.2** (step-009) ; il est en **6.10.0**
-depuis le 30/09/2026 (6.8.0 et 6.9.0 le 26/09, qui décrit les trames temps réel ; 6.10.0 à step-062,
-qui ajoute `member_count` aux groupes). Les deux majeures qui le séparaient
+**Dette soldée le 08/08/2026 : le dépôt était alors en 4.0.2** (step-009) ; il est en **6.10.1**
+depuis le 04/10/2026 (6.8.0 et 6.9.0 le 26/09, qui décrit les trames temps réel ; 6.10.0 à step-062,
+qui ajoute `member_count` aux groupes ; 6.10.1 à step-065, des `description` seules : `closed` est définitif). Les deux majeures qui le séparaient
 de 2.5.0 ont été relues ligne à ligne, et ce qu'elles changent est inscrit dans
 `tasks/steps/done/step-009.md`. En résumé : 133 opérations avant et après, aucune ajoutée, retirée ni
 renommée, six touchées dont aucune que le BFF appelle — le bump s'est payé sur le seul
@@ -776,7 +776,7 @@ M3 → M4 → M5 → M9`.
 ## 16. Dépendance externe : l'état réel de la passerelle
 
 **C'était la contrainte de planification la plus importante de ce document. Elle est levée, et c'est
-la mesure qui le dit.** Le contrat 6.10.0 décrit **134 opérations**, comme 6.9.0 : `list-audit-log` s'est ajoutée
+la mesure qui le dit.** Le contrat 6.10.1 décrit **134 opérations**, comme 6.9.0 : `list-audit-log` s'est ajoutée
 aux 133 que les versions 2.5.0 à 6.7.x décrivaient. La passerelle les sert **toutes**, relevé le
 26/09/2026 sur `go-gateway` au commit `7723f3d`. Aucune opération n'existe plus seulement au contrat.
 
