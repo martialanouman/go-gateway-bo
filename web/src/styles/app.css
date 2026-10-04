@@ -93,6 +93,11 @@
   min-width: 0;
 }
 
+.page-header__crumbs {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .page-header__crumbs ol {
   display: flex;
   align-items: center;
@@ -127,6 +132,7 @@
 }
 
 .page-header__title {
+  min-width: 12ch;
   overflow: hidden;
   margin: 0;
   color: var(--text-primary);
@@ -142,6 +148,13 @@
   font: var(--text-caption);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* Sous 1280 px, la barre garde le titre et les actions ; la date reste sur la ligne de la liste. */
+@media (max-width: 1279px) {
+  .page-header__meta {
+    display: none;
+  }
 }
 
 .card-grid {
