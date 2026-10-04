@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { LoginRequest, MfaVerification } from './contract.gen'
+import { AccountSessionLimits, LoginRequest, MfaVerification } from './contract.gen'
 import { refusalInFrench } from './form'
 
 /** Le message que le schéma oppose à cette valeur, ou `undefined` s'il l'accepte. */
@@ -67,5 +67,25 @@ describe('number agreement in the refusal', () => {
 
   it('uses the plural beyond one', () => {
     expect(refusalOf(MfaVerification.shape.challenge, 'court')).toContain('43 caractères')
+  })
+})
+
+describe('a number refused', () => {
+  it('names the bound of the contract as a number, not as characters', () => {
+    const refusal = refusalOf(AccountSessionLimits.shape.maxSessions, -1)
+
+    expect(refusal).toBe('Saisissez un nombre au moins égal à 0.')
+  })
+
+  it('asks for a whole number when given a fraction', () => {
+    expect(refusalOf(AccountSessionLimits.shape.maxSessions, 1.5)).toBe(
+      'Saisissez un nombre entier.',
+    )
+  })
+
+  it('asks for a value when the field is left empty', () => {
+    expect(refusalOf(AccountSessionLimits.shape.maxSessions, Number.NaN)).toBe(
+      'Renseignez ce champ.',
+    )
   })
 })

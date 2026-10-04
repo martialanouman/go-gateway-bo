@@ -815,6 +815,41 @@
 }
 
 /* ─── Carte et sous-barre (`Card`, `Toolbar` de la charte) ─────────────────────────────────── */
+.ui-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  padding: var(--sp-6);
+  border: 1px solid color-mix(in srgb, var(--red-500) 30%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--tint-red);
+  color: var(--text-secondary);
+  font-size: var(--fs-13);
+}
+
+.ui-banner__icon {
+  display: flex;
+  flex: none;
+  margin-top: 1px;
+  color: var(--red-500);
+}
+
+.ui-banner__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.ui-banner__title {
+  color: var(--text-primary);
+  font-weight: var(--fw-medium);
+}
+
+.ui-banner__text {
+  color: var(--text-muted);
+}
+
 .ui-card {
   display: flex;
   flex-direction: column;

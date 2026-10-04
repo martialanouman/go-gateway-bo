@@ -125,13 +125,13 @@ export const WebauthnRegistration = z.object({
 
 export const WebhookCreation = z.object({
   eventType: z.enum(['mo', 'dlr']),
-  url: z.string().regex(/^https?:\/\/[^\/]/),
+  url: z.string().regex(/^https?:\/\/[^/]/),
 })
 
 export const WebhookUpdate = z.object({
   status: z.enum(['active', 'disabled']).optional(),
   url: z
     .string()
-    .regex(/^https?:\/\/[^\/]/)
+    .regex(/^https?:\/\/[^/]/)
     .optional(),
 })

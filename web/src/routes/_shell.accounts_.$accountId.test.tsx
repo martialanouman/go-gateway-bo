@@ -123,7 +123,7 @@ describe('the account screen', () => {
     expect(fetch.mock.calls.some(([request]) => (request as Request).method === 'PUT')).toBe(false)
   })
 
-  it('names what is not delivered yet in the credentials and quotas tabs', async () => {
+  it('names what is not delivered yet in the credentials tab', async () => {
     const user = userEvent.setup()
     open()
 
@@ -134,13 +134,6 @@ describe('the account screen', () => {
     expect(screen.getByRole('tabpanel')).toHaveTextContent(
       'Tant qu’ils n’existent pas, ce compte ne peut pas se lier.',
     )
-
-    await user.click(screen.getByRole('tab', { name: 'Quotas & sessions' }))
-    expect(
-      await screen.findByRole('heading', {
-        name: 'Les quotas et les sessions ne sont pas encore livrés',
-      }),
-    ).toBeVisible()
   })
 
   it('shows a new webhook secret once, and never again once the dialog is closed', async () => {
@@ -366,5 +359,94 @@ describe('the account screen', () => {
     await user.click(within(form).getByRole('button', { name: 'Créer le webhook' }))
 
     expect(await within(form).findByText(refusal)).toBeVisible()
+  })
+})
+
+const BIND: components['schemas']['AccountSession'] = {
+  id: 'session-1',
+  bindType: 'trx',
+  remoteAddr: '10.4.19.7',
+  connectedAt: '2026-10-04T08:00:00Z',
+}
+const THREE_BINDS = [BIND, { ...BIND, id: 'session-2' }, { ...BIND, id: 'session-3' }]
+
+async function openQuotas(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('tab', { name: 'Quotas & sessions' }))
+}
+
+describe('the sessions of an account', () => {
+  it('flags an account above its limit, and says that no bind is cut', async () => {
+    const user = userEvent.setup()
+    open({ accounts: [{ ...OTP_ACCOUNT, maxSessions: 1 }], sessions: THREE_BINDS })
+
+    await openQuotas(user)
+
+    const gap = await screen.findByRole('alert')
+    expect(gap).toHaveTextContent('3 binds ouverts / limite 1')
+    expect(gap).toHaveTextContent('aucun bind ouvert n’est coupé')
+    expect(screen.getAllByRole('cell', { name: '10.4.19.7' })).toHaveLength(3)
+  })
+
+  it('raises no flag when the account sits exactly at its limit', async () => {
+    const user = userEvent.setup()
+    open({ accounts: [{ ...OTP_ACCOUNT, maxSessions: 3 }], sessions: THREE_BINDS })
+
+    await openQuotas(user)
+
+    expect(await screen.findByText('3 ouverts / limite 3')).toBeVisible()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('warns before lowering the limit under the open binds, then lowers it without cutting any', async () => {
+    const user = userEvent.setup()
+    open({ sessions: THREE_BINDS })
+
+    await openQuotas(user)
+    const limit = await screen.findByRole('spinbutton', { name: 'max_sessions' })
+    await user.clear(limit)
+    await user.type(limit, '2')
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Limiter ce compte à 2 binds ?' })
+    expect(dialog).toHaveTextContent('Ce compte a 3 binds ouverts : aucun ne sera coupé.')
+    await user.click(within(dialog).getByRole('button', { name: 'Limiter' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('3 binds ouverts / limite 2')
+  })
+
+  it('saves a limit equal to the open binds without asking', async () => {
+    const user = userEvent.setup()
+    open({ sessions: THREE_BINDS })
+
+    await openQuotas(user)
+    const limit = await screen.findByRole('spinbutton', { name: 'max_sessions' })
+    await user.clear(limit)
+    await user.type(limit, '3')
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(await screen.findByText('3 ouverts / limite 3')).toBeVisible()
+    expect(screen.queryByRole('dialog', { name: /Limiter/ })).toBeNull()
+    expect(screen.getByText('max_sessions vaut désormais 3 pour trafic-otp.')).toBeVisible()
+  })
+
+  it('names the missing permission on the save button', async () => {
+    const user = userEvent.setup()
+    stubAdministration(
+      { permissions: ['accounts:read', 'customers:read'] },
+      { accounts: [OTP_ACCOUNT] },
+    )
+    render(
+      <RouterProvider
+        router={createAppRouter(
+          createMemoryHistory({ initialEntries: [`/accounts/${OTP_ACCOUNT.id}`] }),
+        )}
+      />,
+    )
+
+    await openQuotas(user)
+
+    const save = await screen.findByRole('button', { name: 'Enregistrer' })
+    expect(save).toHaveAttribute('aria-disabled', 'true')
+    expect(save).toHaveAccessibleDescription('Modifier un compte demande accounts:write.')
   })
 })
