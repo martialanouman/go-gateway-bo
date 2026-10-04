@@ -389,13 +389,13 @@ describe('the sessions of an account', () => {
 
   it('counts the binds the gateway counts, and says which ones are not listed yet', async () => {
     const user = userEvent.setup()
-    open({ accounts: [{ ...OTP_ACCOUNT, maxSessions: 2 }], sessions: [BIND], activeBinds: 3 })
+    open({ accounts: [{ ...OTP_ACCOUNT, maxSessions: 2 }], sessions: [], activeBinds: 3 })
 
     await openQuotas(user)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('3 binds ouverts / limite 2')
     expect(screen.getByRole('tabpanel')).toHaveTextContent(
-      '2 binds comptés par la passerelle ne sont pas encore listés',
+      '3 binds comptés par la passerelle ne sont pas encore listés',
     )
     expect(screen.queryByText('Aucun bind ouvert')).toBeNull()
   })
