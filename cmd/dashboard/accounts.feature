@@ -30,6 +30,16 @@ Fonctionnalité: La fiche d'un compte SMPP
     Alors le serveur répond 200
     Et la réponse ne porte pas "senderIdPolicy"
 
+  Scénario: les binds ouverts se comptent comme la passerelle les compte, pas à la longueur de leur liste
+    Étant donné une passerelle qui compte 8 binds ouverts pour une limite de 4, sans en lister aucun
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/sessions"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+    Et la réponse compte 8 binds ouverts pour une limite de 4
+
   Plan du scénario: <geste> atteint la passerelle
     Étant donné une passerelle qui compte les requêtes reçues
     Et un serveur démarré

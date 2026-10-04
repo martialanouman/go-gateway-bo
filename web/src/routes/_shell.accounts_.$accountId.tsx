@@ -434,6 +434,10 @@ function binds(count: number) {
   return `${count} bind${count > 1 ? 's' : ''}`
 }
 
+function openBinds(count: number) {
+  return `${binds(count)} ouvert${count > 1 ? 's' : ''}`
+}
+
 function Sessions({
   account,
   writeRefusal,
@@ -486,7 +490,7 @@ function Sessions({
   return (
     <>
       {live.isSuccess && live.data.active > live.data.maxSessions ? (
-        <Banner title={`${binds(live.data.active)} ouverts / limite ${live.data.maxSessions}`}>
+        <Banner title={`${openBinds(live.data.active)} / limite ${live.data.maxSessions}`}>
           Le compte dépasse sa limite, mais aucun bind ouvert n’est coupé : la passerelle refusera
           tout nouveau bind tant que leur nombre ne sera pas repassé sous la limite. Pour converger
           plus tôt, il faudra déconnecter des binds depuis le moniteur de sessions, qui arrive avec
@@ -610,7 +614,7 @@ function Sessions({
           title={`Limiter ce compte à ${binds(lowering.maxSessions)} ?`}
         >
           <Refusal error={save.error} />
-          <p>Ce compte a {binds(live.data.active)} ouverts : aucun ne sera coupé.</p>
+          <p>Ce compte a {openBinds(live.data.active)} : aucun ne sera coupé.</p>
           <p>
             Il restera au-dessus de sa limite tant que des binds ne se fermeront pas, et aucun
             nouveau bind ne sera admis d’ici là.

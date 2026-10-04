@@ -40,12 +40,15 @@ pas bloqué : la copie dit qu'aucun bind ouvert n'est coupé. Chaque réglage la
   baisse est un geste légitime (spec §6.5), et l'avertissement relève du confort, pas d'une garde.
   L'audit `account.session_limits` porte les deux valeurs posées.
 - **Avertissement avant sauvegarde** : si la nouvelle limite est inférieure aux binds ouverts, une
-  modale Material s'ouvre. Titre : « Abaisser max_sessions à 2 ? ». Corps, au futur : aucun bind
-  ouvert ne sera coupé, le compte restera au-dessus de sa limite tant que des binds ne se fermeront
-  pas, et aucun nouveau bind ne sera admis d'ici là. Bouton : « Abaisser ». Une limite égale ou
+  modale Material s'ouvre. Titre : « Limiter ce compte à 2 binds ? ». « Abaisser » serait faux
+  quand la limite est déjà sous les binds ouverts et que l'opérateur la remonte un peu. Corps, au
+  futur : aucun bind ouvert ne sera coupé, le compte restera au-dessus de sa limite tant que des
+  binds ne se fermeront pas, et aucun nouveau bind ne sera admis d'ici là (le registre refuse dès
+  que le plafond est atteint, `session/registry.go`). Bouton : « Limiter ». Une limite égale ou
   supérieure s'enregistre sans modale.
 - **Badge d'écart** : un `Banner` au-dessus des cartes, sur le modèle de la maquette, titré « 8 binds
-  ouverts / limite 4 ». Il dit que baisser la limite ne coupe aucun bind, et que pour converger il
+  ouverts / limite 4 ». Le client n'avait pas de `Banner` : il est porté du kit
+  (`feedback/Banner`), réduit au seul ton dont il a l'usage, le rouge, avec `role="alert"`. Il dit que baisser la limite ne coupe aucun bind, et que pour converger il
   faut déconnecter des binds depuis le moniteur de sessions (jalon M4). La maquette montre aussi un
   bouton « Forcer la convergence », qui relève de step-086 et n'est pas construit ici.
 - **Les binds ouverts sont un instantané REST** : ils sont relus après une sauvegarde, mais il n'y a
@@ -54,6 +57,11 @@ pas bloqué : la copie dit qu'aucun bind ouvert n'est coupé. Chaque réglage la
 - **Dette 065 payée** : la modale de suspension d'un client ne promet plus qu'un compte fermé
   repassera suspendu. Elle compte les comptes que la cascade suspendra réellement (le total moins
   les comptes fermés), et dit que les comptes fermés le restent.
+- **Refus de saisie numériques** : `zodgen` rend désormais un entier (`z.number().int()` avec ses
+  bornes), et `refusalInFrench` rédige ses refus en nombre (« Saisissez un nombre au moins égal à
+  0. », « Saisissez un nombre entier. ») et non plus en caractères.
+- **Le faux amont du parcours** (`internal/fakegateway`) sert les deux opérations, avec un bind
+  ouvert permanent par compte : sans lui, le parcours ne traverserait jamais l'écart.
 - **Permissions existantes** : `accounts:read` et `accounts:write`. Aucune n'est ajoutée.
 
 ## Tests

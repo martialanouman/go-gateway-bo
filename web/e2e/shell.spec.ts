@@ -639,6 +639,18 @@ test('the binary serves the painted shell, then the application replaces it', as
   )
   await expect(page.locator('body')).not.toContainText(secretDeWebhook)
 
+  // step-065 : limiter le compte sous son bind ouvert avertit, n'est pas bloqué, et signale l'écart.
+  await page.getByRole('tab', { name: 'Quotas & sessions' }).click()
+  await expect(page.getByText('1 ouvert / limite 1')).toBeVisible()
+  await expect(page.getByRole('spinbutton', { name: 'max_sessions' })).toHaveValue('1')
+  await page.getByRole('spinbutton', { name: 'max_sessions' }).fill('0')
+  await page.getByRole('button', { name: 'Enregistrer' }).click()
+  const limitation = page.getByRole('dialog', { name: 'Limiter ce compte à 0 bind ?' })
+  await expect(limitation).toContainText('Ce compte a 1 bind ouvert : aucun ne sera coupé.')
+  await limitation.getByRole('button', { name: 'Limiter' }).click()
+  await expect(page.locator('.ui-banner')).toContainText('1 bind ouvert / limite 0')
+  await expect(page.locator('.ui-banner')).toContainText('aucun bind ouvert n’est coupé')
+
   // step-068 : le fil d'Ariane de la barre supérieure ramène au client du compte.
   await page
     .getByRole('banner')

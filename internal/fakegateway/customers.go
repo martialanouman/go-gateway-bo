@@ -49,6 +49,21 @@ type account struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+type liveBinds struct {
+	MaxSessions int        `json:"max_sessions"`
+	Active      int        `json:"active"`
+	Sessions    []liveBind `json:"sessions"`
+}
+
+type liveBind struct {
+	ID          string    `json:"id"`
+	BindID      string    `json:"bind_id"`
+	BindType    string    `json:"bind_type"`
+	PodID       string    `json:"pod_id"`
+	RemoteAddr  string    `json:"remote_addr"`
+	ConnectedAt time.Time `json:"connected_at"`
+}
+
 // Customers sert les clients, leurs sender IDs et leurs comptes avec un état en mémoire, pour qu'un
 // parcours retrouve ce qu'il vient de créer. Une seule page : un parcours ne crée pas cinquante
 // objets.
@@ -152,6 +167,27 @@ func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
 		}
 
 		reply(w, http.StatusOK, c.accounts[index])
+	case action == "session-limits" && r.Method == http.MethodPatch:
+		var body struct {
+			MaxSessions      int    `json:"max_sessions"`
+			AllowedBindTypes string `json:"allowed_bind_types"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+
+		c.accounts[index].MaxSessions, c.accounts[index].AllowedBindTypes = body.MaxSessions, body.AllowedBindTypes
+		reply(w, http.StatusOK, c.accounts[index])
+	// Un client lié en permanence : sans bind ouvert, le parcours ne traverserait jamais l'écart.
+	case action == "sessions" && r.Method == http.MethodGet:
+		reply(w, http.StatusOK, liveBinds{
+			MaxSessions: c.accounts[index].MaxSessions, Active: 1,
+			Sessions: []liveBind{{
+				ID: uuid.NewSHA1(uuid.NameSpaceOID, []byte(id)).String(), BindID: "bind-" + id,
+				BindType: c.accounts[index].AllowedBindTypes, PodID: "pod-0", RemoteAddr: "10.4.19.7",
+				ConnectedAt: c.accounts[index].CreatedAt,
+			}},
+		})
 	case action == "webhooks" && r.PathValue("webhookId") != "":
 		c.serveWebhook(w, r, id, r.PathValue("webhookId"))
 	case action == "webhooks" && r.Method == http.MethodGet:
