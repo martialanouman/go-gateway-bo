@@ -117,6 +117,22 @@ Fonctionnalité: La fiche d'un compte SMPP
     Et la réponse est conforme au contrat du BFF
     Et le refus place une erreur sous le champ "eventType"
 
+  Plan du scénario: sans accounts:read, <objet> est refusé avant d'atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Reporting"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "<adresse>"
+    Alors le serveur répond 403
+    Et le refus nomme la permission "accounts:read"
+    Et la passerelle n'a reçu aucune requête
+
+    Exemples:
+      | objet                 | adresse                                                       |
+      | la fiche d'un compte  | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e            |
+      | ses webhooks          | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/webhooks   |
+      | ses binds ouverts     | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/sessions   |
+
   Plan du scénario: sans accounts:write, <geste> est refusé avant d'atteindre la passerelle
     Étant donné une passerelle qui compte les requêtes reçues
     Et un serveur démarré
