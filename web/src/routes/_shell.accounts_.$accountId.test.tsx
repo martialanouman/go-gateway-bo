@@ -220,6 +220,9 @@ describe('the account screen', () => {
       'La fiche du compte n’a pas pu être chargée',
     )
     expect(screen.getByRole('link', { name: 'Revenir à la liste des comptes' })).toBeVisible()
+    expect(
+      within(screen.getByRole('banner')).getByRole('heading', { level: 1, name: 'Compte' }),
+    ).toBeInTheDocument()
   })
 
   it('reads the account again when the operator retries', async () => {

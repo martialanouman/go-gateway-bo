@@ -72,6 +72,7 @@
 
 .shell__topbar {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: var(--sp-6);
   padding: 0 var(--sp-7);
@@ -106,7 +107,7 @@
 
 .page-header__crumbs li + li::before {
   margin-right: var(--sp-4);
-  content: "›";
+  content: "›" / "";
 }
 
 .page-header__crumbs a {
@@ -152,6 +153,7 @@
 
 .page-header__actions {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--sp-4);
   margin-left: auto;
@@ -159,6 +161,7 @@
 
 .topbar__end {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--sp-6);
   margin-left: auto;

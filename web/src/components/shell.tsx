@@ -20,10 +20,12 @@ import { TopBar } from './top-bar'
 export function ShellPending() {
   return (
     <Frame live={false}>
-      <LoadingState label="Ouverture de la session">
-        <Skeleton width={240} />
-        <Skeleton width={180} />
-      </LoadingState>
+      <div className="page">
+        <LoadingState label="Ouverture de la session">
+          <Skeleton width={240} />
+          <Skeleton width={180} />
+        </LoadingState>
+      </div>
     </Frame>
   )
 }
@@ -47,26 +49,28 @@ export function Shell({ children }: { readonly children: ReactNode }) {
   if (isUnauthenticated(me.error)) {
     return (
       <Frame live={false}>
-        <EmptyState
-          description={
-            <>
-              <p>
-                Le tableau de bord ne montre aucun écran sans session : la navigation et les données
-                restent fermées.
-              </p>
-              <p>
-                {/* Sans destination à rejouer : l'adresse d'où l'on vient ne correspond à aucun
+        <div className="page">
+          <EmptyState
+            description={
+              <>
+                <p>
+                  Le tableau de bord ne montre aucun écran sans session : la navigation et les
+                  données restent fermées.
+                </p>
+                <p>
+                  {/* Sans destination à rejouer : l'adresse d'où l'on vient ne correspond à aucun
                     écran, et y revenir ramènerait à ce même message. */}
-                <Link search={{ passwordSet: false, redirect: undefined }} to="/login">
-                  Se connecter
-                </Link>{' '}
-                ouvre une session et conduit à l’accueil.
-              </p>
-            </>
-          }
-          title="Aucune session ouverte"
-          titleAs="h1"
-        />
+                  <Link search={{ passwordSet: false, redirect: undefined }} to="/login">
+                    Se connecter
+                  </Link>{' '}
+                  ouvre une session et conduit à l’accueil.
+                </p>
+              </>
+            }
+            title="Aucune session ouverte"
+            titleAs="h1"
+          />
+        </div>
       </Frame>
     )
   }
@@ -95,18 +99,20 @@ export function Shell({ children }: { readonly children: ReactNode }) {
     const status = me.error instanceof HttpError ? String(me.error.status) : 'réseau'
     return (
       <Frame live={false}>
-        <ErrorState
-          description="Le tableau de bord n’a pas pu vérifier la session ; aucun écran ne s’ouvre sans elle."
-          // `router.invalidate()` et non `me.refetch()` : ce qu'il faut rejouer est la **garde**,
-          // pas la seule requête. Une relecture réussie peut rendre une session **non élevée**, et
-          // la coquille se peignait alors tout entière — `beforeLoad` ne se rejoue pas de lui-même
-          // — pour un cockpit dont chaque appel gardé rendrait 403. La garde, elle, tranche.
-          onRetry={() => void router.invalidate()}
-          request={`GET /api/auth/me · ${status}`}
-          // Le titre par défaut accuse l'API Admin ; c'est le BFF qui répond à `/auth/me`.
-          title="Impossible de vérifier la session"
-          titleAs="h1"
-        />
+        <div className="page">
+          <ErrorState
+            description="Le tableau de bord n’a pas pu vérifier la session ; aucun écran ne s’ouvre sans elle."
+            // `router.invalidate()` et non `me.refetch()` : ce qu'il faut rejouer est la **garde**,
+            // pas la seule requête. Une relecture réussie peut rendre une session **non élevée**, et
+            // la coquille se peignait alors tout entière — `beforeLoad` ne se rejoue pas de lui-même
+            // — pour un cockpit dont chaque appel gardé rendrait 403. La garde, elle, tranche.
+            onRetry={() => void router.invalidate()}
+            request={`GET /api/auth/me · ${status}`}
+            // Le titre par défaut accuse l'API Admin ; c'est le BFF qui répond à `/auth/me`.
+            title="Impossible de vérifier la session"
+            titleAs="h1"
+          />
+        </div>
       </Frame>
     )
   }

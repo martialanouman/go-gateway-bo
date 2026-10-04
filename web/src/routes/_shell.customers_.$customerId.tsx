@@ -75,6 +75,7 @@ function CustomerScreen() {
   if (customer.isPending) {
     return (
       <div className="page">
+        <PageHeader crumbs={[{ label: 'Clients', link: { to: '/customers' } }]} title="Client" />
         <LoadingState label="Chargement du client…">
           <Skeleton height={32} />
           <Skeleton height={38} />
@@ -87,6 +88,7 @@ function CustomerScreen() {
   if (customer.isError) {
     return (
       <div className="page">
+        <PageHeader crumbs={[{ label: 'Clients', link: { to: '/customers' } }]} title="Client" />
         <ErrorState
           description={customer.error.message}
           onRetry={() => void customer.refetch()}

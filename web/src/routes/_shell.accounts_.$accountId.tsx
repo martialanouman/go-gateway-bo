@@ -81,6 +81,7 @@ function AccountScreen() {
   if (account.isPending) {
     return (
       <div className="page">
+        <PageHeader crumbs={[{ label: 'Comptes', link: { to: '/accounts' } }]} title="Compte" />
         <LoadingState label="Chargement du compte…">
           <Skeleton height={32} />
           <Skeleton height={38} />
@@ -93,6 +94,7 @@ function AccountScreen() {
   if (account.isError) {
     return (
       <div className="page">
+        <PageHeader crumbs={[{ label: 'Comptes', link: { to: '/accounts' } }]} title="Compte" />
         <ErrorState
           description={account.error.message}
           onRetry={() => void account.refetch()}

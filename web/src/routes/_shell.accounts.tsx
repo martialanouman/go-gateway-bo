@@ -102,12 +102,12 @@ function AccountsScreen() {
     <>
       <PageHeader
         crumbs={
-          customerId === undefined
+          customerId === undefined || customerName === undefined
             ? undefined
             : [
                 { label: 'Clients', link: { to: '/customers' } },
                 {
-                  label: customerName ?? 'ce client',
+                  label: customerName,
                   link: { to: '/customers/$customerId', params: { customerId } },
                 },
               ]

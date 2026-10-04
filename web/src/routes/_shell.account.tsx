@@ -325,6 +325,7 @@ function Passkeys({ factors }: { readonly factors: Me['secondFactors'] }) {
       ) : (
         <DataTable
           caption="Clés d’accès du compte"
+          dense
           columns={[
             { key: 'name', header: 'Nom', cell: (passkey) => passkey.name },
             {
