@@ -162,12 +162,14 @@ func TestTwoWorkersOneRowOneSend(t *testing.T) {
 	var calls atomic.Int32
 
 	release := make(chan struct{})
+	entered := make(chan struct{})
 	held := make(chan error, 1)
 
 	go func() {
 		_, err := links.DeliverNext(context.WithoutCancel(t.Context()),
 			func(context.Context, store.PendingLink, string) error {
 				calls.Add(1)
+				close(entered)
 				<-release
 
 				return nil
@@ -175,19 +177,14 @@ func TestTwoWorkersOneRowOneSend(t *testing.T) {
 		held <- err
 	}()
 
-	locks := func(granted bool) int {
-		var count int
-
-		require.NoError(t, pool.QueryRow(t.Context(), `
-			SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
-			WHERE c.relname = 'access_links' AND l.mode = 'RowShareLock' AND l.granted = $1
-			  AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())`, granted).Scan(&count))
-
-		return count
+	// L'envoi ne commence qu'une fois la ligne verrouillée. Un `RowShareLock` de table, attendu jusqu'au
+	// 05/10/2026, se prend dès le début du `SELECT … FOR UPDATE`, avant la ligne : sous charge, le
+	// second worker passait dans cet intervalle et envoyait la ligne une seconde fois.
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "le premier worker n'entre jamais dans l'envoi : la séquence n'exerce pas la course")
 	}
-
-	require.Eventually(t, func() bool { return locks(true) >= 1 }, 5*time.Second, 20*time.Millisecond,
-		"le premier worker ne tient jamais la ligne : la séquence n'exerce pas la course")
 
 	second, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
