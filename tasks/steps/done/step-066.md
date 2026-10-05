@@ -33,9 +33,10 @@ payée.
   la grâce). **Aucun fragment du secret** : le contrat ne porte pas de « 4 derniers caractères », et
   la passerelle ne garde qu'une empreinte (argon2id pour le bind, empreinte pour la clé), dont rien
   ne se déduit. La spec §6.14 est amendée dans la même PR. Le `MaskedSecret` du kit est repris sans
-  sa ligne `last4`, et sa ligne de points devient un fait « Secret : masqué » : la feuille d'entrée
-  n'avait plus la place d'une règle propre (plafond de 36 864 octets bruts, ~70 de marge mesurés), et
-  les faits tiennent en une rangée flexible. Le `system_id` n'est pas un secret : c'est l'identifiant de connexion, et le
+  sa ligne `last4` ni sa ligne de points : la carte ne montre **rien** du secret, pas même un
+  emplacement masqué, puisqu'il n'est jamais réaffiché (retiré au test de l'utilisateur, 05/10/2026).
+  Le `system_id` s'y lit sous « System ID ». Les faits tiennent en une rangée flexible : la feuille
+  d'entrée n'avait plus la place d'une règle propre (plafond de 36 864 octets bruts, ~70 de marge). Le `system_id` n'est pas un secret : c'est l'identifiant de connexion, et le
   contrat le rend dans sa vue masquée.
 - **Deux cartes, pas une liste** : la liste du contrat est rangée par `type`. Une carte dont le type
   manque affiche « Aucun identifiant SMPP » (ou « Aucune clé API ») et le bouton « Créer ».

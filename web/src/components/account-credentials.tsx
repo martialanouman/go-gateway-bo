@@ -273,13 +273,9 @@ function CredentialCard({
       title={kind.title}
     >
       <dl className="facts">
-        <div>
-          <dt>Secret</dt>
-          <dd>masqué</dd>
-        </div>
         {credential.systemId === null ? null : (
           <div>
-            <dt>Identifiant de connexion</dt>
+            <dt>System ID</dt>
             <dd className="mono">{credential.systemId}</dd>
           </div>
         )}

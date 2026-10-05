@@ -211,15 +211,16 @@ describe('the credentials of an SMPP account', () => {
     await waitFor(() => expect(sentTo(fetch, 'GET', CREDENTIALS)).toHaveLength(2))
   })
 
-  it('keeps every credential masked, with nothing to reveal', async () => {
+  it('names the System ID, and shows nothing of the secret, not even a placeholder', async () => {
     const user = userEvent.setup()
     open({ credentials: [SMPP, API_KEY] })
 
     await openCredentials(user)
     await screen.findByText('acme01')
 
+    expect(within(card('Identifiant SMPP')).getByText('System ID')).toBeVisible()
     for (const name of ['Identifiant SMPP', 'Clé API']) {
-      expect(within(card(name)).getByText('masqué')).toBeVisible()
+      expect(card(name)).not.toHaveTextContent(/secret|masqué/i)
       expect(
         within(card(name)).queryByRole('button', { name: /révéler|afficher|voir/i }),
       ).toBeNull()
