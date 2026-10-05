@@ -667,6 +667,39 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(page.locator('.ui-banner')).toContainText('1 bind ouvert / limite 0')
   await expect(page.locator('.ui-banner')).toContainText('aucun bind ouvert n’est coupé')
 
+  // step-066 : un identifiant SMPP créé, son mot de passe montré une fois, puis une rotation avec
+  // grâce, qui ne coupe rien, et une révocation, qui chiffre le bind ouvert qu'elle coupera.
+  await page.getByRole('tab', { name: 'Identifiants' }).click()
+  await page.getByRole('button', { name: 'Créer l’identifiant SMPP' }).click()
+  const nouvelIdentifiant = page.getByRole('dialog', { name: 'Nouvel identifiant SMPP' })
+  await nouvelIdentifiant.getByRole('button', { name: 'Générer un System ID' }).click()
+  const systemId = await nouvelIdentifiant.getByLabel('System ID', { exact: true }).inputValue()
+  expect(systemId).toMatch(/^comptede-[a-z0-9]{6}$/)
+  await nouvelIdentifiant.getByRole('button', { name: 'Créer' }).click()
+  const secretDeBindMontre = page.getByRole('dialog', {
+    name: 'Mot de passe de l’identifiant SMPP',
+  })
+  const secretDeBind = (await secretDeBindMontre.locator('.mono').textContent()) ?? ''
+  expect(secretDeBind).toMatch(/^[\w-]{8}$/)
+  await secretDeBindMontre.getByRole('button', { name: 'J’ai copié le secret' }).click()
+  const carteSmpp = page.getByRole('region', { name: 'Identifiant SMPP' })
+  await expect(carteSmpp).toContainText(systemId)
+  await expect(page.locator('body')).not.toContainText(secretDeBind)
+  await carteSmpp.getByRole('button', { name: 'Faire tourner l’identifiant SMPP' }).click()
+  const rotation = page.getByRole('dialog', { name: 'Faire tourner l’identifiant SMPP ?' })
+  await expect(rotation).toContainText('Aucun bind ouvert ne sera coupé.')
+  await rotation.getByRole('button', { name: 'Faire tourner' }).click()
+  await page
+    .getByRole('dialog', { name: 'Mot de passe de l’identifiant SMPP' })
+    .getByRole('button', { name: 'J’ai copié le secret' })
+    .click()
+  await expect(carteSmpp).toContainText('Ancien secret accepté jusqu’au')
+  await carteSmpp.getByRole('button', { name: 'Révoquer l’identifiant SMPP' }).click()
+  const revocation = page.getByRole('dialog', { name: 'Révoquer l’identifiant SMPP ?' })
+  await expect(revocation).toContainText('Le bind ouvert de ce compte sera coupé.')
+  await revocation.getByRole('button', { name: 'Révoquer' }).click()
+  await expect(carteSmpp).toContainText('Révoqué')
+
   // step-068 : le fil d'Ariane de la barre supérieure ramène au client du compte.
   await page
     .getByRole('banner')

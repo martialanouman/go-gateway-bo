@@ -133,7 +133,7 @@ func (a API) UpdateWebhook(ctx context.Context, request UpdateWebhookRequestObje
 		return nil, err
 	}
 
-	accountID, webhookID, known := parseWebhookPath(request.AccountId, request.WebhookId)
+	accountID, webhookID, known := parseAccountItemPath(request.AccountId, request.WebhookId)
 	if !known {
 		return UpdateWebhook404JSONResponse{WebhookInconnuJSONResponse(unknownWebhook())}, nil
 	}
@@ -199,7 +199,7 @@ func (a API) RotateWebhookSecret(ctx context.Context, request RotateWebhookSecre
 		return nil, err
 	}
 
-	accountID, webhookID, known := parseWebhookPath(request.AccountId, request.WebhookId)
+	accountID, webhookID, known := parseAccountItemPath(request.AccountId, request.WebhookId)
 	if !known {
 		return RotateWebhookSecret404JSONResponse{WebhookInconnuJSONResponse(unknownWebhook())}, nil
 	}
@@ -258,7 +258,7 @@ func (a API) DeleteWebhook(ctx context.Context, request DeleteWebhookRequestObje
 		return nil, err
 	}
 
-	accountID, webhookID, known := parseWebhookPath(request.AccountId, request.WebhookId)
+	accountID, webhookID, known := parseAccountItemPath(request.AccountId, request.WebhookId)
 	if !known {
 		return DeleteWebhook404JSONResponse{WebhookInconnuJSONResponse(unknownWebhook())}, nil
 	}
@@ -320,11 +320,11 @@ func newWebhookSecret() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(secret), nil
 }
 
-func parseWebhookPath(rawAccount, rawWebhook string) (gateway.Id, gateway.Id, bool) {
+func parseAccountItemPath(rawAccount, rawItem string) (gateway.Id, gateway.Id, bool) {
 	accountID, accountKnown := parseID(rawAccount)
-	webhookID, webhookKnown := parseID(rawWebhook)
+	itemID, itemKnown := parseID(rawItem)
 
-	return accountID, webhookID, accountKnown && webhookKnown
+	return accountID, itemID, accountKnown && itemKnown
 }
 
 func webhookDTO(webhook gateway.Webhook) Webhook {

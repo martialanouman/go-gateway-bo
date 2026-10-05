@@ -37,6 +37,15 @@ export const AccountSmppOps = z.object({
   querySmEnabled: z.boolean(),
 })
 
+export const CredentialCreation = z.object({
+  systemId: z.string().min(1).max(15).optional(),
+  type: z.enum(['smpp_bind', 'api_key']),
+})
+
+export const CredentialRotation = z.object({
+  gracePeriodSec: z.number().int().min(0).max(604800).optional(),
+})
+
 export const CustomerCreation = z.object({
   groupId: z.string().optional(),
   name: z.string().min(1),

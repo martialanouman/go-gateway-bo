@@ -160,6 +160,18 @@ describe('a button forbidden by a reason', () => {
     expect(button).toHaveAccessibleDescription('Le compte de la session ne se désactive pas ici.')
   })
 
+  it('keeps the accessible name its caller gives it', () => {
+    render(
+      <Button aria-label="Révoquer la clé API" blockedReason="Révoquer demande credentials:write.">
+        Révoquer
+      </Button>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Révoquer la clé API' })).toHaveAccessibleDescription(
+      'Révoquer demande credentials:write.',
+    )
+  })
+
   it('shows its reason in a tooltip on keyboard focus, without triggering anything on click', async () => {
     const user = userEvent.setup()
     const onClick = vi.fn()

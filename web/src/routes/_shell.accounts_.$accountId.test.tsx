@@ -123,19 +123,6 @@ describe('the account screen', () => {
     expect(fetch.mock.calls.some(([request]) => (request as Request).method === 'PUT')).toBe(false)
   })
 
-  it('names what is not delivered yet in the credentials tab', async () => {
-    const user = userEvent.setup()
-    open()
-
-    await user.click(await screen.findByRole('tab', { name: 'Identifiants' }))
-    expect(
-      await screen.findByRole('heading', { name: 'Les identifiants ne sont pas encore livrés' }),
-    ).toBeVisible()
-    expect(screen.getByRole('tabpanel')).toHaveTextContent(
-      'Tant qu’ils n’existent pas, ce compte ne peut pas se lier.',
-    )
-  })
-
   it('shows a new webhook secret once, and never again once the dialog is closed', async () => {
     const user = userEvent.setup()
     const { queryClient } = open()

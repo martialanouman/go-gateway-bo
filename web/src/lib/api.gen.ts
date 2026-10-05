@@ -1029,6 +1029,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{accountId}/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Les identifiants d'un compte, masqués
+         * @description Relayée vers `list-credentials`. Aucun secret n'est rendu, ni aucun fragment de secret.
+         */
+        get: operations["listCredentials"];
+        put?: never;
+        /**
+         * Crée l'identifiant SMPP ou la clé API d'un compte
+         * @description Relayée vers `create-credential`. La passerelle engendre le secret ; le BFF le rend dans cette
+         *     réponse seulement, sans le conserver ni le journaliser (invariant b).
+         */
+        post: operations["createCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{accountId}/credentials/{credentialId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+                credentialId: components["parameters"]["CredentialId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Révoque un identifiant
+         * @description Relayée vers `revoke-credential`. La ligne est conservée au statut `revoked` ; la révocation d'un
+         *     identifiant SMPP coupe les binds ouverts du compte. Une rotation le réactive.
+         */
+        delete: operations["revokeCredential"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{accountId}/credentials/{credentialId}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+                credentialId: components["parameters"]["CredentialId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fait tourner un identifiant, avec une fenêtre de grâce facultative
+         * @description Relayée vers `rotate-credential`. Sans grâce, l'ancien secret est refusé aussitôt et la rotation
+         *     d'un identifiant SMPP coupe ses binds ouverts. Un identifiant révoqué redevient actif, sans grâce
+         *     possible. Le nouveau secret n'est rendu que dans cette réponse (invariant b).
+         */
+        post: operations["rotateCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1535,6 +1611,35 @@ export interface components {
             /** @enum {string} */
             status?: "active" | "disabled";
         };
+        /** @enum {string} */
+        CredentialType: "smpp_bind" | "api_key";
+        /** @description Masqué, toujours ; seul `CredentialSecret` porte le secret, une fois. */
+        Credential: {
+            id: string;
+            type: components["schemas"]["CredentialType"];
+            systemId: string | null;
+            /** @enum {string} */
+            status: "active" | "disabled" | "revoked";
+            /** Format: date-time */
+            lastUsedAt: string | null;
+            /** Format: date-time */
+            graceExpiresAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            rotatedAt: string | null;
+        };
+        CredentialSecret: {
+            credential: components["schemas"]["Credential"];
+            secret: string;
+        };
+        CredentialCreation: {
+            type: components["schemas"]["CredentialType"];
+            systemId?: string;
+        };
+        CredentialRotation: {
+            gracePeriodSec?: number;
+        };
         AccountPage: {
             items: components["schemas"]["SmppAccount"][];
             nextCursor?: string;
@@ -1639,6 +1744,37 @@ export interface components {
          *     `eventType`.
          */
         TypeDeWebhookPris: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Cet identifiant n'existe pas sur ce compte. */
+        IdentifiantInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
+         * @description Ce compte a déjà un identifiant de ce type, actif ou révoqué, ou ce `system_id` est pris par un
+         *     autre compte : la passerelle ne distingue pas les deux. `errors[]` place le refus sous `type`
+         *     pour une clé API, sous `systemId` pour un identifiant SMPP.
+         */
+        TypeDIdentifiantPris: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description L'identifiant révoqué ne peut pas revivre : un autre compte a pris son `system_id` depuis. */
+        SystemIdRepris: {
             headers: {
                 [name: string]: unknown;
             };
@@ -1789,6 +1925,7 @@ export interface components {
         SenderIdParam: string;
         AccountId: string;
         WebhookId: string;
+        CredentialId: string;
     };
     requestBodies: never;
     headers: never;
@@ -3750,6 +3887,129 @@ export interface operations {
             401: components["responses"]["SessionAbsente"];
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["WebhookInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    listCredentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les identifiants du compte, au plus un par type. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Credential"][];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    createCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CredentialCreation"];
+            };
+        };
+        responses: {
+            /** @description L'identifiant créé, et son secret, montré cette fois seulement. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialSecret"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
+            409: components["responses"]["TypeDIdentifiantPris"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    revokeCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+                credentialId: components["parameters"]["CredentialId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description L'identifiant est révoqué. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["IdentifiantInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    rotateCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+                credentialId: components["parameters"]["CredentialId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CredentialRotation"];
+            };
+        };
+        responses: {
+            /** @description L'identifiant, et son nouveau secret, montré cette fois seulement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialSecret"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["IdentifiantInconnu"];
+            409: components["responses"]["SystemIdRepris"];
             415: components["responses"]["TypeDeContenuRefuse"];
             422: components["responses"]["RefusDeLaPasserelle"];
             503: components["responses"]["PasserelleIndisponible"];

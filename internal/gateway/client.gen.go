@@ -3595,9 +3595,12 @@ type SenderId struct {
 	CreatedAt  time.Time           `json:"created_at"`
 	CreatedBy  *openapi_types.UUID `json:"created_by,omitempty"`
 	CustomerId openapi_types.UUID  `json:"customer_id"`
-	Id         openapi_types.UUID  `json:"id"`
-	Status     SenderIdStatus      `json:"status"`
-	UpdatedAt  time.Time           `json:"updated_at"`
+
+	// FirstUsedAt When a message from this sender ID was submitted to a carrier SMSC, approximately the first one; null if never. Set asynchronously, so it may lag the first send by a few seconds. Once set, the sender ID can no longer be deleted (409), only disabled.
+	FirstUsedAt *time.Time         `json:"first_used_at,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	Status      SenderIdStatus     `json:"status"`
+	UpdatedAt   time.Time          `json:"updated_at"`
 }
 
 // SenderIdStatus defines model for SenderId.Status.
@@ -5538,14 +5541,16 @@ type ClientInterface interface {
 	// Corresponds with POST /admin/smpp-accounts/{id}/credentials (the `CreateCredential` operationId).
 	CreateCredential(ctx context.Context, id Id, body CreateCredentialJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// RevokeCredential Revoke a credential (force-unbinds live sessions)
+	// RevokeCredential Revoke a credential (an smpp_bind force-unbinds live sessions)
 	//
-	// The credential row is retained with status=revoked; re-creating this type on the account conflicts (409). Use rotate to issue a new secret.
+	// The credential row is retained with status=revoked; re-creating this type on the account conflicts (409). Use rotate to issue a new secret. Revoking an smpp_bind force-unbinds the account's live sessions; revoking an api_key closes none.
 	//
 	// Corresponds with DELETE /admin/smpp-accounts/{id}/credentials/{credId} (the `RevokeCredential` operationId).
 	RevokeCredential(ctx context.Context, id Id, credId CredId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCredentialStatusWithBody Update a credential (status only)
+	//
+	// Disabling or revoking an smpp_bind force-unbinds the account's live sessions; an api_key closes none, since REST calls are stateless. A revoked credential can only stay revoked (422 on status), since leaving revoked would revive its old secret; rotate brings it back with a new one.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -5554,6 +5559,8 @@ type ClientInterface interface {
 
 	// UpdateCredentialStatus Update a credential (status only)
 	//
+	// Disabling or revoking an smpp_bind force-unbinds the account's live sessions; an api_key closes none, since REST calls are stateless. A revoked credential can only stay revoked (422 on status), since leaving revoked would revive its old secret; rotate brings it back with a new one.
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /admin/smpp-accounts/{id}/credentials/{credId} (the `UpdateCredentialStatus` operationId).
@@ -5561,12 +5568,16 @@ type ClientInterface interface {
 
 	// RotateCredentialWithBody Rotate a credential (manual; optional grace window)
 	//
+	// Without a grace window (grace_period_sec absent, null or 0) the cutover is immediate, and rotating an smpp_bind force-unbinds the account's live sessions, as for a leaked secret. With a grace window nothing is closed. An api_key rotation closes nothing. Rotating a revoked credential re-activates it with the new secret only: a grace window is refused (422 on grace_period_sec), and an smpp_bind whose system_id another account has since taken conflicts (409). A disabled credential stays disabled.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /admin/smpp-accounts/{id}/credentials/{credId}/rotate (the `RotateCredential` operationId).
 	RotateCredentialWithBody(ctx context.Context, id Id, credId CredId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RotateCredential Rotate a credential (manual; optional grace window)
+	//
+	// Without a grace window (grace_period_sec absent, null or 0) the cutover is immediate, and rotating an smpp_bind force-unbinds the account's live sessions, as for a leaked secret. With a grace window nothing is closed. An api_key rotation closes nothing. Rotating a revoked credential re-activates it with the new secret only: a grace window is refused (422 on grace_period_sec), and an smpp_bind whose system_id another account has since taken conflicts (409). A disabled credential stays disabled.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -8446,9 +8457,9 @@ func (c *Client) CreateCredential(ctx context.Context, id Id, body CreateCredent
 	return c.Client.Do(req)
 }
 
-// RevokeCredential Revoke a credential (force-unbinds live sessions)
+// RevokeCredential Revoke a credential (an smpp_bind force-unbinds live sessions)
 //
-// The credential row is retained with status=revoked; re-creating this type on the account conflicts (409). Use rotate to issue a new secret.
+// The credential row is retained with status=revoked; re-creating this type on the account conflicts (409). Use rotate to issue a new secret. Revoking an smpp_bind force-unbinds the account's live sessions; revoking an api_key closes none.
 //
 // Corresponds with DELETE /admin/smpp-accounts/{id}/credentials/{credId} (the `RevokeCredential` operationId).
 func (c *Client) RevokeCredential(ctx context.Context, id Id, credId CredId, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8464,6 +8475,8 @@ func (c *Client) RevokeCredential(ctx context.Context, id Id, credId CredId, req
 }
 
 // UpdateCredentialStatusWithBody Update a credential (status only)
+//
+// Disabling or revoking an smpp_bind force-unbinds the account's live sessions; an api_key closes none, since REST calls are stateless. A revoked credential can only stay revoked (422 on status), since leaving revoked would revive its old secret; rotate brings it back with a new one.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8482,6 +8495,8 @@ func (c *Client) UpdateCredentialStatusWithBody(ctx context.Context, id Id, cred
 
 // UpdateCredentialStatus Update a credential (status only)
 //
+// Disabling or revoking an smpp_bind force-unbinds the account's live sessions; an api_key closes none, since REST calls are stateless. A revoked credential can only stay revoked (422 on status), since leaving revoked would revive its old secret; rotate brings it back with a new one.
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PATCH /admin/smpp-accounts/{id}/credentials/{credId} (the `UpdateCredentialStatus` operationId).
@@ -8499,6 +8514,8 @@ func (c *Client) UpdateCredentialStatus(ctx context.Context, id Id, credId CredI
 
 // RotateCredentialWithBody Rotate a credential (manual; optional grace window)
 //
+// Without a grace window (grace_period_sec absent, null or 0) the cutover is immediate, and rotating an smpp_bind force-unbinds the account's live sessions, as for a leaked secret. With a grace window nothing is closed. An api_key rotation closes nothing. Rotating a revoked credential re-activates it with the new secret only: a grace window is refused (422 on grace_period_sec), and an smpp_bind whose system_id another account has since taken conflicts (409). A disabled credential stays disabled.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /admin/smpp-accounts/{id}/credentials/{credId}/rotate (the `RotateCredential` operationId).
@@ -8515,6 +8532,8 @@ func (c *Client) RotateCredentialWithBody(ctx context.Context, id Id, credId Cre
 }
 
 // RotateCredential Rotate a credential (manual; optional grace window)
+//
+// Without a grace window (grace_period_sec absent, null or 0) the cutover is immediate, and rotating an smpp_bind force-unbinds the account's live sessions, as for a leaked secret. With a grace window nothing is closed. An api_key rotation closes nothing. Rotating a revoked credential re-activates it with the new secret only: a grace window is refused (422 on grace_period_sec), and an smpp_bind whose system_id another account has since taken conflicts (409). A disabled credential stays disabled.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16125,9 +16144,9 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /admin/smpp-accounts/{id}/credentials (the `CreateCredential` operationId).
 	CreateCredentialWithResponse(ctx context.Context, id Id, body CreateCredentialJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCredentialResponse, error)
 
-	// RevokeCredentialWithResponse Revoke a credential (force-unbinds live sessions)
+	// RevokeCredentialWithResponse Revoke a credential (an smpp_bind force-unbinds live sessions)
 	//
-	// The credential row is retained with status=revoked; re-creating this type on the account conflicts (409). Use rotate to issue a new secret.
+	// The credential row is retained with status=revoked; re-creating this type on the account conflicts (409). Use rotate to issue a new secret. Revoking an smpp_bind force-unbinds the account's live sessions; revoking an api_key closes none.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16136,12 +16155,16 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateCredentialStatusWithBodyWithResponse Update a credential (status only)
 	//
+	// Disabling or revoking an smpp_bind force-unbinds the account's live sessions; an api_key closes none, since REST calls are stateless. A revoked credential can only stay revoked (422 on status), since leaving revoked would revive its old secret; rotate brings it back with a new one.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/smpp-accounts/{id}/credentials/{credId} (the `UpdateCredentialStatus` operationId).
 	UpdateCredentialStatusWithBodyWithResponse(ctx context.Context, id Id, credId CredId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCredentialStatusResponse, error)
 
 	// UpdateCredentialStatusWithResponse Update a credential (status only)
+	//
+	// Disabling or revoking an smpp_bind force-unbinds the account's live sessions; an api_key closes none, since REST calls are stateless. A revoked credential can only stay revoked (422 on status), since leaving revoked would revive its old secret; rotate brings it back with a new one.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16150,12 +16173,16 @@ type ClientWithResponsesInterface interface {
 
 	// RotateCredentialWithBodyWithResponse Rotate a credential (manual; optional grace window)
 	//
+	// Without a grace window (grace_period_sec absent, null or 0) the cutover is immediate, and rotating an smpp_bind force-unbinds the account's live sessions, as for a leaked secret. With a grace window nothing is closed. An api_key rotation closes nothing. Rotating a revoked credential re-activates it with the new secret only: a grace window is refused (422 on grace_period_sec), and an smpp_bind whose system_id another account has since taken conflicts (409). A disabled credential stays disabled.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /admin/smpp-accounts/{id}/credentials/{credId}/rotate (the `RotateCredential` operationId).
 	RotateCredentialWithBodyWithResponse(ctx context.Context, id Id, credId CredId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RotateCredentialResponse, error)
 
 	// RotateCredentialWithResponse Rotate a credential (manual; optional grace window)
+	//
+	// Without a grace window (grace_period_sec absent, null or 0) the cutover is immediate, and rotating an smpp_bind force-unbinds the account's live sessions, as for a leaked secret. With a grace window nothing is closed. An api_key rotation closes nothing. Rotating a revoked credential re-activates it with the new secret only: a grace window is refused (422 on grace_period_sec), and an smpp_bind whose system_id another account has since taken conflicts (409). A disabled credential stays disabled.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -19283,6 +19310,8 @@ type DeleteSenderIdResponse struct {
 	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *ValidationError
 }
@@ -19300,6 +19329,11 @@ func (r DeleteSenderIdResponse) GetJSON403() *Forbidden {
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r DeleteSenderIdResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r DeleteSenderIdResponse) GetJSON409() *Conflict {
+	return r.JSON409
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -23808,6 +23842,8 @@ type RotateCredentialResponse struct {
 	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *NotFound
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Conflict
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *ValidationError
 }
@@ -23830,6 +23866,11 @@ func (r RotateCredentialResponse) GetJSON403() *Forbidden {
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r RotateCredentialResponse) GetJSON404() *NotFound {
 	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r RotateCredentialResponse) GetJSON409() *Conflict {
+	return r.JSON409
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -27117,9 +27158,9 @@ func (c *ClientWithResponses) CreateCredentialWithResponse(ctx context.Context, 
 	return ParseCreateCredentialResponse(rsp)
 }
 
-// RevokeCredentialWithResponse Revoke a credential (force-unbinds live sessions)
+// RevokeCredentialWithResponse Revoke a credential (an smpp_bind force-unbinds live sessions)
 //
-// The credential row is retained with status=revoked; re-creating this type on the account conflicts (409). Use rotate to issue a new secret.
+// The credential row is retained with status=revoked; re-creating this type on the account conflicts (409). Use rotate to issue a new secret. Revoking an smpp_bind force-unbinds the account's live sessions; revoking an api_key closes none.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27134,6 +27175,8 @@ func (c *ClientWithResponses) RevokeCredentialWithResponse(ctx context.Context, 
 
 // UpdateCredentialStatusWithBodyWithResponse Update a credential (status only)
 //
+// Disabling or revoking an smpp_bind force-unbinds the account's live sessions; an api_key closes none, since REST calls are stateless. A revoked credential can only stay revoked (422 on status), since leaving revoked would revive its old secret; rotate brings it back with a new one.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /admin/smpp-accounts/{id}/credentials/{credId} (the `UpdateCredentialStatus` operationId).
@@ -27146,6 +27189,8 @@ func (c *ClientWithResponses) UpdateCredentialStatusWithBodyWithResponse(ctx con
 }
 
 // UpdateCredentialStatusWithResponse Update a credential (status only)
+//
+// Disabling or revoking an smpp_bind force-unbinds the account's live sessions; an api_key closes none, since REST calls are stateless. A revoked credential can only stay revoked (422 on status), since leaving revoked would revive its old secret; rotate brings it back with a new one.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27160,6 +27205,8 @@ func (c *ClientWithResponses) UpdateCredentialStatusWithResponse(ctx context.Con
 
 // RotateCredentialWithBodyWithResponse Rotate a credential (manual; optional grace window)
 //
+// Without a grace window (grace_period_sec absent, null or 0) the cutover is immediate, and rotating an smpp_bind force-unbinds the account's live sessions, as for a leaked secret. With a grace window nothing is closed. An api_key rotation closes nothing. Rotating a revoked credential re-activates it with the new secret only: a grace window is refused (422 on grace_period_sec), and an smpp_bind whose system_id another account has since taken conflicts (409). A disabled credential stays disabled.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /admin/smpp-accounts/{id}/credentials/{credId}/rotate (the `RotateCredential` operationId).
@@ -27172,6 +27219,8 @@ func (c *ClientWithResponses) RotateCredentialWithBodyWithResponse(ctx context.C
 }
 
 // RotateCredentialWithResponse Rotate a credential (manual; optional grace window)
+//
+// Without a grace window (grace_period_sec absent, null or 0) the cutover is immediate, and rotating an smpp_bind force-unbinds the account's live sessions, as for a leaked secret. With a grace window nothing is closed. An api_key rotation closes nothing. Rotating a revoked credential re-activates it with the new secret only: a grace window is refused (422 on grace_period_sec), and an smpp_bind whose system_id another account has since taken conflicts (409). A disabled credential stays disabled.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29833,6 +29882,13 @@ func ParseDeleteSenderIdResponse(rsp *http.Response) (*DeleteSenderIdResponse, e
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError
@@ -33311,6 +33367,13 @@ func ParseRotateCredentialResponse(rsp *http.Response) (*RotateCredentialRespons
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError

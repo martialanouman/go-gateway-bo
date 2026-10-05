@@ -693,10 +693,10 @@ Section « Facturation », visible aux détenteurs d'une permission `billing:*`,
 Écran rattaché à la page du compte SMPP (`credentials:*`).
 
 - **Exactement deux identifiants** : deux cartes fixes « Identifiant SMPP » et « Clé API » (contrainte de schéma côté passerelle), pas une liste extensible.
-- **Toujours masqué** (type, 4 derniers caractères, statut, dernière utilisation, état de rotation) ; aucune action « révéler ».
+- **Toujours masqué** (type, `system_id` du bind, statut, dernière utilisation, état de rotation) ; aucune action « révéler ». *(Amendement 04/10/2026, step-066 : aucun fragment du secret n'est affiché — la passerelle n'en garde qu'une empreinte et le contrat ne porte pas de « 4 derniers caractères ».)*
 - **Création** : secret affiché une seule fois dans une modale non réaffichable.
-- **Rotation manuelle** uniquement (`credentials:rotate`), avec fenêtre de grâce mise en avant et avertissement (une rotation sans grâce coupe les binds vivants du client).
-- **Révocation** avec indication du nombre de sessions vivantes déconnectées ; **diagnostic d'échec de bind** (échecs d'auth récents).
+- **Rotation manuelle** uniquement (`credentials:rotate`), avec fenêtre de grâce mise en avant et avertissement (une rotation sans grâce coupe les binds vivants du client ; une clé API n'a pas de bind). La rotation d'un identifiant révoqué le réactive, sans grâce possible.
+- **Révocation** avec indication du nombre de sessions vivantes déconnectées (bind SMPP seulement ; révoquer la clé API ne coupe aucun bind). **Diagnostic d'échec de bind** (échecs d'auth récents) : step-069, attend le contrat.
 
 ### 6.15 UI de groupes de clients (admin, organisationnel)
 

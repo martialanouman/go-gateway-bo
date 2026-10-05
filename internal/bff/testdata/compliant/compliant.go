@@ -286,3 +286,23 @@ func (API) DeleteWebhook(_ context.Context, _ bff.DeleteWebhookRequestObject,
 ) (bff.DeleteWebhookResponseObject, error) {
 	return bff.DeleteWebhook204Response{}, nil
 }
+
+func (API) ListCredentials(_ context.Context, _ bff.ListCredentialsRequestObject,
+) (bff.ListCredentialsResponseObject, error) {
+	return bff.ListCredentials200JSONResponse{}, nil
+}
+
+func (API) CreateCredential(_ context.Context, _ bff.CreateCredentialRequestObject,
+) (bff.CreateCredentialResponseObject, error) {
+	return bff.CreateCredential201JSONResponse{}, nil
+}
+
+func (API) RevokeCredential(_ context.Context, _ bff.RevokeCredentialRequestObject,
+) (bff.RevokeCredentialResponseObject, error) {
+	return bff.RevokeCredential204Response{}, nil
+}
+
+func (API) RotateCredential(_ context.Context, _ bff.RotateCredentialRequestObject,
+) (bff.RotateCredentialResponseObject, error) {
+	return bff.RotateCredential200JSONResponse{}, nil
+}

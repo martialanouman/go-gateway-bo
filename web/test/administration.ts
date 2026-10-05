@@ -10,6 +10,7 @@ type SenderId = components['schemas']['SenderId']
 type Account = components['schemas']['SmppAccount']
 type Webhook = components['schemas']['Webhook']
 type AccountSession = components['schemas']['AccountSession']
+type Credential = components['schemas']['Credential']
 
 /** L'opérateur de la session, tel que `stubSession` le rend dans `GET /auth/me`. */
 export const SELF_ID = '01960000-0000-7000-8000-000000000001'
@@ -97,6 +98,9 @@ export const OTP_ACCOUNT: Account = {
 /** Le secret que le faux BFF rend à la création et à la rotation d'un webhook. */
 export const WEBHOOK_SECRET = 'c2VjcmV0LWRlLXRlc3QtcXVpLW5lLXNlcnQtcXUnaWNp'
 
+/** Le secret que le faux BFF rend à la création et à la rotation d'un identifiant. */
+export const CREDENTIAL_SECRET = 'sgw_c2VjcmV0LWQtaWRlbnRpZmlhbnQtZGUtdGVzdA'
+
 type Reply = { readonly status: number; readonly body?: unknown }
 
 /** Un refus que le test veut voir rendu, route par route. */
@@ -119,6 +123,7 @@ export function stubAdministration(
     senders?: SenderId[]
     accounts?: Account[]
     webhooks?: Webhook[]
+    credentials?: Credential[]
     /** Les binds ouverts de chaque compte servi, tous comptes confondus. */
     sessions?: AccountSession[]
     /** Ce que la passerelle compte, qui peut dépasser la liste (`list-account-sessions`). */
@@ -134,6 +139,7 @@ export function stubAdministration(
   let senders = [...(initial.senders ?? [])]
   let accounts = [...(initial.accounts ?? [])]
   let webhooks = [...(initial.webhooks ?? [])]
+  let credentials = [...(initial.credentials ?? [])]
   const sessions = initial.sessions ?? []
   const activeBinds = initial.activeBinds ?? sessions.length
   const customerPageSize = initial.customerPageSize ?? 50
@@ -146,7 +152,8 @@ export function stubAdministration(
 
     const [, , collection, id, detail, detailId, detailAction] = pathname.split('/')
     // `POST /operators/{id}/access-link` n'a pas de corps ; `request.json()` sur un flux vide lève.
-    const raw = request.method === 'GET' || request.method === 'DELETE' ? '' : await request.text()
+    const raw =
+      request.method === 'GET' || request.method === 'DELETE' ? '' : await request.clone().text()
     const body = raw ? JSON.parse(raw) : undefined
 
     if (collection === 'operators') {
@@ -242,6 +249,46 @@ export function stubAdministration(
           return new Response(null, { status: 204 })
         }
         return Response.json(webhooks)
+      }
+      if (detail === 'credentials') {
+        if (request.method === 'POST' && detailId === undefined) {
+          const created: Credential = {
+            id: `credential-${credentials.length + 1}`,
+            type: body.type,
+            systemId: body.systemId ?? null,
+            status: 'active',
+            lastUsedAt: null,
+            graceExpiresAt: null,
+            createdAt: '2026-10-04T10:00:00Z',
+            rotatedAt: null,
+          }
+          credentials = [...credentials, created]
+          return Response.json({ credential: created, secret: CREDENTIAL_SECRET }, { status: 201 })
+        }
+        if (detailAction === 'rotate') {
+          const grace: number | undefined = body?.gracePeriodSec
+          credentials = credentials.map((candidate) =>
+            candidate.id === detailId
+              ? {
+                  ...candidate,
+                  status: 'active',
+                  rotatedAt: '2026-10-04T12:00:00Z',
+                  graceExpiresAt: grace
+                    ? new Date(Date.UTC(2026, 9, 4, 12) + grace * 1000).toISOString()
+                    : null,
+                }
+              : candidate,
+          )
+          const rotated = credentials.find((candidate) => candidate.id === detailId)
+          return Response.json({ credential: rotated, secret: CREDENTIAL_SECRET })
+        }
+        if (request.method === 'DELETE') {
+          credentials = credentials.map((candidate) =>
+            candidate.id === detailId ? { ...candidate, status: 'revoked' } : candidate,
+          )
+          return new Response(null, { status: 204 })
+        }
+        return Response.json(credentials)
       }
       if (detail === 'sessions') {
         return Response.json({ maxSessions: target.maxSessions, active: activeBinds, sessions })

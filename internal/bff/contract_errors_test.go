@@ -389,3 +389,23 @@ func (failingAPI) DeleteWebhook(_ context.Context, _ DeleteWebhookRequestObject,
 ) (DeleteWebhookResponseObject, error) {
 	return nil, errors.ErrUnsupported
 }
+
+func (failingAPI) ListCredentials(_ context.Context, _ ListCredentialsRequestObject,
+) (ListCredentialsResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) CreateCredential(_ context.Context, _ CreateCredentialRequestObject,
+) (CreateCredentialResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) RevokeCredential(_ context.Context, _ RevokeCredentialRequestObject,
+) (RevokeCredentialResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) RotateCredential(_ context.Context, _ RotateCredentialRequestObject,
+) (RotateCredentialResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}

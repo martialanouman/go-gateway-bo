@@ -245,3 +245,19 @@ func (API) RotateWebhookSecret(_ context.Context, _ bff.RotateWebhookSecretReque
 func (API) DeleteWebhook(_ context.Context, _ bff.DeleteWebhookRequestObject) (bff.DeleteWebhookResponseObject, error) {
 	return nil, nil
 }
+
+func (API) ListCredentials(_ context.Context, _ bff.ListCredentialsRequestObject) (bff.ListCredentialsResponseObject, error) {
+	return nil, nil
+}
+
+func (API) CreateCredential(_ context.Context, _ bff.CreateCredentialRequestObject) (bff.CreateCredentialResponseObject, error) {
+	return nil, nil
+}
+
+func (API) RevokeCredential(_ context.Context, _ bff.RevokeCredentialRequestObject) (bff.RevokeCredentialResponseObject, error) {
+	return nil, nil
+}
+
+func (API) RotateCredential(_ context.Context, _ bff.RotateCredentialRequestObject) (bff.RotateCredentialResponseObject, error) {
+	return nil, nil
+}

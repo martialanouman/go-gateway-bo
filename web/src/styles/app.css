@@ -431,8 +431,15 @@
   text-align: center;
 }
 
-.form p {
+.form p,
+.facts dd {
   margin: 0;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-7);
 }
 
 .row-actions {

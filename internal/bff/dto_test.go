@@ -418,3 +418,76 @@ func assertEmbedsOnlyGeneratedTypes(
 				"sans relecture", name, field.Name())
 	}
 }
+
+// secretResponses nomme les seules réponses qui peuvent porter un secret : chacune est un affichage
+// unique de l'invariant (b), à la création ou à la rotation. C'est une égalité et non une liste
+// d'interdits — `forbiddenFields` ne connaît que les secrets d'aujourd'hui, celle-ci rougit sur un
+// `secret` ajouté à n'importe quelle autre réponse.
+var secretResponses = []string{
+	"CreateCredential201JSONResponse", "RotateCredential200JSONResponse",
+	"CreateWebhook201JSONResponse", "RotateWebhookSecret200JSONResponse",
+	"EnrollTotp200JSONResponse",
+}
+
+func TestOnlyTheOneTimeDisplaysCarryASecret(t *testing.T) {
+	t.Parallel()
+
+	pkg := loadBFF(t)
+	scope := pkg.Types.Scope()
+	ifaces := responseInterfaces(scope)
+	require.NotEmpty(t, ifaces, "aucune interface %q : l'analyseur est cassé, pas vert", responseObjectSuffix)
+
+	carriers := map[string]bool{}
+	visited := map[types.Type]bool{}
+
+	for _, name := range scope.Names() {
+		declared, ok := scope.Lookup(name).(*types.TypeName)
+		if ok && implementsAny(declared.Type(), ifaces) {
+			collectSecretCarriers(declared.Type(), name, carriers, visited)
+		}
+	}
+
+	found := make([]string, 0, len(carriers))
+	for carrier := range carriers {
+		found = append(found, carrier)
+	}
+
+	assert.ElementsMatch(t, secretResponses, found,
+		"un secret ne sort que dans les affichages uniques de l'invariant (b) ; tout autre type qui en "+
+			"porte un le réafficherait")
+}
+
+func collectSecretCarriers(carrier types.Type, path string, carriers map[string]bool, visited map[types.Type]bool) {
+	if visited[carrier] {
+		return
+	}
+	visited[carrier] = true
+
+	if named, ok := types.Unalias(carrier).(*types.Named); ok {
+		path = named.Obj().Name()
+	}
+
+	switch shape := carrier.Underlying().(type) {
+	case *types.Struct:
+		for index := range shape.NumFields() {
+			field := shape.Field(index)
+			if !field.Exported() && !field.Embedded() {
+				continue
+			}
+
+			for _, name := range serializedNames(field, shape.Tag(index)) {
+				if strings.Contains(name, "secret") {
+					carriers[path] = true
+				}
+			}
+
+			collectSecretCarriers(field.Type(), path+"."+field.Name(), carriers, visited)
+		}
+	case *types.Pointer:
+		collectSecretCarriers(shape.Elem(), path, carriers, visited)
+	case *types.Slice:
+		collectSecretCarriers(shape.Elem(), path+"[]", carriers, visited)
+	case *types.Array:
+		collectSecretCarriers(shape.Elem(), path+"[]", carriers, visited)
+	}
+}

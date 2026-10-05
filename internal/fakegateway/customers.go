@@ -73,6 +73,7 @@ type Customers struct {
 	senders   []senderID
 	accounts  []account
 	webhooks  []webhook
+	creds     []credential
 }
 
 type webhook struct {
@@ -120,8 +121,8 @@ func (c *Customers) ServeAccounts(w http.ResponseWriter, r *http.Request) {
 	reply(w, http.StatusCreated, created)
 }
 
-// ServeAccount sert la fiche d'un compte : sa lecture, ses canaux, ses opérations SMPP et ses
-// webhooks.
+// ServeAccount sert la fiche d'un compte : sa lecture, ses canaux, ses opérations SMPP, ses
+// webhooks et ses identifiants.
 func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -136,6 +137,8 @@ func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch action := r.PathValue("action"); {
+	case r.PathValue("verb") != "" && action != "credentials":
+		http.NotFound(w, r)
 	case action == "" && r.Method == http.MethodGet:
 		reply(w, http.StatusOK, c.accounts[index])
 	case action == "channels" && r.Method == http.MethodPatch:
@@ -188,8 +191,10 @@ func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
 				ConnectedAt: c.accounts[index].CreatedAt,
 			}},
 		})
-	case action == "webhooks" && r.PathValue("webhookId") != "":
-		c.serveWebhook(w, r, id, r.PathValue("webhookId"))
+	case action == "webhooks" && r.PathValue("itemId") != "":
+		c.serveWebhook(w, r, id, r.PathValue("itemId"))
+	case action == "credentials":
+		c.serveCredentials(w, r, id)
 	case action == "webhooks" && r.Method == http.MethodGet:
 		reply(w, http.StatusOK, slices.DeleteFunc(append([]webhook{}, c.webhooks...), func(candidate webhook) bool {
 			return candidate.AccountID != id
