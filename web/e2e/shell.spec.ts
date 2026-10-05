@@ -672,8 +672,8 @@ test('the binary serves the painted shell, then the application replaces it', as
   await page.getByRole('tab', { name: 'Identifiants' }).click()
   await page.getByRole('button', { name: 'Créer l’identifiant SMPP' }).click()
   const nouvelIdentifiant = page.getByRole('dialog', { name: 'Nouvel identifiant SMPP' })
-  await nouvelIdentifiant.getByRole('button', { name: 'Générer un system_id' }).click()
-  const systemId = await nouvelIdentifiant.getByLabel(/system_id/).inputValue()
+  await nouvelIdentifiant.getByRole('button', { name: 'Générer un System ID' }).click()
+  const systemId = await nouvelIdentifiant.getByLabel('System ID', { exact: true }).inputValue()
   expect(systemId).toMatch(/^comptede-[a-z0-9]{6}$/)
   await nouvelIdentifiant.getByRole('button', { name: 'Créer' }).click()
   const secretDeBindMontre = page.getByRole('dialog', {

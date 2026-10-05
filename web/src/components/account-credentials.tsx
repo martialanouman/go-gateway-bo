@@ -387,14 +387,7 @@ function CreateSmppCredential({
       >
         <p>{KINDS.smpp_bind.creation} L’action est enregistrée dans le journal d’audit.</p>
         <Refusal error={placed === undefined ? create.error : null} />
-        <Field
-          error={form.formState.errors.systemId?.message ?? placed?.message}
-          label={
-            <>
-              Identifiant de connexion <span className="mono">system_id</span>
-            </>
-          }
-        >
+        <Field error={form.formState.errors.systemId?.message ?? placed?.message} label="System ID">
           <Input
             autoComplete="off"
             className="ui-input--mono"
@@ -409,7 +402,7 @@ function CreateSmppCredential({
           }
           size="sm"
         >
-          Générer un system_id
+          Générer un System ID
         </Button>
       </form>
     </Modal>

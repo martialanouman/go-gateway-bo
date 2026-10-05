@@ -143,8 +143,8 @@ describe('the credentials of an SMPP account', () => {
     await openCredentials(user)
     await user.click(await screen.findByRole('button', { name: 'Créer l’identifiant SMPP' }))
     const form = await screen.findByRole('dialog', { name: 'Nouvel identifiant SMPP' })
-    await user.click(within(form).getByRole('button', { name: 'Générer un system_id' }))
-    const generated = (within(form).getByRole('textbox', { name: /system_id/ }) as HTMLInputElement)
+    await user.click(within(form).getByRole('button', { name: 'Générer un System ID' }))
+    const generated = (within(form).getByRole('textbox', { name: 'System ID' }) as HTMLInputElement)
       .value
     await user.click(within(form).getByRole('button', { name: 'Créer' }))
 
@@ -183,7 +183,7 @@ describe('the credentials of an SMPP account', () => {
     await openCredentials(user)
     await user.click(await screen.findByRole('button', { name: 'Créer l’identifiant SMPP' }))
     const form = await screen.findByRole('dialog', { name: 'Nouvel identifiant SMPP' })
-    const systemId = within(form).getByRole('textbox', { name: /system_id/ })
+    const systemId = within(form).getByRole('textbox', { name: 'System ID' })
     await user.type(systemId, 'acme01')
     await user.click(within(form).getByRole('button', { name: 'Créer' }))
 
@@ -234,7 +234,7 @@ describe('the credentials of an SMPP account', () => {
     await openCredentials(user)
     await user.click(await screen.findByRole('button', { name: 'Créer l’identifiant SMPP' }))
     const form = await screen.findByRole('dialog', { name: 'Nouvel identifiant SMPP' })
-    await user.type(within(form).getByRole('textbox', { name: /system_id/ }), 'acme01')
+    await user.type(within(form).getByRole('textbox', { name: 'System ID' }), 'acme01')
     await user.click(within(form).getByRole('button', { name: 'Créer' }))
 
     const shown = await screen.findByRole('dialog', { name: 'Mot de passe de l’identifiant SMPP' })
