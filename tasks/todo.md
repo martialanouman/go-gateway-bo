@@ -259,7 +259,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [x] step-068 — Coquille et écrans livrés alignés sur la maquette du kit : titre et fil d'Ariane dans la barre supérieure, `Toolbar`, onglets pleine largeur, `Card`, tables denses  *(insérée le 04/10/2026)*
 - [x] step-065 — `max_sessions`, type de bind et binds ouverts (avertissement d'écart) ; le débit relève du sender ID, step-067
 - [x] step-066 — Identifiants : deux cartes masquées, secret une fois, rotation, révocation  *(invariant b)*
-- [ ] step-067 — Sender IDs : catégorie de trafic, limite de débit, filtre, signalements `category_mismatch` (§6.19)
+- [x] step-067 — Sender IDs : catégorie de trafic, limite de débit, filtre, signalements `category_mismatch` (§6.19)
 - [ ] step-069 — Diagnostic d'échec de bind : échecs d'authentification récents du compte (§6.14) — `list-account-bind-failures`, contrat 7.3.0  *(détaché de step-066 le 04/10/2026)*
 
 ## M4 — Exploitation temps réel : trafic, connecteurs, sessions  (§6.3, §6.5)

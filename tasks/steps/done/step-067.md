@@ -1,6 +1,6 @@
 # step-067 — Sender IDs : catégorie de trafic, limite de débit, filtre, signalements `category_mismatch`
 
-> **Jalon :** M3 (plan §8 ; spec §6.19, amendement v2.2) · **Statut :** EN COURS
+> **Jalon :** M3 (plan §8 ; spec §6.19, amendement v2.2) · **Statut :** FAIT
 > **Dépend de :** step-062 (liste des sender IDs de la fiche client), **contrat 7.3.0** · **Bloque :** —
 
 ## But
