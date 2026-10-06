@@ -92,15 +92,43 @@ Fonctionnalité: Les identifiants d'un compte SMPP
     Et le refus dit "Rechargez la fiche"
     Et la réponse ne porte pas "credential not found"
 
-  Scénario: sans credentials:read, la lecture des identifiants est refusée avant d'atteindre la passerelle
+  Plan du scénario: sans credentials:read, la lecture <objet> est refusée avant d'atteindre la passerelle
     Étant donné une passerelle qui compte les requêtes reçues
     Et un serveur démarré
     Et l'opérateur détient le rôle "Support"
     Et l'opérateur ouvre une session élevée
-    Quand le navigateur demande "/api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/credentials"
+    Quand le navigateur demande "<adresse>"
     Alors le serveur répond 403
     Et le refus nomme la permission "credentials:read"
     Et la passerelle n'a reçu aucune requête
+
+    Exemples:
+      | objet               | adresse                                                             |
+      | des identifiants    | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/credentials      |
+      | des binds refusés   | /api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/bind-failures    |
+
+  Scénario: un opérateur credentials:read lit les binds refusés à un compte
+    Étant donné une passerelle servie par le mock du contrat
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/bind-failures"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+
+  Scénario: un bind refusé garde la cause que le code lu par l'ESME confond
+    Étant donné une passerelle qui a refusé un bind "trx" de "10.4.19.7" en "ESME_RINVPASWD" pour la cause "throttled"
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/accounts/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e/bind-failures"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+    Et la réponse porte '"reason":"throttled"'
+    Et la réponse porte '"commandStatus":"ESME_RINVPASWD"'
+    Et la réponse porte '"remoteIp":"10.4.19.7"'
+    Et la réponse porte '"bindType":"trx"'
+    Et la réponse porte '"at":"2026-10-06T09:41:02Z"'
 
   Plan du scénario: sans credentials:write, <geste> est refusée avant d'atteindre la passerelle
     Étant donné une passerelle qui compte les requêtes reçues

@@ -714,6 +714,11 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(revocation).toContainText('Le bind ouvert de ce compte sera coupé.')
   await revocation.getByRole('button', { name: 'Révoquer' }).click()
   await expect(carteSmpp).toContainText('Révoqué')
+  // step-069 : le diagnostic nomme la cause que le code lu par l'ESME confond.
+  const diagnostic = page.getByRole('region', { name: 'Diagnostic d’échec de bind' })
+  const refus = diagnostic.getByRole('row', { name: /10\.4\.19\.7/ })
+  await expect(refus).toContainText('ESME_RINVPASWD')
+  await expect(refus).toContainText('Verrouillage anti-force brute')
 
   // step-068 : le fil d'Ariane de la barre supérieure ramène au client du compte.
   await page

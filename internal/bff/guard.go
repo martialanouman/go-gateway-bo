@@ -91,6 +91,7 @@ var authorization = map[string]rule{
 	"RotateWebhookSecret":         requires(permissions.AccountsWrite),
 	"DeleteWebhook":               requires(permissions.AccountsWrite),
 	"ListCredentials":             requires(permissions.CredentialsRead),
+	"ListAccountBindFailures":     requires(permissions.CredentialsRead),
 	"CreateCredential":            requires(permissions.CredentialsWrite),
 	"RevokeCredential":            requires(permissions.CredentialsWrite),
 	"RotateCredential":            requires(permissions.CredentialsRotate),

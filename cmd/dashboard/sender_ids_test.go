@@ -16,6 +16,11 @@ func (w *customerGroupsWorld) registerSenderIDSteps(ctx *godog.ScenarioContext) 
 	ctx.Then(`^la passerelle n'a reçu aucune écriture$`, w.receivedNoWrite)
 	ctx.Given(`^une passerelle dont le sender ID a déjà servi et compte (\d+) signalements$`, w.servingAUsedSender)
 	ctx.Then(`^la réponse porte '([^']*)'$`, w.responseCarries)
+	ctx.Given(`^une passerelle qui a refusé un bind "([^"]*)" de "([^"]*)" en "([^"]*)" pour la cause "([^"]*)"$`,
+		func(bindType, remoteIP, commandStatus, reason string) error {
+			return w.answering(http.StatusOK, fmt.Sprintf(`{"data":[{"at":"2026-10-06T09:41:02Z","remote_ip":%q,`+
+				`"bind_type":%q,"command_status":%q,"reason":%q}]}`, remoteIP, bindType, commandStatus, reason))
+		})
 }
 
 // servingASenderClassedAs sert la liste avant le PATCH, puis le sender ID reclassé : seule la liste

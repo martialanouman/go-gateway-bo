@@ -1060,6 +1060,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{accountId}/bind-failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Les binds refusés à un compte ces dernières 24 heures
+         * @description Relayée vers `list-account-bind-failures`, du plus récent au plus ancien. Seul un bind dont le
+         *     `system_id` désigne un identifiant du compte y figure ; la passerelle garde 24 heures et les 200
+         *     derniers refus au plus. Le secret présenté n'est jamais rendu.
+         */
+        get: operations["listAccountBindFailures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/accounts/{accountId}/credentials": {
         parameters: {
             query?: never;
@@ -1660,6 +1684,22 @@ export interface components {
         };
         /** @enum {string} */
         CredentialType: "smpp_bind" | "api_key";
+        /**
+         * @description `commandStatus` est ce que l'ESME a lu ; `reason` la cause réelle, que `ESME_RINVPASWD` confond
+         *     (mot de passe faux, identifiant révoqué, verrouillage anti-force brute). Les deux `enum` sont
+         *     ceux du contrat Admin 7.3.0, relayés sans être filtrés : une valeur que la passerelle ajouterait
+         *     sortirait telle quelle.
+         */
+        BindFailure: {
+            /** Format: date-time */
+            at: string;
+            remoteIp: string;
+            bindType: components["schemas"]["BindType"];
+            /** @enum {string} */
+            commandStatus: "ESME_RINVPASWD" | "ESME_RBINDFAIL" | "ESME_RSYSERR";
+            /** @enum {string} */
+            reason: "password_mismatch" | "credential_revoked" | "credential_disabled" | "account_inactive" | "smpp_channel_disabled" | "bind_type_not_allowed" | "max_sessions_exceeded" | "throttled" | "registry_unavailable";
+        };
         /** @description Masqué, toujours ; seul `CredentialSecret` porte le secret, une fois. */
         Credential: {
             id: string;
@@ -4006,6 +4046,33 @@ export interface operations {
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["WebhookInconnu"];
             415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    listAccountBindFailures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                accountId: components["parameters"]["AccountId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les refus récents. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BindFailure"][];
+                };
+            };
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["CompteInconnu"];
             422: components["responses"]["RefusDeLaPasserelle"];
             503: components["responses"]["PasserelleIndisponible"];
         };

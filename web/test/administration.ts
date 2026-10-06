@@ -11,6 +11,7 @@ type Account = components['schemas']['SmppAccount']
 type Webhook = components['schemas']['Webhook']
 type AccountSession = components['schemas']['AccountSession']
 type Credential = components['schemas']['Credential']
+type BindFailure = components['schemas']['BindFailure']
 
 /** L'opérateur de la session, tel que `stubSession` le rend dans `GET /auth/me`. */
 export const SELF_ID = '01960000-0000-7000-8000-000000000001'
@@ -142,6 +143,8 @@ export function stubAdministration(
     sessions?: AccountSession[]
     /** Ce que la passerelle compte, qui peut dépasser la liste (`list-account-sessions`). */
     activeBinds?: number
+    /** Les binds refusés de chaque compte servi, tous comptes confondus. */
+    bindFailures?: BindFailure[]
   } = {},
   replies: AdministrationReplies = {},
 ) {
@@ -303,6 +306,9 @@ export function stubAdministration(
           return new Response(null, { status: 204 })
         }
         return Response.json(credentials)
+      }
+      if (detail === 'bind-failures') {
+        return Response.json(initial.bindFailures ?? [])
       }
       if (detail === 'sessions') {
         return Response.json({ maxSessions: target.maxSessions, active: activeBinds, sessions })

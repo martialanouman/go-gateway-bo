@@ -400,6 +400,11 @@ func (failingAPI) DeleteWebhook(_ context.Context, _ DeleteWebhookRequestObject,
 	return nil, errors.ErrUnsupported
 }
 
+func (failingAPI) ListAccountBindFailures(_ context.Context, _ ListAccountBindFailuresRequestObject,
+) (ListAccountBindFailuresResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
 func (failingAPI) ListCredentials(_ context.Context, _ ListCredentialsRequestObject,
 ) (ListCredentialsResponseObject, error) {
 	return nil, errors.ErrUnsupported

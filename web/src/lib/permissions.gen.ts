@@ -176,7 +176,7 @@ export const PERMISSIONS: readonly Permission[] = [
     key: 'credentials:read',
     category: 'accounts',
     description:
-      'Voir la liste des identifiants d’un compte et leur état — jamais le secret, qui n’est plus réaffichable',
+      'Voir la liste des identifiants d’un compte et leur état, et les binds refusés au compte avec leur IP source et leur cause — jamais le secret, qui n’est plus réaffichable',
   },
   {
     key: 'credentials:write',

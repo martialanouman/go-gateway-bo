@@ -57,6 +57,14 @@ type account struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+type bindFailure struct {
+	At            time.Time `json:"at"`
+	RemoteIP      string    `json:"remote_ip"`
+	BindType      string    `json:"bind_type"`
+	CommandStatus string    `json:"command_status"`
+	Reason        string    `json:"reason"`
+}
+
 type liveBinds struct {
 	MaxSessions int        `json:"max_sessions"`
 	Active      int        `json:"active"`
@@ -199,6 +207,12 @@ func (c *Customers) ServeAccount(w http.ResponseWriter, r *http.Request) {
 				ConnectedAt: c.accounts[index].CreatedAt,
 			}},
 		})
+	// Un verrouillage permanent : la cause que `ESME_RINVPASWD` confond est ce que le parcours lit.
+	case action == "bind-failures" && r.Method == http.MethodGet:
+		reply(w, http.StatusOK, map[string][]bindFailure{"data": {{
+			At: c.accounts[index].CreatedAt, RemoteIP: "10.4.19.7", BindType: c.accounts[index].AllowedBindTypes,
+			CommandStatus: "ESME_RINVPASWD", Reason: "throttled",
+		}}})
 	case action == "webhooks" && r.PathValue("itemId") != "":
 		c.serveWebhook(w, r, id, r.PathValue("itemId"))
 	case action == "credentials":

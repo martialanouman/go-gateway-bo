@@ -696,7 +696,7 @@ Section « Facturation », visible aux détenteurs d'une permission `billing:*`,
 - **Toujours masqué** (type, `system_id` du bind, statut, dernière utilisation, état de rotation) ; aucune action « révéler ». *(Amendement 04/10/2026, step-066 : aucun fragment du secret n'est affiché — la passerelle n'en garde qu'une empreinte et le contrat ne porte pas de « 4 derniers caractères ».)*
 - **Création** : secret affiché une seule fois dans une modale non réaffichable.
 - **Rotation manuelle** uniquement (`credentials:rotate`), avec fenêtre de grâce mise en avant et avertissement (une rotation sans grâce coupe les binds vivants du client ; une clé API n'a pas de bind). La rotation d'un identifiant révoqué le réactive, sans grâce possible.
-- **Révocation** avec indication du nombre de sessions vivantes déconnectées (bind SMPP seulement ; révoquer la clé API ne coupe aucun bind). **Diagnostic d'échec de bind** (échecs d'auth récents) : step-069, attend le contrat.
+- **Révocation** avec indication du nombre de sessions vivantes déconnectées (bind SMPP seulement ; révoquer la clé API ne coupe aucun bind). **Diagnostic d’échec de bind** : les binds refusés au compte ces dernières 24 heures, avec la cause que `ESME_RINVPASWD` confond (mot de passe faux, identifiant révoqué, verrouillage anti-force brute) ; un bind sous un `system_id` inconnu n’est rattaché à aucun compte (step-069).
 
 ### 6.15 UI de groupes de clients (admin, organisationnel)
 
