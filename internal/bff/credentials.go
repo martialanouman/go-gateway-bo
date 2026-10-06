@@ -14,6 +14,7 @@ const (
 	operationCreateCredential = "create-credential"
 	operationRevokeCredential = "revoke-credential"
 	operationRotateCredential = "rotate-credential"
+	operationListBindFailures = "list-account-bind-failures"
 )
 
 func (a API) ListCredentials(ctx context.Context, request ListCredentialsRequestObject,
@@ -292,4 +293,49 @@ func systemIDRetaken(code string) Error {
 		Message: "Cet identifiant ne peut pas redevenir actif : un autre compte utilise désormais son system_id. " +
 			"Ce compte ne pourra pas se lier en SMPP tant que ce system_id reste pris.",
 	}
+}
+
+func (a API) ListAccountBindFailures(ctx context.Context, request ListAccountBindFailuresRequestObject,
+) (ListAccountBindFailuresResponseObject, error) {
+	accountID, known := parseID(request.AccountId)
+	if !known {
+		return ListAccountBindFailures404JSONResponse{CompteInconnuJSONResponse(unknownAccount())}, nil
+	}
+
+	response, err := a.Gateway.ListAccountBindFailuresWithResponse(ctx, accountID, nil)
+	if err == nil {
+		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
+	}
+
+	if err == nil && response.JSON200 == nil {
+		err = gateway.ErrorFrom(http.StatusBadGateway, nil)
+	}
+
+	if err != nil {
+		status, body, err := a.accountRefusal(ctx, operationListBindFailures, err)
+
+		switch status {
+		case http.StatusNotFound:
+			return ListAccountBindFailures404JSONResponse{CompteInconnuJSONResponse(body)}, nil
+		case http.StatusUnprocessableEntity:
+			return ListAccountBindFailures422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
+		case http.StatusServiceUnavailable:
+			return ListAccountBindFailures503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
+		default:
+			return nil, err
+		}
+	}
+
+	failures := make(ListAccountBindFailures200JSONResponse, 0, len(response.JSON200.Data))
+	for _, failure := range response.JSON200.Data {
+		failures = append(failures, BindFailure{
+			At:            failure.At,
+			RemoteIp:      failure.RemoteIp,
+			BindType:      BindType(failure.BindType),
+			CommandStatus: BindFailureCommandStatus(failure.CommandStatus),
+			Reason:        BindFailureReason(failure.Reason),
+		})
+	}
+
+	return failures, nil
 }

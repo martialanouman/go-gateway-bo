@@ -297,6 +297,11 @@ func (API) DeleteWebhook(_ context.Context, _ bff.DeleteWebhookRequestObject,
 	return bff.DeleteWebhook204Response{}, nil
 }
 
+func (API) ListAccountBindFailures(_ context.Context, _ bff.ListAccountBindFailuresRequestObject,
+) (bff.ListAccountBindFailuresResponseObject, error) {
+	return bff.ListAccountBindFailures200JSONResponse{}, nil
+}
+
 func (API) ListCredentials(_ context.Context, _ bff.ListCredentialsRequestObject,
 ) (bff.ListCredentialsResponseObject, error) {
 	return bff.ListCredentials200JSONResponse{}, nil
