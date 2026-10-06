@@ -1,6 +1,6 @@
 # step-069 — Diagnostic d'échec de bind : les refus récents d'un compte
 
-> **Jalon :** M3 (plan §8 ; spec §6.14) · **Statut :** EN COURS
+> **Jalon :** M3 (plan §8 ; spec §6.14) · **Statut :** FAIT
 > **Dépend de :** step-066 (onglet « Identifiants »), **contrat 7.3.0** · **Bloque :** —
 
 ## But
@@ -35,7 +35,8 @@ un `system_id` inconnu n'est rattaché à aucun compte.
   de bind », et une table dense « Heure / IP source / Type /
   Lu par l'ESME / Cause ». Le code `command_status` reste verbatim en mono, et la cause s'affiche
   en français :
-  `password_mismatch` « Mot de passe erroné », `credential_revoked` « Identifiant révoqué »,
+  `password_mismatch` « Mot de passe refusé » (le contrat y range aussi une empreinte stockée
+  illisible : « erroné » mentirait), `credential_revoked` « Identifiant révoqué »,
   `credential_disabled` « Identifiant désactivé », `account_inactive` « Compte ou client
   inactif », `smpp_channel_disabled` « Canal SMPP coupé », `bind_type_not_allowed` « Type de bind
   non admis », `max_sessions_exceeded` « Limite de binds atteinte », `throttled` « Verrouillage
@@ -94,3 +95,23 @@ un `system_id` inconnu n'est rattaché à aucun compte.
 - La fenêtre `since` et le suivi en direct.
 - Les binds sous un `system_id` inconnu, que le contrat ne rattache à aucun compte.
 - Le déverrouillage d'un compte verrouillé par l'anti-force brute : le contrat n'en offre pas.
+
+## Tableau des mutations
+
+Jouées le 06/10/2026 après commit, `-count=1`, dans un worktree jetable. Chaque motif a été vérifié
+présent une fois avant d'être remplacé.
+
+| Mutation | Ce qui tombe |
+|---|---|
+| `ListAccountBindFailures` retiré de la table de garde | les trois scénarios du diagnostic (fermée par défaut) |
+| La même, exemptée | « sans credentials:read, la lecture des binds refusés est refusée… » |
+| La même, gardée par `accounts:read` | le même scénario |
+| Cause relayée constante | « un bind refusé garde la cause que le code lu par l'ESME confond » |
+| IP source perdue | le même scénario |
+| Code lu par l'ESME constant | le même scénario |
+| Cause affichée en code seul | `tells a lockout apart from a wrong password…` |
+| Repli d'une cause inconnue retiré | `shows a cause the dashboard has no label for…` |
+| Phrase du `system_id` inconnu retirée | `says that a bind under an unknown system_id shows up nowhere` |
+| « Réessayer » ne relit rien | `keeps both credential cards when the diagnosis cannot be read…` |
+| Carte retirée | les quatre tests du diagnostic |
+

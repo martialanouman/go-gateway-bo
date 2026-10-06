@@ -35,7 +35,7 @@ const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })
 const dateTimeFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 const instantFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'medium' })
 const CAUSES: Record<BindFailure['reason'], string> = {
-  password_mismatch: 'Mot de passe erroné',
+  password_mismatch: 'Mot de passe refusé',
   credential_revoked: 'Identifiant révoqué',
   credential_disabled: 'Identifiant désactivé',
   account_inactive: 'Compte ou client inactif',
@@ -181,8 +181,8 @@ export function Credentials({
             writeRefusal={writeRefusal}
           />
         ))}
-        <BindFailures accountId={accountId} />
       </div>
+      <BindFailures accountId={accountId} />
 
       {pending?.kind === 'create' && pending.type === 'smpp_bind' ? (
         <CreateSmppCredential
@@ -236,7 +236,6 @@ function BindFailures({ accountId }: { readonly accountId: string }) {
 
   return (
     <Card
-      className="card-grid__full"
       flush
       subtitle="24 dernières heures · 200 refus au plus"
       title="Diagnostic d’échec de bind"
