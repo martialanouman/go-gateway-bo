@@ -42,7 +42,6 @@ type account struct {
 	RestEnabled      bool      `json:"rest_enabled"`
 	QuerySmEnabled   bool      `json:"query_sm_enabled"`
 	CancelSmEnabled  bool      `json:"cancel_sm_enabled"`
-	SenderIDPolicy   string    `json:"sender_id_policy"`
 	AllowedBindTypes string    `json:"allowed_bind_types"`
 	MaxSessions      int       `json:"max_sessions"`
 	CreatedAt        time.Time `json:"created_at"`
@@ -114,7 +113,7 @@ func (c *Customers) ServeAccounts(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	created := account{
 		ID: uuid.NewString(), CustomerID: body.CustomerID, Name: body.Name, Status: "active", SmppEnabled: true,
-		RestEnabled: true, QuerySmEnabled: true, CancelSmEnabled: true, SenderIDPolicy: "strict", AllowedBindTypes: "trx", MaxSessions: 1, CreatedAt: now,
+		RestEnabled: true, QuerySmEnabled: true, CancelSmEnabled: true, AllowedBindTypes: "trx", MaxSessions: 1, CreatedAt: now,
 		UpdatedAt: now,
 	}
 	c.accounts = append(c.accounts, created)

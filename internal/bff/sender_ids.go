@@ -22,7 +22,7 @@ func (a API) ListSenderIds(ctx context.Context, request ListSenderIdsRequestObje
 		return ListSenderIds404JSONResponse{ClientInconnuJSONResponse(unknownCustomer())}, nil
 	}
 
-	response, err := a.Gateway.ListSenderIdsWithResponse(ctx, customerID)
+	response, err := a.Gateway.ListSenderIdsWithResponse(ctx, customerID, nil)
 	if err == nil {
 		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
 	}
