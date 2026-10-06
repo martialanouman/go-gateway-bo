@@ -1686,7 +1686,9 @@ export interface components {
         CredentialType: "smpp_bind" | "api_key";
         /**
          * @description `commandStatus` est ce que l'ESME a lu ; `reason` la cause réelle, que `ESME_RINVPASWD` confond
-         *     (mot de passe faux, identifiant révoqué, verrouillage anti-force brute).
+         *     (mot de passe faux, identifiant révoqué, verrouillage anti-force brute). Les deux `enum` sont
+         *     ceux du contrat Admin 7.3.0, relayés sans être filtrés : une valeur que la passerelle ajouterait
+         *     sortirait telle quelle.
          */
         BindFailure: {
             /** Format: date-time */

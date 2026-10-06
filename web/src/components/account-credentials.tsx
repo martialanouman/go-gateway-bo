@@ -39,7 +39,7 @@ const CAUSES: Record<BindFailure['reason'], string> = {
   credential_revoked: 'Identifiant révoqué',
   credential_disabled: 'Identifiant désactivé',
   account_inactive: 'Compte ou client inactif',
-  smpp_channel_disabled: 'Canal SMPP coupé',
+  smpp_channel_disabled: 'Canal SMPP désactivé',
   bind_type_not_allowed: 'Type de bind non admis',
   max_sessions_exceeded: 'Limite de binds atteinte',
   throttled: 'Verrouillage anti-force brute',
@@ -264,7 +264,7 @@ function BindFailures({ accountId }: { readonly accountId: string }) {
           columns={[
             {
               key: 'at',
-              header: 'Heure',
+              header: 'Horodatage',
               mono: true,
               cell: (failure: BindFailure & { readonly position: number }) =>
                 instantFormat.format(new Date(failure.at)),

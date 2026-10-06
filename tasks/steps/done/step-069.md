@@ -32,13 +32,13 @@ un `system_id` inconnu n'est rattaché à aucun compte.
   ajouterait traverserait le BFF sans être refusée (le type engendré est une chaîne), et le client
   l'afficherait telle quelle, en mono, faute de libellé.
 - **L'écran** suit la maquette `AccountScreen.jsx` : une carte pleine largeur « Diagnostic d'échec
-  de bind », et une table dense « Heure / IP source / Type /
+  de bind », et une table dense « Horodatage / IP source / Type /
   Lu par l'ESME / Cause ». Le code `command_status` reste verbatim en mono, et la cause s'affiche
   en français :
   `password_mismatch` « Mot de passe refusé » (le contrat y range aussi une empreinte stockée
   illisible : « erroné » mentirait), `credential_revoked` « Identifiant révoqué »,
   `credential_disabled` « Identifiant désactivé », `account_inactive` « Compte ou client
-  inactif », `smpp_channel_disabled` « Canal SMPP coupé », `bind_type_not_allowed` « Type de bind
+  inactif », `smpp_channel_disabled` « Canal SMPP désactivé », `bind_type_not_allowed` « Type de bind
   non admis », `max_sessions_exceeded` « Limite de binds atteinte », `throttled` « Verrouillage
   anti-force brute », `registry_unavailable` « Registre des sessions indisponible ».
 - **État vide** : « Aucun bind refusé », et la description dit la frontière : seuls les binds sous un

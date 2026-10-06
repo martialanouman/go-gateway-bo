@@ -188,7 +188,7 @@ var catalog = []Entry{
 	{
 		Key:         CredentialsRead,
 		Category:    "accounts",
-		Description: "Voir la liste des identifiants d’un compte et leur état — jamais le secret, qui n’est plus réaffichable",
+		Description: "Voir la liste des identifiants d’un compte et leur état, et les binds refusés au compte avec leur IP source et leur cause — jamais le secret, qui n’est plus réaffichable",
 	},
 	{
 		Key:         CredentialsWrite,
