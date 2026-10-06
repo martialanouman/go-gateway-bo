@@ -137,7 +137,7 @@ function CustomerScreen() {
         />
         <CustomerAccounts customerId={current.id} />
       </div>
-      <CustomerSenderIds blocked={blocked} customerId={current.id} onDeleted={closeToTitle} />
+      <CustomerSenderIds blocked={blocked} customerId={current.id} onRowGone={closeToTitle} />
 
       {pending?.kind === 'rename' ? <RenameCustomer customer={current} onClose={close} /> : null}
       {pending?.kind === 'group' ? <AssignGroup customer={current} onClose={close} /> : null}

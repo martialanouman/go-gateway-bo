@@ -833,8 +833,8 @@ export interface paths {
         post?: never;
         /**
          * Retire la limite de débit propre d'un sender ID
-         * @description Relayée vers `delete-sender-id-rate-limit`. Le sender ID n'est plus borné que par la limite de
-         *     son compte.
+         * @description Relayée vers `delete-sender-id-rate-limit`. Le sender ID n'a plus de limite propre ; retirer une
+         *     limite absente rend aussi 204.
          */
         delete: operations["deleteSenderIdRateLimit"];
         options?: never;

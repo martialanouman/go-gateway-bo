@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { PermissionKey } from '~/lib/permissions.gen'
@@ -52,15 +52,13 @@ describe('the sender IDs of a customer', () => {
 
     const row = await rowOf('ACME')
     expect(within(row).queryByRole('cell', { name: '0' })).toBeNull()
-    expect(
-      within(row).getByRole('cell', { name: 'Compteur illisible : inconnu, pas zéro' }),
-    ).toHaveTextContent('—')
+    expect(within(row).getByRole('cell', { name: 'Inconnu' })).toBeInTheDocument()
   })
 
-  it('says a name without its own limit is bounded by its account', async () => {
+  it('says a name without its own limit has none', async () => {
     open(READER, [sender()])
 
-    expect(await rowOf('ACME')).toHaveTextContent('Celle du compte')
+    expect(await rowOf('ACME')).toHaveTextContent('Aucune limite propre')
   })
 
   it('reclassifies a name only once the consequence is confirmed', async () => {
@@ -104,15 +102,21 @@ describe('the sender IDs of a customer', () => {
     await user.type(within(dialog).getByLabelText('Messages par seconde'), '50')
     await user.click(within(dialog).getByRole('button', { name: 'Limiter' }))
 
+    expect(await screen.findByText('ACME est limité à 50/s, rafale 50.')).toBeInTheDocument()
     expect(await rowOf('ACME')).toHaveTextContent('50/s, rafale 50')
     const request = sent(fetch, `PUT ${SENDER}/rate-limit`)[0]?.[0] as Request
     expect(await request.json()).toEqual({ maxPerSec: 50 })
 
-    await user.click(within(await rowOf('ACME')).getByRole('button', { name: 'Limiter ACME' }))
-    const again = await screen.findByRole('dialog', { name: 'Limiter le débit de ACME ?' })
-    await user.click(within(again).getByRole('button', { name: 'Retirer la limite' }))
+    await user.click(
+      within(await rowOf('ACME')).getByRole('button', { name: 'Retirer la limite de ACME' }),
+    )
+    const removal = await screen.findByRole('dialog', { name: 'Retirer la limite de ACME ?' })
+    expect(removal).toHaveTextContent('ne seront plus refusés à l’admission')
+    await user.click(within(removal).getByRole('button', { name: 'Retirer' }))
 
-    expect(await rowOf('ACME')).toHaveTextContent('Celle du compte')
+    expect(await screen.findByText('ACME n’a plus de limite propre.')).toBeInTheDocument()
+
+    expect(await rowOf('ACME')).toHaveTextContent('Aucune limite propre')
     expect(sent(fetch, `DELETE ${SENDER}/rate-limit`)).toHaveLength(1)
   })
 
@@ -149,6 +153,27 @@ describe('the sender IDs of a customer', () => {
       await screen.findByText('Aucun nom d’expéditeur dans cette catégorie'),
     ).toBeInTheDocument()
     expect(screen.getByText(/Choisissez « Toutes les catégories »/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Réinitialiser' }))
+    expect(await rowOf('ACME')).toBeInTheDocument()
+    expect(await rowOf('BANQUEX')).toBeInTheDocument()
+  })
+
+  it('moves the focus to the page title when a reclassified name leaves the filter', async () => {
+    const user = userEvent.setup()
+    open(WRITER, [sender()])
+
+    await rowOf('ACME')
+    await user.click(screen.getByRole('combobox', { name: 'Catégorie' }))
+    await user.click(await screen.findByRole('option', { name: 'Marketing' }))
+    await user.click(within(await rowOf('ACME')).getByRole('button', { name: 'Classer ACME' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Classer ACME en OTP ?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Classer' }))
+
+    expect(
+      await screen.findByText('Aucun nom d’expéditeur dans cette catégorie'),
+    ).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus())
   })
 
   it('disables and explains deleting a name that has already sent', async () => {

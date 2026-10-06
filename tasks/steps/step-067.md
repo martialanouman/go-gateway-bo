@@ -31,17 +31,29 @@ confirmation qui nomme la conséquence. Le même opérateur pose ou retire la li
   (§6.19), et un formulaire de création qui le permettrait la contournerait.
 - **Le changement de catégorie passe par le `PATCH` existant.** `SenderIdUpdate` devient
   `{ status?, trafficCategory? }`, avec `minProperties: 1`. La modale Material porte le titre
-  « Classer ACME en OTP ? ». Vers `otp` ou `transactional`, elle dit : « Ce trafic passera devant le
-  marketing sur les connecteurs partagés. » Vers `marketing`, elle dit que le trafic perdra cette
-  priorité. Le bouton est « Classer ».
+  « Classer ACME en OTP ? », et la conséquence dépend de la cible, d'après `priority_tier` (§6.19 : 1
+  sert le transactionnel et l'OTP, 2 l'OTP seul). Vers `otp`, le trafic passera devant le marketing
+  et les connecteurs réservés à l'OTP pourront le servir. Vers `transactional`, il passera devant le
+  marketing, mais les connecteurs réservés à l'OTP ne le serviront pas. Vers `marketing`, il perdra sa
+  priorité, et les connecteurs réservés ne le serviront plus. La modale dit aussi comment revenir en
+  arrière. Le bouton est « Classer ».
 - **L'audit garde l'ancienne valeur, lue côté serveur.** Pour un changement de catégorie, le BFF
   relit `list-sender-ids` avant le `PATCH` et écrit `Before.traffic_category`. Il ne se fie jamais à
   une valeur envoyée par le navigateur. Si le sender ID est absent de la liste, le BFF répond 404
-  sans appel d'écriture. C'est le premier `Before` écrit par le BFF.
+  sans appel d'écriture. C'est le premier `Before` d'une action **relayée** : `internal/store/admin.go`
+  en écrit déjà pour les actions locales. **La relecture et le `PATCH` ne sont pas atomiques** : si un
+  autre opérateur reclasse le même nom entre les deux, l'ancienne valeur écrite est périmée. Accepté :
+  le contrat n'offre ni version ni `If-Match`, et les deux écritures restent tracées dans l'ordre.
 - **Limite de débit** : `PUT /customers/{customerId}/sender-ids/{senderId}/rate-limit` reçoit
   `{ maxPerSec, burstCapacity? }`, avec les bornes du contrat (1 à 2 147 483 647). `DELETE` sur la
   même route rend 204. Les deux routes sont gardées par `customers:write` et auditées sous
-  `sender_id.rate_limit` (`After` vaut la limite, ou `removed`). La modale dit ce que l'écran doit
+  `sender_id.rate_limit` (`After` vaut la limite, ou `removed`). **L'ancienne limite n'est pas écrite
+  en `Before`** : la spec ne le demande que pour la catégorie, et la limite précédente se lit dans
+  l'événement `sender_id.rate_limit` d'avant. Une limite absente s'affiche « Aucune limite propre » :
+  le compte ne porte aucun débit (§1.1, amendement step-065), si bien que « celle du compte » aurait
+  désigné une limite introuvable.
+  Le retrait a sa propre modale (« Retirer la limite de ACME ? », bouton « Retirer »), ouverte depuis
+  la ligne : une modale ne porte que le verbe de son titre. Poser ou retirer annonce son succès. La modale dit ce que l'écran doit
   dire (§6.19) : au-delà de la limite, le message est refusé à l'admission (429 en REST,
   `ESME_RTHROTTLED` en SMPP) et **aucun CDR n'est écrit**, si bien que le CDR Explorer ne le
   montrera pas.
@@ -49,8 +61,8 @@ confirmation qui nomme la conséquence. Le même opérateur pose ou retire la li
   en entier : relayer `traffic_category` ajouterait un paramètre, une clé de cache et un aller-retour
   sans rien montrer de plus.
 - **Le compteur de signalements n'a pas de lien.** La file de revue (§6.6) n'existe pas encore : elle
-  arrive avec step-146. Un compteur nul s'affiche « — », avec une infobulle « Compteur illisible :
-  inconnu, pas zéro ». La dette **066** porte le lien manquant, avec step-146 pour porteur.
+  arrive avec step-146. Un compteur illisible (`null` du contrat) s'affiche « Inconnu », en clair :
+  lisible au clavier comme au lecteur d'écran, sans infobulle, et jamais confondu avec 0. La dette **066** porte le lien manquant, avec step-146 pour porteur.
 - **Dette 064 payée.** Le DTO porte `firstUsedAt`. Quand ce champ est posé, « Supprimer » est
   désactivé et l'infobulle dit « Ce nom a déjà servi à envoyer : désactivez-le plutôt. ». Le BFF
   traduit le 409 de `delete-sender-id` dans la même copie (réponse `SenderIdDejaUtilise`), parce que
@@ -94,11 +106,15 @@ confirmation qui nomme la conséquence. Le même opérateur pose ou retire la li
   valeur, et l'audit porte l'ancienne lue en amont. Mutation : retirer la relecture fait rougir.
 - **Garde absente sur les deux routes de limite** → plan du scénario 403 sans appel amont. Mutation :
   retirer l'entrée de `guard.go` fait rougir, puisque la garde est fermée par défaut.
-- **Audit absent** → le plan « <geste> laisse sa trace » gagne la catégorie, la pose et le retrait
-  de limite.
+- **Audit absent** → le plan « <geste> laisse sa trace » gagne la pose et le retrait de limite ; la
+  trace de la catégorie est vérifiée par le scénario de reclassement, qui lit `Before` et `After`.
+- **Mapping du DTO perdu** (`firstUsedAt`, compteur, limite) → un scénario de liste dont l'amont pose
+  ces champs, et dont l'`Alors` lit les valeurs rendues. Mutation : retirer `FirstUsedAt` ou le
+  compteur du mapping fait rougir.
 - **Une catégorie changée sans confirmation** → Vitest : le `PATCH` ne part qu'après « Classer ».
   Mutation : appeler la mutation au choix dans le menu.
-- **Un compteur nul affiché 0** → Vitest : `null` donne « — » et non « 0 ».
+- **Un compteur illisible affiché 0** → Vitest : `null` donne « Inconnu » et non « 0 ».
+- **Focus perdu** quand un nom reclassé sort du filtre → Vitest : le focus revient au titre.
 - **« Supprimer » proposé sur un nom déjà utilisé** → Vitest : bouton désactivé et expliqué. Le 409
   serveur est couvert par un scénario.
 - **Le filtre** → Vitest : seuls les noms de la catégorie choisie restent.

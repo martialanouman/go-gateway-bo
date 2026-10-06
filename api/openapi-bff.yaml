@@ -1401,8 +1401,8 @@ paths:
       operationId: deleteSenderIdRateLimit
       summary: Retire la limite de débit propre d'un sender ID
       description: |
-        Relayée vers `delete-sender-id-rate-limit`. Le sender ID n'est plus borné que par la limite de
-        son compte.
+        Relayée vers `delete-sender-id-rate-limit`. Le sender ID n'a plus de limite propre ; retirer une
+        limite absente rend aussi 204.
       responses:
         '204':
           description: La limite est retirée, ou n'existait pas.
@@ -2785,7 +2785,7 @@ components:
         status: { $ref: '#/components/schemas/SenderIdStatus' }
         trafficCategory: { $ref: '#/components/schemas/TrafficCategory' }
         rateLimit:
-          # Nul quand le sender ID n'a pas de limite propre : seule celle de son compte s'applique.
+          # Nul quand le sender ID n'a pas de limite propre.
           oneOf:
             - $ref: '#/components/schemas/SenderIdRateLimit'
             - type: 'null'

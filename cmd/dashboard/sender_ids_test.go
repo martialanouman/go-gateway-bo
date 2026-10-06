@@ -14,6 +14,8 @@ func (w *customerGroupsWorld) registerSenderIDSteps(ctx *godog.ScenarioContext) 
 		return w.answering(http.StatusConflict, `{"code":"conflict","message":"sender id already used"}`)
 	})
 	ctx.Then(`^la passerelle n'a reçu aucune écriture$`, w.receivedNoWrite)
+	ctx.Given(`^une passerelle dont le sender ID a déjà servi et compte (\d+) signalements$`, w.servingAUsedSender)
+	ctx.Then(`^la réponse porte '([^']*)'$`, w.responseCarries)
 }
 
 // servingASenderClassedAs sert la liste avant le PATCH, puis le sender ID reclassé : seule la liste
@@ -42,6 +44,22 @@ func (w *customerGroupsWorld) receivedNoWrite() error {
 		if !strings.HasPrefix(query, http.MethodGet+" ") {
 			return fmt.Errorf("la passerelle a reçu une écriture : %q", query)
 		}
+	}
+
+	return nil
+}
+
+func (w *customerGroupsWorld) servingAUsedSender(mismatches int) error {
+	return w.answering(http.StatusOK, fmt.Sprintf(`[{"id":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d",`+
+		`"customer_id":"0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b","address":"ACME","status":"active",`+
+		`"traffic_category":"otp","recent_category_mismatches_24h":%d,`+
+		`"rate_limit":{"max_per_sec":50,"burst_capacity":100},"first_used_at":"2026-10-01T08:00:00Z",`+
+		`"created_at":"2026-09-30T08:00:00Z","updated_at":"2026-09-30T08:00:00Z"}]`, mismatches))
+}
+
+func (w *customerGroupsWorld) responseCarries(fragment string) error {
+	if !strings.Contains(w.process.received.body, fragment) {
+		return fmt.Errorf("la réponse ne porte pas %s :\n%s", fragment, w.process.received.body)
 	}
 
 	return nil

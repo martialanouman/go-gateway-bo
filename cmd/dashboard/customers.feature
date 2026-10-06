@@ -201,6 +201,19 @@ Fonctionnalité: Les clients relayés depuis la passerelle
     Et la réponse est conforme au contrat du BFF
     Et le refus place une erreur sous le champ "name"
 
+  Scénario: la liste rend la première utilisation, le compteur et la limite que la passerelle sert
+    Étant donné une passerelle dont le sender ID a déjà servi et compte 3 signalements
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur demande "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+    Et la réponse porte '"firstUsedAt":"2026-10-01T08:00:00Z"'
+    Et la réponse porte '"recentCategoryMismatches24h":3'
+    Et la réponse porte '"rateLimit":{"burstCapacity":100,"maxPerSec":50}'
+    Et la réponse porte '"trafficCategory":"otp"'
+
   Scénario: classer un nom d'expéditeur garde au journal la catégorie qu'il quitte, lue à la passerelle
     Étant donné une passerelle dont le sender ID "0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d" est classé "marketing"
     Et un serveur démarré
@@ -234,7 +247,6 @@ Fonctionnalité: Les clients relayés depuis la passerelle
 
     Exemples:
       | geste                    | méthode | adresse                                                     | corps                      |
-      | reclasser un nom         | PATCH   | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d            | {"trafficCategory":"otp"} |
       | poser une limite         | PUT     | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d/rate-limit | {"maxPerSec":50}          |
       | retirer une limite       | DELETE  | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d/rate-limit |                            |
 

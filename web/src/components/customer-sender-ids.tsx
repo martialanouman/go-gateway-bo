@@ -27,7 +27,7 @@ type TrafficCategory = components['schemas']['TrafficCategory']
 type Blocked = ReturnType<typeof blockedBy>
 type Pending =
   | { readonly kind: 'register' }
-  | { readonly kind: 'classify' | 'limit' | 'delete'; readonly sender: SenderId }
+  | { readonly kind: 'classify' | 'limit' | 'unlimit' | 'delete'; readonly sender: SenderId }
 
 const ALL = 'all'
 const customersQueryKey = ['gateway', 'customers'] as const
@@ -43,17 +43,25 @@ const STATUS_LABELS: Record<SenderId['status'], string> = {
   active: 'Approuvé',
   disabled: 'Désactivé',
 }
+// §6.19 : `priority_tier` 1 sert le transactionnel et l'OTP, 2 l'OTP seul.
+const CLASSIFY_CONSEQUENCES: Record<TrafficCategory, string> = {
+  otp: 'Ce trafic passera devant le marketing sur les connecteurs partagés, et les connecteurs réservés à l’OTP pourront le servir.',
+  transactional:
+    'Ce trafic passera devant le marketing sur les connecteurs partagés ; les connecteurs réservés à l’OTP ne le serviront pas.',
+  marketing:
+    'Ce trafic perdra sa priorité sur les connecteurs partagés, et les connecteurs réservés à l’OTP ou au transactionnel ne le serviront plus.',
+}
 const ALREADY_USED = 'Ce nom a déjà servi à envoyer : désactivez-le plutôt.'
-const UNREADABLE_COUNTER = 'Compteur illisible : inconnu, pas zéro'
 
 export function CustomerSenderIds({
   customerId,
   blocked,
-  onDeleted,
+  onRowGone,
 }: {
   readonly customerId: string
   readonly blocked: Blocked
-  readonly onDeleted: () => void
+  /** La ligne qui portait le bouton n'est plus affichée : le focus doit aller ailleurs que `body`. */
+  readonly onRowGone: () => void
 }) {
   const [pending, setPending] = useState<Pending | null>(null)
   const [category, setCategory] = useState<TrafficCategory | typeof ALL>(ALL)
@@ -143,7 +151,7 @@ export function CustomerSenderIds({
                 header: 'Débit',
                 cell: (sender: SenderId) =>
                   sender.rateLimit === null
-                    ? 'Celle du compte'
+                    ? 'Aucune limite propre'
                     : `${sender.rateLimit.maxPerSec}/s, rafale ${sender.rateLimit.burstCapacity}`,
               },
               {
@@ -155,16 +163,9 @@ export function CustomerSenderIds({
                 key: 'recentCategoryMismatches24h',
                 header: 'Signalements 24 h',
                 cell: (sender: SenderId) =>
-                  sender.recentCategoryMismatches24h === null ? (
-                    <>
-                      <span aria-hidden title={UNREADABLE_COUNTER}>
-                        —
-                      </span>
-                      <span className="ui-visually-hidden">{UNREADABLE_COUNTER}</span>
-                    </>
-                  ) : (
-                    sender.recentCategoryMismatches24h
-                  ),
+                  sender.recentCategoryMismatches24h === null
+                    ? 'Inconnu'
+                    : sender.recentCategoryMismatches24h,
               },
               {
                 key: 'createdAt',
@@ -193,6 +194,16 @@ export function CustomerSenderIds({
                     >
                       Limiter
                     </Button>
+                    {sender.rateLimit === null ? null : (
+                      <Button
+                        {...blocked}
+                        aria-label={`Retirer la limite de ${sender.address}`}
+                        onClick={() => setPending({ kind: 'unlimit', sender })}
+                        size="sm"
+                      >
+                        Retirer la limite
+                      </Button>
+                    )}
                     <Button
                       {...(sender.firstUsedAt === null ? blocked : blockedBy(ALREADY_USED))}
                       aria-label={`Supprimer ${sender.address}`}
@@ -216,10 +227,21 @@ export function CustomerSenderIds({
         <RegisterSender customerId={customerId} onClose={close} />
       ) : null}
       {pending?.kind === 'classify' ? (
-        <ClassifySender customerId={customerId} onClose={close} sender={pending.sender} />
+        <ClassifySender
+          customerId={customerId}
+          onClose={close}
+          onDone={(updated) => {
+            close()
+            if (category !== ALL && updated.trafficCategory !== category) onRowGone()
+          }}
+          sender={pending.sender}
+        />
       ) : null}
       {pending?.kind === 'limit' ? (
         <LimitSender customerId={customerId} onClose={close} sender={pending.sender} />
+      ) : null}
+      {pending?.kind === 'unlimit' ? (
+        <ConfirmUnlimitSender customerId={customerId} onClose={close} sender={pending.sender} />
       ) : null}
       {pending?.kind === 'delete' ? (
         <ConfirmDeleteSender
@@ -227,7 +249,7 @@ export function CustomerSenderIds({
           onClose={close}
           onDone={() => {
             close()
-            onDeleted()
+            onRowGone()
           }}
           sender={pending.sender}
         />
@@ -293,10 +315,12 @@ function ClassifySender({
   customerId,
   sender,
   onClose,
+  onDone,
 }: {
   readonly customerId: string
   readonly sender: SenderId
   readonly onClose: () => void
+  readonly onDone: (updated: SenderId) => void
 }) {
   const changed = useSenderChanged(customerId)
   const toast = useToast()
@@ -318,7 +342,7 @@ function ClassifySender({
         title: `${updated.address} est classé en ${CATEGORY_LABELS[updated.trafficCategory]}.`,
         severity: 'success',
       })
-      onClose()
+      onDone(updated)
     },
   })
 
@@ -346,11 +370,8 @@ function ClassifySender({
         }))}
         value={target}
       />
-      <p>
-        {target === 'marketing'
-          ? 'Ce trafic perdra sa priorité et passera après l’OTP et le transactionnel sur les connecteurs partagés.'
-          : 'Ce trafic passera devant le marketing sur les connecteurs partagés.'}
-      </p>
+      <p>{CLASSIFY_CONSEQUENCES[target]}</p>
+      <p>Pour revenir en arrière, il suffira de le reclasser.</p>
       <p>L’action est enregistrée dans le journal d’audit, avec l’ancienne catégorie.</p>
     </Modal>
   )
@@ -366,6 +387,7 @@ function LimitSender({
   readonly onClose: () => void
 }) {
   const changed = useSenderChanged(customerId)
+  const toast = useToast()
   const optionalNumber = (value: string) => (value === '' ? undefined : Number(value))
   const form = useForm({
     resolver: formResolver(SenderIdRateLimitSetting),
@@ -383,26 +405,12 @@ function LimitSender({
         }),
         'La limite n’a pas été posée',
       ),
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
       await changed()
-      onClose()
-    },
-    onError: (error) => {
-      for (const { field, message } of fieldRefusalsOf(error)) {
-        if (field === 'maxPerSec' || field === 'burstCapacity') form.setError(field, { message })
-      }
-    },
-  })
-  const unlimit = useMutation({
-    mutationFn: () =>
-      orRefusal(
-        api.DELETE('/customers/{customerId}/sender-ids/{senderId}/rate-limit', {
-          params: { path: { customerId, senderId: sender.id } },
-        }),
-        'La limite n’a pas été retirée',
-      ),
-    onSuccess: async () => {
-      await changed()
+      toast({
+        title: `${updated.address} est limité à ${updated.rateLimit?.maxPerSec}/s, rafale ${updated.rateLimit?.burstCapacity}.`,
+        severity: 'success',
+      })
       onClose()
     },
   })
@@ -412,11 +420,6 @@ function LimitSender({
       footer={
         <>
           <Button onClick={onClose}>Annuler</Button>
-          {sender.rateLimit === null ? null : (
-            <Button loading={unlimit.isPending} onClick={() => unlimit.mutate()}>
-              Retirer la limite
-            </Button>
-          )}
           <Button form="limit-sender" loading={limit.isPending} type="submit" variant="primary">
             Limiter
           </Button>
@@ -436,11 +439,13 @@ function LimitSender({
           Au-delà, la passerelle refusera le message à l’admission (429 en REST, ESME_RTHROTTLED en
           SMPP) et n’écrira aucun CDR : le CDR Explorer ne le montrera pas.
         </p>
-        <Refusal error={limit.error ?? unlimit.error} />
+        <Refusal error={limit.error} />
         <Field error={form.formState.errors.maxPerSec?.message} label="Messages par seconde">
           <Input
-            inputMode="numeric"
+            min={1}
             required
+            step={1}
+            type="number"
             {...form.register('maxPerSec', { setValueAs: optionalNumber })}
           />
         </Field>
@@ -450,7 +455,9 @@ function LimitSender({
           label="Rafale"
         >
           <Input
-            inputMode="numeric"
+            min={1}
+            step={1}
+            type="number"
             {...form.register('burstCapacity', { setValueAs: optionalNumber })}
           />
         </Field>
@@ -513,7 +520,7 @@ function RegisterSender({
       >
         <p>
           Le nom d’expéditeur naît en attente d’approbation de l’opérateur télécom, classé en
-          marketing. Action journalisée.
+          marketing. L’action est enregistrée dans le journal d’audit.
         </p>
         <Refusal error={placed ? null : register.error} />
         <Field
@@ -577,6 +584,56 @@ function ConfirmDeleteSender({
       <p>
         {sender.address} disparaîtra de la liste du client. Pour l’utiliser de nouveau, il faudra
         l’enregistrer et attendre une nouvelle approbation de l’opérateur télécom.
+      </p>
+      <p>L’action est enregistrée dans le journal d’audit.</p>
+    </Modal>
+  )
+}
+
+function ConfirmUnlimitSender({
+  customerId,
+  sender,
+  onClose,
+}: {
+  readonly customerId: string
+  readonly sender: SenderId
+  readonly onClose: () => void
+}) {
+  const changed = useSenderChanged(customerId)
+  const toast = useToast()
+  const unlimit = useMutation({
+    mutationFn: () =>
+      orRefusal(
+        api.DELETE('/customers/{customerId}/sender-ids/{senderId}/rate-limit', {
+          params: { path: { customerId, senderId: sender.id } },
+        }),
+        'La limite n’a pas été retirée',
+      ),
+    onSuccess: async () => {
+      await changed()
+      toast({ title: `${sender.address} n’a plus de limite propre.`, severity: 'success' })
+      onClose()
+    },
+  })
+
+  return (
+    <Modal
+      footer={
+        <>
+          <Button onClick={onClose}>Annuler</Button>
+          <Button loading={unlimit.isPending} onClick={() => unlimit.mutate()} variant="primary">
+            Retirer
+          </Button>
+        </>
+      }
+      onClose={onClose}
+      open
+      title={`Retirer la limite de ${sender.address} ?`}
+    >
+      <Refusal error={unlimit.error} />
+      <p>
+        Les messages de {sender.address} ne seront plus refusés à l’admission au titre de cette
+        limite. Pour la rétablir, il faudra la poser de nouveau.
       </p>
       <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>
