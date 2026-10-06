@@ -14,6 +14,7 @@ import {
 
 type Credential = components['schemas']['Credential']
 type AccountSession = components['schemas']['AccountSession']
+type BindFailure = components['schemas']['BindFailure']
 
 const CLIENTELE: PermissionKey[] = [
   'accounts:read',
@@ -24,6 +25,14 @@ const CLIENTELE: PermissionKey[] = [
 ]
 const CREDENTIALS = `/api/accounts/${OTP_ACCOUNT.id}/credentials`
 const SESSIONS = `/api/accounts/${OTP_ACCOUNT.id}/sessions`
+const BIND_FAILURES = `/api/accounts/${OTP_ACCOUNT.id}/bind-failures`
+const LOCKOUT: BindFailure = {
+  at: '2026-10-06T09:41:02Z',
+  remoteIp: '10.4.19.7',
+  bindType: 'trx',
+  commandStatus: 'ESME_RINVPASWD',
+  reason: 'throttled',
+}
 const SMPP: Credential = {
   id: 'credential-smpp',
   type: 'smpp_bind',
@@ -443,5 +452,65 @@ describe('the credentials of an SMPP account', () => {
       await screen.findByText('Lire les identifiants d’un compte demande credentials:read.'),
     ).toBeVisible()
     expect(sentTo(fetch, 'GET', CREDENTIALS)).toHaveLength(0)
+  })
+})
+
+describe('the bind failures of an SMPP account', () => {
+  it('tells a lockout apart from a wrong password, though the ESME read the same code', async () => {
+    const user = userEvent.setup()
+    open({ credentials: [SMPP], bindFailures: [LOCKOUT] })
+
+    await openCredentials(user)
+    const row = await within(
+      await screen.findByRole('region', { name: 'Diagnostic d’échec de bind' }),
+    ).findByRole('row', { name: /10\.4\.19\.7/ })
+
+    expect(row).toHaveTextContent('ESME_RINVPASWD')
+    expect(row).toHaveTextContent('Verrouillage anti-force brute')
+    expect(row).toHaveTextContent('trx')
+  })
+
+  it('shows a cause the dashboard has no label for as the gateway wrote it', async () => {
+    const user = userEvent.setup()
+    open({
+      credentials: [SMPP],
+      bindFailures: [{ ...LOCKOUT, reason: 'quota_frozen' as BindFailure['reason'] }],
+    })
+
+    await openCredentials(user)
+
+    expect(await screen.findByText('quota_frozen')).toBeVisible()
+  })
+
+  it('says that a bind under an unknown system_id shows up nowhere', async () => {
+    const user = userEvent.setup()
+    open({ credentials: [SMPP] })
+
+    await openCredentials(user)
+    const diagnosis = await screen.findByRole('region', { name: 'Diagnostic d’échec de bind' })
+
+    expect(await within(diagnosis).findByText('Aucun bind refusé')).toBeVisible()
+    expect(diagnosis).toHaveTextContent('system_id inconnu')
+  })
+
+  it('keeps both credential cards when the diagnosis cannot be read, and reads it again on retry', async () => {
+    const user = userEvent.setup()
+    const { fetch } = open(
+      { credentials: [SMPP] },
+      {
+        [`GET ${BIND_FAILURES}`]: {
+          status: 503,
+          body: { code: 'upstream_unreachable', message: '' },
+        },
+      },
+    )
+
+    await openCredentials(user)
+    const diagnosis = await screen.findByRole('region', { name: 'Diagnostic d’échec de bind' })
+    await user.click(await within(diagnosis).findByRole('button', { name: 'Réessayer' }))
+
+    expect(card('Identifiant SMPP')).toBeVisible()
+    expect(card('Clé API')).toBeVisible()
+    await waitFor(() => expect(sentTo(fetch, 'GET', BIND_FAILURES)).toHaveLength(2))
   })
 })

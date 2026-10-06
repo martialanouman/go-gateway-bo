@@ -5,6 +5,7 @@ import { SecretShown } from '~/components/secret-shown'
 import {
   Button,
   Card,
+  DataTable,
   EmptyState,
   ErrorState,
   Field,
@@ -24,6 +25,7 @@ import { generatedSystemId } from '~/lib/system-id'
 
 type Credential = components['schemas']['Credential']
 type CredentialType = components['schemas']['CredentialType']
+type BindFailure = components['schemas']['BindFailure']
 type Pending =
   | { readonly kind: 'create' | 'rotate' | 'revoke'; readonly type: CredentialType }
   | { readonly kind: 'secret'; readonly type: CredentialType; readonly secret: string }
@@ -31,6 +33,18 @@ type Pending =
 const accountsQueryKey = ['gateway', 'accounts'] as const
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })
 const dateTimeFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+const instantFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'medium' })
+const CAUSES: Record<BindFailure['reason'], string> = {
+  password_mismatch: 'Mot de passe erroné',
+  credential_revoked: 'Identifiant révoqué',
+  credential_disabled: 'Identifiant désactivé',
+  account_inactive: 'Compte ou client inactif',
+  smpp_channel_disabled: 'Canal SMPP coupé',
+  bind_type_not_allowed: 'Type de bind non admis',
+  max_sessions_exceeded: 'Limite de binds atteinte',
+  throttled: 'Verrouillage anti-force brute',
+  registry_unavailable: 'Registre des sessions indisponible',
+}
 const WRITE_REFUSAL = 'Créer ou révoquer un identifiant demande credentials:write.'
 const ROTATE_REFUSAL = 'Faire tourner un identifiant demande credentials:rotate.'
 const TYPES: readonly CredentialType[] = ['smpp_bind', 'api_key']
@@ -167,6 +181,7 @@ export function Credentials({
             writeRefusal={writeRefusal}
           />
         ))}
+        <BindFailures accountId={accountId} />
       </div>
 
       {pending?.kind === 'create' && pending.type === 'smpp_bind' ? (
@@ -205,6 +220,82 @@ export function Credentials({
         </SecretShown>
       ) : null}
     </>
+  )
+}
+
+function BindFailures({ accountId }: { readonly accountId: string }) {
+  const failures = useQuery({
+    queryKey: [...accountsQueryKey, accountId, 'bind-failures'],
+    queryFn: () =>
+      orRefusal(
+        api.GET('/accounts/{accountId}/bind-failures', { params: { path: { accountId } } }),
+        'Les binds refusés n’ont pas pu être lus',
+      ),
+    retry: false,
+  })
+
+  return (
+    <Card
+      className="card-grid__full"
+      flush
+      subtitle="24 dernières heures · 200 refus au plus"
+      title="Diagnostic d’échec de bind"
+    >
+      {failures.isPending ? (
+        <LoadingState label="Chargement des binds refusés…">
+          <Skeleton height={38} />
+        </LoadingState>
+      ) : failures.isError ? (
+        <ErrorState
+          description={failures.error.message}
+          onRetry={() => void failures.refetch()}
+          title="Les binds refusés n’ont pas pu être chargés"
+          titleAs="h3"
+        />
+      ) : failures.data.length === 0 ? (
+        <EmptyState
+          description="Seuls les binds présentés sous un system_id de ce compte figurent ici. Un bind sous un system_id inconnu n’est rattaché à aucun compte : il n’apparaît nulle part."
+          inline
+          title="Aucun bind refusé"
+          titleAs="h3"
+        />
+      ) : (
+        <DataTable
+          caption="Binds refusés au compte"
+          columns={[
+            {
+              key: 'at',
+              header: 'Heure',
+              mono: true,
+              cell: (failure: BindFailure & { readonly position: number }) =>
+                instantFormat.format(new Date(failure.at)),
+            },
+            {
+              key: 'remoteIp',
+              header: 'IP source',
+              mono: true,
+              cell: (failure) => failure.remoteIp,
+            },
+            { key: 'bindType', header: 'Type', mono: true, cell: (failure) => failure.bindType },
+            {
+              key: 'commandStatus',
+              header: 'Lu par l’ESME',
+              mono: true,
+              cell: (failure) => failure.commandStatus,
+            },
+            {
+              key: 'reason',
+              header: 'Cause',
+              cell: (failure) =>
+                CAUSES[failure.reason] ?? <span className="mono">{failure.reason}</span>,
+            },
+          ]}
+          dense
+          rowKey={(failure) => String(failure.position)}
+          rows={failures.data.map((failure, position) => ({ ...failure, position }))}
+        />
+      )}
+    </Card>
   )
 }
 

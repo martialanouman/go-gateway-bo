@@ -46,8 +46,10 @@ un `system_id` inconnu n'est rattaché à aucun compte.
   rafale peut évincer les plus anciens.
 - **La carte a son propre état** de chargement et d'erreur : une passerelle qui refuse la lecture du
   diagnostic ne masque pas les deux cartes d'identifiants.
-- **Instantané REST.** La liste n'est pas suivie en direct, et elle est relue après une rotation ou
-  une révocation, qui invalident déjà les clés du compte.
+- **Instantané REST.** La liste n'est pas suivie en direct : elle se relit en rouvrant l'onglet,
+  et une révocation, qui invalide déjà toutes les clés du compte, la relit aussi.
+- **Clé de ligne par position** : deux refus d'une même rafale partagent souvent l'heure, l'IP et la
+  cause, et le contrat ne leur donne pas d'identifiant.
 - **Faux amont** (`internal/fakegateway`) : il sert un refus permanent `throttled` par compte, sur
   le modèle du bind ouvert permanent de step-065. Le parcours e2e lit sa cause sous l'onglet
   « Identifiants ».
