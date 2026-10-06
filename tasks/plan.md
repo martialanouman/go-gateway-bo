@@ -576,7 +576,7 @@ alimente — en topologie multi-instance.
 suspension **en cascade** chiffrée, sender IDs avec catégorie et limite de débit), comptes SMPP (canaux,
 bascules `query_sm`/`cancel_sm`, webhooks, quotas, `max_sessions` avec **badge d'écart**), identifiants
 (**exactement deux cartes** masquées, secret montré **une seule fois**, rotation avec fenêtre de grâce,
-révocation avec impact chiffré ; le diagnostic d'échec de bind est détaché en step-069, qui attend le contrat).
+révocation avec impact chiffré ; diagnostic d’échec de bind, step-069, sur `list-account-bind-failures` du contrat 7.3.0).
 
 **Hors périmètre :** déconnexion forcée des sessions (M4) ; facturation du client (M8).
 
