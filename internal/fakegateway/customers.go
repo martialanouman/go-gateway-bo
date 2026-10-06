@@ -25,12 +25,21 @@ type customer struct {
 }
 
 type senderID struct {
-	ID         string    `json:"id"`
-	CustomerID string    `json:"customer_id"`
-	Address    string    `json:"address"`
-	Status     string    `json:"status"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID                          string     `json:"id"`
+	CustomerID                  string     `json:"customer_id"`
+	Address                     string     `json:"address"`
+	Status                      string     `json:"status"`
+	TrafficCategory             string     `json:"traffic_category"`
+	RecentCategoryMismatches24h *int       `json:"recent_category_mismatches_24h"`
+	RateLimit                   *rateLimit `json:"rate_limit"`
+	FirstUsedAt                 *time.Time `json:"first_used_at"`
+	CreatedAt                   time.Time  `json:"created_at"`
+	UpdatedAt                   time.Time  `json:"updated_at"`
+}
+
+type rateLimit struct {
+	MaxPerSec     int `json:"max_per_sec"`
+	BurstCapacity int `json:"burst_capacity"`
 }
 
 type account struct {
@@ -393,23 +402,39 @@ func (c *Customers) serveSenderIDs(w http.ResponseWriter, r *http.Request, custo
 		now := time.Now().UTC()
 		created := senderID{
 			ID: uuid.NewString(), CustomerID: customerID, Address: body.Address,
-			Status: "pending_carrier_approval", CreatedAt: now, UpdatedAt: now,
+			Status: "pending_carrier_approval", TrafficCategory: "marketing", RecentCategoryMismatches24h: new(int),
+			CreatedAt: now, UpdatedAt: now,
 		}
 		c.senders = append(c.senders, created)
 		reply(w, http.StatusCreated, created)
 	case index < 0:
 		reply(w, http.StatusNotFound, map[string]string{"code": "not_found", "message": "sender id not found"})
+	case r.PathValue("verb") == "rate-limit":
+		c.serveSenderRateLimit(w, r, &c.senders[index])
+	case r.PathValue("verb") != "":
+		w.WriteHeader(http.StatusNotFound)
 	case r.Method == http.MethodPatch:
 		var patch struct {
-			Status string `json:"status"`
+			Status          *string `json:"status"`
+			TrafficCategory *string `json:"traffic_category"`
 		}
 		if !decode(w, r, &patch) {
 			return
 		}
 
 		updated := &c.senders[index]
-		updated.Status, updated.UpdatedAt = patch.Status, time.Now().UTC()
+		if patch.Status != nil {
+			updated.Status = *patch.Status
+		}
+
+		if patch.TrafficCategory != nil {
+			updated.TrafficCategory = *patch.TrafficCategory
+		}
+
+		updated.UpdatedAt = time.Now().UTC()
 		reply(w, http.StatusOK, *updated)
+	case r.Method == http.MethodDelete && c.senders[index].FirstUsedAt != nil:
+		reply(w, http.StatusConflict, map[string]string{"code": "conflict", "message": "sender id already used"})
 	case r.Method == http.MethodDelete:
 		c.senders = slices.Delete(c.senders, index, index+1)
 		w.WriteHeader(http.StatusNoContent)
@@ -440,4 +465,31 @@ func (c *Customers) countIn(groupID string) int {
 	}
 
 	return count
+}
+
+func (c *Customers) serveSenderRateLimit(w http.ResponseWriter, r *http.Request, sender *senderID) {
+	switch r.Method {
+	case http.MethodPut:
+		var body struct {
+			MaxPerSec     int  `json:"max_per_sec"`
+			BurstCapacity *int `json:"burst_capacity"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+
+		burst := body.MaxPerSec
+		if body.BurstCapacity != nil {
+			burst = *body.BurstCapacity
+		}
+
+		sender.RateLimit = &rateLimit{MaxPerSec: body.MaxPerSec, BurstCapacity: burst}
+		sender.UpdatedAt = time.Now().UTC()
+		reply(w, http.StatusOK, *sender)
+	case http.MethodDelete:
+		sender.RateLimit = nil
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
 }

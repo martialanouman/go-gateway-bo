@@ -50,7 +50,7 @@ confirmation qui nomme la conséquence. Le même opérateur pose ou retire la li
   sans rien montrer de plus.
 - **Le compteur de signalements n'a pas de lien.** La file de revue (§6.6) n'existe pas encore : elle
   arrive avec step-146. Un compteur nul s'affiche « — », avec une infobulle « Compteur illisible :
-  inconnu, pas zéro ». La dette **067** porte le lien manquant, avec step-146 pour porteur.
+  inconnu, pas zéro ». La dette **066** porte le lien manquant, avec step-146 pour porteur.
 - **Dette 064 payée.** Le DTO porte `firstUsedAt`. Quand ce champ est posé, « Supprimer » est
   désactivé et l'infobulle dit « Ce nom a déjà servi à envoyer : désactivez-le plutôt. ». Le BFF
   traduit le 409 de `delete-sender-id` dans la même copie (réponse `SenderIdDejaUtilise`), parce que
@@ -72,7 +72,7 @@ confirmation qui nomme la conséquence. Le même opérateur pose ou retire la li
   `_shell.customers_.$customerId.tsx`, déjà longue de 821 lignes, comme les identifiants à
   step-066. Ses tests Vitest vivent à côté.
 - `web/e2e/shell.spec.ts` : le parcours étendu.
-- `debts/064-…` supprimé ; `debts/067-…` créé.
+- `debts/064-…` supprimé ; `debts/066-…` créé.
 
 ## Ordre d'implémentation (un commit vert chacun)
 1. Fiche, todo, plan ; bump 7.3.0 avec l'exception ; `make generate`. Le faux amont perd
@@ -86,7 +86,7 @@ confirmation qui nomme la conséquence. Le même opérateur pose ou retire la li
 3. Handlers, garde et audit : les scénarios passent au vert.
 4. Client : la liste extraite, la catégorie, la limite, le compteur, le filtre et le « Supprimer »
    désactivé. Tests Vitest écrits rouges d'abord.
-5. Faux amont, parcours e2e étendu, dettes 064 et 067.
+5. Faux amont, parcours e2e étendu, dettes 064 et 066.
 6. Mutations, DoD, `git mv` de la fiche et case cochée.
 
 ## Tests (les risques, et la preuve de chacun)
@@ -104,7 +104,7 @@ confirmation qui nomme la conséquence. Le même opérateur pose ou retire la li
 - **Le filtre** → Vitest : seuls les noms de la catégorie choisie restent.
 
 ## Hors périmètre
-- Le lien vers la file de revue (step-146, dette 067).
+- Le lien vers la file de revue (step-146, dette 066).
 - Les échecs de bind (step-069) et le `402` du grand livre.
 - Le choix de catégorie à la création.
 - La ventilation du trafic par catégorie (step-082).
