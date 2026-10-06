@@ -41,6 +41,7 @@ func (e AntispamRuleAction) Valid() bool {
 
 // Defines values for AntispamRuleRuleType.
 const (
+	AntispamRuleRuleTypeCategoryMismatch AntispamRuleRuleType = "category_mismatch"
 	AntispamRuleRuleTypeContentBlacklist AntispamRuleRuleType = "content_blacklist"
 	AntispamRuleRuleTypeDuplicate        AntispamRuleRuleType = "duplicate"
 	AntispamRuleRuleTypeReputation       AntispamRuleRuleType = "reputation"
@@ -50,6 +51,8 @@ const (
 // Valid indicates whether the value is a known member of the AntispamRuleRuleType enum.
 func (e AntispamRuleRuleType) Valid() bool {
 	switch e {
+	case AntispamRuleRuleTypeCategoryMismatch:
+		return true
 	case AntispamRuleRuleTypeContentBlacklist:
 		return true
 	case AntispamRuleRuleTypeDuplicate:
@@ -125,6 +128,7 @@ func (e AntispamRuleCreateAction) Valid() bool {
 
 // Defines values for AntispamRuleCreateRuleType.
 const (
+	AntispamRuleCreateRuleTypeCategoryMismatch AntispamRuleCreateRuleType = "category_mismatch"
 	AntispamRuleCreateRuleTypeContentBlacklist AntispamRuleCreateRuleType = "content_blacklist"
 	AntispamRuleCreateRuleTypeDuplicate        AntispamRuleCreateRuleType = "duplicate"
 	AntispamRuleCreateRuleTypeReputation       AntispamRuleCreateRuleType = "reputation"
@@ -134,6 +138,8 @@ const (
 // Valid indicates whether the value is a known member of the AntispamRuleCreateRuleType enum.
 func (e AntispamRuleCreateRuleType) Valid() bool {
 	switch e {
+	case AntispamRuleCreateRuleTypeCategoryMismatch:
+		return true
 	case AntispamRuleCreateRuleTypeContentBlacklist:
 		return true
 	case AntispamRuleCreateRuleTypeDuplicate:
@@ -279,6 +285,66 @@ func (e BillingCustomerUpdateBillingMode) Valid() bool {
 	case BillingCustomerUpdateBillingModePostpaid:
 		return true
 	case BillingCustomerUpdateBillingModePrepaid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BindFailureCommandStatus.
+const (
+	ESMERBINDFAIL BindFailureCommandStatus = "ESME_RBINDFAIL"
+	ESMERINVPASWD BindFailureCommandStatus = "ESME_RINVPASWD"
+	ESMERSYSERR   BindFailureCommandStatus = "ESME_RSYSERR"
+)
+
+// Valid indicates whether the value is a known member of the BindFailureCommandStatus enum.
+func (e BindFailureCommandStatus) Valid() bool {
+	switch e {
+	case ESMERBINDFAIL:
+		return true
+	case ESMERINVPASWD:
+		return true
+	case ESMERSYSERR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BindFailureReason.
+const (
+	AccountInactive     BindFailureReason = "account_inactive"
+	BindTypeNotAllowed  BindFailureReason = "bind_type_not_allowed"
+	CredentialDisabled  BindFailureReason = "credential_disabled"
+	CredentialRevoked   BindFailureReason = "credential_revoked"
+	MaxSessionsExceeded BindFailureReason = "max_sessions_exceeded"
+	PasswordMismatch    BindFailureReason = "password_mismatch"
+	RegistryUnavailable BindFailureReason = "registry_unavailable"
+	SmppChannelDisabled BindFailureReason = "smpp_channel_disabled"
+	Throttled           BindFailureReason = "throttled"
+)
+
+// Valid indicates whether the value is a known member of the BindFailureReason enum.
+func (e BindFailureReason) Valid() bool {
+	switch e {
+	case AccountInactive:
+		return true
+	case BindTypeNotAllowed:
+		return true
+	case CredentialDisabled:
+		return true
+	case CredentialRevoked:
+		return true
+	case MaxSessionsExceeded:
+		return true
+	case PasswordMismatch:
+		return true
+	case RegistryUnavailable:
+		return true
+	case SmppChannelDisabled:
+		return true
+	case Throttled:
 		return true
 	default:
 		return false
@@ -1968,27 +2034,6 @@ func (e SenderIdStatus) Valid() bool {
 	}
 }
 
-// Defines values for SenderIdPolicy.
-const (
-	SenderIdPolicyAllowUnregisteredNumeric SenderIdPolicy = "allow_unregistered_numeric"
-	SenderIdPolicyDisabled                 SenderIdPolicy = "disabled"
-	SenderIdPolicyStrict                   SenderIdPolicy = "strict"
-)
-
-// Valid indicates whether the value is a known member of the SenderIdPolicy enum.
-func (e SenderIdPolicy) Valid() bool {
-	switch e {
-	case SenderIdPolicyAllowUnregisteredNumeric:
-		return true
-	case SenderIdPolicyDisabled:
-		return true
-	case SenderIdPolicyStrict:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for SenderIdUpdateStatus.
 const (
 	SenderIdUpdateStatusActive                 SenderIdUpdateStatus = "active"
@@ -2223,6 +2268,27 @@ func (e SuppressionSource) Valid() bool {
 	case MoStop:
 		return true
 	case Regulator:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TrafficCategory.
+const (
+	Marketing     TrafficCategory = "marketing"
+	Otp           TrafficCategory = "otp"
+	Transactional TrafficCategory = "transactional"
+)
+
+// Valid indicates whether the value is a known member of the TrafficCategory enum.
+func (e TrafficCategory) Valid() bool {
+	switch e {
+	case Marketing:
+		return true
+	case Otp:
+		return true
+	case Transactional:
 		return true
 	default:
 		return false
@@ -2475,7 +2541,9 @@ type AntispamRuleStatus string
 
 // AntispamRuleCreate defines model for AntispamRuleCreate.
 type AntispamRuleCreate struct {
-	Action     AntispamRuleCreateAction   `json:"action"`
+	Action *AntispamRuleCreateAction `json:"action,omitempty"`
+
+	// ConfigJson Per rule type. category_mismatch (ADR-0020 §5), every field optional and no other accepted: otp_code_min_digits (4) and otp_code_max_digits (8, at most 32) bound the code an otp sender's message must carry, a single space or dash between its digits allowed; otp_max_length (160 characters) bounds its body, which must hold no link, with or without a scheme; promo_markers ([]) are the case-insensitive words a transactional sender's message must not contain. A marketing sender is never checked.
 	ConfigJson *map[string]interface{}    `json:"config_json,omitempty"`
 	RuleType   AntispamRuleCreateRuleType `json:"rule_type"`
 	Scope      AntispamRuleCreateScope    `json:"scope"`
@@ -2577,6 +2645,25 @@ type BillingCustomerUpdate struct {
 
 // BillingCustomerUpdateBillingMode defines model for BillingCustomerUpdate.BillingMode.
 type BillingCustomerUpdateBillingMode string
+
+// BindFailure defines model for BindFailure.
+type BindFailure struct {
+	At       time.Time `json:"at"`
+	BindType BindType  `json:"bind_type"`
+
+	// CommandStatus What the ESME read.
+	CommandStatus BindFailureCommandStatus `json:"command_status"`
+
+	// Reason Internal cause. account_inactive covers a suspended or closed account or customer; throttled is the anti-brute-force lockout, answered ESME_RINVPASWD whatever the secret; password_mismatch also covers an unreadable stored hash, which the server logs as an error.
+	Reason   BindFailureReason `json:"reason"`
+	RemoteIp string            `json:"remote_ip"`
+}
+
+// BindFailureCommandStatus What the ESME read.
+type BindFailureCommandStatus string
+
+// BindFailureReason Internal cause. account_inactive covers a suspended or closed account or customer; throttled is the anti-brute-force lockout, answered ESME_RINVPASWD whatever the secret; password_mismatch also covers an unreadable stored hash, which the server logs as an error.
+type BindFailureReason string
 
 // BindType defines model for BindType.
 type BindType string
@@ -3599,8 +3686,20 @@ type SenderId struct {
 	// FirstUsedAt When a message from this sender ID was submitted to a carrier SMSC, approximately the first one; null if never. Set asynchronously, so it may lag the first send by a few seconds. Once set, the sender ID can no longer be deleted (409), only disabled.
 	FirstUsedAt *time.Time         `json:"first_used_at,omitempty"`
 	Id          openapi_types.UUID `json:"id"`
-	Status      SenderIdStatus     `json:"status"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+
+	// RateLimit The sender ID's own limit; null when it has none and only its account's limit applies.
+	RateLimit *struct {
+		BurstCapacity int `json:"burst_capacity"`
+		MaxPerSec     int `json:"max_per_sec"`
+	} `json:"rate_limit"`
+
+	// RecentCategoryMismatches24h Messages from this sender ID that a category_mismatch rule matched (flagged or blocked) in the current hour and the 23 before it, each message counted once. Null when the counter store cannot be read: unknown, not zero.
+	RecentCategoryMismatches24h *int           `json:"recent_category_mismatches_24h"`
+	Status                      SenderIdStatus `json:"status"`
+
+	// TrafficCategory What the customer commits to send under a sender ID (ADR-0020). marketing is the default and the most constrained category; any other value is an explicit declaration.
+	TrafficCategory TrafficCategory `json:"traffic_category"`
+	UpdatedAt       time.Time       `json:"updated_at"`
 }
 
 // SenderIdStatus defines model for SenderId.Status.
@@ -3609,14 +3708,24 @@ type SenderIdStatus string
 // SenderIdCreate defines model for SenderIdCreate.
 type SenderIdCreate struct {
 	Address string `json:"address"`
+
+	// TrafficCategory What the customer commits to send under a sender ID (ADR-0020). marketing is the default and the most constrained category; any other value is an explicit declaration.
+	TrafficCategory *TrafficCategory `json:"traffic_category,omitempty"`
 }
 
-// SenderIdPolicy defines model for SenderIdPolicy.
-type SenderIdPolicy string
+// SenderIdRateLimitSet defines model for SenderIdRateLimitSet.
+type SenderIdRateLimitSet struct {
+	// BurstCapacity Messages admitted at once before max_per_sec paces them. Defaults to max_per_sec.
+	BurstCapacity *int `json:"burst_capacity,omitempty"`
+	MaxPerSec     int  `json:"max_per_sec"`
+}
 
 // SenderIdUpdate defines model for SenderIdUpdate.
 type SenderIdUpdate struct {
 	Status *SenderIdUpdateStatus `json:"status,omitempty"`
+
+	// TrafficCategory What the customer commits to send under a sender ID (ADR-0020). marketing is the default and the most constrained category; any other value is an explicit declaration.
+	TrafficCategory *TrafficCategory `json:"traffic_category,omitempty"`
 }
 
 // SenderIdUpdateStatus defines model for SenderIdUpdate.Status.
@@ -3752,7 +3861,6 @@ type SmppAccount struct {
 	Name             string             `json:"name"`
 	QuerySmEnabled   *bool              `json:"query_sm_enabled,omitempty"`
 	RestEnabled      bool               `json:"rest_enabled"`
-	SenderIdPolicy   SenderIdPolicy     `json:"sender_id_policy"`
 	SmppEnabled      bool               `json:"smpp_enabled"`
 	Status           SmppAccountStatus  `json:"status"`
 	UpdatedAt        time.Time          `json:"updated_at"`
@@ -3770,7 +3878,6 @@ type SmppAccountCreate struct {
 	Name             string             `json:"name"`
 	QuerySmEnabled   *bool              `json:"query_sm_enabled,omitempty"`
 	RestEnabled      *bool              `json:"rest_enabled,omitempty"`
-	SenderIdPolicy   *SenderIdPolicy    `json:"sender_id_policy,omitempty"`
 	SmppEnabled      *bool              `json:"smpp_enabled,omitempty"`
 }
 
@@ -3831,6 +3938,9 @@ type SuppressionScope string
 
 // SuppressionSource defines model for SuppressionSource.
 type SuppressionSource string
+
+// TrafficCategory What the customer commits to send under a sender ID (ADR-0020). marketing is the default and the most constrained category; any other value is an explicit declaration.
+type TrafficCategory string
 
 // TrafficMetrics defines model for TrafficMetrics.
 type TrafficMetrics struct {
@@ -3929,6 +4039,12 @@ type Conflict = Error
 // is human-readable. `errors[]` carries per-field detail on validation failures. The numeric HTTP
 // status is on the status line, not duplicated in the body.
 type Forbidden = Error
+
+// InsufficientCredit Flat error model (application/json). `code` is the stable machine-readable error code — the
+// cross-protocol contract also carried by SMPP command_status (engineering guide §11). `message`
+// is human-readable. `errors[]` carries per-field detail on validation failures. The numeric HTTP
+// status is on the status line, not duplicated in the body.
+type InsufficientCredit = Error
 
 // NotFound Flat error model (application/json). `code` is the stable machine-readable error code — the
 // cross-protocol contract also carried by SMPP command_status (engineering guide §11). `message`
@@ -4033,6 +4149,11 @@ type TransferBalanceJSONBodyDirection string
 // SetCustomerGroupJSONBody defines parameters for SetCustomerGroup.
 type SetCustomerGroupJSONBody struct {
 	GroupId *openapi_types.UUID `json:"group_id"`
+}
+
+// ListSenderIdsParams defines parameters for ListSenderIds.
+type ListSenderIdsParams struct {
+	TrafficCategory *TrafficCategory `form:"traffic_category,omitempty" json:"traffic_category,omitempty"`
 }
 
 // ListExactRoutesParams defines parameters for ListExactRoutes.
@@ -4164,6 +4285,12 @@ type ListSmppAccountsParams struct {
 	Limit      *Limit              `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListAccountBindFailuresParams defines parameters for ListAccountBindFailures.
+type ListAccountBindFailuresParams struct {
+	// Since Inclusive lower bound on at, within the last 24 hours. Defaults to 24 hours ago.
+	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
+}
+
 // CreateCredentialJSONBody defines parameters for CreateCredential.
 type CreateCredentialJSONBody struct {
 	// SystemId Required for smpp_bind. Bounded by the SMPP bind field (v3.4 §4.1.1).
@@ -4186,11 +4313,6 @@ type UpdateCredentialStatusJSONBodyStatus string
 type RotateCredentialJSONBody struct {
 	// GracePeriodSec Old secret stays valid this long in parallel. At most 7 days.
 	GracePeriodSec *int `json:"grace_period_sec,omitempty"`
-}
-
-// SetAccountSenderIdPolicyJSONBody defines parameters for SetAccountSenderIdPolicy.
-type SetAccountSenderIdPolicyJSONBody struct {
-	SenderIdPolicy SenderIdPolicy `json:"sender_id_policy"`
 }
 
 // SetAccountSmppOpsJSONBody defines parameters for SetAccountSmppOps.
@@ -4282,6 +4404,9 @@ type CreateSenderIdJSONRequestBody = SenderIdCreate
 
 // UpdateSenderIdJSONRequestBody defines body for UpdateSenderId for application/json ContentType.
 type UpdateSenderIdJSONRequestBody = SenderIdUpdate
+
+// SetSenderIdRateLimitJSONRequestBody defines body for SetSenderIdRateLimit for application/json ContentType.
+type SetSenderIdRateLimitJSONRequestBody = SenderIdRateLimitSet
 
 // CreateExactRouteJSONRequestBody defines body for CreateExactRoute for application/json ContentType.
 type CreateExactRouteJSONRequestBody = ExactRouteCreate
@@ -4375,9 +4500,6 @@ type UpdateCredentialStatusJSONRequestBody UpdateCredentialStatusJSONBody
 
 // RotateCredentialJSONRequestBody defines body for RotateCredential for application/json ContentType.
 type RotateCredentialJSONRequestBody RotateCredentialJSONBody
-
-// SetAccountSenderIdPolicyJSONRequestBody defines body for SetAccountSenderIdPolicy for application/json ContentType.
-type SetAccountSenderIdPolicyJSONRequestBody SetAccountSenderIdPolicyJSONBody
 
 // SetAccountSessionLimitsJSONRequestBody defines body for SetAccountSessionLimits for application/json ContentType.
 type SetAccountSessionLimitsJSONRequestBody = SessionLimitsUpdate
@@ -4861,9 +4983,11 @@ type ClientInterface interface {
 	// ListSenderIds List a customer's sender IDs
 	//
 	// Corresponds with GET /admin/customers/{id}/sender-ids (the `ListSenderIds` operationId).
-	ListSenderIds(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListSenderIds(ctx context.Context, id Id, params *ListSenderIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateSenderIdWithBody Register a sender ID (starts pending carrier approval)
+	//
+	// Every sender address must be registered, numeric ones included: a message whose source address has no active sender ID of its customer is rejected (ADR-0020).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4871,6 +4995,8 @@ type ClientInterface interface {
 	CreateSenderIdWithBody(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateSenderId Register a sender ID (starts pending carrier approval)
+	//
+	// Every sender address must be registered, numeric ones included: a message whose source address has no active sender ID of its customer is rejected (ADR-0020).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4882,19 +5008,44 @@ type ClientInterface interface {
 	// Corresponds with DELETE /admin/customers/{id}/sender-ids/{senderId} (the `DeleteSenderId` operationId).
 	DeleteSenderId(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateSenderIdWithBody Update a sender ID (status)
+	// UpdateSenderIdWithBody Update a sender ID (status, traffic category)
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /admin/customers/{id}/sender-ids/{senderId} (the `UpdateSenderId` operationId).
 	UpdateSenderIdWithBody(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateSenderId Update a sender ID (status)
+	// UpdateSenderId Update a sender ID (status, traffic category)
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /admin/customers/{id}/sender-ids/{senderId} (the `UpdateSenderId` operationId).
 	UpdateSenderId(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, body UpdateSenderIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSenderIdRateLimit Remove a sender ID's own rate limit
+	//
+	// The sender ID is then bounded by its account's limit only. Removing an absent limit is a 204.
+	//
+	// Corresponds with DELETE /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `DeleteSenderIdRateLimit` operationId).
+	DeleteSenderIdRateLimit(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSenderIdRateLimitWithBody Set a sender ID's own rate limit
+	//
+	// Checked at admission, before the acknowledgement and next to the account's limit: past it the submission is refused (429, ESME_RTHROTTLED) and no CDR is written (ADR-0021). Applies to the next message, live sessions included.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `SetSenderIdRateLimit` operationId).
+	SetSenderIdRateLimitWithBody(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSenderIdRateLimit Set a sender ID's own rate limit
+	//
+	// Checked at admission, before the acknowledgement and next to the account's limit: past it the submission is refused (429, ESME_RTHROTTLED) and no CDR is written (ADR-0021). Applies to the next message, live sessions included.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `SetSenderIdRateLimit` operationId).
+	SetSenderIdRateLimit(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, body SetSenderIdRateLimitJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListCustomerAccounts List a customer's SMPP accounts
 	//
@@ -5508,6 +5659,13 @@ type ClientInterface interface {
 	// Corresponds with PATCH /admin/smpp-accounts/{id} (the `UpdateSmppAccount` operationId).
 	UpdateSmppAccount(ctx context.Context, id Id, body UpdateSmppAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAccountBindFailures Recent refused binds of this account (§6.14)
+	//
+	// Newest first. Only a bind whose system_id resolves one of this account's credentials, revoked or disabled included, is attributed here: a bind under an unknown system_id belongs to no account and appears nowhere, so this list is not every attempt aimed at the account. ESME_RINVPASWD covers a wrong password, a revoked credential and the throttle alike (§11.3); only `reason` tells them apart. Retention is 24 hours and at most the 200 latest refusals per account, so a burst can evict older ones. Never carries the presented secret.
+	//
+	// Corresponds with GET /admin/smpp-accounts/{id}/bind-failures (the `ListAccountBindFailures` operationId).
+	ListAccountBindFailures(ctx context.Context, id Id, params *ListAccountBindFailuresParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SetAccountChannelsWithBody Enable/disable channels (at least one must stay true)
 	//
 	// Takes any type of body and a specified content type.
@@ -5583,24 +5741,6 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /admin/smpp-accounts/{id}/credentials/{credId}/rotate (the `RotateCredential` operationId).
 	RotateCredential(ctx context.Context, id Id, credId CredId, body RotateCredentialJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetAccountSenderIdPolicyWithBody Set sender-ID authorization policy (§6.19)
-	//
-	// Takes effect on the next message, live sessions included; no rebind.
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
-	SetAccountSenderIdPolicyWithBody(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetAccountSenderIdPolicy Set sender-ID authorization policy (§6.19)
-	//
-	// Takes effect on the next message, live sessions included; no rebind.
-	//
-	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
-	SetAccountSenderIdPolicy(ctx context.Context, id Id, body SetAccountSenderIdPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetAccountSessionLimitsWithBody Set max_sessions and allowed bind types
 	//
@@ -6747,8 +6887,8 @@ func (c *Client) SetCustomerGroup(ctx context.Context, id Id, body SetCustomerGr
 // ListSenderIds List a customer's sender IDs
 //
 // Corresponds with GET /admin/customers/{id}/sender-ids (the `ListSenderIds` operationId).
-func (c *Client) ListSenderIds(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListSenderIdsRequest(c.Server, id)
+func (c *Client) ListSenderIds(ctx context.Context, id Id, params *ListSenderIdsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSenderIdsRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -6760,6 +6900,8 @@ func (c *Client) ListSenderIds(ctx context.Context, id Id, reqEditors ...Request
 }
 
 // CreateSenderIdWithBody Register a sender ID (starts pending carrier approval)
+//
+// Every sender address must be registered, numeric ones included: a message whose source address has no active sender ID of its customer is rejected (ADR-0020).
 //
 // Takes any type of body and a specified content type.
 //
@@ -6777,6 +6919,8 @@ func (c *Client) CreateSenderIdWithBody(ctx context.Context, id Id, contentType 
 }
 
 // CreateSenderId Register a sender ID (starts pending carrier approval)
+//
+// Every sender address must be registered, numeric ones included: a message whose source address has no active sender ID of its customer is rejected (ADR-0020).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6808,7 +6952,7 @@ func (c *Client) DeleteSenderId(ctx context.Context, id Id, senderIdPathParam Se
 	return c.Client.Do(req)
 }
 
-// UpdateSenderIdWithBody Update a sender ID (status)
+// UpdateSenderIdWithBody Update a sender ID (status, traffic category)
 //
 // Takes any type of body and a specified content type.
 //
@@ -6825,13 +6969,68 @@ func (c *Client) UpdateSenderIdWithBody(ctx context.Context, id Id, senderIdPath
 	return c.Client.Do(req)
 }
 
-// UpdateSenderId Update a sender ID (status)
+// UpdateSenderId Update a sender ID (status, traffic category)
 //
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PATCH /admin/customers/{id}/sender-ids/{senderId} (the `UpdateSenderId` operationId).
 func (c *Client) UpdateSenderId(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, body UpdateSenderIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateSenderIdRequest(c.Server, id, senderIdPathParam, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteSenderIdRateLimit Remove a sender ID's own rate limit
+//
+// The sender ID is then bounded by its account's limit only. Removing an absent limit is a 204.
+//
+// Corresponds with DELETE /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `DeleteSenderIdRateLimit` operationId).
+func (c *Client) DeleteSenderIdRateLimit(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSenderIdRateLimitRequest(c.Server, id, senderIdPathParam)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetSenderIdRateLimitWithBody Set a sender ID's own rate limit
+//
+// Checked at admission, before the acknowledgement and next to the account's limit: past it the submission is refused (429, ESME_RTHROTTLED) and no CDR is written (ADR-0021). Applies to the next message, live sessions included.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `SetSenderIdRateLimit` operationId).
+func (c *Client) SetSenderIdRateLimitWithBody(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetSenderIdRateLimitRequestWithBody(c.Server, id, senderIdPathParam, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetSenderIdRateLimit Set a sender ID's own rate limit
+//
+// Checked at admission, before the acknowledgement and next to the account's limit: past it the submission is refused (429, ESME_RTHROTTLED) and no CDR is written (ADR-0021). Applies to the next message, live sessions included.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `SetSenderIdRateLimit` operationId).
+func (c *Client) SetSenderIdRateLimit(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, body SetSenderIdRateLimitJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetSenderIdRateLimitRequest(c.Server, id, senderIdPathParam, body)
 	if err != nil {
 		return nil, err
 	}
@@ -8374,6 +8573,23 @@ func (c *Client) UpdateSmppAccount(ctx context.Context, id Id, body UpdateSmppAc
 	return c.Client.Do(req)
 }
 
+// ListAccountBindFailures Recent refused binds of this account (§6.14)
+//
+// Newest first. Only a bind whose system_id resolves one of this account's credentials, revoked or disabled included, is attributed here: a bind under an unknown system_id belongs to no account and appears nowhere, so this list is not every attempt aimed at the account. ESME_RINVPASWD covers a wrong password, a revoked credential and the throttle alike (§11.3); only `reason` tells them apart. Retention is 24 hours and at most the 200 latest refusals per account, so a burst can evict older ones. Never carries the presented secret.
+//
+// Corresponds with GET /admin/smpp-accounts/{id}/bind-failures (the `ListAccountBindFailures` operationId).
+func (c *Client) ListAccountBindFailures(ctx context.Context, id Id, params *ListAccountBindFailuresParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAccountBindFailuresRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // SetAccountChannelsWithBody Enable/disable channels (at least one must stay true)
 //
 // Takes any type of body and a specified content type.
@@ -8540,44 +8756,6 @@ func (c *Client) RotateCredentialWithBody(ctx context.Context, id Id, credId Cre
 // Corresponds with POST /admin/smpp-accounts/{id}/credentials/{credId}/rotate (the `RotateCredential` operationId).
 func (c *Client) RotateCredential(ctx context.Context, id Id, credId CredId, body RotateCredentialJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRotateCredentialRequest(c.Server, id, credId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetAccountSenderIdPolicyWithBody Set sender-ID authorization policy (§6.19)
-//
-// Takes effect on the next message, live sessions included; no rebind.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
-func (c *Client) SetAccountSenderIdPolicyWithBody(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetAccountSenderIdPolicyRequestWithBody(c.Server, id, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetAccountSenderIdPolicy Set sender-ID authorization policy (§6.19)
-//
-// Takes effect on the next message, live sessions included; no rebind.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
-func (c *Client) SetAccountSenderIdPolicy(ctx context.Context, id Id, body SetAccountSenderIdPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetAccountSenderIdPolicyRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -10828,7 +11006,7 @@ func NewSetCustomerGroupRequestWithBody(server string, id Id, contentType string
 }
 
 // NewListSenderIdsRequest constructs an http.Request for the ListSenderIds method
-func NewListSenderIdsRequest(server string, id Id) (*http.Request, error) {
+func NewListSenderIdsRequest(server string, id Id, params *ListSenderIdsParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -10851,6 +11029,33 @@ func NewListSenderIdsRequest(server string, id Id) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.TrafficCategory != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "traffic_category", *params.TrafficCategory, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -10994,6 +11199,101 @@ func NewUpdateSenderIdRequestWithBody(server string, id Id, senderIdPathParam Se
 	}
 
 	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteSenderIdRateLimitRequest constructs an http.Request for the DeleteSenderIdRateLimit method
+func NewDeleteSenderIdRateLimitRequest(server string, id Id, senderIdPathParam SenderIdPathParam) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "senderId", senderIdPathParam, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/admin/customers/%s/sender-ids/%s/rate-limit", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetSenderIdRateLimitRequest calls the generic SetSenderIdRateLimit builder with application/json body
+func NewSetSenderIdRateLimitRequest(server string, id Id, senderIdPathParam SenderIdPathParam, body SetSenderIdRateLimitJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetSenderIdRateLimitRequestWithBody(server, id, senderIdPathParam, "application/json", bodyReader)
+}
+
+// NewSetSenderIdRateLimitRequestWithBody constructs an http.Request for the SetSenderIdRateLimit method, with any body, and a specified content type
+func NewSetSenderIdRateLimitRequestWithBody(server string, id Id, senderIdPathParam SenderIdPathParam, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "senderId", senderIdPathParam, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/admin/customers/%s/sender-ids/%s/rate-limit", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -13904,6 +14204,67 @@ func NewUpdateSmppAccountRequestWithBody(server string, id Id, contentType strin
 	return req, nil
 }
 
+// NewListAccountBindFailuresRequest constructs an http.Request for the ListAccountBindFailures method
+func NewListAccountBindFailuresRequest(server string, id Id, params *ListAccountBindFailuresParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/admin/smpp-accounts/%s/bind-failures", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewSetAccountChannelsRequest calls the generic SetAccountChannels builder with application/json body
 func NewSetAccountChannelsRequest(server string, id Id, body SetAccountChannelsJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -14172,53 +14533,6 @@ func NewRotateCredentialRequestWithBody(server string, id Id, credId CredId, con
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewSetAccountSenderIdPolicyRequest calls the generic SetAccountSenderIdPolicy builder with application/json body
-func NewSetAccountSenderIdPolicyRequest(server string, id Id, body SetAccountSenderIdPolicyJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetAccountSenderIdPolicyRequestWithBody(server, id, "application/json", bodyReader)
-}
-
-// NewSetAccountSenderIdPolicyRequestWithBody constructs an http.Request for the SetAccountSenderIdPolicy method, with any body, and a specified content type
-func NewSetAccountSenderIdPolicyRequestWithBody(server string, id Id, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/admin/smpp-accounts/%s/sender-id-policy", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -15384,9 +15698,11 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /admin/customers/{id}/sender-ids (the `ListSenderIds` operationId).
-	ListSenderIdsWithResponse(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*ListSenderIdsResponse, error)
+	ListSenderIdsWithResponse(ctx context.Context, id Id, params *ListSenderIdsParams, reqEditors ...RequestEditorFn) (*ListSenderIdsResponse, error)
 
 	// CreateSenderIdWithBodyWithResponse Register a sender ID (starts pending carrier approval)
+	//
+	// Every sender address must be registered, numeric ones included: a message whose source address has no active sender ID of its customer is rejected (ADR-0020).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15394,6 +15710,8 @@ type ClientWithResponsesInterface interface {
 	CreateSenderIdWithBodyWithResponse(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSenderIdResponse, error)
 
 	// CreateSenderIdWithResponse Register a sender ID (starts pending carrier approval)
+	//
+	// Every sender address must be registered, numeric ones included: a message whose source address has no active sender ID of its customer is rejected (ADR-0020).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15407,19 +15725,46 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /admin/customers/{id}/sender-ids/{senderId} (the `DeleteSenderId` operationId).
 	DeleteSenderIdWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, reqEditors ...RequestEditorFn) (*DeleteSenderIdResponse, error)
 
-	// UpdateSenderIdWithBodyWithResponse Update a sender ID (status)
+	// UpdateSenderIdWithBodyWithResponse Update a sender ID (status, traffic category)
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/customers/{id}/sender-ids/{senderId} (the `UpdateSenderId` operationId).
 	UpdateSenderIdWithBodyWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSenderIdResponse, error)
 
-	// UpdateSenderIdWithResponse Update a sender ID (status)
+	// UpdateSenderIdWithResponse Update a sender ID (status, traffic category)
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /admin/customers/{id}/sender-ids/{senderId} (the `UpdateSenderId` operationId).
 	UpdateSenderIdWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, body UpdateSenderIdJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSenderIdResponse, error)
+
+	// DeleteSenderIdRateLimitWithResponse Remove a sender ID's own rate limit
+	//
+	// The sender ID is then bounded by its account's limit only. Removing an absent limit is a 204.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `DeleteSenderIdRateLimit` operationId).
+	DeleteSenderIdRateLimitWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, reqEditors ...RequestEditorFn) (*DeleteSenderIdRateLimitResponse, error)
+
+	// SetSenderIdRateLimitWithBodyWithResponse Set a sender ID's own rate limit
+	//
+	// Checked at admission, before the acknowledgement and next to the account's limit: past it the submission is refused (429, ESME_RTHROTTLED) and no CDR is written (ADR-0021). Applies to the next message, live sessions included.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `SetSenderIdRateLimit` operationId).
+	SetSenderIdRateLimitWithBodyWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSenderIdRateLimitResponse, error)
+
+	// SetSenderIdRateLimitWithResponse Set a sender ID's own rate limit
+	//
+	// Checked at admission, before the acknowledgement and next to the account's limit: past it the submission is refused (429, ESME_RTHROTTLED) and no CDR is written (ADR-0021). Applies to the next message, live sessions included.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `SetSenderIdRateLimit` operationId).
+	SetSenderIdRateLimitWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, body SetSenderIdRateLimitJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSenderIdRateLimitResponse, error)
 
 	// ListCustomerAccountsWithResponse List a customer's SMPP accounts
 	//
@@ -16109,6 +16454,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /admin/smpp-accounts/{id} (the `UpdateSmppAccount` operationId).
 	UpdateSmppAccountWithResponse(ctx context.Context, id Id, body UpdateSmppAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSmppAccountResponse, error)
 
+	// ListAccountBindFailuresWithResponse Recent refused binds of this account (§6.14)
+	//
+	// Newest first. Only a bind whose system_id resolves one of this account's credentials, revoked or disabled included, is attributed here: a bind under an unknown system_id belongs to no account and appears nowhere, so this list is not every attempt aimed at the account. ESME_RINVPASWD covers a wrong password, a revoked credential and the throttle alike (§11.3); only `reason` tells them apart. Retention is 24 hours and at most the 200 latest refusals per account, so a burst can evict older ones. Never carries the presented secret.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /admin/smpp-accounts/{id}/bind-failures (the `ListAccountBindFailures` operationId).
+	ListAccountBindFailuresWithResponse(ctx context.Context, id Id, params *ListAccountBindFailuresParams, reqEditors ...RequestEditorFn) (*ListAccountBindFailuresResponse, error)
+
 	// SetAccountChannelsWithBodyWithResponse Enable/disable channels (at least one must stay true)
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -16188,24 +16542,6 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /admin/smpp-accounts/{id}/credentials/{credId}/rotate (the `RotateCredential` operationId).
 	RotateCredentialWithResponse(ctx context.Context, id Id, credId CredId, body RotateCredentialJSONRequestBody, reqEditors ...RequestEditorFn) (*RotateCredentialResponse, error)
-
-	// SetAccountSenderIdPolicyWithBodyWithResponse Set sender-ID authorization policy (§6.19)
-	//
-	// Takes effect on the next message, live sessions included; no rebind.
-	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
-	SetAccountSenderIdPolicyWithBodyWithResponse(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAccountSenderIdPolicyResponse, error)
-
-	// SetAccountSenderIdPolicyWithResponse Set sender-ID authorization policy (§6.19)
-	//
-	// Takes effect on the next message, live sessions included; no rebind.
-	//
-	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
-	SetAccountSenderIdPolicyWithResponse(ctx context.Context, id Id, body SetAccountSenderIdPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAccountSenderIdPolicyResponse, error)
 
 	// SetAccountSessionLimitsWithBodyWithResponse Set max_sessions and allowed bind types
 	//
@@ -18763,6 +19099,8 @@ type TransferBalanceResponse struct {
 	JSON200 *[]LedgerEntry
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Unauthorized
+	// JSON402 the response for an HTTP 402 `application/json` response
+	JSON402 *InsufficientCredit
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *Forbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
@@ -18781,6 +19119,11 @@ func (r TransferBalanceResponse) GetJSON200() *[]LedgerEntry {
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r TransferBalanceResponse) GetJSON401() *Unauthorized {
 	return r.JSON401
+}
+
+// GetJSON402 returns the response for an HTTP 402 `application/json` response
+func (r TransferBalanceResponse) GetJSON402() *InsufficientCredit {
+	return r.JSON402
 }
 
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
@@ -19433,6 +19776,137 @@ func (r UpdateSenderIdResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateSenderIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteSenderIdRateLimitResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteSenderIdRateLimitResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteSenderIdRateLimitResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteSenderIdRateLimitResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r DeleteSenderIdRateLimitResponse) GetJSON422() *ValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteSenderIdRateLimitResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSenderIdRateLimitResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSenderIdRateLimitResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteSenderIdRateLimitResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetSenderIdRateLimitResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SenderId
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetSenderIdRateLimitResponse) GetJSON200() *SenderId {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r SetSenderIdRateLimitResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r SetSenderIdRateLimitResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SetSenderIdRateLimitResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r SetSenderIdRateLimitResponse) GetJSON422() *ValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r SetSenderIdRateLimitResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetSenderIdRateLimitResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetSenderIdRateLimitResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetSenderIdRateLimitResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -23493,6 +23967,79 @@ func (r UpdateSmppAccountResponse) ContentType() string {
 	return ""
 }
 
+type ListAccountBindFailuresResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		Data []BindFailure `json:"data"`
+	}
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Unauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Forbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *NotFound
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *ValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAccountBindFailuresResponse) GetJSON200() *struct {
+	Data []BindFailure `json:"data"`
+} {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListAccountBindFailuresResponse) GetJSON401() *Unauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListAccountBindFailuresResponse) GetJSON403() *Forbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ListAccountBindFailuresResponse) GetJSON404() *NotFound {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListAccountBindFailuresResponse) GetJSON422() *ValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAccountBindFailuresResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAccountBindFailuresResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAccountBindFailuresResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAccountBindFailuresResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type SetAccountChannelsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -23901,75 +24448,6 @@ func (r RotateCredentialResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RotateCredentialResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type SetAccountSenderIdPolicyResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *SmppAccount
-	// JSON401 the response for an HTTP 401 `application/json` response
-	JSON401 *Unauthorized
-	// JSON403 the response for an HTTP 403 `application/json` response
-	JSON403 *Forbidden
-	// JSON404 the response for an HTTP 404 `application/json` response
-	JSON404 *NotFound
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *ValidationError
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r SetAccountSenderIdPolicyResponse) GetJSON200() *SmppAccount {
-	return r.JSON200
-}
-
-// GetJSON401 returns the response for an HTTP 401 `application/json` response
-func (r SetAccountSenderIdPolicyResponse) GetJSON401() *Unauthorized {
-	return r.JSON401
-}
-
-// GetJSON403 returns the response for an HTTP 403 `application/json` response
-func (r SetAccountSenderIdPolicyResponse) GetJSON403() *Forbidden {
-	return r.JSON403
-}
-
-// GetJSON404 returns the response for an HTTP 404 `application/json` response
-func (r SetAccountSenderIdPolicyResponse) GetJSON404() *NotFound {
-	return r.JSON404
-}
-
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r SetAccountSenderIdPolicyResponse) GetJSON422() *ValidationError {
-	return r.JSON422
-}
-
-// GetBody returns the raw response body bytes
-func (r SetAccountSenderIdPolicyResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r SetAccountSenderIdPolicyResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetAccountSenderIdPolicyResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r SetAccountSenderIdPolicyResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -25780,8 +26258,8 @@ func (c *ClientWithResponses) SetCustomerGroupWithResponse(ctx context.Context, 
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /admin/customers/{id}/sender-ids (the `ListSenderIds` operationId).
-func (c *ClientWithResponses) ListSenderIdsWithResponse(ctx context.Context, id Id, reqEditors ...RequestEditorFn) (*ListSenderIdsResponse, error) {
-	rsp, err := c.ListSenderIds(ctx, id, reqEditors...)
+func (c *ClientWithResponses) ListSenderIdsWithResponse(ctx context.Context, id Id, params *ListSenderIdsParams, reqEditors ...RequestEditorFn) (*ListSenderIdsResponse, error) {
+	rsp, err := c.ListSenderIds(ctx, id, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -25789,6 +26267,8 @@ func (c *ClientWithResponses) ListSenderIdsWithResponse(ctx context.Context, id 
 }
 
 // CreateSenderIdWithBodyWithResponse Register a sender ID (starts pending carrier approval)
+//
+// Every sender address must be registered, numeric ones included: a message whose source address has no active sender ID of its customer is rejected (ADR-0020).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25802,6 +26282,8 @@ func (c *ClientWithResponses) CreateSenderIdWithBodyWithResponse(ctx context.Con
 }
 
 // CreateSenderIdWithResponse Register a sender ID (starts pending carrier approval)
+//
+// Every sender address must be registered, numeric ones included: a message whose source address has no active sender ID of its customer is rejected (ADR-0020).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25827,7 +26309,7 @@ func (c *ClientWithResponses) DeleteSenderIdWithResponse(ctx context.Context, id
 	return ParseDeleteSenderIdResponse(rsp)
 }
 
-// UpdateSenderIdWithBodyWithResponse Update a sender ID (status)
+// UpdateSenderIdWithBodyWithResponse Update a sender ID (status, traffic category)
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25840,7 +26322,7 @@ func (c *ClientWithResponses) UpdateSenderIdWithBodyWithResponse(ctx context.Con
 	return ParseUpdateSenderIdResponse(rsp)
 }
 
-// UpdateSenderIdWithResponse Update a sender ID (status)
+// UpdateSenderIdWithResponse Update a sender ID (status, traffic category)
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25851,6 +26333,51 @@ func (c *ClientWithResponses) UpdateSenderIdWithResponse(ctx context.Context, id
 		return nil, err
 	}
 	return ParseUpdateSenderIdResponse(rsp)
+}
+
+// DeleteSenderIdRateLimitWithResponse Remove a sender ID's own rate limit
+//
+// The sender ID is then bounded by its account's limit only. Removing an absent limit is a 204.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `DeleteSenderIdRateLimit` operationId).
+func (c *ClientWithResponses) DeleteSenderIdRateLimitWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, reqEditors ...RequestEditorFn) (*DeleteSenderIdRateLimitResponse, error) {
+	rsp, err := c.DeleteSenderIdRateLimit(ctx, id, senderIdPathParam, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSenderIdRateLimitResponse(rsp)
+}
+
+// SetSenderIdRateLimitWithBodyWithResponse Set a sender ID's own rate limit
+//
+// Checked at admission, before the acknowledgement and next to the account's limit: past it the submission is refused (429, ESME_RTHROTTLED) and no CDR is written (ADR-0021). Applies to the next message, live sessions included.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `SetSenderIdRateLimit` operationId).
+func (c *ClientWithResponses) SetSenderIdRateLimitWithBodyWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSenderIdRateLimitResponse, error) {
+	rsp, err := c.SetSenderIdRateLimitWithBody(ctx, id, senderIdPathParam, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetSenderIdRateLimitResponse(rsp)
+}
+
+// SetSenderIdRateLimitWithResponse Set a sender ID's own rate limit
+//
+// Checked at admission, before the acknowledgement and next to the account's limit: past it the submission is refused (429, ESME_RTHROTTLED) and no CDR is written (ADR-0021). Applies to the next message, live sessions included.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /admin/customers/{id}/sender-ids/{senderId}/rate-limit (the `SetSenderIdRateLimit` operationId).
+func (c *ClientWithResponses) SetSenderIdRateLimitWithResponse(ctx context.Context, id Id, senderIdPathParam SenderIdPathParam, body SetSenderIdRateLimitJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSenderIdRateLimitResponse, error) {
+	rsp, err := c.SetSenderIdRateLimit(ctx, id, senderIdPathParam, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetSenderIdRateLimitResponse(rsp)
 }
 
 // ListCustomerAccountsWithResponse List a customer's SMPP accounts
@@ -27093,6 +27620,21 @@ func (c *ClientWithResponses) UpdateSmppAccountWithResponse(ctx context.Context,
 	return ParseUpdateSmppAccountResponse(rsp)
 }
 
+// ListAccountBindFailuresWithResponse Recent refused binds of this account (§6.14)
+//
+// Newest first. Only a bind whose system_id resolves one of this account's credentials, revoked or disabled included, is attributed here: a bind under an unknown system_id belongs to no account and appears nowhere, so this list is not every attempt aimed at the account. ESME_RINVPASWD covers a wrong password, a revoked credential and the throttle alike (§11.3); only `reason` tells them apart. Retention is 24 hours and at most the 200 latest refusals per account, so a burst can evict older ones. Never carries the presented secret.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /admin/smpp-accounts/{id}/bind-failures (the `ListAccountBindFailures` operationId).
+func (c *ClientWithResponses) ListAccountBindFailuresWithResponse(ctx context.Context, id Id, params *ListAccountBindFailuresParams, reqEditors ...RequestEditorFn) (*ListAccountBindFailuresResponse, error) {
+	rsp, err := c.ListAccountBindFailures(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAccountBindFailuresResponse(rsp)
+}
+
 // SetAccountChannelsWithBodyWithResponse Enable/disable channels (at least one must stay true)
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -27231,36 +27773,6 @@ func (c *ClientWithResponses) RotateCredentialWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseRotateCredentialResponse(rsp)
-}
-
-// SetAccountSenderIdPolicyWithBodyWithResponse Set sender-ID authorization policy (§6.19)
-//
-// Takes effect on the next message, live sessions included; no rebind.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
-func (c *ClientWithResponses) SetAccountSenderIdPolicyWithBodyWithResponse(ctx context.Context, id Id, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAccountSenderIdPolicyResponse, error) {
-	rsp, err := c.SetAccountSenderIdPolicyWithBody(ctx, id, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetAccountSenderIdPolicyResponse(rsp)
-}
-
-// SetAccountSenderIdPolicyWithResponse Set sender-ID authorization policy (§6.19)
-//
-// Takes effect on the next message, live sessions included; no rebind.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /admin/smpp-accounts/{id}/sender-id-policy (the `SetAccountSenderIdPolicy` operationId).
-func (c *ClientWithResponses) SetAccountSenderIdPolicyWithResponse(ctx context.Context, id Id, body SetAccountSenderIdPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAccountSenderIdPolicyResponse, error) {
-	rsp, err := c.SetAccountSenderIdPolicy(ctx, id, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetAccountSenderIdPolicyResponse(rsp)
 }
 
 // SetAccountSessionLimitsWithBodyWithResponse Set max_sessions and allowed bind types
@@ -29448,6 +29960,13 @@ func ParseTransferBalanceResponse(rsp *http.Response) (*TransferBalanceResponse,
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 402:
+		var dest InsufficientCredit
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON402 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
 		var dest Forbidden
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -29911,6 +30430,110 @@ func ParseUpdateSenderIdResponse(rsp *http.Response) (*UpdateSenderIdResponse, e
 	}
 
 	response := &UpdateSenderIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SenderId
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSenderIdRateLimitResponse parses an HTTP response from a DeleteSenderIdRateLimitWithResponse call
+func ParseDeleteSenderIdRateLimitResponse(rsp *http.Response) (*DeleteSenderIdRateLimitResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSenderIdRateLimitResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetSenderIdRateLimitResponse parses an HTTP response from a SetSenderIdRateLimitWithResponse call
+func ParseSetSenderIdRateLimitResponse(rsp *http.Response) (*SetSenderIdRateLimitResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetSenderIdRateLimitResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -33060,6 +33683,62 @@ func ParseUpdateSmppAccountResponse(rsp *http.Response) (*UpdateSmppAccountRespo
 	return response, nil
 }
 
+// ParseListAccountBindFailuresResponse parses an HTTP response from a ListAccountBindFailuresWithResponse call
+func ParseListAccountBindFailuresResponse(rsp *http.Response) (*ListAccountBindFailuresResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAccountBindFailuresResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Data []BindFailure `json:"data"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseSetAccountChannelsResponse parses an HTTP response from a SetAccountChannelsWithResponse call
 func ParseSetAccountChannelsResponse(rsp *http.Response) (*SetAccountChannelsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -33374,60 +34053,6 @@ func ParseRotateCredentialResponse(rsp *http.Response) (*RotateCredentialRespons
 			return nil, err
 		}
 		response.JSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest ValidationError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON422 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSetAccountSenderIdPolicyResponse parses an HTTP response from a SetAccountSenderIdPolicyWithResponse call
-func ParseSetAccountSenderIdPolicyResponse(rsp *http.Response) (*SetAccountSenderIdPolicyResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SetAccountSenderIdPolicyResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SmppAccount
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest ValidationError

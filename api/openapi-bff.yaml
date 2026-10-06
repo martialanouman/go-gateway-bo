@@ -1332,8 +1332,10 @@ paths:
       - $ref: '#/components/parameters/SenderIdParam'
     patch:
       operationId: updateSenderId
-      summary: Approuve ou désactive un sender ID
-      description: Relayée vers `update-sender-id`.
+      summary: Approuve, désactive ou classe un sender ID
+      description: |
+        Relayée vers `update-sender-id`. Un changement de catégorie relit d'abord `list-sender-ids` :
+        l'audit porte l'ancienne catégorie lue en amont, jamais une valeur venue du navigateur.
       requestBody:
         required: true
         content:
@@ -1359,6 +1361,52 @@ paths:
       responses:
         '204':
           description: Le sender ID est supprimé.
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/SenderIdInconnu' }
+        '409': { $ref: '#/components/responses/SenderIdDejaUtilise' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+
+  /customers/{customerId}/sender-ids/{senderId}/rate-limit:
+    parameters:
+      - $ref: '#/components/parameters/CustomerId'
+      - $ref: '#/components/parameters/SenderIdParam'
+    put:
+      operationId: setSenderIdRateLimit
+      summary: Pose la limite de débit propre d'un sender ID
+      description: |
+        Relayée vers `set-sender-id-rate-limit`. Au-delà, la passerelle refuse à l'admission (429,
+        `ESME_RTHROTTLED`) et n'écrit aucun CDR. `burstCapacity` absent vaut `maxPerSec`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SenderIdRateLimitSetting' }
+      responses:
+        '200':
+          description: Le sender ID et sa nouvelle limite.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SenderId' }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '404': { $ref: '#/components/responses/SenderIdInconnu' }
+        '415': { $ref: '#/components/responses/TypeDeContenuRefuse' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+    delete:
+      operationId: deleteSenderIdRateLimit
+      summary: Retire la limite de débit propre d'un sender ID
+      description: |
+        Relayée vers `delete-sender-id-rate-limit`. Le sender ID n'a plus de limite propre et reste soumis
+        au plafond de son compte (ADR-0021 §3), que le contrat Admin n'expose pas. Retirer une limite
+        absente rend aussi 204.
+      responses:
+        '204':
+          description: La limite est retirée, ou n'existait pas.
         '401': { $ref: '#/components/responses/SessionAbsente' }
         '403': { $ref: '#/components/responses/PermissionRefusee' }
         '404': { $ref: '#/components/responses/SenderIdInconnu' }
@@ -1816,6 +1864,12 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     SenderIdInconnu:
       description: Ce client n'a aucun sender ID de cet identifiant.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SenderIdDejaUtilise:
+      description: |
+        Ce nom a déjà servi à envoyer : il ne se supprime plus, il se désactive.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -2719,6 +2773,10 @@ components:
       type: string
       enum: [pending_carrier_approval, active, disabled]
 
+    TrafficCategory:
+      type: string
+      enum: [otp, transactional, marketing]
+
     SenderId:
       type: object
       additionalProperties: false
@@ -2726,8 +2784,35 @@ components:
         id: { type: string }
         address: { type: string }
         status: { $ref: '#/components/schemas/SenderIdStatus' }
+        trafficCategory: { $ref: '#/components/schemas/TrafficCategory' }
+        rateLimit:
+          # Nul quand le sender ID n'a pas de limite propre.
+          oneOf:
+            - $ref: '#/components/schemas/SenderIdRateLimit'
+            - type: 'null'
+        recentCategoryMismatches24h:
+          # Nul quand la passerelle ne peut pas lire son compteur : inconnu, pas zéro.
+          type: [integer, "null"]
+          minimum: 0
+        firstUsedAt: { type: [string, "null"], format: date-time }
         createdAt: { type: string, format: date-time }
-      required: [id, address, status, createdAt]
+      required: [id, address, status, trafficCategory, rateLimit, recentCategoryMismatches24h, firstUsedAt, createdAt]
+
+    SenderIdRateLimit:
+      type: object
+      additionalProperties: false
+      properties:
+        maxPerSec: { type: integer, minimum: 1, maximum: 2147483647 }
+        burstCapacity: { type: integer, minimum: 1, maximum: 2147483647 }
+      required: [maxPerSec, burstCapacity]
+
+    SenderIdRateLimitSetting:
+      type: object
+      additionalProperties: false
+      properties:
+        maxPerSec: { type: integer, minimum: 1, maximum: 2147483647 }
+        burstCapacity: { type: integer, minimum: 1, maximum: 2147483647 }
+      required: [maxPerSec]
 
     SenderIdCreation:
       type: object
@@ -2743,9 +2828,10 @@ components:
     SenderIdUpdate:
       type: object
       additionalProperties: false
+      minProperties: 1
       properties:
         status: { type: string, enum: [active, disabled] }
-      required: [status]
+        trafficCategory: { $ref: '#/components/schemas/TrafficCategory' }
 
     SmppAccount:
       type: object

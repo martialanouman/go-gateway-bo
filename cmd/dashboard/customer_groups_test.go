@@ -60,6 +60,7 @@ func (w *customerGroupsWorld) registerSteps(ctx *godog.ScenarioContext) {
 		return w.answering(http.StatusConflict, `{"code":"conflict","message":"sender id already exists"}`)
 	})
 	ctx.Then(`^la réponse compte (\d+) comptes, dont (\d+) actifs et (\d+) fermé$`, w.countsAccounts)
+	w.registerSenderIDSteps(ctx)
 	ctx.Given(`^une passerelle qui compte (\d+) binds ouverts pour une limite de (\d+), sans en lister aucun$`,
 		func(active, limit int) error {
 			return w.answering(http.StatusOK,
@@ -104,6 +105,10 @@ func (w *customerGroupsWorld) answering(status int, body string) error {
 }
 
 func (w *customerGroupsWorld) answeringBy(statusFor func(*http.Request) int, body string) error {
+	return w.replying(func(r *http.Request) (int, string) { return statusFor(r), body })
+}
+
+func (w *customerGroupsWorld) replying(reply func(*http.Request) (int, string)) error {
 	w.upstream = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		// Le hub ouvre aussi ses flux temps réel sur cette adresse : seul l'appel relayé compte.
 		if strings.HasPrefix(r.URL.Path, "/admin/customer-groups") || strings.HasPrefix(r.URL.Path, "/admin/customers") ||
@@ -111,12 +116,13 @@ func (w *customerGroupsWorld) answeringBy(statusFor func(*http.Request) int, bod
 			w.received.Add(1)
 			sent, _ := io.ReadAll(r.Body)
 			w.mu.Lock()
-			w.queries = append(w.queries, r.URL.RawQuery+" "+string(sent))
+			w.queries = append(w.queries, r.Method+" "+r.URL.RawQuery+" "+string(sent))
 			w.mu.Unlock()
 		}
 
+		status, body := reply(r)
 		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(statusFor(r))
+		rw.WriteHeader(status)
 		_, _ = rw.Write([]byte(body))
 	}))
 	w.process.env["DASHBOARD_GATEWAY_BASE_URL"] = w.upstream.URL

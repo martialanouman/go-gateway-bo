@@ -44,6 +44,7 @@ const (
 	actionSenderIDCreate     = "sender_id.create"
 	actionSenderIDUpdate     = "sender_id.update"
 	actionSenderIDDelete     = "sender_id.delete"
+	actionSenderIDRateLimit  = "sender_id.rate_limit"
 	actionAccountCreate      = "account.create"
 	actionAccountChannels    = "account.channels"
 	actionAccountSmppOps     = "account.smpp_ops"

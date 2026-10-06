@@ -330,6 +330,16 @@ func (failingAPI) DeleteSenderId(_ context.Context, _ DeleteSenderIdRequestObjec
 	return nil, errors.ErrUnsupported
 }
 
+func (failingAPI) SetSenderIdRateLimit(_ context.Context, _ SetSenderIdRateLimitRequestObject,
+) (SetSenderIdRateLimitResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
+func (failingAPI) DeleteSenderIdRateLimit(_ context.Context, _ DeleteSenderIdRateLimitRequestObject,
+) (DeleteSenderIdRateLimitResponseObject, error) {
+	return nil, errors.ErrUnsupported
+}
+
 func (failingAPI) ListAccounts(_ context.Context, _ ListAccountsRequestObject,
 ) (ListAccountsResponseObject, error) {
 	return nil, errors.ErrUnsupported

@@ -607,6 +607,21 @@ test('the binary serves the painted shell, then the application replaces it', as
     'En attente d’approbation',
   )
 
+  // step-067 : le nom classé en OTP après confirmation, puis limité.
+  const nomDeParcours = page.getByRole('row', { name: /PARCOURS/ })
+  await expect(nomDeParcours).toContainText('Marketing')
+  await nomDeParcours.getByRole('button', { name: 'Classer PARCOURS' }).click()
+  const classement = page.getByRole('dialog', { name: 'Classer PARCOURS en OTP ?' })
+  await expect(classement).toContainText('passera devant le marketing')
+  await classement.getByRole('button', { name: 'Classer' }).click()
+  await expect(nomDeParcours).toContainText('OTP')
+  await nomDeParcours.getByRole('button', { name: 'Limiter PARCOURS' }).click()
+  const limiteDuNom = page.getByRole('dialog', { name: 'Limiter le débit de PARCOURS ?' })
+  await limiteDuNom.getByLabel('Messages par seconde').fill('50')
+  await limiteDuNom.getByLabel('Rafale').fill('100')
+  await limiteDuNom.getByRole('button', { name: 'Limiter' }).click()
+  await expect(nomDeParcours).toContainText('50/s, rafale 100')
+
   // step-063 : un compte créé depuis les comptes du client, que la suspension chiffre ensuite.
   await page.getByRole('link', { name: 'Voir ses comptes' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Comptes de Client de parcours')

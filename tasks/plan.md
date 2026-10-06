@@ -130,7 +130,7 @@ Aucune autre bibliothèque pour ces rôles sans décision d'équipe.
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat | `@martialanouman/gateway-api-contracts` | **6.13.0** |
+| Contrat | `@martialanouman/gateway-api-contracts` | **7.3.0** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests | `vitest` + `@playwright/test` | 4.1.10 / 1.62.0 |
 | Langage | `typescript` | 7.0.2 |
@@ -312,9 +312,9 @@ pas la compilation. Une contrainte de validation resserrée (`additionalProperti
 > Aucun de ces points n'aurait été vu en lisant seulement le numéro de version, et quatre sur six ne
 > font pas échouer la compilation.
 
-**Dette soldée le 08/08/2026 : le dépôt était alors en 4.0.2** (step-009) ; il est en **6.13.0**
-depuis le 04/10/2026 (6.8.0 et 6.9.0 le 26/09, qui décrit les trames temps réel ; 6.10.0 à step-062,
-qui ajoute `member_count` aux groupes ; 6.10.1 à step-065, des `description` seules : `closed` est définitif ; 6.13.0 à step-066, hors quarantaine par exception épinglée, qui porte les correctifs d'identifiants et, de 6.11.0 et 6.12.0, `first_used_at` et le 409 de suppression d'un nom d'expéditeur, puis le scope `cdr:export_bulk`). Les deux majeures qui le séparaient
+**Dette soldée le 08/08/2026 : le dépôt était alors en 4.0.2** (step-009) ; il est en **7.3.0**
+depuis le 06/10/2026 (6.8.0 et 6.9.0 le 26/09, qui décrit les trames temps réel ; 6.10.0 à step-062,
+qui ajoute `member_count` aux groupes ; 6.10.1 à step-065, des `description` seules : `closed` est définitif ; 6.13.0 à step-066, hors quarantaine par exception épinglée, qui porte les correctifs d'identifiants et, de 6.11.0 et 6.12.0, `first_used_at` et le 409 de suppression d'un nom d'expéditeur, puis le scope `cdr:export_bulk` ; 7.3.0 à step-067, par la même exception, qui retire la politique de sender ID et porte la catégorie de trafic, la limite de débit et le compteur `category_mismatch` des sender IDs, ainsi que les échecs de bind de step-069). Les deux majeures qui le séparaient
 de 2.5.0 ont été relues ligne à ligne, et ce qu'elles changent est inscrit dans
 `tasks/steps/done/step-009.md`. En résumé : 133 opérations avant et après, aucune ajoutée, retirée ni
 renommée, six touchées dont aucune que le BFF appelle — le bump s'est payé sur le seul
@@ -776,15 +776,18 @@ M3 → M4 → M5 → M9`.
 ## 16. Dépendance externe : l'état réel de la passerelle
 
 **C'était la contrainte de planification la plus importante de ce document. Elle est levée, et c'est
-la mesure qui le dit.** Le contrat 6.13.0 décrit **134 opérations**, comme 6.9.0 : `list-audit-log` s'est ajoutée
-aux 133 que les versions 2.5.0 à 6.7.x décrivaient. La passerelle les sert **toutes**, relevé le
-26/09/2026 sur `go-gateway` au commit `7723f3d`. Aucune opération n'existe plus seulement au contrat.
+la mesure qui le dit.** Le contrat 7.3.0 décrit **136 opérations** : 6.13.0 en décrivait 134, et 7.x en ajoute trois
+(`set-sender-id-rate-limit`, `delete-sender-id-rate-limit`, `list-account-bind-failures`) et en retire une
+(`set-account-sender-id-policy`). La passerelle les sert toutes, relevé le 06/10/2026 sur `go-gateway` au
+commit `10db989`. Avant : 134 en 6.9.0, où `list-audit-log` s'était ajoutée aux 133 que les versions 2.5.0
+à 6.7.x décrivaient. Le relevé précédent, le 26/09/2026 au commit `7723f3d`,
+comptait aussi toutes les opérations servies. Aucune opération n'existe plus seulement au contrat.
 
 > **Comment le chiffre a été obtenu**, pour qu'il soit refaisable et non recopié : le routage de
 > `go-gateway` est déclaratif — huma v2 sur chi, une opération = un `huma.Operation{OperationID}`
 > enregistré dans `internal/adminapi/`. Compter les `OperationID` des fichiers non-test et les
-> croiser avec les `operationId` du YAML **est** la mesure, pas une approximation. Le 26/09/2026 :
-> 134 déclarées, 134 servies, aucune déclarée sans être servie.
+> croiser avec les `operationId` du YAML **est** la mesure, pas une approximation. Le 06/10/2026 :
+> 136 déclarées, 136 servies, aucune déclarée sans être servie.
 >
 > **Le relever à l'ouverture de chaque jalon.** Les relevés précédents (71/133 le 27/07, 103/133 le
 > 12/09) avaient chacun rendu faux le tableau qui les précédait.

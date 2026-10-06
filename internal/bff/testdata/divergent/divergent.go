@@ -206,6 +206,14 @@ func (API) DeleteSenderId(_ context.Context, _ bff.DeleteSenderIdRequestObject) 
 	return nil, nil
 }
 
+func (API) SetSenderIdRateLimit(_ context.Context, _ bff.SetSenderIdRateLimitRequestObject) (bff.SetSenderIdRateLimitResponseObject, error) {
+	return nil, nil
+}
+
+func (API) DeleteSenderIdRateLimit(_ context.Context, _ bff.DeleteSenderIdRateLimitRequestObject) (bff.DeleteSenderIdRateLimitResponseObject, error) {
+	return nil, nil
+}
+
 func (API) ListAccounts(_ context.Context, _ bff.ListAccountsRequestObject) (bff.ListAccountsResponseObject, error) {
 	return nil, nil
 }

@@ -90,7 +90,7 @@ var gatewayContracts = []contract{
 			operation("/admin/smpp-accounts", "list-smpp-accounts"),
 			operation("/admin/smpp-accounts/{id}/credentials/{credId}/rotate", "rotate-credential"),
 			operation("/admin/smpp-accounts/{id}/session-limits", "set-account-session-limits"),
-			operation("/admin/smpp-accounts/{id}/sender-id-policy", "set-account-sender-id-policy"),
+			operation("/admin/smpp-accounts/{id}/bind-failures", "list-account-bind-failures"),
 			operation("/admin/smpp-accounts/{id}/webhooks/{webhookId}", "update-webhook"),
 			operation("/admin/connectors/{id}/rebind", "rebind-connector"),
 			operation("/admin/connectors/{id}/reconnect-policy", "set-connector-reconnect-policy"),

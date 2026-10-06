@@ -114,8 +114,14 @@ export const SenderIdCreation = z.object({
     .regex(/^[a-zA-Z0-9+\-\s]+$/),
 })
 
+export const SenderIdRateLimitSetting = z.object({
+  burstCapacity: z.number().int().min(1).max(2.147483647e9).optional(),
+  maxPerSec: z.number().int().min(1).max(2.147483647e9),
+})
+
 export const SenderIdUpdate = z.object({
-  status: z.enum(['active', 'disabled']),
+  status: z.enum(['active', 'disabled']).optional(),
+  trafficCategory: z.enum(['otp', 'transactional', 'marketing']).optional(),
 })
 
 export const TotpConfirmation = z.object({
