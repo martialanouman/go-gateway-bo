@@ -29,6 +29,11 @@ overrides:
   # uuid <11.1.1 : lecture hors bornes quand un buffer est fourni à v3/v5/v6
   # (GHSA-w5hq-g745-h8pq). `postman-collection` épingle 8.3.2, dépréciée par ailleurs.
   'postman-collection>uuid': '^11.1.1'
+  # sprintf-js <=1.1.3 : déni de service par spécificateur de précision non borné
+  # (GHSA-hp3w-g68c-fv3c, modérée), **sans version corrigée publiée** (06/10/2026). Chemin unique :
+  # `@stoplight/prism-cli > … > js-yaml@3 > argparse@1 > sprintf-js`. js-yaml 3 ne charge argparse que
+  # dans `bin/js-yaml.js`, sa CLI, que Prism n'exécute jamais ; argparse 2 n'a aucune dépendance.
+  'js-yaml@3>argparse': '^2.0.1'
   # js-yaml : deux avis élevés sur la même bibliothèque, et le second a périmé le plancher du
   # premier. GHSA-5p4m-2wfm-xmqj (consommation CPU quadratique à la résolution d'un `!!omap`,
   # CVE-2026-59870) est corrigé en 3.15.1 et 4.3.1 ; GHSA-2883-xcg3-v3hh (`maxTotalMergeKeys` ne
