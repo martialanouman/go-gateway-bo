@@ -95,6 +95,8 @@ var authorization = map[string]rule{
 	"RevokeCredential":            requires(permissions.CredentialsWrite),
 	"RotateCredential":            requires(permissions.CredentialsRotate),
 	"DeleteSenderId":              requires(permissions.CustomersWrite),
+	"SetSenderIdRateLimit":        requires(permissions.CustomersWrite),
+	"DeleteSenderIdRateLimit":     requires(permissions.CustomersWrite),
 	"Health": exempt("la sonde de l'orchestrateur, qui n'a pas de session et ne doit jamais " +
 		"dépendre d'une autre brique pour répondre"),
 	"Login": exempt("la porte d'entrée : exiger une session pour en ouvrir une n'a pas de sens. " +

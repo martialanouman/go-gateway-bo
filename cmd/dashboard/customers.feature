@@ -142,6 +142,8 @@ Fonctionnalité: Les clients relayés depuis la passerelle
       | réactiver un client          | POST    | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/reactivate                                       |                                                     | 200    | customer.reactivate |
       | approuver un sender ID       | PATCH   | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d  | {"status":"active"}                                 | 200    | sender_id.update    |
       | supprimer un sender ID       | DELETE  | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d  |                                                     | 204    | sender_id.delete    |
+      | limiter un sender ID         | PUT     | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d/rate-limit | {"maxPerSec":50}                                  | 200    | sender_id.rate_limit |
+      | délimiter un sender ID       | DELETE  | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d/rate-limit |                                                     | 204    | sender_id.rate_limit |
 
   Scénario: détacher un client de son groupe envoie un groupe nul, pas un champ absent
     Étant donné une passerelle qui compte les requêtes reçues
@@ -198,3 +200,64 @@ Fonctionnalité: Les clients relayés depuis la passerelle
     Alors le serveur répond 409
     Et la réponse est conforme au contrat du BFF
     Et le refus place une erreur sous le champ "name"
+
+  Scénario: classer un nom d'expéditeur garde au journal la catégorie qu'il quitte, lue à la passerelle
+    Étant donné une passerelle dont le sender ID "0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d" est classé "marketing"
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie PATCH "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d" avec le corps '{"trafficCategory":"otp"}'
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+    Et la passerelle a reçu '"traffic_category":"otp"'
+    Et l'issue "sender_id.update" porte avant '"traffic_category": "marketing"'
+    Et l'issue "sender_id.update" porte '"traffic_category": "otp"'
+
+  Scénario: un nom d'expéditeur que la passerelle ne liste pas n'est pas reclassé
+    Étant donné une passerelle dont le sender ID "0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7e" est classé "marketing"
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie PATCH "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d" avec le corps '{"trafficCategory":"otp"}'
+    Alors le serveur répond 404
+    Et la passerelle n'a reçu aucune écriture
+
+  Plan du scénario: sans customers:write, <geste> est refusé avant d'atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie <méthode> "<adresse>" avec le corps '<corps>'
+    Alors le serveur répond 403
+    Et le refus nomme la permission "customers:write"
+    Et la passerelle n'a reçu aucune requête
+
+    Exemples:
+      | geste                    | méthode | adresse                                                     | corps                      |
+      | reclasser un nom         | PATCH   | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d            | {"trafficCategory":"otp"} |
+      | poser une limite         | PUT     | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d/rate-limit | {"maxPerSec":50}          |
+      | retirer une limite       | DELETE  | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d/rate-limit |                            |
+
+  Plan du scénario: le BFF refuse <défaut> avant d'atteindre la passerelle
+    Étant donné une passerelle qui compte les requêtes reçues
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie <méthode> "<adresse>" avec le corps '<corps>'
+    Alors le serveur répond 400
+    Et la passerelle n'a reçu aucune requête
+
+    Exemples:
+      | défaut                       | méthode | adresse                                                     | corps                |
+      | une modification vide        | PATCH   | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d            | {}                  |
+      | une limite nulle             | PUT     | /api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d/rate-limit | {"maxPerSec":0}     |
+
+  Scénario: un nom d'expéditeur qui a déjà servi se désactive au lieu de se supprimer
+    Étant donné une passerelle qui répond 409 à la suppression d'un sender ID
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Clientèle"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie DELETE "/api/customers/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7b/sender-ids/0192b3c4-5d6e-7f80-9a1b-2c3d4e5f6a7d"
+    Alors le serveur répond 409
+    Et la réponse est conforme au contrat du BFF
+    Et le refus nomme "désactivez-le plutôt"

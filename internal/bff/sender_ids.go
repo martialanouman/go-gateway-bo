@@ -13,6 +13,9 @@ const (
 	operationCreateSenderID = "create-sender-id"
 	operationUpdateSenderID = "update-sender-id"
 	operationDeleteSenderID = "delete-sender-id"
+
+	operationSetSenderIDRateLimit    = "set-sender-id-rate-limit"
+	operationDeleteSenderIDRateLimit = "delete-sender-id-rate-limit"
 )
 
 func (a API) ListSenderIds(ctx context.Context, request ListSenderIdsRequestObject,
@@ -124,18 +127,43 @@ func (a API) UpdateSenderId(ctx context.Context, request UpdateSenderIdRequestOb
 		return UpdateSenderId404JSONResponse{SenderIdInconnuJSONResponse(unknownSenderID())}, nil
 	}
 
-	status := gateway.SenderIdUpdateStatus(request.Body.Status)
+	change := gateway.UpdateSenderIdJSONRequestBody{}
+	after := store.NewFields().Text("customer_id", customerID.String())
+
+	var before *store.Fields
+
+	if request.Body.Status != nil {
+		status := gateway.SenderIdUpdateStatus(*request.Body.Status)
+		change.Status = &status
+		after = after.Text("status", string(status))
+	}
+
+	if request.Body.TrafficCategory != nil {
+		category := gateway.TrafficCategory(*request.Body.TrafficCategory)
+		change.TrafficCategory = &category
+		after = after.Text("traffic_category", string(category))
+
+		current, found, err := a.senderIDCategory(ctx, customerID, senderID)
+		if err == nil && !found {
+			return UpdateSenderId404JSONResponse{SenderIdInconnuJSONResponse(unknownSenderID())}, nil
+		}
+
+		if err != nil {
+			return updateSenderIDRefusal(a.senderIDRefusal(ctx, operationListSenderIDs, err))
+		}
+
+		before = store.NewFields().Text("traffic_category", string(current))
+	}
 
 	var response *gateway.UpdateSenderIdResponse
 
 	_, err = auditRelayed(ctx, a.Audit.Record, a.Logger, a.event(ctx, store.Event{
 		OperatorID: actor, Action: actionSenderIDUpdate, TargetType: auditTargetSenderID, TargetID: senderID.String(),
-		After: store.NewFields().Text("customer_id", customerID.String()).Text("status", string(status)),
+		Before: before, After: after,
 	}), func(ctx context.Context, _ *store.Event) (int, error) {
 		var callErr error
 
-		response, callErr = a.Gateway.UpdateSenderIdWithResponse(ctx, customerID, senderID,
-			gateway.UpdateSenderIdJSONRequestBody{Status: &status})
+		response, callErr = a.Gateway.UpdateSenderIdWithResponse(ctx, customerID, senderID, change)
 		if callErr != nil {
 			return 0, callErr
 		}
@@ -151,21 +179,160 @@ func (a API) UpdateSenderId(ctx context.Context, request UpdateSenderIdRequestOb
 	}
 
 	if err != nil {
-		status, body, err := a.senderIDRefusal(ctx, operationUpdateSenderID, err)
+		return updateSenderIDRefusal(a.senderIDRefusal(ctx, operationUpdateSenderID, err))
+	}
+
+	return UpdateSenderId200JSONResponse(senderIDDTO(*response.JSON200)), nil
+}
+
+func updateSenderIDRefusal(status int, body Error, err error) (UpdateSenderIdResponseObject, error) {
+	switch status {
+	case http.StatusNotFound:
+		return UpdateSenderId404JSONResponse{SenderIdInconnuJSONResponse(body)}, nil
+	case http.StatusUnprocessableEntity:
+		return UpdateSenderId422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
+	case http.StatusServiceUnavailable:
+		return UpdateSenderId503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
+	default:
+		return nil, err
+	}
+}
+
+// senderIDCategory relit la catégorie en amont : l'audit garde celle que le sender ID quitte, et le
+// navigateur n'a pas autorité pour la dire.
+func (a API) senderIDCategory(ctx context.Context, customerID gateway.Id, senderID gateway.SenderIdPathParam,
+) (gateway.TrafficCategory, bool, error) {
+	response, err := a.Gateway.ListSenderIdsWithResponse(ctx, customerID, nil)
+	if err == nil {
+		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
+	}
+
+	if err == nil && response.JSON200 == nil {
+		err = gateway.ErrorFrom(http.StatusBadGateway, nil)
+	}
+
+	if err != nil {
+		return "", false, err
+	}
+
+	for _, sender := range *response.JSON200 {
+		if sender.Id == senderID {
+			return sender.TrafficCategory, true, nil
+		}
+	}
+
+	return "", false, nil
+}
+
+func (a API) SetSenderIdRateLimit(ctx context.Context, request SetSenderIdRateLimitRequestObject,
+) (SetSenderIdRateLimitResponseObject, error) {
+	actor, err := actorOf(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	customerID, senderID, known := parseSenderPath(request.CustomerId, request.SenderId)
+	if !known {
+		return SetSenderIdRateLimit404JSONResponse{SenderIdInconnuJSONResponse(unknownSenderID())}, nil
+	}
+
+	limit := gateway.SetSenderIdRateLimitJSONRequestBody{
+		MaxPerSec: request.Body.MaxPerSec, BurstCapacity: request.Body.BurstCapacity,
+	}
+
+	after := store.NewFields().Text("customer_id", customerID.String()).Number("max_per_sec", limit.MaxPerSec)
+	if limit.BurstCapacity != nil {
+		after = after.Number("burst_capacity", *limit.BurstCapacity)
+	}
+
+	var response *gateway.SetSenderIdRateLimitResponse
+
+	_, err = auditRelayed(ctx, a.Audit.Record, a.Logger, a.event(ctx, store.Event{
+		OperatorID: actor, Action: actionSenderIDRateLimit, TargetType: auditTargetSenderID, TargetID: senderID.String(),
+		After: after,
+	}), func(ctx context.Context, _ *store.Event) (int, error) {
+		var callErr error
+
+		response, callErr = a.Gateway.SetSenderIdRateLimitWithResponse(ctx, customerID, senderID, limit)
+		if callErr != nil {
+			return 0, callErr
+		}
+
+		return response.StatusCode(), nil
+	})
+	if err == nil {
+		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
+	}
+
+	if err == nil && response.JSON200 == nil {
+		err = gateway.ErrorFrom(http.StatusBadGateway, nil)
+	}
+
+	if err != nil {
+		status, body, err := a.senderIDRefusal(ctx, operationSetSenderIDRateLimit, err)
 
 		switch status {
 		case http.StatusNotFound:
-			return UpdateSenderId404JSONResponse{SenderIdInconnuJSONResponse(body)}, nil
+			return SetSenderIdRateLimit404JSONResponse{SenderIdInconnuJSONResponse(body)}, nil
 		case http.StatusUnprocessableEntity:
-			return UpdateSenderId422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
+			return SetSenderIdRateLimit422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
 		case http.StatusServiceUnavailable:
-			return UpdateSenderId503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
+			return SetSenderIdRateLimit503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
 		default:
 			return nil, err
 		}
 	}
 
-	return UpdateSenderId200JSONResponse(senderIDDTO(*response.JSON200)), nil
+	return SetSenderIdRateLimit200JSONResponse(senderIDDTO(*response.JSON200)), nil
+}
+
+func (a API) DeleteSenderIdRateLimit(ctx context.Context, request DeleteSenderIdRateLimitRequestObject,
+) (DeleteSenderIdRateLimitResponseObject, error) {
+	actor, err := actorOf(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	customerID, senderID, known := parseSenderPath(request.CustomerId, request.SenderId)
+	if !known {
+		return DeleteSenderIdRateLimit404JSONResponse{SenderIdInconnuJSONResponse(unknownSenderID())}, nil
+	}
+
+	var response *gateway.DeleteSenderIdRateLimitResponse
+
+	_, err = auditRelayed(ctx, a.Audit.Record, a.Logger, a.event(ctx, store.Event{
+		OperatorID: actor, Action: actionSenderIDRateLimit, TargetType: auditTargetSenderID, TargetID: senderID.String(),
+		After: store.NewFields().Text("customer_id", customerID.String()).Text("rate_limit", "removed"),
+	}), func(ctx context.Context, _ *store.Event) (int, error) {
+		var callErr error
+
+		response, callErr = a.Gateway.DeleteSenderIdRateLimitWithResponse(ctx, customerID, senderID)
+		if callErr != nil {
+			return 0, callErr
+		}
+
+		return response.StatusCode(), nil
+	})
+	if err == nil {
+		err = gateway.ErrorFrom(response.StatusCode(), response.Body)
+	}
+
+	if err != nil {
+		status, body, err := a.senderIDRefusal(ctx, operationDeleteSenderIDRateLimit, err)
+
+		switch status {
+		case http.StatusNotFound:
+			return DeleteSenderIdRateLimit404JSONResponse{SenderIdInconnuJSONResponse(body)}, nil
+		case http.StatusUnprocessableEntity:
+			return DeleteSenderIdRateLimit422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
+		case http.StatusServiceUnavailable:
+			return DeleteSenderIdRateLimit503JSONResponse{PasserelleIndisponibleJSONResponse(body)}, nil
+		default:
+			return nil, err
+		}
+	}
+
+	return DeleteSenderIdRateLimit204Response{}, nil
 }
 
 func (a API) DeleteSenderId(ctx context.Context, request DeleteSenderIdRequestObject,
@@ -205,6 +372,8 @@ func (a API) DeleteSenderId(ctx context.Context, request DeleteSenderIdRequestOb
 		switch status {
 		case http.StatusNotFound:
 			return DeleteSenderId404JSONResponse{SenderIdInconnuJSONResponse(body)}, nil
+		case http.StatusConflict:
+			return DeleteSenderId409JSONResponse{SenderIdDejaUtiliseJSONResponse(senderIDAlreadyUsed(body.Code))}, nil
 		case http.StatusUnprocessableEntity:
 			return DeleteSenderId422JSONResponse{RefusDeLaPasserelleJSONResponse(body)}, nil
 		case http.StatusServiceUnavailable:
@@ -234,12 +403,27 @@ func parseSenderPath(rawCustomer, rawSender string) (gateway.Id, gateway.SenderI
 }
 
 func senderIDDTO(sender gateway.SenderId) SenderId {
-	return SenderId{
-		Id:        sender.Id.String(),
-		Address:   sender.Address,
-		Status:    SenderIdStatus(sender.Status),
-		CreatedAt: sender.CreatedAt,
+	dto := SenderId{
+		Id:                          sender.Id.String(),
+		Address:                     sender.Address,
+		Status:                      SenderIdStatus(sender.Status),
+		TrafficCategory:             TrafficCategory(sender.TrafficCategory),
+		RecentCategoryMismatches24h: sender.RecentCategoryMismatches24h,
+		FirstUsedAt:                 sender.FirstUsedAt,
+		CreatedAt:                   sender.CreatedAt,
 	}
+
+	if sender.RateLimit != nil {
+		dto.RateLimit = &SenderIdRateLimit{
+			MaxPerSec: sender.RateLimit.MaxPerSec, BurstCapacity: sender.RateLimit.BurstCapacity,
+		}
+	}
+
+	return dto
+}
+
+func senderIDAlreadyUsed(code string) Error {
+	return Error{Code: code, Message: "Ce nom a déjà servi à envoyer : il ne se supprime plus, désactivez-le plutôt."}
 }
 
 func unknownSenderID() Error {

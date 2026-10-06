@@ -806,10 +806,40 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Approuve ou désactive un sender ID
-         * @description Relayée vers `update-sender-id`.
+         * Approuve, désactive ou classe un sender ID
+         * @description Relayée vers `update-sender-id`. Un changement de catégorie relit d'abord `list-sender-ids` :
+         *     l'audit porte l'ancienne catégorie lue en amont, jamais une valeur venue du navigateur.
          */
         patch: operations["updateSenderId"];
+        trace?: never;
+    };
+    "/customers/{customerId}/sender-ids/{senderId}/rate-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+                senderId: components["parameters"]["SenderIdParam"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Pose la limite de débit propre d'un sender ID
+         * @description Relayée vers `set-sender-id-rate-limit`. Au-delà, la passerelle refuse à l'admission (429,
+         *     `ESME_RTHROTTLED`) et n'écrit aucun CDR. `burstCapacity` absent vaut `maxPerSec`.
+         */
+        put: operations["setSenderIdRateLimit"];
+        post?: never;
+        /**
+         * Retire la limite de débit propre d'un sender ID
+         * @description Relayée vers `delete-sender-id-rate-limit`. Le sender ID n'est plus borné que par la limite de
+         *     son compte.
+         */
+        delete: operations["deleteSenderIdRateLimit"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/accounts": {
@@ -1529,19 +1559,35 @@ export interface components {
         };
         /** @enum {string} */
         SenderIdStatus: "pending_carrier_approval" | "active" | "disabled";
+        /** @enum {string} */
+        TrafficCategory: "otp" | "transactional" | "marketing";
         SenderId: {
             id: string;
             address: string;
             status: components["schemas"]["SenderIdStatus"];
+            trafficCategory: components["schemas"]["TrafficCategory"];
+            rateLimit: components["schemas"]["SenderIdRateLimit"] | null;
+            recentCategoryMismatches24h: number | null;
+            /** Format: date-time */
+            firstUsedAt: string | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        SenderIdRateLimit: {
+            maxPerSec: number;
+            burstCapacity: number;
+        };
+        SenderIdRateLimitSetting: {
+            maxPerSec: number;
+            burstCapacity?: number;
         };
         SenderIdCreation: {
             address: string;
         };
         SenderIdUpdate: {
             /** @enum {string} */
-            status: "active" | "disabled";
+            status?: "active" | "disabled";
+            trafficCategory?: components["schemas"]["TrafficCategory"];
         };
         SmppAccount: {
             id: string;
@@ -1696,6 +1742,15 @@ export interface components {
         };
         /** @description Ce client n'a aucun sender ID de cet identifiant. */
         SenderIdInconnu: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Ce nom a déjà servi à envoyer : il ne se supprime plus, il se désactive. */
+        SenderIdDejaUtilise: {
             headers: {
                 [name: string]: unknown;
             };
@@ -3488,6 +3543,7 @@ export interface operations {
             401: components["responses"]["SessionAbsente"];
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["SenderIdInconnu"];
+            409: components["responses"]["SenderIdDejaUtilise"];
             415: components["responses"]["TypeDeContenuRefuse"];
             422: components["responses"]["RefusDeLaPasserelle"];
             503: components["responses"]["PasserelleIndisponible"];
@@ -3519,6 +3575,67 @@ export interface operations {
                 };
             };
             400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["SenderIdInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    setSenderIdRateLimit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+                senderId: components["parameters"]["SenderIdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SenderIdRateLimitSetting"];
+            };
+        };
+        responses: {
+            /** @description Le sender ID et sa nouvelle limite. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SenderId"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            404: components["responses"]["SenderIdInconnu"];
+            415: components["responses"]["TypeDeContenuRefuse"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    deleteSenderIdRateLimit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: components["parameters"]["CustomerId"];
+                senderId: components["parameters"]["SenderIdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description La limite est retirée, ou n'existait pas. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             401: components["responses"]["SessionAbsente"];
             403: components["responses"]["PermissionRefusee"];
             404: components["responses"]["SenderIdInconnu"];
