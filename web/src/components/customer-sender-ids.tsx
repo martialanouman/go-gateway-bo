@@ -388,7 +388,11 @@ function LimitSender({
 }) {
   const changed = useSenderChanged(customerId)
   const toast = useToast()
-  const optionalNumber = (value: string) => (value === '' ? undefined : Number(value))
+  const optionalNumber = (value: string) => {
+    if (value.trim() === '') return undefined
+    const parsed = Number(value)
+    return Number.isNaN(parsed) ? value : parsed
+  }
   const form = useForm({
     resolver: formResolver(SenderIdRateLimitSetting),
     defaultValues: {
@@ -408,7 +412,10 @@ function LimitSender({
     onSuccess: async (updated) => {
       await changed()
       toast({
-        title: `${updated.address} est limité à ${updated.rateLimit?.maxPerSec}/s, rafale ${updated.rateLimit?.burstCapacity}.`,
+        title:
+          updated.rateLimit === null
+            ? `La limite de ${updated.address} est enregistrée.`
+            : `${updated.address} est limité à ${updated.rateLimit.maxPerSec}/s, rafale ${updated.rateLimit.burstCapacity}.`,
         severity: 'success',
       })
       onClose()
@@ -442,10 +449,8 @@ function LimitSender({
         <Refusal error={limit.error} />
         <Field error={form.formState.errors.maxPerSec?.message} label="Messages par seconde">
           <Input
-            min={1}
             required
-            step={1}
-            type="number"
+            inputMode="numeric"
             {...form.register('maxPerSec', { setValueAs: optionalNumber })}
           />
         </Field>
@@ -455,9 +460,7 @@ function LimitSender({
           label="Rafale"
         >
           <Input
-            min={1}
-            step={1}
-            type="number"
+            inputMode="numeric"
             {...form.register('burstCapacity', { setValueAs: optionalNumber })}
           />
         </Field>

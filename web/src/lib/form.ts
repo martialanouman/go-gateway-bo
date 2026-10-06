@@ -23,8 +23,13 @@ export function refusalInFrench(issue: z.core.$ZodRawIssue): string {
     // valider : « Saisissez un e-mail. », « Saisissez un mot de passe. » La règle « conséquence
     // d'abord » de `CLAUDE.md` gouverne la copie qui **explique** un refus ; un refus de champ, lui,
     // tient sur une ligne à côté du champ, et l'opérateur y cherche quoi faire.
+    // Un nombre attendu et du texte reçu : le champ est rempli, et « Renseignez ce champ. » enverrait
+    // chercher une case vide. Un champ vide sous `valueAsNumber` reçoit NaN, pas du texte.
     case 'invalid_type':
-      return issue.expected === 'int' ? 'Saisissez un nombre entier.' : 'Renseignez ce champ.'
+      if (issue.expected === 'int') return 'Saisissez un nombre entier.'
+      return issue.expected === 'number' && typeof issue.input === 'string'
+        ? 'Saisissez un nombre.'
+        : 'Renseignez ce champ.'
 
     // **Aucune attribution au serveur ici.** Elle serait fausse une fois sur deux : `internal/bff/
     // auth.go` ne compare que des **maxima**, et le `minLength: 1` que le contrat pose sur

@@ -87,6 +87,10 @@ describe('a number refused', () => {
     )
   })
 
+  it('asks for a number when text was typed in a number field', () => {
+    expect(refusalOf(AccountSessionLimits.shape.maxSessions, 'cent')).toBe('Saisissez un nombre.')
+  })
+
   it('asks for a value when the field is left empty', () => {
     expect(refusalOf(AccountSessionLimits.shape.maxSessions, Number.NaN)).toBe(
       'Renseignez ce champ.',

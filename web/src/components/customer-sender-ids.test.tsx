@@ -135,6 +135,20 @@ describe('the sender IDs of a customer', () => {
     expect(sent(fetch, `PUT ${SENDER}/rate-limit`)).toHaveLength(0)
   })
 
+  it('refuses a burst that is not a number instead of sending the limit without it', async () => {
+    const user = userEvent.setup()
+    const fetch = open(WRITER, [sender()])
+
+    await user.click(within(await rowOf('ACME')).getByRole('button', { name: 'Limiter ACME' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Limiter le débit de ACME ?' })
+    await user.type(within(dialog).getByLabelText('Messages par seconde'), '50')
+    await user.type(within(dialog).getByLabelText('Rafale'), 'cent')
+    await user.click(within(dialog).getByRole('button', { name: 'Limiter' }))
+
+    expect(await within(dialog).findByText('Saisissez un nombre.')).toBeInTheDocument()
+    expect(sent(fetch, `PUT ${SENDER}/rate-limit`)).toHaveLength(0)
+  })
+
   it('keeps only the names of the chosen category, and says how to widen an empty filter', async () => {
     const user = userEvent.setup()
     open(READER, [sender(), sender({ id: 'sender-2', address: 'BANQUEX', trafficCategory: 'otp' })])
