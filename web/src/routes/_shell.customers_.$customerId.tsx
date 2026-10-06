@@ -2,12 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { CustomerSenderIds } from '~/components/customer-sender-ids'
 import { PageHeader } from '~/components/page-header'
 import {
   Button,
   Card,
-  DataTable,
-  EmptyState,
   ErrorState,
   Field,
   Input,
@@ -16,30 +15,21 @@ import {
   Select,
   Skeleton,
   StatusPill,
-  useToast,
 } from '~/components/ui'
 import { blockedBy, fieldRefusalsOf, orRefusal, Refusal } from '~/lib/administration'
 import { api } from '~/lib/api'
 import type { components } from '~/lib/api.gen'
-import { CustomerUpdate, SenderIdCreation } from '~/lib/contract.gen'
+import { CustomerUpdate } from '~/lib/contract.gen'
 import { formResolver } from '~/lib/form'
 import { usePermission } from '~/lib/permissions'
 
 type Customer = components['schemas']['Customer']
-type SenderId = components['schemas']['SenderId']
-type Pending =
-  | { readonly kind: 'rename' | 'group' | 'suspend' | 'reactivate' | 'register' }
-  | { readonly kind: 'delete-sender'; readonly sender: SenderId }
+type Pending = { readonly kind: 'rename' | 'group' | 'suspend' | 'reactivate' }
 
 const NO_GROUP = 'none'
 const customersQueryKey = ['gateway', 'customers'] as const
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })
 const WRITE_REFUSAL = 'Modifier un client demande customers:write.'
-const SENDER_STATUS_LABELS: Record<SenderId['status'], string> = {
-  pending_carrier_approval: 'En attente d’approbation',
-  active: 'Approuvé',
-  disabled: 'Désactivé',
-}
 
 export const Route = createFileRoute('/_shell/customers_/$customerId')({
   component: CustomerScreen,
@@ -147,12 +137,7 @@ function CustomerScreen() {
         />
         <CustomerAccounts customerId={current.id} />
       </div>
-      <SenderIds
-        blocked={blocked}
-        customerId={current.id}
-        onDelete={(sender) => setPending({ kind: 'delete-sender', sender })}
-        onRegister={() => setPending({ kind: 'register' })}
-      />
+      <CustomerSenderIds blocked={blocked} customerId={current.id} onDeleted={closeToTitle} />
 
       {pending?.kind === 'rename' ? <RenameCustomer customer={current} onClose={close} /> : null}
       {pending?.kind === 'group' ? <AssignGroup customer={current} onClose={close} /> : null}
@@ -161,17 +146,6 @@ function CustomerScreen() {
       ) : null}
       {pending?.kind === 'reactivate' ? (
         <ConfirmReactivate customer={current} onClose={close} onDone={closeToTitle} />
-      ) : null}
-      {pending?.kind === 'register' ? (
-        <RegisterSender customerId={current.id} onClose={close} />
-      ) : null}
-      {pending?.kind === 'delete-sender' ? (
-        <ConfirmDeleteSender
-          customerId={current.id}
-          onClose={close}
-          onDone={closeToTitle}
-          sender={pending.sender}
-        />
       ) : null}
     </div>
   )
@@ -252,153 +226,6 @@ function CustomerAccounts({ customerId }: { readonly customerId: string }) {
         Un compte porte les identifiants SMPP et REST, les canaux et les quotas d’un client.
       </span>
     </Card>
-  )
-}
-
-function SenderIds({
-  customerId,
-  blocked,
-  onRegister,
-  onDelete,
-}: {
-  readonly customerId: string
-  readonly blocked: ReturnType<typeof blockedBy>
-  readonly onRegister: () => void
-  readonly onDelete: (sender: SenderId) => void
-}) {
-  const senders = useQuery({
-    queryKey: [...customersQueryKey, customerId, 'sender-ids'],
-    queryFn: () =>
-      orRefusal(
-        api.GET('/customers/{customerId}/sender-ids', { params: { path: { customerId } } }),
-        'Les noms d’expéditeur n’ont pas pu être lus',
-      ),
-    retry: false,
-  })
-  const register = (
-    <Button {...blocked} onClick={onRegister} size="sm" variant="primary">
-      Enregistrer un nom d’expéditeur
-    </Button>
-  )
-
-  return (
-    <Card
-      actions={register}
-      flush={senders.isSuccess && senders.data.length > 0}
-      title="Noms d’expéditeur"
-    >
-      {senders.isPending ? (
-        <LoadingState label="Chargement des noms d’expéditeur…">
-          <Skeleton height={38} />
-        </LoadingState>
-      ) : senders.isError ? (
-        <ErrorState
-          description={senders.error.message}
-          onRetry={() => void senders.refetch()}
-          title="Les noms d’expéditeur n’ont pas pu être chargés"
-          titleAs="h3"
-        />
-      ) : senders.data.length === 0 ? (
-        <EmptyState
-          description="Un nom d’expéditeur enregistré naît en attente d’approbation de l’opérateur télécom."
-          title="Aucun nom d’expéditeur pour l’instant"
-          titleAs="h3"
-        />
-      ) : (
-        <DataTable
-          caption="Noms d’expéditeur du client"
-          dense
-          columns={[
-            {
-              key: 'address',
-              header: 'Nom',
-              cell: (sender: SenderId) => <span className="mono">{sender.address}</span>,
-            },
-            {
-              key: 'status',
-              header: 'Statut',
-              cell: (sender: SenderId) => SENDER_STATUS_LABELS[sender.status],
-            },
-            {
-              key: 'createdAt',
-              header: 'Enregistré le',
-              cell: (sender: SenderId) => dateFormat.format(new Date(sender.createdAt)),
-            },
-            {
-              key: 'actions',
-              header: 'Actions',
-              cell: (sender: SenderId) => (
-                <div className="row-actions">
-                  <SenderStatusToggle blocked={blocked} customerId={customerId} sender={sender} />
-                  <Button
-                    {...blocked}
-                    aria-label={`Supprimer ${sender.address}`}
-                    onClick={() => onDelete(sender)}
-                    size="sm"
-                    variant="danger"
-                  >
-                    Supprimer
-                  </Button>
-                </div>
-              ),
-            },
-          ]}
-          rowKey={(sender) => sender.id}
-          rows={senders.data}
-        />
-      )}
-    </Card>
-  )
-}
-
-function SenderStatusToggle({
-  customerId,
-  sender,
-  blocked,
-}: {
-  readonly customerId: string
-  readonly sender: SenderId
-  readonly blocked: ReturnType<typeof blockedBy>
-}) {
-  const queryClient = useQueryClient()
-  const toast = useToast()
-  const next = sender.status === 'active' ? 'disabled' : 'active'
-  const gesture =
-    next === 'disabled'
-      ? 'Désactiver'
-      : sender.status === 'pending_carrier_approval'
-        ? 'Approuver'
-        : 'Réactiver'
-  const done = { Désactiver: 'désactivé', Approuver: 'approuvé', Réactiver: 'réactivé' }[gesture]
-  const change = useMutation({
-    mutationFn: () =>
-      orRefusal(
-        api.PATCH('/customers/{customerId}/sender-ids/{senderId}', {
-          params: { path: { customerId, senderId: sender.id } },
-          body: { status: next },
-        }),
-        'Le nom d’expéditeur n’a pas été modifié',
-      ),
-    onSuccess: async (changed) => {
-      await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
-      toast({
-        title: `${changed.address} est ${done}.`,
-        severity: 'success',
-      })
-    },
-    onError: (error) => toast({ title: error.message, severity: 'warning' }),
-  })
-
-  return (
-    <Button
-      {...blocked}
-      aria-label={`${gesture} ${sender.address}`}
-      loading={change.isPending}
-      onClick={() => change.mutate()}
-      size="sm"
-    >
-      {gesture}
-    </Button>
   )
 }
 
@@ -690,130 +517,6 @@ function ConfirmReactivate({
       <p>
         Le client redevient actif, mais ses comptes restent suspendus : ils ne pourront pas envoyer
         de SMS tant qu’ils ne seront pas réactivés un par un.
-      </p>
-      <p>L’action est enregistrée dans le journal d’audit.</p>
-    </Modal>
-  )
-}
-
-function RegisterSender({
-  customerId,
-  onClose,
-}: {
-  readonly customerId: string
-  readonly onClose: () => void
-}) {
-  const queryClient = useQueryClient()
-  const form = useForm({ resolver: formResolver(SenderIdCreation), defaultValues: { address: '' } })
-  const register = useMutation({
-    mutationFn: (body: { address: string }) =>
-      orRefusal(
-        api.POST('/customers/{customerId}/sender-ids', { params: { path: { customerId } }, body }),
-        'Le nom d’expéditeur n’a pas été enregistré',
-      ),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
-      onClose()
-    },
-    onError: (error) => {
-      for (const { field, message } of fieldRefusalsOf(error)) {
-        if (field === 'address') form.setError(field, { message })
-      }
-    },
-  })
-  const placed = fieldRefusalsOf(register.error).some(({ field }) => field === 'address')
-
-  return (
-    <Modal
-      footer={
-        <>
-          <Button onClick={onClose}>Annuler</Button>
-          <Button
-            form="register-sender"
-            loading={register.isPending}
-            type="submit"
-            variant="primary"
-          >
-            Enregistrer
-          </Button>
-        </>
-      }
-      onClose={onClose}
-      open
-      title="Enregistrer un nom d’expéditeur"
-    >
-      <form
-        className="form"
-        id="register-sender"
-        noValidate
-        onSubmit={form.handleSubmit((values) => register.mutate(values))}
-      >
-        <p>
-          Le nom d’expéditeur naît en attente d’approbation de l’opérateur télécom. Action
-          journalisée.
-        </p>
-        <Refusal error={placed ? null : register.error} />
-        <Field
-          error={form.formState.errors.address?.message}
-          hint="De 2 à 11 caractères : lettres, chiffres, espaces, + et -."
-          label="Nom"
-        >
-          <Input
-            autoComplete="off"
-            className="ui-input--mono"
-            required
-            {...form.register('address')}
-          />
-        </Field>
-      </form>
-    </Modal>
-  )
-}
-
-function ConfirmDeleteSender({
-  customerId,
-  sender,
-  onClose,
-  onDone,
-}: {
-  readonly customerId: string
-  readonly sender: SenderId
-  readonly onClose: () => void
-  readonly onDone: () => void
-}) {
-  const queryClient = useQueryClient()
-  const remove = useMutation({
-    mutationFn: () =>
-      orRefusal(
-        api.DELETE('/customers/{customerId}/sender-ids/{senderId}', {
-          params: { path: { customerId, senderId: sender.id } },
-        }),
-        'Le nom d’expéditeur n’a pas été supprimé',
-      ),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [...customersQueryKey, customerId] })
-      onDone()
-    },
-  })
-
-  return (
-    <Modal
-      footer={
-        <>
-          <Button onClick={onClose}>Annuler</Button>
-          <Button loading={remove.isPending} onClick={() => remove.mutate()} variant="danger">
-            Supprimer
-          </Button>
-        </>
-      }
-      onClose={onClose}
-      open
-      title={`Supprimer le nom d’expéditeur ${sender.address} ?`}
-    >
-      <Refusal error={remove.error} />
-      <p>
-        {sender.address} disparaîtra de la liste du client. Pour l’utiliser de nouveau, il faudra
-        l’enregistrer et attendre une nouvelle approbation de l’opérateur télécom.
       </p>
       <p>L’action est enregistrée dans le journal d’audit.</p>
     </Modal>

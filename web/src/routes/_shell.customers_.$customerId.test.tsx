@@ -8,6 +8,7 @@ import {
   ACME,
   type AdministrationReplies,
   RESELLERS,
+  sender,
   stubAdministration,
 } from '../../test/administration'
 
@@ -191,14 +192,7 @@ describe('the customer screen', () => {
       WRITER,
       {},
       {
-        senders: [
-          {
-            id: 'sender-1',
-            address: 'ACME',
-            status: 'pending_carrier_approval',
-            createdAt: '2026-09-30T08:00:00Z',
-          },
-        ],
+        senders: [sender({ status: 'pending_carrier_approval' })],
       },
     )
 
@@ -273,9 +267,7 @@ describe('the customer screen', () => {
         },
       },
       {
-        senders: [
-          { id: 'sender-1', address: 'ACME', status: 'active', createdAt: '2026-09-30T08:00:00Z' },
-        ],
+        senders: [sender()],
       },
     )
 

@@ -81,6 +81,20 @@ export const ACME: Customer = {
   updatedAt: '2026-09-02T08:00:00Z',
 }
 
+export function sender(overrides: Partial<SenderId> = {}): SenderId {
+  return {
+    id: 'sender-1',
+    address: 'ACME',
+    status: 'active',
+    trafficCategory: 'marketing',
+    rateLimit: null,
+    recentCategoryMismatches24h: 0,
+    firstUsedAt: null,
+    createdAt: '2026-09-30T08:00:00Z',
+    ...overrides,
+  }
+}
+
 export const OTP_ACCOUNT: Account = {
   id: '0192b3c4-0000-7000-8000-0000000a0001',
   customerId: ACME.id,
@@ -332,23 +346,43 @@ export function stubAdministration(
       if (target === undefined) return respond({ status: 404, body: refusal('not_found') })
       if (detail === 'sender-ids') {
         if (request.method === 'POST') {
-          const created: SenderId = {
+          const created = sender({
             id: `sender-${senders.length + 1}`,
             address: body.address,
             status: 'pending_carrier_approval',
-            createdAt: '2026-09-30T08:00:00Z',
-          }
+          })
           senders = [...senders, created]
           return Response.json(created, { status: 201 })
         }
-        if (request.method === 'PATCH') {
-          senders = senders.map((sender) =>
-            sender.id === detailId ? { ...sender, status: body.status } : sender,
+        if (detailAction === 'rate-limit') {
+          const rateLimit =
+            request.method === 'PUT'
+              ? { maxPerSec: body.maxPerSec, burstCapacity: body.burstCapacity ?? body.maxPerSec }
+              : null
+          senders = senders.map((candidate) =>
+            candidate.id === detailId ? { ...candidate, rateLimit } : candidate,
           )
-          return Response.json(senders.find((sender) => sender.id === detailId))
+          return request.method === 'PUT'
+            ? Response.json(senders.find((candidate) => candidate.id === detailId))
+            : new Response(null, { status: 204 })
+        }
+        if (request.method === 'PATCH') {
+          senders = senders.map((candidate) =>
+            candidate.id === detailId ? { ...candidate, ...body } : candidate,
+          )
+          return Response.json(senders.find((candidate) => candidate.id === detailId))
         }
         if (request.method === 'DELETE') {
-          senders = senders.filter((sender) => sender.id !== detailId)
+          if (senders.find((candidate) => candidate.id === detailId)?.firstUsedAt)
+            return respond({
+              status: 409,
+              body: {
+                code: 'conflict',
+                message:
+                  'Ce nom a déjà servi à envoyer : il ne se supprime plus, désactivez-le plutôt.',
+              },
+            })
+          senders = senders.filter((candidate) => candidate.id !== detailId)
           return new Response(null, { status: 204 })
         }
         return Response.json(senders)
