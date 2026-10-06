@@ -833,8 +833,9 @@ export interface paths {
         post?: never;
         /**
          * Retire la limite de débit propre d'un sender ID
-         * @description Relayée vers `delete-sender-id-rate-limit`. Le sender ID n'a plus de limite propre ; retirer une
-         *     limite absente rend aussi 204.
+         * @description Relayée vers `delete-sender-id-rate-limit`. Le sender ID n'a plus de limite propre et reste soumis
+         *     au plafond de son compte (ADR-0021 §3), que le contrat Admin n'expose pas. Retirer une limite
+         *     absente rend aussi 204.
          */
         delete: operations["deleteSenderIdRateLimit"];
         options?: never;

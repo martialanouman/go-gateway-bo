@@ -50,11 +50,11 @@ confirmation qui nomme la conséquence. Le même opérateur pose ou retire la li
   `sender_id.rate_limit` (`After` vaut la limite, ou `removed`). **L'ancienne limite n'est pas écrite
   en `Before`** : la spec ne le demande que pour la catégorie, et la limite précédente se lit dans
   l'événement `sender_id.rate_limit` d'avant, quand elle a été posée depuis le tableau de bord. Une
-  limite absente s'affiche « Aucune limite propre ». **Écart constaté entre la spec et la passerelle** :
-  §1.1 dit que le compte ne porte aucun débit, mais `go-gateway` refuse à l'admission au-delà de la
-  limite du compte aussi (`internal/ingest/ingest.go`, `ratelimit.EntityAccount`, ADR-0021 §3), que le
-  contrat Admin n'expose pas. Le tableau de bord ne lit ni ne règle cette limite : l'écran ne la nomme
-  donc pas, et l'écart est remonté à l'utilisateur plutôt que tranché ici.
+  limite absente s'affiche « Aucune limite propre ». **La spec est amendée d'après la passerelle** (décision de l'utilisateur, 06/10/2026) :
+  l'amendement du 04/10 disait que le compte ne porte aucun débit, mais `go-gateway` vérifie à
+  l'admission le plafond du compte avec celui du sender ID (ADR-0021 §3, `internal/ingest/ingest.go`,
+  `ratelimit.EntityAccount`). Le contrat Admin n'expose pas ce plafond : le tableau de bord ne le lit
+  ni ne le règle, et l'écran ne le nomme pas.
   Le retrait a sa propre modale (« Retirer la limite de ACME ? », bouton « Retirer »), ouverte depuis
   la ligne : une modale ne porte que le verbe de son titre. Poser ou retirer annonce son succès. La modale dit ce que l'écran doit
   dire (§6.19) : au-delà de la limite, le message est refusé à l'admission (429 en REST,
