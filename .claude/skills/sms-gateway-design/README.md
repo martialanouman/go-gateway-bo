@@ -53,7 +53,7 @@ No codebase and no Figma file were provided. The charter's rendered pages were r
 
 **Numbers.** French formatting: space thousands separator (`504 219`), comma decimal (`99,64 %`), unit always present (`crédits SMS`, `MT/s`, `ms`, `1,24 s`). Approximations are marked (`~1,24 M au total`), as is freshness (`fraîcheur ~15 s`).
 
-**Audit is announced before the act:** *« Action journalisée dans audit_log »*, *« lecture journalisée »* — next to the trigger, not after the fact.
+**Audit is announced before the act**, in plain French and next to the trigger, not after the fact: *« L'action est enregistrée dans le journal d'audit. »*, *« La lecture est enregistrée dans le journal d'audit. »*
 
 **No emoji, ever.** Charter §07: *« Pas de pictogrammes décoratifs ni d'emoji. »*
 
@@ -120,7 +120,7 @@ The charter closes this question: *« Pas de pictogrammes décoratifs ni d'emoji
 
 ## Index
 
-**Root** — `styles.css` (the only file consumers link; `@import` list only), `readme.md`, `SKILL.md`, `thumbnail.html`.
+**Root** — `styles.css` (the only file consumers link; `@import` list only), `README.md`, `SKILL.md`, `thumbnail.html`.
 
 **Tokens** (`tokens/`) — `fonts.css` (IBM Plex families), `colors.css` (charter hexes, tints, semantic + domain aliases), `typography.css` (six roles + mono roles), `spacing.css`, `radius.css` (7/12/20), `elevation.css`, `motion.css`, `layout.css` (236/56/44/420), `base.css` (resets, dark `color-scheme`, focus ring, scrollbars, reduced-motion).
 

@@ -87,7 +87,7 @@ protection couvre et où s'arrête la frontière d'accès. Les cinq états de co
 `tasks/plan.md` §1.9 et tranchent aussi côté serveur — `internal/gateway/errors_test.go` sépare un
 503 d'un module désactivé ; `web/CLAUDE.md` en redonne la liste, sans rien y arbitrer.
 
-- **Code auto-documenté** : Écris du code clair et lisible. Préfère des noms de variables et fonctions explicites plutôt que d'ajouter des commentaires.
+- **Code auto-documenté** : des noms de variables et de fonctions explicites plutôt que des commentaires.
 - **Zéro commentaire évident** : Ne commente jamais le code standard, le boilerplate ou la logique triviale (ex: pas de `// incrémente i` ou `// récupère les données`).
 - **Commentaires autorisés** : Limite les commentaires au "Pourquoi" (décisions d'architecture complexes, hacks temporaires ou optimisations non intuitives), jamais au "Quoi".
 - **Format compact** : Pas de longs blocs d'explications avant ou après le code. Rends les réponses directes et purement techniques.
@@ -104,7 +104,7 @@ protection couvre et où s'arrête la frontière d'accès. Les cinq états de co
   La majorité des tests, en nombre. Côté client : `web/CLAUDE.md`.
 
 **Le mock-first rend les scénarios rejouables sans la passerelle.** Celle-ci sert toutes les
-opérations du contrat depuis le 26/09/2026, relevé dans `tasks/plan.md` §16. Prism ne sert pas les
+opérations du contrat — le relevé daté vit dans `tasks/plan.md` §16. Prism ne sert pas les
 trois flux WebSocket : ceux-là se testent contre un faux amont.
 
 **Le mode d'échec est nommé** : un scénario par critère d'acceptation fabrique la suite qu'on n'ose
