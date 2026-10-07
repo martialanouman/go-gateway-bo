@@ -168,6 +168,7 @@ func mountContract(api chi.Router, impl StrictServerInterface, sessions *session
 // interne de l'API Admin au navigateur.
 //
 // L'erreur part au journal du serveur et jamais au navigateur : elle peut nommer la topologie interne.
+// Le 401 et le 403 amont y sont traduits (`reportFailedResponse`) ; le reste devient un 500.
 //
 // **L'ordre du slice compte.** La boucle du wrapper engendré enveloppe successivement, donc le
 // **dernier** élément est le plus extérieur : la garde s'exécute avant l'autre middleware strict, et
@@ -217,6 +218,7 @@ func reportFailedResponse(logger *slog.Logger) func(http.ResponseWriter, *http.R
 		if errors.As(err, &upstream) {
 			switch upstream.Status {
 			case http.StatusUnauthorized:
+				// L'exploitation est prévenue par le transport (ERROR `gateway_token_rejected`, kid/iss/sub) : pas de second log ici.
 				writeJSON(w, http.StatusBadGateway, Error{
 					Code: codeGatewayRejectedToken,
 					Message: "La passerelle a refusé l'identité du tableau de bord : l'action n'a pas eu lieu. " +
