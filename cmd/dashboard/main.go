@@ -26,6 +26,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
+	"github.com/martialanouman/go-gateway-bo/internal/token"
 	"github.com/martialanouman/go-gateway-bo/internal/webassets"
 )
 
@@ -140,12 +141,25 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
-	admin, err := gateway.NewAdminClient(cfg.Gateway)
+	keys, err := signingKeys(cfg.Gateway)
 	if err != nil {
 		return err
 	}
 
-	streams, err := gateway.NewStreamClient(cfg.Gateway)
+	issuer, err := token.NewIssuer(keys, cfg.Gateway.TokenIssuer, time.Now)
+	if err != nil {
+		return err
+	}
+
+	logger.InfoContext(ctx, "émetteur des jetons de l'API Admin",
+		"iss", cfg.Gateway.TokenIssuer, "kid_actif", keys.ActiveID(), "kid_publiés", keys.IDs())
+
+	admin, err := gateway.NewAdminClient(cfg.Gateway, issuer, logger)
+	if err != nil {
+		return err
+	}
+
+	streams, err := gateway.NewStreamClient(cfg.Gateway, issuer, logger)
 	if err != nil {
 		return err
 	}
@@ -249,10 +263,20 @@ func recordBillingAlert(notifications *store.Notifications) hub.Recorder {
 	}
 }
 
+// signingKeys ne tombe sur une clé éphémère qu'en mock et sans dossier : en réel, config.Load a déjà
+// exigé le dossier et le kid actif.
+func signingKeys(cfg config.GatewayConfig) (token.KeySet, error) {
+	if cfg.Mode == config.GatewayModeMock && cfg.TokenKeysDir == "" {
+		return token.EphemeralKeySet()
+	}
+
+	return token.LoadKeySet(cfg.TokenKeysDir, cfg.TokenActiveKID)
+}
+
 func dialStream(baseURL string, client *http.Client) hub.Dialer {
 	return func(ctx context.Context, path string, onPing func()) (*websocket.Conn, error) {
 		//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
-		conn, _, err := websocket.Dial(ctx, strings.TrimSuffix(baseURL, "/")+path,
+		conn, _, err := websocket.Dial(gateway.WithSystem(ctx), strings.TrimSuffix(baseURL, "/")+path,
 			&websocket.DialOptions{
 				HTTPClient: client,
 				OnPingReceived: func(context.Context, []byte) bool {

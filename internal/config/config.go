@@ -31,15 +31,15 @@ const (
 	EnvShutdownTimeout = "DASHBOARD_SHUTDOWN_TIMEOUT"
 	EnvProductName     = "DASHBOARD_PRODUCT_NAME"
 
-	EnvGatewayMode         = "DASHBOARD_GATEWAY_MODE"
-	EnvGatewayBaseURL      = "DASHBOARD_GATEWAY_BASE_URL"
-	EnvGatewayTokenURL     = "DASHBOARD_GATEWAY_TOKEN_URL"
-	EnvGatewayClientID     = "DASHBOARD_GATEWAY_CLIENT_ID"
-	EnvGatewayClientSecret = "DASHBOARD_GATEWAY_CLIENT_SECRET"
-	EnvGatewayClientCert   = "DASHBOARD_GATEWAY_CLIENT_CERT"
-	EnvGatewayClientKey    = "DASHBOARD_GATEWAY_CLIENT_KEY"
-	EnvGatewayCACert       = "DASHBOARD_GATEWAY_CA_CERT"
-	EnvGatewayTimeout      = "DASHBOARD_GATEWAY_TIMEOUT"
+	EnvGatewayMode       = "DASHBOARD_GATEWAY_MODE"
+	EnvGatewayBaseURL    = "DASHBOARD_GATEWAY_BASE_URL"
+	EnvGatewayClientCert = "DASHBOARD_GATEWAY_CLIENT_CERT"
+	EnvGatewayClientKey  = "DASHBOARD_GATEWAY_CLIENT_KEY"
+	EnvGatewayCACert     = "DASHBOARD_GATEWAY_CA_CERT"
+	EnvGatewayTimeout    = "DASHBOARD_GATEWAY_TIMEOUT"
+	EnvTokenIssuer       = "DASHBOARD_TOKEN_ISSUER"
+	EnvTokenKeysDir      = "DASHBOARD_TOKEN_KEYS_DIR"
+	EnvTokenActiveKID    = "DASHBOARD_TOKEN_ACTIVE_KID"
 
 	EnvDatabaseURL = "DASHBOARD_DATABASE_URL"
 
@@ -210,21 +210,26 @@ type AuthConfig struct {
 	WebauthnOrigin string
 }
 
+// MockTokenIssuer est l'émetteur des jetons en mode `mock`, où Prism ne vérifie aucune signature.
+const MockTokenIssuer = "https://dashboard.mock.invalid"
+
 // GatewayConfig décrit la connexion sortante vers l'API Admin. Hors du mode `real`, seule BaseURL
 // porte une valeur exigée : le mock n'authentifie personne.
 type GatewayConfig struct {
 	Mode GatewayMode
 	// BaseURL porte le préfixe de chemin de l'API : la vraie sert sous `/v1`, le mock sans préfixe.
 	// C'est une différence de déploiement, jamais une constante du code.
-	BaseURL  string
-	TokenURL string
-	ClientID string
-	// ClientSecret est un secret : il ne sort ni dans un message d'erreur, ni dans un journal.
-	ClientSecret string
-	ClientCert   string
-	ClientKey    string
-	CACert       string
-	// Timeout borne un appel sortant, obtention du jeton comprise.
+	BaseURL    string
+	ClientCert string
+	ClientKey  string
+	CACert     string
+	// TokenIssuer est la valeur `iss` des jetons signés, recopiée telle quelle dans OIDC_ISSUER de la
+	// passerelle.
+	TokenIssuer string
+	// TokenKeysDir ne contient que des clés privées : jamais dans un message d'erreur ni un journal.
+	TokenKeysDir   string
+	TokenActiveKID string
+	// Timeout borne un appel sortant.
 	Timeout time.Duration
 }
 
@@ -237,19 +242,21 @@ type Lookup func(name string) (value string, found bool)
 func Load(lookup Lookup) (Config, error) {
 	r := reader{lookup: lookup}
 
+	gatewayMode := r.gatewayMode(EnvGatewayMode)
+
 	cfg := Config{
 		Addr:            r.listenAddr(EnvAddr),
 		ShutdownTimeout: r.positiveDuration(EnvShutdownTimeout, defaultShutdownTimeout),
 		Gateway: GatewayConfig{
-			Mode:         r.gatewayMode(EnvGatewayMode),
-			BaseURL:      r.requiredAbsoluteURL(EnvGatewayBaseURL, "http", "https"),
-			TokenURL:     r.optionalAbsoluteURL(EnvGatewayTokenURL, "https"),
-			ClientID:     r.optional(EnvGatewayClientID),
-			ClientSecret: r.optional(EnvGatewayClientSecret),
-			ClientCert:   r.optional(EnvGatewayClientCert),
-			ClientKey:    r.optional(EnvGatewayClientKey),
-			CACert:       r.optional(EnvGatewayCACert),
-			Timeout:      r.positiveDuration(EnvGatewayTimeout, defaultGatewayTimeout),
+			Mode:           gatewayMode,
+			BaseURL:        r.requiredAbsoluteURL(EnvGatewayBaseURL, "http", "https"),
+			ClientCert:     r.optional(EnvGatewayClientCert),
+			ClientKey:      r.optional(EnvGatewayClientKey),
+			CACert:         r.optional(EnvGatewayCACert),
+			TokenIssuer:    r.tokenIssuer(EnvTokenIssuer, gatewayMode),
+			TokenKeysDir:   r.optional(EnvTokenKeysDir),
+			TokenActiveKID: r.optional(EnvTokenActiveKID),
+			Timeout:        r.positiveDuration(EnvGatewayTimeout, defaultGatewayTimeout),
 		},
 		DatabaseURL: r.requiredDatabaseURL(EnvDatabaseURL),
 		ProductName: r.productName(EnvProductName),
@@ -298,7 +305,7 @@ func Load(lookup Lookup) (Config, error) {
 // La contrainte que cela impose au chargeur : **toute lecture est inconditionnelle**, faite dans le
 // littéral Config ci-dessus. Une variable lue seulement quand une autre est renseignée resterait
 // invisible ici, et `.env.example` pourrait alors l'omettre sans que rien ne rougisse. Les secrets
-// que le §1.8 annonce (DSN, Redis, mTLS, OAuth2) s'ajoutent donc à cette forme, pas à côté d'elle.
+// que le §1.8 annonce (DSN, Redis, mTLS, clés de signature) s'ajoutent donc à cette forme, pas à côté d'elle.
 func Variables() []string {
 	var (
 		names []string
@@ -346,7 +353,7 @@ func (r *reader) required(name string) (string, bool) {
 	return value, true
 }
 
-// requireRealGatewayMaterial exige les identifiants OAuth2 et le matériel mTLS d'une passerelle
+// requireRealGatewayMaterial exige le matériel mTLS et celui des jetons signés d'une passerelle
 // jointe pour de vrai. Le manque se constate sur l'environnement et non sur la valeur chargée : une
 // valeur présente mais refusée plus haut est déjà signalée, et la redire « absente » ferait deux
 // lignes pour un seul problème.
@@ -356,12 +363,12 @@ func (r *reader) requireRealGatewayMaterial(mode GatewayMode) {
 	}
 
 	for _, name := range []string{
-		EnvGatewayTokenURL,
-		EnvGatewayClientID,
-		EnvGatewayClientSecret,
 		EnvGatewayClientCert,
 		EnvGatewayClientKey,
 		EnvGatewayCACert,
+		EnvTokenIssuer,
+		EnvTokenKeysDir,
+		EnvTokenActiveKID,
 	} {
 		if r.optional(name) == "" {
 			r.reject(name, "variable obligatoire absente en mode %s", GatewayModeReal)
@@ -373,7 +380,7 @@ func (r *reader) requireRealGatewayMaterial(mode GatewayMode) {
 // inconditionnellement plus haut — `http` reste la normale du mock Prism — et c'est ici, le mode
 // connu, qu'il se restreint : http.Transport ne consulte pas son tls.Config quand l'URL est en
 // `http`, si bien que le matériel mTLS serait chargé, posé, et jamais présenté, pendant que le jeton
-// machine et ses cinq scopes partiraient en clair à chaque appel. Rien ne tomberait.
+// signé partirait en clair à chaque appel. Rien ne tomberait.
 func (r *reader) requireEncryptedGatewayBaseURL(mode GatewayMode, baseURL string) {
 	// Une URL absente ou déjà refusée est rendue vide : la redire ferait deux lignes pour un problème.
 	if mode != GatewayModeReal || baseURL == "" {
@@ -714,15 +721,6 @@ func (r *reader) requiredAbsoluteURL(name string, schemes ...string) string {
 	return r.absoluteURL(name, value, schemes)
 }
 
-func (r *reader) optionalAbsoluteURL(name string, schemes ...string) string {
-	value := r.optional(name)
-	if value == "" {
-		return ""
-	}
-
-	return r.absoluteURL(name, value, schemes)
-}
-
 // absoluteURL rend la valeur verbatim plutôt que la forme reconstruite par net/url : le préfixe de
 // chemin de l'API appartient à l'URL configurée — la vraie sert sous `/v1`, le mock Prism sans
 // préfixe — et rien ici ne doit le réécrire.
@@ -731,6 +729,29 @@ func (r *reader) absoluteURL(name, value string, schemes []string) string {
 	if err != nil || parsed.Host == "" || !slices.Contains(schemes, parsed.Scheme) {
 		r.reject(name, "URL absolue en %s attendue, reçu %q",
 			strings.Join(schemes, " ou "), RedactURL(value))
+
+		return ""
+	}
+
+	return value
+}
+
+// tokenIssuer lit la valeur brute, sans TrimSpace : la passerelle la compare octet pour octet à
+// OIDC_ISSUER, et une valeur nettoyée ici divergerait de celle qu'on aura recopiée là-bas.
+func (r *reader) tokenIssuer(name string, mode GatewayMode) string {
+	value, found := r.lookup(name)
+	if !found || value == "" {
+		if mode == GatewayModeMock {
+			return MockTokenIssuer
+		}
+
+		return ""
+	}
+
+	parsed, err := url.Parse(value)
+	if value != strings.TrimSpace(value) || err != nil || parsed.Scheme != "https" || parsed.Host == "" ||
+		parsed.RawQuery != "" || parsed.Fragment != "" {
+		r.reject(name, "URL https canonique attendue, sans espace, requête ni fragment, reçu %q", value)
 
 		return ""
 	}

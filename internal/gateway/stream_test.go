@@ -17,12 +17,10 @@ import (
 
 // Le serveur propose HTTP/2 par ALPN, comme la passerelle derrière son ingress : la montée ne passe
 // que parce que net/http la garde en HTTP/1.1.
-func TestStreamClientUpgradesOverMutualTLSWithTheMachineToken(t *testing.T) {
+func TestStreamClientUpgradesOverMutualTLSWithASignedToken(t *testing.T) {
 	t.Parallel()
 
 	pki := newTestPKI(t)
-	tokens := &tokenEndpoint{lifetimes: []int{3600}}
-	tokenServer := pki.serveTLS(t, tokens.handle)
 
 	var api recorder
 
@@ -47,20 +45,17 @@ func TestStreamClientUpgradesOverMutualTLSWithTheMachineToken(t *testing.T) {
 	t.Cleanup(apiServer.Close)
 
 	client, err := gateway.NewStreamClient(config.GatewayConfig{
-		Mode:         config.GatewayModeReal,
-		BaseURL:      apiServer.URL,
-		TokenURL:     tokenServer.URL,
-		ClientID:     "tableau-de-bord",
-		ClientSecret: "secret-de-test",
-		ClientCert:   pki.clientCertFile,
-		ClientKey:    pki.clientKeyFile,
-		CACert:       pki.caFile,
-		Timeout:      5 * time.Second,
-	})
+		Mode:       config.GatewayModeReal,
+		BaseURL:    apiServer.URL,
+		ClientCert: pki.clientCertFile,
+		ClientKey:  pki.clientKeyFile,
+		CACert:     pki.caFile,
+		Timeout:    5 * time.Second,
+	}, testIssuer(t), quietLogger())
 	require.NoError(t, err)
 
 	//nolint:bodyclose // Dial ferme le corps en échec, et en fait la connexion en succès (dial.go:147-185).
-	conn, _, err := websocket.Dial(t.Context(), apiServer.URL+"/admin/stream/metrics",
+	conn, _, err := websocket.Dial(gateway.WithSystem(t.Context()), apiServer.URL+"/admin/stream/metrics",
 		&websocket.DialOptions{HTTPClient: client})
 	require.NoError(t, err)
 	_ = conn.CloseNow()
@@ -68,16 +63,15 @@ func TestStreamClientUpgradesOverMutualTLSWithTheMachineToken(t *testing.T) {
 	received := api.snapshot()
 	require.Len(t, received, 1)
 	assert.Positive(t, received[0].clientCerts, "le flux a été ouvert sans certificat client")
-	assert.Equal(t, "Bearer jeton-machine-1", received[0].authorization)
+	assert.Regexp(t, `^Bearer \S+$`, received[0].authorization)
 }
 
 func TestStreamClientRefusesAPlaintextGatewayInRealMode(t *testing.T) {
 	t.Parallel()
 
 	_, err := gateway.NewStreamClient(config.GatewayConfig{
-		Mode:     config.GatewayModeReal,
-		BaseURL:  "http://passerelle.exemple.test",
-		TokenURL: "https://jeton.exemple.test",
-	})
+		Mode:    config.GatewayModeReal,
+		BaseURL: "http://passerelle.exemple.test",
+	}, testIssuer(t), quietLogger())
 	require.Error(t, err)
 }

@@ -62,7 +62,7 @@ func (r *recorder) count() int {
 	return len(r.snapshot())
 }
 
-func TestAdminClientAuthenticatesWithoutTokenEndpointInMockMode(t *testing.T) {
+func TestAdminClientSignsATokenInMockMode(t *testing.T) {
 	t.Parallel()
 
 	var api recorder
@@ -77,10 +77,10 @@ func TestAdminClientAuthenticatesWithoutTokenEndpointInMockMode(t *testing.T) {
 		Mode:    config.GatewayModeMock,
 		BaseURL: server.URL,
 		Timeout: 5 * time.Second,
-	})
+	}, testIssuer(t), quietLogger())
 	require.NoError(t, err)
 
-	_, err = client.ListCustomersWithResponse(t.Context(), nil)
+	_, err = client.ListCustomersWithResponse(gateway.WithSystem(t.Context()), nil)
 	require.NoError(t, err)
 
 	received := api.snapshot()
@@ -99,7 +99,7 @@ func TestAdminClientAuthenticatesWithoutTokenEndpointInMockMode(t *testing.T) {
 // traverse pas la frontière du package — NewAdminClient prend une struct nue, que rien n'oblige à
 // venir de `config.Load` : seuls les tests de ce package la construisent, et `internal/gateway` n'a
 // aucun importeur hors de lui-même. Un `Mode` vide qui prendrait le chemin `mock` joindrait une
-// passerelle de production sans certificat client et avec le jeton factice en en-tête.
+// passerelle de production sans certificat client et avec un jeton signé en en-tête.
 func TestAdminClientRefusesAnUnknownGatewayMode(t *testing.T) {
 	t.Parallel()
 
@@ -111,7 +111,7 @@ func TestAdminClientRefusesAnUnknownGatewayMode(t *testing.T) {
 				Mode:    mode,
 				BaseURL: "https://admin.gateway.internal/v1",
 				Timeout: time.Second,
-			})
+			}, testIssuer(t), quietLogger())
 
 			require.Error(t, err,
 				"un mode que le package ne connaît pas ne doit pas retomber sur le chemin permissif")
@@ -126,54 +126,31 @@ func TestAdminClientRefusesAnUnknownGatewayMode(t *testing.T) {
 // refuse déjà une passerelle réelle jointe en clair, mais cette polarité s'arrête à l'environnement.
 // NewAdminClient prend une struct nue, et un `http://` qui la traverse ne casse rien de visible —
 // http.Transport ne consulte pas son tls.Config, le matériel mTLS est chargé, posé, jamais présenté.
-//
-// Mesuré sans cette garde, en mode `real` avec un matériel mTLS valide et les deux bouts en clair :
-// `NewAdminClient` rend nil, l'API reçoit `Bearer jeton-machine-1` et `clientCerts:0`, et le tokenUrl
-// reçoit le secret client en Base64 sur le fil, avec les cinq scopes dont `gdpr:erase`.
 func TestAdminClientRefusesAPlaintextGatewayInRealMode(t *testing.T) {
 	t.Parallel()
 
 	pki := newTestPKI(t)
 
-	withGateway := func(baseURL, tokenURL string) config.GatewayConfig {
+	withGateway := func(baseURL string) config.GatewayConfig {
 		return config.GatewayConfig{
-			Mode:         config.GatewayModeReal,
-			BaseURL:      baseURL,
-			TokenURL:     tokenURL,
-			ClientID:     "tableau-de-bord",
-			ClientSecret: "secret-de-test",
-			ClientCert:   pki.clientCertFile,
-			ClientKey:    pki.clientKeyFile,
-			CACert:       pki.caFile,
-			Timeout:      time.Second,
+			Mode:       config.GatewayModeReal,
+			BaseURL:    baseURL,
+			ClientCert: pki.clientCertFile,
+			ClientKey:  pki.clientKeyFile,
+			CACert:     pki.caFile,
+			Timeout:    time.Second,
 		}
 	}
 
 	t.Run("refuse une API jointe en clair", func(t *testing.T) {
 		t.Parallel()
 
-		client, err := gateway.NewAdminClient(
-			withGateway("http://passerelle.test/v1", "https://passerelle.test/token"))
+		client, err := gateway.NewAdminClient(withGateway("http://passerelle.test/v1"), testIssuer(t), quietLogger())
 
-		require.Error(t, err,
-			"le jeton machine et ses cinq scopes partiraient en clair, mTLS chargé et jamais présenté")
+		require.Error(t, err, "le jeton signé partirait en clair, mTLS chargé et jamais présenté")
 		assert.Nil(t, client)
 		assert.Contains(t, err.Error(), "http://passerelle.test/v1",
 			"le message doit nommer l'URL fautive : sinon l'exploitant relit les deux")
-		assert.NotContains(t, err.Error(), "secret-de-test", "un secret ne sort pas dans une erreur")
-	})
-
-	t.Run("refuse un tokenUrl joint en clair", func(t *testing.T) {
-		t.Parallel()
-
-		client, err := gateway.NewAdminClient(
-			withGateway("https://passerelle.test/v1", "http://passerelle.test/token"))
-
-		require.Error(t, err,
-			"c'est là que part le secret client en Basic ; en clair, il est lisible sur le fil")
-		assert.Nil(t, client)
-		assert.Contains(t, err.Error(), "http://passerelle.test/token")
-		assert.NotContains(t, err.Error(), "secret-de-test", "un secret ne sort pas dans une erreur")
 	})
 
 	// Le schéma d'une URL est insensible à la casse, et net/url le minuscule à l'analyse
@@ -182,8 +159,7 @@ func TestAdminClientRefusesAPlaintextGatewayInRealMode(t *testing.T) {
 	t.Run("accepte un schéma en majuscules", func(t *testing.T) {
 		t.Parallel()
 
-		client, err := gateway.NewAdminClient(
-			withGateway("HTTPS://passerelle.test/v1", "HTTPS://passerelle.test/token"))
+		client, err := gateway.NewAdminClient(withGateway("HTTPS://passerelle.test/v1"), testIssuer(t), quietLogger())
 
 		require.NoError(t, err)
 		assert.NotNil(t, client)
@@ -191,8 +167,7 @@ func TestAdminClientRefusesAPlaintextGatewayInRealMode(t *testing.T) {
 }
 
 // NewAdminClient lit le matériel mTLS à la construction et refuse en nommant le fichier fautif
-// (§1.8), plutôt que de rendre un client qui échouera à sa première requête. Aucune de ces erreurs
-// ne porte le secret client, qui n'entre pas ici.
+// (§1.8), plutôt que de rendre un client qui échouera à sa première requête.
 //
 // **Ce que ce test ne prouve pas, et que la §1.8 demande pourtant** : que ce refus arrive au
 // démarrage. `internal/gateway` n'a aucun importeur hors de lui-même, `NewAdminClient` n'est appelé
@@ -212,15 +187,12 @@ func TestAdminClientRefusesIncompleteMutualTLSMaterial(t *testing.T) {
 
 	withGateway := func(mutate func(*config.GatewayConfig)) config.GatewayConfig {
 		cfg := config.GatewayConfig{
-			Mode:         config.GatewayModeReal,
-			BaseURL:      "https://passerelle.test/v1",
-			TokenURL:     "https://passerelle.test/token",
-			ClientID:     "tableau-de-bord",
-			ClientSecret: "secret-de-test",
-			ClientCert:   pki.clientCertFile,
-			ClientKey:    pki.clientKeyFile,
-			CACert:       pki.caFile,
-			Timeout:      time.Second,
+			Mode:       config.GatewayModeReal,
+			BaseURL:    "https://passerelle.test/v1",
+			ClientCert: pki.clientCertFile,
+			ClientKey:  pki.clientKeyFile,
+			CACert:     pki.caFile,
+			Timeout:    time.Second,
 		}
 		mutate(&cfg)
 
@@ -255,13 +227,12 @@ func TestAdminClientRefusesIncompleteMutualTLSMaterial(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			client, err := gateway.NewAdminClient(withGateway(testCase.mutate))
+			client, err := gateway.NewAdminClient(withGateway(testCase.mutate), testIssuer(t), quietLogger())
 
 			require.Error(t, err)
 			assert.Nil(t, client)
 			assert.Contains(t, err.Error(), testCase.nameSin,
 				"le message doit dire quel matériel manque : sinon l'exploitant relit les six variables")
-			assert.NotContains(t, err.Error(), "secret-de-test", "un secret ne sort pas dans une erreur")
 		})
 	}
 }

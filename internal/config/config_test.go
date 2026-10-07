@@ -78,29 +78,29 @@ const localDatabaseURL = "postgres://dashboard:dashboard@127.0.0.1:5432/dashboar
 // jointe pour de vrai, sans aucune valeur qui ressemble à un secret d'installation.
 func realGatewayEnv() map[string]string {
 	return map[string]string{
-		config.EnvAddr:                ":3001",
-		config.EnvProductName:         testProductName,
-		config.EnvGatewayMode:         string(config.GatewayModeReal),
-		config.EnvGatewayBaseURL:      "https://admin.gateway.internal/v1",
-		config.EnvGatewayTokenURL:     "https://auth.gateway.internal/oauth2/token",
-		config.EnvGatewayClientID:     "dashboard",
-		config.EnvGatewayClientSecret: "un-secret-de-test",
-		config.EnvGatewayClientCert:   "/etc/dashboard/tls/client.crt",
-		config.EnvGatewayClientKey:    "/etc/dashboard/tls/client.key",
-		config.EnvGatewayCACert:       "/etc/dashboard/tls/ca.crt",
-		config.EnvGatewayTimeout:      "5s",
-		config.EnvShutdownTimeout:     "30s",
-		config.EnvDatabaseURL:         localDatabaseURL,
-		config.EnvBruteForceSalt:      testBruteForceSalt,
-		config.EnvSessionSecret:       testSessionSecret,
-		config.EnvTOTPEncryptionKey:   testTOTPEncryptionKey,
-		config.EnvWebauthnRPID:        testWebauthnRPID,
-		config.EnvWebauthnOrigin:      testWebauthnOrigin,
-		config.EnvTrustedProxies:      config.NoTrustedProxy,
-		config.EnvSMTPAddr:            testSMTPAddr,
-		config.EnvSMTPFrom:            testSMTPFrom,
-		config.EnvPublicURL:           testPublicURL,
-		config.EnvRedisURL:            testRedisURL,
+		config.EnvAddr:              ":3001",
+		config.EnvProductName:       testProductName,
+		config.EnvGatewayMode:       string(config.GatewayModeReal),
+		config.EnvGatewayBaseURL:    "https://admin.gateway.internal/v1",
+		config.EnvTokenIssuer:       "https://dashboard.internal",
+		config.EnvTokenKeysDir:      "/etc/dashboard/token-keys",
+		config.EnvTokenActiveKID:    "kid-actif",
+		config.EnvGatewayClientCert: "/etc/dashboard/tls/client.crt",
+		config.EnvGatewayClientKey:  "/etc/dashboard/tls/client.key",
+		config.EnvGatewayCACert:     "/etc/dashboard/tls/ca.crt",
+		config.EnvGatewayTimeout:    "5s",
+		config.EnvShutdownTimeout:   "30s",
+		config.EnvDatabaseURL:       localDatabaseURL,
+		config.EnvBruteForceSalt:    testBruteForceSalt,
+		config.EnvSessionSecret:     testSessionSecret,
+		config.EnvTOTPEncryptionKey: testTOTPEncryptionKey,
+		config.EnvWebauthnRPID:      testWebauthnRPID,
+		config.EnvWebauthnOrigin:    testWebauthnOrigin,
+		config.EnvTrustedProxies:    config.NoTrustedProxy,
+		config.EnvSMTPAddr:          testSMTPAddr,
+		config.EnvSMTPFrom:          testSMTPFrom,
+		config.EnvPublicURL:         testPublicURL,
+		config.EnvRedisURL:          testRedisURL,
 	}
 }
 
@@ -211,9 +211,9 @@ func TestLoadGateway(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, config.GatewayModeReal, cfg.Gateway.Mode)
 		assert.Equal(t, "https://admin.gateway.internal/v1", cfg.Gateway.BaseURL)
-		assert.Equal(t, "https://auth.gateway.internal/oauth2/token", cfg.Gateway.TokenURL)
-		assert.Equal(t, "dashboard", cfg.Gateway.ClientID)
-		assert.Equal(t, "un-secret-de-test", cfg.Gateway.ClientSecret)
+		assert.Equal(t, "https://dashboard.internal", cfg.Gateway.TokenIssuer)
+		assert.Equal(t, "/etc/dashboard/token-keys", cfg.Gateway.TokenKeysDir)
+		assert.Equal(t, "kid-actif", cfg.Gateway.TokenActiveKID)
 		assert.Equal(t, "/etc/dashboard/tls/client.crt", cfg.Gateway.ClientCert)
 		assert.Equal(t, "/etc/dashboard/tls/client.key", cfg.Gateway.ClientKey)
 		assert.Equal(t, "/etc/dashboard/tls/ca.crt", cfg.Gateway.CACert)
@@ -309,12 +309,12 @@ func TestLoadGateway(t *testing.T) {
 
 		require.Error(t, err)
 		for _, name := range []string{
-			config.EnvGatewayTokenURL,
-			config.EnvGatewayClientID,
-			config.EnvGatewayClientSecret,
 			config.EnvGatewayClientCert,
 			config.EnvGatewayClientKey,
 			config.EnvGatewayCACert,
+			config.EnvTokenIssuer,
+			config.EnvTokenKeysDir,
+			config.EnvTokenActiveKID,
 		} {
 			assert.Contains(t, err.Error(), name)
 		}
@@ -332,21 +332,53 @@ func TestLoadGateway(t *testing.T) {
 		assert.Contains(t, err.Error(), string(config.GatewayModeReal))
 		assert.Contains(t, err.Error(), string(config.GatewayModeMock))
 	})
+}
 
-	// Un secret nommé dans un message d'erreur finit dans le journal de l'orchestrateur, que bien plus
-	// de monde peut lire que le fichier d'environnement.
-	t.Run("ne recopie jamais le secret client dans le message", func(t *testing.T) {
+func TestLoadTokenIssuer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("kept byte for byte", func(t *testing.T) {
 		t.Parallel()
 
-		const secret = "s3cr3t-qui-ne-doit-pas-fuiter"
+		cfg, err := config.Load(lookupFrom(envWith(realGatewayEnv(), map[string]string{config.EnvTokenIssuer: "https://dashboard.internal/"})))
+		require.NoError(t, err)
+		assert.Equal(t, "https://dashboard.internal/", cfg.Gateway.TokenIssuer)
+	})
 
-		_, err := config.Load(lookupFrom(envWith(realGatewayEnv(), map[string]string{
-			config.EnvGatewayClientSecret: secret,
-			config.EnvGatewayTokenURL:     "pas-une-url",
-		})))
+	for name, value := range map[string]string{
+		"surrounding space": " https://dashboard.internal",
+		"cleartext":         "http://dashboard.internal",
+		"query":             "https://dashboard.internal?x=1",
+		"fragment":          "https://dashboard.internal#x",
+	} {
+		t.Run("refuses "+name, func(t *testing.T) {
+			t.Parallel()
 
+			_, err := config.Load(lookupFrom(envWith(realGatewayEnv(), map[string]string{config.EnvTokenIssuer: value})))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), config.EnvTokenIssuer)
+		})
+	}
+
+	t.Run("required in real mode", func(t *testing.T) {
+		t.Parallel()
+
+		env := realGatewayEnv()
+		delete(env, config.EnvTokenKeysDir)
+		delete(env, config.EnvTokenActiveKID)
+
+		_, err := config.Load(lookupFrom(env))
 		require.Error(t, err)
-		assert.NotContains(t, err.Error(), secret)
+		assert.Contains(t, err.Error(), config.EnvTokenKeysDir)
+		assert.Contains(t, err.Error(), config.EnvTokenActiveKID)
+	})
+
+	t.Run("optional in mock mode, with a mock issuer", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := config.Load(lookupFrom(minimalEnv()))
+		require.NoError(t, err)
+		assert.Equal(t, config.MockTokenIssuer, cfg.Gateway.TokenIssuer)
 	})
 }
 
@@ -546,23 +578,12 @@ func TestLoadRejectsMalformedValues(t *testing.T) {
 			mention:   config.EnvGatewayBaseURL,
 		},
 		// http.Transport ne consulte pas son tls.Config quand le schéma est `http` : le mTLS
-		// disparaîtrait sans un mot, et le jeton machine partirait en clair sur chaque appel à l'API
-		// Admin — le même jeton que la ligne ci-dessous protège à son obtention.
+		// disparaîtrait sans un mot, et le jeton signé partirait en clair sur chaque appel à l'API
+		// Admin.
 		"une URL de base en clair en mode real": {
 			base:      realGatewayEnv(),
 			overrides: map[string]string{config.EnvGatewayBaseURL: "http://admin.gateway.internal/v1"},
 			mention:   config.EnvGatewayBaseURL,
-		},
-		"une URL de jeton sans schéma": {
-			base:      realGatewayEnv(),
-			overrides: map[string]string{config.EnvGatewayTokenURL: "auth.gateway.internal/token"},
-			mention:   config.EnvGatewayTokenURL,
-		},
-		// Le jeton machine traverse le réseau : l'obtenir en clair le donne à qui écoute.
-		"une URL de jeton en clair": {
-			base:      realGatewayEnv(),
-			overrides: map[string]string{config.EnvGatewayTokenURL: "http://auth.gateway.internal/token"},
-			mention:   config.EnvGatewayTokenURL,
 		},
 		// Ni une URL `postgres://`, ni une forme `clé=valeur` : c'est l'adresse de la passerelle
 		// recopiée d'une ligne à l'autre du `.env`, et rien ne la refuserait avant la première requête.
@@ -651,12 +672,12 @@ func TestVariablesListsEveryNameLoadReads(t *testing.T) {
 		config.EnvProductName,
 		config.EnvGatewayMode,
 		config.EnvGatewayBaseURL,
-		config.EnvGatewayTokenURL,
-		config.EnvGatewayClientID,
-		config.EnvGatewayClientSecret,
 		config.EnvGatewayClientCert,
 		config.EnvGatewayClientKey,
 		config.EnvGatewayCACert,
+		config.EnvTokenIssuer,
+		config.EnvTokenKeysDir,
+		config.EnvTokenActiveKID,
 		config.EnvGatewayTimeout,
 		config.EnvDatabaseURL,
 		config.EnvBruteForceSalt,

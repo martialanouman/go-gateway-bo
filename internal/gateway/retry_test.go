@@ -19,13 +19,13 @@ import (
 // lecture et une mutation. Elles rendent l'erreur de transport, la seule chose qui distingue « la
 // requête n'est jamais partie » de « la passerelle a répondu ».
 func listCustomers(ctx context.Context, client *gateway.ClientWithResponses) error {
-	_, err := client.ListCustomersWithResponse(ctx, nil)
+	_, err := client.ListCustomersWithResponse(gateway.WithSystem(ctx), nil)
 
 	return err
 }
 
 func suspendCustomer(ctx context.Context, client *gateway.ClientWithResponses) error {
-	_, err := client.SuspendCustomerWithResponse(ctx, gateway.Id{})
+	_, err := client.SuspendCustomerWithResponse(gateway.WithSystem(ctx), gateway.Id{})
 
 	return err
 }
@@ -45,7 +45,7 @@ func alwaysRespond(t *testing.T, status int) (*recorder, *gateway.ClientWithResp
 		Mode:    config.GatewayModeMock,
 		BaseURL: server.URL,
 		Timeout: 5 * time.Second,
-	})
+	}, testIssuer(t), quietLogger())
 	require.NoError(t, err)
 
 	return &api, client
@@ -161,7 +161,7 @@ func dropsTheFirstConnection(t *testing.T) (*recorder, *gateway.ClientWithRespon
 		Mode:    config.GatewayModeMock,
 		BaseURL: server.URL,
 		Timeout: 5 * time.Second,
-	})
+	}, testIssuer(t), quietLogger())
 	require.NoError(t, err)
 
 	return &api, client
@@ -214,7 +214,7 @@ func TestAdminClientStopsWaitingWhenTheCallerGivesUp(t *testing.T) {
 		Mode:    config.GatewayModeMock,
 		BaseURL: server.URL,
 		Timeout: 5 * time.Second,
-	})
+	}, testIssuer(t), quietLogger())
 	require.NoError(t, err)
 
 	require.Error(t, listCustomers(ctx, client),
