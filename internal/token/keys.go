@@ -126,6 +126,9 @@ func readKey(path string) (signingKey, error) {
 	return signingKey{id: id, private: private}, nil
 }
 
+// KeyIDOf rend le kid d'une clé publique, tel que le JWKS le publiera.
+func KeyIDOf(public *ecdsa.PublicKey) (string, error) { return keyID(public) }
+
 func keyID(public *ecdsa.PublicKey) (string, error) {
 	thumbprint, err := (&jose.JSONWebKey{Key: public}).Thumbprint(crypto.SHA256)
 	if err != nil {

@@ -66,3 +66,9 @@ Fonctionnalité: Le BFF s'authentifie auprès de la passerelle au nom de l'opér
     Quand le navigateur demande "/.well-known/jwks.json"
     Alors le serveur répond 200
     Et la réponse publie une clé ES256 sans partie privée
+
+  Scénario: la clé de signature fournie n'apparaît dans aucune sortie
+    Étant donné une clé de signature fournie au serveur
+    Et un serveur démarré
+    Alors la sortie du serveur nomme le kid actif
+    Et aucune sortie ne porte la clé de signature

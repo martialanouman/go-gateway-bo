@@ -2,11 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +24,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/config"
 	"github.com/martialanouman/go-gateway-bo/internal/fakegateway"
 	"github.com/martialanouman/go-gateway-bo/internal/gateway"
+	"github.com/martialanouman/go-gateway-bo/internal/token"
 )
 
 type gatewayTokenWorld struct {
@@ -23,6 +32,9 @@ type gatewayTokenWorld struct {
 	login    *loginWorld
 	verifier *fakegateway.Verifier
 	upstream *httptest.Server
+
+	keysDir                           string
+	pemBody, privateScalar, activeKID string
 }
 
 func (w *gatewayTokenWorld) registerSteps(ctx *godog.ScenarioContext) {
@@ -36,9 +48,17 @@ func (w *gatewayTokenWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^aucune sortie ne porte le jeton reçu par la passerelle$`, w.outputHidesTheToken)
 	ctx.Then(`^la passerelle a ouvert le flux "([^"]*)" au nom de l'identité système avec le scope "([^"]*)"$`, w.openedFeedAsSystem)
 	ctx.Then(`^la réponse publie une clé ES256 sans partie privée$`, w.publishesPublicKeyOnly)
+	ctx.Given(`^une clé de signature fournie au serveur$`, w.providedSigningKey)
+	ctx.Then(`^la sortie du serveur nomme le kid actif$`, w.outputNamesTheActiveKID)
+	ctx.Then(`^aucune sortie ne porte la clé de signature$`, w.outputHidesTheKey)
 	ctx.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
 		if w.upstream != nil {
 			w.upstream.Close()
+		}
+
+		if w.keysDir != "" {
+			_ = os.RemoveAll(w.keysDir)
+			w.keysDir = ""
 		}
 
 		return ctx, nil
@@ -177,4 +197,63 @@ func (w *gatewayTokenWorld) publishesPublicKeyOnly() error {
 	}
 
 	return nil
+}
+
+func (w *gatewayTokenWorld) providedSigningKey() error {
+	dir, err := os.MkdirTemp("", "token-keys")
+	if err != nil {
+		return err
+	}
+
+	w.keysDir = dir
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return err
+	}
+
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return err
+	}
+
+	w.pemBody = base64.StdEncoding.EncodeToString(der)
+	scalar, err := key.Bytes()
+	if err != nil {
+		return err
+	}
+
+	w.privateScalar = base64.RawURLEncoding.EncodeToString(scalar)
+
+	if err := os.WriteFile(filepath.Join(dir, "active.pem"),
+		pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), 0o600); err != nil {
+		return err
+	}
+
+	kid, err := token.KeyIDOf(&key.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	w.activeKID = kid
+	w.process.env["DASHBOARD_TOKEN_KEYS_DIR"] = dir
+	w.process.env["DASHBOARD_TOKEN_ACTIVE_KID"] = kid
+
+	return nil
+}
+
+func (w *gatewayTokenWorld) outputNamesTheActiveKID() error {
+	if !strings.Contains(w.process.output.String(), w.activeKID) {
+		return fmt.Errorf("la sortie ne nomme pas le kid actif %s", w.activeKID)
+	}
+
+	return nil
+}
+
+func (w *gatewayTokenWorld) outputHidesTheKey() error {
+	if err := w.process.outputHides(w.pemBody[:48]); err != nil {
+		return err
+	}
+
+	return w.process.outputHides(w.privateScalar)
 }
