@@ -40,21 +40,22 @@ Le jeton prouve **qui** appelle et avec quels droits ; le mTLS existant prouve *
   **`cdr:read_pii` → `msisdn:reveal`** : la clé du démasquage existe déjà (spec §6.4), on n'en crée
   pas une seconde. `operators:manage`, `roles:manage` et toute clé propre au BFF sont `Local` et
   n'ouvrent rien à la passerelle. On n'émet que ce que l'opérateur détient.
-- **Identité système** pour les trois flux du hub : une ligne réservée de `dashboard.operators`,
-  UUID fixe, aucune connexion possible (ni mot de passe, ni facteur, ni rôle), absente de la liste
-  des opérateurs ; `scope: "admin:read"` seul. L'ADR-0019 (« pas de compte de service ») visait les
-  scripts ; l'amender d'une ligne côté passerelle fait partie de la PR (lien dans la description).
+- **Identité système** pour les trois flux du hub : une **constante** `gateway.SystemSubject`
+  (UUID fixe), sans ligne en base — `first_operator.go:94` n'amorce le premier administrateur que
+  sur une table `operators` vide, et une ligne réservée l'aurait bloqué. `scope: "admin:read"` seul.
+  L'ADR-0019 (« pas de compte de service ») visait les scripts ; l'amender d'une ligne côté
+  passerelle fait partie de la PR.
 - **Transport.** Un `RoundTripper` lit l'appelant dans le contexte (`gateway.WithOperator`, posé par
   la garde ; `gateway.WithSystem`, posé par le hub) et pose `Authorization: Bearer`. **Sans appelant,
   ou sans aucun scope, l'appel est refusé avant le réseau.** Le cookie de session n'est jamais
-  transmis. Le mode `mock` garde son jeton factice ; l'émetteur reste actif, sur une clé éphémère
-  engendrée en mémoire quand les trois variables sont absentes.
+  transmis. Le mode `mock` envoie aussi le jeton signé, Prism acceptant tout `Bearer` ;
+  `mockAccessToken` disparaît ; l'émetteur reste actif, sur une clé éphémère engendrée en mémoire quand les trois variables sont absentes.
 - **Disparaissent** : `TokenURL`, `ClientID`, `ClientSecret`, `machineCredentials`, `token.go`, leurs
   variables d'environnement et leur exigence dans `requireRealGatewayMaterial`.
 - **Réponses de la passerelle**, traduites dans `relayError`, jamais par handler ; aucune ne touche
   la session :
-  - 401 `unauthenticated` → ERROR (`kid`, `iss`, `sub`, heure), compteur
-    `gateway_token_rejected_total`, pas de rejeu ; l'opérateur reçoit 502
+  - 401 `unauthenticated` → ERROR (`kid`, `iss`, `sub`, heure), événement de log stable
+    `gateway_token_rejected` (le BFF n'a aucun registre de métriques), pas de rejeu ; l'opérateur reçoit 502
     `bff_gateway_rejected_token` : « La passerelle a refusé l'identité du tableau de bord : l'action
     n'a pas eu lieu. L'exploitation est prévenue ; votre session reste ouverte. »
   - 403 `forbidden_scope` → relayé, refus expliqué ; WARN (la garde aurait dû refuser avant).
@@ -79,7 +80,6 @@ Le jeton prouve **qui** appelle et avec quels droits ; le mTLS existant prouve *
 - `internal/config/config.go` : les trois variables, les refus.
 - `internal/bff/guard.go` (pose l'appelant), `relayError` (401/403/503).
 - `internal/hub/upstream.go` : `WithSystem`.
-- `internal/store/migrations/` : l'identité système.
 - `cmd/dashboard/main.go` : JWKS monté ; `gateway-token.feature` et ses steps.
 - `internal/fakegateway` / faux amont des scénarios : vérification réelle des jetons (`go-oidc`).
 - `docs/runbook.md` (neuf) ; `tasks/todo.md` l. 255 si la tranche réelle n'est pas jouée.
@@ -112,8 +112,8 @@ Le jeton prouve **qui** appelle et avec quels droits ; le mTLS existant prouve *
   Mutation : réutiliser au-delà de `exp - 60`.
 - **Traduction** → les 9 rôles de §6.10, table écrite à la main ; toute clé a une classe, et un
   second test exige la complétude. Mutation : une clé `Local` traduite en `admin:write`.
-- **Appel parti sans identité** → scénario « un appel sans appelant n'atteint jamais la
-  passerelle ». Mutation : retirer le refus avant le réseau.
+- **Appel parti sans identité** → test du
+  transport `TestACallWithoutACallerNeverLeaves`. Mutation : retirer le refus avant le réseau.
 - **Rôle changé, jeton périmé** → scénario : le `scope` du jeton suivant suit le nouveau rôle.
 - **Session tuée par la passerelle** → scénarios 401 et 503 : `/auth/me` répond toujours 200.
   Mutation : traiter le 401 comme une session morte.
