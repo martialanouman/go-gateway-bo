@@ -102,6 +102,7 @@ func readKeys(dir string) ([]signingKey, error) {
 // readKey ne rend jamais le contenu du fichier dans son erreur : un PEM tronqué est encore un secret.
 func readKey(path string) (signingKey, error) {
 	name := filepath.Base(path)
+	//nolint:gosec // G304 : le chemin vient du dossier de clés configuré par l'exploitant, listé par os.ReadDir.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return signingKey{}, fmt.Errorf("%s : clé illisible", name)

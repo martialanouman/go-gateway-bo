@@ -2,7 +2,6 @@ package token
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
@@ -60,7 +59,7 @@ func TestTheTokenCarriesExactlyTheClaimsTheGatewayChecks(t *testing.T) {
 	scope, isString := payload["scope"].(string)
 	require.True(t, isString, "scope est une chaîne et non un tableau : un tableau est refusé en 401")
 	assert.Equal(t, "admin:read admin:write", scope)
-	assert.EqualValues(t, 300, payload["exp"].(float64)-payload["iat"].(float64))
+	assert.EqualValues(t, 300, int64(payload["exp"].(float64)-payload["iat"].(float64)))
 }
 
 func TestTheIssuerIsSignedByteForByte(t *testing.T) {
@@ -101,9 +100,9 @@ func TestOtherScopesGetAnotherToken(t *testing.T) {
 func TestNoTokenWithoutASubjectOrAScope(t *testing.T) {
 	issuer, _, _ := newTestIssuer(t, "https://dashboard.internal")
 	_, err := issuer.Token("", []string{"admin:read"})
-	assert.ErrorIs(t, err, ErrNoSubject)
+	require.ErrorIs(t, err, ErrNoSubject)
 	_, err = issuer.Token(operator, nil)
-	assert.ErrorIs(t, err, ErrNoScope)
+	require.ErrorIs(t, err, ErrNoScope)
 }
 
 func TestATokenSignedByARetiredKeyNoLongerVerifies(t *testing.T) {
@@ -122,7 +121,7 @@ func TestATokenSignedByARetiredKeyNoLongerVerifies(t *testing.T) {
 	token, err := jwt.ParseSigned(raw, []jose.SignatureAlgorithm{jose.ES256})
 	require.NoError(t, err)
 	assert.Empty(t, set.Key(token.Headers[0].KeyID), "retirée, plus rien ne la vérifie")
-	assert.False(t, strings.Contains(string(served), oldKeys.ActiveID()))
+	assert.NotContains(t, string(served), oldKeys.ActiveID())
 }
 
 func TestTwoOperatorsWithTheSameScopesGetTheirOwnToken(t *testing.T) {
