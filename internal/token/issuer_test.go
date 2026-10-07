@@ -125,4 +125,40 @@ func TestATokenSignedByARetiredKeyNoLongerVerifies(t *testing.T) {
 	assert.False(t, strings.Contains(string(served), oldKeys.ActiveID()))
 }
 
+func TestTwoOperatorsWithTheSameScopesGetTheirOwnToken(t *testing.T) {
+	issuer, keys, _ := newTestIssuer(t, "https://dashboard.internal")
+	operator1 := "11111111-2222-3333-4444-555555555555"
+	operator2 := "99999999-8888-7777-6666-555555555555"
+
+	token1, err := issuer.Token(operator1, []string{"admin:read"})
+	require.NoError(t, err)
+	token2, err := issuer.Token(operator2, []string{"admin:read"})
+	require.NoError(t, err)
+
+	assert.NotEqual(t, token1, token2, "tokens must differ when subject differs")
+
+	_, payload1 := verifyWithServedKeys(t, keys, token1)
+	assert.Equal(t, operator1, payload1["sub"])
+
+	_, payload2 := verifyWithServedKeys(t, keys, token2)
+	assert.Equal(t, operator2, payload2["sub"])
+}
+
+func TestScopeOrderAndDuplicatesShareOneToken(t *testing.T) {
+	issuer, keys, _ := newTestIssuer(t, "https://dashboard.internal")
+
+	token1, err := issuer.Token(operator, []string{"admin:write", "admin:read"})
+	require.NoError(t, err)
+
+	token2, err := issuer.Token(operator, []string{"admin:read", "admin:write", "admin:read"})
+	require.NoError(t, err)
+
+	assert.Equal(t, token1, token2, "same normalized scopes must reuse cache")
+
+	_, payload := verifyWithServedKeys(t, keys, token1)
+	scope, isString := payload["scope"].(string)
+	require.True(t, isString)
+	assert.Equal(t, "admin:read admin:write", scope)
+}
+
 func slicesOf(s KeySet) []signingKey { return append([]signingKey(nil), s.all...) }
