@@ -8,6 +8,7 @@ package bff
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/martialanouman/go-gateway-bo/internal/gateway"
 	"github.com/martialanouman/go-gateway-bo/internal/hub"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
@@ -207,8 +209,32 @@ func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
 	})
 }
 
+const codeGatewayRejectedToken = "bff_gateway_rejected_token" //nolint:gosec // code d'erreur, pas un identifiant
+
 func reportFailedResponse(logger *slog.Logger) func(http.ResponseWriter, *http.Request, error) {
 	return func(w http.ResponseWriter, r *http.Request, err error) {
+		var upstream gateway.APIError
+		if errors.As(err, &upstream) {
+			switch upstream.Status {
+			case http.StatusUnauthorized:
+				writeJSON(w, http.StatusBadGateway, Error{
+					Code: codeGatewayRejectedToken,
+					Message: "La passerelle a refusé l'identité du tableau de bord : l'action n'a pas eu lieu. " +
+						"L'exploitation est prévenue ; votre session reste ouverte.",
+				})
+				return
+			case http.StatusForbidden:
+				logger.WarnContext(r.Context(), "la passerelle refuse un scope que la garde du BFF a laissé passer",
+					"route", routeOf(r), "code", upstream.Code)
+				writeJSON(w, http.StatusForbidden, Error{
+					Code: "forbidden_scope",
+					Message: "La passerelle refuse cette action à votre compte : un droit lui manque de son côté. " +
+						"Un administrateur peut vérifier les rôles du compte dans « Rôles ».",
+				})
+				return
+			}
+		}
+
 		logger.ErrorContext(r.Context(), "une requête a échoué", "route", routeOf(r), "error", err)
 		writeJSON(w, http.StatusInternalServerError, unexpectedError())
 	}

@@ -3,8 +3,10 @@ package bff
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,15 +49,45 @@ func TestAnUnavailableGatewayIsRelayedAsRetryable(t *testing.T) {
 	}
 }
 
-// Un 401 ou un 403 amont refuse le jeton machine du BFF, pas l'opérateur : le relayer renverrait
-// l'écran à la connexion pour une faute de configuration du serveur.
-func TestARefusalOfTheMachineTokenIsNotRelayed(t *testing.T) {
+// Un 401 ou un 403 amont refuse le jeton signé du BFF ou son scope, pas la session : le relayer
+// renverrait l'écran à la connexion pour une faute que la reconnexion ne répare pas.
+func TestARefusalOfTheSignedTokenIsNotRelayed(t *testing.T) {
 	t.Parallel()
 
 	for _, upstream := range []int{http.StatusUnauthorized, http.StatusForbidden} {
 		_, _, relayed := relayError(&gateway.APIError{Status: upstream, Code: "unauthorized"})
 		assert.False(t, relayed)
 	}
+}
+
+func TestAGatewayRefusalOfTheTokenIsNotASessionMatter(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		upstream int
+		code     string
+		want     int
+		wantCode string
+	}{
+		{http.StatusUnauthorized, "unauthenticated", http.StatusBadGateway, "bff_gateway_rejected_token"},
+		{http.StatusForbidden, "forbidden_scope", http.StatusForbidden, "forbidden_scope"},
+	} {
+		recorder := httptest.NewRecorder()
+		reportFailedResponse(slog.New(slog.DiscardHandler))(recorder,
+			httptest.NewRequest(http.MethodGet, "/api/customer-groups", nil),
+			fmt.Errorf("relais : %w", gateway.APIError{Status: tc.upstream, Code: tc.code}))
+		assert.Equal(t, tc.want, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), `"code":"`+tc.wantCode+`"`)
+		assert.Empty(t, recorder.Header().Values("Set-Cookie"), "aucune réponse de la passerelle ne touche la session")
+	}
+}
+
+func TestACallWithoutACallerIsAServerFault(t *testing.T) {
+	t.Parallel()
+
+	status, _, relayed := relayError(gateway.ErrNoCaller)
+	assert.False(t, relayed)
+	assert.Zero(t, status)
 }
 
 func TestAnUnreachableGatewayIsRelayedAsRetryable(t *testing.T) {

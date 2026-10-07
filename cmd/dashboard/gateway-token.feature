@@ -42,7 +42,7 @@ Fonctionnalité: Le BFF s'authentifie auprès de la passerelle au nom de l'opér
     Quand le navigateur demande "/api/auth/me"
     Alors le serveur répond 200
 
-  Scénario: une passerelle qui ne peut pas lire le JWKS laisse la session ouverte
+  Scénario: une passerelle indisponible laisse la session ouverte
     Étant donné une passerelle qui répond 503 "service_unavailable"
     Et un serveur démarré
     Et l'opérateur détient le rôle "Support"

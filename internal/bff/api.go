@@ -49,7 +49,7 @@ type API struct {
 	AccessLinks *store.AccessLinks
 	// Notifications lit et marque le centre de chaque opérateur.
 	Notifications *store.Notifications
-	// Gateway joint l'API Admin pour les routes relayées ; le jeton machine et le mTLS vivent dessous.
+	// Gateway joint l'API Admin pour les routes relayées ; la signature du jeton de l'opérateur et le mTLS vivent dessous.
 	Gateway *gateway.ClientWithResponses
 	Logger  *slog.Logger
 }

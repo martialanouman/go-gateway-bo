@@ -14,9 +14,13 @@ import (
 
 // relayError traduit une erreur de la passerelle dans la forme du produit (§1.4). Une passerelle
 // injoignable ou qui expire, un 429 ou un 5xx amont deviennent un 503 à réessayer. `relayed` faux
-// laisse l'appelant rendre l'erreur, donc un 500 journalisé : c'est le sort d'un 401 ou 403 amont,
-// qui refusent le jeton machine du BFF et non l'opérateur.
+// laisse l'appelant rendre l'erreur : un 401 ou un 403 amont, que `reportFailedResponse` traduit en
+// un seul point, et un appel parti sans appelant, qui est un défaut du BFF (500).
 func relayError(err error) (status int, body Error, relayed bool) {
+	if errors.Is(err, gateway.ErrNoCaller) {
+		return 0, Error{}, false
+	}
+
 	var upstream gateway.APIError
 	if !errors.As(err, &upstream) {
 		return http.StatusServiceUnavailable, unavailable(gateway.CodeUpstreamUnreachable), true
