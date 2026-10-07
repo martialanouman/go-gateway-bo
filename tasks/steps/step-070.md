@@ -49,19 +49,22 @@ Le jeton prouve **qui** appelle et avec quels droits ; le mTLS existant prouve *
   la garde ; `gateway.WithSystem`, posé par le hub) et pose `Authorization: Bearer`. **Sans appelant,
   ou sans aucun scope, l'appel est refusé avant le réseau.** Le cookie de session n'est jamais
   transmis. Le mode `mock` envoie aussi le jeton signé, Prism acceptant tout `Bearer` ;
-  `mockAccessToken` disparaît ; l'émetteur reste actif, sur une clé éphémère engendrée en mémoire quand les trois variables sont absentes.
+  `mockAccessToken` disparaît ; l'émetteur reste actif, sur une clé éphémère engendrée en
+  mémoire quand les trois variables sont absentes.
 - **Disparaissent** : `TokenURL`, `ClientID`, `ClientSecret`, `machineCredentials`, `token.go`, leurs
   variables d'environnement et leur exigence dans `requireRealGatewayMaterial`.
 - **Réponses de la passerelle**, traduites dans `relayError`, jamais par handler ; aucune ne touche
   la session :
   - 401 `unauthenticated` → ERROR (`kid`, `iss`, `sub`, heure), événement de log stable
-    `gateway_token_rejected` (le BFF n'a aucun registre de métriques), pas de rejeu ; l'opérateur reçoit 502
-    `bff_gateway_rejected_token` : « La passerelle a refusé l'identité du tableau de bord : l'action
-    n'a pas eu lieu. L'exploitation est prévenue ; votre session reste ouverte. »
+    `gateway_token_rejected` (le BFF n'a aucun registre de métriques), pas de rejeu ;
+    l'opérateur reçoit 502 `bff_gateway_rejected_token` : « La passerelle a refusé l'identité
+    du tableau de bord : l'action n'a pas eu lieu. L'exploitation est prévenue ; votre session
+    reste ouverte. »
   - 403 `forbidden_scope` → relayé, refus expliqué ; WARN (la garde aurait dû refuser avant).
   - 503 `service_unavailable` → lectures rejouées une fois (`replayReadsOnce`), jamais les
     écritures ; WARN « vérifier le JWKS » ; l'opérateur voit l'état d'erreur avec « Réessayer ».
-  - 401 sur un flux du hub → sujet `stale`, backoff existant, compteur ; les sockets clients restent.
+  - 401 sur un flux du hub → sujet `stale`, backoff existant, événement de log `gateway_token_rejected` ;
+    les sockets clients restent.
 - **Rotation** en trois déploiements roulants, chacun terminé partout avant le suivant : publier,
   signer, retirer **5 min** après. Retirer une clé invalide les jetons personnels qu'elle a signés
   (step-071) : décidé, et dit par le runbook et par l'écran de délivrance.
