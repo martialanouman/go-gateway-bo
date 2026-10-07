@@ -1667,7 +1667,7 @@ logger.InfoContext(ctx, "émetteur des jetons de l'API Admin",
 	"iss", cfg.Gateway.TokenIssuer, "kid_actif", keys.ActiveID(), "kid_publiés", keys.IDs())
 
 admin, err := gateway.NewAdminClient(cfg.Gateway, issuer, logger)
-…
+// (le code existant entre les deux appels reste inchangé)
 streams, err := gateway.NewStreamClient(cfg.Gateway, issuer, logger)
 ```
 
