@@ -275,6 +275,7 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	realtime.registerSteps(ctx)
 	(&notificationsWorld{operators: operators, realtime: realtime}).registerSteps(ctx)
 	(&customerGroupsWorld{process: p}).registerSteps(ctx)
+	(&gatewayTokenWorld{process: p, login: login}).registerSteps(ctx)
 	ctx.Then(`^le serveur s'arrête sans erreur$`, p.exitsCleanly)
 	ctx.Then(`^le tableau de bord s'affiche$`, p.servesDashboard)
 	ctx.Then(`^le script est servi$`, p.servesScript)

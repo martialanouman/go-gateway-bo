@@ -46,6 +46,9 @@ type Dependencies struct {
 	Origin string
 	// Realtime relaie les flux de la passerelle sur `/ws`.
 	Realtime *hub.Hub
+	// JWKS publie les clés publiques qui vérifient les jetons de l'API Admin. Hors de /api :
+	// la passerelle le lit sans session.
+	JWKS http.Handler
 }
 
 // NewRouter assemble les routes du BFF et le service des assets de la SPA.
@@ -93,6 +96,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	// de corps. Le contrôle d'origine est dans le handler, puisque c'est un GET.
 	r.With(withoutCaching, withSession(deps.Sessions)).
 		Get("/ws", serveRealtime(deps.Realtime, deps.Sessions, deps.Origin))
+
+	r.Get("/.well-known/jwks.json", deps.JWKS.ServeHTTP)
 
 	asset := serveAsset(assets)
 	r.Get("/assets/*", asset)
