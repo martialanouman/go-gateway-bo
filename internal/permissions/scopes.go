@@ -15,6 +15,7 @@ const (
 
 // gatewayAccess dit ce que chaque clé ouvre à la passerelle (ADR-0019). Une clé propre au BFF
 // n'ouvre rien : la traduire en admin:write donnerait l'écriture amont à qui gère les opérateurs.
+// Les alertes (règles et notifications) vivent dans le BFF ; le flux amont billing-alerts est ouvert par l'identité système.
 var gatewayAccess = map[Key]string{
 	RoutesRead: ScopeAdminRead, RoutesWrite: ScopeAdminWrite, RoutesImport: ScopeAdminWrite,
 	ScriptsRead: ScopeAdminRead, ScriptsWrite: ScopeAdminWrite, ScriptsPublish: ScopeAdminWrite,

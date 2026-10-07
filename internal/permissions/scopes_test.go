@@ -51,7 +51,7 @@ func TestNoClassNamesAKeyOutsideTheCatalog(t *testing.T) {
 }
 
 func TestLocalKeysOpenNothingAtTheGateway(t *testing.T) {
-	assert.Nil(t, GatewayScopes([]string{string(OperatorsManage), string(RolesManage), string(AlertsWrite)}))
+	assert.Nil(t, GatewayScopes([]string{string(AlertsRead), string(AlertsWrite), string(OperatorsManage), string(RolesManage)}))
 }
 
 func TestReadingUnmaskedNumbersMapsToMSISDNReveal(t *testing.T) {
