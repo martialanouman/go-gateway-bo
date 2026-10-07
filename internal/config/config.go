@@ -211,6 +211,8 @@ type AuthConfig struct {
 }
 
 // MockTokenIssuer est l'émetteur des jetons en mode `mock`, où Prism ne vérifie aucune signature.
+//
+//nolint:gosec // G101 : une URL publique qui n'ouvre rien, pas un secret.
 const MockTokenIssuer = "https://dashboard.mock.invalid"
 
 // GatewayConfig décrit la connexion sortante vers l'API Admin. Hors du mode `real`, seule BaseURL

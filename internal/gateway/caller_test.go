@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -60,7 +61,7 @@ func TestACallWithoutACallerNeverLeaves(t *testing.T) {
 	client, _ := mockClient(t, srv.URL, &bytes.Buffer{})
 
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/admin/customers", nil)
-	_, err := client.Do(req)
+	_, err := client.Do(req) //nolint:bodyclose // aucune réponse : l'appel est refusé avant le réseau.
 	require.ErrorIs(t, err, ErrNoCaller)
 	assert.Zero(t, s.calls, "aucune requête n'a atteint la passerelle")
 }
@@ -73,7 +74,7 @@ func TestAnOperatorWithOnlyLocalKeysNeverLeavesEither(t *testing.T) {
 
 	ctx := WithOperator(context.Background(), "4f3c2b1a-9e8d-4c7b-a6f5-0e1d2c3b4a59", []string{"operators:manage"})
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/admin/customers", nil)
-	_, err := client.Do(req)
+	_, err := client.Do(req) //nolint:bodyclose // aucune réponse : l'appel est refusé avant le réseau.
 	require.ErrorIs(t, err, ErrNoCaller)
 	assert.Zero(t, s.calls)
 }
@@ -149,4 +150,64 @@ func TestARejectedTokenIsLoggedWithoutTheToken(t *testing.T) {
 	assert.Contains(t, logs.String(), "gateway_token_rejected")
 	assert.Contains(t, logs.String(), keys.ActiveID())
 	assert.NotContains(t, logs.String(), s.authorization[len("Bearer "):])
+}
+
+func TestAnUnavailableGatewayIsLoggedWithAStableEventName(t *testing.T) {
+	s := &seen{}
+	srv := upstream(t, http.StatusServiceUnavailable, s)
+	defer srv.Close()
+	logs := &bytes.Buffer{}
+	client, keys := mockClient(t, srv.URL, logs)
+
+	ctx := WithOperator(context.Background(), "4f3c2b1a-9e8d-4c7b-a6f5-0e1d2c3b4a59", []string{"customers:read"})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/admin/customers", nil)
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+
+	var event map[string]any
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &event))
+	assert.Equal(t, "gateway_unavailable", event["msg"])
+	assert.Contains(t, event["hint"], "JWKS")
+	assert.Equal(t, keys.ActiveID(), event["kid"])
+}
+
+func TestAReplayedReadReusesTheSameToken(t *testing.T) {
+	var mu sync.Mutex
+	var authorizations []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		authorizations = append(authorizations, r.Header.Get("Authorization"))
+		status := http.StatusOK
+		if len(authorizations) == 1 {
+			status = http.StatusBadGateway
+		}
+		mu.Unlock()
+		w.WriteHeader(status)
+	}))
+	defer srv.Close()
+
+	keys, err := token.EphemeralKeySet()
+	require.NoError(t, err)
+	var ticks int
+	var clockMu sync.Mutex
+	issuer, err := token.NewIssuer(keys, issuerURL, func() time.Time {
+		clockMu.Lock()
+		defer clockMu.Unlock()
+		ticks++
+		return time.Unix(1_800_000_000, 0).Add(time.Duration(ticks) * 2 * time.Second)
+	})
+	require.NoError(t, err)
+	client, err := NewStreamClient(config.GatewayConfig{Mode: config.GatewayModeMock, BaseURL: srv.URL, Timeout: 5 * time.Second},
+		issuer, slog.New(slog.DiscardHandler))
+	require.NoError(t, err)
+
+	ctx := WithOperator(context.Background(), "4f3c2b1a-9e8d-4c7b-a6f5-0e1d2c3b4a59", []string{"customers:read"})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/admin/customers", nil)
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+
+	require.Len(t, authorizations, 2, "la lecture a été rejouée une fois")
+	assert.Equal(t, authorizations[0], authorizations[1])
 }

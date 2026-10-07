@@ -1,6 +1,7 @@
 package gateway_test
 
 import (
+	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -91,6 +92,39 @@ func TestAdminClientSignsATokenInMockMode(t *testing.T) {
 	assert.Regexp(t, `^Bearer \S+$`, received[0].authorization,
 		"Prism applique le security global du contrat et refuse une requête sans en-tête "+
 			"Authorization : le mode mock doit donc porter un jeton, fût-il factice")
+}
+
+// VerifyClientCertIfGiven et non Require… : un client sans certificat entre, et se fait accuser par
+// l'assertion qui le nomme au lieu de mourir dans la poignée de main.
+func TestTheAdminClientPresentsItsCertificateAndItsToken(t *testing.T) {
+	t.Parallel()
+
+	pki := newTestPKI(t)
+
+	var api recorder
+
+	server := pki.serveTLSWithClientAuth(t, tls.VerifyClientCertIfGiven, func(w http.ResponseWriter, req *http.Request) {
+		api.record(req)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	client, err := gateway.NewAdminClient(config.GatewayConfig{
+		Mode:       config.GatewayModeReal,
+		BaseURL:    server.URL,
+		ClientCert: pki.clientCertFile,
+		ClientKey:  pki.clientKeyFile,
+		CACert:     pki.caFile,
+		Timeout:    5 * time.Second,
+	}, testIssuer(t), quietLogger())
+	require.NoError(t, err)
+
+	_, err = client.ListCustomersWithResponse(gateway.WithSystem(t.Context()), nil)
+	require.NoError(t, err)
+
+	received := api.snapshot()
+	require.Len(t, received, 1)
+	assert.Positive(t, received[0].clientCerts, "l'API a été jointe sans certificat client")
+	assert.Regexp(t, `^Bearer \S+$`, received[0].authorization)
 }
 
 // Le mode est ce qui décide du mTLS et du jeton : la valeur zéro doit tomber du côté strict.

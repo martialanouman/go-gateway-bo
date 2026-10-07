@@ -64,12 +64,6 @@ func newTestPKI(t *testing.T) testPKI {
 	}
 }
 
-// serveTLS exige et vérifie le certificat client : sans lui, la poignée de main échoue et le test
-// qui l'affirme tombe pour de bon.
-func (p testPKI) serveTLS(t *testing.T, handler http.HandlerFunc) *httptest.Server {
-	return p.serveTLSWithClientAuth(t, tls.RequireAndVerifyClientCert, handler)
-}
-
 // serveTLSWithClientAuth laisse le test choisir sa politique de certificat client. Deux valeurs sont
 // utilisées, et l'écart entre elles n'est pas un détail de confort :
 //

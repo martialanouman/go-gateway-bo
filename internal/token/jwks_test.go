@@ -20,7 +20,9 @@ func TestTheJWKSPublishesOnlyPublicFields(t *testing.T) {
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
 
-	var raw struct{ Keys []map[string]any `json:"keys"` }
+	var raw struct {
+		Keys []map[string]any `json:"keys"`
+	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &raw))
 	require.Len(t, raw.Keys, 1)
 	key := raw.Keys[0]

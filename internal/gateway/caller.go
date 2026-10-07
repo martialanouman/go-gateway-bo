@@ -60,7 +60,8 @@ func (t signedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		t.logger.ErrorContext(req.Context(), "gateway_token_rejected",
 			"kid", t.issuer.ActiveKeyID(), "iss", t.issuer.Issuer(), "sub", who.subject, "at", time.Now().UTC())
 	case http.StatusServiceUnavailable:
-		t.logger.WarnContext(req.Context(), "gateway_unavailable : si le code est service_unavailable, la passerelle n'a pas pu lire le JWKS du tableau de bord",
+		t.logger.WarnContext(req.Context(), "gateway_unavailable",
+			"hint", "si le code est service_unavailable, vérifier le JWKS du tableau de bord",
 			"kid", t.issuer.ActiveKeyID())
 	}
 	return response, nil

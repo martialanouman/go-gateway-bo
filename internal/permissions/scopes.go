@@ -33,8 +33,8 @@ var gatewayAccess = map[Key]string{
 	CDRReadPII: ScopeMSISDNReveal, CDRExportBulk: ScopeCDRExportBulk,
 	SuppressionsRead: ScopeAdminRead, SuppressionsWrite: ScopeAdminWrite, SuppressionsDelete: ScopeAdminWrite,
 	InboundRead: ScopeAdminRead, InboundWrite: ScopeAdminWrite,
-	GDPRErase: ScopeGDPRErase,
-	AuditRead: ScopeAuditRead,
+	GDPRErase:  ScopeGDPRErase,
+	AuditRead:  ScopeAuditRead,
 	AlertsRead: "", AlertsWrite: "",
 	OperatorsManage: "", RolesManage: "",
 }
