@@ -251,7 +251,7 @@ func (w *gatewayTokenWorld) outputNamesTheActiveKID() error {
 }
 
 func (w *gatewayTokenWorld) outputHidesTheKey() error {
-	if err := w.process.outputHides(w.pemBody[:48]); err != nil {
+	if err := w.process.outputHides(w.pemBody[48:64]); err != nil {
 		return err
 	}
 
