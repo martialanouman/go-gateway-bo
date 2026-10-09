@@ -61,7 +61,8 @@ func (i *Issuer) Token(subject string, scopes []string) (string, error) {
 	sorted := slices.Sorted(slices.Values(scopes))
 	scope := strings.Join(slices.Compact(sorted), " ")
 	key := subject + "\x00" + scope
-	now := i.now()
+	// Round(0) supprime la lecture monotone : l'exp du JWT est le temps mural ; le temps monotone s'arrête en hibernation ou suspension VM.
+	now := i.now().Round(0)
 
 	i.mu.Lock()
 	defer i.mu.Unlock()
