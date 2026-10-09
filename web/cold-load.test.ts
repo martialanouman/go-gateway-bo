@@ -255,7 +255,7 @@ describe('cold load', () => {
   })
 
   it('ships no address in the bundle that the browser must not know', async () => {
-    // **Invariant (d).** `internal/` met le jeton machine, le mTLS et la base hors de portée du
+    // **Invariant (d).** `internal/` met la clé de signature des jetons de l'API Admin, le mTLS et la base hors de portée du
     // bundle par construction ; le risque résiduel est une adresse écrite en dur dans le client, et
     // `web/CLAUDE.md` présente ce test comme le dernier rempart.
     //

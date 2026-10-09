@@ -81,7 +81,7 @@ l'ajout**, pas ici.
   exactement une fois à la création ou à la rotation, aucune action « révéler ».
 - **(c)** L'**autorisation est appliquée côté serveur**. Le rendu conditionnel de l'UI est un confort,
   jamais la garde.
-- **(d)** Le **navigateur ne parle jamais directement à l'API Admin** : jeton machine, mTLS et scopes
+- **(d)** Le **navigateur ne parle jamais directement à l'API Admin** : clé de signature des jetons, mTLS et scopes
   restent sous `internal/`, que le langage rend inatteignable de l'extérieur du module.
 - **(e)** Le tableau de bord n'est **jamais sur le chemin critique du plan de données** : sa panne
   dégrade la visualisation, jamais le débit de SMS ni la détection d'incident infra.
@@ -280,15 +280,11 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [ ] step-103 — Corps du message gardé par `content:read` + journal des accès  *(invariant a)*
 - [ ] step-104 — Export CSV asynchrone gouverné ◊
 
-◊ **Le jeton machine ne porte pas le scope que ces opérations exigent, et rien ne le dira.** Le contrat
-exige `cdr:export_bulk` sur `create-message-export` et `get-message-export` (depuis la 4.0.0), et
-`msisdn:reveal` pour un export non masqué. `internal/gateway/client.go` n'en demande aucun des deux :
-step-009 l'a constaté et a **choisi** de ne pas élargir le jeton machine pour du code qui n'existait
-pas encore. oapi-codegen n'engendrant rien du `security`, le symptôme sera un **403 de la passerelle**
-sur du code qui compile — et le réflexe sera de chercher du côté de `RequirePermission()`, puisque
-`cdr:export_bulk` est **aussi** une permission BFF (§6.10). Deux objets homonymes, deux couches : le
-403 vient du jeton sortant, pas de la garde entrante. Décider en connaissance de cause, et corriger
-au passage le manque amont — `cdr:export_bulk` est exigé par le contrat sans y être catalogué.
+◊ **Les scopes de l'export viennent de l'opérateur, pas de la garde.** Le contrat exige `cdr:export_bulk`
+sur `create-message-export` et `get-message-export`, et `msisdn:reveal` pour un export non masqué.
+Depuis step-070 le BFF les inscrit dans le jeton signé au nom de l'opérateur quand celui-ci détient
+`cdr:export_bulk` ou `cdr:read_pii` (`internal/permissions/scopes.go`). Un 403 de la passerelle sur un
+export vient donc du jeton sortant, pas de `RequirePermission()` : deux objets homonymes, deux couches.
 
 ## M6 — Routage & scripts  (§6.1, §6.2, §6.7, §6.13)
 - [ ] step-120 — Routes : table par priorité + réordonnancement souris et clavier
@@ -353,7 +349,7 @@ observable que dans un run de CI : pousser tôt vaut mieux que relire.
 |---|---|---|
 | §6.8 prévoit que le tableau de bord écrive la config Alertmanager « via l'API Admin », mais **aucune opération Alertmanager n'existe** au contrat. | Write-through et réconciliation non implémentables. | step-183 (bloquée), step-180 (dégradée) |
 | Pas de lecture unitaire de CDR : la fiche d'un message se **compose** côté BFF (`search-messages` filtré + `get-message-trace`). | Composition et cache à la charge du BFF. | step-101 |
-| L'API Admin s'authentifie en **OAuth2 client_credentials + mTLS** avec un jeton *machine* portant des scopes fixes, dont `content:read`. | Seul le BFF peut restreindre la lecture de corps par opérateur — d'où l'invariant (c). | step-003, step-025, step-103 |
+| L'API Admin s'authentifie par un **jeton ES256 signé par le BFF au nom de l'opérateur, plus mTLS** ; ses scopes suivent les permissions de l'opérateur (`content:read` seulement s'il la détient). | Seul le BFF peut restreindre la lecture de corps par opérateur — d'où l'invariant (c). | step-003, step-025, step-103 |
 
 
 ---

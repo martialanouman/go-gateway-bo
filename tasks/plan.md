@@ -150,11 +150,13 @@ Pas de framework CSS utilitaire : les tokens de la charte et le CSS de composant
 C'est la convention la plus structurante du dépôt, et elle change de nature avec Go.
 
 - Le client parle **uniquement** aux routes du BFF. Jamais à l'API Admin (**invariant d**).
-- Le jeton machine (OAuth2 client_credentials), le certificat mTLS et la connexion PostgreSQL vivent
+- La clé qui signe les jetons de l'API Admin (ES256, ADR-0019), le certificat mTLS et la connexion
+  PostgreSQL vivent
   sous `internal/` — **le langage interdit de les importer depuis ailleurs**. Là où la v1.0 posait
   une règle de lint désactivable, la v2.0 a une erreur de compilation.
-- Conséquence à garder en tête : le jeton du BFF porte `content:read` en permanence. **Seul le BFF**
-  peut restreindre la lecture d'un corps par opérateur — d'où l'invariant (c) et le test
+- Conséquence à garder en tête : le BFF signe pour chaque appel un jeton au nom de l'opérateur, dont les scopes
+  (`internal/permissions/scopes.go`) suivent ses permissions : `content:read` n'y figure que si l'opérateur
+  détient `content:read`. **Seul le BFF** reste la frontière de la lecture d'un corps par opérateur — d'où l'invariant (c) et le test
   d'énumération des routes.
 
 ### 1.4 Modèle d'erreur & codes
@@ -440,8 +442,8 @@ contrat resté en 2.5.0. Cette ligne a annoncé « 000 → 008 » pendant vingt-
 - SPA Vite + TanStack Router, portage de `web/`, **squelette de coquille peint au chargement à froid**
   (§1.9), et le fallback SPA **ordonné après `/api`** — un `/api/*` inconnu rend 404, jamais du HTML.
 - `embed.FS` : `go build` produit un binaire autonome qui sert l'application.
-- Client Admin Go généré par `oapi-codegen` sur `openapi-admin.yaml`, OAuth2 client_credentials avec
-  jeton mis en cache, mTLS, traduction de l'enveloppe d'erreur (§1.4). Mock Prism et bascule
+- Client Admin Go généré par `oapi-codegen` sur `openapi-admin.yaml`, jeton ES256 signé par le BFF au nom
+  de l'opérateur (step-070, ADR-0019) et mis en cache cinq minutes, mTLS, traduction de l'enveloppe d'erreur (§1.4). Mock Prism et bascule
   réel/mock par environnement.
 - `api/openapi-bff.yaml` : le contrat du BFF, engendrant les types serveur Go **et** les types client
   TypeScript. Un seul contrat, deux bouts typés.

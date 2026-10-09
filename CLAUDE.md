@@ -53,8 +53,8 @@ Le code les cite par leur lettre.
   contrôle masqué dont la route n'est pas gardée est une faille. Le middleware `requirePermission`
   (`internal/bff/guard.go`, monté en `router.go`) est **fermé par défaut** : une opération absente de
   sa table est refusée.
-- **(d) JAMAIS le navigateur en direct sur l'API Admin.** Le jeton machine, le mTLS et la connexion
-  PostgreSQL vivent sous `internal/`, que le langage rend inatteignable : (d) est une propriété du
+- **(d) JAMAIS le navigateur en direct sur l'API Admin.** La clé qui signe les jetons de l'API Admin, le mTLS et la
+  connexion PostgreSQL vivent sous `internal/`, que le langage rend inatteignable : (d) est une propriété du
   compilateur, pas une consigne. Le risque résiduel est côté client — voir `web/CLAUDE.md`.
 - **Un contrôle interdit est désactivé et expliqué**, jamais silencieusement masqué : le refus nomme
   ce qui manque et par où passer. Vaut aussi pour un 403/409 rédigé dans `api/openapi-bff.yaml` ou
