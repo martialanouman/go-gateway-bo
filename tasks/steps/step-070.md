@@ -136,3 +136,52 @@ avec sa condition de levée, et `todo.md` cesse de dire « la tranche verticale 
 - Les jobs planifiés au nom de leur créateur (ADR-0019) : M5, step-104.
 - Le stockage des clés en KMS.
 - Le rendu de `created_by` en nom d'opérateur : la step qui l'affichera.
+
+## Tranche réelle (09/10/2026)
+
+Critère M3 « la tranche verticale passe contre la passerelle réelle » (plan §8), joué une fois contre une
+**instance locale** de `../go-gateway` (`362f850`) — `contabo169` non touché, aucun fichier des deux dépôts
+modifié. Matériel sous `.superpowers/sdd/2026-10-07-step-070-jetons-api-admin/real-slice/` (git-ignoré).
+
+**Lancé.** Infra de la passerelle sous `docker compose -p gw-local`, surcharge `!override` de tous les
+ports publiés (15432, 16379, 19092, 19644, 18123, 19000) ; `cmd/migrate` Postgres (version 34) et
+ClickHouse ; `admin-api-svc` en `TLS_ENABLED=true` sur une CA locale (openssl, SAN
+`localhost`/`127.0.0.1`), `OIDC_ISSUER=https://localhost:13001`, `OIDC_AUDIENCE=gateway-admin`,
+`OIDC_JWKS_URL=http://127.0.0.1:13001/.well-known/jwks.json` (http admis hors production),
+`HTTP_ADMIN_TOKENS` vide. Le BFF de cette branche en mode `real` sur `127.0.0.1:13001`,
+`DASHBOARD_GATEWAY_BASE_URL=https://localhost:18081/v1`, une clé P-256 (kid lu dans le refus d'un
+premier lancement), base propre `dashboard_real_slice` sur le Postgres du BFF, `DASHBOARD_REDIS_NAMESPACE=real-slice`.
+
+**L'émetteur n'est pas servi en https, et n'a pas à l'être.** `DASHBOARD_TOKEN_ISSUER` exige une URL
+https canonique (`internal/config/config.go`, `tokenIssuer`) ; la passerelle ne la compare qu'octet pour
+octet à `iss` et va chercher les clés à `OIDC_JWKS_URL`, distincte. `https://localhost:13001` nomme donc le
+BFF sans qu'aucun TLS y écoute.
+
+**Mesuré** (opérateur amorcé par `cmd/bootstrap`, session élevée par TOTP, en-tête `Origin` exact) :
+
+| Geste | HTTP |
+|---|---|
+| `POST /api/auth/login` | 200 |
+| `POST /api/auth/mfa/totp/enroll` | 200 |
+| `POST /api/auth/mfa/verify` | 204 (`/auth/me` : `elevated: true`) |
+| `GET /api/customers` | 200, `items: []` |
+| `POST /api/customers` `{"name":"tranche-reelle-20261009T215423"}` | **201** |
+| `GET /api/customers` | 200, le client créé |
+
+Côté passerelle : `control_plane.customers` porte la ligne (`01a122a8-…`, `active`), et
+`control_plane.audit_log` la trace `operator=01a122a1-4fe9-78ab-b080-b06fd475960a | create-customer |
+POST | /v1/admin/customers | 201` — l'UUID est celui de l'opérateur dans la base du BFF. `customers` n'a
+pas de colonne `created_by`. La passerelle ne journalise ni `sub` ni scopes d'une requête acceptée :
+la ligne d'audit est la preuve du sujet vu.
+
+**Conclusion : la tranche passe en réel.**
+
+**Constat en marge, mesuré, non corrigé ici.** Le poste s'est mis en veille de 21:46:24 à 21:53:01 (UTC,
+`pmset -g log`). Au réveil, le hub a reçu **401** sur les trois flux, `gateway_token_rejected` pour
+`sub=SystemSubject`, toutes les 15–30 s jusqu'à 21:56:32, puis s'est reconnecté seul (trois WS établies).
+Un jeton frais pour le même sujet était accepté pendant ce temps (101 sur les trois flux, 200 sur
+`/admin/customers`). Cause, cohérente avec la chronologie à la seconde : le cache de `token.Issuer` juge
+la fraîcheur par `expiry.Sub(now)`, en horloge **monotone**, qui ne court pas pendant une veille
+(`mach_absolute_time` sous darwin ; `CLOCK_MONOTONIC` exclut aussi une suspension sous Linux), alors que
+`exp` est en horloge murale : un jeton expiré est resservi pour la durée de la veille. Aucun test ne
+l'exerce.

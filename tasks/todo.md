@@ -252,7 +252,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
       qui désignent step-060 pour ce rôle (extension d'`errors[]`, journal serveur, dettes du
       transport) se lisent step-059 : découpage arbitré le 28/09/2026
 - [x] step-060 — Groupes de clients : CRUD et écran (le filtre par groupe naît avec step-061)
-- [x] step-061 — Clients : liste, filtres, création  ← **la tranche verticale est acquise ici**
+- [x] step-061 — Clients : liste, filtres, création  ← **la tranche verticale est acquise ici** — jouée en réel le 09/10/2026 (step-070)
 - [x] step-062 — Fiche client : identité, statut, suspension en cascade, sender IDs (liste nue ; catégorie et débit : step-067)
 - [x] step-063 — Comptes SMPP : liste + création rattachée au client
 - [x] step-064 — Fiche compte : canaux, bascules SMPP, webhooks (plus de politique de sender ID, ADR-0020)
