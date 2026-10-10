@@ -427,6 +427,7 @@ describe('the personal API token', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Jeton d’API personnel' })
 
     expect(within(dialog).getByText(GATEWAY_TOKEN)).toBeVisible()
+    expect(within(dialog).getByText(GATEWAY_TOKEN)).toHaveStyle({ overflowWrap: 'anywhere' })
     expect(dialog).toHaveTextContent('ne sera plus jamais affiché')
     expect(dialog).toHaveTextContent('admin:read, msisdn:reveal')
 

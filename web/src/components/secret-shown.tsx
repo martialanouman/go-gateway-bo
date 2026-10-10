@@ -29,7 +29,10 @@ export function SecretShown({
       title={title}
     >
       <p>{children}</p>
-      <p className="mono">{secret}</p>
+      {/* En style porté : la feuille d'entrée n'a plus d'octet libre (`cold-load.test.ts`). */}
+      <p className="mono" style={{ overflowWrap: 'anywhere' }}>
+        {secret}
+      </p>
       <CopyButton done="Secret copié." label="Copier le secret" value={secret} />
     </Modal>
   )
