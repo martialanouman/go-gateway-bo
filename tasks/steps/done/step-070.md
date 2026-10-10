@@ -44,7 +44,7 @@ Le jeton prouve **qui** appelle et avec quels droits ; le mTLS existant prouve *
   (UUID fixe), sans ligne en base — `first_operator.go:94` n'amorce le premier administrateur que
   sur une table `operators` vide, et une ligne réservée l'aurait bloqué. `scope: "admin:read"` seul.
   L'ADR-0019 (« pas de compte de service ») visait les scripts ; l'amender d'une ligne côté
-  passerelle fait partie de la PR.
+  passerelle est la dette `debts/067-l-adr-0019-ne-dit-rien-de-l-identite-systeme-des-flux.md`.
 - **Transport.** Un `RoundTripper` lit l'appelant dans le contexte (`gateway.WithOperator`, posé par
   la garde ; `gateway.WithSystem`, posé par le hub) et pose `Authorization: Bearer`. **Sans appelant,
   ou sans aucun scope, l'appel est refusé avant le réseau.** Le cookie de session n'est jamais
@@ -77,7 +77,7 @@ Le jeton prouve **qui** appelle et avec quels droits ; le mTLS existant prouve *
 ## Fichiers
 - `go.mod` : `go-jose/v4` ; `golang.org/x/oauth2` retiré s'il ne sert plus.
 - `internal/token/` (neuf) : `keys.go`, `jwks.go`, `issuer.go` et leurs tests.
-- `internal/permissions/catalog.go` (classe par clé), `scopes.go` (neuf) et tests.
+- `internal/permissions/scopes.go` (neuf : la classe de chaque clé, dans la map `gatewayAccess`) et tests.
 - `internal/gateway/` : `client.go` (transport par appelant), `caller.go` (neuf), `errors.go` ;
   `token.go` supprimé.
 - `internal/config/config.go` : les trois variables, les refus.
