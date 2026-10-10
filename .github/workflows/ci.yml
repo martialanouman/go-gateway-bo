@@ -296,7 +296,7 @@ jobs:
       - name: Le binaire sert la sortie de Vite
         run: |
           # Le mode `mock` est explicite parce que le défaut est `real`, qui exigerait ici les
-          # identifiants OAuth2 et le matériel mTLS d'une passerelle que ce job ne joint jamais : ce
+          # clés de signature et le matériel mTLS d'une passerelle que ce job ne joint jamais : ce
           # qu'il vérifie est le service des assets. L'adresse est celle du mock, jamais interrogée.
           # Le DSN, lui, désigne le service `postgres` ci-dessus, que l'étape précédente vient de
           # migrer : depuis step-020, le binaire refuse de servir sur un schéma en retard, et ce

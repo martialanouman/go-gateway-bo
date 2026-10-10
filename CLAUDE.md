@@ -53,8 +53,8 @@ Le code les cite par leur lettre.
   contrôle masqué dont la route n'est pas gardée est une faille. Le middleware `requirePermission`
   (`internal/bff/guard.go`, monté en `router.go`) est **fermé par défaut** : une opération absente de
   sa table est refusée.
-- **(d) JAMAIS le navigateur en direct sur l'API Admin.** Le jeton machine, le mTLS et la connexion
-  PostgreSQL vivent sous `internal/`, que le langage rend inatteignable : (d) est une propriété du
+- **(d) JAMAIS le navigateur en direct sur l'API Admin.** La clé qui signe les jetons de l'API Admin, le mTLS et la
+  connexion PostgreSQL vivent sous `internal/`, que le langage rend inatteignable : (d) est une propriété du
   compilateur, pas une consigne. Le risque résiduel est côté client — voir `web/CLAUDE.md`.
 - **Un contrôle interdit est désactivé et expliqué**, jamais silencieusement masqué : le refus nomme
   ce qui manque et par où passer. Vaut aussi pour un 403/409 rédigé dans `api/openapi-bff.yaml` ou
@@ -120,10 +120,12 @@ reste obligatoire, critère 3.
   régénérer → écrire le scénario rouge, à côté du package décrit → le handler avec sa garde, son
   audit et son **DTO de sortie** → le fichier de route sous `web/src/routes/` → **régénérer l'arbre et
   commiter `routeTree.gen.ts`**, que `check-routes` garde. Détail client : `web/CLAUDE.md`.
-- **Ajouter une permission** — quatre endroits dans la même PR : le catalogue
+- **Ajouter une permission** — cinq endroits dans la même PR : le catalogue
   `internal/permissions/catalog.go`, la garde serveur qui l'exige, les rôles par défaut de
-  `internal/permissions/roles.go` (§6.10 de la spec), puis `make generate`, qui en dérive le
-  TypeScript. Deux gardes tiennent les deux derniers : une clé qu'aucun rôle ne détient fait rougir
+  `internal/permissions/roles.go` (§6.10 de la spec), la classe de la clé dans `gatewayAccess`
+  (`internal/permissions/scopes.go`), puis `make generate`, qui en dérive le TypeScript.
+  `TestEveryCatalogKeyHasAGatewayClass` tient la classe ; deux autres gardes tiennent les rôles et
+  le TypeScript : une clé qu'aucun rôle ne détient fait rougir
   `TestNoOrphanKeyBesidesTheThreeDeliberateOnes`, et `check-generated` rougit sur un TS non régénéré.
 
 ## La boucle de travail

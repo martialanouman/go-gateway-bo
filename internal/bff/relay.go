@@ -14,9 +14,13 @@ import (
 
 // relayError traduit une erreur de la passerelle dans la forme du produit (§1.4). Une passerelle
 // injoignable ou qui expire, un 429 ou un 5xx amont deviennent un 503 à réessayer. `relayed` faux
-// laisse l'appelant rendre l'erreur, donc un 500 journalisé : c'est le sort d'un 401 ou 403 amont,
-// qui refusent le jeton machine du BFF et non l'opérateur.
+// laisse l'appelant rendre l'erreur : un 401 ou un 403 amont, que `reportFailedResponse` traduit en
+// un seul point, et un appel parti sans appelant, qui est un défaut du BFF (500).
 func relayError(err error) (status int, body Error, relayed bool) {
+	if errors.Is(err, gateway.ErrNoCaller) {
+		return 0, Error{}, false
+	}
+
 	var upstream gateway.APIError
 	if !errors.As(err, &upstream) {
 		return http.StatusServiceUnavailable, unavailable(gateway.CodeUpstreamUnreachable), true
@@ -99,9 +103,11 @@ func auditRelayed(ctx context.Context, record func(context.Context, store.Event)
 	return status, err
 }
 
-// relayedRefusal traduit l'échec d'une opération relayée. Un statut nul rend `err` à l'appelant, qui
-// le laisse devenir un 500 journalisé ; tout autre statut vient avec le corps à servir. Un journal
-// d'audit en panne n'est pas une passerelle injoignable : l'appel n'est pas parti.
+// relayedRefusal traduit l'échec d'une opération relayée. Un statut nul rend `err` à l'appelant,
+// qui le laisse rendre à `reportFailedResponse` : un 401 ou 403 amont y est traduit, tout le reste
+// (un appel sans appelant, une erreur non classée) devient un 500 journalisé ; tout autre statut
+// vient avec le corps à servir. Un journal d'audit en panne n'est pas une passerelle injoignable :
+// l'appel n'est pas parti.
 func (a API) relayedRefusal(ctx context.Context, operation string, err error) (int, Error, error) {
 	status, body, relayed := relayError(err)
 	if !relayed || errors.Is(err, errIntentNotTraced) {

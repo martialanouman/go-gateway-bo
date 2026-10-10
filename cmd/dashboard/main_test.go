@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
+	"github.com/martialanouman/go-gateway-bo/internal/config"
 )
 
 // Les scénarios exercent le binaire livré, pas une fonction appelée en bibliothèque : ce qui est
@@ -275,6 +276,7 @@ func initializeScenario(ctx *godog.ScenarioContext, visited *bddtest.OperationLe
 	realtime.registerSteps(ctx)
 	(&notificationsWorld{operators: operators, realtime: realtime}).registerSteps(ctx)
 	(&customerGroupsWorld{process: p}).registerSteps(ctx)
+	(&gatewayTokenWorld{process: p, login: login}).registerSteps(ctx)
 	ctx.Then(`^le serveur s'arrête sans erreur$`, p.exitsCleanly)
 	ctx.Then(`^le tableau de bord s'affiche$`, p.servesDashboard)
 	ctx.Then(`^le script est servi$`, p.servesScript)
@@ -931,4 +933,14 @@ func environment(vars map[string]string) []string {
 	}
 
 	return env
+}
+
+func TestASigningKeysRefusalNamesTheVariables(t *testing.T) {
+	_, err := signingKeys(config.GatewayConfig{
+		Mode: config.GatewayModeReal, TokenKeysDir: t.TempDir(), TokenActiveKID: "absent",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvTokenKeysDir)
+	assert.Contains(t, err.Error(), config.EnvTokenActiveKID)
 }

@@ -25,7 +25,7 @@ Fonctionnalité: Configuration validée au démarrage
     Étant donné une configuration complète dont on passe "DASHBOARD_GATEWAY_MODE" à "real"
     Quand le serveur démarre
     Alors le serveur refuse de démarrer
-    Et le message d'erreur nomme "DASHBOARD_GATEWAY_CLIENT_ID"
+    Et le message d'erreur nomme "DASHBOARD_TOKEN_ISSUER"
     Et le message d'erreur nomme "DASHBOARD_GATEWAY_CA_CERT"
 
   # Vide était accepté, et vide se lit comme « pas de proxy » aussi bien que comme « je n'y ai pas

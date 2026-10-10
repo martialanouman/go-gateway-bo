@@ -106,11 +106,11 @@ bouts** — une divergence ne compile pas.
 Le mock Prism sert ce contrat sans dépendre de la passerelle : c'est la frontière des scénarios, qui
 se rejouent sans elle. La passerelle sert aujourd'hui toutes les opérations du contrat, relevé dans
 `tasks/plan.md` §16. `DASHBOARD_GATEWAY_MODE` tranche entre le mock et la vraie passerelle, et **son
-absence vaut `real`** : la lecture la plus stricte, qui exige tout le matériel OAuth2 et mTLS. Le
+absence vaut `real`** : la lecture la plus stricte, qui exige tout le matériel de signature des jetons et de mTLS. Le
 défaut inverse aurait servi des données inventées sans que rien ne le dise.
 
-Le jeton obtenu est un jeton **machine** à scopes fixes : il ne représente pas l'opérateur connecté,
-et aucune restriction par opérateur ne peut donc être déléguée à la passerelle.
+Le jeton envoyé à la passerelle est signé par le BFF (ES256) au nom de l'opérateur connecté, avec les
+scopes que ses permissions traduisent ; la passerelle le vérifie contre le JWKS que le BFF publie.
 
 ### Accès au registre
 

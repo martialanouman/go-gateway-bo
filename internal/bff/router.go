@@ -8,6 +8,7 @@ package bff
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/martialanouman/go-gateway-bo/internal/gateway"
 	"github.com/martialanouman/go-gateway-bo/internal/hub"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
@@ -46,6 +48,9 @@ type Dependencies struct {
 	Origin string
 	// Realtime relaie les flux de la passerelle sur `/ws`.
 	Realtime *hub.Hub
+	// JWKS publie les clés publiques qui vérifient les jetons de l'API Admin. Hors de /api :
+	// la passerelle le lit sans session.
+	JWKS http.Handler
 }
 
 // NewRouter assemble les routes du BFF et le service des assets de la SPA.
@@ -93,6 +98,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	// de corps. Le contrôle d'origine est dans le handler, puisque c'est un GET.
 	r.With(withoutCaching, withSession(deps.Sessions)).
 		Get("/ws", serveRealtime(deps.Realtime, deps.Sessions, deps.Origin))
+
+	r.Get("/.well-known/jwks.json", deps.JWKS.ServeHTTP)
 
 	asset := serveAsset(assets)
 	r.Get("/assets/*", asset)
@@ -161,6 +168,7 @@ func mountContract(api chi.Router, impl StrictServerInterface, sessions *session
 // interne de l'API Admin au navigateur.
 //
 // L'erreur part au journal du serveur et jamais au navigateur : elle peut nommer la topologie interne.
+// Le 401 et le 403 amont y sont traduits (`reportFailedResponse`) ; le reste devient un 500.
 //
 // **L'ordre du slice compte.** La boucle du wrapper engendré enveloppe successivement, donc le
 // **dernier** élément est le plus extérieur : la garde s'exécute avant l'autre middleware strict, et
@@ -202,8 +210,33 @@ func rejectRequest(w http.ResponseWriter, _ *http.Request, _ error) {
 	})
 }
 
+const codeGatewayRejectedToken = "bff_gateway_rejected_token" //nolint:gosec // code d'erreur, pas un identifiant
+
 func reportFailedResponse(logger *slog.Logger) func(http.ResponseWriter, *http.Request, error) {
 	return func(w http.ResponseWriter, r *http.Request, err error) {
+		var upstream gateway.APIError
+		if errors.As(err, &upstream) {
+			switch upstream.Status {
+			case http.StatusUnauthorized:
+				// L'exploitation est prévenue par le transport (ERROR `gateway_token_rejected`, kid/iss/sub) : pas de second log ici.
+				writeJSON(w, http.StatusBadGateway, Error{
+					Code: codeGatewayRejectedToken,
+					Message: "La passerelle a refusé l'identité du tableau de bord : l'action n'a pas eu lieu. " +
+						"L'exploitation est prévenue ; votre session reste ouverte.",
+				})
+				return
+			case http.StatusForbidden:
+				logger.WarnContext(r.Context(), "la passerelle refuse un scope que la garde du BFF a laissé passer",
+					"route", routeOf(r), "code", upstream.Code)
+				writeJSON(w, http.StatusForbidden, Error{
+					Code: "forbidden_scope",
+					Message: "La passerelle refuse cette action à votre compte : un droit lui manque de son côté. " +
+						"Un administrateur peut vérifier les rôles du compte dans « Rôles ».",
+				})
+				return
+			}
+		}
+
 		logger.ErrorContext(r.Context(), "une requête a échoué", "route", routeOf(r), "error", err)
 		writeJSON(w, http.StatusInternalServerError, unexpectedError())
 	}

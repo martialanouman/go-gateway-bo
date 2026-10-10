@@ -80,7 +80,7 @@ internal/
   config/               configuration validée au démarrage
   webassets/            l'embed.FS des assets du client (step-002)
   auth/                 session, argon2id, TOTP, WebAuthn
-  gateway/              client généré vers l'API Admin (OAuth2 + mTLS)
+  gateway/              client généré vers l'API Admin (jeton ES256 + mTLS)
   hub/                  hub WebSocket : 3 flux amont → 1 socket par opérateur
   alerting/             évaluateur métier à offset persisté
   store/                pgx + requêtes typées + migrations
@@ -150,11 +150,13 @@ Pas de framework CSS utilitaire : les tokens de la charte et le CSS de composant
 C'est la convention la plus structurante du dépôt, et elle change de nature avec Go.
 
 - Le client parle **uniquement** aux routes du BFF. Jamais à l'API Admin (**invariant d**).
-- Le jeton machine (OAuth2 client_credentials), le certificat mTLS et la connexion PostgreSQL vivent
+- La clé qui signe les jetons de l'API Admin (ES256, ADR-0019), le certificat mTLS et la connexion
+  PostgreSQL vivent
   sous `internal/` — **le langage interdit de les importer depuis ailleurs**. Là où la v1.0 posait
   une règle de lint désactivable, la v2.0 a une erreur de compilation.
-- Conséquence à garder en tête : le jeton du BFF porte `content:read` en permanence. **Seul le BFF**
-  peut restreindre la lecture d'un corps par opérateur — d'où l'invariant (c) et le test
+- Conséquence à garder en tête : le BFF signe pour chaque appel un jeton au nom de l'opérateur, dont les scopes
+  (`internal/permissions/scopes.go`) suivent ses permissions : `content:read` n'y figure que si l'opérateur
+  détient `content:read`. **Seul le BFF** reste la frontière de la lecture d'un corps par opérateur — d'où l'invariant (c) et le test
   d'énumération des routes.
 
 ### 1.4 Modèle d'erreur & codes
@@ -221,7 +223,7 @@ C'est la convention la plus structurante du dépôt, et elle change de nature av
 - Toute la configuration par variables d'environnement, validée **au démarrage** — échec bruyant, pas
   de valeur par défaut silencieuse en production.
 - `.env.example` documenté et à jour ; `.env` jamais commité.
-- Secrets requis : identifiants OAuth2 de l'API Admin, certificat mTLS, secret de signature de
+- Secrets requis : clés de signature ES256 des jetons de l'API Admin, certificat mTLS, secret de signature de
   session, secret du webhook Alertmanager, DSN PostgreSQL, URL Redis.
 - Aucun secret ne traverse la frontière §1.3, n'entre dans un log, un toast, une URL ou un audit.
 
@@ -379,7 +381,7 @@ Login + MFA ──► session BFF ──► /auth/me (permissions résolues)
                        RequirePermission("customers:write")
                                       │
                                       ▼
-              client Go typé (OAuth2 + mTLS) ──► Admin API ──► audit_log
+              client Go typé (jeton ES256 + mTLS) ──► Admin API ──► audit_log
 ```
 
 **Elle est acquise à la fin de `M3`, step-061** : un opérateur se connecte, franchit le MFA, voit
@@ -440,8 +442,8 @@ contrat resté en 2.5.0. Cette ligne a annoncé « 000 → 008 » pendant vingt-
 - SPA Vite + TanStack Router, portage de `web/`, **squelette de coquille peint au chargement à froid**
   (§1.9), et le fallback SPA **ordonné après `/api`** — un `/api/*` inconnu rend 404, jamais du HTML.
 - `embed.FS` : `go build` produit un binaire autonome qui sert l'application.
-- Client Admin Go généré par `oapi-codegen` sur `openapi-admin.yaml`, OAuth2 client_credentials avec
-  jeton mis en cache, mTLS, traduction de l'enveloppe d'erreur (§1.4). Mock Prism et bascule
+- Client Admin Go généré par `oapi-codegen` sur `openapi-admin.yaml`, jeton ES256 signé par le BFF au nom
+  de l'opérateur (step-070, ADR-0019) et valable cinq minutes et réutilisé jusqu'à 60 s avant son expiration, mTLS, traduction de l'enveloppe d'erreur (§1.4). Mock Prism et bascule
   réel/mock par environnement.
 - `api/openapi-bff.yaml` : le contrat du BFF, engendrant les types serveur Go **et** les types client
   TypeScript. Un seul contrat, deux bouts typés.
@@ -808,7 +810,7 @@ aussi.
 4. **Les opérations « non planifiées »** méritent une question à l'équipe passerelle **avant**
    d'attaquer le jalon, pas pendant.
 5. **L'authentification opérateur de l'Admin API est encore un stub** côté passerelle. Le client Go
-   est écrit pour OAuth2 + mTLS dès `M0` : c'est la cible, mais l'environnement de développement
+   est écrit pour un jeton ES256 signé par le BFF + mTLS dès `M0` : c'est la cible, mais l'environnement de développement
    pourra être plus permissif. Ne jamais laisser cette permissivité atteindre la production (§1.8).
 
 ---

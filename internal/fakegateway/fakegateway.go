@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/coreos/go-oidc/v3/oidc"
 )
 
 const (
@@ -39,7 +40,7 @@ func New() *Gateway {
 
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
-		http.Error(w, "jeton machine absent", http.StatusUnauthorized)
+		http.Error(w, "jeton absent", http.StatusUnauthorized)
 
 		return
 	}
@@ -134,4 +135,62 @@ func (g *Gateway) Opened(feed string) int {
 	defer g.mu.Unlock()
 
 	return g.opened[feed]
+}
+
+// Verifier juge chaque requête comme la passerelle (go-oidc, iss, aud, ES256) avant de servir les flux
+// de Gateway ou une liste vide de groupes, et retient qui a appelé.
+type Verifier struct {
+	streams  *Gateway
+	verifier *oidc.IDTokenVerifier
+	mu       sync.Mutex
+	seen     []Principal
+}
+
+type Principal struct{ Path, Subject, Scope, Cookie, Token string }
+
+func Verifying(issuer, jwksURL string) *Verifier {
+	keys := oidc.NewRemoteKeySet(context.Background(), jwksURL)
+
+	return &Verifier{streams: New(), verifier: oidc.NewVerifier(issuer, keys,
+		&oidc.Config{ClientID: "gateway-admin", SupportedSigningAlgs: []string{oidc.ES256}})}
+}
+
+func (v *Verifier) Seen() []Principal {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	return slices.Clone(v.seen)
+}
+
+func (v *Verifier) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	raw, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	idToken, err := v.verifier.Verify(r.Context(), raw)
+
+	var claims struct {
+		Scope string `json:"scope"`
+	}
+
+	if err != nil || idToken.Claims(&claims) != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"code":"unauthenticated","message":"jeton refusé"}`))
+
+		return
+	}
+
+	v.mu.Lock()
+	v.seen = append(v.seen, Principal{
+		Path: r.URL.Path, Subject: idToken.Subject, Scope: claims.Scope,
+		Cookie: r.Header.Get("Cookie"), Token: raw,
+	})
+	v.mu.Unlock()
+
+	if strings.HasPrefix(r.URL.Path, "/admin/stream/") {
+		v.streams.ServeHTTP(w, r)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`[]`))
 }

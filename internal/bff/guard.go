@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/martialanouman/go-gateway-bo/internal/gateway"
 	"github.com/martialanouman/go-gateway-bo/internal/permissions"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
@@ -226,7 +227,7 @@ func requirePermission(rules map[string]rule, grants grantsOf, denied recordDeni
 				return nil, nil
 			}
 
-			return next(ctx, w, r, request)
+			return next(gateway.WithOperator(ctx, resolved.OperatorID, held), w, r, request)
 		}
 	}
 }

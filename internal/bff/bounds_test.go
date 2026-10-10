@@ -46,6 +46,7 @@ func apiRouter(t *testing.T) http.Handler {
 	pool.Close()
 
 	return NewRouter(Dependencies{
+		JWKS:   http.NotFoundHandler(),
 		Assets: fstest.MapFS{},
 		API: API{
 			Authenticator: auth.NewAuthenticator(store.NewLogins(pool), []byte("un sel de test assez long"),
@@ -352,6 +353,7 @@ func TestAnUnreachableDatabaseDoesNotCloseTheOperatorSession(t *testing.T) {
 
 	secret := []byte("une-cle-de-session-assez-longue-pour-la-borne")
 	handler := NewRouter(Dependencies{
+		JWKS:   http.NotFoundHandler(),
 		Assets: fstest.MapFS{},
 		API: API{
 			Sessions: session.NewManager(store.NewSessions(pool), secret),

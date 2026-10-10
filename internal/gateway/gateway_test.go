@@ -225,15 +225,20 @@ type adminCalls struct {
 }
 
 func (c *adminCalls) connect(baseURL string) error {
-	// Le mode `mock` est celui du développement local : pas de mTLS, pas d'endpoint de jeton, un
-	// `Bearer` factice. Prism applique le `security` global du contrat — il refuse en 401 une requête
+	// Le mode `mock` est celui du développement local : pas de mTLS, un jeton signé que Prism ne
+	// vérifie pas. Prism applique le `security` global du contrat — il refuse en 401 une requête
 	// sans en-tête `Authorization` et accepte n'importe quel `Bearer` —, donc ces scénarios traversent
 	// bien l'authentification sortante, sans rien exiger d'une passerelle.
+	issuer, err := newIssuer()
+	if err != nil {
+		return fmt.Errorf("émetteur de jetons de test: %w", err)
+	}
+
 	client, err := gateway.NewAdminClient(config.GatewayConfig{
 		Mode:    config.GatewayModeMock,
 		BaseURL: baseURL,
 		Timeout: callTimeout,
-	})
+	}, issuer, quietLogger())
 	if err != nil {
 		return fmt.Errorf("client de l'API Admin sur le mock: %w", err)
 	}
@@ -269,7 +274,7 @@ func (c *adminCalls) refusedListing(ctx context.Context, status int) error {
 }
 
 func (c *adminCalls) list(ctx context.Context, editors ...gateway.RequestEditorFn) (int, error) {
-	response, err := c.client.ListCustomersWithResponse(ctx, nil, editors...)
+	response, err := c.client.ListCustomersWithResponse(gateway.WithSystem(ctx), nil, editors...)
 	if err != nil {
 		return 0, fmt.Errorf("appel de list-customers sur le mock: %w", err)
 	}

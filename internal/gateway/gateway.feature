@@ -7,7 +7,7 @@ Fonctionnalité: Le BFF interroge l'API Admin de la passerelle
 
   Ce que ces scénarios n'observent pas : la passerelle réelle. Le mock rend les exemples du contrat,
   jamais ce que produit le plan de contrôle, et il n'exige aucun certificat. Le mTLS, l'obtention du
-  jeton machine par `client_credentials` et le rejeu restent prouvés par les tests unitaires du
+  jeton signé par appelant et le rejeu restent prouvés par les tests unitaires du
   package, sur le même code.
 
   Scénario: le BFF liste les clients de la passerelle

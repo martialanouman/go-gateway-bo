@@ -12,7 +12,7 @@ playwright-report/
 .tanstack/
 
 # Variables d'environnement locales. `.env.example` est commité, jamais un `.env` réel :
-# il portera le jeton OAuth2 de l'API Admin, le secret de session et le DSN PostgreSQL (§1.8).
+# il portera le dossier des clés de signature des jetons, le secret de session et le DSN PostgreSQL (§1.8).
 .env
 .env.*
 !.env.example

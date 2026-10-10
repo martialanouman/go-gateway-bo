@@ -35,8 +35,8 @@ info:
   title: Tableau de bord Admin — API du BFF
   version: 0.1.0
   description: |
-    Surface servie au navigateur. Le client ne parle qu'à elle : le jeton machine, le mTLS et la base
-    vivent sous `internal/`, hors d'atteinte du bundle (invariant d).
+    Surface servie au navigateur. Le client ne parle qu'à elle : la clé de signature des jetons de l'API Admin, le mTLS et la
+    base vivent sous `internal/`, hors d'atteinte du bundle (invariant d).
 
 # Le seul consommateur de `servers` dans le dépôt est `kin-openapi`, dans le scénario godog de
 # `cmd/dashboard` : c'est lui, et lui seul, qui lie ce préfixe au `r.Route("/api", …)` du routeur.
