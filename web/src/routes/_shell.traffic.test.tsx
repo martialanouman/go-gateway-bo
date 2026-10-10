@@ -23,7 +23,7 @@ async function visitTraffic(replies: AuthReplies = {}) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: ['/traffic'] }))
   render(<RouterProvider router={router} />)
 
-  return { fetch }
+  return { fetch, queryClient: router.options.context.queryClient }
 }
 
 describe('the traffic screen', () => {
@@ -69,5 +69,27 @@ describe('the traffic screen', () => {
       },
     })
     expect(await screen.findByRole('button', { name: 'Réessayer' })).toBeVisible()
+  })
+
+  it('keeps the last values on screen and says so when a later poll fails', async () => {
+    let gatewayDown = false
+    const { queryClient } = await visitTraffic({
+      get metricsSummary() {
+        return gatewayDown
+          ? {
+              status: 503,
+              body: { code: 'service_unavailable', message: 'La passerelle est indisponible.' },
+            }
+          : undefined
+      },
+    })
+    expect(await screen.findByText('30,0')).toBeVisible()
+
+    gatewayDown = true
+    await queryClient.refetchQueries({ queryKey: ['metrics', 'summary'] })
+
+    expect(await screen.findByText(/Les dernières valeurs restent affichées/)).toBeVisible()
+    expect(screen.getByText('30,0')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Réessayer' })).not.toBeInTheDocument()
   })
 })
