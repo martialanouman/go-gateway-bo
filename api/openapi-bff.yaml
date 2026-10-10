@@ -795,6 +795,41 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /metrics/summary:
+    get:
+      operationId: getMetricsSummary
+      summary: Les compteurs du trafic sur une fenêtre glissante
+      description: |
+        Relayée vers `get-metrics-summary`. Compte les messages **soumis** dans la fenêtre, chacun avec
+        son statut au moment de la lecture : sur une fenêtre courte, des messages sont encore en vol.
+        Une latence ou un nombre de sessions que l'amont ne mesure pas est `null`, jamais `0`.
+      parameters:
+        - { name: window, in: query, required: false, schema: { $ref: '#/components/schemas/MetricsWindow' } }
+      responses:
+        '200': { description: Les compteurs., content: { application/json: { schema: { $ref: '#/components/schemas/MetricsSummary' } } } }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
+  /metrics/traffic:
+    get:
+      operationId: getTrafficMetrics
+      summary: Les séries du trafic, par connecteur, client ou groupe
+      description: |
+        Relayée vers `get-traffic-metrics`. Tranches de 10 s (5m), 30 s (15m) ou une minute (30m, 1h).
+        Les 20 clés les plus actives ont leur série, le reste est sommé sous `other`. Par connecteur, un
+        message jamais dispatché n'apparaît dans aucune série ; par client, chaque message figure.
+      parameters:
+        - { name: window, in: query, required: false, schema: { $ref: '#/components/schemas/MetricsWindow' } }
+        - { name: groupBy, in: query, required: false, schema: { $ref: '#/components/schemas/TrafficGroupBy' } }
+      responses:
+        '200': { description: Les séries., content: { application/json: { schema: { $ref: '#/components/schemas/TrafficMetrics' } } } }
+        '400': { $ref: '#/components/responses/RequeteInvalide' }
+        '401': { $ref: '#/components/responses/SessionAbsente' }
+        '403': { $ref: '#/components/responses/PermissionRefusee' }
+        '422': { $ref: '#/components/responses/RefusDeLaPasserelle' }
+        '503': { $ref: '#/components/responses/PasserelleIndisponible' }
   /operators:
     get:
       operationId: listOperators
@@ -2489,6 +2524,51 @@ components:
           type: string
           format: date-time
       required: [token, scopes, expiresAt]
+
+    MetricsWindow:
+      type: string
+      enum: [5m, 15m, 30m, 1h]
+    TrafficGroupBy:
+      type: string
+      enum: [connector, customer, group]
+    MetricsSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        window: { type: string, description: La fenêtre servie ; l'amont ne promet pas l'énumération en sortie. }
+        submitted: { type: integer }
+        delivered: { type: integer }
+        failed: { type: integer, description: Échoués ou expirés. }
+        rejected: { type: integer }
+        moReceived: { type: integer }
+        e2eLatencyMsP50: { type: [number, 'null'] }
+        e2eLatencyMsP99: { type: [number, 'null'] }
+        activeSessions: { type: [integer, 'null'] }
+      required: [window, submitted, delivered, failed, rejected, moReceived, e2eLatencyMsP50, e2eLatencyMsP99, activeSessions]
+    TrafficPoint:
+      type: object
+      additionalProperties: false
+      properties:
+        t: { type: string, format: date-time }
+        submitted: { type: integer }
+        delivered: { type: integer }
+        failed: { type: integer }
+      required: [t, submitted, delivered, failed]
+    TrafficSeries:
+      type: object
+      additionalProperties: false
+      properties:
+        key: { type: string, description: 'Identifiant de connecteur, client ou groupe, ou les clés réservées other et ungrouped.' }
+        points: { type: array, items: { $ref: '#/components/schemas/TrafficPoint' } }
+      required: [key, points]
+    TrafficMetrics:
+      type: object
+      additionalProperties: false
+      properties:
+        groupBy: { $ref: '#/components/schemas/TrafficGroupBy' }
+        window: { type: string, description: La fenêtre servie ; l'amont ne promet pas l'énumération en sortie. }
+        series: { type: array, items: { $ref: '#/components/schemas/TrafficSeries' } }
+      required: [groupBy, window, series]
 
     CurrentOperator:
       type: object

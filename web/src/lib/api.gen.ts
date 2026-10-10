@@ -419,6 +419,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/metrics/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Les compteurs du trafic sur une fenêtre glissante
+         * @description Relayée vers `get-metrics-summary`. Compte les messages **soumis** dans la fenêtre, chacun avec
+         *     son statut au moment de la lecture : sur une fenêtre courte, des messages sont encore en vol.
+         *     Une latence ou un nombre de sessions que l'amont ne mesure pas est `null`, jamais `0`.
+         */
+        get: operations["getMetricsSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/metrics/traffic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Les séries du trafic, par connecteur, client ou groupe
+         * @description Relayée vers `get-traffic-metrics`. Tranches de 10 s (5m), 30 s (15m) ou une minute (30m, 1h).
+         *     Les 20 clés les plus actives ont leur série, le reste est sommé sous `other`. Par connecteur, un
+         *     message jamais dispatché n'apparaît dans aucune série ; par client, chaque message figure.
+         */
+        get: operations["getTrafficMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/operators": {
         parameters: {
             query?: never;
@@ -1393,6 +1437,41 @@ export interface components {
             scopes: string[];
             /** Format: date-time */
             expiresAt: string;
+        };
+        /** @enum {string} */
+        MetricsWindow: "5m" | "15m" | "30m" | "1h";
+        /** @enum {string} */
+        TrafficGroupBy: "connector" | "customer" | "group";
+        MetricsSummary: {
+            /** @description La fenêtre servie ; l'amont ne promet pas l'énumération en sortie. */
+            window: string;
+            submitted: number;
+            delivered: number;
+            /** @description Échoués ou expirés. */
+            failed: number;
+            rejected: number;
+            moReceived: number;
+            e2eLatencyMsP50: number | null;
+            e2eLatencyMsP99: number | null;
+            activeSessions: number | null;
+        };
+        TrafficPoint: {
+            /** Format: date-time */
+            t: string;
+            submitted: number;
+            delivered: number;
+            failed: number;
+        };
+        TrafficSeries: {
+            /** @description Identifiant de connecteur, client ou groupe, ou les clés réservées other et ungrouped. */
+            key: string;
+            points: components["schemas"]["TrafficPoint"][];
+        };
+        TrafficMetrics: {
+            groupBy: components["schemas"]["TrafficGroupBy"];
+            /** @description La fenêtre servie ; l'amont ne promet pas l'énumération en sortie. */
+            window: string;
+            series: components["schemas"]["TrafficSeries"][];
         };
         /**
          * @description De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
@@ -2897,6 +2976,61 @@ export interface operations {
                 };
             };
             415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    getMetricsSummary: {
+        parameters: {
+            query?: {
+                window?: components["schemas"]["MetricsWindow"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les compteurs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricsSummary"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
+        };
+    };
+    getTrafficMetrics: {
+        parameters: {
+            query?: {
+                window?: components["schemas"]["MetricsWindow"];
+                groupBy?: components["schemas"]["TrafficGroupBy"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Les séries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficMetrics"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            401: components["responses"]["SessionAbsente"];
+            403: components["responses"]["PermissionRefusee"];
+            422: components["responses"]["RefusDeLaPasserelle"];
+            503: components["responses"]["PasserelleIndisponible"];
         };
     };
     listOperators: {

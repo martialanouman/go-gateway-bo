@@ -85,6 +85,18 @@ func (failingAPI) DeleteWebauthnPasskey(_ context.Context,
 	return nil, errors.New("appel de " + internalTopology + "/admin/v1/passkeys: connexion refusée")
 }
 
+func (failingAPI) GetMetricsSummary(_ context.Context,
+	_ GetMetricsSummaryRequestObject,
+) (GetMetricsSummaryResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/metrics/summary: connexion refusée")
+}
+
+func (failingAPI) GetTrafficMetrics(_ context.Context,
+	_ GetTrafficMetricsRequestObject,
+) (GetTrafficMetricsResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/metrics/traffic: connexion refusée")
+}
+
 func (failingAPI) IssueGatewayToken(_ context.Context,
 	_ IssueGatewayTokenRequestObject,
 ) (IssueGatewayTokenResponseObject, error) {
