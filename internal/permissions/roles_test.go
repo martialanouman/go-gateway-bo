@@ -20,7 +20,7 @@ import (
 // trop large accorde en silence exactement ce qu'il existe pour interdire.
 //
 // `Propriétaire` n'y figure pas : le §6.10 dit « toutes les permissions », donc il se dérive du
-// catalogue et se vérifie autrement — l'écrire ici demanderait de recopier les 44 clés, et cette
+// catalogue et se vérifie autrement — l'écrire ici demanderait de recopier les 45 clés, et cette
 // copie-là ne dirait rien de plus que le catalogue.
 var specRoles = map[string][]permissions.Key{
 	// « Lecture/écriture routage (dont numéros exacts, routes:import), connecteurs (dont
@@ -103,7 +103,7 @@ var specRoles = map[string][]permissions.Key{
 // laissait son contrôle **vert** — il passait en n'ayant rien cherché.
 const specRoleCount = 9
 
-// deliberateOrphans sont les trois clés que le §6.10 laisse hors de tout rôle par défaut sauf
+// deliberateOrphans sont les clés que le §6.10 laisse hors de tout rôle par défaut sauf
 // `Propriétaire`, et il dit pourquoi : `content:read` n'est jamais implicite — elle s'accorde par un
 // rôle taillé pour un opérateur nommé ; `operators:manage` et `roles:manage` parce que qui peut
 // éditer les rôles peut s'accorder tout le reste.
@@ -115,6 +115,10 @@ var deliberateOrphans = []permissions.Key{
 	permissions.ContentRead,
 	permissions.OperatorsManage,
 	permissions.RolesManage,
+	// Le jeton personnel sort du BFF avec admin:read et admin:write, que seule la garde de
+	// `requirePermission` bornait : aucun rôle hors Propriétaire n'a des droits qui les couvrent
+	// (step-071, arbitré le 10/10/2026).
+	permissions.GatewayPersonalToken,
 }
 
 func TestEveryDefaultRoleGrantsExactlyWhatTheSpecSays(t *testing.T) {
@@ -166,7 +170,7 @@ func TestSuperAdminIsExactlyTheCatalog(t *testing.T) {
 	assert.Empty(t, missing(actual, all), "Propriétaire accorde %v, hors catalogue", missing(actual, all))
 }
 
-func TestNoOrphanKeyBesidesTheThreeDeliberateOnes(t *testing.T) {
+func TestNoOrphanKeyBesidesTheDeliberateOnes(t *testing.T) {
 	t.Parallel()
 
 	held := map[permissions.Key]bool{}
@@ -190,7 +194,7 @@ func TestNoOrphanKeyBesidesTheThreeDeliberateOnes(t *testing.T) {
 	}
 
 	assert.ElementsMatch(t, deliberateOrphans, orphans,
-		"les clés qu'aucun rôle par défaut ne détient hors Propriétaire ne sont plus les trois que le "+
+		"les clés qu'aucun rôle par défaut ne détient hors Propriétaire ne sont plus les quatre que le "+
 			"§6.10 laisse orphelines délibérément : une clé orpheline par oubli est inaccessible à "+
 			"tous, sans qu'aucun écran ne le dise")
 }

@@ -85,6 +85,12 @@ func (failingAPI) DeleteWebauthnPasskey(_ context.Context,
 	return nil, errors.New("appel de " + internalTopology + "/admin/v1/passkeys: connexion refusée")
 }
 
+func (failingAPI) IssueGatewayToken(_ context.Context,
+	_ IssueGatewayTokenRequestObject,
+) (IssueGatewayTokenResponseObject, error) {
+	return nil, errors.New("appel de " + internalTopology + "/admin/v1/token: connexion refusée")
+}
+
 func (failingAPI) ListWebauthnPasskeys(_ context.Context,
 	_ ListWebauthnPasskeysRequestObject,
 ) (ListWebauthnPasskeysResponseObject, error) {

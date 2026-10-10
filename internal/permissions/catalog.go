@@ -1,6 +1,6 @@
 package permissions
 
-// Les 44 clés, chacune déclarée **une seule fois**. Le catalogue plus bas les référence plutôt que
+// Les 45 clés, chacune déclarée **une seule fois**. Le catalogue plus bas les référence plutôt que
 // de répéter leurs littéraux : il n'y a pas deux listes à tenir cohérentes, il y en a une.
 //
 // Ce que ces constantes achètent : `Key` a `string` pour sous-jacent, donc n'importe quelle chaîne
@@ -63,6 +63,8 @@ const (
 	// admin
 	OperatorsManage Key = "operators:manage"
 	RolesManage     Key = "roles:manage"
+
+	GatewayPersonalToken Key = "gateway:personal_token"
 )
 
 // catalog est le vocabulaire lui-même. L'ordre des catégories est celui où l'écran d'édition de
@@ -315,5 +317,12 @@ var catalog = []Entry{
 		Key:         RolesManage,
 		Category:    "admin",
 		Description: "Créer et modifier des rôles, c’est-à-dire redistribuer toutes les permissions",
+	},
+	{
+		Key:      GatewayPersonalToken,
+		Category: "admin",
+		Description: "Se délivrer un jeton d’une heure pour l’API Admin, hors du tableau de bord. Ses " +
+			"scopes sont grossiers : admin:write ouvre toute écriture que la passerelle sert, au-delà " +
+			"des autres permissions du rôle",
 	},
 }

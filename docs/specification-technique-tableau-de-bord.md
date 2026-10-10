@@ -97,7 +97,7 @@ operators
   last_login_at
 
 permissions                          -- fixed catalog, seeded/versioned with releases, not admin-editable
-  key                    (pk, 44 clés — routes:read, routes:write, routes:import, scripts:read, scripts:write,
+  key                    (pk, 45 clés — routes:read, routes:write, routes:import, scripts:read, scripts:write,
                            scripts:publish, connectors:read, connectors:write, connectors:rebind,
                            sessions:read, sessions:disconnect, antispam:read, antispam:write,
                            customers:read, customers:write, accounts:read, accounts:write,
@@ -108,7 +108,7 @@ permissions                          -- fixed catalog, seeded/versioned with rel
                            billing:read, billing:write, billing:topup, billing:provider:write, billing:scope_change,
                            content:read, content:erase, gdpr:erase,
                            cdr:export_bulk, cdr:read_pii, alerts:read, alerts:write, audit:read,
-                           operators:manage, roles:manage)
+                           operators:manage, roles:manage, gateway:personal_token)
   category               (routing|connectors|sessions|antispam|accounts|billing|content|compliance|alerts|audit|admin)
   description
 
@@ -659,9 +659,11 @@ Autorisation **basée sur les permissions** : chaque action protégée correspon
 | `Conformité` | Conformité / juridique | `suppressions:read/write/delete`, `inbound:read`, `gdpr:erase`, **`content:erase`**, lecture seule comptes/CDR, `cdr:read_pii`, `cdr:export_bulk`. Seul rôle par défaut habilité à **lever** un désabonnement et à **exécuter un effacement RGPD**. Pas de `content:read` par défaut |
 | `Audit` | Revue conformité/sécurité | `audit:read` uniquement — **pas** `cdr:read_pii` : une ligne d'audit se corrèle avec un numéro masqué, et davantage relève d'une élévation explicite |
 
-**Trois clés ne sont détenues par aucun rôle par défaut hors `Propriétaire`, délibérément** : `content:read` (jamais
+**Quatre clés ne sont détenues par aucun rôle par défaut hors `Propriétaire`, délibérément** : `content:read` (jamais
 implicite — accordée par un rôle taillé pour un opérateur nommé), `operators:manage` et
-`roles:manage` (qui peut éditer les rôles peut s'accorder tout le reste). Toute autre clé orpheline
+`roles:manage` (qui peut éditer les rôles peut s'accorder tout le reste), et `gateway:personal_token`
+(le jeton personnel sort du BFF avec `admin:read`/`admin:write`, plus larges que les droits de tout
+autre rôle — amendement step-071). Toute autre clé orpheline
 est un oubli, et un test bloquant le signale. *(Amendement step-020 : `connectors:read/write/rebind`
 et `cdr:read_pii` ajoutés au catalogue ; `alerts:*`, `content:erase` et `cdr:export_bulk` rattachés à
 des rôles — ils n'appartenaient à personne.)*

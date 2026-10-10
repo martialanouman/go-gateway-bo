@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { PageHeader } from '~/components/page-header'
+import { SecretShown } from '~/components/secret-shown'
 import { TotpEnrollment } from '~/components/totp-enrollment'
 import {
   Button,
@@ -23,10 +24,12 @@ import type { components } from '~/lib/api.gen'
 import { TotpEnrollmentRequest } from '~/lib/contract.gen'
 import { formResolver } from '~/lib/form'
 import { passkeyNaming, registerPasskey } from '~/lib/passkey'
+import { usePermission } from '~/lib/permissions'
 
 type Enrollment = components['schemas']['TotpEnrollment']
 type EnrollmentBody = components['schemas']['TotpEnrollmentRequest']
 type Passkey = components['schemas']['PasskeySummary']
+type IssuedToken = components['schemas']['GatewayToken']
 
 export const Route = createFileRoute('/_shell/account')({ component: AccountScreen })
 
@@ -132,6 +135,8 @@ function AccountScreen() {
           </Panel>
 
           <Passkeys factors={factors} />
+
+          <PersonalToken />
         </>
       )}
     </div>
@@ -387,5 +392,50 @@ function PasskeyNaming({
         <Button onClick={onCancel}>Annuler</Button>
       </div>
     </form>
+  )
+}
+
+const timeFormat = new Intl.DateTimeFormat('fr-FR', { timeStyle: 'short' })
+
+const TOKEN_REFUSAL =
+  'Se délivrer un jeton personnel demande gateway:personal_token, que seul le rôle Propriétaire détient par défaut ; un administrateur peut l’accorder.'
+
+function PersonalToken() {
+  const [issued, setIssued] = useState<IssuedToken | null>(null)
+  const refusal = usePermission('gateway:personal_token') ? undefined : TOKEN_REFUSAL
+  const issue = useMutation({
+    mutationFn: () =>
+      orRefusal(api.POST('/auth/gateway-token'), 'Le jeton personnel n’a pas été délivré'),
+    // Le jeton ne doit pas survivre dans le cache des mutations une fois la modale fermée (invariant b).
+    gcTime: 0,
+    onSuccess: setIssued,
+  })
+
+  return (
+    <Panel title="Jeton d’API personnel">
+      <p>
+        Le jeton expire une heure après sa délivrance, ou plus tôt si la clé qui l’a signé est
+        retirée. Hors du tableau de bord, admin:read et admin:write ne sont plus bornés par vos
+        autres permissions ; le corps des messages, sa destruction et l’effacement RGPD n’en sortent
+        jamais.
+      </p>
+      <Refusal error={issue.error} />
+      <Button {...blockedBy(refusal)} loading={issue.isPending} onClick={() => issue.mutate()}>
+        Délivrer
+      </Button>
+      {issued !== null ? (
+        <SecretShown
+          onClose={() => {
+            setIssued(null)
+            issue.reset()
+          }}
+          secret={issued.token}
+          title="Jeton d’API personnel"
+        >
+          Ce jeton ne sera plus jamais affiché. Il expire à{' '}
+          {timeFormat.format(new Date(issued.expiresAt))} et ouvre : {issued.scopes.join(', ')}.
+        </SecretShown>
+      ) : null}
+    </Panel>
   )
 }

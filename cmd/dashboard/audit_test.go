@@ -28,6 +28,7 @@ func (w *auditWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Then(`^le journal ne porte ni le secret ni les codes de récupération$`, w.journalHidesSecrets)
 	ctx.Then(`^le journal ne porte pas le secret que la réponse rend$`, w.journalHidesTheReturnedSecret)
 	ctx.Then(`^l'issue "([^"]+)" porte '([^']+)'$`, w.outcomeCarries)
+	ctx.Then(`^l'événement "([^"]+)" porte '([^']+)'$`, w.eventCarries)
 	ctx.Then(`^l'issue "([^"]+)" porte avant '([^']+)'$`, w.outcomeCarriesBefore)
 	ctx.Given(`^les partitions du journal sont retirées$`, w.auditPartitionsRemoved)
 	ctx.When(`^l'opérateur remplace son application d'authentification$`,
@@ -416,6 +417,28 @@ func (w *auditWorld) outcomeColumnCarries(ctx context.Context, column, action, f
 
 	if carried == nil || !strings.Contains(*carried, fragment) {
 		return fmt.Errorf("l'issue de %q ne porte pas %s dans %s : %v", action, fragment, column, carried)
+	}
+
+	return nil
+}
+
+func (w *auditWorld) eventCarries(ctx context.Context, action, fragment string) error {
+	conn, err := w.connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var carried string
+
+	err = conn.QueryRow(ctx, `SELECT after_json::text FROM audit_log WHERE action = $1`, action).Scan(&carried)
+	if err != nil {
+		return fmt.Errorf("lire l'événement %q : %w", action, err)
+	}
+
+	if !strings.Contains(carried, fragment) {
+		return fmt.Errorf("l'événement %q ne porte pas %s : %s", action, fragment, carried)
 	}
 
 	return nil

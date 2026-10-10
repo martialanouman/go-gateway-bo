@@ -389,6 +389,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/gateway-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Délivre un jeton personnel pour l'API Admin
+         * @description Le jeton qu'un opérateur emporte hors du tableau de bord — la collection Bruno de l'API Admin, un
+         *     script lancé à la main (ADR-0019 de `go-gateway`). Signé par le BFF à **son** `sub`, valable
+         *     **une heure**, sans renouvellement ; il cesse aussi de valoir quand la clé qui l'a signé est
+         *     retirée du JWKS.
+         *
+         *     Exige `gateway:personal_token` et une session élevée. Ses scopes sont ceux que les permissions
+         *     de l'opérateur traduisent, **moins** `content:read`, `content:erase` et `gdpr:erase`, qui ne
+         *     quittent jamais le BFF. Hors du tableau de bord, `admin:read` et `admin:write` ne sont plus
+         *     bornés par les gardes fines du BFF : c'est pourquoi aucun rôle par défaut hors
+         *     `Propriétaire` ne détient la clé. Le jeton n'est rendu qu'ici, une fois, et n'est écrit nulle
+         *     part.
+         */
+        post: operations["issueGatewayToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/operators": {
         parameters: {
             query?: never;
@@ -1352,6 +1382,17 @@ export interface components {
          */
         WebauthnCredential: {
             id: string;
+        };
+        /** @description Absent ou sans `scopes`, le jeton porte tous les scopes de l'opérateur. */
+        GatewayTokenRequest: {
+            scopes?: string[];
+        };
+        /** @description Le jeton personnel, à poser en `Authorization: Bearer` sur l'API Admin. Montré une fois. */
+        GatewayToken: {
+            token: string;
+            scopes: string[];
+            /** Format: date-time */
+            expiresAt: string;
         };
         /**
          * @description De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
@@ -2797,6 +2838,57 @@ export interface operations {
              *     expliqué, jamais masqué.
              */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    issueGatewayToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["GatewayTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Le jeton, montré cette fois seulement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayToken"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            /** @description Aucune session vivante. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description `origin_refused` : la requête ne vient pas de l'origine du tableau de bord.
+             *     `mfa_required` : la session n'a pas franchi le second facteur.
+             *     `permission_denied` : l'opérateur ne détient pas `gateway:personal_token`, ou aucune
+             *     permission qui ouvre la passerelle.
+             *     `forbidden_scope` : un scope demandé dépasse ce que le jeton peut porter, et le message le
+             *     nomme.
+             */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

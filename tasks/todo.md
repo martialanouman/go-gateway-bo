@@ -262,7 +262,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [x] step-067 — Sender IDs : catégorie de trafic, limite de débit, filtre, signalements `category_mismatch` (§6.19)
 - [x] step-069 — Diagnostic d'échec de bind : échecs d'authentification récents du compte (§6.14) — `list-account-bind-failures`, contrat 7.3.0  *(détaché de step-066 le 04/10/2026)*
 - [x] step-070 — Le BFF émet les jetons de l'API Admin (ADR-0019) : clé ES256, JWKS, jeton par opérateur, traduction permissions → scopes, identité système des flux, rotation  ← **condition de la tranche verticale en réel**  *(insérée le 07/10/2026)*
-- [ ] step-071 — Jeton personnel pour scripts et collection : délivré sous MFA, scopes ⊆ les siens, ≤ 1 h, montré une fois, audité  *(insérée le 07/10/2026)*
+- [x] step-071 — Jeton personnel pour scripts et collection : délivré sous MFA, scopes ⊆ les siens, ≤ 1 h, montré une fois, audité  *(insérée le 07/10/2026)*
 
 ## M4 — Exploitation temps réel : trafic, connecteurs, sessions  (§6.3, §6.5)
 - [ ] step-080 — Trafic : instantané REST, widgets et graphiques

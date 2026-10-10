@@ -305,6 +305,16 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(cle).toHaveCount(0)
   await expect(page.getByText('Aucune clé d’accès sur ce compte')).toBeVisible()
 
+  // ── Le jeton d'API personnel, montré une fois ───────────────────────────────────────────────
+  await page
+    .getByRole('region', { name: 'Jeton d’API personnel' })
+    .getByRole('button', { name: 'Délivrer' })
+    .click()
+  const jeton = page.getByRole('dialog', { name: 'Jeton d’API personnel' })
+  await expect(jeton.locator('.mono')).toHaveText(/^[\w-]+\.[\w-]+\.[\w-]+$/)
+  await jeton.getByRole('button', { name: 'J’ai copié le secret' }).click()
+  await expect(jeton).toHaveCount(0)
+
   // ── Le remplacement de l'application d'authentification, jusqu'à la connexion suivante ──────
   await page.getByRole('button', { name: 'Remplacer' }).click()
   await page.getByLabel('Code', { exact: true }).fill(await nextTotp(secret))

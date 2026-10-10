@@ -43,8 +43,8 @@ const SuperAdminRole = "Propriétaire"
 // exclusion oubliée n'a aucun symptôme visible : elle accorde, en silence, exactement ce que le rôle
 // existe pour interdire.
 //
-// Trois clés n'appartiennent à aucun rôle sauf `Propriétaire`, délibérément : `content:read`,
-// `operators:manage` et `roles:manage`. Toute autre clé orpheline est un oubli, et le test le dit.
+// Quatre clés n'appartiennent à aucun rôle sauf `Propriétaire`, délibérément : `content:read`,
+// `operators:manage`, `roles:manage` et `gateway:personal_token`. Toute autre clé orpheline est un oubli, et le test le dit.
 //
 // Les arbitrages que la prose du §6.10 ne tranche pas mécaniquement — `sessions:disconnect` pour
 // `Exploitation`, `credentials:read` refusé à `Support` — sont écrits dans DN-3 de

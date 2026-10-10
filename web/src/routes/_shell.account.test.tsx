@@ -1,13 +1,15 @@
 import { _browserSupportsWebAuthnInternals } from '@simplewebauthn/browser'
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '~/lib/api.gen'
+import type { PermissionKey } from '~/lib/permissions.gen'
 import { createAppRouter } from '~/router'
 import {
   type AuthReplies,
   ENROLLMENT_SECRET,
+  GATEWAY_TOKEN,
   OPERATOR_NAME,
   stubAuthenticator,
   stubSession,
@@ -17,13 +19,17 @@ type SecondFactors = components['schemas']['SecondFactors']
 
 afterEach(() => vi.restoreAllMocks())
 
-async function visitAccount(factors: Partial<SecondFactors>, replies: AuthReplies = {}) {
-  const fetch = stubSession({ permissions: [], secondFactors: factors }, replies)
+async function visitAccount(
+  factors: Partial<SecondFactors>,
+  replies: AuthReplies = {},
+  permissions: readonly PermissionKey[] = [],
+) {
+  const fetch = stubSession({ permissions: [...permissions], secondFactors: factors }, replies)
   const router = createAppRouter(createMemoryHistory({ initialEntries: ['/account'] }))
   render(<RouterProvider router={router} />)
   await screen.findByRole('heading', { level: 1, name: 'Mon compte' })
 
-  return { fetch, router, user: userEvent.setup() }
+  return { fetch, router, queryClient: router.options.context.queryClient, user: userEvent.setup() }
 }
 
 const section = (name: string) => within(screen.getByRole('region', { name }))
@@ -408,5 +414,57 @@ describe('the keyboard', () => {
       method: 'totp',
       code: '123456',
     })
+  })
+})
+
+describe('the personal API token', () => {
+  const holder = { permissions: ['gateway:personal_token'] as const }
+
+  it('shows the token once, with what it opens, and forgets it on close', async () => {
+    const { user, queryClient } = await visitAccount({ totp: true }, {}, holder.permissions)
+
+    await user.click(section('Jeton d’API personnel').getByRole('button', { name: 'Délivrer' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Jeton d’API personnel' })
+
+    expect(within(dialog).getByText(GATEWAY_TOKEN)).toBeVisible()
+    expect(dialog).toHaveTextContent('ne sera plus jamais affiché')
+    expect(dialog).toHaveTextContent('admin:read, msisdn:reveal')
+
+    await user.click(within(dialog).getByRole('button', { name: 'J’ai copié le secret' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText(GATEWAY_TOKEN)).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(JSON.stringify(queryClient.getMutationCache().getAll())).not.toContain(GATEWAY_TOKEN),
+    )
+  })
+
+  it('is disabled and explained without the dedicated permission', async () => {
+    await visitAccount({ totp: true })
+
+    const button = section('Jeton d’API personnel').getByRole('button', { name: 'Délivrer' })
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    expect(button).toHaveAccessibleDescription(/gateway:personal_token/)
+  })
+
+  it('names the refusal when the server delivers nothing', async () => {
+    const { user } = await visitAccount(
+      { totp: true },
+      {
+        gatewayToken: {
+          status: 403,
+          body: {
+            code: 'forbidden_scope',
+            message: 'Aucun jeton n’a été délivré : refus de test.',
+          },
+        },
+      },
+      holder.permissions,
+    )
+
+    await user.click(section('Jeton d’API personnel').getByRole('button', { name: 'Délivrer' }))
+
+    expect(await screen.findByText(/refus de test/)).toBeVisible()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

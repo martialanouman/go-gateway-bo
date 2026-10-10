@@ -36,7 +36,7 @@ var gatewayAccess = map[Key]string{
 	GDPRErase:  ScopeGDPRErase,
 	AuditRead:  ScopeAuditRead,
 	AlertsRead: "", AlertsWrite: "",
-	OperatorsManage: "", RolesManage: "",
+	OperatorsManage: "", RolesManage: "", GatewayPersonalToken: "",
 }
 
 func GatewayScopes(held []string) []string {

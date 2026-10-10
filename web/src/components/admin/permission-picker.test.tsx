@@ -5,12 +5,12 @@ import { PERMISSIONS } from '~/lib/permissions.gen'
 import { PermissionPicker } from './permission-picker'
 
 describe('choosing a role’s permissions', () => {
-  it('groups the 44 catalog keys by category, each in its named group', () => {
+  it('groups the 45 catalog keys by category, each in its named group', () => {
     render(<PermissionPicker onChange={() => undefined} selected={[]} />)
 
     const groups = screen.getAllByRole('group')
     expect(groups).toHaveLength(new Set(PERMISSIONS.map((permission) => permission.category)).size)
-    expect(screen.getAllByRole('checkbox')).toHaveLength(44)
+    expect(screen.getAllByRole('checkbox')).toHaveLength(45)
 
     const admin = screen.getByRole('group', { name: 'Administration' })
     expect(within(admin).getByRole('checkbox', { name: /operators:manage/ })).toBeInTheDocument()
