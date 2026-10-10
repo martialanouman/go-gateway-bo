@@ -258,11 +258,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Un secret sans espace (un JWT, ~400 caractères) déborderait sinon en défilement horizontal (WCAG 1.4.10). */
-.ui-modal__body .mono {
-  overflow-wrap: anywhere;
-}
-
 /* La destructive à droite de tout : c'est la position la plus loin du geste réflexe. */
 .ui-modal__foot {
   display: flex;

@@ -54,6 +54,26 @@ atteinte que par un rôle personnalisé qui porte `gateway:personal_token` sans 
 passerelle ; aucun rôle par défaut n'y mène. Retirée, `Personal` rendrait `ErrNoScope`, soit un 500
 au lieu du 403 — vérifié à la lecture, pas par un scénario.
 
+## Mutations (10/10/2026, après correctif de revue, worktree isolé, `-count=1`)
+| Mutation | Ce qui rougit |
+|---|---|
+| filtre `neverPersonal` neutralisé | « le corps des messages… » (200) et « un Propriétaire… » (scopes) |
+| garde rendue exempte | « sans second facteur… », « sans session… » |
+| garde sur `routes:read` (que détient Exploitation) | « sans la permission dédiée… » |
+| contrôle d'inclusion retiré | « le corps des messages… » |
+| `PersonalLifetime` à 5 min | « un Propriétaire… » : vaut 5m0s |
+| écriture d'audit retirée · jeton dans l'audit · jeton loggé | « un Propriétaire… » (mesuré avant correctif, chemin inchangé) |
+| bouton sans `blockedBy` | `_shell.account.test.tsx` : « is disabled and explained… » |
+| `gcTime: 0` et `issue.reset()` retirés | même fichier : le jeton reste dans `getMutationCache()` |
+| modale qui ne l'efface pas à la fermeture | même fichier : le jeton reste affiché |
+
+**Dette 067** : son remède (go-gateway#294) n'était pas mergé à la fin de la step ; porteur reporté
+sur step-080.
+
 ## Hors périmètre
 - Durée réglable, choix des scopes dans l'UI, second facteur repassé à la délivrance.
 - Comptes de service, révocation.
+- Le jeton (~400 caractères sans espace) défile horizontalement dans la modale de `SecretShown`
+  (WCAG 1.4.10), défaut hérité ; le bouton « Copier » le contourne. `overflow-wrap` sur le corps de
+  modale dépasse le budget de `cold-load.test.ts` de 14 octets, et le budget ne se relève pas pour
+  ça.
