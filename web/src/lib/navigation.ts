@@ -53,7 +53,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'Exploitation',
     entries: [
-      { to: '/traffic', label: 'Trafic', milestone: 'M4', anyOf: ['traffic:read'] },
+      { to: '/traffic', label: 'Trafic', anyOf: ['traffic:read'] },
       { to: '/cdr', label: 'CDR Explorer', milestone: 'M5', anyOf: [] },
       { to: '/sessions', label: 'Sessions', milestone: 'M4', anyOf: ['sessions:read'] },
       { to: '/connectors', label: 'Connecteurs', milestone: 'M4', anyOf: ['connectors:read'] },
