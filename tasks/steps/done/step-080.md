@@ -83,6 +83,9 @@ step-081, les ventilations et le drill-down step-082.
 | `style` retiré de `SecretShown` | `_shell.account.test.tsx` « shows the token once, with what it opens, and forgets it on close » |
 | `retry` sans `summary.refetch()` | `_shell.traffic.test.tsx` « reads the figures again when the retry is used » |
 | plancher d'échelle du graphique rétabli (`Math.max(..., 1)`) | `chart.test.tsx` « scales a ratio series on its own maximum instead of a floor of one » |
+| comblement des tranches retiré | `traffic.test.ts` « fills the buckets the gateway left out with zeros, at the window step » |
+| `refetchInterval` retiré | `_shell.traffic.test.tsx` « polls both endpoints every ten seconds and recovers after a failed poll » |
+| tuiles masquées quand rien n'est soumis | `_shell.traffic.test.tsx` « says the window is empty rather than drawing zeros » |
 
 ## Hors périmètre
 - Bascule 5 min / 1 h / 24 h et flux WS (step-081) ; 24 h n'est pas servi par l'amont (422).
