@@ -453,6 +453,7 @@ export interface paths {
          * @description Relayée vers `get-traffic-metrics`. Tranches de 10 s (5m), 30 s (15m) ou une minute (30m, 1h).
          *     Les 20 clés les plus actives ont leur série, le reste est sommé sous `other`. Par connecteur, un
          *     message jamais dispatché n'apparaît dans aucune série ; par client, chaque message figure.
+         *     Une tranche sans message n'a pas de point : le client la comble par un zéro.
          */
         get: operations["getTrafficMetrics"];
         put?: never;

@@ -30,6 +30,7 @@ describe('traffic figures', () => {
     expect(latency(null)).toBeNull()
     expect(latency(212)).toBe('212 ms')
     expect(latency(1240)).toBe('1,24 s')
+    expect(latency(999.6)).toBe('1,00 s')
   })
 
   it('sums every series, other included, per bucket', () => {
@@ -55,5 +56,31 @@ describe('traffic figures', () => {
       { t: '2026-10-10T10:00:10Z', submitted: 8, delivered: 6, failed: 1 },
     ])
     expect(failureRatios(points)).toEqual([0, 0.125])
+  })
+
+  it('fills the buckets the gateway left out with zeros, at the window step', () => {
+    const point = (t: string) => ({ t, submitted: 4, delivered: 3, failed: 1 })
+    const filled = (window: string, times: string[]) =>
+      totals({
+        groupBy: 'customer',
+        window,
+        series: [{ key: 'a', points: times.map(point) }],
+      }).map(({ t, submitted }) => [t, submitted])
+
+    expect(filled('5m', ['2026-10-10T10:00:00Z', '2026-10-10T10:00:30Z'])).toEqual([
+      ['2026-10-10T10:00:00Z', 4],
+      ['2026-10-10T10:00:10Z', 0],
+      ['2026-10-10T10:00:20Z', 0],
+      ['2026-10-10T10:00:30Z', 4],
+    ])
+    expect(filled('15m', ['2026-10-10T10:00:00Z', '2026-10-10T10:01:30Z'])).toHaveLength(4)
+    expect(filled('1h', ['2026-10-10T10:00:00Z', '2026-10-10T10:03:00Z'])).toHaveLength(4)
+    expect(filled('24h', ['2026-10-10T10:00:00Z', '2026-10-10T10:03:00Z'])).toHaveLength(2)
+  })
+
+  it('has no failure ratio for a bucket without messages', () => {
+    expect(
+      failureRatios([{ t: '2026-10-10T10:00:00Z', submitted: 0, delivered: 0, failed: 0 }]),
+    ).toEqual([0])
   })
 })

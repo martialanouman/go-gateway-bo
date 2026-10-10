@@ -26,8 +26,11 @@ export function successRate({ delivered, failed, rejected }: Summary) {
 
 export function latency(ms: number | null) {
   if (ms === null) return null
-  return ms < 1000 ? `${Math.round(ms)} ms` : `${twoDecimals.format(ms / 1000)} s`
+  const rounded = Math.round(ms)
+  return rounded < 1000 ? `${rounded} ms` : `${twoDecimals.format(ms / 1000)} s`
 }
+
+const STEP_SECONDS: Record<string, number> = { '5m': 10, '15m': 30, '30m': 60, '1h': 60 }
 
 export function totals(metrics: Metrics): TrafficPoint[] {
   const byTime = new Map<string, TrafficPoint>()
@@ -42,7 +45,24 @@ export function totals(metrics: Metrics): TrafficPoint[] {
       })
     }
   }
-  return [...byTime.values()].sort((a, b) => a.t.localeCompare(b.t))
+  const sorted = [...byTime.values()].sort((a, b) => a.t.localeCompare(b.t))
+  const stepMs = (STEP_SECONDS[metrics.window] ?? 0) * 1000
+  if (stepMs === 0) return sorted
+  return sorted.flatMap((point, index) => {
+    const gap: TrafficPoint[] = []
+    if (index > 0) {
+      const previous = Date.parse(sorted[index - 1]?.t ?? point.t)
+      for (let ms = previous + stepMs; ms < Date.parse(point.t); ms += stepMs) {
+        gap.push({
+          t: new Date(ms).toISOString().replace('.000Z', 'Z'),
+          submitted: 0,
+          delivered: 0,
+          failed: 0,
+        })
+      }
+    }
+    return [...gap, point]
+  })
 }
 
 export function failureRatios(points: readonly TrafficPoint[]) {
