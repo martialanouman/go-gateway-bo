@@ -21,7 +21,8 @@ export function Chart({
   readonly height?: number
 }) {
   if (primary.length < 2) return <div aria-label={label} role="img" style={{ height }} />
-  const max = Math.max(...primary, ...(secondary ?? []), 1) * 1.14
+  const peak = Math.max(...primary, ...(secondary ?? []))
+  const max = (peak > 0 ? peak : 1) * 1.14
   const line = path(primary, max)
   return (
     <div aria-label={label} role="img" style={{ height }}>

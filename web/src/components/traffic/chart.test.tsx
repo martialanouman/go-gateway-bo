@@ -17,6 +17,22 @@ describe('traffic primitives', () => {
     expect(container.querySelector('path')).toBeNull()
   })
 
+  const lineYs = (container: HTMLElement) =>
+    (container.querySelector('.traffic-chart__line')?.getAttribute('d') ?? '')
+      .split(' ')
+      .map((point) => Number(point.slice(1).split(',')[1]))
+
+  it('scales a ratio series on its own maximum instead of a floor of one', () => {
+    const { container } = render(<Chart label="Taux d’échec" primary={[0.01, 0.03, 0.02]} />)
+    expect(Math.min(...lineYs(container))).toBeLessThan(20)
+  })
+
+  it('draws an all-zero series as a flat baseline without NaN', () => {
+    const { container } = render(<Chart label="Taux d’échec" primary={[0, 0, 0]} />)
+    expect(container.querySelector('.traffic-chart__line')?.getAttribute('d')).not.toContain('NaN')
+    expect(lineYs(container)).toEqual([100, 100, 100])
+  })
+
   it('says unmeasured instead of zero', () => {
     render(<MetricTile label="Sessions actives" value={null} />)
     expect(screen.getByText('non mesurée')).toBeVisible()

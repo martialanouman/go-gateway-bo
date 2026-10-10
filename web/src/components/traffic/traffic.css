@@ -65,8 +65,13 @@
 }
 .traffic-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-6);
+}
+@media (min-width: 1280px) {
+  .traffic-tiles {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }
 .traffic-charts {
   display: grid;
