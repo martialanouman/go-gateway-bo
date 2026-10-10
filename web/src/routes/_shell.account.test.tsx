@@ -8,6 +8,7 @@ import { createAppRouter } from '~/router'
 import {
   type AuthReplies,
   ENROLLMENT_SECRET,
+  GATEWAY_TOKEN,
   OPERATOR_NAME,
   stubAuthenticator,
   stubSession,
@@ -408,5 +409,43 @@ describe('the keyboard', () => {
       method: 'totp',
       code: '123456',
     })
+  })
+})
+
+describe('the personal API token', () => {
+  it('shows the token once, with what it opens, and forgets it on close', async () => {
+    const { user } = await visitAccount({ totp: true })
+
+    await user.click(section('Jeton d’API personnel').getByRole('button', { name: 'Délivrer' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Jeton d’API personnel' })
+
+    expect(within(dialog).getByText(GATEWAY_TOKEN)).toBeVisible()
+    expect(dialog).toHaveTextContent('ne sera plus jamais affiché')
+    expect(dialog).toHaveTextContent('admin:read, msisdn:reveal')
+
+    await user.click(within(dialog).getByRole('button', { name: 'J’ai copié le secret' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText(GATEWAY_TOKEN)).not.toBeInTheDocument()
+  })
+
+  it('names the refusal when the server delivers nothing', async () => {
+    const { user } = await visitAccount(
+      { totp: true },
+      {
+        gatewayToken: {
+          status: 403,
+          body: {
+            code: 'forbidden_scope',
+            message: 'Aucun jeton n’a été délivré : refus de test.',
+          },
+        },
+      },
+    )
+
+    await user.click(section('Jeton d’API personnel').getByRole('button', { name: 'Délivrer' }))
+
+    expect(await screen.findByText(/refus de test/)).toBeVisible()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

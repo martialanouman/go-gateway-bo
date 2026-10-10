@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { PageHeader } from '~/components/page-header'
+import { SecretShown } from '~/components/secret-shown'
 import { TotpEnrollment } from '~/components/totp-enrollment'
 import {
   Button,
@@ -27,6 +28,7 @@ import { passkeyNaming, registerPasskey } from '~/lib/passkey'
 type Enrollment = components['schemas']['TotpEnrollment']
 type EnrollmentBody = components['schemas']['TotpEnrollmentRequest']
 type Passkey = components['schemas']['PasskeySummary']
+type IssuedToken = components['schemas']['GatewayToken']
 
 export const Route = createFileRoute('/_shell/account')({ component: AccountScreen })
 
@@ -132,6 +134,8 @@ function AccountScreen() {
           </Panel>
 
           <Passkeys factors={factors} />
+
+          <PersonalToken />
         </>
       )}
     </div>
@@ -387,5 +391,44 @@ function PasskeyNaming({
         <Button onClick={onCancel}>Annuler</Button>
       </div>
     </form>
+  )
+}
+
+const timeFormat = new Intl.DateTimeFormat('fr-FR', { timeStyle: 'short' })
+
+function PersonalToken() {
+  const [issued, setIssued] = useState<IssuedToken | null>(null)
+  const issue = useMutation({
+    mutationFn: () =>
+      orRefusal(api.POST('/auth/gateway-token'), 'Le jeton personnel n’a pas été délivré'),
+    // Le jeton ne doit pas survivre dans le cache des mutations une fois la modale fermée (invariant b).
+    gcTime: 0,
+    onSuccess: setIssued,
+  })
+
+  return (
+    <Panel title="Jeton d’API personnel">
+      <p>
+        Le jeton expire une heure après sa délivrance, ou plus tôt si la clé de signature du tableau
+        de bord change. Il n’ouvre de l’API Admin que ce que vos permissions ouvrent.
+      </p>
+      <Refusal error={issue.error} />
+      <Button loading={issue.isPending} onClick={() => issue.mutate()}>
+        Délivrer
+      </Button>
+      {issued !== null ? (
+        <SecretShown
+          onClose={() => {
+            setIssued(null)
+            issue.reset()
+          }}
+          secret={issued.token}
+          title="Jeton d’API personnel"
+        >
+          Ce jeton ne sera plus jamais affiché. Il expire à{' '}
+          {timeFormat.format(new Date(issued.expiresAt))} et ouvre : {issued.scopes.join(', ')}.
+        </SecretShown>
+      ) : null}
+    </Panel>
   )
 }

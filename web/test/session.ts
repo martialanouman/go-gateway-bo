@@ -57,6 +57,7 @@ export type AuthReplies = {
   readonly confirm?: Reply | 'pending'
   readonly passkeys?: Reply | 'pending'
   readonly unregister?: Reply | 'pending'
+  readonly gatewayToken?: Reply | 'pending'
   /** La coquille lit le centre de notifications à chaque ouverture : vide par défaut. */
   readonly notifications?: Reply | 'pending'
 }
@@ -64,6 +65,8 @@ export type AuthReplies = {
 type PasskeySummary = components['schemas']['PasskeySummary']
 
 export const OPERATOR_NAME = 'Awa Kouadio'
+
+export const GATEWAY_TOKEN = 'eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signature-de-test'
 
 /** Ce que `POST /auth/login` rend au succès, et que l'écran du second facteur doit reporter. */
 export const CHALLENGE = 'un-challenge-de-test-assez-long-pour-passer-la-borne-de-43'
@@ -224,6 +227,18 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
 
         return respond(reply)
       }
+
+      case 'POST /api/auth/gateway-token':
+        return respond(
+          replies.gatewayToken ?? {
+            status: 200,
+            body: {
+              token: GATEWAY_TOKEN,
+              scopes: ['admin:read', 'msisdn:reveal'],
+              expiresAt: '2026-10-10T15:00:00Z',
+            },
+          },
+        )
 
       case 'GET /api/notifications':
         return respond(
