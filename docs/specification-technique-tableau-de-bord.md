@@ -97,9 +97,9 @@ operators
   last_login_at
 
 permissions                          -- fixed catalog, seeded/versioned with releases, not admin-editable
-  key                    (pk, 45 clés — routes:read, routes:write, routes:import, scripts:read, scripts:write,
+  key                    (pk, 46 clés — routes:read, routes:write, routes:import, scripts:read, scripts:write,
                            scripts:publish, connectors:read, connectors:write, connectors:rebind,
-                           sessions:read, sessions:disconnect, antispam:read, antispam:write,
+                           sessions:read, sessions:disconnect, traffic:read, antispam:read, antispam:write,
                            customers:read, customers:write, accounts:read, accounts:write,
                            credentials:read, credentials:write, credentials:rotate,
                            senderrewrite:read, senderrewrite:write,
@@ -654,7 +654,7 @@ Autorisation **basée sur les permissions** : chaque action protégée correspon
 | `Scripts` | Ingénieurs scripts | `scripts:read/write` (pas `publish` — revue par `Exploitation`/`Propriétaire`) |
 | `Support` | Support L1 | Lecture seule (comptes, routage, connecteurs, sessions, CDR/trace, facturation, alertes) + `cdr:read_pii` — **hors** secrets d'identifiants, code source de script, réécriture, et **corps des messages** (`content:read` jamais implicite) |
 | `Finance` | Finance | Facturation complète (`billing:read/write/topup/provider:write/scope_change`), lecture seule ailleurs (mêmes exclusions que `Support`, et sans `cdr:read_pii`) |
-| `Reporting` | Reporting finance | `billing:read` uniquement |
+| `Reporting` | Reporting finance | `billing:read` et `traffic:read` |
 | `Clientèle` | Onboarding client | `customers:read/write`, `accounts:read/write`, `credentials:read/write/rotate`, `groups:read/write`, `billing:read/write/scope_change` ; pas de routage/connecteur/fournisseur de facturation, pas de `billing:topup` |
 | `Conformité` | Conformité / juridique | `suppressions:read/write/delete`, `inbound:read`, `gdpr:erase`, **`content:erase`**, lecture seule comptes/CDR, `cdr:read_pii`, `cdr:export_bulk`. Seul rôle par défaut habilité à **lever** un désabonnement et à **exécuter un effacement RGPD**. Pas de `content:read` par défaut |
 | `Audit` | Revue conformité/sécurité | `audit:read` uniquement — **pas** `cdr:read_pii` : une ligne d'audit se corrèle avec un numéro masqué, et davantage relève d'une élévation explicite |
@@ -667,6 +667,7 @@ autre rôle — amendement step-071). Toute autre clé orpheline
 est un oubli, et un test bloquant le signale. *(Amendement step-020 : `connectors:read/write/rebind`
 et `cdr:read_pii` ajoutés au catalogue ; `alerts:*`, `content:erase` et `cdr:export_bulk` rattachés à
 des rôles — ils n'appartenaient à personne.)*
+*(Amendement step-080 : `traffic:read`, accordée à tous les rôles sauf `Audit`.)*
 
 ### 6.11 UI de solde de crédit SMS
 

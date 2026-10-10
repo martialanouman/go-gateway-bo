@@ -68,7 +68,7 @@ var defaultRoles = []DefaultRole{
 			ScriptsRead, ScriptsWrite, ScriptsPublish,
 			SenderRewriteRead, SenderRewriteWrite,
 			ConnectorsRead, ConnectorsWrite, ConnectorsRebind,
-			SessionsRead, SessionsDisconnect,
+			SessionsRead, SessionsDisconnect, TrafficRead,
 			AntispamRead, AntispamWrite,
 			InboundRead, InboundWrite,
 			SuppressionsRead, SuppressionsWrite,
@@ -82,7 +82,7 @@ var defaultRoles = []DefaultRole{
 		Description: "Écrit et modifie les scripts de routage sans pouvoir les mettre en " +
 			"production — la publication passe par Exploitation ou Propriétaire",
 		Keys: []Key{
-			ScriptsRead, ScriptsWrite,
+			ScriptsRead, ScriptsWrite, TrafficRead,
 		},
 	},
 	{
@@ -94,7 +94,7 @@ var defaultRoles = []DefaultRole{
 			CustomersRead, AccountsRead, GroupsRead,
 			RoutesRead, ConnectorsRead, SessionsRead,
 			BillingRead, AlertsRead,
-			CDRReadPII,
+			CDRReadPII, TrafficRead,
 		},
 	},
 	{
@@ -106,14 +106,14 @@ var defaultRoles = []DefaultRole{
 			BillingRead, BillingWrite, BillingTopup, BillingProviderWrite, BillingScopeChange,
 			CustomersRead, AccountsRead, GroupsRead,
 			RoutesRead, ConnectorsRead, SessionsRead,
-			AlertsRead,
+			AlertsRead, TrafficRead,
 		},
 	},
 	{
 		Name:        "Reporting",
-		Description: "Consulte les soldes, le grand livre et les plans tarifaires, et reçoit les alertes de facturation — rien d'autre",
+		Description: "Consulte les soldes, le grand livre et les plans tarifaires, reçoit les alertes de facturation, et lit le trafic — rien d'autre",
 		Keys: []Key{
-			BillingRead,
+			BillingRead, TrafficRead,
 		},
 	},
 	{
@@ -126,7 +126,7 @@ var defaultRoles = []DefaultRole{
 			AccountsRead, AccountsWrite,
 			CredentialsRead, CredentialsWrite, CredentialsRotate,
 			GroupsRead, GroupsWrite,
-			BillingRead, BillingWrite, BillingScopeChange,
+			BillingRead, BillingWrite, BillingScopeChange, TrafficRead,
 		},
 	},
 	{
@@ -141,7 +141,7 @@ var defaultRoles = []DefaultRole{
 			InboundRead,
 			GDPRErase, ContentErase,
 			CustomersRead, AccountsRead, GroupsRead,
-			CDRReadPII, CDRExportBulk,
+			CDRReadPII, CDRExportBulk, TrafficRead,
 		},
 	},
 	{

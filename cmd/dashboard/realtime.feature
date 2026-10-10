@@ -50,6 +50,13 @@ Fonctionnalité: Le temps réel, une socket par opérateur
     Quand la passerelle émet une alerte de facturation
     Alors aucune trame "billing.alerts" n'arrive
 
+  Scénario: le trafic temps réel est refusé à qui ne détient pas traffic:read
+    Étant donné l'opérateur détient le rôle "Audit"
+    Et l'opérateur ouvre une session élevée
+    Et la socket est ouverte
+    Quand l'opérateur s'abonne à "metrics.traffic"
+    Alors la socket refuse "metrics.traffic" en nommant "traffic:read"
+
   # Invariant (e) : une panne en amont dégrade l'affichage d'un sujet, sans vider les autres.
   Scénario: la chute d'un flux rend son sujet périmé sans toucher aux autres
     Étant donné l'opérateur détient le rôle "Exploitation"
