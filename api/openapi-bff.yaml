@@ -747,6 +747,54 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /auth/gateway-token:
+    post:
+      operationId: issueGatewayToken
+      summary: Délivre un jeton personnel pour l'API Admin
+      description: |
+        Le jeton qu'un opérateur emporte hors du tableau de bord — la collection Bruno de l'API Admin, un
+        script lancé à la main (ADR-0019 de `go-gateway`). Signé par le BFF à **son** `sub`, avec des
+        scopes inclus dans ceux que ses permissions traduisent, valable **une heure**, sans
+        renouvellement. Il tombe aussi à la rotation de la clé qui l'a signé.
+
+        Aucune permission ne la garde — c'est du self-service, et ses scopes ne dépassent jamais ceux de
+        l'opérateur ; l'élévation la garde, et le journal en garde la trace. Le jeton n'est rendu
+        qu'ici, une fois, et n'est écrit nulle part.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GatewayTokenRequest' }
+      responses:
+        '403':
+          description: |
+            `origin_refused` : la requête ne vient pas de l'origine du tableau de bord.
+            `forbidden_scope` : un scope demandé dépasse ceux de l'opérateur, et le message le nomme ;
+            ou l'opérateur ne détient aucun droit à la passerelle.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '415':
+          $ref: '#/components/responses/TypeDeContenuRefuse'
+        '200':
+          description: Le jeton, montré cette fois seulement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GatewayToken' }
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '401':
+          description: Aucune session vivante.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            `mfa_elevation_required` : la session n'a pas franchi le second facteur.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /operators:
     get:
       operationId: listOperators
@@ -2415,6 +2463,32 @@ components:
       properties:
         id: { type: string }
       required: [id]
+
+    GatewayTokenRequest:
+      type: object
+      description: Absent ou sans `scopes`, le jeton porte tous les scopes de l'opérateur.
+      additionalProperties: false
+      properties:
+        scopes:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items: { type: string, maxLength: 64 }
+
+    GatewayToken:
+      type: object
+      description: |
+        Le jeton personnel, à poser en `Authorization: Bearer` sur l'API Admin. Montré une fois.
+      additionalProperties: false
+      properties:
+        token: { type: string }
+        scopes:
+          type: array
+          items: { type: string }
+        expiresAt:
+          type: string
+          format: date-time
+      required: [token, scopes, expiresAt]
 
     CurrentOperator:
       type: object

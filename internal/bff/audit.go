@@ -14,14 +14,15 @@ import (
 // consommé ou échu en cinq minutes. Les tracer produirait du bruit qu'une enquête devrait apprendre à
 // écarter, ce qui est le meilleur moyen de lui faire écarter autre chose.
 const (
-	actionLogin           = "operator.login"
-	actionLogout          = "operator.logout"
-	actionMFAEnroll       = "mfa.enroll"
-	actionMFAVerify       = "mfa.verify"
-	actionMFAConfirm      = "mfa.confirm"
-	actionPasskeyRegister = "passkey.register"
-	actionPasskeyRemove   = "passkey.remove"
-	actionPasswordSet     = "operator.password_set"
+	actionLogin             = "operator.login"
+	actionLogout            = "operator.logout"
+	actionMFAEnroll         = "mfa.enroll"
+	actionMFAVerify         = "mfa.verify"
+	actionMFAConfirm        = "mfa.confirm"
+	actionPasskeyRegister   = "passkey.register"
+	actionPasskeyRemove     = "passkey.remove"
+	actionPasswordSet       = "operator.password_set"
+	actionGatewayTokenIssue = "gateway_token.issue"
 
 	actionPermissionDenied   = "permission.denied"
 	actionOperatorCreate     = "operator.create"

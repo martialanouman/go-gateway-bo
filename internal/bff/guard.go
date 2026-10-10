@@ -126,6 +126,9 @@ var authorization = map[string]rule{
 		"sur autrui : aucune clé du catalogue n'y correspond, et en créer une qu'il faudrait donner " +
 		"aux neuf rôles n'exclurait personne. L'élévation la garde, le journal en garde la trace, et " +
 		"sur autrui, la sortie est un lien de réinitialisation, par `RequestOperatorAccessLink`"),
+	"IssueGatewayToken": exempt("délivrer à soi-même un jeton dont les scopes ne dépassent jamais " +
+		"les siens : aucune clé du catalogue ne désigne son propre accès. L'élévation la garde, " +
+		"vérifiée par le handler, et le journal en garde la trace"),
 	"SetPasswordFromAccessLink": exempt("la porte de qui n'a pas encore de mot de passe : aucune " +
 		"session ne peut exister. Ce qui la garde est le jeton, 256 bits à usage unique, vérifié " +
 		"avant tout hachage"),

@@ -72,3 +72,54 @@ Fonctionnalité: Le BFF s'authentifie auprès de la passerelle au nom de l'opér
     Et un serveur démarré
     Alors la sortie du serveur nomme le kid actif
     Et aucune sortie ne porte la clé de signature
+
+  Scénario: un opérateur élevé reçoit un jeton personnel d'une heure que la passerelle accepte
+    Étant donné une passerelle qui vérifie les jetons du tableau de bord
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/auth/gateway-token"
+    Alors le serveur répond 200
+    Et la réponse est conforme au contrat du BFF
+    Et le jeton rendu vaut une heure
+    Et le journal porte 1 événement "gateway_token.issue"
+    Et l'événement "gateway_token.issue" porte '"admin:read msisdn:reveal"'
+    Et le journal ne porte pas le jeton rendu
+    Et aucune sortie ne porte le jeton rendu
+    Quand un script présente le jeton rendu à la passerelle
+    Alors la passerelle a reçu un jeton au nom de l'opérateur avec le scope "admin:read msisdn:reveal"
+
+  Scénario: le jeton personnel se demande sur un sous-ensemble de ses scopes
+    Étant donné une passerelle qui vérifie les jetons du tableau de bord
+    Et un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/auth/gateway-token" avec le corps '{"scopes":["admin:read"]}'
+    Alors le serveur répond 200
+    Quand un script présente le jeton rendu à la passerelle
+    Alors la passerelle a reçu un jeton au nom de l'opérateur avec le scope "admin:read"
+
+  Scénario: un scope que l'opérateur ne détient pas est refusé et nommé
+    Étant donné un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/auth/gateway-token" avec le corps '{"scopes":["admin:read","admin:write"]}'
+    Alors le serveur répond 403
+    Et la réponse porte 'admin:write'
+    Et la réponse est conforme au contrat du BFF
+    Et le journal porte 0 événement "gateway_token.issue"
+
+  Scénario: sans second facteur, aucun jeton personnel n'est délivré
+    Étant donné un serveur démarré
+    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur se connecte avec son mot de passe
+    Quand le navigateur envoie POST "/api/auth/gateway-token"
+    Alors le serveur répond 409
+    Et la réponse porte '"code":"mfa_elevation_required"'
+    Et la réponse est conforme au contrat du BFF
+
+  Scénario: sans session, aucun jeton personnel n'est délivré
+    Étant donné un serveur démarré
+    Quand le navigateur envoie POST "/api/auth/gateway-token"
+    Alors le serveur répond 401
+    Et la réponse est conforme au contrat du BFF

@@ -51,6 +51,10 @@ func (w *gatewayTokenWorld) registerSteps(ctx *godog.ScenarioContext) {
 	ctx.Given(`^une clé de signature fournie au serveur$`, w.providedSigningKey)
 	ctx.Then(`^la sortie du serveur nomme le kid actif$`, w.outputNamesTheActiveKID)
 	ctx.Then(`^aucune sortie ne porte la clé de signature$`, w.outputHidesTheKey)
+	ctx.Then(`^le jeton rendu vaut une heure$`, w.returnedTokenLastsAnHour)
+	ctx.Then(`^le journal ne porte pas le jeton rendu$`, w.journalHidesTheReturnedToken)
+	ctx.Then(`^aucune sortie ne porte le jeton rendu$`, w.outputHidesTheReturnedToken)
+	ctx.When(`^un script présente le jeton rendu à la passerelle$`, w.scriptPresentsTheReturnedToken)
 	ctx.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
 		if w.upstream != nil {
 			w.upstream.Close()
@@ -256,4 +260,114 @@ func (w *gatewayTokenWorld) outputHidesTheKey() error {
 	}
 
 	return w.process.outputHides(w.privateScalar)
+}
+
+func (w *gatewayTokenWorld) returnedToken() (string, error) {
+	var returned struct {
+		Token string `json:"token"`
+	}
+
+	if err := json.Unmarshal([]byte(w.process.received.body), &returned); err != nil || returned.Token == "" {
+		return "", fmt.Errorf("la réponse ne rend aucun jeton :\n%s", w.process.received.body)
+	}
+
+	return returned.Token, nil
+}
+
+func (w *gatewayTokenWorld) returnedTokenLastsAnHour() error {
+	raw, err := w.returnedToken()
+	if err != nil {
+		return err
+	}
+
+	parts := strings.Split(raw, ".")
+	if len(parts) != 3 {
+		return fmt.Errorf("le jeton rendu n'est pas un JWS compact")
+	}
+
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return err
+	}
+
+	var claims struct {
+		IssuedAt int64 `json:"iat"`
+		Expiry   int64 `json:"exp"`
+	}
+
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return err
+	}
+
+	if lasts := time.Duration(claims.Expiry-claims.IssuedAt) * time.Second; lasts != time.Hour {
+		return fmt.Errorf("le jeton rendu vaut %s, attendu une heure", lasts)
+	}
+
+	return nil
+}
+
+func (w *gatewayTokenWorld) journalHidesTheReturnedToken(ctx context.Context) error {
+	raw, err := w.returnedToken()
+	if err != nil {
+		return err
+	}
+
+	conn, err := pgx.Connect(ctx, w.login.dsn)
+	if err != nil {
+		return fmt.Errorf("joindre la base du scénario : %w", err)
+	}
+
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	var leaks int
+	// La signature seule suffit : en-tête et charge utile se recomposent depuis l'audit, pas elle.
+	signature := raw[strings.LastIndex(raw, ".")+1:]
+
+	err = conn.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE strpos(audit_log::text, $1) > 0`,
+		signature).Scan(&leaks)
+	if err != nil {
+		return err
+	}
+
+	if leaks != 0 {
+		return fmt.Errorf("le journal porte le jeton rendu dans %d ligne(s)", leaks)
+	}
+
+	return nil
+}
+
+func (w *gatewayTokenWorld) outputHidesTheReturnedToken() error {
+	raw, err := w.returnedToken()
+	if err != nil {
+		return err
+	}
+
+	return w.process.outputHides(raw[strings.LastIndex(raw, ".")+1:])
+}
+
+func (w *gatewayTokenWorld) scriptPresentsTheReturnedToken(ctx context.Context) error {
+	raw, err := w.returnedToken()
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.upstream.URL+"/admin/customer-groups", nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+raw)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("la passerelle refuse le jeton rendu : %d", resp.StatusCode)
+	}
+
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/mfa"
 	"github.com/martialanouman/go-gateway-bo/internal/session"
 	"github.com/martialanouman/go-gateway-bo/internal/store"
+	"github.com/martialanouman/go-gateway-bo/internal/token"
 )
 
 // API implémente l'interface **stricte** qu'engendre `api/openapi-bff.yaml` : elle retire le
@@ -51,7 +52,9 @@ type API struct {
 	Notifications *store.Notifications
 	// Gateway joint l'API Admin pour les routes relayées ; la signature du jeton de l'opérateur et le mTLS vivent dessous.
 	Gateway *gateway.ClientWithResponses
-	Logger  *slog.Logger
+	// Tokens signe le jeton personnel ; le même émetteur signe, sous `Gateway`, les jetons des appels relayés.
+	Tokens *token.Issuer
+	Logger *slog.Logger
 }
 
 // Health ne touche ni la base ni la passerelle : c'est une sonde de **vivacité**, qui répond « le

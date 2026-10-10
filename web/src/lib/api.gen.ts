@@ -389,6 +389,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/gateway-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Délivre un jeton personnel pour l'API Admin
+         * @description Le jeton qu'un opérateur emporte hors du tableau de bord — la collection Bruno de l'API Admin, un
+         *     script lancé à la main (ADR-0019 de `go-gateway`). Signé par le BFF à **son** `sub`, avec des
+         *     scopes inclus dans ceux que ses permissions traduisent, valable **une heure**, sans
+         *     renouvellement. Il tombe aussi à la rotation de la clé qui l'a signé.
+         *
+         *     Aucune permission ne la garde — c'est du self-service, et ses scopes ne dépassent jamais ceux de
+         *     l'opérateur ; l'élévation la garde, et le journal en garde la trace. Le jeton n'est rendu
+         *     qu'ici, une fois, et n'est écrit nulle part.
+         */
+        post: operations["issueGatewayToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/operators": {
         parameters: {
             query?: never;
@@ -1352,6 +1379,17 @@ export interface components {
          */
         WebauthnCredential: {
             id: string;
+        };
+        /** @description Absent ou sans `scopes`, le jeton porte tous les scopes de l'opérateur. */
+        GatewayTokenRequest: {
+            scopes?: string[];
+        };
+        /** @description Le jeton personnel, à poser en `Authorization: Bearer` sur l'API Admin. Montré une fois. */
+        GatewayToken: {
+            token: string;
+            scopes: string[];
+            /** Format: date-time */
+            expiresAt: string;
         };
         /**
          * @description De quoi nommer l'opérateur à l'écran, et rien de plus. Ni `password_hash`, ni
@@ -2796,6 +2834,63 @@ export interface operations {
              *     Les deux nomment ce qui manque et par où passer — un contrôle interdit est désactivé et
              *     expliqué, jamais masqué.
              */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            415: components["responses"]["TypeDeContenuRefuse"];
+        };
+    };
+    issueGatewayToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["GatewayTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Le jeton, montré cette fois seulement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GatewayToken"];
+                };
+            };
+            400: components["responses"]["RequeteInvalide"];
+            /** @description Aucune session vivante. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description `origin_refused` : la requête ne vient pas de l'origine du tableau de bord.
+             *     `forbidden_scope` : un scope demandé dépasse ceux de l'opérateur, et le message le nomme ;
+             *     ou l'opérateur ne détient aucun droit à la passerelle.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `mfa_elevation_required` : la session n'a pas franchi le second facteur. */
             409: {
                 headers: {
                     [name: string]: unknown;

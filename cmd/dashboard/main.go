@@ -221,6 +221,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	router := bff.NewRouter(bff.Dependencies{
 		Assets: assets,
 		API: bff.API{
+			Tokens:         issuer,
 			Authenticator:  authenticator,
 			Sessions:       sessions,
 			SecondFactor:   secondFactor,

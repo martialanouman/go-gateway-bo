@@ -70,6 +70,10 @@ export const CustomerUpdate = z.object({
   name: z.string().min(1),
 })
 
+export const GatewayTokenRequest = z.object({
+  scopes: z.array(z.string().max(64)).max(16).optional(),
+})
+
 export const LoginRequest = z.object({
   email: z.string().max(320),
   password: z.string().min(1).max(4096),

@@ -81,6 +81,12 @@ func (API) DeleteWebauthnPasskey(_ context.Context,
 	return bff.DeleteWebauthnPasskey204Response{}, nil
 }
 
+func (API) IssueGatewayToken(_ context.Context,
+	_ bff.IssueGatewayTokenRequestObject,
+) (bff.IssueGatewayTokenResponseObject, error) {
+	return nil, nil
+}
+
 func (API) ListOperators(_ context.Context, _ bff.ListOperatorsRequestObject) (bff.ListOperatorsResponseObject, error) {
 	return nil, nil
 }
