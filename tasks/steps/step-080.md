@@ -21,14 +21,16 @@ step-081, les ventilations et le drill-down step-082.
   `requires(TrafficRead)`, DTO de sortie déclarés. `window` ∈ `5m|15m|30m|1h` comme l'amont, pour que
   step-081 les reprenne sans changement ; `groupBy` ∈ `connector|customer|group`.
 - **Graphiques en SVG maison** : le `Chart` du kit (aire teal + ligne, deux lignes de grille, sans
-  axes, charte §07) porté dans `web/src/components/ui`. Aucune bibliothèque : aucun axe ni zoom
+  axes, charte §07) porté dans `web/src/components/traffic/`, avec `MetricTile` ; leur CSS voyage dans
+  le bloc de la route, la feuille d'entrée n'ayant plus d'octet libre (`cold-load.test.ts`). Aucune bibliothèque : aucun axe ni zoom
   demandé ; on en ajoutera une le jour où un écran en aura besoin. Le plan §9 (« Nouvelles
   dépendances : bibliothèque de graphiques ») est amendé.
 - **Écran `/traffic`**, fenêtre fixe de 5 min, relu toutes les 10 s (une tranche) par React Query ;
   step-081 remplace ce rafraîchissement par le flux.
   - **Tuiles** : MT/s = `submitted`/300 ; MO/s = `mo_received`/300 ; taux de succès =
     `delivered`/(`delivered`+`failed`+`rejected`), parmi les issues connues — sur 5 min, des messages
-    sont encore en vol ; latences p50/p99 de bout en bout (`e2e_latency_ms_*`) ; sessions actives.
+    sont encore en vol ; latences p50 et p99 de bout en bout (`e2e_latency_ms_*`), une tuile chacune ; sessions actives —
+    six tuiles.
     Une valeur `null` ou absente se lit « non mesurée », jamais 0.
   - **Graphiques** depuis un seul appel `groupBy=customer` — le seul regroupement où chaque message
     figure (`connector` omet les messages jamais dispatchés) : « Débit MT » (soumis, remis) et « Taux
