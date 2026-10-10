@@ -1,5 +1,6 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAppRouter } from '~/router'
 import { type AuthReplies, stubSession } from '../../test/session'
@@ -69,6 +70,26 @@ describe('the traffic screen', () => {
       },
     })
     expect(await screen.findByRole('button', { name: 'Réessayer' })).toBeVisible()
+  })
+
+  it('reads the figures again when the retry is used', async () => {
+    let gatewayDown = true
+    await visitTraffic({
+      get metricsSummary() {
+        return gatewayDown
+          ? {
+              status: 503,
+              body: { code: 'service_unavailable', message: 'La passerelle est indisponible.' },
+            }
+          : undefined
+      },
+    })
+    const retry = await screen.findByRole('button', { name: 'Réessayer' })
+
+    gatewayDown = false
+    await userEvent.click(retry)
+
+    expect(await screen.findByText('30,0')).toBeVisible()
   })
 
   it('keeps the last values on screen and says so when a later poll fails', async () => {
