@@ -21,7 +21,7 @@ const (
 )
 
 // feed relie un flux de l'API Admin au sujet qui le diffuse. Une permission vide ouvrirait le sujet à tout
-// opérateur authentifié ; aucun sujet n'en a plus.
+// opérateur authentifié ; aucun flux n'en a plus.
 type feed struct {
 	path       string
 	topic      Topic

@@ -650,13 +650,13 @@ Autorisation **basée sur les permissions** : chaque action protégée correspon
 | Rôle | Cas d'usage | Portée |
 |---|---|---|
 | `Propriétaire` | Propriétaire | Toutes les permissions, y compris `operators:manage`/`roles:manage` |
-| `Exploitation` | Exploitation réseau | Lecture/écriture routage (dont numéros exacts, `routes:import`), connecteurs (**dont `connectors:rebind`**), sessions, anti-spam, scripts (**dont `scripts:publish`**), réécriture, numéros entrants ; `suppressions:read/write` **sans `:delete`** ; `alerts:read/write` ; `cdr:read_pii` et `cdr:export_bulk` ; lecture seule facturation/audit |
-| `Scripts` | Ingénieurs scripts | `scripts:read/write` (pas `publish` — revue par `Exploitation`/`Propriétaire`) |
-| `Support` | Support L1 | Lecture seule (comptes, routage, connecteurs, sessions, CDR/trace, facturation, alertes) + `cdr:read_pii` — **hors** secrets d'identifiants, code source de script, réécriture, et **corps des messages** (`content:read` jamais implicite) |
-| `Finance` | Finance | Facturation complète (`billing:read/write/topup/provider:write/scope_change`), lecture seule ailleurs (mêmes exclusions que `Support`, et sans `cdr:read_pii`) |
+| `Exploitation` | Exploitation réseau | Lecture/écriture routage (dont numéros exacts, `routes:import`), connecteurs (**dont `connectors:rebind`**), sessions, anti-spam, scripts (**dont `scripts:publish`**), réécriture, numéros entrants ; `suppressions:read/write` **sans `:delete`** ; `alerts:read/write` ; `cdr:read_pii` et `cdr:export_bulk` ; lecture seule facturation/audit ; `traffic:read` |
+| `Scripts` | Ingénieurs scripts | `scripts:read/write` (pas `publish` — revue par `Exploitation`/`Propriétaire`) ; `traffic:read` |
+| `Support` | Support L1 | Lecture seule (comptes, routage, connecteurs, sessions, CDR/trace, facturation, alertes) + `cdr:read_pii` — **hors** secrets d'identifiants, code source de script, réécriture, et **corps des messages** (`content:read` jamais implicite) ; `traffic:read` |
+| `Finance` | Finance | Facturation complète (`billing:read/write/topup/provider:write/scope_change`), lecture seule ailleurs (mêmes exclusions que `Support`, et sans `cdr:read_pii`) ; `traffic:read` |
 | `Reporting` | Reporting finance | `billing:read` et `traffic:read` |
-| `Clientèle` | Onboarding client | `customers:read/write`, `accounts:read/write`, `credentials:read/write/rotate`, `groups:read/write`, `billing:read/write/scope_change` ; pas de routage/connecteur/fournisseur de facturation, pas de `billing:topup` |
-| `Conformité` | Conformité / juridique | `suppressions:read/write/delete`, `inbound:read`, `gdpr:erase`, **`content:erase`**, lecture seule comptes/CDR, `cdr:read_pii`, `cdr:export_bulk`. Seul rôle par défaut habilité à **lever** un désabonnement et à **exécuter un effacement RGPD**. Pas de `content:read` par défaut |
+| `Clientèle` | Onboarding client | `customers:read/write`, `accounts:read/write`, `credentials:read/write/rotate`, `groups:read/write`, `billing:read/write/scope_change` ; pas de routage/connecteur/fournisseur de facturation, pas de `billing:topup` ; `traffic:read` |
+| `Conformité` | Conformité / juridique | `suppressions:read/write/delete`, `inbound:read`, `gdpr:erase`, **`content:erase`**, lecture seule comptes/CDR, `cdr:read_pii`, `cdr:export_bulk`. Seul rôle par défaut habilité à **lever** un désabonnement et à **exécuter un effacement RGPD**. Pas de `content:read` par défaut ; `traffic:read` |
 | `Audit` | Revue conformité/sécurité | `audit:read` uniquement — **pas** `cdr:read_pii` : une ligne d'audit se corrèle avec un numéro masqué, et davantage relève d'une élévation explicite |
 
 **Quatre clés ne sont détenues par aucun rôle par défaut hors `Propriétaire`, délibérément** : `content:read` (jamais

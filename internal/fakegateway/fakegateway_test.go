@@ -99,7 +99,7 @@ func TestTheTrafficSeriesCarryThreePointsEach(t *testing.T) {
 	require.NoError(t, json.NewDecoder(response.Body).Decode(&body))
 	assert.Equal(t, "customer", body.GroupBy)
 	require.Len(t, body.Series, 2)
-	assert.Len(t, body.Series[0].Points, 3)
+	require.Len(t, body.Series[0].Points, 3)
 	assert.ElementsMatch(t, []string{"t", "submitted", "delivered", "failed"}, keysOf(body.Series[0].Points[0]))
 }
 

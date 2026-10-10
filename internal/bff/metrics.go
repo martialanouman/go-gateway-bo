@@ -116,8 +116,8 @@ func (a API) GetTrafficMetrics(ctx context.Context, request GetTrafficMetricsReq
 	}, nil
 }
 
-// count lit un compteur absent comme zéro : l'amont omet un compteur vide, alors qu'une latence ou
-// des sessions absentes disent « non mesuré » et restent nil.
+// count lit un compteur absent comme zéro : le contrat ne rend pas les compteurs obligatoires, alors
+// qu'une latence ou des sessions absentes disent « non mesuré » et restent nil.
 func count(value *int) int {
 	if value == nil {
 		return 0

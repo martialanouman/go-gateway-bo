@@ -52,7 +52,7 @@ step-081, les ventilations et le drill-down step-082.
   n'est pas abonné. Mutation : permission retirée du `feed`.
 - **Un `null` lu comme 0, un taux faux, une série oubliée dans la somme** → unitaires TS sur les
   calculs. Mutations : `?? 0` à la place de « non mesurée » ; somme sur la première série seulement.
-- **États de l'écran** → tests de composant (chargement, erreur avec valeurs conservées, fenêtre vide).
+- **États de l'écran** → tests de composant (chargement, erreur avec valeurs conservées, fenêtre vide, sondage et reprise).
 - **Secret qui défile** → test de composant sur le style porté ; vérifié au navigateur
   (`scrollWidth ≤ clientWidth`).
 - **Chemin d'écran** → parcours e2e de la coquille étendu jusqu'à « Trafic » ; `fakegateway` sert
@@ -61,6 +61,13 @@ step-081, les ventilations et le drill-down step-082.
 ## Vérifié
 - Au navigateur le 10/10/2026 : les six tuiles lisent 30,0 / 5,0 / 95,6 % / 120 ms / 840 ms / 12 ; la modale
   du jeton fait 518/518 px (`scrollWidth` = `clientWidth`), sans défilement horizontal.
+- Critère 4 : en production le handler de synthèse de go-gateway ne renseigne pas `active_sessions`,
+  la tuile lit donc « non mesurée » ; les 12 vus au navigateur viennent de la fausse passerelle.
+- Arbitrages de la revue finale : l'amont n'émet que les tranches non vides (regroupement sans
+  remplissage), `totals` comble les trous par des zéros au pas de la fenêtre (10 s, 30 s, 60 s) ; à
+  zéro message soumis, les six tuiles restent (MO/s et sessions peuvent être non nuls) et l'état vide
+  ne remplace que les deux graphiques. Le sondage de 10 s et la reprise après un échec sont couverts
+  par un test à horloge simulée.
 - Mutations, chacune lancée dans un worktree isolé, le test nommé seul (toutes rouges) :
 
 | Mutation | Test rouge |

@@ -66,7 +66,7 @@ var specRoles = map[string][]permissions.Key{
 		permissions.AlertsRead, permissions.TrafficRead,
 	},
 
-	// « billing:read uniquement »
+	// « billing:read et traffic:read »
 	"Reporting": {
 		permissions.BillingRead, permissions.TrafficRead,
 	},
