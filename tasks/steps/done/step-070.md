@@ -1,7 +1,7 @@
 # step-070 — Le BFF émet les jetons de l'API Admin (ADR-0019)
 
 > **Jalon :** M3 (plan §8, critère « la tranche verticale passe contre la passerelle réelle ») ·
-> **Statut :** À FAIRE
+> **Statut :** FAIT
 > **Dépend de :** step-059 (socle du relais), step-043 (hub), **contrat 7.3.0** · **Bloque :** step-071
 
 ## But
@@ -128,8 +128,39 @@ Le jeton prouve **qui** appelle et avec quels droits ; le mTLS existant prouve *
 
 **Non testable ici, écrit tel quel (critère 4)** : la tranche verticale contre la vraie passerelle
 dépend d'une infrastructure locale (Kafka, ClickHouse, ports des deux Compose en collision —
-step-061). Elle est tentée une fois à la main ; si l'infrastructure bloque, une dette est inscrite
-avec sa condition de levée, et `todo.md` cesse de dire « la tranche verticale est acquise ».
+step-061). Elle a été jouée : voir « Tranche réelle (09/10/2026) » plus bas.
+
+**Mutations jouées (10/10/2026)**, dans un worktree jetable, après commit, `go test -count=1`, chaque
+motif compté une fois avant remplacement. Les mutations 1–11 sont rouges ; les six dernières lignes ont
+été jouées pendant les revues, aux commits indiqués dans l'historique de la branche.
+
+| Mutation | Fichier | Test qui tombe |
+|---|---|---|
+| refus « sans appelant » neutralisé | `internal/gateway/caller.go` | `TestACallWithoutACallerNeverLeaves` |
+| `scope` en tableau | `internal/token/issuer.go` | `TestTheTokenCarriesExactlyTheClaimsTheGatewayChecks` |
+| `TrimSuffix(i.issuer, "/")` à la signature | `internal/token/issuer.go` | `TestTheIssuerIsSignedByteForByte` |
+| `reuseMargin = 0` | `internal/token/issuer.go` | `TestATokenIsReusedUntilSixtySecondsBeforeItsExpiry` |
+| `JWK` gagne `d`, rempli par `k.private.D` | `internal/token/jwks.go` | `TestTheJWKSPublishesOnlyPublicFields` ; scénario « le JWKS se lit sans session et ne publie aucune partie privée » |
+| `OperatorsManage: ScopeAdminWrite` | `internal/permissions/scopes.go` | `TestLocalKeysOpenNothingAtTheGateway` ; `TestEveryDefaultRoleOpensExactlyItsGatewayScopes` reste vert (Propriétaire détient déjà `admin:write`, aucun autre rôle n'a `operators:manage`) |
+| `CDRReadPII` retiré de `gatewayAccess` | `internal/permissions/scopes.go` | `TestEveryCatalogKeyHasAGatewayClass` |
+| `case http.StatusUnauthorized` supprimé | `internal/bff/router.go` | `TestAGatewayRefusalOfTheTokenIsNotASessionMatter` ; scénario « un jeton refusé par la passerelle laisse la session ouverte » |
+| `Header.Del("Cookie")` supprimé | `internal/gateway/caller.go` | `TestTheOperatorTokenVerifiesAsTheGatewayVerifiesIt` |
+| `WithSystem` retiré de `dialStream` | `cmd/dashboard/main.go` | scénario « les flux temps réel s'ouvrent au nom de l'identité système, en lecture seule » (et dix autres scénarios temps réel) |
+| `WithOperator` retiré de la garde | `internal/bff/guard.go` | scénario « la passerelle reçoit l'identité et les droits de l'opérateur, jamais son cookie » (et le reste de la suite) |
+| sujet retiré de la clé du cache | `internal/token/issuer.go` | `TestTwoOperatorsWithTheSameScopesGetTheirOwnToken` |
+| `Sorted`/`Compact` retirés | `internal/token/issuer.go` | `TestScopeOrderAndDuplicatesShareOneToken` |
+| `AlertsRead` → `admin:read` | `internal/permissions/scopes.go` | `TestLocalKeysOpenNothingAtTheGateway` |
+| `Certificates` retiré du mTLS | `internal/gateway/` | `TestTheAdminClientPresentsItsCertificateAndItsToken` |
+| le binaire logue le PEM | `cmd/dashboard` | scénario « la clé de signature fournie n'apparaît dans aucune sortie » |
+| log de démarrage retiré | `cmd/dashboard` | même scénario (il nomme le `kid` actif) |
+
+Une première tentative de la mutation 1 (`if false {` seul) ne compilait pas (`declared and not used`) :
+non comptée, refaite avec `_ = ok`.
+
+**Non testable (critère 4) : le cache de `token.Issuer` compte en temps mural (bcdbdd0).** Le temps
+monotone ne court pas pendant une veille, le temps mural oui ; un test ne peut pas désynchroniser les
+deux horloges d'un process. Aucun test ne rougit si `.Round(0)` disparaît : vérifié par la tranche réelle
+qui a révélé le défaut, pas par une mutation.
 
 ## Hors périmètre
 - Le jeton personnel pour scripts et collection : step-071.
@@ -176,12 +207,13 @@ la ligne d'audit est la preuve du sujet vu.
 
 **Conclusion : la tranche passe en réel.**
 
-**Constat en marge, mesuré, non corrigé ici.** Le poste s'est mis en veille de 21:46:24 à 21:53:01 (UTC,
+**Constat en marge, mesuré, corrigé en bcdbdd0.** Le poste s'est mis en veille de 21:46:24 à 21:53:01 (UTC,
 `pmset -g log`). Au réveil, le hub a reçu **401** sur les trois flux, `gateway_token_rejected` pour
 `sub=SystemSubject`, toutes les 15–30 s jusqu'à 21:56:32, puis s'est reconnecté seul (trois WS établies).
 Un jeton frais pour le même sujet était accepté pendant ce temps (101 sur les trois flux, 200 sur
 `/admin/customers`). Cause, cohérente avec la chronologie à la seconde : le cache de `token.Issuer` juge
 la fraîcheur par `expiry.Sub(now)`, en horloge **monotone**, qui ne court pas pendant une veille
-(`mach_absolute_time` sous darwin ; `CLOCK_MONOTONIC` exclut aussi une suspension sous Linux), alors que
-`exp` est en horloge murale : un jeton expiré est resservi pour la durée de la veille. Aucun test ne
-l'exerce.
+(`mach_absolute_time` sous darwin ; `CLOCK_MONOTONIC` excluant la suspension, vraisemblablement aussi sous Linux, non mesuré), alors
+que `exp` est en horloge murale : un jeton expiré était resservi pour la durée de la veille. Corrigé en
+comptant en temps mural (`i.now().Round(0)`). Aucun test ne peut le reproduire : monotone et mural ne se
+désynchronisent pas dans un test (voir « Mutations jouées »).
