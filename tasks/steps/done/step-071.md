@@ -62,7 +62,7 @@ au lieu du 403 — vérifié à la lecture, pas par un scénario.
 | garde sur `routes:read` (que détient Exploitation) | « sans la permission dédiée… » |
 | contrôle d'inclusion retiré | « le corps des messages… » |
 | `PersonalLifetime` à 5 min | « un Propriétaire… » : vaut 5m0s |
-| écriture d'audit retirée · jeton dans l'audit · jeton loggé | « un Propriétaire… » (mesuré avant correctif, chemin inchangé) |
+| écriture d’audit retirée · jeton dans l’audit · jeton loggé | « un Propriétaire… » : 0 événement · le journal porte le jeton · la sortie porte la signature |
 | bouton sans `blockedBy` | `_shell.account.test.tsx` : « is disabled and explained… » |
 | `gcTime: 0` et `issue.reset()` retirés | même fichier : le jeton reste dans `getMutationCache()` |
 | modale qui ne l'efface pas à la fermeture | même fichier : le jeton reste affiché |
