@@ -2,7 +2,6 @@ package token
 
 import (
 	"errors"
-	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -94,11 +93,4 @@ func (i *Issuer) Token(subject string, scopes []string) (string, error) {
 	}
 	i.cache[key] = cached{raw: raw, expiry: expiry}
 	return raw, nil
-}
-
-func (i *Issuer) String() string   { return "Issuer{" + i.issuer + " kid " + i.keyID + "}" }
-func (i *Issuer) GoString() string { return i.String() }
-
-func (i *Issuer) LogValue() slog.Value {
-	return slog.GroupValue(slog.String("issuer", i.issuer), slog.String("kid", i.keyID))
 }

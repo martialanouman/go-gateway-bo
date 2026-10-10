@@ -11,7 +11,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -136,11 +135,4 @@ func keyID(public *ecdsa.PublicKey) (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(thumbprint), nil
-}
-
-func (s KeySet) String() string   { return "KeySet" + fmt.Sprint(s.IDs()) + " actif " + s.active.id }
-func (s KeySet) GoString() string { return s.String() }
-
-func (s KeySet) LogValue() slog.Value {
-	return slog.GroupValue(slog.String("active", s.active.id), slog.Any("kids", s.IDs()))
 }
