@@ -20,7 +20,7 @@ import (
 // trop large accorde en silence exactement ce qu'il existe pour interdire.
 //
 // `Propriétaire` n'y figure pas : le §6.10 dit « toutes les permissions », donc il se dérive du
-// catalogue et se vérifie autrement — l'écrire ici demanderait de recopier les 45 clés, et cette
+// catalogue et se vérifie autrement — l'écrire ici demanderait de recopier les 46 clés, et cette
 // copie-là ne dirait rien de plus que le catalogue.
 var specRoles = map[string][]permissions.Key{
 	// « Lecture/écriture routage (dont numéros exacts, routes:import), connecteurs (dont
