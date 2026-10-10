@@ -1,6 +1,6 @@
 # step-071 — Jeton personnel pour scripts et collection
 
-> **Jalon :** M3 · **Statut :** EN COURS
+> **Jalon :** M3 · **Statut :** FAIT
 > **Dépend de :** step-070 (émetteur, JWKS, `GatewayScopes`) · **Bloque :** —
 
 ## But
@@ -40,6 +40,22 @@ compte de service.
   JWKS servi, `sub` de l'opérateur, `scope` attendu, `exp − iat` = 1 h. Mutation : durée de 5 min.
 - **Jeton dans le journal** → scénario : l'audit porte les scopes, jamais le jeton.
 - **Chemin d'écran** → parcours e2e existant étendu (critère 1).
+
+## Mutations (10/10/2026, worktree isolé, `-count=1`)
+| Mutation | Ce qui rougit |
+|---|---|
+| contrôle d'élévation retiré | « sans second facteur… » : 200 au lieu de 409 |
+| contrôle d'inclusion des scopes retiré | « un scope que l'opérateur ne détient pas… » : 200 au lieu de 403 |
+| `PersonalLifetime` à 5 min | « …jeton personnel d'une heure… » : vaut 5m0s |
+| écriture d'audit retirée | même scénario : 0 événement `gateway_token.issue` |
+| jeton écrit dans l'audit | même scénario : le journal porte le jeton |
+| jeton loggé | même scénario : la sortie porte la signature |
+| modale qui ne l'efface pas à la fermeture | `_shell.account.test.tsx` : le jeton reste affiché |
+
+Parcours e2e `shell.spec.ts` étendu : délivrance et fermeture contre le binaire, vert.
+
+**Dette 067** : son remède (go-gateway#294) n'était pas mergé à la fin de la step ; porteur reporté
+sur step-080.
 
 ## Hors périmètre
 - Durée réglable, choix des scopes dans l'UI, second facteur repassé à la délivrance.

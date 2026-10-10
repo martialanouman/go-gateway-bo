@@ -15,7 +15,7 @@ const (
 	Audience         = "gateway-admin"
 	lifetime         = 5 * time.Minute
 	PersonalLifetime = time.Hour
-	reuseMargin = 60 * time.Second
+	reuseMargin      = 60 * time.Second
 )
 
 var (
