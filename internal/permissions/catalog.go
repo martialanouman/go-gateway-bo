@@ -1,6 +1,6 @@
 package permissions
 
-// Les 44 clés, chacune déclarée **une seule fois**. Le catalogue plus bas les référence plutôt que
+// Les 45 clés, chacune déclarée **une seule fois**. Le catalogue plus bas les référence plutôt que
 // de répéter leurs littéraux : il n'y a pas deux listes à tenir cohérentes, il y en a une.
 //
 // Ce que ces constantes achètent : `Key` a `string` pour sous-jacent, donc n'importe quelle chaîne

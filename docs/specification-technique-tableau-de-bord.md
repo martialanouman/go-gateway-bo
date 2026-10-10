@@ -97,7 +97,7 @@ operators
   last_login_at
 
 permissions                          -- fixed catalog, seeded/versioned with releases, not admin-editable
-  key                    (pk, 44 clés — routes:read, routes:write, routes:import, scripts:read, scripts:write,
+  key                    (pk, 45 clés — routes:read, routes:write, routes:import, scripts:read, scripts:write,
                            scripts:publish, connectors:read, connectors:write, connectors:rebind,
                            sessions:read, sessions:disconnect, antispam:read, antispam:write,
                            customers:read, customers:write, accounts:read, accounts:write,

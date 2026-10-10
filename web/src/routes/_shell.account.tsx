@@ -398,7 +398,7 @@ function PasskeyNaming({
 const timeFormat = new Intl.DateTimeFormat('fr-FR', { timeStyle: 'short' })
 
 const TOKEN_REFUSAL =
-  'Se délivrer un jeton personnel demande gateway:personal_token, que seul le rôle Propriétaire détient par défaut.'
+  'Se délivrer un jeton personnel demande gateway:personal_token, que seul le rôle Propriétaire détient par défaut ; un administrateur peut l’accorder.'
 
 function PersonalToken() {
   const [issued, setIssued] = useState<IssuedToken | null>(null)
@@ -415,8 +415,9 @@ function PersonalToken() {
     <Panel title="Jeton d’API personnel">
       <p>
         Le jeton expire une heure après sa délivrance, ou plus tôt si la clé qui l’a signé est
-        retirée. Hors du tableau de bord, admin:read et admin:write ouvrent toute lecture et toute
-        écriture de l’API Admin ; le corps des messages et les effacements n’en sortent jamais.
+        retirée. Hors du tableau de bord, admin:read et admin:write ne sont plus bornés par vos
+        autres permissions ; le corps des messages, sa destruction et l’effacement RGPD n’en sortent
+        jamais.
       </p>
       <Refusal error={issue.error} />
       <Button {...blockedBy(refusal)} loading={issue.isPending} onClick={() => issue.mutate()}>

@@ -71,8 +71,8 @@ func (a API) IssueGatewayToken(ctx context.Context,
 func noGatewayAccess() Error {
 	return Error{
 		Code: "permission_denied",
-		Message: "Aucun jeton n'a été délivré : votre compte ne détient aucune permission qui ouvre " +
-			"l'API Admin. Un administrateur peut vous en accorder une.",
+		Message: "Aucun jeton n'a été délivré : votre compte ne détient aucune permission qu'un jeton " +
+			"personnel puisse porter. Un administrateur peut vous en accorder une.",
 	}
 }
 

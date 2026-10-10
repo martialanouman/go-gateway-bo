@@ -1,6 +1,6 @@
 import { _browserSupportsWebAuthnInternals } from '@simplewebauthn/browser'
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '~/lib/api.gen'
@@ -434,7 +434,9 @@ describe('the personal API token', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByText(GATEWAY_TOKEN)).not.toBeInTheDocument()
-    expect(JSON.stringify(queryClient.getMutationCache().getAll())).not.toContain(GATEWAY_TOKEN)
+    await waitFor(() =>
+      expect(JSON.stringify(queryClient.getMutationCache().getAll())).not.toContain(GATEWAY_TOKEN),
+    )
   })
 
   it('is disabled and explained without the dedicated permission', async () => {

@@ -20,7 +20,7 @@ import (
 // trop large accorde en silence exactement ce qu'il existe pour interdire.
 //
 // `Propriétaire` n'y figure pas : le §6.10 dit « toutes les permissions », donc il se dérive du
-// catalogue et se vérifie autrement — l'écrire ici demanderait de recopier les 44 clés, et cette
+// catalogue et se vérifie autrement — l'écrire ici demanderait de recopier les 45 clés, et cette
 // copie-là ne dirait rien de plus que le catalogue.
 var specRoles = map[string][]permissions.Key{
 	// « Lecture/écriture routage (dont numéros exacts, routes:import), connecteurs (dont
@@ -194,7 +194,7 @@ func TestNoOrphanKeyBesidesTheDeliberateOnes(t *testing.T) {
 	}
 
 	assert.ElementsMatch(t, deliberateOrphans, orphans,
-		"les clés qu'aucun rôle par défaut ne détient hors Propriétaire ne sont plus les trois que le "+
+		"les clés qu'aucun rôle par défaut ne détient hors Propriétaire ne sont plus les quatre que le "+
 			"§6.10 laisse orphelines délibérément : une clé orpheline par oubli est inaccessible à "+
 			"tous, sans qu'aucun écran ne le dise")
 }

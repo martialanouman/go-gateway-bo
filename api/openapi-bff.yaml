@@ -2136,7 +2136,7 @@ components:
         operator:
           $ref: '#/components/schemas/CurrentOperator'
         permissions:
-          # L'union des permissions des rôles détenus, sans doublon et triée. Les 44 clés ne sont
+          # L'union des permissions des rôles détenus, sans doublon et triée. Les 45 clés ne sont
           # **pas** énumérées en `enum` : le catalogue de `internal/permissions` fait foi et engendre
           # déjà `web/src/lib/permissions.gen.ts`. Deux listes pour un seul vocabulaire finiraient
           # figées chacune par sa propre porte, puis divergeraient.
