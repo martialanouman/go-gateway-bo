@@ -346,10 +346,10 @@ test('the binary serves the painted shell, then the application replaces it', as
   await nav.getByRole('link', { name: 'Trafic' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trafic')
   const tile = (label: string) => page.locator('.metric-tile').filter({ hasText: label })
-  await expect(tile('MT / s').locator('.metric-tile__value')).toContainText('30,0')
-  await expect(tile('MO / s').locator('.metric-tile__value')).toContainText('5,0')
-  await expect(tile('Latence p99').locator('.metric-tile__value')).toContainText('840 ms')
-  await expect(tile('Sessions actives').locator('.metric-tile__value')).toContainText('12')
+  await expect(tile('MT / s').locator('.metric-tile__value')).toHaveText(/^30,0$/)
+  await expect(tile('MO / s').locator('.metric-tile__value')).toHaveText(/^5,0$/)
+  await expect(tile('Latence p99').locator('.metric-tile__value')).toHaveText(/^840 ms$/)
+  await expect(tile('Sessions actives').locator('.metric-tile__value')).toHaveText(/^12$/)
   await expect(page.getByRole('img', { name: /Débit MT/ })).toBeVisible()
 
   // Et une entrée du rail mène à un état vide qui nomme son jalon

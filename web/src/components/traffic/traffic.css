@@ -78,3 +78,29 @@
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
   gap: var(--sp-7);
 }
+.traffic-legend {
+  display: flex;
+  gap: var(--sp-6);
+  margin: var(--sp-4) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.traffic-legend__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.traffic-legend__item::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+}
+.traffic-legend__item--primary::before {
+  background: var(--viz-primary);
+}
+.traffic-legend__item--secondary::before {
+  background: var(--viz-secondary);
+}

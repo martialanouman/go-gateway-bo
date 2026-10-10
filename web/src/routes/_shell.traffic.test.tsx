@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAppRouter } from '~/router'
@@ -36,7 +36,13 @@ describe('the traffic screen', () => {
     expect(screen.getByText('180 ms')).toBeVisible()
     expect(screen.getByText('1,24 s')).toBeVisible()
     expect(screen.getByText('non mesurée')).toBeVisible()
-    expect(await screen.findByRole('img', { name: /Débit MT/ })).toBeVisible()
+    expect(
+      await screen.findByRole('img', {
+        name: 'Débit MT, soumis et remis, pic de 600 par tranche, dernière tranche 600',
+      }),
+    ).toBeVisible()
+    expect(screen.getByText('Soumis')).toBeVisible()
+    expect(screen.getByText('Remis')).toBeVisible()
     expect(screen.getByRole('img', { name: /Taux d’échec/ })).toBeVisible()
   })
 
@@ -56,10 +62,16 @@ describe('the traffic screen', () => {
   })
 
   it('says the window is empty rather than drawing zeros', async () => {
-    await visitTraffic({ metricsSummary: { status: 200, body: EMPTY_SUMMARY } })
+    await visitTraffic({
+      metricsSummary: { status: 200, body: { ...EMPTY_SUMMARY, moReceived: 6000 } },
+    })
     expect(
       await screen.findByText('Aucun message soumis sur les cinq dernières minutes'),
     ).toBeVisible()
+    expect(screen.getByText('MO / s')).toBeVisible()
+    expect(screen.getByText('20,0')).toBeVisible()
+    expect(screen.queryByRole('img', { name: /Débit MT/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /Taux d’échec/ })).not.toBeInTheDocument()
   })
 
   it('names the failure and offers a retry when the gateway is unavailable', async () => {
@@ -112,5 +124,44 @@ describe('the traffic screen', () => {
     expect(await screen.findByText(/Les dernières valeurs restent affichées/)).toBeVisible()
     expect(screen.getByText('30,0')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Réessayer' })).not.toBeInTheDocument()
+  })
+
+  it('polls both endpoints every ten seconds and recovers after a failed poll', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      let gatewayDown = false
+      const { fetch } = await visitTraffic({
+        get metricsSummary() {
+          return gatewayDown
+            ? {
+                status: 503,
+                body: { code: 'service_unavailable', message: 'La passerelle est indisponible.' },
+              }
+            : undefined
+        },
+      })
+      const count = (path: string) =>
+        fetch.mock.calls.filter(([request]) => request.url.includes(path)).length
+      expect(await screen.findByText('30,0')).toBeVisible()
+      expect(count('/api/metrics/summary')).toBe(1)
+      expect(count('/api/metrics/traffic')).toBe(1)
+
+      gatewayDown = true
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(await screen.findByText(/Les dernières valeurs restent affichées/)).toBeVisible()
+      expect(count('/api/metrics/summary')).toBe(2)
+      expect(count('/api/metrics/traffic')).toBe(2)
+
+      gatewayDown = false
+      await vi.advanceTimersByTimeAsync(10_000)
+      await waitFor(() =>
+        expect(
+          screen.queryByText(/Les dernières valeurs restent affichées/),
+        ).not.toBeInTheDocument(),
+      )
+      expect(screen.getByText('30,0')).toBeVisible()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

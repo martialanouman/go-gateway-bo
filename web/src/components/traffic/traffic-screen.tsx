@@ -8,6 +8,7 @@ import { Chart } from './chart'
 import { MetricTile } from './metric-tile'
 
 const REFRESH_MS = 10_000
+const integer = new Intl.NumberFormat('fr-FR')
 const SUBTITLE = '5 dernières minutes · tranches de 10 s'
 
 export function TrafficScreen() {
@@ -38,6 +39,8 @@ export function TrafficScreen() {
   const failed = summary.isError ? summary : traffic.isError ? traffic : null
   const points = traffic.data === undefined ? [] : totals(traffic.data)
   const ratios = failureRatios(points)
+  const peak = Math.max(0, ...points.flatMap((point) => [point.submitted, point.delivered]))
+  const last = points.at(-1)?.submitted ?? 0
   const worst = Math.round(Math.max(0, ...ratios) * 1000) / 10
 
   return (
@@ -69,41 +72,47 @@ export function TrafficScreen() {
               Les dernières valeurs restent affichées. {failed.error?.message}
             </Banner>
           )}
+          <div className="traffic-tiles">
+            <MetricTile label="MT / s" tone="mt" value={perSecond(summary.data.submitted)} />
+            <MetricTile label="MO / s" tone="mo" value={perSecond(summary.data.moReceived)} />
+            <MetricTile label="Taux de succès" unit="%" value={successRate(summary.data)} />
+            <MetricTile label="Latence p50" value={latency(summary.data.e2eLatencyMsP50)} />
+            <MetricTile label="Latence p99" value={latency(summary.data.e2eLatencyMsP99)} />
+            <MetricTile
+              label="Sessions actives"
+              value={
+                summary.data.activeSessions === null || summary.data.activeSessions === undefined
+                  ? null
+                  : integer.format(summary.data.activeSessions)
+              }
+            />
+          </div>
           {summary.data.submitted === 0 ? (
             <EmptyState
-              description="Les compteurs reprennent dès le prochain message."
+              description="Les graphiques réapparaissent au premier relevé qui suit le prochain message."
               title="Aucun message soumis sur les cinq dernières minutes"
               titleAs="h2"
             />
           ) : (
-            <>
-              <div className="traffic-tiles">
-                <MetricTile label="MT / s" tone="mt" value={perSecond(summary.data.submitted)} />
-                <MetricTile label="MO / s" tone="mo" value={perSecond(summary.data.moReceived)} />
-                <MetricTile label="Taux de succès" unit="%" value={successRate(summary.data)} />
-                <MetricTile label="Latence p50" value={latency(summary.data.e2eLatencyMsP50)} />
-                <MetricTile label="Latence p99" value={latency(summary.data.e2eLatencyMsP99)} />
-                <MetricTile
-                  label="Sessions actives"
-                  value={summary.data.activeSessions?.toString() ?? null}
+            <div className="traffic-charts">
+              <Card subtitle={SUBTITLE} title="Débit MT">
+                <Chart
+                  label={`Débit MT, soumis et remis, pic de ${integer.format(peak)} par tranche, dernière tranche ${integer.format(last)}`}
+                  primary={points.map((point) => point.submitted)}
+                  secondary={points.map((point) => point.delivered)}
                 />
-              </div>
-              <div className="traffic-charts">
-                <Card subtitle={SUBTITLE} title="Débit MT">
-                  <Chart
-                    label={`Débit MT, soumis et remis, ${points.length} tranches`}
-                    primary={points.map((point) => point.submitted)}
-                    secondary={points.map((point) => point.delivered)}
-                  />
-                </Card>
-                <Card subtitle={SUBTITLE} title="Taux d’échec">
-                  <Chart
-                    label={`Taux d’échec par tranche, maximum ${worst.toLocaleString('fr-FR')} %`}
-                    primary={ratios}
-                  />
-                </Card>
-              </div>
-            </>
+                <ul className="traffic-legend">
+                  <li className="traffic-legend__item traffic-legend__item--primary">Soumis</li>
+                  <li className="traffic-legend__item traffic-legend__item--secondary">Remis</li>
+                </ul>
+              </Card>
+              <Card subtitle={`${SUBTITLE} · hors rejets`} title="Taux d’échec">
+                <Chart
+                  label={`Taux d’échec par tranche, maximum ${worst.toLocaleString('fr-FR')} %`}
+                  primary={ratios}
+                />
+              </Card>
+            </div>
           )}
         </>
       )}
