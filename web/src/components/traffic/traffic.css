@@ -1,0 +1,71 @@
+.traffic {
+  --viz-primary: var(--teal-500);
+  --viz-primary-area: color-mix(in srgb, var(--teal-500) 18%, transparent);
+  --viz-secondary: var(--blue-500);
+  --viz-grid: color-mix(in srgb, var(--n-50) 6%, transparent);
+}
+.traffic-chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.traffic-chart__grid {
+  stroke: var(--viz-grid);
+  stroke-width: 0.4;
+}
+.traffic-chart__area {
+  fill: var(--viz-primary-area);
+}
+.traffic-chart__line {
+  fill: none;
+  stroke: var(--viz-primary);
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+.traffic-chart__secondary {
+  fill: none;
+  stroke: var(--viz-secondary);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+.metric-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-7);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+}
+.metric-tile__label {
+  color: var(--text-faint);
+  font: var(--text-overline);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+}
+.metric-tile__value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  color: var(--text-primary);
+  font: var(--text-metric);
+  letter-spacing: var(--ls-tight);
+  white-space: nowrap;
+}
+.metric-tile__unit {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-regular);
+}
+.metric-tile__unmeasured {
+  color: var(--text-faint);
+  font: var(--text-body);
+}
+.metric-tile--mt .metric-tile__value {
+  color: var(--mt-accent);
+}
+.metric-tile--mo .metric-tile__value {
+  color: var(--mo-accent);
+}
