@@ -18,7 +18,7 @@ import (
 // type-checker, jamais au texte : `Key` est un nom trop court pour être cherché dans la source.
 const keyTypeName = "Key"
 
-// Le catalogue est gardé **contre les rôles** par `TestNoOrphanKeyBesidesTheThreeDeliberateOnes` :
+// Le catalogue est gardé **contre les rôles** par `TestNoOrphanKeyBesidesTheDeliberateOnes` :
 // toute entrée qu'aucun rôle ne détient y est signalée. Le sens inverse n'est gardé que par cette
 // porte-ci : un `const FooBar Key = "foo:bar"` ajouté au bloc compile, laisse les deux suites vertes
 // et n'apparaît pas dans le TypeScript engendré, Go ne signalant pas une constante exportée

@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '~/lib/api.gen'
+import type { PermissionKey } from '~/lib/permissions.gen'
 import { createAppRouter } from '~/router'
 import {
   type AuthReplies,
@@ -18,13 +19,17 @@ type SecondFactors = components['schemas']['SecondFactors']
 
 afterEach(() => vi.restoreAllMocks())
 
-async function visitAccount(factors: Partial<SecondFactors>, replies: AuthReplies = {}) {
-  const fetch = stubSession({ permissions: [], secondFactors: factors }, replies)
+async function visitAccount(
+  factors: Partial<SecondFactors>,
+  replies: AuthReplies = {},
+  permissions: readonly PermissionKey[] = [],
+) {
+  const fetch = stubSession({ permissions: [...permissions], secondFactors: factors }, replies)
   const router = createAppRouter(createMemoryHistory({ initialEntries: ['/account'] }))
   render(<RouterProvider router={router} />)
   await screen.findByRole('heading', { level: 1, name: 'Mon compte' })
 
-  return { fetch, router, user: userEvent.setup() }
+  return { fetch, router, queryClient: router.options.context.queryClient, user: userEvent.setup() }
 }
 
 const section = (name: string) => within(screen.getByRole('region', { name }))
@@ -413,8 +418,10 @@ describe('the keyboard', () => {
 })
 
 describe('the personal API token', () => {
+  const holder = { permissions: ['gateway:personal_token'] as const }
+
   it('shows the token once, with what it opens, and forgets it on close', async () => {
-    const { user } = await visitAccount({ totp: true })
+    const { user, queryClient } = await visitAccount({ totp: true }, {}, holder.permissions)
 
     await user.click(section('Jeton d’API personnel').getByRole('button', { name: 'Délivrer' }))
     const dialog = await screen.findByRole('dialog', { name: 'Jeton d’API personnel' })
@@ -427,6 +434,15 @@ describe('the personal API token', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByText(GATEWAY_TOKEN)).not.toBeInTheDocument()
+    expect(JSON.stringify(queryClient.getMutationCache().getAll())).not.toContain(GATEWAY_TOKEN)
+  })
+
+  it('is disabled and explained without the dedicated permission', async () => {
+    await visitAccount({ totp: true })
+
+    const button = section('Jeton d’API personnel').getByRole('button', { name: 'Délivrer' })
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    expect(button).toHaveAccessibleDescription(/gateway:personal_token/)
   })
 
   it('names the refusal when the server delivers nothing', async () => {
@@ -441,6 +457,7 @@ describe('the personal API token', () => {
           },
         },
       },
+      holder.permissions,
     )
 
     await user.click(section('Jeton d’API personnel').getByRole('button', { name: 'Délivrer' }))

@@ -126,7 +126,7 @@ reste obligatoire, critère 3.
   (`internal/permissions/scopes.go`), puis `make generate`, qui en dérive le TypeScript.
   `TestEveryCatalogKeyHasAGatewayClass` tient la classe ; deux autres gardes tiennent les rôles et
   le TypeScript : une clé qu'aucun rôle ne détient fait rougir
-  `TestNoOrphanKeyBesidesTheThreeDeliberateOnes`, et `check-generated` rougit sur un TS non régénéré.
+  `TestNoOrphanKeyBesidesTheDeliberateOnes`, et `check-generated` rougit sur un TS non régénéré.
 
 ## La boucle de travail
 

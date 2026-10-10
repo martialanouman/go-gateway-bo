@@ -24,6 +24,7 @@ import type { components } from '~/lib/api.gen'
 import { TotpEnrollmentRequest } from '~/lib/contract.gen'
 import { formResolver } from '~/lib/form'
 import { passkeyNaming, registerPasskey } from '~/lib/passkey'
+import { usePermission } from '~/lib/permissions'
 
 type Enrollment = components['schemas']['TotpEnrollment']
 type EnrollmentBody = components['schemas']['TotpEnrollmentRequest']
@@ -396,8 +397,12 @@ function PasskeyNaming({
 
 const timeFormat = new Intl.DateTimeFormat('fr-FR', { timeStyle: 'short' })
 
+const TOKEN_REFUSAL =
+  'Se délivrer un jeton personnel demande gateway:personal_token, que seul le rôle Propriétaire détient par défaut.'
+
 function PersonalToken() {
   const [issued, setIssued] = useState<IssuedToken | null>(null)
+  const refusal = usePermission('gateway:personal_token') ? undefined : TOKEN_REFUSAL
   const issue = useMutation({
     mutationFn: () =>
       orRefusal(api.POST('/auth/gateway-token'), 'Le jeton personnel n’a pas été délivré'),
@@ -409,11 +414,12 @@ function PersonalToken() {
   return (
     <Panel title="Jeton d’API personnel">
       <p>
-        Le jeton expire une heure après sa délivrance, ou plus tôt si la clé de signature du tableau
-        de bord change. Il n’ouvre de l’API Admin que ce que vos permissions ouvrent.
+        Le jeton expire une heure après sa délivrance, ou plus tôt si la clé qui l’a signé est
+        retirée. Hors du tableau de bord, admin:read et admin:write ouvrent toute lecture et toute
+        écriture de l’API Admin ; le corps des messages et les effacements n’en sortent jamais.
       </p>
       <Refusal error={issue.error} />
-      <Button loading={issue.isPending} onClick={() => issue.mutate()}>
+      <Button {...blockedBy(refusal)} loading={issue.isPending} onClick={() => issue.mutate()}>
         Délivrer
       </Button>
       {issued !== null ? (

@@ -10,20 +10,19 @@ import (
 	"github.com/martialanouman/go-gateway-bo/internal/store"
 )
 
+// neverPersonal ne quitte jamais le BFF dans un jeton personnel : le corps d'un message ne se lit que
+// dans l'onglet qui l'affiche (invariant a), et un effacement ne s'exécute que derrière la confirmation
+// de l'écran.
+var neverPersonal = []string{
+	permissions.ScopeContentRead, permissions.ScopeContentErase, permissions.ScopeGDPRErase,
+}
+
 func (a API) IssueGatewayToken(ctx context.Context,
 	request IssueGatewayTokenRequestObject,
 ) (IssueGatewayTokenResponseObject, error) {
-	resolved, alive, err := sessionFrom(ctx)
+	resolved, _, err := sessionFrom(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	if !alive {
-		return IssueGatewayToken401JSONResponse(notAuthenticated()), nil
-	}
-
-	if !resolved.Elevated {
-		return IssueGatewayToken409JSONResponse(elevationRequiredToIssueAToken()), nil
 	}
 
 	grants, err := a.Sessions.Grants(ctx, resolved.OperatorID)
@@ -31,7 +30,9 @@ func (a API) IssueGatewayToken(ctx context.Context,
 		return nil, err
 	}
 
-	held := permissions.GatewayScopes(grants.Permissions)
+	held := slices.DeleteFunc(permissions.GatewayScopes(grants.Permissions), func(scope string) bool {
+		return slices.Contains(neverPersonal, scope)
+	})
 	if len(held) == 0 {
 		return IssueGatewayToken403JSONResponse(noGatewayAccess()), nil
 	}
@@ -67,17 +68,9 @@ func (a API) IssueGatewayToken(ctx context.Context,
 	return IssueGatewayToken200JSONResponse{Token: raw, Scopes: scopes, ExpiresAt: expiresAt}, nil
 }
 
-func elevationRequiredToIssueAToken() Error {
-	return Error{
-		Code: "mfa_elevation_required",
-		Message: "Délivrer un jeton personnel demande d'avoir franchi le second facteur sur cette " +
-			"session. Le franchir, puis reprendre la délivrance.",
-	}
-}
-
 func noGatewayAccess() Error {
 	return Error{
-		Code: "forbidden_scope",
+		Code: "permission_denied",
 		Message: "Aucun jeton n'a été délivré : votre compte ne détient aucune permission qui ouvre " +
 			"l'API Admin. Un administrateur peut vous en accorder une.",
 	}
@@ -86,7 +79,7 @@ func noGatewayAccess() Error {
 func scopeNotHeld(scope string) Error {
 	return Error{
 		Code: "forbidden_scope",
-		Message: "Aucun jeton n'a été délivré : le scope « " + scope + " » dépasse ce que vos " +
-			"permissions ouvrent. Le retirer de la demande, ou demander la permission à un administrateur.",
+		Message: "Aucun jeton n'a été délivré : le scope « " + scope + " » dépasse ce qu'un jeton " +
+			"personnel peut porter pour votre compte. Le retirer de la demande.",
 	}
 }

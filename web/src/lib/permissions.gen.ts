@@ -51,6 +51,7 @@ export type PermissionKey =
   | 'audit:read'
   | 'operators:manage'
   | 'roles:manage'
+  | 'gateway:personal_token'
 
 export type PermissionCategory =
   | 'routing'
@@ -308,5 +309,11 @@ export const PERMISSIONS: readonly Permission[] = [
     key: 'roles:manage',
     category: 'admin',
     description: 'Créer et modifier des rôles, c’est-à-dire redistribuer toutes les permissions',
+  },
+  {
+    key: 'gateway:personal_token',
+    category: 'admin',
+    description:
+      'Se délivrer un jeton d’une heure pour l’API Admin, hors du tableau de bord. Ses scopes sont grossiers : admin:write ouvre toute écriture que la passerelle sert, au-delà des autres permissions du rôle',
   },
 ]

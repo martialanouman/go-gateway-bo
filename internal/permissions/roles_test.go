@@ -103,7 +103,7 @@ var specRoles = map[string][]permissions.Key{
 // laissait son contrôle **vert** — il passait en n'ayant rien cherché.
 const specRoleCount = 9
 
-// deliberateOrphans sont les trois clés que le §6.10 laisse hors de tout rôle par défaut sauf
+// deliberateOrphans sont les clés que le §6.10 laisse hors de tout rôle par défaut sauf
 // `Propriétaire`, et il dit pourquoi : `content:read` n'est jamais implicite — elle s'accorde par un
 // rôle taillé pour un opérateur nommé ; `operators:manage` et `roles:manage` parce que qui peut
 // éditer les rôles peut s'accorder tout le reste.
@@ -115,6 +115,10 @@ var deliberateOrphans = []permissions.Key{
 	permissions.ContentRead,
 	permissions.OperatorsManage,
 	permissions.RolesManage,
+	// Le jeton personnel sort du BFF avec admin:read et admin:write, que seule la garde de
+	// `requirePermission` bornait : aucun rôle hors Propriétaire n'a des droits qui les couvrent
+	// (step-071, arbitré le 10/10/2026).
+	permissions.GatewayPersonalToken,
 }
 
 func TestEveryDefaultRoleGrantsExactlyWhatTheSpecSays(t *testing.T) {
@@ -166,7 +170,7 @@ func TestSuperAdminIsExactlyTheCatalog(t *testing.T) {
 	assert.Empty(t, missing(actual, all), "Propriétaire accorde %v, hors catalogue", missing(actual, all))
 }
 
-func TestNoOrphanKeyBesidesTheThreeDeliberateOnes(t *testing.T) {
+func TestNoOrphanKeyBesidesTheDeliberateOnes(t *testing.T) {
 	t.Parallel()
 
 	held := map[permissions.Key]bool{}

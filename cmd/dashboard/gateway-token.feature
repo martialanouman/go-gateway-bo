@@ -73,49 +73,61 @@ Fonctionnalité: Le BFF s'authentifie auprès de la passerelle au nom de l'opér
     Alors la sortie du serveur nomme le kid actif
     Et aucune sortie ne porte la clé de signature
 
-  Scénario: un opérateur élevé reçoit un jeton personnel d'une heure que la passerelle accepte
+  Scénario: un Propriétaire élevé reçoit un jeton personnel d'une heure que la passerelle accepte
     Étant donné une passerelle qui vérifie les jetons du tableau de bord
     Et un serveur démarré
-    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur détient le rôle "Propriétaire"
     Et l'opérateur ouvre une session élevée
     Quand le navigateur envoie POST "/api/auth/gateway-token"
     Alors le serveur répond 200
     Et la réponse est conforme au contrat du BFF
     Et le jeton rendu vaut une heure
     Et le journal porte 1 événement "gateway_token.issue"
-    Et l'événement "gateway_token.issue" porte '"admin:read msisdn:reveal"'
+    Et l'événement "gateway_token.issue" porte '"admin:read admin:write audit:read cdr:export_bulk msisdn:reveal"'
     Et le journal ne porte pas le jeton rendu
     Et aucune sortie ne porte le jeton rendu
     Quand un script présente le jeton rendu à la passerelle
-    Alors la passerelle a reçu un jeton au nom de l'opérateur avec le scope "admin:read msisdn:reveal"
+    Alors la passerelle a reçu un jeton au nom de l'opérateur avec le scope "admin:read admin:write audit:read cdr:export_bulk msisdn:reveal"
 
   Scénario: le jeton personnel se demande sur un sous-ensemble de ses scopes
     Étant donné une passerelle qui vérifie les jetons du tableau de bord
     Et un serveur démarré
-    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur détient le rôle "Propriétaire"
     Et l'opérateur ouvre une session élevée
     Quand le navigateur envoie POST "/api/auth/gateway-token" avec le corps '{"scopes":["admin:read"]}'
     Alors le serveur répond 200
     Quand un script présente le jeton rendu à la passerelle
     Alors la passerelle a reçu un jeton au nom de l'opérateur avec le scope "admin:read"
 
-  Scénario: un scope que l'opérateur ne détient pas est refusé et nommé
+  # Le corps d'un message ne se lit que dans l'onglet qui l'affiche (invariant a) : même le
+  # Propriétaire, qui détient content:read, ne l'emporte pas hors du tableau de bord.
+  Scénario: le corps des messages ne sort jamais dans un jeton personnel
     Étant donné un serveur démarré
-    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur détient le rôle "Propriétaire"
     Et l'opérateur ouvre une session élevée
-    Quand le navigateur envoie POST "/api/auth/gateway-token" avec le corps '{"scopes":["admin:read","admin:write"]}'
+    Quand le navigateur envoie POST "/api/auth/gateway-token" avec le corps '{"scopes":["admin:read","content:read"]}'
     Alors le serveur répond 403
-    Et la réponse porte 'admin:write'
+    Et la réponse porte 'content:read'
+    Et la réponse est conforme au contrat du BFF
+    Et le journal porte 0 événement "gateway_token.issue"
+
+  Scénario: sans la permission dédiée, aucun jeton personnel n'est délivré
+    Étant donné un serveur démarré
+    Et l'opérateur détient le rôle "Exploitation"
+    Et l'opérateur ouvre une session élevée
+    Quand le navigateur envoie POST "/api/auth/gateway-token"
+    Alors le serveur répond 403
+    Et la réponse porte '"code":"permission_denied"'
     Et la réponse est conforme au contrat du BFF
     Et le journal porte 0 événement "gateway_token.issue"
 
   Scénario: sans second facteur, aucun jeton personnel n'est délivré
     Étant donné un serveur démarré
-    Et l'opérateur détient le rôle "Support"
+    Et l'opérateur détient le rôle "Propriétaire"
     Et l'opérateur se connecte avec son mot de passe
     Quand le navigateur envoie POST "/api/auth/gateway-token"
-    Alors le serveur répond 409
-    Et la réponse porte '"code":"mfa_elevation_required"'
+    Alors le serveur répond 403
+    Et la réponse porte '"code":"mfa_required"'
     Et la réponse est conforme au contrat du BFF
 
   Scénario: sans session, aucun jeton personnel n'est délivré

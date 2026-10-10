@@ -17,45 +17,42 @@ compte de service.
   (ADR-0019, « À revoir »), pas un JWT long.
 - **Route** `POST /auth/gateway-token`, corps optionnel `{ "scopes": [...] }` ; absent, tous les
   scopes de l'opérateur. Réponse `{ token, scopes, expiresAt }`.
-- **Garde** : exemptée dans `authorization` (self-service, aucune clé du catalogue ne la désigne) ;
-  le handler exige la session (401) et l'élévation (409 `mfa_elevation_required`), sur le patron de
-  `DeleteWebauthnPasskey`.
-- **Scopes** : `GatewayScopes(grants)` relu à la délivrance. Un scope demandé hors de cet ensemble →
-  403 qui le nomme ; aucun scope (liste vide demandée, ou opérateur sans droit à la passerelle) →
-  400 / 403.
+- **Permission dédiée `gateway:personal_token`**, détenue par défaut par `Propriétaire` seul
+  (arbitré après revue, 10/10/2026). Hors du BFF, `admin:read`/`admin:write` ne sont plus bornés par
+  les gardes fines : « Scripts » publierait, « Clientèle » rechargerait un solde, « Reporting »
+  lirait le routage. `Exploitation` non plus ne couvre pas `admin:write` (facturation en lecture,
+  pas de clé client). Quatrième orpheline délibérée ; spec §6.10 amendée. La garde est
+  `requires(GatewayPersonalToken)` : permission, élévation (403 `mfa_required`) et refus audité.
+- **Jamais dans un jeton personnel** : `content:read`, `content:erase`, `gdpr:erase` (invariant a,
+  ADR-0008 de la passerelle ; effacements derrière la confirmation de l'écran).
+- **Scopes** : `GatewayScopes(grants)` moins ces trois-là, relu à la délivrance. Un scope demandé
+  hors de cet ensemble → 403 `forbidden_scope` qui le nomme ; liste vide → 400 (validateur du
+  contrat, `minItems`).
 - **Émetteur** : `Issuer.Personal(subject, scopes)` — même signature que `Token`, 1 h, hors cache.
 - **Audit** `gateway_token.issue`, scopes et expiration dans `After`. Le jeton n'est écrit nulle
   part : ni log, ni audit, ni cache client.
-- **Client** : carte « Jeton d'API personnel » dans « Mon compte ». Le jeton est montré une fois,
-  copiable ; la carte dit qu'il expire dans l'heure et tombe à la rotation de clé.
+- **Client** : carte « Jeton d'API personnel » dans « Mon compte », bouton désactivé et expliqué sans
+  la permission. Le jeton est montré une fois (`SecretShown`), copiable, effacé du cache des
+  mutations à la fermeture.
 - **Choix des scopes dans l'interface** : hors périmètre — l'API accepte le sous-ensemble, la carte
   délivre l'ensemble.
 
 ## Tests (les risques, et la preuve de chacun)
-- **Délivré sans second facteur** → scénario : session non élevée, 409. Mutation : retirer le
-  contrôle d'élévation.
-- **Scopes au-delà des siens** → scénario : un scope non détenu est refusé et nommé. Mutation :
-  retirer le contrôle d'inclusion.
+- **Délivré sans la permission, ou sans second facteur** → scénarios : `Exploitation` → 403
+  `permission_denied` ; session non élevée → 403 `mfa_required`.
+- **Corps des messages emporté** → scénario : le Propriétaire demande `content:read` → 403 qui le
+  nomme ; le jeton par défaut ne porte ni `content:*` ni `gdpr:erase`.
+- **Scopes au-delà des siens** → même mécanisme d'inclusion, même scénario.
 - **Jeton que la passerelle refuse ou garde trop longtemps** → scénario : vérifié par la clé du
-  JWKS servi, `sub` de l'opérateur, `scope` attendu, `exp − iat` = 1 h. Mutation : durée de 5 min.
-- **Jeton dans le journal** → scénario : l'audit porte les scopes, jamais le jeton.
-- **Chemin d'écran** → parcours e2e existant étendu (critère 1).
+  JWKS servi, `sub`, `scope` attendu, `exp − iat` = 1 h.
+- **Jeton dans le journal, les logs ou le cache client** → scénario (journal, sortie du process) et
+  test de composant (`getMutationCache()`).
+- **Chemin d'écran** → parcours e2e `shell.spec.ts` étendu (critère 1).
 
-## Mutations (10/10/2026, worktree isolé, `-count=1`)
-| Mutation | Ce qui rougit |
-|---|---|
-| contrôle d'élévation retiré | « sans second facteur… » : 200 au lieu de 409 |
-| contrôle d'inclusion des scopes retiré | « un scope que l'opérateur ne détient pas… » : 200 au lieu de 403 |
-| `PersonalLifetime` à 5 min | « …jeton personnel d'une heure… » : vaut 5m0s |
-| écriture d'audit retirée | même scénario : 0 événement `gateway_token.issue` |
-| jeton écrit dans l'audit | même scénario : le journal porte le jeton |
-| jeton loggé | même scénario : la sortie porte la signature |
-| modale qui ne l'efface pas à la fermeture | `_shell.account.test.tsx` : le jeton reste affiché |
-
-Parcours e2e `shell.spec.ts` étendu : délivrance et fermeture contre le binaire, vert.
-
-**Dette 067** : son remède (go-gateway#294) n'était pas mergé à la fin de la step ; porteur reporté
-sur step-080.
+**Non testé, écrit ici (critère 4)** : la branche `noGatewayAccess` (403 `permission_denied`) n'est
+atteinte que par un rôle personnalisé qui porte `gateway:personal_token` sans aucune clé ouvrant la
+passerelle ; aucun rôle par défaut n'y mène. Retirée, `Personal` rendrait `ErrNoScope`, soit un 500
+au lieu du 403 — vérifié à la lecture, pas par un scénario.
 
 ## Hors périmètre
 - Durée réglable, choix des scopes dans l'UI, second facteur repassé à la délivrance.

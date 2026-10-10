@@ -753,13 +753,16 @@ paths:
       summary: Délivre un jeton personnel pour l'API Admin
       description: |
         Le jeton qu'un opérateur emporte hors du tableau de bord — la collection Bruno de l'API Admin, un
-        script lancé à la main (ADR-0019 de `go-gateway`). Signé par le BFF à **son** `sub`, avec des
-        scopes inclus dans ceux que ses permissions traduisent, valable **une heure**, sans
-        renouvellement. Il tombe aussi à la rotation de la clé qui l'a signé.
+        script lancé à la main (ADR-0019 de `go-gateway`). Signé par le BFF à **son** `sub`, valable
+        **une heure**, sans renouvellement ; il cesse aussi de valoir quand la clé qui l'a signé est
+        retirée du JWKS.
 
-        Aucune permission ne la garde — c'est du self-service, et ses scopes ne dépassent jamais ceux de
-        l'opérateur ; l'élévation la garde, et le journal en garde la trace. Le jeton n'est rendu
-        qu'ici, une fois, et n'est écrit nulle part.
+        Exige `gateway:personal_token` et une session élevée. Ses scopes sont ceux que les permissions
+        de l'opérateur traduisent, **moins** `content:read`, `content:erase` et `gdpr:erase`, qui ne
+        quittent jamais le BFF. Hors du tableau de bord, `admin:read` et `admin:write` ne sont plus
+        bornés par les gardes fines du BFF : c'est pourquoi aucun rôle par défaut hors
+        `Propriétaire` ne détient la clé. Le jeton n'est rendu qu'ici, une fois, et n'est écrit nulle
+        part.
       requestBody:
         required: false
         content:
@@ -769,8 +772,11 @@ paths:
         '403':
           description: |
             `origin_refused` : la requête ne vient pas de l'origine du tableau de bord.
-            `forbidden_scope` : un scope demandé dépasse ceux de l'opérateur, et le message le nomme ;
-            ou l'opérateur ne détient aucun droit à la passerelle.
+            `mfa_required` : la session n'a pas franchi le second facteur.
+            `permission_denied` : l'opérateur ne détient pas `gateway:personal_token`, ou aucune
+            permission qui ouvre la passerelle.
+            `forbidden_scope` : un scope demandé dépasse ce que le jeton peut porter, et le message le
+            nomme.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -785,12 +791,6 @@ paths:
           $ref: '#/components/responses/RequeteInvalide'
         '401':
           description: Aucune session vivante.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '409':
-          description: |
-            `mfa_elevation_required` : la session n'a pas franchi le second facteur.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
