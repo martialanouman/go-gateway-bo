@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/martialanouman/go-gateway-bo/internal/bddtest"
+	"github.com/martialanouman/go-gateway-bo/internal/config"
 )
 
 // Les scénarios exercent le binaire livré, pas une fonction appelée en bibliothèque : ce qui est
@@ -932,4 +933,14 @@ func environment(vars map[string]string) []string {
 	}
 
 	return env
+}
+
+func TestASigningKeysRefusalNamesTheVariables(t *testing.T) {
+	_, err := signingKeys(config.GatewayConfig{
+		Mode: config.GatewayModeReal, TokenKeysDir: t.TempDir(), TokenActiveKID: "absent",
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), config.EnvTokenKeysDir)
+	assert.Contains(t, err.Error(), config.EnvTokenActiveKID)
 }

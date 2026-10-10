@@ -271,7 +271,12 @@ func signingKeys(cfg config.GatewayConfig) (token.KeySet, error) {
 		return token.EphemeralKeySet()
 	}
 
-	return token.LoadKeySet(cfg.TokenKeysDir, cfg.TokenActiveKID)
+	keys, err := token.LoadKeySet(cfg.TokenKeysDir, cfg.TokenActiveKID)
+	if err != nil {
+		return token.KeySet{}, fmt.Errorf("%s / %s : %w", config.EnvTokenKeysDir, config.EnvTokenActiveKID, err)
+	}
+
+	return keys, nil
 }
 
 func dialStream(baseURL string, client *http.Client) hub.Dialer {

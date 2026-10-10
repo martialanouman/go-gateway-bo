@@ -58,6 +58,9 @@ func authenticatedClient(cfg config.GatewayConfig, issuer *token.Issuer, logger 
 	return &http.Client{
 		Transport: signedTransport{base: transport, issuer: issuer, logger: logger},
 		Timeout:   cfg.Timeout,
+		// L'API Admin ne redirige jamais ; signedTransport rejouerait le jeton de l'opérateur vers
+		// n'importe quelle Location, y compris en clair.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}, nil
 }
 

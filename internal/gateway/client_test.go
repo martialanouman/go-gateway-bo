@@ -94,6 +94,35 @@ func TestAdminClientSignsATokenInMockMode(t *testing.T) {
 			"Authorization : le mode mock doit donc porter un jeton, fût-il factice")
 }
 
+func TestAdminClientDoesNotFollowRedirectsWithTheOperatorToken(t *testing.T) {
+	t.Parallel()
+
+	var elsewhere recorder
+
+	other := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		elsewhere.record(req)
+	}))
+	t.Cleanup(other.Close)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		http.Redirect(w, req, other.URL+"/stolen", http.StatusFound)
+	}))
+	t.Cleanup(server.Close)
+
+	client, err := gateway.NewAdminClient(config.GatewayConfig{
+		Mode:    config.GatewayModeMock,
+		BaseURL: server.URL,
+		Timeout: 5 * time.Second,
+	}, testIssuer(t), quietLogger())
+	require.NoError(t, err)
+
+	response, err := client.ListCustomersWithResponse(gateway.WithSystem(t.Context()), nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusFound, response.StatusCode())
+	assert.Zero(t, elsewhere.count())
+}
+
 // VerifyClientCertIfGiven et non Require… : un client sans certificat entre, et se fait accuser par
 // l'assertion qui le nomme au lieu de mourir dans la poignée de main.
 func TestTheAdminClientPresentsItsCertificateAndItsToken(t *testing.T) {

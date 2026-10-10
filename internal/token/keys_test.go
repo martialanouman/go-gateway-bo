@@ -1,14 +1,19 @@
 package token
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -87,4 +92,25 @@ func idsOf(t *testing.T, dir string) []string {
 		ids = append(ids, k.id)
 	}
 	return ids
+}
+
+func TestPrintingKeysOrAnIssuerNeverShowsThePrivateScalar(t *testing.T) {
+	keys, err := EphemeralKeySet()
+	require.NoError(t, err)
+	issuer, err := NewIssuer(keys, "https://dashboard.internal", time.Now)
+	require.NoError(t, err)
+	scalar, err := keys.active.private.Bytes()
+	require.NoError(t, err)
+
+	var logged bytes.Buffer
+	slog.New(slog.NewJSONHandler(&logged, nil)).Info("keys", "keys", keys, "issuer", issuer)
+
+	for _, printed := range []string{
+		fmt.Sprintf("%v %+v %#v", keys, keys, keys),
+		fmt.Sprintf("%v %+v %#v", issuer, issuer, issuer),
+		logged.String(),
+	} {
+		assert.NotContains(t, printed, base64.RawURLEncoding.EncodeToString(scalar))
+		assert.Contains(t, printed, keys.ActiveID())
+	}
 }

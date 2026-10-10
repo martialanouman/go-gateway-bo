@@ -50,8 +50,6 @@ func TestNoClassNamesAKeyOutsideTheCatalog(t *testing.T) {
 	assert.Len(t, gatewayAccess, len(All()))
 }
 
-// Mutation test: changing AlertsRead: "" to AlertsRead: ScopeAdminRead makes this test fail
-// with Expected nil, but got: []string{"admin:read"}, proving the guard holds.
 func TestLocalKeysOpenNothingAtTheGateway(t *testing.T) {
 	assert.Nil(t, GatewayScopes([]string{string(AlertsRead), string(AlertsWrite), string(OperatorsManage), string(RolesManage)}))
 }

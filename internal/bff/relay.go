@@ -103,9 +103,11 @@ func auditRelayed(ctx context.Context, record func(context.Context, store.Event)
 	return status, err
 }
 
-// relayedRefusal traduit l'échec d'une opération relayée. Un statut nul rend `err` à l'appelant, qui
-// le laisse rendre à `reportFailedResponse` : un 401 ou 403 amont y est traduit, tout le reste (un appel sans appelant, une erreur non classée) devient un 500 journalisé ; tout autre statut vient avec le corps à servir. Un journal
-// d'audit en panne n'est pas une passerelle injoignable : l'appel n'est pas parti.
+// relayedRefusal traduit l'échec d'une opération relayée. Un statut nul rend `err` à l'appelant,
+// qui le laisse rendre à `reportFailedResponse` : un 401 ou 403 amont y est traduit, tout le reste
+// (un appel sans appelant, une erreur non classée) devient un 500 journalisé ; tout autre statut
+// vient avec le corps à servir. Un journal d'audit en panne n'est pas une passerelle injoignable :
+// l'appel n'est pas parti.
 func (a API) relayedRefusal(ctx context.Context, operation string, err error) (int, Error, error) {
 	status, body, relayed := relayError(err)
 	if !relayed || errors.Is(err, errIntentNotTraced) {
