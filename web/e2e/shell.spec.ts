@@ -342,6 +342,12 @@ test('the binary serves the painted shell, then the application replaces it', as
     "Le cockpit d'exploitation se construit",
   )
 
+  // ── Le trafic des cinq dernières minutes ─────────────────────────────────────────────────────
+  await nav.getByRole('link', { name: 'Trafic' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trafic')
+  await expect(page.getByText('MT / s')).toBeVisible()
+  await expect(page.getByRole('img', { name: /Débit MT/ })).toBeVisible()
+
   // Et une entrée du rail mène à un état vide qui nomme son jalon
   const routes = nav.getByRole('link', { name: 'Routes' })
   await routes.click()

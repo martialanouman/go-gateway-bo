@@ -85,3 +85,19 @@ func TestACustomerIsListedUnderItsGroupOnly(t *testing.T) {
 	require.Len(t, page.Data, 1)
 	assert.Equal(t, created.ID, page.Data[0].ID)
 }
+
+func TestTheTrafficSeriesCarryThreePointsEach(t *testing.T) {
+	response := httptest.NewRecorder()
+	fakegateway.ServeTrafficMetrics(response, httptest.NewRequest(http.MethodGet, fakegateway.TrafficMetricsPath+"?groupBy=customer", nil))
+
+	var body struct {
+		GroupBy string `json:"group_by"`
+		Series  []struct {
+			Points []map[string]any `json:"points"`
+		} `json:"series"`
+	}
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&body))
+	assert.Equal(t, "customer", body.GroupBy)
+	require.Len(t, body.Series, 2)
+	assert.Len(t, body.Series[0].Points, 3)
+}
