@@ -63,3 +63,13 @@
 .metric-tile--mo .metric-tile__value {
   color: var(--mo-accent);
 }
+.traffic-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--sp-6);
+}
+.traffic-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--sp-7);
+}
