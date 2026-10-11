@@ -266,7 +266,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 
 ## M4 — Exploitation temps réel : trafic, connecteurs, sessions  (§6.3, §6.5)
 - [x] step-080 — Trafic : instantané REST, widgets et graphiques
-- [ ] step-087 — Trafic : débit MO par tranche (contrat 7.7.0)  *(insérée le 11/10/2026)*
+- [x] step-087 — Trafic : débit MO par tranche (contrat 7.7.0)  *(insérée le 11/10/2026)*
 - [ ] step-081 — Trafic : flux WS + bascule de plage (5 min / 1 h / 24 h)
 - [ ] step-082 — Trafic : ventilations connecteur/client/compte/groupe/**catégorie** (débit, lag, attente) + drill-down CDR
 - [ ] step-083 — Connecteurs : CRUD à divulgation progressive, pool de binds, reconnexion, `priority_flag_default` et `priority_tier` en « Avancé »
