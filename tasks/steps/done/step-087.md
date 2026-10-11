@@ -38,10 +38,14 @@ MO par tranche au contrat. La 7.7.0 (go-gateway#302) ajoute `mo_received` à cha
   pas, et une septième casserait la grille.
 - **Taux d'échec en ambre** (`--amber-500`, aire à 16 %), comme le graphique « Taux d'erreur » de la
   maquette du kit : l'ambre est l'état dégradé de la charte, le rouge reste aux états critiques.
-- **Valeur courante et pic dans l'en-tête de chaque graphique** (arbitré avec l'utilisateur) : sans
-  axe, chaque courbe est mise à l'échelle de son propre maximum, et un pic à 3 % se dessine comme un
-  pic à 30 %. Débits en messages par seconde, comme les tuiles ; le libellé accessible lit les mêmes
-  chaînes. Absente d'une carte vide.
+- **Une infobulle par tranche** (arbitré avec l'utilisateur, qui a écarté une lecture « valeur ·
+  pic » dans l'en-tête, jugée encombrante) : sans axe, chaque courbe est mise à l'échelle de son
+  propre maximum, et un pic à 3 % se dessine comme un pic à 30 %. Au survol, un trait marque la
+  tranche la plus proche et l'infobulle donne son heure et ses valeurs, débits en messages par
+  seconde comme les tuiles. Équivalent clavier (WCAG 2.1.1) : le graphique prend le focus, ←/→
+  changent de tranche, Début/Fin vont aux extrémités, Échap ferme ; l'infobulle est une région
+  `status` hors du `role="img"`, dont les enfants ne seraient pas annoncés. Le libellé accessible
+  garde la dernière tranche et le pic, en messages par seconde.
 - **`totals`** somme `moReceived` sur toutes les séries et comble les tranches vides par 0, comme
   pour le MT.
 - **Hors périmètre** : le compteur temps réel `mo_received_total` du flux (`stream-metrics`) — il
@@ -64,7 +68,9 @@ MO par tranche au contrat. La 7.7.0 (go-gateway#302) ajoute `mo_received` à cha
 - `make check` vert, parcours e2e vert (11/10/2026).
 - Au navigateur, binaire local et trafic généré : les trois cartes à 3 × 261 px (1100 px) et
   3 × 375 px (1440 px), chacune sous sa tuile à 1100 px. Critère 4 : la grille de trois colonnes et
-  la teinte ambre du taux d'échec ne sont tenues par aucun test — vérifiées ici.
+  la teinte ambre du taux d'échec ne sont tenues par aucun test — vérifiées ici. L'infobulle vue au
+  navigateur (instance de sonde sur une base séparée) : trait et valeurs sur Débit MT, bascule à
+  gauche du trait près du bord droit sur Taux d'échec MT.
 - Le libellé accessible et la courbe MO lisent une seule série (`moSeries`) : la mutation « courbe sur
   `submitted` » restait verte tant que le libellé était calculé à part.
 - Mutations, le test nommé seul, l'arbre restauré entre chacune (toutes rouges) :
@@ -79,7 +85,12 @@ MO par tranche au contrat. La 7.7.0 (go-gateway#302) ajoute `mo_received` à cha
 | pic lu sur la dernière tranche | `_shell.traffic.test.tsx` « shows the figures of the last five minutes » |
 | dernière valeur lue sur la première tranche | `_shell.traffic.test.tsx` « shows the figures of the last five minutes » |
 | `bucketRate` rend un compte par tranche au lieu d'un débit par seconde | `_shell.traffic.test.tsx` « shows the figures of the last five minutes » |
-| lecture affichée sur la carte MT vide | `_shell.traffic.test.tsx` « says each chart is empty rather than drawing zeros, and keeps the MO flowing without MT » |
+| le focus n'ouvre pas l'infobulle | `_shell.traffic.test.tsx` « reads one bucket in a tooltip, from the keyboard and from the pointer » |
+| ← avance au lieu de reculer | idem |
+| Échap sans effet | idem |
+| sortie du pointeur sans effet | idem |
+| survol sur la tranche précédente (`floor` au lieu de `round`) | idem — vert tant que le pointeur tombait pile au milieu d'une tranche (x = 50 sur 3 points), rouge à x = 40 |
+| « Remis » lu sur `submitted` | idem |
 | relais sans `MoReceived` (`internal/bff/metrics.go`) | e2e `shell.spec.ts` (« Débit MO, pic de 50… » introuvable) ; le scénario godog reste vert, il ne juge que la conformité |
 
 ## Hors périmètre
