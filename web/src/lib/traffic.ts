@@ -32,16 +32,21 @@ export function latency(ms: number | null) {
 
 const STEP_SECONDS: Record<string, number> = { '5m': 10, '15m': 30, '30m': 60, '1h': 60 }
 
+function emptyBucket(t: string): TrafficPoint {
+  return { t, submitted: 0, delivered: 0, failed: 0, moReceived: 0 }
+}
+
 export function totals(metrics: Metrics): TrafficPoint[] {
   const byTime = new Map<string, TrafficPoint>()
   for (const series of metrics.series) {
     for (const point of series.points) {
-      const sum = byTime.get(point.t) ?? { t: point.t, submitted: 0, delivered: 0, failed: 0 }
+      const sum = byTime.get(point.t) ?? emptyBucket(point.t)
       byTime.set(point.t, {
         t: point.t,
         submitted: sum.submitted + point.submitted,
         delivered: sum.delivered + point.delivered,
         failed: sum.failed + point.failed,
+        moReceived: sum.moReceived + point.moReceived,
       })
     }
   }
@@ -53,12 +58,7 @@ export function totals(metrics: Metrics): TrafficPoint[] {
     if (index > 0) {
       const previous = Date.parse(sorted[index - 1]?.t ?? point.t)
       for (let ms = previous + stepMs; ms < Date.parse(point.t); ms += stepMs) {
-        gap.push({
-          t: new Date(ms).toISOString().replace('.000Z', 'Z'),
-          submitted: 0,
-          delivered: 0,
-          failed: 0,
-        })
+        gap.push(emptyBucket(new Date(ms).toISOString().replace('.000Z', 'Z')))
       }
     }
     return [...gap, point]

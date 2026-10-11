@@ -75,7 +75,7 @@
 }
 .traffic-charts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-7);
 }
 .traffic-legend {

@@ -351,6 +351,9 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(tile('Latence p99').locator('.metric-tile__value')).toHaveText(/^840 ms$/)
   await expect(tile('Sessions actives').locator('.metric-tile__value')).toHaveText(/^12$/)
   await expect(page.getByRole('img', { name: /Débit MT/ })).toBeVisible()
+  await expect(
+    page.getByRole('img', { name: 'Débit MO, pic de 50 par tranche, dernière tranche 50' }),
+  ).toBeVisible()
 
   // Et une entrée du rail mène à un état vide qui nomme son jalon
   const routes = nav.getByRole('link', { name: 'Routes' })

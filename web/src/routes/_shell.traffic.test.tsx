@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAppRouter } from '~/router'
@@ -17,6 +17,25 @@ const EMPTY_SUMMARY = {
   e2eLatencyMsP50: null,
   e2eLatencyMsP99: null,
   activeSessions: null,
+}
+
+function seriesOf(counts: { submitted: number; moReceived: number }) {
+  return {
+    groupBy: 'customer',
+    window: '5m',
+    series: [
+      {
+        key: 'acme',
+        points: [0, 10].map((second) => ({
+          t: `2026-10-10T12:00:${String(second).padStart(2, '0')}Z`,
+          submitted: counts.submitted,
+          delivered: counts.submitted,
+          failed: 0,
+          moReceived: counts.moReceived,
+        })),
+      },
+    ],
+  }
 }
 
 async function visitTraffic(replies: AuthReplies = {}) {
@@ -44,6 +63,9 @@ describe('the traffic screen', () => {
     expect(screen.getByText('Soumis')).toBeVisible()
     expect(screen.getByText('Remis')).toBeVisible()
     expect(screen.getByRole('img', { name: /Taux d’échec/ })).toBeVisible()
+    expect(
+      screen.getByRole('img', { name: 'Débit MO, pic de 120 par tranche, dernière tranche 120' }),
+    ).toBeVisible()
   })
 
   it('asks the gateway for the five-minute window, per customer', async () => {
@@ -61,17 +83,32 @@ describe('the traffic screen', () => {
     ).toBe(true)
   })
 
-  it('says the window is empty rather than drawing zeros', async () => {
+  it('says each chart is empty rather than drawing zeros, and keeps the MO flowing without MT', async () => {
     await visitTraffic({
       metricsSummary: { status: 200, body: { ...EMPTY_SUMMARY, moReceived: 6000 } },
+      trafficMetrics: { status: 200, body: seriesOf({ submitted: 0, moReceived: 200 }) },
     })
+    const mt = await screen.findByRole('region', { name: 'Débit MT' })
+    expect(within(mt).getByText('Aucun MT soumis sur les cinq dernières minutes')).toBeVisible()
     expect(
-      await screen.findByText('Aucun message soumis sur les cinq dernières minutes'),
+      within(screen.getByRole('region', { name: 'Taux d’échec' })).getByText(
+        'Aucun MT soumis sur les cinq dernières minutes',
+      ),
     ).toBeVisible()
-    expect(screen.getByText('MO / s')).toBeVisible()
-    expect(screen.getByText('20,0')).toBeVisible()
     expect(screen.queryByRole('img', { name: /Débit MT/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /Taux d’échec/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /^Débit MO, pic de 200/ })).toBeVisible()
+    expect(screen.getByText('20,0')).toBeVisible()
+  })
+
+  it('says the MO chart is empty when no MO was received', async () => {
+    await visitTraffic({
+      trafficMetrics: { status: 200, body: seriesOf({ submitted: 300, moReceived: 0 }) },
+    })
+    const mo = await screen.findByRole('region', { name: 'Débit MO' })
+    expect(within(mo).getByText('Aucun MO reçu sur les cinq dernières minutes')).toBeVisible()
+    expect(screen.queryByRole('img', { name: /Débit MO/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Débit MT/ })).toBeVisible()
   })
 
   it('names the failure and offers a retry when the gateway is unavailable', async () => {

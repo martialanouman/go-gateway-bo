@@ -279,6 +279,7 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
                   submitted: 100 * (index + 1),
                   delivered: 90 * (index + 1),
                   failed: 5 * (index + 1),
+                  moReceived: 20 * (index + 1),
                 })),
               })),
             },

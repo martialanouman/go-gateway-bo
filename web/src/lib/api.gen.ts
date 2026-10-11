@@ -1462,6 +1462,8 @@ export interface components {
             submitted: number;
             delivered: number;
             failed: number;
+            /** @description MO reçus et routés vers un compte dans la tranche ; un MO non routé n’est dans aucune série. */
+            moReceived: number;
         };
         TrafficSeries: {
             /** @description Identifiant de connecteur, client ou groupe, ou les clés réservées other et ungrouped. */

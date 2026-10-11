@@ -2554,7 +2554,8 @@ components:
         submitted: { type: integer }
         delivered: { type: integer }
         failed: { type: integer }
-      required: [t, submitted, delivered, failed]
+        moReceived: { type: integer, description: 'MO reçus et routés vers un compte dans la tranche ; un MO non routé n’est dans aucune série.' }
+      required: [t, submitted, delivered, failed, moReceived]
     TrafficSeries:
       type: object
       additionalProperties: false

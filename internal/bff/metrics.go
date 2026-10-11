@@ -99,10 +99,11 @@ func (a API) GetTrafficMetrics(ctx context.Context, request GetTrafficMetricsReq
 		points := make([]TrafficPoint, 0, len(upstream.Points))
 		for _, point := range upstream.Points {
 			points = append(points, TrafficPoint{
-				T:         point.T,
-				Submitted: count(point.Submitted),
-				Delivered: count(point.Delivered),
-				Failed:    count(point.Failed),
+				T:          point.T,
+				Submitted:  count(point.Submitted),
+				Delivered:  count(point.Delivered),
+				Failed:     count(point.Failed),
+				MoReceived: count(point.MoReceived),
 			})
 		}
 

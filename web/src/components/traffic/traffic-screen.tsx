@@ -10,6 +10,7 @@ import { MetricTile } from './metric-tile'
 const REFRESH_MS = 10_000
 const integer = new Intl.NumberFormat('fr-FR')
 const SUBTITLE = '5 dernières minutes · tranches de 10 s'
+const NO_MT = 'Aucun MT soumis sur les cinq dernières minutes'
 
 export function TrafficScreen() {
   const summary = useQuery({
@@ -44,6 +45,10 @@ export function TrafficScreen() {
   const peak = Math.max(0, ...points.flatMap((point) => [point.submitted, point.delivered]))
   const last = points.at(-1)?.submitted ?? 0
   const worst = Math.round(Math.max(0, ...ratios) * 1000) / 10
+  const peakMo = Math.max(0, ...points.map((point) => point.moReceived))
+  const lastMo = points.at(-1)?.moReceived ?? 0
+  const noMt = points.every((point) => point.submitted === 0)
+  const noMo = peakMo === 0
 
   return (
     <div className="page">
@@ -89,13 +94,7 @@ export function TrafficScreen() {
               }
             />
           </div>
-          {summary.data.submitted === 0 ? (
-            <EmptyState
-              description="Les graphiques réapparaissent au premier relevé qui suit le prochain message."
-              title="Aucun message soumis sur les cinq dernières minutes"
-              titleAs="h2"
-            />
-          ) : chartsFailed ? (
+          {chartsFailed ? (
             <ErrorState
               description={traffic.error?.message}
               onRetry={() => void traffic.refetch()}
@@ -109,21 +108,43 @@ export function TrafficScreen() {
           ) : (
             <div className="traffic-charts">
               <Card subtitle={SUBTITLE} title="Débit MT">
-                <Chart
-                  label={`Débit MT, soumis et remis, pic de ${integer.format(peak)} par tranche, dernière tranche ${integer.format(last)}`}
-                  primary={points.map((point) => point.submitted)}
-                  secondary={points.map((point) => point.delivered)}
-                />
-                <ul className="traffic-legend">
-                  <li className="traffic-legend__item traffic-legend__item--primary">Soumis</li>
-                  <li className="traffic-legend__item traffic-legend__item--secondary">Remis</li>
-                </ul>
+                {noMt ? (
+                  <EmptyState inline title={NO_MT} />
+                ) : (
+                  <>
+                    <Chart
+                      label={`Débit MT, soumis et remis, pic de ${integer.format(peak)} par tranche, dernière tranche ${integer.format(last)}`}
+                      primary={points.map((point) => point.submitted)}
+                      secondary={points.map((point) => point.delivered)}
+                    />
+                    <ul className="traffic-legend">
+                      <li className="traffic-legend__item traffic-legend__item--primary">Soumis</li>
+                      <li className="traffic-legend__item traffic-legend__item--secondary">
+                        Remis
+                      </li>
+                    </ul>
+                  </>
+                )}
+              </Card>
+              <Card subtitle={SUBTITLE} title="Débit MO">
+                {noMo ? (
+                  <EmptyState inline title="Aucun MO reçu sur les cinq dernières minutes" />
+                ) : (
+                  <Chart
+                    label={`Débit MO, pic de ${integer.format(peakMo)} par tranche, dernière tranche ${integer.format(lastMo)}`}
+                    primary={points.map((point) => point.moReceived)}
+                  />
+                )}
               </Card>
               <Card subtitle={`${SUBTITLE} · hors rejets`} title="Taux d’échec">
-                <Chart
-                  label={`Taux d’échec par tranche, maximum ${worst.toLocaleString('fr-FR')} %`}
-                  primary={ratios}
-                />
+                {noMt ? (
+                  <EmptyState inline title={NO_MT} />
+                ) : (
+                  <Chart
+                    label={`Taux d’échec par tranche, maximum ${worst.toLocaleString('fr-FR')} %`}
+                    primary={ratios}
+                  />
+                )}
               </Card>
             </div>
           )}
