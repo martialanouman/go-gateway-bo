@@ -268,6 +268,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [x] step-080 — Trafic : instantané REST, widgets et graphiques
 - [x] step-087 — Trafic : débit MO par tranche (contrat 7.7.0)  *(insérée le 11/10/2026)*
 - [ ] step-081 — Trafic : flux WS + bascule de plage (5 min / 1 h / 24 h)
+- [ ] step-088 — Trafic : section Entrée par canal (HTTP / SMPP) — débit, latence d'admission, refus — et sessions SMPP actives renseignées. Dépend d'une PR go-gateway (`groupBy=channel`, `active_sessions`, contrat > 7.7.0) et de step-081 pour le temps réel  *(insérée le 11/10/2026)*
 - [ ] step-082 — Trafic : ventilations connecteur/client/compte/groupe/**catégorie** (débit, lag, attente) + drill-down CDR
 - [ ] step-083 — Connecteurs : CRUD à divulgation progressive, pool de binds, reconnexion, `priority_flag_default` et `priority_tier` en « Avancé »
 - [ ] step-084 — Connecteurs : santé par bind — `link_status` vs `breaker_state` — et rebind
