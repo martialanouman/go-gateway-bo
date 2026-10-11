@@ -20,9 +20,8 @@ const (
 	NotificationsTopic Topic = "notifications"
 )
 
-// feed relie un flux de l'API Admin au sujet qui le diffuse. Une permission vide ouvre le sujet à tout
-// opérateur authentifié : le catalogue n'a aucune clé pour lire le trafic, comme l'entrée « Trafic »
-// du rail (`web/src/lib/navigation.ts`).
+// feed relie un flux de l'API Admin au sujet qui le diffuse. Une permission vide ouvrirait le sujet à tout
+// opérateur authentifié ; aucun flux n'en a plus.
 type feed struct {
 	path       string
 	topic      Topic
@@ -35,7 +34,7 @@ type feed struct {
 
 var feeds = []feed{
 	{
-		path: "/admin/stream/metrics", topic: TrafficTopic,
+		path: "/admin/stream/metrics", topic: TrafficTopic, permission: permissions.TrafficRead,
 		relay: relay(TrafficTopic, upstreamSnapshot.outgoing), recheck: recheck[TrafficSnapshot](TrafficTopic),
 	},
 	{

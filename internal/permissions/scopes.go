@@ -21,7 +21,7 @@ var gatewayAccess = map[Key]string{
 	ScriptsRead: ScopeAdminRead, ScriptsWrite: ScopeAdminWrite, ScriptsPublish: ScopeAdminWrite,
 	SenderRewriteRead: ScopeAdminRead, SenderRewriteWrite: ScopeAdminWrite,
 	ConnectorsRead: ScopeAdminRead, ConnectorsWrite: ScopeAdminWrite, ConnectorsRebind: ScopeAdminWrite,
-	SessionsRead: ScopeAdminRead, SessionsDisconnect: ScopeAdminWrite,
+	TrafficRead: ScopeAdminRead, SessionsRead: ScopeAdminRead, SessionsDisconnect: ScopeAdminWrite,
 	AntispamRead: ScopeAdminRead, AntispamWrite: ScopeAdminWrite,
 	CustomersRead: ScopeAdminRead, CustomersWrite: ScopeAdminWrite,
 	AccountsRead: ScopeAdminRead, AccountsWrite: ScopeAdminWrite,

@@ -29,11 +29,18 @@ describe('the rail', () => {
       .getAllByRole('link')
       .map((link) => link.textContent)
 
-    // Trafic et CDR n'exigent aucune clé ; Routes et Numéros exacts suivent `routes:read`.
-    expect(labels).toEqual(['SMS Gateway', 'Trafic', 'CDR Explorer', 'Routes', 'Numéros exacts'])
+    // CDR n'exige aucune clé ; Trafic exige `traffic:read` ; Routes et Numéros exacts suivent `routes:read`.
+    expect(labels).toEqual(['SMS Gateway', 'CDR Explorer', 'Routes', 'Numéros exacts'])
     expect(within(nav).queryByText('Clients')).toBeNull()
     expect(within(nav).queryByText('Facturation')).toBeNull()
     expect(within(nav).getByText('Routage')).toBeInTheDocument()
+  })
+
+  it('shows Trafic to a session holding traffic:read', async () => {
+    visit('/', { permissions: ['traffic:read'] })
+    const nav = await rail()
+
+    expect(within(nav).getByRole('link', { name: 'Trafic' })).toBeInTheDocument()
   })
 
   it('marks the entry of the displayed screen', async () => {

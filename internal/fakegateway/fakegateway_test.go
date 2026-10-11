@@ -85,3 +85,41 @@ func TestACustomerIsListedUnderItsGroupOnly(t *testing.T) {
 	require.Len(t, page.Data, 1)
 	assert.Equal(t, created.ID, page.Data[0].ID)
 }
+
+func TestTheTrafficSeriesCarryThreePointsEach(t *testing.T) {
+	response := httptest.NewRecorder()
+	fakegateway.ServeTrafficMetrics(response, httptest.NewRequest(http.MethodGet, fakegateway.TrafficMetricsPath+"?groupBy=customer", nil))
+
+	var body struct {
+		GroupBy string `json:"group_by"`
+		Series  []struct {
+			Points []map[string]any `json:"points"`
+		} `json:"series"`
+	}
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&body))
+	assert.Equal(t, "customer", body.GroupBy)
+	require.Len(t, body.Series, 2)
+	require.Len(t, body.Series[0].Points, 3)
+	assert.ElementsMatch(t, []string{"t", "submitted", "delivered", "failed"}, keysOf(body.Series[0].Points[0]))
+}
+
+func TestTheMetricsSummaryUsesTheUpstreamKeys(t *testing.T) {
+	response := httptest.NewRecorder()
+	fakegateway.ServeMetricsSummary(response, httptest.NewRequest(http.MethodGet, fakegateway.MetricsSummaryPath, nil))
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&body))
+	assert.ElementsMatch(t, []string{
+		"window", "submitted", "delivered", "failed", "rejected", "mo_received",
+		"e2e_latency_ms_p50", "e2e_latency_ms_p99", "active_sessions",
+	}, keysOf(body))
+}
+
+func keysOf(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+
+	return keys
+}

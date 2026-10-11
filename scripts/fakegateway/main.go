@@ -39,6 +39,8 @@ func main() {
 	mux.HandleFunc("/admin/smpp-accounts/{id}/{action}", customers.ServeAccount)
 	mux.HandleFunc("/admin/smpp-accounts/{id}/{action}/{itemId}", customers.ServeAccount)
 	mux.HandleFunc("/admin/smpp-accounts/{id}/{action}/{itemId}/{verb}", customers.ServeAccount)
+	mux.HandleFunc("GET "+fakegateway.MetricsSummaryPath, fakegateway.ServeMetricsSummary)
+	mux.HandleFunc("GET "+fakegateway.TrafficMetricsPath, fakegateway.ServeTrafficMetrics)
 	mux.HandleFunc("GET /control/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})

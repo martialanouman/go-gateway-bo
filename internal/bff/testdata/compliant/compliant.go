@@ -81,6 +81,18 @@ func (API) DeleteWebauthnPasskey(_ context.Context,
 	return bff.DeleteWebauthnPasskey204Response{}, nil
 }
 
+func (API) GetMetricsSummary(_ context.Context,
+	_ bff.GetMetricsSummaryRequestObject,
+) (bff.GetMetricsSummaryResponseObject, error) {
+	return nil, nil
+}
+
+func (API) GetTrafficMetrics(_ context.Context,
+	_ bff.GetTrafficMetricsRequestObject,
+) (bff.GetTrafficMetricsResponseObject, error) {
+	return nil, nil
+}
+
 func (API) IssueGatewayToken(_ context.Context,
 	_ bff.IssueGatewayTokenRequestObject,
 ) (bff.IssueGatewayTokenResponseObject, error) {

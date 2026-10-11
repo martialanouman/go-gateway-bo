@@ -18,6 +18,7 @@ export type PermissionKey =
   | 'connectors:read'
   | 'connectors:write'
   | 'connectors:rebind'
+  | 'traffic:read'
   | 'sessions:read'
   | 'sessions:disconnect'
   | 'antispam:read'
@@ -131,6 +132,11 @@ export const PERMISSIONS: readonly Permission[] = [
     category: 'connectors',
     description:
       'Forcer la reconnexion d’un bind — interrompt le trafic qu’il porte le temps du rétablissement',
+  },
+  {
+    key: 'traffic:read',
+    category: 'sessions',
+    description: 'Consulter le trafic : débits, taux de succès, latences et sessions actives',
   },
   {
     key: 'sessions:read',

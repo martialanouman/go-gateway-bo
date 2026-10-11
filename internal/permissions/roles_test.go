@@ -20,7 +20,7 @@ import (
 // trop large accorde en silence exactement ce qu'il existe pour interdire.
 //
 // `Propriétaire` n'y figure pas : le §6.10 dit « toutes les permissions », donc il se dérive du
-// catalogue et se vérifie autrement — l'écrire ici demanderait de recopier les 45 clés, et cette
+// catalogue et se vérifie autrement — l'écrire ici demanderait de recopier les 46 clés, et cette
 // copie-là ne dirait rien de plus que le catalogue.
 var specRoles = map[string][]permissions.Key{
 	// « Lecture/écriture routage (dont numéros exacts, routes:import), connecteurs (dont
@@ -32,7 +32,7 @@ var specRoles = map[string][]permissions.Key{
 		permissions.ScriptsRead, permissions.ScriptsWrite, permissions.ScriptsPublish,
 		permissions.SenderRewriteRead, permissions.SenderRewriteWrite,
 		permissions.ConnectorsRead, permissions.ConnectorsWrite, permissions.ConnectorsRebind,
-		permissions.SessionsRead, permissions.SessionsDisconnect,
+		permissions.SessionsRead, permissions.SessionsDisconnect, permissions.TrafficRead,
 		permissions.AntispamRead, permissions.AntispamWrite,
 		permissions.InboundRead, permissions.InboundWrite,
 		permissions.SuppressionsRead, permissions.SuppressionsWrite,
@@ -43,7 +43,7 @@ var specRoles = map[string][]permissions.Key{
 
 	// « scripts:read/write (pas publish — revue par Exploitation/Propriétaire) »
 	"Scripts": {
-		permissions.ScriptsRead, permissions.ScriptsWrite,
+		permissions.ScriptsRead, permissions.ScriptsWrite, permissions.TrafficRead,
 	},
 
 	// « Lecture seule (comptes, routage, connecteurs, sessions, CDR/trace, facturation, alertes) +
@@ -53,7 +53,7 @@ var specRoles = map[string][]permissions.Key{
 		permissions.CustomersRead, permissions.AccountsRead, permissions.GroupsRead,
 		permissions.RoutesRead, permissions.ConnectorsRead, permissions.SessionsRead,
 		permissions.BillingRead, permissions.AlertsRead,
-		permissions.CDRReadPII,
+		permissions.CDRReadPII, permissions.TrafficRead,
 	},
 
 	// « Facturation complète (billing:read/write/topup/provider:write/scope_change), lecture seule
@@ -63,12 +63,12 @@ var specRoles = map[string][]permissions.Key{
 		permissions.BillingProviderWrite, permissions.BillingScopeChange,
 		permissions.CustomersRead, permissions.AccountsRead, permissions.GroupsRead,
 		permissions.RoutesRead, permissions.ConnectorsRead, permissions.SessionsRead,
-		permissions.AlertsRead,
+		permissions.AlertsRead, permissions.TrafficRead,
 	},
 
-	// « billing:read uniquement »
+	// « billing:read et traffic:read »
 	"Reporting": {
-		permissions.BillingRead,
+		permissions.BillingRead, permissions.TrafficRead,
 	},
 
 	// « customers:read/write, accounts:read/write, credentials:read/write/rotate, groups:read/write,
@@ -79,7 +79,7 @@ var specRoles = map[string][]permissions.Key{
 		permissions.AccountsRead, permissions.AccountsWrite,
 		permissions.CredentialsRead, permissions.CredentialsWrite, permissions.CredentialsRotate,
 		permissions.GroupsRead, permissions.GroupsWrite,
-		permissions.BillingRead, permissions.BillingWrite, permissions.BillingScopeChange,
+		permissions.BillingRead, permissions.BillingWrite, permissions.BillingScopeChange, permissions.TrafficRead,
 	},
 
 	// « suppressions:read/write/delete, inbound:read, gdpr:erase, content:erase, lecture seule
@@ -89,7 +89,7 @@ var specRoles = map[string][]permissions.Key{
 		permissions.InboundRead,
 		permissions.GDPRErase, permissions.ContentErase,
 		permissions.CustomersRead, permissions.AccountsRead, permissions.GroupsRead,
-		permissions.CDRReadPII, permissions.CDRExportBulk,
+		permissions.CDRReadPII, permissions.CDRExportBulk, permissions.TrafficRead,
 	},
 
 	// « audit:read uniquement — pas cdr:read_pii »

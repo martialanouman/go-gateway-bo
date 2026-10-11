@@ -45,7 +45,7 @@ export type NavGroup = { readonly label: string; readonly entries: readonly NavE
  * Le rail de la charte — cinq groupes, quinze entrées —, plus l'administration, et la seule liste : les routes, le rail et
  * leurs tests la lisent.
  *
- * Trafic et CDR Explorer n'exigent rien parce que le catalogue n'a aucune clé pour les lire
+ * CDR Explorer n'exige rien parce que le catalogue n'a aucune clé pour le lire
  * (`cdr:read_pii` ne gouverne que les numéros en clair). Contenu & RGPD s'ouvre sur l'une de trois
  * clés : le rôle `compliance` efface sans jamais lire (§6.10).
  */
@@ -53,7 +53,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'Exploitation',
     entries: [
-      { to: '/traffic', label: 'Trafic', milestone: 'M4', anyOf: [] },
+      { to: '/traffic', label: 'Trafic', anyOf: ['traffic:read'] },
       { to: '/cdr', label: 'CDR Explorer', milestone: 'M5', anyOf: [] },
       { to: '/sessions', label: 'Sessions', milestone: 'M4', anyOf: ['sessions:read'] },
       { to: '/connectors', label: 'Connecteurs', milestone: 'M4', anyOf: ['connectors:read'] },

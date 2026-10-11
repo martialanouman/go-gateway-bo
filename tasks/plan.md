@@ -604,8 +604,8 @@ divulgation progressive, pool de binds, politique de reconnexion, santé **par b
 `link_status` et `breaker_state` **séparés**, rebind), sessions (table virtualisée, mises à jour en
 **deltas**, réconciliation périodique, déconnexion forcée nommée et auditée).
 
-**Nouvelles dépendances :** bibliothèque de graphiques et virtualisation — **version relevée à
-l'ajout**, §1.2.
+**Nouvelles dépendances :** virtualisation — **version relevée à l'ajout**, §1.2. Pas de
+bibliothèque de graphiques : SVG maison (step-080).
 
 **Critères d'acceptation**
 - Un connecteur dont certains binds sont `up` et d'autres `down` s'affiche correctement : aucun état

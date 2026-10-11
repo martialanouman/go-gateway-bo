@@ -1,6 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { PendingScreen } from '~/components/pending-screen'
+import { TrafficScreen } from '~/components/traffic/traffic-screen'
 
-export const Route = createFileRoute('/_shell/traffic')({
-  component: () => <PendingScreen to="/traffic" />,
-})
+export const Route = createFileRoute('/_shell/traffic')({ component: TrafficScreen })

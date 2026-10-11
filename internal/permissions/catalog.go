@@ -1,6 +1,6 @@
 package permissions
 
-// Les 45 clés, chacune déclarée **une seule fois**. Le catalogue plus bas les référence plutôt que
+// Les 46 clés, chacune déclarée **une seule fois**. Le catalogue plus bas les référence plutôt que
 // de répéter leurs littéraux : il n'y a pas deux listes à tenir cohérentes, il y en a une.
 //
 // Ce que ces constantes achètent : `Key` a `string` pour sous-jacent, donc n'importe quelle chaîne
@@ -22,6 +22,7 @@ const (
 	ConnectorsWrite  Key = "connectors:write"
 	ConnectorsRebind Key = "connectors:rebind"
 	// sessions
+	TrafficRead        Key = "traffic:read"
 	SessionsRead       Key = "sessions:read"
 	SessionsDisconnect Key = "sessions:disconnect"
 	// antispam
@@ -145,6 +146,11 @@ var catalog = []Entry{
 		Description: "Forcer la reconnexion d’un bind — interrompt le trafic qu’il porte le temps du rétablissement",
 	},
 	// ─── sessions ───
+	{
+		Key:         TrafficRead,
+		Category:    "sessions",
+		Description: "Consulter le trafic : débits, taux de succès, latences et sessions actives",
+	},
 	{
 		Key:         SessionsRead,
 		Category:    "sessions",

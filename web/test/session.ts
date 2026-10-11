@@ -60,6 +60,8 @@ export type AuthReplies = {
   readonly gatewayToken?: Reply | 'pending'
   /** La coquille lit le centre de notifications à chaque ouverture : vide par défaut. */
   readonly notifications?: Reply | 'pending'
+  readonly metricsSummary?: Reply | 'pending'
+  readonly trafficMetrics?: Reply | 'pending'
 }
 
 type PasskeySummary = components['schemas']['PasskeySummary']
@@ -243,6 +245,44 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
       case 'GET /api/notifications':
         return respond(
           replies.notifications ?? { status: 200, body: { items: [], unreadCount: 0 } },
+        )
+
+      case 'GET /api/metrics/summary':
+        return respond(
+          replies.metricsSummary ?? {
+            status: 200,
+            body: {
+              window: '5m',
+              submitted: 9000,
+              delivered: 8000,
+              failed: 150,
+              rejected: 50,
+              moReceived: 600,
+              e2eLatencyMsP50: 180,
+              e2eLatencyMsP99: 1240,
+              activeSessions: null,
+            },
+          },
+        )
+
+      case 'GET /api/metrics/traffic':
+        return respond(
+          replies.trafficMetrics ?? {
+            status: 200,
+            body: {
+              groupBy: 'customer',
+              window: '5m',
+              series: ['acme', 'globex'].map((key) => ({
+                key,
+                points: [0, 10, 20].map((second, index) => ({
+                  t: `2026-10-10T12:00:${String(second).padStart(2, '0')}Z`,
+                  submitted: 100 * (index + 1),
+                  delivered: 90 * (index + 1),
+                  failed: 5 * (index + 1),
+                })),
+              })),
+            },
+          },
         )
 
       case 'GET /api/auth/me':

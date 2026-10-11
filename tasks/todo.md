@@ -265,7 +265,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 - [x] step-071 — Jeton personnel pour scripts et collection : délivré sous MFA, scopes ⊆ les siens, ≤ 1 h, montré une fois, audité  *(insérée le 07/10/2026)*
 
 ## M4 — Exploitation temps réel : trafic, connecteurs, sessions  (§6.3, §6.5)
-- [ ] step-080 — Trafic : instantané REST, widgets et graphiques
+- [x] step-080 — Trafic : instantané REST, widgets et graphiques
 - [ ] step-081 — Trafic : flux WS + bascule de plage (5 min / 1 h / 24 h)
 - [ ] step-082 — Trafic : ventilations connecteur/client/compte/groupe/**catégorie** (débit, lag, attente) + drill-down CDR
 - [ ] step-083 — Connecteurs : CRUD à divulgation progressive, pool de binds, reconnexion, `priority_flag_default` et `priority_tier` en « Avancé »

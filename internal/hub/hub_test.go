@@ -26,7 +26,7 @@ func quietHub() *Hub {
 }
 
 func grantAll(context.Context) (bool, []string, error) {
-	return true, []string{"sessions:read", "billing:read"}, nil
+	return true, []string{"sessions:read", "billing:read", "traffic:read"}, nil
 }
 
 // serveOn expose h.Serve derrière un serveur de test et rend l'URL de la socket.
