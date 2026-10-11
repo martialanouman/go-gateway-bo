@@ -83,11 +83,11 @@ export function TrafficScreen() {
           <div className="traffic-tiles">
             <MetricTile label="MT / s" tone="mt" value={perSecond(summary.data.submitted)} />
             <MetricTile label="MO / s" tone="mo" value={perSecond(summary.data.moReceived)} />
-            <MetricTile label="Taux de succès" unit="%" value={successRate(summary.data)} />
-            <MetricTile label="Latence p50" value={latency(summary.data.e2eLatencyMsP50)} />
-            <MetricTile label="Latence p99" value={latency(summary.data.e2eLatencyMsP99)} />
+            <MetricTile label="Succès MT" unit="%" value={successRate(summary.data)} />
+            <MetricTile label="Latence MT p50" value={latency(summary.data.e2eLatencyMsP50)} />
+            <MetricTile label="Latence MT p99" value={latency(summary.data.e2eLatencyMsP99)} />
             <MetricTile
-              label="Sessions actives"
+              label="Sessions SMPP"
               value={
                 summary.data.activeSessions === null || summary.data.activeSessions === undefined
                   ? null
@@ -137,13 +137,14 @@ export function TrafficScreen() {
                   />
                 )}
               </Card>
-              <Card subtitle={`${SUBTITLE} · hors rejets`} title="Taux d’échec">
+              <Card subtitle={`${SUBTITLE} · hors rejets`} title="Taux d’échec MT">
                 {noMt ? (
                   <EmptyState inline title={NO_MT} />
                 ) : (
                   <Chart
-                    label={`Taux d’échec par tranche, maximum ${worst.toLocaleString('fr-FR')} %`}
+                    label={`Taux d’échec MT par tranche, maximum ${worst.toLocaleString('fr-FR')} %`}
                     primary={ratios}
+                    tone="warning"
                   />
                 )}
               </Card>

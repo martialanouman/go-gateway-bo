@@ -16,6 +16,12 @@
   stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
 }
+.traffic-chart--warning .traffic-chart__area {
+  fill: color-mix(in srgb, var(--amber-500) 16%, transparent);
+}
+.traffic-chart--warning .traffic-chart__line {
+  stroke: var(--amber-500);
+}
 .traffic-chart__secondary {
   fill: none;
   stroke: var(--viz-secondary);

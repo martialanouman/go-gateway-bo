@@ -14,11 +14,13 @@ export function Chart({
   primary,
   secondary,
   height = 104,
+  tone,
 }: {
   readonly label: string
   readonly primary: readonly number[]
   readonly secondary?: readonly number[]
   readonly height?: number
+  readonly tone?: 'warning'
 }) {
   if (primary.length < 2) return <div aria-label={label} role="img" style={{ height }} />
   const peak = Math.max(...primary, ...(secondary ?? []))
@@ -28,7 +30,7 @@ export function Chart({
     <div aria-label={label} role="img" style={{ height }}>
       <svg
         aria-hidden="true"
-        className="traffic-chart"
+        className={tone ? `traffic-chart traffic-chart--${tone}` : 'traffic-chart'}
         preserveAspectRatio="none"
         viewBox="0 0 100 100"
       >

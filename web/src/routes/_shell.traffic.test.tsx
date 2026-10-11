@@ -62,7 +62,7 @@ describe('the traffic screen', () => {
     ).toBeVisible()
     expect(screen.getByText('Soumis')).toBeVisible()
     expect(screen.getByText('Remis')).toBeVisible()
-    expect(screen.getByRole('img', { name: /Taux d’échec/ })).toBeVisible()
+    expect(screen.getByRole('img', { name: /Taux d’échec MT/ })).toBeVisible()
     expect(
       screen.getByRole('img', { name: 'Débit MO, pic de 120 par tranche, dernière tranche 120' }),
     ).toBeVisible()
@@ -91,7 +91,7 @@ describe('the traffic screen', () => {
     const mt = await screen.findByRole('region', { name: 'Débit MT' })
     expect(within(mt).getByText('Aucun MT soumis sur les cinq dernières minutes')).toBeVisible()
     expect(
-      within(screen.getByRole('region', { name: 'Taux d’échec' })).getByText(
+      within(screen.getByRole('region', { name: 'Taux d’échec MT' })).getByText(
         'Aucun MT soumis sur les cinq dernières minutes',
       ),
     ).toBeVisible()

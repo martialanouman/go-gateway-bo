@@ -348,8 +348,8 @@ test('the binary serves the painted shell, then the application replaces it', as
   const tile = (label: string) => page.locator('.metric-tile').filter({ hasText: label })
   await expect(tile('MT / s').locator('.metric-tile__value')).toHaveText(/^30,0$/)
   await expect(tile('MO / s').locator('.metric-tile__value')).toHaveText(/^5,0$/)
-  await expect(tile('Latence p99').locator('.metric-tile__value')).toHaveText(/^840 ms$/)
-  await expect(tile('Sessions actives').locator('.metric-tile__value')).toHaveText(/^12$/)
+  await expect(tile('Latence MT p99').locator('.metric-tile__value')).toHaveText(/^840 ms$/)
+  await expect(tile('Sessions SMPP').locator('.metric-tile__value')).toHaveText(/^12$/)
   await expect(page.getByRole('img', { name: /Débit MT/ })).toBeVisible()
   await expect(
     page.getByRole('img', { name: 'Débit MO, pic de 50 par tranche, dernière tranche 50' }),
