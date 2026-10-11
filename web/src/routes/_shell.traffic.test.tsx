@@ -129,7 +129,7 @@ describe('the traffic screen', () => {
     expect(tooltip('Taux d’échec MT')).toHaveTextContent('Échec 5,0 %')
 
     vi.spyOn(mt, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 40))
-    fireEvent.mouseMove(mt, { clientX: 50 })
+    fireEvent.mouseMove(mt, { clientX: 40 })
     expect(tooltip('Débit MT')).toHaveTextContent('Soumis 60,0 /s')
     fireEvent.mouseLeave(mt)
     expect(tooltip('Débit MT')).not.toBeInTheDocument()
