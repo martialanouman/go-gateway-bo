@@ -52,7 +52,7 @@ step-081, les ventilations et le drill-down step-082.
   n'est pas abonné. Mutation : permission retirée du `feed`.
 - **Un `null` lu comme 0, un taux faux, une série oubliée dans la somme** → unitaires TS sur les
   calculs. Mutations : `?? 0` à la place de « non mesurée » ; somme sur la première série seulement.
-- **États de l'écran** → tests de composant (chargement, erreur avec valeurs conservées, fenêtre vide, sondage et reprise).
+- **États de l'écran** → tests de composant (chargement, erreur avec valeurs conservées, échec des seules séries, fenêtre vide, sondage et reprise).
 - **Secret qui défile** → test de composant sur le style porté ; vérifié au navigateur
   (`scrollWidth ≤ clientWidth`).
 - **Chemin d'écran** → parcours e2e de la coquille étendu jusqu'à « Trafic » ; `fakegateway` sert
@@ -68,6 +68,9 @@ step-081, les ventilations et le drill-down step-082.
   zéro message soumis, les six tuiles restent (MO/s et sessions peuvent être non nuls) et l'état vide
   ne remplace que les deux graphiques. Le sondage de 10 s et la reprise après un échec sont couverts
   par un test à horloge simulée.
+- Échec des seules séries : les tuiles restent, l'erreur et « Réessayer » ne visent que la zone des
+  graphiques et ne relancent que `/metrics/traffic`. Les quatre autres différés de la revue finale
+  sont la dette 068, portée par step-081.
 - Mutations, chacune lancée dans un worktree isolé, le test nommé seul (toutes rouges) :
 
 | Mutation | Test rouge |
@@ -85,6 +88,7 @@ step-081, les ventilations et le drill-down step-082.
 | plancher d'échelle du graphique rétabli (`Math.max(..., 1)`) | `chart.test.tsx` « scales a ratio series on its own maximum instead of a floor of one » |
 | comblement des tranches retiré | `traffic.test.ts` « fills the buckets the gateway left out with zeros, at the window step » |
 | `refetchInterval` retiré | `_shell.traffic.test.tsx` « polls both endpoints every ten seconds and recovers after a failed poll » |
+| erreur plein écran quand seules les séries manquent ; « Réessayer » qui relance aussi la synthèse | `_shell.traffic.test.tsx` « keeps the tiles when only the series fail, and retries the charts alone » |
 | tuiles masquées quand rien n'est soumis | `_shell.traffic.test.tsx` « says the window is empty rather than drawing zeros » |
 
 ## Hors périmètre
