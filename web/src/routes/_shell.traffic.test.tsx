@@ -84,6 +84,33 @@ describe('the traffic screen', () => {
     expect(await screen.findByRole('button', { name: 'Réessayer' })).toBeVisible()
   })
 
+  it('keeps the tiles when only the series fail, and retries the charts alone', async () => {
+    let seriesDown = true
+    const { fetch } = await visitTraffic({
+      get trafficMetrics() {
+        return seriesDown
+          ? {
+              status: 503,
+              body: { code: 'service_unavailable', message: 'La passerelle est indisponible.' },
+            }
+          : undefined
+      },
+    })
+    expect(
+      await screen.findByText('Les graphiques du trafic n’ont pas pu être chargés'),
+    ).toBeVisible()
+    expect(screen.getByText('30,0')).toBeVisible()
+    const summaryCalls = () =>
+      fetch.mock.calls.filter(([request]) => request.url.includes('/api/metrics/summary')).length
+    const summaryCallsBeforeRetry = summaryCalls()
+
+    seriesDown = false
+    await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
+
+    expect(await screen.findByRole('img', { name: /Débit MT/ })).toBeVisible()
+    expect(summaryCalls()).toBe(summaryCallsBeforeRetry)
+  })
+
   it('reads the figures again when the retry is used', async () => {
     let gatewayDown = true
     await visitTraffic({

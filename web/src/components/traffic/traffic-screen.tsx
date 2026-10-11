@@ -37,6 +37,8 @@ export function TrafficScreen() {
     void traffic.refetch()
   }
   const failed = summary.isError ? summary : traffic.isError ? traffic : null
+  const chartsFailed = traffic.isError && traffic.data === undefined
+  const stale = summary.isError || (traffic.isError && !chartsFailed)
   const points = traffic.data === undefined ? [] : totals(traffic.data)
   const ratios = failureRatios(points)
   const peak = Math.max(0, ...points.flatMap((point) => [point.submitted, point.delivered]))
@@ -46,8 +48,8 @@ export function TrafficScreen() {
   return (
     <div className="page">
       <PageHeader title="Trafic" />
-      {summary.data === undefined || traffic.data === undefined ? (
-        failed === null ? (
+      {summary.data === undefined ? (
+        !summary.isError ? (
           <LoadingState label="Chargement du trafic…">
             <div className="traffic-tiles">
               {Array.from({ length: 6 }, (_, index) => (
@@ -59,7 +61,7 @@ export function TrafficScreen() {
           </LoadingState>
         ) : (
           <ErrorState
-            description={failed.error?.message}
+            description={summary.error?.message}
             onRetry={retry}
             title="Le trafic n’a pas pu être chargé"
             titleAs="h2"
@@ -67,11 +69,11 @@ export function TrafficScreen() {
         )
       ) : (
         <>
-          {failed === null ? null : (
+          {stale ? (
             <Banner title="Le trafic n’a pas pu être actualisé">
-              Les dernières valeurs restent affichées. {failed.error?.message}
+              Les dernières valeurs restent affichées. {failed?.error?.message}
             </Banner>
-          )}
+          ) : null}
           <div className="traffic-tiles">
             <MetricTile label="MT / s" tone="mt" value={perSecond(summary.data.submitted)} />
             <MetricTile label="MO / s" tone="mo" value={perSecond(summary.data.moReceived)} />
@@ -93,6 +95,17 @@ export function TrafficScreen() {
               title="Aucun message soumis sur les cinq dernières minutes"
               titleAs="h2"
             />
+          ) : chartsFailed ? (
+            <ErrorState
+              description={traffic.error?.message}
+              onRetry={() => void traffic.refetch()}
+              title="Les graphiques du trafic n’ont pas pu être chargés"
+              titleAs="h2"
+            />
+          ) : traffic.data === undefined ? (
+            <LoadingState label="Chargement des graphiques…">
+              <Skeleton height={140} />
+            </LoadingState>
           ) : (
             <div className="traffic-charts">
               <Card subtitle={SUBTITLE} title="Débit MT">
