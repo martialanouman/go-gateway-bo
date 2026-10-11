@@ -45,8 +45,9 @@ export function TrafficScreen() {
   const peak = Math.max(0, ...points.flatMap((point) => [point.submitted, point.delivered]))
   const last = points.at(-1)?.submitted ?? 0
   const worst = Math.round(Math.max(0, ...ratios) * 1000) / 10
-  const peakMo = Math.max(0, ...points.map((point) => point.moReceived))
-  const lastMo = points.at(-1)?.moReceived ?? 0
+  const moSeries = points.map((point) => point.moReceived)
+  const peakMo = Math.max(0, ...moSeries)
+  const lastMo = moSeries.at(-1) ?? 0
   const noMt = points.every((point) => point.submitted === 0)
   const noMo = peakMo === 0
 
@@ -132,7 +133,7 @@ export function TrafficScreen() {
                 ) : (
                   <Chart
                     label={`Débit MO, pic de ${integer.format(peakMo)} par tranche, dernière tranche ${integer.format(lastMo)}`}
-                    primary={points.map((point) => point.moReceived)}
+                    primary={moSeries}
                   />
                 )}
               </Card>
