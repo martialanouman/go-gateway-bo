@@ -31,6 +31,17 @@ MO par tranche au contrat. La 7.7.0 (go-gateway#302) ajoute `mo_received` à cha
   synthèse (`MetricsSummary`) et les séries (`Traffic`) lisent toutes deux la CDR, qui ne reçoit
   qu'une ligne par MO **routé** (go-gateway#302) — la tuile MO/s et la courbe comptent la même
   population, aucune mention n'est due.
+- **Les libellés nomment le flux (arbitré avec l'utilisateur)** : taux de succès, latences et taux
+  d'échec ne portent que sur le MT (`direction = 'mt'` dans les requêtes de go-gateway) ; ils
+  deviennent « Succès MT », « Latence MT p50/p99 », « Taux d'échec MT ». « Sessions actives » devient
+  « Sessions SMPP » : un bind porte les deux directions. Pas de tuile d'échec : la spec n'en liste
+  pas, et une septième casserait la grille.
+- **Taux d'échec en ambre** (`--amber-500`, aire à 16 %), comme le graphique « Taux d'erreur » de la
+  maquette du kit : l'ambre est l'état dégradé de la charte, le rouge reste aux états critiques.
+- **Valeur courante et pic dans l'en-tête de chaque graphique** (arbitré avec l'utilisateur) : sans
+  axe, chaque courbe est mise à l'échelle de son propre maximum, et un pic à 3 % se dessine comme un
+  pic à 30 %. Débits en messages par seconde, comme les tuiles ; le libellé accessible lit les mêmes
+  chaînes. Absente d'une carte vide.
 - **`totals`** somme `moReceived` sur toutes les séries et comble les tranches vides par 0, comme
   pour le MT.
 - **Hors périmètre** : le compteur temps réel `mo_received_total` du flux (`stream-metrics`) — il
@@ -52,8 +63,8 @@ MO par tranche au contrat. La 7.7.0 (go-gateway#302) ajoute `mo_received` à cha
 ## Vérifié
 - `make check` vert, parcours e2e vert (11/10/2026).
 - Au navigateur, binaire local et trafic généré : les trois cartes à 3 × 261 px (1100 px) et
-  3 × 375 px (1440 px), chacune sous sa tuile à 1100 px. Critère 4 : la grille de trois colonnes
-  n'est tenue par aucun test — vérifiée ici.
+  3 × 375 px (1440 px), chacune sous sa tuile à 1100 px. Critère 4 : la grille de trois colonnes et
+  la teinte ambre du taux d'échec ne sont tenues par aucun test — vérifiées ici.
 - Le libellé accessible et la courbe MO lisent une seule série (`moSeries`) : la mutation « courbe sur
   `submitted` » restait verte tant que le libellé était calculé à part.
 - Mutations, le test nommé seul, l'arbre restauré entre chacune (toutes rouges) :
@@ -65,6 +76,10 @@ MO par tranche au contrat. La 7.7.0 (go-gateway#302) ajoute `mo_received` à cha
 | « Débit MO » masqué quand rien n'est soumis | `_shell.traffic.test.tsx` « says each chart is empty rather than drawing zeros, and keeps the MO flowing without MT » |
 | état vide MO retiré | `_shell.traffic.test.tsx` « says the MO chart is empty when no MO was received » |
 | état vide MT retiré | `_shell.traffic.test.tsx` « says each chart is empty rather than drawing zeros, and keeps the MO flowing without MT » |
+| pic lu sur la dernière tranche | `_shell.traffic.test.tsx` « shows the figures of the last five minutes » |
+| dernière valeur lue sur la première tranche | `_shell.traffic.test.tsx` « shows the figures of the last five minutes » |
+| `bucketRate` rend un compte par tranche au lieu d'un débit par seconde | `_shell.traffic.test.tsx` « shows the figures of the last five minutes » |
+| lecture affichée sur la carte MT vide | `_shell.traffic.test.tsx` « says each chart is empty rather than drawing zeros, and keeps the MO flowing without MT » |
 | relais sans `MoReceived` (`internal/bff/metrics.go`) | e2e `shell.spec.ts` (« Débit MO, pic de 50… » introuvable) ; le scénario godog reste vert, il ne juge que la conformité |
 
 ## Hors périmètre
