@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAppRouter } from '~/router'
@@ -17,6 +17,25 @@ const EMPTY_SUMMARY = {
   e2eLatencyMsP50: null,
   e2eLatencyMsP99: null,
   activeSessions: null,
+}
+
+function seriesOf(counts: { submitted: number; moReceived: number }) {
+  return {
+    groupBy: 'customer',
+    window: '5m',
+    series: [
+      {
+        key: 'acme',
+        points: [0, 10].map((second) => ({
+          t: `2026-10-10T12:00:${String(second).padStart(2, '0')}Z`,
+          submitted: counts.submitted,
+          delivered: counts.submitted,
+          failed: 0,
+          moReceived: counts.moReceived,
+        })),
+      },
+    ],
+  }
 }
 
 async function visitTraffic(replies: AuthReplies = {}) {
@@ -38,12 +57,21 @@ describe('the traffic screen', () => {
     expect(screen.getByText('non mesurée')).toBeVisible()
     expect(
       await screen.findByRole('img', {
-        name: 'Débit MT, soumis et remis, pic de 600 par tranche, dernière tranche 600',
+        name: 'Débit MT, soumis et remis : 40,0 par seconde à la dernière tranche, pic 60,0',
       }),
     ).toBeVisible()
     expect(screen.getByText('Soumis')).toBeVisible()
     expect(screen.getByText('Remis')).toBeVisible()
-    expect(screen.getByRole('img', { name: /Taux d’échec/ })).toBeVisible()
+    expect(
+      screen.getByRole('img', {
+        name: 'Taux d’échec MT : 5,0 % à la dernière tranche, pic 10,0 %',
+      }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('img', {
+        name: 'Débit MO : 8,0 par seconde à la dernière tranche, pic 12,0',
+      }),
+    ).toBeVisible()
   })
 
   it('asks the gateway for the five-minute window, per customer', async () => {
@@ -61,17 +89,60 @@ describe('the traffic screen', () => {
     ).toBe(true)
   })
 
-  it('says the window is empty rather than drawing zeros', async () => {
+  it('says each chart is empty rather than drawing zeros, and keeps the MO flowing without MT', async () => {
     await visitTraffic({
       metricsSummary: { status: 200, body: { ...EMPTY_SUMMARY, moReceived: 6000 } },
+      trafficMetrics: { status: 200, body: seriesOf({ submitted: 0, moReceived: 200 }) },
     })
+    const mt = await screen.findByRole('region', { name: 'Débit MT' })
+    expect(within(mt).getByText('Aucun MT soumis sur les cinq dernières minutes')).toBeVisible()
     expect(
-      await screen.findByText('Aucun message soumis sur les cinq dernières minutes'),
+      within(screen.getByRole('region', { name: 'Taux d’échec MT' })).getByText(
+        'Aucun MT soumis sur les cinq dernières minutes',
+      ),
     ).toBeVisible()
-    expect(screen.getByText('MO / s')).toBeVisible()
-    expect(screen.getByText('20,0')).toBeVisible()
     expect(screen.queryByRole('img', { name: /Débit MT/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /Taux d’échec/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /^Débit MO : 20,0 par seconde/ })).toBeVisible()
+    expect(screen.getByText('20,0')).toBeVisible()
+  })
+
+  it('reads one bucket in a tooltip, from the keyboard and from the pointer', async () => {
+    await visitTraffic()
+    const tooltip = (title: string) =>
+      within(screen.getByRole('region', { name: title })).queryByRole('status')
+    const mt = await screen.findByRole('img', { name: /^Débit MT/ })
+
+    act(() => mt.focus())
+    expect(tooltip('Débit MT')).toHaveTextContent('Soumis 40,0 /sRemis 36,0 /s')
+    await userEvent.keyboard('{ArrowLeft}')
+    expect(tooltip('Débit MT')).toHaveTextContent('Soumis 60,0 /sRemis 54,0 /s')
+    await userEvent.keyboard('{Home}')
+    expect(tooltip('Débit MT')).toHaveTextContent('Soumis 20,0 /s')
+    await userEvent.keyboard('{Escape}')
+    expect(tooltip('Débit MT')).not.toBeInTheDocument()
+
+    act(() => screen.getByRole('img', { name: /^Débit MO/ }).focus())
+    expect(tooltip('Débit MO')).toHaveTextContent('Reçus 8,0 /s')
+    act(() => screen.getByRole('img', { name: /^Taux d’échec MT/ }).focus())
+    expect(tooltip('Débit MO')).not.toBeInTheDocument()
+    expect(tooltip('Taux d’échec MT')).toHaveTextContent('Échec 5,0 %')
+
+    vi.spyOn(mt, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 40))
+    fireEvent.mouseMove(mt, { clientX: 40 })
+    expect(tooltip('Débit MT')).toHaveTextContent('Soumis 60,0 /s')
+    fireEvent.mouseLeave(mt)
+    expect(tooltip('Débit MT')).not.toBeInTheDocument()
+  })
+
+  it('says the MO chart is empty when no MO was received', async () => {
+    await visitTraffic({
+      trafficMetrics: { status: 200, body: seriesOf({ submitted: 300, moReceived: 0 }) },
+    })
+    const mo = await screen.findByRole('region', { name: 'Débit MO' })
+    expect(within(mo).getByText('Aucun MO reçu sur les cinq dernières minutes')).toBeVisible()
+    expect(screen.queryByRole('img', { name: /Débit MO/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Débit MT/ })).toBeVisible()
   })
 
   it('names the failure and offers a retry when the gateway is unavailable', async () => {

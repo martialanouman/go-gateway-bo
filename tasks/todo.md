@@ -62,7 +62,7 @@ Versions Go relevées sur `proxy.golang.org` le 01/08/2026 ; versions JS telles 
 | État serveur | `@tanstack/react-query` | 5.101.4 |
 | Primitives UI | `@base-ui/react` | 1.6.0 |
 | Client HTTP typé | `openapi-fetch` | 0.17.0 |
-| Contrat API | `@martialanouman/gateway-api-contracts` | **7.3.0** |
+| Contrat API | `@martialanouman/gateway-api-contracts` | **7.7.0** |
 | Mock d'API | `@stoplight/prism-cli` | 5.16.0 |
 | Tests client | Vitest + Playwright | 4.1.10 / 1.62.0 |
 | Langage client | TypeScript, `strict` | 7.0.2 |
@@ -266,6 +266,7 @@ la règle de la charte : un contrôle interdit est désactivé et expliqué, jam
 
 ## M4 — Exploitation temps réel : trafic, connecteurs, sessions  (§6.3, §6.5)
 - [x] step-080 — Trafic : instantané REST, widgets et graphiques
+- [x] step-087 — Trafic : débit MO par tranche (contrat 7.7.0)  *(insérée le 11/10/2026)*
 - [ ] step-081 — Trafic : flux WS + bascule de plage (5 min / 1 h / 24 h)
 - [ ] step-082 — Trafic : ventilations connecteur/client/compte/groupe/**catégorie** (débit, lag, attente) + drill-down CDR
 - [ ] step-083 — Connecteurs : CRUD à divulgation progressive, pool de binds, reconnexion, `priority_flag_default` et `priority_tier` en « Avancé »

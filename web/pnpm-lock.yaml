@@ -34,8 +34,8 @@ importers:
         specifier: ^5.9.1
         version: 5.9.1(@standard-schema/spec@1.1.0)(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(fp-ts@2.16.11)(io-ts@2.2.22(fp-ts@2.16.11))(react-hook-form@7.88.0(react@19.2.8))(zod@4.6.5)
       '@martialanouman/gateway-api-contracts':
-        specifier: 7.3.0
-        version: 7.3.0
+        specifier: 7.7.0
+        version: 7.7.0
       '@simplewebauthn/browser':
         specifier: 13.3.0
         version: 13.3.0
@@ -650,8 +650,8 @@ packages:
     peerDependencies:
       jsep: ^0.4.0||^1.0.0
 
-  '@martialanouman/gateway-api-contracts@7.3.0':
-    resolution: {integrity: sha512-1cgXbO1uigeWY33tOZkGLXnyckfsBiCKp3hu8Ei7QiTmAK29o3tykuqN+/ujijfmTCre4N+dhFdVaiHiuZ5kZg==, tarball: https://npm.pkg.github.com/download/@martialanouman/gateway-api-contracts/7.3.0/e35e42c22cc6383752aeabbcad1f22c2e0819514}
+  '@martialanouman/gateway-api-contracts@7.7.0':
+    resolution: {integrity: sha512-0j0qKidJ/n7AQY3gnpfbJLdWJwzikSKPKpRy0W51LwzoqAl+awo0A7fjKPvEdOhG8p6JX8pewT2SGD+5zMpQxQ==, tarball: https://npm.pkg.github.com/download/@martialanouman/gateway-api-contracts/7.7.0/88786a9f6fa5b17c4b88e4823a254eaa587c1b4f}
 
   '@napi-rs/wasm-runtime@1.1.6':
     resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
@@ -3072,7 +3072,7 @@ snapshots:
     dependencies:
       jsep: 1.4.0
 
-  '@martialanouman/gateway-api-contracts@7.3.0': {}
+  '@martialanouman/gateway-api-contracts@7.7.0': {}
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:

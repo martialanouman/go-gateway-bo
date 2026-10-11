@@ -3,13 +3,27 @@ import { PageHeader } from '~/components/page-header'
 import { Banner, Card, EmptyState, ErrorState, LoadingState, Skeleton } from '~/components/ui'
 import { orRefusal } from '~/lib/administration'
 import { api } from '~/lib/api'
-import { failureRatios, latency, perSecond, successRate, totals } from '~/lib/traffic'
+import {
+  bucketRate,
+  failureRatios,
+  latency,
+  percent,
+  perSecond,
+  successRate,
+  totals,
+} from '~/lib/traffic'
 import { Chart } from './chart'
 import { MetricTile } from './metric-tile'
 
 const REFRESH_MS = 10_000
 const integer = new Intl.NumberFormat('fr-FR')
+const clock = new Intl.DateTimeFormat('fr-FR', { timeStyle: 'medium' })
 const SUBTITLE = '5 dernières minutes · tranches de 10 s'
+const NO_MT = 'Aucun MT soumis sur les cinq dernières minutes'
+
+function readout(series: readonly number[], format: (value: number) => string) {
+  return { last: format(series.at(-1) ?? 0), peak: format(Math.max(0, ...series)) }
+}
 
 export function TrafficScreen() {
   const summary = useQuery({
@@ -40,10 +54,20 @@ export function TrafficScreen() {
   const chartsFailed = traffic.isError && traffic.data === undefined
   const stale = summary.isError || (traffic.isError && !chartsFailed)
   const points = traffic.data === undefined ? [] : totals(traffic.data)
+  const window = traffic.data?.window ?? '5m'
+  const rate = (count: number) => bucketRate(count, window)
+  const mtSeries = points.map((point) => point.submitted)
+  const moSeries = points.map((point) => point.moReceived)
   const ratios = failureRatios(points)
-  const peak = Math.max(0, ...points.flatMap((point) => [point.submitted, point.delivered]))
-  const last = points.at(-1)?.submitted ?? 0
-  const worst = Math.round(Math.max(0, ...ratios) * 1000) / 10
+  const mt = readout(mtSeries, rate)
+  const mo = readout(moSeries, rate)
+  const failure = readout(ratios, percent)
+  const timeAt = (index: number) => {
+    const t = points[index]?.t
+    return t === undefined ? '' : clock.format(new Date(t))
+  }
+  const noMt = mtSeries.every((count) => count === 0)
+  const noMo = moSeries.every((count) => count === 0)
 
   return (
     <div className="page">
@@ -77,11 +101,11 @@ export function TrafficScreen() {
           <div className="traffic-tiles">
             <MetricTile label="MT / s" tone="mt" value={perSecond(summary.data.submitted)} />
             <MetricTile label="MO / s" tone="mo" value={perSecond(summary.data.moReceived)} />
-            <MetricTile label="Taux de succès" unit="%" value={successRate(summary.data)} />
-            <MetricTile label="Latence p50" value={latency(summary.data.e2eLatencyMsP50)} />
-            <MetricTile label="Latence p99" value={latency(summary.data.e2eLatencyMsP99)} />
+            <MetricTile label="Succès MT" unit="%" value={successRate(summary.data)} />
+            <MetricTile label="Latence MT p50" value={latency(summary.data.e2eLatencyMsP50)} />
+            <MetricTile label="Latence MT p99" value={latency(summary.data.e2eLatencyMsP99)} />
             <MetricTile
-              label="Sessions actives"
+              label="Sessions SMPP"
               value={
                 summary.data.activeSessions === null || summary.data.activeSessions === undefined
                   ? null
@@ -89,13 +113,7 @@ export function TrafficScreen() {
               }
             />
           </div>
-          {summary.data.submitted === 0 ? (
-            <EmptyState
-              description="Les graphiques réapparaissent au premier relevé qui suit le prochain message."
-              title="Aucun message soumis sur les cinq dernières minutes"
-              titleAs="h2"
-            />
-          ) : chartsFailed ? (
+          {chartsFailed ? (
             <ErrorState
               description={traffic.error?.message}
               onRetry={() => void traffic.refetch()}
@@ -109,21 +127,51 @@ export function TrafficScreen() {
           ) : (
             <div className="traffic-charts">
               <Card subtitle={SUBTITLE} title="Débit MT">
-                <Chart
-                  label={`Débit MT, soumis et remis, pic de ${integer.format(peak)} par tranche, dernière tranche ${integer.format(last)}`}
-                  primary={points.map((point) => point.submitted)}
-                  secondary={points.map((point) => point.delivered)}
-                />
-                <ul className="traffic-legend">
-                  <li className="traffic-legend__item traffic-legend__item--primary">Soumis</li>
-                  <li className="traffic-legend__item traffic-legend__item--secondary">Remis</li>
-                </ul>
+                {noMt ? (
+                  <EmptyState inline title={NO_MT} />
+                ) : (
+                  <>
+                    <Chart
+                      label={`Débit MT, soumis et remis : ${mt.last} par seconde à la dernière tranche, pic ${mt.peak}`}
+                      describe={(index) => [
+                        timeAt(index),
+                        `Soumis ${rate(mtSeries[index] ?? 0)} /s`,
+                        `Remis ${rate(points[index]?.delivered ?? 0)} /s`,
+                      ]}
+                      primary={mtSeries}
+                      secondary={points.map((point) => point.delivered)}
+                    />
+                    <ul className="traffic-legend">
+                      <li className="traffic-legend__item traffic-legend__item--primary">Soumis</li>
+                      <li className="traffic-legend__item traffic-legend__item--secondary">
+                        Remis
+                      </li>
+                    </ul>
+                  </>
+                )}
               </Card>
-              <Card subtitle={`${SUBTITLE} · hors rejets`} title="Taux d’échec">
-                <Chart
-                  label={`Taux d’échec par tranche, maximum ${worst.toLocaleString('fr-FR')} %`}
-                  primary={ratios}
-                />
+              <Card subtitle={SUBTITLE} title="Débit MO">
+                {noMo ? (
+                  <EmptyState inline title="Aucun MO reçu sur les cinq dernières minutes" />
+                ) : (
+                  <Chart
+                    label={`Débit MO : ${mo.last} par seconde à la dernière tranche, pic ${mo.peak}`}
+                    describe={(index) => [timeAt(index), `Reçus ${rate(moSeries[index] ?? 0)} /s`]}
+                    primary={moSeries}
+                  />
+                )}
+              </Card>
+              <Card subtitle={`${SUBTITLE} · hors rejets`} title="Taux d’échec MT">
+                {noMt ? (
+                  <EmptyState inline title={NO_MT} />
+                ) : (
+                  <Chart
+                    label={`Taux d’échec MT : ${failure.last} % à la dernière tranche, pic ${failure.peak} %`}
+                    describe={(index) => [timeAt(index), `Échec ${percent(ratios[index] ?? 0)} %`]}
+                    primary={ratios}
+                    tone="warning"
+                  />
+                )}
               </Card>
             </div>
           )}

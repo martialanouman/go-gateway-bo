@@ -100,7 +100,7 @@ func TestTheTrafficSeriesCarryThreePointsEach(t *testing.T) {
 	assert.Equal(t, "customer", body.GroupBy)
 	require.Len(t, body.Series, 2)
 	require.Len(t, body.Series[0].Points, 3)
-	assert.ElementsMatch(t, []string{"t", "submitted", "delivered", "failed"}, keysOf(body.Series[0].Points[0]))
+	assert.ElementsMatch(t, []string{"t", "submitted", "delivered", "failed", "mo_received"}, keysOf(body.Series[0].Points[0]))
 }
 
 func TestTheMetricsSummaryUsesTheUpstreamKeys(t *testing.T) {

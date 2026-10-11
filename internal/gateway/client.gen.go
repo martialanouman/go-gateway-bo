@@ -1530,6 +1530,30 @@ func (e MessageSummaryEncoding) Valid() bool {
 	}
 }
 
+// Defines values for MessageSummaryTrafficCategory.
+const (
+	MessageSummaryTrafficCategoryLessThannil   MessageSummaryTrafficCategory = "<nil>"
+	MessageSummaryTrafficCategoryMarketing     MessageSummaryTrafficCategory = "marketing"
+	MessageSummaryTrafficCategoryOtp           MessageSummaryTrafficCategory = "otp"
+	MessageSummaryTrafficCategoryTransactional MessageSummaryTrafficCategory = "transactional"
+)
+
+// Valid indicates whether the value is a known member of the MessageSummaryTrafficCategory enum.
+func (e MessageSummaryTrafficCategory) Valid() bool {
+	switch e {
+	case MessageSummaryTrafficCategoryLessThannil:
+		return true
+	case MessageSummaryTrafficCategoryMarketing:
+		return true
+	case MessageSummaryTrafficCategoryOtp:
+		return true
+	case MessageSummaryTrafficCategoryTransactional:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MessageTraceSpansStatus.
 const (
 	MessageTraceSpansStatusError MessageTraceSpansStatus = "error"
@@ -2276,19 +2300,19 @@ func (e SuppressionSource) Valid() bool {
 
 // Defines values for TrafficCategory.
 const (
-	Marketing     TrafficCategory = "marketing"
-	Otp           TrafficCategory = "otp"
-	Transactional TrafficCategory = "transactional"
+	TrafficCategoryMarketing     TrafficCategory = "marketing"
+	TrafficCategoryOtp           TrafficCategory = "otp"
+	TrafficCategoryTransactional TrafficCategory = "transactional"
 )
 
 // Valid indicates whether the value is a known member of the TrafficCategory enum.
 func (e TrafficCategory) Valid() bool {
 	switch e {
-	case Marketing:
+	case TrafficCategoryMarketing:
 		return true
-	case Otp:
+	case TrafficCategoryOtp:
 		return true
-	case Transactional:
+	case TrafficCategoryTransactional:
 		return true
 	default:
 		return false
@@ -2682,50 +2706,64 @@ type ChannelsUpdate struct {
 
 // Connector defines model for Connector.
 type Connector struct {
-	AddrNpi                *int               `json:"addr_npi,omitempty"`
-	AddrTon                *int               `json:"addr_ton,omitempty"`
-	AddressRange           *string            `json:"address_range,omitempty"`
-	AutoReconnectEnabled   bool               `json:"auto_reconnect_enabled"`
-	BindPoolSize           int                `json:"bind_pool_size"`
-	BindTimeoutMs          *int               `json:"bind_timeout_ms,omitempty"`
-	BindType               BindType           `json:"bind_type"`
-	CreatedAt              *time.Time         `json:"created_at,omitempty"`
-	DataCodingDefault      *int               `json:"data_coding_default,omitempty"`
-	DestAddrNpi            *int               `json:"dest_addr_npi,omitempty"`
-	DestAddrTon            *int               `json:"dest_addr_ton,omitempty"`
-	EnquireLinkIntervalSec *int               `json:"enquire_link_interval_sec,omitempty"`
-	EnquireLinkMaxMissed   *int               `json:"enquire_link_max_missed,omitempty"`
-	EsmClassDefault        *int               `json:"esm_class_default,omitempty"`
-	Host                   string             `json:"host"`
-	Id                     openapi_types.UUID `json:"id"`
+	AddrNpi                *int       `json:"addr_npi,omitempty"`
+	AddrTon                *int       `json:"addr_ton,omitempty"`
+	AddressRange           *string    `json:"address_range,omitempty"`
+	AutoReconnectEnabled   bool       `json:"auto_reconnect_enabled"`
+	BindPoolSize           int        `json:"bind_pool_size"`
+	BindTimeoutMs          *int       `json:"bind_timeout_ms,omitempty"`
+	BindType               BindType   `json:"bind_type"`
+	CreatedAt              *time.Time `json:"created_at,omitempty"`
+	DataCodingDefault      *int       `json:"data_coding_default,omitempty"`
+	DestAddrNpi            *int       `json:"dest_addr_npi,omitempty"`
+	DestAddrTon            *int       `json:"dest_addr_ton,omitempty"`
+	EnquireLinkIntervalSec *int       `json:"enquire_link_interval_sec,omitempty"`
+	EnquireLinkMaxMissed   *int       `json:"enquire_link_max_missed,omitempty"`
+
+	// EsmClassDefault Read-only: stored and served, but no runtime code reads it yet.
+	EsmClassDefault *int               `json:"esm_class_default,omitempty"`
+	Host            string             `json:"host"`
+	Id              openapi_types.UUID `json:"id"`
 
 	// InterfaceVersion 52 = SMPP v3.4 (0x34), 80 = v5.0 (0x50).
-	InterfaceVersion            *int                    `json:"interface_version,omitempty"`
-	Name                        string                  `json:"name"`
-	Port                        int                     `json:"port"`
-	PriorityFlagDefault         *int                    `json:"priority_flag_default,omitempty"`
-	PriorityTier                *int                    `json:"priority_tier,omitempty"`
-	ReconnectInitialDelayMs     *int                    `json:"reconnect_initial_delay_ms,omitempty"`
-	ReconnectJitterPct          *int                    `json:"reconnect_jitter_pct,omitempty"`
-	ReconnectMaxAttempts        *int                    `json:"reconnect_max_attempts,omitempty"`
-	ReconnectMaxDelayMs         *int                    `json:"reconnect_max_delay_ms,omitempty"`
-	ReconnectMultiplier         *float32                `json:"reconnect_multiplier,omitempty"`
-	RegisteredDeliveryDefault   *int                    `json:"registered_delivery_default,omitempty"`
-	ReplaceIfPresentFlagDefault *int                    `json:"replace_if_present_flag_default,omitempty"`
-	ResponseTimeoutMs           *int                    `json:"response_timeout_ms,omitempty"`
-	SmDefaultMsgId              *int                    `json:"sm_default_msg_id,omitempty"`
-	SourceAddrNpi               *int                    `json:"source_addr_npi,omitempty"`
-	SourceAddrTon               *int                    `json:"source_addr_ton,omitempty"`
-	Status                      ConnectorStatus         `json:"status"`
-	SystemId                    string                  `json:"system_id"`
-	SystemType                  *string                 `json:"system_type,omitempty"`
-	ThroughputLimitPerSec       *int                    `json:"throughput_limit_per_sec,omitempty"`
-	TlsConfigJson               *map[string]interface{} `json:"tls_config_json,omitempty"`
-	TlsEnabled                  *bool                   `json:"tls_enabled,omitempty"`
-	UpdatedAt                   *time.Time              `json:"updated_at,omitempty"`
-	ValidityPeriodDefault       *string                 `json:"validity_period_default,omitempty"`
-	VendorProfile               *string                 `json:"vendor_profile,omitempty"`
-	WindowSize                  int                     `json:"window_size"`
+	InterfaceVersion *int   `json:"interface_version,omitempty"`
+	Name             string `json:"name"`
+	Port             int    `json:"port"`
+
+	// PriorityFlagDefault SMPP priority_flag sent when the message effective priority is 0 (a marketing message).
+	PriorityFlagDefault *int `json:"priority_flag_default,omitempty"`
+
+	// PriorityTier Lowest traffic category rank this connector accepts (ADR-0020 §4): 0 accepts all, 1 transactional and otp only, 2 otp only. A connector above a message rank is skipped at route resolution, as if unavailable.
+	PriorityTier            *int     `json:"priority_tier,omitempty"`
+	ReconnectInitialDelayMs *int     `json:"reconnect_initial_delay_ms,omitempty"`
+	ReconnectJitterPct      *int     `json:"reconnect_jitter_pct,omitempty"`
+	ReconnectMaxAttempts    *int     `json:"reconnect_max_attempts,omitempty"`
+	ReconnectMaxDelayMs     *int     `json:"reconnect_max_delay_ms,omitempty"`
+	ReconnectMultiplier     *float32 `json:"reconnect_multiplier,omitempty"`
+
+	// RegisteredDeliveryDefault Read-only: stored and served, but no runtime code reads it yet.
+	RegisteredDeliveryDefault *int `json:"registered_delivery_default,omitempty"`
+
+	// ReplaceIfPresentFlagDefault Read-only: stored and served, but no runtime code reads it yet.
+	ReplaceIfPresentFlagDefault *int `json:"replace_if_present_flag_default,omitempty"`
+	ResponseTimeoutMs           *int `json:"response_timeout_ms,omitempty"`
+
+	// SmDefaultMsgId Read-only: stored and served, but no runtime code reads it yet.
+	SmDefaultMsgId        *int                    `json:"sm_default_msg_id,omitempty"`
+	SourceAddrNpi         *int                    `json:"source_addr_npi,omitempty"`
+	SourceAddrTon         *int                    `json:"source_addr_ton,omitempty"`
+	Status                ConnectorStatus         `json:"status"`
+	SystemId              string                  `json:"system_id"`
+	SystemType            *string                 `json:"system_type,omitempty"`
+	ThroughputLimitPerSec *int                    `json:"throughput_limit_per_sec,omitempty"`
+	TlsConfigJson         *map[string]interface{} `json:"tls_config_json,omitempty"`
+	TlsEnabled            *bool                   `json:"tls_enabled,omitempty"`
+	UpdatedAt             *time.Time              `json:"updated_at,omitempty"`
+
+	// ValidityPeriodDefault Read-only: stored and served, but no runtime code reads it yet.
+	ValidityPeriodDefault *string `json:"validity_period_default,omitempty"`
+	VendorProfile         *string `json:"vendor_profile,omitempty"`
+	WindowSize            int     `json:"window_size"`
 }
 
 // ConnectorStatus defines model for Connector.Status.
@@ -2742,8 +2780,13 @@ type ConnectorCreate struct {
 	Name                 string   `json:"name"`
 
 	// Password Write-only; stored sealed, never returned.
-	Password              string                  `json:"password"`
-	Port                  int                     `json:"port"`
+	Password string `json:"password"`
+	Port     int    `json:"port"`
+
+	// PriorityFlagDefault SMPP priority_flag sent when the message effective priority is 0 (a marketing message).
+	PriorityFlagDefault *int `json:"priority_flag_default,omitempty"`
+
+	// PriorityTier Lowest traffic category rank this connector accepts (ADR-0020 §4): 0 accepts all, 1 transactional and otp only, 2 otp only. A connector above a message rank is skipped at route resolution, as if unavailable.
 	PriorityTier          *int                    `json:"priority_tier,omitempty"`
 	SystemId              string                  `json:"system_id"`
 	ThroughputLimitPerSec *int                    `json:"throughput_limit_per_sec,omitempty"`
@@ -2768,12 +2811,17 @@ type ConnectorHealth struct {
 
 // ConnectorUpdate Any connector field may be updated except id. `password` is write-only.
 type ConnectorUpdate struct {
-	BindType              *BindType               `json:"bind_type,omitempty"`
-	DataCodingDefault     *int                    `json:"data_coding_default,omitempty"`
-	Host                  *string                 `json:"host,omitempty"`
-	Name                  *string                 `json:"name,omitempty"`
-	Password              *string                 `json:"password,omitempty"`
-	Port                  *int                    `json:"port,omitempty"`
+	BindType          *BindType `json:"bind_type,omitempty"`
+	DataCodingDefault *int      `json:"data_coding_default,omitempty"`
+	Host              *string   `json:"host,omitempty"`
+	Name              *string   `json:"name,omitempty"`
+	Password          *string   `json:"password,omitempty"`
+	Port              *int      `json:"port,omitempty"`
+
+	// PriorityFlagDefault Applied at the next bind; rebind-connector applies it at once.
+	PriorityFlagDefault *int `json:"priority_flag_default,omitempty"`
+
+	// PriorityTier Lowest traffic category rank this connector accepts (ADR-0020 §4): 0 accepts all, 1 transactional and otp only, 2 otp only. A connector above a message rank is skipped at route resolution, as if unavailable.
 	PriorityTier          *int                    `json:"priority_tier,omitempty"`
 	Status                *ConnectorUpdateStatus  `json:"status,omitempty"`
 	SystemId              *string                 `json:"system_id,omitempty"`
@@ -3292,6 +3340,9 @@ type MessageExportFilters struct {
 	Status  *CdrStatus          `json:"status,omitempty"`
 	ToDate  time.Time           `json:"to_date"`
 	TraceId *openapi_types.UUID `json:"traceId,omitempty"`
+
+	// TrafficCategory What the customer commits to send under a sender ID (ADR-0020). marketing is the default and the most constrained category; any other value is an explicit declaration.
+	TrafficCategory *TrafficCategory `json:"traffic_category,omitempty"`
 }
 
 // MessageExportRequest defines model for MessageExportRequest.
@@ -3322,16 +3373,25 @@ type MessageSummary struct {
 	LatencyMs          *int                    `json:"latency_ms,omitempty"`
 	MessageId          openapi_types.UUID      `json:"message_id"`
 	OriginalSourceAddr *string                 `json:"original_source_addr,omitempty"`
-	RouteId            *openapi_types.UUID     `json:"route_id,omitempty"`
-	SegmentCount       int                     `json:"segment_count"`
-	SourceAddr         string                  `json:"source_addr"`
-	Status             CdrStatus               `json:"status"`
-	SubmittedAt        time.Time               `json:"submitted_at"`
-	TraceId            openapi_types.UUID      `json:"trace_id"`
+
+	// Priority Effective priority the category allowed (ADR-0020 §2). Null when traffic_category is.
+	Priority     *int                `json:"priority,omitempty"`
+	RouteId      *openapi_types.UUID `json:"route_id,omitempty"`
+	SegmentCount int                 `json:"segment_count"`
+	SourceAddr   string              `json:"source_addr"`
+	Status       CdrStatus           `json:"status"`
+	SubmittedAt  time.Time           `json:"submitted_at"`
+	TraceId      openapi_types.UUID  `json:"trace_id"`
+
+	// TrafficCategory Category of the sender ID, read when the message was authorized (ADR-0020). Null for an MO, and for an MT rejected before its sender ID was authorized.
+	TrafficCategory *MessageSummaryTrafficCategory `json:"traffic_category,omitempty"`
 }
 
 // MessageSummaryEncoding defines model for MessageSummary.Encoding.
 type MessageSummaryEncoding string
+
+// MessageSummaryTrafficCategory Category of the sender ID, read when the message was authorized (ADR-0020). Null for an MO, and for an MT rejected before its sender ID was authorized.
+type MessageSummaryTrafficCategory string
 
 // MessageSummaryPage defines model for MessageSummaryPage.
 type MessageSummaryPage struct {
@@ -3949,10 +4009,13 @@ type TrafficMetrics struct {
 		// Key Dimension value (connector/customer/group id), or the reserved keys other and ungrouped.
 		Key    string `json:"key"`
 		Points []struct {
-			Delivered *int      `json:"delivered,omitempty"`
-			Failed    *int      `json:"failed,omitempty"`
-			Submitted *int      `json:"submitted,omitempty"`
-			T         time.Time `json:"t"`
+			Delivered *int `json:"delivered,omitempty"`
+			Failed    *int `json:"failed,omitempty"`
+
+			// MoReceived MO messages received and routed to an account in the bucket.
+			MoReceived *int      `json:"mo_received,omitempty"`
+			Submitted  *int      `json:"submitted,omitempty"`
+			T          time.Time `json:"t"`
 		} `json:"points"`
 	} `json:"series"`
 	Window string `json:"window"`
@@ -4198,9 +4261,10 @@ type SearchMessagesParams struct {
 	CustomerId *openapi_types.UUID `form:"customerId,omitempty" json:"customerId,omitempty"`
 
 	// GroupId Customers CURRENTLY in this group; membership is resolved at read time.
-	GroupId   *openapi_types.UUID `form:"groupId,omitempty" json:"groupId,omitempty"`
-	Status    *CdrStatus          `form:"status,omitempty" json:"status,omitempty"`
-	Direction *Direction          `form:"direction,omitempty" json:"direction,omitempty"`
+	GroupId         *openapi_types.UUID `form:"groupId,omitempty" json:"groupId,omitempty"`
+	Status          *CdrStatus          `form:"status,omitempty" json:"status,omitempty"`
+	Direction       *Direction          `form:"direction,omitempty" json:"direction,omitempty"`
+	TrafficCategory *TrafficCategory    `form:"traffic_category,omitempty" json:"traffic_category,omitempty"`
 
 	// Msisdn Exact E.164 match on either address. Never a prefix — that would allow enumeration.
 	Msisdn   *string   `form:"msisdn,omitempty" json:"msisdn,omitempty"`
@@ -5278,7 +5342,7 @@ type ClientInterface interface {
 
 	// GetTrafficMetrics Traffic time series grouped by dimension
 	//
-	// MT messages submitted within the window, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most submissions get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, a message never dispatched has no connector and appears in no series. 503 when the window holds more rows than a read may return.
+	// Messages within the window, MT submitted and MO received, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most messages (submitted plus mo_received) get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, an MT never dispatched has no connector and appears in no series; an MO belongs to the connector that received it. By customer and by group, an MO belongs to the customer of the account it was routed to. An unrouted MO has no account and appears in no series (see list-unrouted-mo). 503 when the window holds more rows than a read may return.
 	//
 	// Corresponds with GET /admin/metrics/traffic (the `GetTrafficMetrics` operationId).
 	GetTrafficMetrics(ctx context.Context, params *GetTrafficMetricsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7622,7 +7686,7 @@ func (c *Client) GetMetricsSummary(ctx context.Context, params *GetMetricsSummar
 
 // GetTrafficMetrics Traffic time series grouped by dimension
 //
-// MT messages submitted within the window, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most submissions get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, a message never dispatched has no connector and appears in no series. 503 when the window holds more rows than a read may return.
+// Messages within the window, MT submitted and MO received, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most messages (submitted plus mo_received) get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, an MT never dispatched has no connector and appears in no series; an MO belongs to the connector that received it. By customer and by group, an MO belongs to the customer of the account it was routed to. An unrouted MO has no account and appears in no series (see list-unrouted-mo). 503 when the window holds more rows than a read may return.
 //
 // Corresponds with GET /admin/metrics/traffic (the `GetTrafficMetrics` operationId).
 func (c *Client) GetTrafficMetrics(ctx context.Context, params *GetTrafficMetricsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12267,6 +12331,18 @@ func NewSearchMessagesRequest(server string, params *SearchMessagesParams) (*htt
 
 		}
 
+		if params.TrafficCategory != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "traffic_category", *params.TrafficCategory, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Msisdn != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "msisdn", *params.Msisdn, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
@@ -16027,7 +16103,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetTrafficMetricsWithResponse Traffic time series grouped by dimension
 	//
-	// MT messages submitted within the window, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most submissions get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, a message never dispatched has no connector and appears in no series. 503 when the window holds more rows than a read may return.
+	// Messages within the window, MT submitted and MO received, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most messages (submitted plus mo_received) get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, an MT never dispatched has no connector and appears in no series; an MO belongs to the connector that received it. By customer and by group, an MO belongs to the customer of the account it was routed to. An unrouted MO has no account and appears in no series (see list-unrouted-mo). 503 when the window holds more rows than a read may return.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -26851,7 +26927,7 @@ func (c *ClientWithResponses) GetMetricsSummaryWithResponse(ctx context.Context,
 
 // GetTrafficMetricsWithResponse Traffic time series grouped by dimension
 //
-// MT messages submitted within the window, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most submissions get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, a message never dispatched has no connector and appears in no series. 503 when the window holds more rows than a read may return.
+// Messages within the window, MT submitted and MO received, bucketed every 10s (5m), 30s (15m) or minute (30m, 1h), with the same cohort semantics and the same window end as get-metrics-summary. Only 5m, 15m, 30m and 1h are served; any other window is refused with 422. The 20 keys with the most messages (submitted plus mo_received) get their own series, the rest is summed under the key `other`. By group, the membership is the CURRENT one and customers outside any group, or deleted since, fall under `ungrouped`. By connector, an MT never dispatched has no connector and appears in no series; an MO belongs to the connector that received it. By customer and by group, an MO belongs to the customer of the account it was routed to. An unrouted MO has no account and appears in no series (see list-unrouted-mo). 503 when the window holds more rows than a read may return.
 //
 // Returns a wrapper object for the known response body format(s).
 //

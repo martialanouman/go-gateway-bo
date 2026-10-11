@@ -34,7 +34,7 @@ describe('traffic primitives', () => {
   })
 
   it('says unmeasured instead of zero', () => {
-    render(<MetricTile label="Sessions actives" value={null} />)
+    render(<MetricTile label="Sessions SMPP" value={null} />)
     expect(screen.getByText('non mesurée')).toBeVisible()
     expect(screen.queryByText('0')).toBeNull()
   })

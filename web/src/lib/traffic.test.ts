@@ -41,37 +41,39 @@ describe('traffic figures', () => {
         {
           key: 'a',
           points: [
-            { t: '2026-10-10T10:00:10Z', submitted: 3, delivered: 2, failed: 1 },
-            { t: '2026-10-10T10:00:00Z', submitted: 1, delivered: 1, failed: 0 },
+            { t: '2026-10-10T10:00:10Z', submitted: 3, delivered: 2, failed: 1, moReceived: 2 },
+            { t: '2026-10-10T10:00:00Z', submitted: 1, delivered: 1, failed: 0, moReceived: 0 },
           ],
         },
         {
           key: 'other',
-          points: [{ t: '2026-10-10T10:00:10Z', submitted: 5, delivered: 4, failed: 0 }],
+          points: [
+            { t: '2026-10-10T10:00:10Z', submitted: 5, delivered: 4, failed: 0, moReceived: 7 },
+          ],
         },
       ],
     })
     expect(points).toEqual([
-      { t: '2026-10-10T10:00:00Z', submitted: 1, delivered: 1, failed: 0 },
-      { t: '2026-10-10T10:00:10Z', submitted: 8, delivered: 6, failed: 1 },
+      { t: '2026-10-10T10:00:00Z', submitted: 1, delivered: 1, failed: 0, moReceived: 0 },
+      { t: '2026-10-10T10:00:10Z', submitted: 8, delivered: 6, failed: 1, moReceived: 9 },
     ])
     expect(failureRatios(points)).toEqual([0, 0.125])
   })
 
   it('fills the buckets the gateway left out with zeros, at the window step', () => {
-    const point = (t: string) => ({ t, submitted: 4, delivered: 3, failed: 1 })
+    const point = (t: string) => ({ t, submitted: 4, delivered: 3, failed: 1, moReceived: 2 })
     const filled = (window: string, times: string[]) =>
       totals({
         groupBy: 'customer',
         window,
         series: [{ key: 'a', points: times.map(point) }],
-      }).map(({ t, submitted }) => [t, submitted])
+      }).map(({ t, submitted, moReceived }) => [t, submitted, moReceived])
 
     expect(filled('5m', ['2026-10-10T10:00:00Z', '2026-10-10T10:00:30Z'])).toEqual([
-      ['2026-10-10T10:00:00Z', 4],
-      ['2026-10-10T10:00:10Z', 0],
-      ['2026-10-10T10:00:20Z', 0],
-      ['2026-10-10T10:00:30Z', 4],
+      ['2026-10-10T10:00:00Z', 4, 2],
+      ['2026-10-10T10:00:10Z', 0, 0],
+      ['2026-10-10T10:00:20Z', 0, 0],
+      ['2026-10-10T10:00:30Z', 4, 2],
     ])
     expect(filled('15m', ['2026-10-10T10:00:00Z', '2026-10-10T10:01:30Z'])).toHaveLength(4)
     expect(filled('1h', ['2026-10-10T10:00:00Z', '2026-10-10T10:03:00Z'])).toHaveLength(4)
@@ -80,7 +82,9 @@ describe('traffic figures', () => {
 
   it('has no failure ratio for a bucket without messages', () => {
     expect(
-      failureRatios([{ t: '2026-10-10T10:00:00Z', submitted: 0, delivered: 0, failed: 0 }]),
+      failureRatios([
+        { t: '2026-10-10T10:00:00Z', submitted: 0, delivered: 0, failed: 0, moReceived: 0 },
+      ]),
     ).toEqual([0])
   })
 })

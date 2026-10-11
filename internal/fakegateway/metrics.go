@@ -12,10 +12,11 @@ const (
 )
 
 type trafficPoint struct {
-	T         time.Time `json:"t"`
-	Submitted int       `json:"submitted"`
-	Delivered int       `json:"delivered"`
-	Failed    int       `json:"failed"`
+	T          time.Time `json:"t"`
+	Submitted  int       `json:"submitted"`
+	Delivered  int       `json:"delivered"`
+	Failed     int       `json:"failed"`
+	MoReceived int       `json:"mo_received"`
 }
 
 type trafficSeries struct {
@@ -47,10 +48,11 @@ func ServeTrafficMetrics(w http.ResponseWriter, r *http.Request) {
 	points := make([]trafficPoint, 3)
 	for i := range points {
 		points[i] = trafficPoint{
-			T:         end.Add(time.Duration(i-2) * 10 * time.Second),
-			Submitted: 300 + 10*i,
-			Delivered: 290 + 10*i,
-			Failed:    10,
+			T:          end.Add(time.Duration(i-2) * 10 * time.Second),
+			Submitted:  300 + 10*i,
+			Delivered:  290 + 10*i,
+			Failed:     10,
+			MoReceived: 25,
 		}
 	}
 
