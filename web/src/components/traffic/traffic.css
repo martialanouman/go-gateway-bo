@@ -84,11 +84,32 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-7);
 }
-.traffic-readout {
-  margin: 0;
-  color: var(--text-primary);
+.traffic-chart-frame {
+  position: relative;
+}
+.traffic-chart-frame__plot {
+  height: 100%;
+  border-radius: var(--radius-control);
+}
+.traffic-chart__guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-strong);
+  pointer-events: none;
+}
+.traffic-tooltip {
+  position: absolute;
+  top: var(--sp-3);
+  z-index: 1;
+  margin-left: var(--sp-4);
   font: var(--text-data);
   white-space: nowrap;
+  pointer-events: none;
+}
+.traffic-tooltip--before {
+  transform: translateX(calc(-100% - 2 * var(--sp-4)));
 }
 .traffic-legend {
   display: flex;

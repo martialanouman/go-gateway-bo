@@ -1,5 +1,5 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAppRouter } from '~/router'
@@ -72,11 +72,6 @@ describe('the traffic screen', () => {
         name: 'Débit MO : 8,0 par seconde à la dernière tranche, pic 12,0',
       }),
     ).toBeVisible()
-    const readout = (title: string) =>
-      within(screen.getByRole('region', { name: title })).getByText(/· pic/).textContent
-    expect(readout('Débit MT')).toBe('40,0 /s · pic 60,0 /s')
-    expect(readout('Débit MO')).toBe('8,0 /s · pic 12,0 /s')
-    expect(readout('Taux d’échec MT')).toBe('5,0 % · pic 10,0 %')
   })
 
   it('asks the gateway for the five-minute window, per customer', async () => {
@@ -109,10 +104,35 @@ describe('the traffic screen', () => {
     expect(screen.queryByRole('img', { name: /Débit MT/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /Taux d’échec/ })).not.toBeInTheDocument()
     expect(screen.getByRole('img', { name: /^Débit MO : 20,0 par seconde/ })).toBeVisible()
-    expect(
-      within(screen.getByRole('region', { name: 'Débit MT' })).queryByText(/· pic/),
-    ).not.toBeInTheDocument()
     expect(screen.getByText('20,0')).toBeVisible()
+  })
+
+  it('reads one bucket in a tooltip, from the keyboard and from the pointer', async () => {
+    await visitTraffic()
+    const tooltip = (title: string) =>
+      within(screen.getByRole('region', { name: title })).queryByRole('status')
+    const mt = await screen.findByRole('img', { name: /^Débit MT/ })
+
+    act(() => mt.focus())
+    expect(tooltip('Débit MT')).toHaveTextContent('Soumis 40,0 /sRemis 36,0 /s')
+    await userEvent.keyboard('{ArrowLeft}')
+    expect(tooltip('Débit MT')).toHaveTextContent('Soumis 60,0 /sRemis 54,0 /s')
+    await userEvent.keyboard('{Home}')
+    expect(tooltip('Débit MT')).toHaveTextContent('Soumis 20,0 /s')
+    await userEvent.keyboard('{Escape}')
+    expect(tooltip('Débit MT')).not.toBeInTheDocument()
+
+    act(() => screen.getByRole('img', { name: /^Débit MO/ }).focus())
+    expect(tooltip('Débit MO')).toHaveTextContent('Reçus 8,0 /s')
+    act(() => screen.getByRole('img', { name: /^Taux d’échec MT/ }).focus())
+    expect(tooltip('Débit MO')).not.toBeInTheDocument()
+    expect(tooltip('Taux d’échec MT')).toHaveTextContent('Échec 5,0 %')
+
+    vi.spyOn(mt, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 40))
+    fireEvent.mouseMove(mt, { clientX: 50 })
+    expect(tooltip('Débit MT')).toHaveTextContent('Soumis 60,0 /s')
+    fireEvent.mouseLeave(mt)
+    expect(tooltip('Débit MT')).not.toBeInTheDocument()
   })
 
   it('says the MO chart is empty when no MO was received', async () => {

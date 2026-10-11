@@ -17,21 +17,12 @@ import { MetricTile } from './metric-tile'
 
 const REFRESH_MS = 10_000
 const integer = new Intl.NumberFormat('fr-FR')
+const clock = new Intl.DateTimeFormat('fr-FR', { timeStyle: 'medium' })
 const SUBTITLE = '5 dernières minutes · tranches de 10 s'
 const NO_MT = 'Aucun MT soumis sur les cinq dernières minutes'
 
 function readout(series: readonly number[], format: (value: number) => string) {
   return { last: format(series.at(-1) ?? 0), peak: format(Math.max(0, ...series)) }
-}
-
-function Readout({ last, peak, unit }: { last: string; peak: string; unit: string }) {
-  return (
-    <p className="traffic-readout">
-      {last}
-      {unit} · pic {peak}
-      {unit}
-    </p>
-  )
 }
 
 export function TrafficScreen() {
@@ -71,6 +62,10 @@ export function TrafficScreen() {
   const mt = readout(mtSeries, rate)
   const mo = readout(moSeries, rate)
   const failure = readout(ratios, percent)
+  const timeAt = (index: number) => {
+    const t = points[index]?.t
+    return t === undefined ? '' : clock.format(new Date(t))
+  }
   const noMt = mtSeries.every((count) => count === 0)
   const noMo = moSeries.every((count) => count === 0)
 
@@ -131,17 +126,18 @@ export function TrafficScreen() {
             </LoadingState>
           ) : (
             <div className="traffic-charts">
-              <Card
-                actions={noMt ? undefined : <Readout {...mt} unit=" /s" />}
-                subtitle={SUBTITLE}
-                title="Débit MT"
-              >
+              <Card subtitle={SUBTITLE} title="Débit MT">
                 {noMt ? (
                   <EmptyState inline title={NO_MT} />
                 ) : (
                   <>
                     <Chart
                       label={`Débit MT, soumis et remis : ${mt.last} par seconde à la dernière tranche, pic ${mt.peak}`}
+                      describe={(index) => [
+                        timeAt(index),
+                        `Soumis ${rate(mtSeries[index] ?? 0)} /s`,
+                        `Remis ${rate(points[index]?.delivered ?? 0)} /s`,
+                      ]}
                       primary={mtSeries}
                       secondary={points.map((point) => point.delivered)}
                     />
@@ -154,30 +150,24 @@ export function TrafficScreen() {
                   </>
                 )}
               </Card>
-              <Card
-                actions={noMo ? undefined : <Readout {...mo} unit=" /s" />}
-                subtitle={SUBTITLE}
-                title="Débit MO"
-              >
+              <Card subtitle={SUBTITLE} title="Débit MO">
                 {noMo ? (
                   <EmptyState inline title="Aucun MO reçu sur les cinq dernières minutes" />
                 ) : (
                   <Chart
                     label={`Débit MO : ${mo.last} par seconde à la dernière tranche, pic ${mo.peak}`}
+                    describe={(index) => [timeAt(index), `Reçus ${rate(moSeries[index] ?? 0)} /s`]}
                     primary={moSeries}
                   />
                 )}
               </Card>
-              <Card
-                actions={noMt ? undefined : <Readout {...failure} unit=" %" />}
-                subtitle={`${SUBTITLE} · hors rejets`}
-                title="Taux d’échec MT"
-              >
+              <Card subtitle={`${SUBTITLE} · hors rejets`} title="Taux d’échec MT">
                 {noMt ? (
                   <EmptyState inline title={NO_MT} />
                 ) : (
                   <Chart
                     label={`Taux d’échec MT : ${failure.last} % à la dernière tranche, pic ${failure.peak} %`}
+                    describe={(index) => [timeAt(index), `Échec ${percent(ratios[index] ?? 0)} %`]}
                     primary={ratios}
                     tone="warning"
                   />
