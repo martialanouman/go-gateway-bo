@@ -1,8 +1,7 @@
 # step-087 — Trafic : débit MO par tranche
 
 > **Jalon :** M4 (plan §9, spec §6.3) · **Statut :** À FAIRE · *(insérée le 11/10/2026)*
-> **Dépend de :** step-080, **contrat 7.7.0** (installable le 12/10/2026 à 13 h 42 UTC, fin de la
-> quarantaine `minimumReleaseAge`) · **Bloque :** step-081
+> **Dépend de :** step-080, **contrat 7.7.0** · **Bloque :** step-081
 
 ## But
 La spec promet des « compteurs/graphiques MT/MO » ; step-080 n'a livré que la tuile MO/s, faute de
@@ -12,9 +11,10 @@ MO par tranche au contrat. La 7.7.0 (go-gateway#302) ajoute `mo_received` à cha
 ## Décisions (11/10/2026)
 - **Relevé du contrat 7.3.0 → 7.7.0** en ouverture de step, diff du YAML relu le 11/10/2026 : rien de
   ce que le BFF consomme ne se resserre (`priority_tier` 0–2 et `priority_flag_default` ne sont lus
-  par aucun code, step-083 les prendra). Le même bump **retire l'exception épinglée**
-  `minimumReleaseAgeExclude` sur la 7.3.0 (`web/pnpm-workspace.yaml`), comme son commentaire le
-  prévoit. Aucune nouvelle exception : la step attend la fin de la quarantaine.
+  par aucun code, step-083 les prendra). Installée le 11/10/2026, avant la fin de sa quarantaine
+  (12/10 à 13 h 42 UTC), **par exception épinglée décidée par l'utilisateur**, qui remplace celle de
+  la 7.3.0 (`web/pnpm-workspace.yaml`). 136 opérations avant et après. Le client Go régénéré renomme
+  les constantes de `TrafficCategory` (`Marketing` → `TrafficCategoryMarketing`) : aucun appelant.
 - **Relais** : `TrafficPoint` du contrat du BFF gagne `moReceived` (requis, un absent lu 0 comme les
   autres compteurs de `count()`), relayé par `internal/bff/metrics.go`.
 - **Un graphique à part, « Débit MO »**, pas une troisième courbe dans « Débit MT » : à ~5 MO/s pour

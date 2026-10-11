@@ -113,9 +113,9 @@ minimumReleaseAgeStrict: true
 # valable est un correctif de sécurité qui ne peut pas attendre (`pnpm audit --fix` l'ajoute alors
 # lui-même) ; le justifier ici, avec la version.
 #
-# Exception unique, décidée par l'utilisateur le 06/10/2026 : le contrat 7.3.0 est publié par ce
-# même propriétaire depuis `go-gateway` et porte la catégorie, la limite de débit et le compteur
-# `category_mismatch` des sender IDs, sans lesquels step-067 ne se code pas. Épinglée à cette version :
-# une 7.3.1 repasse par la quarantaine. À retirer au prochain bump du contrat.
+# Exception unique, décidée par l'utilisateur le 11/10/2026 : le contrat 7.7.0 est publié par ce
+# même propriétaire depuis `go-gateway` (go-gateway#302) et porte le MO par tranche de
+# `get-traffic-metrics`, sans lequel step-087 ne se code pas. Épinglée à cette version : une 7.7.1
+# repasse par la quarantaine. Elle remplace celle de la 7.3.0. À retirer au prochain bump du contrat.
 minimumReleaseAgeExclude:
-  - '@martialanouman/gateway-api-contracts@7.3.0'
+  - '@martialanouman/gateway-api-contracts@7.7.0'
