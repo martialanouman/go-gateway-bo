@@ -352,7 +352,7 @@ test('the binary serves the painted shell, then the application replaces it', as
   await expect(tile('Sessions SMPP').locator('.metric-tile__value')).toHaveText(/^12$/)
   await expect(page.getByRole('img', { name: /Débit MT/ })).toBeVisible()
   await expect(
-    page.getByRole('img', { name: 'Débit MO, pic de 50 par tranche, dernière tranche 50' }),
+    page.getByRole('img', { name: 'Débit MO : 5,0 par seconde à la dernière tranche, pic 5,0' }),
   ).toBeVisible()
 
   // Et une entrée du rail mène à un état vide qui nomme son jalon

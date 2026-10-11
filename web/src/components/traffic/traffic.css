@@ -84,6 +84,12 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-7);
 }
+.traffic-readout {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--text-data);
+  white-space: nowrap;
+}
 .traffic-legend {
   display: flex;
   gap: var(--sp-6);

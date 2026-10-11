@@ -274,12 +274,16 @@ export function stubSession(outcome: SessionOutcome, replies: AuthReplies = {}) 
               window: '5m',
               series: ['acme', 'globex'].map((key) => ({
                 key,
-                points: [0, 10, 20].map((second, index) => ({
+                points: [
+                  { second: 0, factor: 1, failed: 5 },
+                  { second: 10, factor: 3, failed: 30 },
+                  { second: 20, factor: 2, failed: 10 },
+                ].map(({ second, factor, failed }) => ({
                   t: `2026-10-10T12:00:${String(second).padStart(2, '0')}Z`,
-                  submitted: 100 * (index + 1),
-                  delivered: 90 * (index + 1),
-                  failed: 5 * (index + 1),
-                  moReceived: 20 * (index + 1),
+                  submitted: 100 * factor,
+                  delivered: 90 * factor,
+                  failed,
+                  moReceived: 20 * factor,
                 })),
               })),
             },

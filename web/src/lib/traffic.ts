@@ -32,6 +32,14 @@ export function latency(ms: number | null) {
 
 const STEP_SECONDS: Record<string, number> = { '5m': 10, '15m': 30, '30m': 60, '1h': 60 }
 
+export function bucketRate(count: number, window: string) {
+  return oneDecimal.format(count / (STEP_SECONDS[window] ?? 1))
+}
+
+export function percent(ratio: number) {
+  return oneDecimal.format(ratio * 100)
+}
+
 function emptyBucket(t: string): TrafficPoint {
   return { t, submitted: 0, delivered: 0, failed: 0, moReceived: 0 }
 }

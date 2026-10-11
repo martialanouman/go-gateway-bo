@@ -57,15 +57,26 @@ describe('the traffic screen', () => {
     expect(screen.getByText('non mesurée')).toBeVisible()
     expect(
       await screen.findByRole('img', {
-        name: 'Débit MT, soumis et remis, pic de 600 par tranche, dernière tranche 600',
+        name: 'Débit MT, soumis et remis : 40,0 par seconde à la dernière tranche, pic 60,0',
       }),
     ).toBeVisible()
     expect(screen.getByText('Soumis')).toBeVisible()
     expect(screen.getByText('Remis')).toBeVisible()
-    expect(screen.getByRole('img', { name: /Taux d’échec MT/ })).toBeVisible()
     expect(
-      screen.getByRole('img', { name: 'Débit MO, pic de 120 par tranche, dernière tranche 120' }),
+      screen.getByRole('img', {
+        name: 'Taux d’échec MT : 5,0 % à la dernière tranche, pic 10,0 %',
+      }),
     ).toBeVisible()
+    expect(
+      screen.getByRole('img', {
+        name: 'Débit MO : 8,0 par seconde à la dernière tranche, pic 12,0',
+      }),
+    ).toBeVisible()
+    const readout = (title: string) =>
+      within(screen.getByRole('region', { name: title })).getByText(/· pic/).textContent
+    expect(readout('Débit MT')).toBe('40,0 /s · pic 60,0 /s')
+    expect(readout('Débit MO')).toBe('8,0 /s · pic 12,0 /s')
+    expect(readout('Taux d’échec MT')).toBe('5,0 % · pic 10,0 %')
   })
 
   it('asks the gateway for the five-minute window, per customer', async () => {
@@ -97,7 +108,10 @@ describe('the traffic screen', () => {
     ).toBeVisible()
     expect(screen.queryByRole('img', { name: /Débit MT/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /Taux d’échec/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /^Débit MO, pic de 200/ })).toBeVisible()
+    expect(screen.getByRole('img', { name: /^Débit MO : 20,0 par seconde/ })).toBeVisible()
+    expect(
+      within(screen.getByRole('region', { name: 'Débit MT' })).queryByText(/· pic/),
+    ).not.toBeInTheDocument()
     expect(screen.getByText('20,0')).toBeVisible()
   })
 
